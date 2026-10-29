@@ -1,0 +1,127 @@
+{
+  "schema_version": "1.0",
+  "name": "Tide & Tackle",
+  "version": 1,
+  "seeds": {
+    "primary": "#1F4E5F",
+    "secondary": "#D98E04",
+    "neutral": "#2B2B28",
+    "font_display": "Bricolage Grotesque",
+    "font_body": "Source Sans 3"
+  },
+  "light": {
+    "surface": "#F3F8FA",
+    "surface.raised": "#FBFEFF",
+    "surface.sunken": "#E7EEF1",
+    "text.primary": "#181B1C",
+    "text.secondary": "#525657",
+    "text.disabled": "#858C8F",
+    "border": "#899094",
+    "accent": "#1F4E5F",
+    "accent.contrast": "#FFFFFF",
+    "accent.soft": "#C5F0FF",
+    "secondary": "#D98E04",
+    "success": "#278733",
+    "warning": "#A36000",
+    "critical": "#B94642",
+    "info": "#0079BF",
+    "overlay": "#00000099",
+    "success.contrast": "#FFFFFF",
+    "success.soft": "#D8EFD8",
+    "warning.contrast": "#FFFFFF",
+    "warning.soft": "#F8E5CB",
+    "critical.contrast": "#FFFFFF",
+    "critical.soft": "#FFDEDB",
+    "info.contrast": "#FFFFFF",
+    "info.soft": "#D1ECFF"
+  },
+  "dark": {
+    "surface": "#0A1113",
+    "surface.raised": "#151C1F",
+    "surface.sunken": "#04080B",
+    "text.primary": "#E1E9ED",
+    "text.secondary": "#9BA7AC",
+    "text.disabled": "#5D6568",
+    "border": "#5D6568",
+    "accent": "#82ACBD",
+    "accent.contrast": "#071318",
+    "accent.soft": "#0A3341",
+    "secondary": "#D98E04",
+    "success": "#61BD67",
+    "warning": "#DA950B",
+    "critical": "#F47B74",
+    "info": "#30AFF8",
+    "overlay": "#000000B3",
+    "success.contrast": "#190E11",
+    "success.soft": "#213321",
+    "warning.contrast": "#190E11",
+    "warning.soft": "#3A2B16",
+    "critical.contrast": "#190E11",
+    "critical.soft": "#402624",
+    "info.contrast": "#190E11",
+    "info.soft": "#1A3040"
+  },
+  "scales": {
+    "primary": [
+      "#E7F8FF",
+      "#D0EDFA",
+      "#AFD9EA",
+      "#8CBDD0",
+      "#6E9DB0",
+      "#507F91",
+      "#366576",
+      "#1C4B5C",
+      "#0B3340",
+      "#001F2C"
+    ],
+    "secondary": [
+      "#FFF0CF",
+      "#FFDFA5",
+      "#FFC36D",
+      "#EFA22F",
+      "#CD8300",
+      "#AC6400",
+      "#8F4900",
+      "#732F00",
+      "#521B00",
+      "#3B0200"
+    ]
+  },
+  "typography": {
+    "font.display": "Bricolage Grotesque",
+    "font.body": "Source Sans 3",
+    "scale": {
+      "display": 34,
+      "title.large": 28,
+      "title": 22,
+      "headline": 17,
+      "body": 16,
+      "body.small": 14,
+      "label": 13,
+      "caption": 12
+    }
+  },
+  "spacing": [
+    0,
+    4,
+    8,
+    12,
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64
+  ],
+  "shape": {
+    "radius.card": "md",
+    "radius.control": "sm"
+  },
+  "motion": {
+    "fast": 120,
+    "base": 200,
+    "slow": 320
+  },
+  "signature": "Tide-table stripe under every section title"
+}

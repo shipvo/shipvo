@@ -1,0 +1,17 @@
+{
+  "app_id": "com.tideandtackle.shop",
+  "shell_version": "1.0.0",
+  "purpose": "Fishing supply shop: browse, buy, track orders",
+  "modules": [
+    "camera",
+    "push",
+    "secure_storage",
+    "maps"
+  ],
+  "permissions": [
+    {
+      "id": "camera",
+      "purpose": "Scan product barcodes"
+    }
+  ]
+}
