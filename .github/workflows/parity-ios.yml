@@ -31,7 +31,7 @@ jobs:
           xcrun simctl list devices | grep Booted
       - name: Start Appium (XCUITest)
         run: |
-          npm i -g appium@2 && appium driver install xcuitest
+          npm i -g appium@3 && appium driver install xcuitest
           nohup appium --port 4723 > appium.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:4723/status >/dev/null && break; sleep 2; done
       - name: Build our simulator
