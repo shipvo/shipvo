@@ -32,7 +32,8 @@ const state: DeviceState = {
   online: true, clipboard: "", log: [],
   ...(cfg.device ?? {}),
 };
-const log = (kind: string, detail?: unknown) => state.log.push({ at: Date.now(), kind, detail });
+// Every entry is marked simulated: a simulated fingerprint or payment is for testing and is never a real verification or money movement.
+const log = (kind: string, detail?: unknown) => state.log.push({ at: Date.now(), kind, detail, simulated: true } as any);
 const netSubs = new Set<(o: boolean) => void>(); const openSubs = new Set<(n: Notification) => void>();
 
 // ---- system sheets (plain DOM so they sit above the app and read as dialogs) ----
@@ -75,8 +76,10 @@ async function askPermission(name: "camera" | "location" | "notifications"): Pro
   state.permissions[name] = result; log("permission", { name, result }); return result;
 }
 
+const ALL_SIM = { camera: "simulated", location: "simulated", biometrics: "simulated", payments: "simulated", notifications: "simulated", share: "simulated", clipboard: "simulated", network: "simulated" } as const;
 export const device: Device = {
   kind: "simulated",
+  capabilities: () => ({ ...ALL_SIM }),
   permissions: { async get(name) { return state.permissions[name]; }, request: askPermission },
   location: {
     async current() {
@@ -115,7 +118,7 @@ export const device: Device = {
       await new Promise((r) => setTimeout(r, 300));
       const n = state.payment.nextResult;
       const r: PaymentResult = state.payment.pin && pin !== state.payment.pin ? { ok: false, reason: "declined" }
-        : n === "approve" ? { ok: true, receipt: `MP${Date.now().toString(36).toUpperCase()}` } : n === "decline" ? { ok: false, reason: "declined" } : n === "timeout" ? { ok: false, reason: "timeout" } : { ok: false, reason: "insufficient_funds" };
+        : n === "approve" ? { ok: true, receipt: `SIMULATED-${Date.now().toString(36).toUpperCase()}` } : n === "decline" ? { ok: false, reason: "declined" } : n === "timeout" ? { ok: false, reason: "timeout" } : { ok: false, reason: "insufficient_funds" };
       log("payment", { req, r }); return r;
     },
   },
@@ -156,6 +159,13 @@ g.__pnDevice = {
   set(patch: Partial<DeviceState>) { Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, camera: { ...state.camera, ...(patch.camera ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (patch.online !== undefined) netSubs.forEach((f) => f(state.online)); },
   push(n: Omit<Notification, "id">) { const id = `n${Date.now().toString(36)}`; showBanner({ id, ...n }); },
   log: () => state.log,
+  capabilities: () => device.capabilities(),
+  /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
+  reset(profile?: Partial<DeviceState>) {
+    Object.assign(state, { permissions: { camera: "undetermined", location: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
+      location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", log: [] }, profile ?? {});
+    for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
+  },
 };
 export const simState = state;
 export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });

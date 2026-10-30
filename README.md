@@ -1,13 +1,19 @@
-# PureNative: over-the-air updates for React Native apps
+# PureNative: build once, publish for people and AI agents
 
-**Ship new features, screens and fixes to native Android and iOS apps without waiting for app store review.** PureNative is an open-source React Native framework with signed over-the-air (OTA) updates, staged rollouts, automatic crash-loop rollback and a built-in admin. You can self-host it on Cloudflare.
+**One React Native app, two places it runs.** People get a native Android or iOS app from the stores, kept current with signed over-the-air updates. AI agents get the same release in a phone-sized simulator they can see and operate over MCP, with no device, including native features (camera, location, biometrics, payments, notifications). Every claim about the simulator is measured against real Android and iOS and published.
+
+Three pillars:
+
+1. **Publish.** Signed OTA updates (64 KB patches, crash-loop rollback, staged rollouts), a built-in owner admin at `/app/<id>/admin`, and a control plane you can self-host on Cloudflare.
+2. **Simulate.** `@purenative/mcp` opens any PureNative app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@purenative/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
+3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% matching controls on both platforms across two purchase flows (`docs/parity-results.md`).
 
 [![CI](https://github.com/purenativedev/purenative/actions/workflows/ci.yml/badge.svg)](https://github.com/purenativedev/purenative/actions/workflows/ci.yml)
 [![Deploy](https://github.com/purenativedev/purenative/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/purenativedev/purenative/actions/workflows/deploy-control-plane.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-![Status: early spike](https://img.shields.io/badge/status-early%20spike-orange)
+![Status: pre-launch](https://img.shields.io/badge/status-pre--launch-orange)
 
-> **Status:** early build. The current milestone is a measured spike: a sample Android app on a real low-end phone (Redmi 9A, 2 GB RAM) receiving signed updates. We publish numbers from real devices in `docs/spike-results.md` before making any speed claims.
+> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is being measured now and will be published the same way.
 
 ## Why PureNative
 
@@ -29,8 +35,9 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Staged rollouts:** cohort bands (1%, 10%, everyone) served as static signed pointers from the edge, with no device registry.
 - **Telemetry for every release:** applied, reverted, cold-start time, download size and time.
 - **Control plane on Cloudflare Workers:** KV, D1 and R2. It's self-hostable, with a Docker target planned.
-- **Admin per app** at `/app/<id>/admin`, built in like a CMS (in progress).
-- **Agent-operable apps:** a typed surface that AI agents can drive and test headlessly (planned).
+- **Admin per app** at `/app/<id>/admin`: live content, prices, offers, orders, history, publish to every phone in seconds; the same typed owner commands are available to agents with a token.
+- **Agent-operable apps:** every app exposes typed commands and a UI simulator; `@purenative/mcp` plugs both into Claude, Cursor, Claude Code or PiPilot.
+- **Simulated device:** `@purenative/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
 - **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/purenative-design`.
 
 ## How an update reaches a phone

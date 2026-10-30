@@ -18,6 +18,12 @@ let online = true; const netSubs = new Set<(o: boolean) => void>();
 
 export const device: Device = {
   kind: "native",
+  capabilities: () => ({
+    camera: MODS["expo-camera"] ? "real" : "unavailable", location: MODS["expo-location"] ? "real" : "unavailable",
+    biometrics: MODS["expo-local-authentication"] ? "real" : "unavailable", notifications: MODS["expo-notifications"] ? "real" : "unavailable",
+    clipboard: MODS["expo-clipboard"] ? "real" : "unavailable", share: "real", network: "real",
+    payments: "simulated", // sandbox provider until a gateway is configured: receipts are prefixed SANDBOX-
+  }),
   permissions: {
     async get(name) {
       if (name === "camera") { const C = opt<any>("expo-camera"); return C ? map((await C.Camera.getCameraPermissionsAsync()).status) : "denied"; }
@@ -53,7 +59,7 @@ export const device: Device = {
   },
   pay: {
     // Sandbox provider until a real mobile-money or card gateway is configured: approves PIN 1234, declines others.
-    async charge(req, pin) { await new Promise((r) => setTimeout(r, 900)); return pin === "1234" ? { ok: true, receipt: `SB${Date.now().toString(36).toUpperCase()}` } : { ok: false, reason: "declined" }; },
+    async charge(req, pin) { await new Promise((r) => setTimeout(r, 900)); return pin === "1234" ? { ok: true, receipt: `SANDBOX-${Date.now().toString(36).toUpperCase()}` } : { ok: false, reason: "declined" }; },
   },
   notifications: {
     async show(n) {
