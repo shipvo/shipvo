@@ -1,10 +1,83 @@
-# PureNative
+# PureNative: over-the-air updates for React Native apps
 
-Open-core React Native framework for shipping features, screens and add-ons to native apps over the air, with a built-in admin and an agent-operable surface.
+**Ship new features, screens and fixes to native Android and iOS apps without waiting for app store review.** PureNative is an open-source React Native framework with signed over-the-air (OTA) updates, staged rollouts, automatic crash-loop rollback and a built-in admin. You can self-host it on Cloudflare.
 
-Status: early build. The first milestone is a measured spike (sample Android app, real low-end device, published numbers in `docs/spike-results.md`).
+[![CI](https://github.com/purenativedev/purenative/actions/workflows/ci.yml/badge.svg)](https://github.com/purenativedev/purenative/actions/workflows/ci.yml)
+[![Deploy](https://github.com/purenativedev/purenative/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/purenativedev/purenative/actions/workflows/deploy-control-plane.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![Status: early spike](https://img.shields.io/badge/status-early%20spike-orange)
 
-- `packages/schema`: signed contracts (manifest, add-on, release pointer, gate report, change log, telemetry)
-- `skills/purenative-design`: design skill with runnable theme, screen and genericness checks
+> **Status:** early build. The current milestone is a measured spike: a sample Android app on a real low-end phone (Redmi 9A, 2 GB RAM) receiving signed updates. We publish numbers from real devices in `docs/spike-results.md` before making any speed claims.
 
-Framework: Apache-2.0.
+## Why PureNative
+
+Every change to a native mobile app normally means a new build, a store submission, a review, and then waiting for users to update. Many never do. PureNative separates what has to go through the store from what doesn't:
+
+| Layer | Ships through | Contains |
+| --- | --- | --- |
+| **Native shell** | App Store / Google Play | Native modules, declared permissions, the signing trust root |
+| **Core runtime** | Over the air, signed | The app's JavaScript (Hermes bytecode) |
+| **Screens and add-ons** | Over the air, signed | New screens, features and fixes built on capabilities the shell already declares |
+
+Updates are interpreted JavaScript running on native capabilities the shell declares up front. The app never asks for a permission it hasn't declared.
+
+## Features
+
+- **Signed OTA updates:** Ed25519 signatures, verified natively on the device against a public key built into the app. An update can't replace its own trust root.
+- **Integrity checks:** SHA-256 and size are verified before a bundle is staged; staging is atomic.
+- **Crash-loop protection:** a release that fails to boot 3 times is discarded automatically, and you can roll back to the previous release in one call.
+- **Staged rollouts:** cohort bands (1%, 10%, everyone) served as static signed pointers from the edge, with no device registry.
+- **Telemetry for every release:** applied, reverted, cold-start time, download size and time.
+- **Control plane on Cloudflare Workers:** KV, D1 and R2. It's self-hostable, with a Docker target planned.
+- **Admin per app** at `/app/<id>/admin`, built in like a CMS (in progress).
+- **Agent-operable apps:** a typed surface that AI agents can drive and test headlessly (planned).
+- **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/purenative-design`.
+
+## How an update reaches a phone
+
+```
+pnpm publish:ota            Build Hermes bundle → SHA-256 → sign pointer (Ed25519)
+        │
+        ▼
+Cloudflare edge             /p/{app}/{shell_major}/{band}.json   (signed envelope, ETag)
+        │                   /b/{app}/r{release}.hbc              (immutable bundle)
+        ▼
+Device runtime (Kotlin)     verify signature → download → verify hash → stage
+        │                   → reload → mark healthy → promote, or revert after 3 failed boots
+        ▼
+Telemetry                   POST /t → D1
+```
+
+## Repository layout
+
+| Path | What it is |
+| --- | --- |
+| `packages/schema` | Contracts: shell manifest, add-on manifest, release pointer, signed envelope, gate report, change log, telemetry (Zod) |
+| `packages/cli` | Ed25519 signing, hashing, publishing |
+| `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, telemetry, admin |
+| `apps/tide-and-tackle` | Sample app and native runtime module used for the spike |
+| `skills/purenative-design` | Design skill with runnable checks |
+
+## Try the sample app
+
+1. Download the latest `tide-and-tackle-shell.apk` from [Releases](https://github.com/purenativedev/purenative/releases) and install it on an Android 7+ phone.
+2. Edit `apps/tide-and-tackle/src/release.ts` and push to `main`. The `publish-ota` workflow signs and publishes the release.
+3. The app checks every 10 seconds while open, verifies the update, applies it, and logs the timings on screen.
+
+## Develop
+
+```bash
+pnpm install
+pnpm -r test
+pnpm --filter @purenative/control-plane dev
+```
+
+Requires Node 22 and pnpm 10.
+
+## Compared with other OTA tools
+
+PureNative sits alongside tools like Expo Updates (EAS Update) and self-hosted CodePush servers, which replaced Microsoft App Center CodePush after it was retired in 2025. What PureNative adds: a declared-capability shell manifest, signed add-ons, a per-app admin, cohort rollouts from static edge files, and apps that AI agents can operate.
+
+## License
+
+Framework: [Apache-2.0](LICENSE). The hosted control plane may be offered under a source-available license; self-hosting stays permitted.

@@ -5,7 +5,44 @@
   "license": "Apache-2.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "scripts": { "build": "tsc -p tsconfig.json", "test": "vitest run" },
-  "dependencies": { "zod": "^3.23.8" },
-  "devDependencies": { "typescript": "^5.6.3", "vitest": "^2.1.4", "@types/node": "^22.8.0" }
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4",
+    "@types/node": "^22.8.0"
+  },
+  "description": "PureNative contracts: shell manifest, release pointer, signed envelope, gate report, telemetry.",
+  "keywords": [
+    "react-native",
+    "expo",
+    "ota",
+    "over-the-air-updates",
+    "codepush",
+    "codepush-alternative",
+    "hot-updates",
+    "mobile-app-updates",
+    "android",
+    "ios",
+    "hermes",
+    "cloudflare-workers",
+    "self-hosted",
+    "staged-rollout",
+    "mobile-cms",
+    "ai-agents"
+  ],
+  "homepage": "https://github.com/purenativedev/purenative#readme",
+  "bugs": {
+    "url": "https://github.com/purenativedev/purenative/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/purenativedev/purenative.git",
+    "directory": "packages/schema"
+  }
 }

@@ -2,6 +2,36 @@
   "name": "purenative",
   "private": true,
   "packageManager": "pnpm@10.28.0",
-  "scripts": { "test": "pnpm -r test", "build": "pnpm -r build" },
-  "license": "Apache-2.0"
+  "scripts": {
+    "test": "pnpm -r test",
+    "build": "pnpm -r build"
+  },
+  "license": "Apache-2.0",
+  "description": "Open-source React Native framework for signed over-the-air updates, staged rollouts and crash-loop rollback.",
+  "keywords": [
+    "react-native",
+    "expo",
+    "ota",
+    "over-the-air-updates",
+    "codepush",
+    "codepush-alternative",
+    "hot-updates",
+    "mobile-app-updates",
+    "android",
+    "ios",
+    "hermes",
+    "cloudflare-workers",
+    "self-hosted",
+    "staged-rollout",
+    "mobile-cms",
+    "ai-agents"
+  ],
+  "homepage": "https://github.com/purenativedev/purenative#readme",
+  "bugs": {
+    "url": "https://github.com/purenativedev/purenative/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/purenativedev/purenative.git"
+  }
 }
