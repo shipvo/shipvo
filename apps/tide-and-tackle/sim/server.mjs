@@ -21,9 +21,10 @@ const PORT = Number(arg("port", 4545)), DIR = arg("dir", "/tmp/pn-ui"), DIST = j
 const CONTROL = (process.env.PN_CONTROL || process.env.CONTENT_FROM || "https://purenative-control.purenative.workers.dev").replace(/\/$/, "");
 async function resolveApp(spec) {
   const m = /^([a-z0-9-]+)(?:@(?:r?(\d+)|(latest)))?$/.exec(String(spec || "tide")); if (!m) throw new Error(`bad app spec "${spec}": use "tide", "tide@r13" or "tide@latest"`);
-  const [, app, rel, latest] = m;
-  if (!rel && !latest && existsSync(join(DIST, "index.html"))) return { app, url: `http://localhost:${PORT}/app/`, release: "local" };   // the local build (development)
-  if (!rel) latest = "latest";   // hosted: no local build, open the published release
+  const [, app, rel] = m;
+  const hasLocal = existsSync(join(DIST, "index.html"));
+  if (!rel && !m[3] && hasLocal) return { app, url: `http://localhost:${PORT}/app/`, release: "local" };   // the local build (development)
+  // otherwise a published release: the one asked for, or the latest (hosted: there is no local build)
   let n = rel ? Number(rel) : null;
   if (!n) { const r = await fetch(`${CONTROL}/w/${app}/releases.json`); if (!r.ok) throw new Error(`no published web artifact for ${app}`); n = (await r.json()).latest; }
   return { app, url: `${CONTROL}/w/${app}/r${n}/index.html`, release: n };
