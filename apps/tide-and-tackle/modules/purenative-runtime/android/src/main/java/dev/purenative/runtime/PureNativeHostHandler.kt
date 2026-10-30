@@ -15,11 +15,20 @@ class PureNativeHostHandler(private val ctx: Context) : ReactNativeHostHandler {
     synchronized(LOCK) {
       val s = Store(ctx)
       Store.bundleSelectedAt = s.now()
+      Store.loadsInProcess = Store.loadsInProcess + 1
+
+      val installed = s.installedBinaryVersion
+      if (s.binaryVersion != installed) {
+        val hadBundles = s.currentPath != null || s.pendingPath != null
+        s.resetForNewShell()
+        if (hadBundles) s.addEvent("shell_changed:0")
+      }
 
       val pending = s.pendingPath
       if (pending != null) {
         if (s.trialBoots >= MAX_BOOTS || !File(pending).exists()) {
           s.addEvent("crash_loop_revert:${s.pendingRelease}")
+          s.block(s.pendingRelease)
           File(pending).delete()
           s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
         } else {
@@ -36,6 +45,7 @@ class PureNativeHostHandler(private val ctx: Context) : ReactNativeHostHandler {
         s.unhealthyBoots = s.unhealthyBoots + 1
         if (s.unhealthyBoots > MAX_BOOTS) {
           s.addEvent("crash_loop_revert:${s.currentRelease}")
+          s.block(s.currentRelease)
           revertToPrevious(s)
           return selectCurrentOrEmbedded(s)
         }

@@ -10,6 +10,8 @@ import { signBytes, sha256Hex } from "@purenative/cli";
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, x, i, all) => (x.startsWith("--") ? [...a, [x.slice(2), all[i + 1]?.startsWith("--") || all[i + 1] === undefined ? "true" : all[i + 1]]] : a), []));
 const APP_ID = "tide", SHELL_MAJOR = 1;
+// A bundle needs the native code of the shell it was built against: default to the app's current version.
+const MIN_SHELL = JSON.parse(readFileSync("app.json", "utf8")).expo.version;
 const ACC = process.env.CLOUDFLARE_ACCOUNT_ID, TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const KV = process.env.PURENATIVE_KV_ID || "c0851feca4c5486d8ed844d16f0b36df";
 const SEED = process.env.PURENATIVE_SIGNING_SEED || (process.env.PURENATIVE_SIGNING_SEED_FILE && readFileSync(process.env.PURENATIVE_SIGNING_SEED_FILE, "utf8").trim());
@@ -47,7 +49,7 @@ for (const band of bands) {
   const body = JSON.stringify({
     schema_version: "1.0", app_id: APP_ID, shell_major: SHELL_MAJOR, band, release, issued_at,
     core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${APP_ID}/${name}` },
-    addons: [], screens: [], min_shell_version: args["min-shell"] || "1.0.0",
+    addons: [], screens: [], min_shell_version: args["min-shell"] || MIN_SHELL,
   });
   const envelope = JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) });
   await kvPut(`p/${APP_ID}/${SHELL_MAJOR}/${band}`, envelope, "application/json");

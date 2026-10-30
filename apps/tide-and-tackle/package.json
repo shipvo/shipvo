@@ -5,13 +5,14 @@
   "dependencies": {
     "expo": "~58.0.21",
     "expo-status-bar": "~58.0.4",
+    "expo-system-ui": "~58.0.7",
     "react": "19.3.0",
     "react-native": "0.88.1"
   },
   "devDependencies": {
+    "@purenative/cli": "workspace:*",
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3",
-    "@purenative/cli": "workspace:*"
+    "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",

@@ -44,6 +44,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="shell-${{ inputs.version || '1.0.0' }}-${{ github.run_number }}"
+          V=$(node -p "require('./apps/tide-and-tackle/app.json').expo.version")
+          TAG="shell-$V-${{ github.run_number }}"
           gh release create "$TAG" tide-and-tackle-shell.apk --title "Tide & Tackle shell $TAG" \
             --notes "Sample shell APK for the PureNative spike. Size: ${{ steps.apk.outputs.size }} bytes. Install by sideloading; updates after this arrive over the air." --prerelease

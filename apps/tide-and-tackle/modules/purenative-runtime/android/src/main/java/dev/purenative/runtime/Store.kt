@@ -26,6 +26,28 @@ internal class Store(private val ctx: Context) {
   var pendingRelease: Int get() = p.getInt("pending_release", 0); set(v) { p.edit().putInt("pending_release", v).commit() }
   var pendingPath: String? get() = p.getString("pending_path", null); set(v) { p.edit().putString("pending_path", v).commit() }
   var pendingIssuedAt: String? get() = p.getString("pending_issued_at", null); set(v) { p.edit().putString("pending_issued_at", v).commit() }
+  /** Highest release this device refused (crash-looped or rolled back). Only newer releases are fetched. */
+  var blockedRelease: Int get() = p.getInt("blocked_release", 0); set(v) { p.edit().putInt("blocked_release", v).commit() }
+  /** Shell binary the stored OTA bundles were downloaded under. */
+  var binaryVersion: String? get() = p.getString("binary_version", null); set(v) { p.edit().putString("binary_version", v).commit() }
+  fun block(release: Int) { if (release > blockedRelease) blockedRelease = release }
+
+  val installedBinaryVersion: String
+    get() = try {
+      val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+      @Suppress("DEPRECATION") val code = if (android.os.Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
+      "${pi.versionName}/$code"
+    } catch (_: Exception) { "unknown" }
+
+  /** After a shell (APK) update, bundles built for the old native code must not run. */
+  fun resetForNewShell() {
+    dir.listFiles()?.forEach { it.delete() }
+    p.edit().remove("current_release").remove("current_path").remove("previous_release").remove("previous_path")
+      .remove("pending_release").remove("pending_path").remove("pending_issued_at").remove("trial_boots")
+      .remove("unhealthy_boots").remove("first_unhealthy_at").remove("blocked_release")
+      .putString("binary_version", installedBinaryVersion).commit()
+  }
+
   var trialBoots: Int get() = p.getInt("trial_boots", 0); set(v) { p.edit().putInt("trial_boots", v).commit() }
   var unhealthyBoots: Int get() = p.getInt("unhealthy_boots", 0); set(v) { p.edit().putInt("unhealthy_boots", v).commit() }
   var firstUnhealthyAt: Long get() = p.getLong("first_unhealthy_at", 0); set(v) { p.edit().putLong("first_unhealthy_at", v).commit() }
@@ -52,6 +74,8 @@ internal class Store(private val ctx: Context) {
     /** Which release the JS that is running right now came from (set at bundle-selection time). */
     @Volatile var runningRelease: Int = 0
     @Volatile var bundleSelectedAt: Long = 0
+    /** How many times a bundle was selected in this process: 1 = cold start, more = in-process reload. */
+    @Volatile var loadsInProcess: Int = 0
   }
 
   fun now() = SystemClock.elapsedRealtime()

@@ -26,6 +26,7 @@ class PureNativeRuntimeModule : Module() {
         "cohort" to s.cohort, "band" to s.band,
         "runningRelease" to Store.runningRelease, "currentRelease" to s.currentRelease,
         "pendingRelease" to s.pendingRelease, "previousRelease" to s.previousRelease,
+        "blockedRelease" to s.blockedRelease, "shellVersion" to s.installedBinaryVersion,
         "baseUrl" to s.baseUrl, "appId" to s.appId, "shellMajor" to s.shellMajor
       )
     }
@@ -53,7 +54,8 @@ class PureNativeRuntimeModule : Module() {
         }
         s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
       }
-      mapOf("release" to Store.runningRelease, "coldStartMs" to coldStart, "sinceLoadMs" to sinceLoad, "promoted" to promoted)
+      val kind = if (Store.loadsInProcess <= 1) "cold" else "reload"
+      mapOf("release" to Store.runningRelease, "coldStartMs" to coldStart, "sinceLoadMs" to sinceLoad, "promoted" to promoted, "kind" to kind)
     }
 
     Function("consumeEvents") { Store(ctx).consumeEvents() }
@@ -64,6 +66,7 @@ class PureNativeRuntimeModule : Module() {
         s.pendingPath?.let { File(it).delete() }
         s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
         s.addEvent("rolled_back:${s.currentRelease}")
+        s.block(s.currentRelease)
         PureNativeHostHandler.revertToPrevious(s)
       }
       reloadHost()
@@ -87,7 +90,7 @@ class PureNativeRuntimeModule : Module() {
   private fun check(): Map<String, Any?> {
     val s = Store(ctx)
     require(s.baseUrl.isNotEmpty() && s.publicKey.isNotEmpty() && s.appId.isNotEmpty()) { "runtime not configured" }
-    val known = maxOf(s.currentRelease, s.pendingRelease)
+    val known = maxOf(s.currentRelease, s.pendingRelease, s.blockedRelease)
     val conn = http("${s.baseUrl}/p/${s.appId}/${s.shellMajor}/${s.band}.json", if (known > 0) "\"$known\"" else null)
     val code = conn.responseCode
     if (code == 304 || code == 404) { conn.disconnect(); return mapOf("status" to "none") }
@@ -126,6 +129,7 @@ class PureNativeRuntimeModule : Module() {
     synchronized(PureNativeHostHandler.LOCK) {
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0
+      if (s.binaryVersion == null) s.binaryVersion = s.installedBinaryVersion
       s.pendingIssuedAt = body.optString("issued_at")
     }
     return mapOf("status" to "staged", "release" to release, "bytes" to dest.length(),

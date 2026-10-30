@@ -3,13 +3,18 @@ import { requireNativeModule } from "expo-modules-core";
 export type RuntimeState = {
   cohort: number; band: "b0" | "b1" | "b2";
   runningRelease: number; currentRelease: number; pendingRelease: number; previousRelease: number;
+  blockedRelease?: number; shellVersion?: string;
   baseUrl: string; appId: string; shellMajor: number;
 };
 export type CheckResult = {
   status: "none" | "staged" | "error"; release?: number; bytes?: number; downloadMs?: number; verifyMs?: number;
   issuedAt?: string; error?: string;
 };
-export type HealthyResult = { release: number; coldStartMs: number; sinceLoadMs: number; promoted: boolean };
+export type HealthyResult = {
+  release: number; coldStartMs: number; sinceLoadMs: number; promoted: boolean;
+  /** Set by shell 1.0.1+: "cold" = first bundle load in this process, "reload" = applied without restart. */
+  kind?: "cold" | "reload";
+};
 
 type Native = {
   getState(): RuntimeState;

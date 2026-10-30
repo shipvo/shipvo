@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Runtime, type RuntimeState } from "./modules/purenative-runtime";
 import { RELEASE } from "./src/release";
 
-const T = {
-  surface: "#F3F8FA", raised: "#FBFEFF", sunken: "#E7EEF1", text: "#181B1C", text2: "#525657",
-  border: "#899094", accent: RELEASE.accent, onAccent: "#FFFFFF", soft: "#C5F0FF", secondary: "#D98E04",
-  success: "#278733", critical: "#B94642",
+const LIGHT = {
+  surface: "#F3F8FA", raised: "#FBFEFF", text: "#181B1C", text2: "#525657", border: "#899094",
+  onAccent: "#FFFFFF", success: "#278733", critical: "#B94642",
+};
+const DARK: typeof LIGHT = {
+  surface: "#0A1113", raised: "#151C1F", text: "#E1E9ED", text2: "#9BA7AC", border: "#5D6568",
+  onAccent: "#FFFFFF", success: "#61BD67", critical: "#F47B74",
 };
 const POLL_MS = 10_000;
 
@@ -24,6 +27,8 @@ async function report(state: RuntimeState, event: string, extra: Record<string, 
 }
 
 export default function App() {
+  const T = useColorScheme() === "dark" ? DARK : LIGHT;
+  const s = styles(T);
   const [state, setState] = useState<RuntimeState | null>(null);
   const [cold, setCold] = useState<number | null>(null);
   const [applyMs, setApplyMs] = useState<number | null>(null);
@@ -37,7 +42,7 @@ export default function App() {
     const s = Runtime.getState();
     // After an over-the-air apply the JS reloads inside the running process, so "since process start" is not a
     // cold start. Treat it as a reload when the bundle was selected well after the process started.
-    const isReload = h.sinceLoadMs >= 0 && h.coldStartMs - h.sinceLoadMs > 2000;
+    const isReload = h.kind ? h.kind === "reload" : h.sinceLoadMs >= 0 && h.coldStartMs - h.sinceLoadMs > 2000;
     setState(s); setCold(isReload ? null : h.coldStartMs); setApplyMs(isReload ? h.sinceLoadMs : null);
     const events = Runtime.consumeEvents();
     events.forEach((e) => add(e.replace(":", " release ")));
@@ -70,27 +75,29 @@ export default function App() {
 
   return (
     <ScrollView style={{ backgroundColor: T.surface }} contentContainerStyle={s.page}>
-      <StatusBar style="dark" />
+      <StatusBar style={T === DARK ? "light" : "dark"} />
       <Text style={s.brand}>Tide & Tackle</Text>
-      <View style={[s.hero, { backgroundColor: T.accent }]}>
+      <View style={[s.hero, { backgroundColor: RELEASE.accent }]}>
         <Text style={s.display} accessibilityRole="header">{RELEASE.headline}</Text>
         <Text style={s.heroNote}>{RELEASE.note}</Text>
       </View>
 
       <View style={s.card}>
         <Text style={s.title}>Spike read-out</Text>
-        <Row k="Running release" v={String(state?.runningRelease ?? "…")} />
-        <Row k="Last good / previous" v={state ? `${state.currentRelease} / ${state.previousRelease}` : "…"} />
+        <Row T={T} k="Running release" v={String(state?.runningRelease ?? "…")} />
+        <Row T={T} k="Last good / previous" v={state ? `${state.currentRelease} / ${state.previousRelease}` : "…"} />
         {applyMs != null
-          ? <Row k="Applied in (no restart)" v={`${applyMs} ms`} good={applyMs < 1000} />
-          : <Row k="Cold start" v={cold == null ? "…" : `${cold} ms`} good={cold != null && cold < 1000} />}
-        <Row k="Cohort / band" v={state ? `${state.cohort} / ${state.band}` : "…"} />
-        <Row k="Checks every" v={`${POLL_MS / 1000} s while open`} />
+          ? <Row T={T} k="Applied in (no restart)" v={`${applyMs} ms`} good={applyMs < 1000} />
+          : <Row T={T} k="Cold start" v={cold == null ? "…" : `${cold} ms`} good={cold != null && cold < 1000} />}
+        <Row T={T} k="Cohort / band" v={state ? `${state.cohort} / ${state.band}` : "…"} />
+        <Row T={T} k="Shell" v={state?.shellVersion ?? "1.0.0"} />
+        {!!state?.blockedRelease && <Row T={T} k="Blocked on this phone" v={`release ${state.blockedRelease} and older`} />}
+        <Row T={T} k="Checks every" v={`${POLL_MS / 1000} s while open`} />
       </View>
 
       <View style={s.actions}>
         <Pressable accessibilityRole="button" onPress={() => check(true)} disabled={busy}
-          style={({ pressed }) => [s.btn, { backgroundColor: T.accent, opacity: pressed || busy ? 0.7 : 1 }]}>
+          style={({ pressed }) => [s.btn, { backgroundColor: RELEASE.accent, opacity: pressed || busy ? 0.7 : 1 }]}>
           <Text style={s.btnText}>{busy ? "Checking…" : "Check for update now"}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={() => Runtime.rollback()}
@@ -108,7 +115,8 @@ export default function App() {
   );
 }
 
-function Row({ k, v, good }: { k: string; v: string; good?: boolean }) {
+function Row({ T, k, v, good }: { T: typeof LIGHT; k: string; v: string; good?: boolean }) {
+  const s = styles(T);
   return (
     <View style={s.row}>
       <Text style={s.muted}>{k}</Text>
@@ -117,7 +125,7 @@ function Row({ k, v, good }: { k: string; v: string; good?: boolean }) {
   );
 }
 
-const s = StyleSheet.create({
+const styles = (T: typeof LIGHT) => StyleSheet.create({
   page: { padding: 20, paddingTop: 56, gap: 16 },
   brand: { fontSize: 15, fontWeight: "700", letterSpacing: 1.5, textTransform: "uppercase", color: T.text2 },
   hero: { borderRadius: 16, padding: 24, gap: 10 },
