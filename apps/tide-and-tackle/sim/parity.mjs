@@ -165,7 +165,13 @@ for (const [fi, flow] of FLOWS.entries()) {
     for (const [nm, d] of [["sim", sim], ["native", native]]) {
       try { if (step.tap) await d.tap(step.tap); if (step.type) await d.type(step.type, step.text); if (step.waitFor) await d.waitFor(step.waitFor, step.timeoutMs ?? 15000); }
       catch (e) { if (step.optional) continue; d.ok = false; const msg = `${nm} ${flow.title} ${step.name ?? step.tap ?? step.type ?? step.waitFor}: ${e.message}`; (report.flow.errors ??= []).push(msg); console.log(`[parity] ERROR ${msg}`);
-        try { (report.flow.debug ??= []).push({ at: msg.slice(0, 80), sim: (await sim.elements()).map((x) => `${x.role}:${x.label}`).slice(0, 40), device: nativeDump().map((x) => `${x.role}:${x.label}`).slice(0, 40) }); } catch {} }
+        try {
+          const n = (report.flow.debug?.length ?? 0) + 1; const shot = join(OUT, `debug-${n}.png`);
+          try { writeFileSync(shot, execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20 })); } catch {}
+          let focus = ""; try { focus = execFileSync("adb", ["shell", "dumpsys", "window"]).toString().split("\n").filter((l) => /mCurrentFocus|mFocusedApp/.test(l)).join(" | ").trim(); } catch {}
+          let perms = ""; try { perms = execFileSync("adb", ["shell", "dumpsys", "package", "dev.purenative.tide"]).toString().split("\n").filter((l) => /CAMERA|ACCESS_FINE_LOCATION/.test(l) && /granted/.test(l)).map((l) => l.trim()).join(" | "); } catch {}
+          (report.flow.debug ??= []).push({ at: msg.slice(0, 80), screenshot: shot, focus, perms, sim: (await sim.elements()).map((x) => `${x.role}:${x.label}`).slice(0, 40), device: nativeDump().map((x) => `${x.role}:${x.label}`).slice(0, 40) });
+        } catch {} }
     }
     if (step.name) {
       const [a, b] = [await sim.elements(), await native.elements()];

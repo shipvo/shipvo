@@ -63,4 +63,8 @@ jobs:
           cat parity-report.json || true
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: parity-report, path: "parity-report.*" }
+        with:
+          name: parity-report
+          path: |
+            parity-report.*
+            debug-*.png
