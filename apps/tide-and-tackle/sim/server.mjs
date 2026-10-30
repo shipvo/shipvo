@@ -37,9 +37,35 @@ async function newSession(id, opts = {}) {
 
 async function screen(page) {
   await page.waitForTimeout(150);
+  // Phones only expose the items of a horizontal list that are on screen; hide the rest, as a phone would,
+  // so an agent learns to swipe the rail ("scroll right <ref>") exactly as it must on a device.
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll("[data-pn-offscreen]")) { el.removeAttribute("aria-hidden"); el.removeAttribute("data-pn-offscreen"); }
+    for (const sc of document.querySelectorAll("div")) {
+      const cs = getComputedStyle(sc);
+      if (!/(auto|scroll)/.test(cs.overflowX) || sc.scrollWidth <= sc.clientWidth + 1) continue;
+      const box = sc.getBoundingClientRect();
+      const row = sc.firstElementChild; if (!row) continue;
+      for (const item of row.children) {
+        const r = item.getBoundingClientRect();
+        if (r.right <= box.left + 1 || r.left >= box.right - 1) { item.setAttribute("aria-hidden", "true"); item.setAttribute("data-pn-offscreen", "1"); }
+      }
+    }
+  });
   const tree = await page.locator("body").ariaSnapshot({ mode: "ai" });
-  // Trim layout-only noise so the agent sees what a screen reader would.
-  return tree.split("\n").filter((l) => !/^\s*- generic \[ref=e\d+\]:?\s*$/.test(l)).join("\n");
+  const lines = tree.split("\n").filter((l) => !/^\s*- generic \[ref=e\d+\]:?\s*$/.test(l));
+  // A screen reader announces a control's label, not the words inside it (Android and iOS group a pressable's
+  // children into one element). Drop the inner text lines of labelled controls, as the phones do.
+  const out = []; let hideBelow = -1;
+  for (const l of lines) {
+    const indent = l.search(/\S/);
+    if (hideBelow >= 0 && indent > hideBelow) continue;
+    hideBelow = -1;
+    if (/\[aria-hidden\]/.test(l)) { hideBelow = indent; continue; }   // hidden from assistive tech: not on screen
+    out.push(l);
+    if (/^\s*- (button|radio|link|checkbox|switch|tab) "[^"]+"/.test(l) && /:\s*$/.test(l)) hideBelow = indent;
+  }
+  return out.join("\n");
 }
 
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
@@ -50,7 +76,12 @@ async function act(id, body) {
   switch (body.action) {
     case "screen": break;
     case "tap": await loc(body.ref).click({ timeout: 3000 }); break;
-    case "type": await loc(body.ref).fill(String(body.text ?? ""), { timeout: 3000 }); if (body.enter) await loc(body.ref).press("Enter"); break;
+    case "type": {
+      // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
+      let t = loc(body.ref);
+      if (!(await t.evaluate((el) => /^(INPUT|TEXTAREA)$/.test(el.tagName) || el.isContentEditable).catch(() => false))) t = t.locator("input, textarea").first();
+      await t.fill(String(body.text ?? ""), { timeout: 3000 }); if (body.enter) await t.press("Enter"); break;
+    }
     case "scroll": {
       const target = body.ref ? loc(body.ref) : page.locator("body");
       const box = await target.boundingBox().catch(() => null);

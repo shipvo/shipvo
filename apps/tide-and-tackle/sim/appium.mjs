@@ -70,8 +70,17 @@ export async function tap(s, label) {
     catch (e) { if (i === 5) throw e; await scroll(s, "down"); }
   }
 }
+// A heading can share a field's label ("Promo code"): look for the text field itself first.
+async function findField(s, label) {
+  const q = label.replace(/"/g, '\\"');
+  const sel = s.platform === "ios" ? { using: "-ios predicate string", value: `label == "${q}" AND type IN {"XCUIElementTypeTextField", "XCUIElementTypeSecureTextField", "XCUIElementTypeTextView"}` }
+    : { using: "-android uiautomator", value: `new UiSelector().className("android.widget.EditText").description("${q}")` };
+  const els = await wd("POST", `/session/${s.id}/elements`, sel).catch(() => []);
+  return els?.length ? Object.values(els[0])[0] : find(s, label);
+}
 export async function type(s, label, text) {
-  const id = await find(s, label);
+  let id;
+  for (let i = 0; i < 4 && !id; i++) { try { id = await findField(s, label); } catch (e) { if (i === 3) throw e; await scroll(s, "down"); } }
   await wd("POST", `/session/${s.id}/element/${id}/click`, {});
   await wd("POST", `/session/${s.id}/element/${id}/value`, { text });
   // A person closes the keyboard before tapping what it covers.

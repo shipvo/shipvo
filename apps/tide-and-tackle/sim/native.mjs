@@ -61,6 +61,10 @@ export function act(cmd, a, b) {
   const at = (r) => refs[r] ?? (() => { throw new Error(`unknown ref ${r}; run screen first`); })();
   if (cmd === "tap") { const p = at(a); adb("shell", "input", "tap", String(p.x), String(p.y)); }
   else if (cmd === "type") { const p = at(a); adb("shell", "input", "tap", String(p.x), String(p.y)); settle(); adb("shell", "input", "text", String(b).replace(/ /g, "%s").replace(/([&|<>;()$`\\"'])/g, "\\$1")); adb("shell", "input", "keyevent", "111"); }
+  else if (cmd === "scroll" && (a === "left" || a === "right")) {
+    const p = b ? at(b) : { x: 540, y: 1100 }; const dx = a === "right" ? -500 : 500;
+    adb("shell", "input", "swipe", String(p.x + (dx < 0 ? 250 : -250)), String(p.y), String(p.x + (dx < 0 ? 250 : -250) + dx), String(p.y), "300");
+  }
   else if (cmd === "scroll") { const up = a === "up"; adb("shell", "input", "swipe", "540", up ? "700" : "1700", "540", up ? "1700" : "700", "250"); }
   else if (cmd === "back") { const n = dump().find((x) => x.role === "button" && x.label === "Back"); if (!n) throw new Error("no Back button on this screen"); adb("shell", "input", "tap", String(n.x), String(n.y)); }
   else if (cmd !== "screen") throw new Error(`unknown command ${cmd}`);

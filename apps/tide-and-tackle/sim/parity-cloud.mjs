@@ -10,6 +10,12 @@ const FLOW = [
   { name: "Home" }, { tap: "Chrome Spoon 30 g", name: "Product" }, { tap: "Increase quantity" }, { tap: "Add 2 to cart", name: "Added" },
   { tap: "Open cart", name: "Cart" }, { tap: "Choose delivery and pay", name: "Checkout" }, { tap: "Friday 14:00" },
   { type: "Delivery address", text: "Bonapriso Douala" }, { tap: "Place order", name: "Order placed" },
+  // Flow B: search, promo code, shop pickup, mobile money.
+  { tap: "Back to shop", flow: "B" }, { tap: "Open search", name: "Search" }, { type: "Search products", text: "popper", name: "Search results" },
+  { tap: "Surface Popper 9 cm", name: "Product B" }, { tap: "Increase quantity" }, { tap: "Increase quantity" }, { tap: "Add 3 to cart" },
+  { tap: "Open cart", name: "Cart B" }, { type: "Promo code", text: "LURES15" }, { tap: "Apply promo code", name: "Promo applied" },
+  { tap: "Choose delivery and pay" }, { tap: "Any day Shop pickup" }, { tap: "Mobile money", exact: true, name: "Checkout B" },
+  { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Order placed B" },
 ];
 const CANDIDATES = {
   ios: [["iPhone 13", "15"], ["iPhone 14", "16"], ["iPhone 13", "14"], ["iPhone 12", "14"], ["iPhone 14 Pro", "16"], ["iPhone 15", "17"], ["iPhone 15 Pro", "17"], ["iPhone 16", "18"], ["iPhone 11", "13"]],
@@ -37,7 +43,7 @@ function parseSim(tree) {
 }
 const simEls = async () => parseSim((await simCall("/act", { session: "pc", action: "screen" })).screen);
 async function simDo(step) {
-  const els = await simEls(); const starts = (e, l) => e.label.toLowerCase().startsWith(l.toLowerCase());
+  const els = await simEls(); const starts = (e, l) => step.exact ? e.label.toLowerCase() === l.toLowerCase() : e.label.toLowerCase().startsWith(l.toLowerCase());
   if (step.tap) { const e = els.find((x) => ["button", "radio", "link"].includes(x.role) && starts(x, step.tap)); if (!e) throw new Error(`sim: no ${step.tap}`); await simCall("/act", { session: "pc", action: "tap", ref: e.ref }); }
   if (step.type) { const e = els.find((x) => x.role === "textbox" && starts(x, step.type)); if (!e) throw new Error(`sim: no ${step.type}`); await simCall("/act", { session: "pc", action: "type", ref: e.ref, text: step.text }); }
 }

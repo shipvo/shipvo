@@ -12,17 +12,35 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ?
 const SIM = arg("sim", "http://localhost:4545"), OUT = arg("out", ".");
 const sleep = (ms) => execFileSync("sleep", [String(ms / 1000)]);
 
-// The flow: a real purchase, by visible labels (no refs, no ids).
-const FLOW = [
-  { name: "Home" },
-  { tap: /^Chrome Spoon 30 g/, name: "Product" },
-  { tap: /^Increase quantity$/ },
-  { tap: /^Add 2 to cart$/, name: "Added" },
-  { tap: /^Open cart/, name: "Cart" },
-  { tap: /^Choose delivery and pay$/, name: "Checkout" },
-  { tap: /^Friday 14:00/ },
-  { type: /^Delivery address$/, text: "Bonapriso Douala" },
-  { tap: /^Place order$/, name: "Order placed" },
+// Two real purchases, by visible labels (no refs, no ids). Each starts from a fresh app.
+const FLOWS = [
+  { title: "A: browse, delivery, cash", steps: [
+    { name: "Home" },
+    { tap: /^Chrome Spoon 30 g/, name: "Product" },
+    { tap: /^Increase quantity$/ },
+    { tap: /^Add 2 to cart$/, name: "Added" },
+    { tap: /^Open cart/, name: "Cart" },
+    { tap: /^Choose delivery and pay$/, name: "Checkout" },
+    { tap: /^Friday 14:00/ },
+    { type: /^Delivery address$/, text: "Bonapriso Douala" },
+    { tap: /^Place order$/, name: "Order placed" },
+  ] },
+  { title: "B: search, promo, pickup, mobile money", steps: [
+    { tap: /^Back to shop$/ },
+    { tap: /^Open search$/, name: "Search" },
+    { type: /^Search products$/, text: "popper", name: "Search results" },
+    { tap: /^Surface Popper 9 cm/, name: "Product B" },
+    { tap: /^Increase quantity$/ }, { tap: /^Increase quantity$/ },
+    { tap: /^Add 3 to cart$/ },
+    { tap: /^Open cart/, name: "Cart B" },
+    { type: /^Promo code$/, text: "LURES15" },
+    { tap: /^Apply promo code$/, name: "Promo applied" },
+    { tap: /^Choose delivery and pay$/ },
+    { tap: /^Any day Shop pickup/ },
+    { tap: /^Mobile money$/, name: "Checkout B" },
+    { type: /^Mobile money number$/, text: "677000111" },
+    { tap: /^Place order$/, name: "Order placed B" },
+  ] },
 ];
 
 /* ---------- simulator driver ---------- */
@@ -45,6 +63,7 @@ function parseSim(tree) {
 }
 const sim = {
   async start() { await simCall("/session", { session: "parity" }); },
+  async restart() { await simCall("/session", { session: "parity" }); },
   async elements() { return parseSim((await simCall("/act", { session: "parity", action: "screen" })).screen); },
   async tap(re) { const el = (await this.elements()).find((e) => ["button", "radio", "link"].includes(e.role) && re.test(e.label)); if (!el) throw new Error(`sim: no element ${re}`); await simCall("/act", { session: "parity", action: "tap", ref: el.ref }); },
   async type(re, text) { const el = (await this.elements()).find((e) => e.role === "textbox" && re.test(e.label)); if (!el) throw new Error(`sim: no field ${re}`); await simCall("/act", { session: "parity", action: "type", ref: el.ref, text }); },
@@ -65,6 +84,11 @@ function nativeFull() {
 }
 const native = {
   async start() {},
+  async restart() {
+    execFileSync("adb", ["shell", "am", "force-stop", "dev.purenative.tide"]);
+    execFileSync("adb", ["shell", "monkey", "-p", "dev.purenative.tide", "-c", "android.intent.category.LAUNCHER", "1"]);
+    sleep(8000);
+  },
   async elements() { return nativeFull(); },
   async find(re, roles) {
     for (let i = 0; i < 8; i++) {
@@ -97,19 +121,22 @@ function compare(a, b) {
 const report = { started_at: new Date().toISOString(), screens: [], flow: {} };
 await sim.start(); await native.start();
 for (const d of [sim, native]) d.ok = true;
-for (const step of FLOW) {
-  for (const [nm, d] of [["sim", sim], ["native", native]]) {
-    try { if (step.tap) await d.tap(step.tap); if (step.type) await d.type(step.type, step.text); }
-    catch (e) { d.ok = false; report.flow[`${nm}_error`] = report.flow[`${nm}_error`] ?? `${step.name ?? step.tap ?? step.type}: ${e.message}`; }
-  }
-  if (step.name) {
-    const [a, b] = [await sim.elements(), await native.elements()];
-    report.screens.push({ screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b) });
+for (const [fi, flow] of FLOWS.entries()) {
+  for (const step of flow.steps) {
+    for (const [nm, d] of [["sim", sim], ["native", native]]) {
+      try { if (step.tap) await d.tap(step.tap); if (step.type) await d.type(step.type, step.text); }
+      catch (e) { d.ok = false; (report.flow.errors ??= []).push(`${nm} ${flow.title} ${step.name ?? step.tap ?? step.type}: ${e.message}`); }
+    }
+    if (step.name) {
+      const [a, b] = [await sim.elements(), await native.elements()];
+      report.screens.push({ flow: flow.title, screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b) });
+    }
   }
 }
 const last = report.screens.at(-1);
 report.flow.sim_completed = sim.ok; report.flow.device_completed = native.ok;
-report.flow.same_outcome = sim.ok === native.ok && (last?.text_coverage ?? 0) > 0.8;
+const finals = report.screens.filter((x) => /^Order placed/.test(x.screen));
+report.flow.same_outcome = sim.ok && native.ok && finals.length === FLOWS.length && finals.every((x) => x.actionable_parity >= 0.99);
 report.summary = {
   screens: report.screens.length,
   mean_actionable_parity: +(report.screens.reduce((a, s) => a + s.actionable_parity, 0) / report.screens.length).toFixed(3),
@@ -118,10 +145,10 @@ report.summary = {
   android_not_responding_dialogs: nativeMod.anrCount,
 };
 writeFileSync(join(OUT, "parity-report.json"), JSON.stringify(report, null, 2));
-const md = [`# Simulator vs device parity`, ``, `Flow: buy 2 × Chrome Spoon, Friday afternoon delivery, cash.`, ``,
-  `| Screen | Elements (sim / device) | Actionable parity | Text coverage | Only in sim | Only on device |`, `| --- | --- | --- | --- | --- | --- |`,
-  ...report.screens.map((s) => `| ${s.screen} | ${s.sim_elements} / ${s.device_elements} | ${(s.actionable_parity * 100).toFixed(0)}% | ${(s.text_coverage * 100).toFixed(0)}% | ${s.only_in_sim.join("<br>")} | ${s.only_on_device.join("<br>")} |`),
+const md = [`# Simulator vs device parity`, ``, `Flows: ${FLOWS.map((f) => f.title).join("; ")}.`, ``,
+  `| Flow | Screen | Elements (sim / device) | Actionable parity | Text coverage | Only in sim | Only on device |`, `| --- | --- | --- | --- | --- | --- | --- |`,
+  ...report.screens.map((s) => `| ${s.flow.slice(0, 1)} | ${s.screen} | ${s.sim_elements} / ${s.device_elements} | ${(s.actionable_parity * 100).toFixed(0)}% | ${(s.text_coverage * 100).toFixed(0)}% | ${s.only_in_sim.join("<br>")} | ${s.only_on_device.join("<br>")} |`),
   ``, `**Mean actionable parity:** ${(report.summary.mean_actionable_parity * 100).toFixed(1)}%  ·  **Mean text coverage:** ${(report.summary.mean_text_coverage * 100).toFixed(1)}%  ·  **Same outcome:** ${report.flow.same_outcome ? "yes" : "no"}  ·  **"App isn't responding" dialogs on device:** ${nativeMod.anrCount}`,
-  report.flow.sim_error ? `\nSimulator error: ${report.flow.sim_error}` : "", report.flow.native_error ? `\nDevice error: ${report.flow.native_error}` : ""].join("\n");
+  report.flow.errors?.length ? `\nErrors:\n${report.flow.errors.map((e) => `- ${e}`).join("\n")}` : ""].join("\n");
 writeFileSync(join(OUT, "parity-report.md"), md);
 console.log(md);
