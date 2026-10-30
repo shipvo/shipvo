@@ -41,6 +41,10 @@ async function screen(page) {
   // so an agent learns to swipe the rail ("scroll right <ref>") exactly as it must on a device.
   await page.evaluate(() => {
     for (const el of document.querySelectorAll("[data-pn-offscreen]")) { el.removeAttribute("aria-hidden"); el.removeAttribute("data-pn-offscreen"); }
+    // A modal sheet (accessibilityViewIsModal / aria-modal) hides everything behind it from assistive tech on phones.
+    const modal = [...document.querySelectorAll('[aria-modal="true"]')].pop();
+    if (modal) for (let node = modal; node && node !== document.body; node = node.parentElement)
+      for (const sib of node.parentElement?.children ?? []) if (sib !== node && !sib.hasAttribute("aria-hidden")) { sib.setAttribute("aria-hidden", "true"); sib.setAttribute("data-pn-offscreen", "1"); }
     for (const sc of document.querySelectorAll("div")) {
       const cs = getComputedStyle(sc);
       if (!/(auto|scroll)/.test(cs.overflowX) || sc.scrollWidth <= sc.clientWidth + 1) continue;

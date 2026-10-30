@@ -15,7 +15,8 @@ const FLOW = [
   { tap: "Surface Popper 9 cm", name: "Product B" }, { tap: "Increase quantity" }, { tap: "Increase quantity" }, { tap: "Add 3 to cart" },
   { tap: "Open cart", name: "Cart B" }, { type: "Promo code", text: "LURES15" }, { tap: "Apply promo code", name: "Promo applied" },
   { tap: "Choose delivery and pay" }, { tap: "Any day Shop pickup" }, { tap: "Mobile money", exact: true, name: "Checkout B" },
-  { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Order placed B" },
+  { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Payment prompt B" },
+  { type: "Mobile money PIN", text: "1234" }, { tap: "Confirm payment", name: "Order placed B" },
 ];
 const CANDIDATES = {
   ios: [["iPhone 13", "15"], ["iPhone 14", "16"], ["iPhone 13", "14"], ["iPhone 12", "14"], ["iPhone 14 Pro", "16"], ["iPhone 15", "17"], ["iPhone 15 Pro", "17"], ["iPhone 16", "18"], ["iPhone 11", "13"]],

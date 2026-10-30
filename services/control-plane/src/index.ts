@@ -46,6 +46,23 @@ app.get("/p/:app/:major/:band", async (c) => {
 });
 
 /** Immutable bundle bytes. Integrity is checked on device against the sha256 inside the signed pointer. */
+// Agent-facing web artifact of a release: /w/<app>/r<N>/index.html and its files; /w/<app>/releases.json lists them.
+app.get("/w/:app/releases.json", async (c) => {
+  const appId = c.req.param("app"); if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const raw = await c.env.POINTERS.get(`w/${appId}/releases`);
+  return raw ? new Response(raw, { headers: { "content-type": "application/json", "cache-control": "public, max-age=5", "access-control-allow-origin": "*" } }) : c.json({ error: "not_found" }, 404);
+});
+app.get("/w/:app/:rel/*", async (c) => {
+  const { app: appId, rel } = c.req.param();
+  if (!ID.test(appId) || !/^r\d{1,6}$/.test(rel)) return c.json({ error: "bad_request" }, 400);
+  const path = c.req.path.split(`/${rel}/`)[1] || "index.html";
+  if (!/^[a-z0-9._\/-]{1,200}$/i.test(path) || path.includes("..")) return c.json({ error: "bad_request" }, 400);
+  const v = await c.env.POINTERS.getWithMetadata(`w/${appId}/${rel}/${path}`, "arrayBuffer");
+  if (!v.value) return c.json({ error: "not_found" }, 404);
+  const type = path.endsWith(".html") ? "text/html; charset=utf-8" : path.endsWith(".js") ? "text/javascript" : path.endsWith(".json") ? "application/json" : path.endsWith(".css") ? "text/css" : path.endsWith(".ico") ? "image/x-icon" : path.endsWith(".png") ? "image/png" : path.endsWith(".ttf") ? "font/ttf" : "application/octet-stream";
+  return new Response(v.value, { headers: { "content-type": type, "cache-control": path.endsWith(".html") ? "public, max-age=60" : "public, max-age=31536000, immutable", "access-control-allow-origin": "*" } });
+});
+
 app.get("/b/:app/:file", async (c) => {
   const { app: appId, file } = c.req.param();
   if (!ID.test(appId) || !/^[a-z0-9._-]{1,128}$/i.test(file)) return c.json({ error: "bad_request" }, 400);

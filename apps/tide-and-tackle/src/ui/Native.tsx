@@ -43,7 +43,7 @@ export function PaymentSheet({ T, req, onDone, onCancel }: { T: Tokens; req: Pay
     setErr(r.reason === "declined" ? "Payment declined. Check your PIN and try again." : r.reason === "insufficient_funds" ? "Insufficient funds." : r.reason === "timeout" ? "The provider did not answer. Try again." : "Payment cancelled.");
   };
   return (
-    <View style={s.overlay} accessibilityViewIsModal accessibilityLabel="Mobile money payment">
+    <View style={s.overlay} accessibilityViewIsModal {...({ "aria-modal": true } as any)} accessibilityLabel="Mobile money payment">
       <View style={s.sheet}>
         <Text style={s.h2} accessibilityRole="header">Mobile money payment</Text>
         <Text style={s.body}>Pay {fcfa(req.amount)} to {req.to}</Text>
