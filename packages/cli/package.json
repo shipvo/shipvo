@@ -1,5 +1,5 @@
 {
-  "name": "purenative",
+  "name": "@purenative/cli",
   "version": "0.0.1",
   "type": "module",
   "license": "Apache-2.0",

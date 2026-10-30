@@ -17,12 +17,12 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm, registry-url: "https://registry.npmjs.org" }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @purenative/schema build && pnpm --filter purenative build
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
       - run: pnpm -r test
-      - name: Publish @purenative/schema then purenative
+      - name: Publish @purenative/schema then @purenative/cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
         run: |
-          pnpm --filter @purenative/schema publish --no-git-checks --access public
-          pnpm --filter purenative publish --no-git-checks --access public
+          if npm view @purenative/schema@$(node -p "require('./packages/schema/package.json').version") version >/dev/null 2>&1; then echo "schema already published"; else pnpm --filter @purenative/schema publish --no-git-checks --access public; fi
+          pnpm --filter @purenative/cli publish --no-git-checks --access public

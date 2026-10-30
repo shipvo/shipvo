@@ -24,7 +24,7 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @purenative/schema build && pnpm --filter purenative build
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
       - name: Prebuild
         working-directory: apps/tide-and-tackle
         run: CI=1 npx expo prebuild -p android --no-install

@@ -11,7 +11,7 @@
   "devDependencies": {
     "@types/react": "~19.3.0",
     "typescript": "~6.0.3",
-    "purenative": "workspace:*"
+    "@purenative/cli": "workspace:*"
   },
   "scripts": {
     "start": "expo start",
