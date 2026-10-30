@@ -1,0 +1,43 @@
+name: parity-cloud
+# Simulator vs LambdaTest cloud devices: an iOS Simulator and a real Android phone, same flow, screen by screen.
+on:
+  workflow_dispatch:
+    inputs:
+      ios_app: { description: "LambdaTest app URL of the iOS simulator build", default: "lt://APP10160321611793349355349356" }
+      android_app: { description: "LambdaTest app URL of the Android APK (real devices)", default: "lt://APP10160321611793349347978846" }
+  push:
+    branches: [main]
+    paths: ["apps/tide-and-tackle/sim/appium.mjs", "apps/tide-and-tackle/sim/parity-cloud.mjs", ".github/workflows/parity-cloud.yml"]
+jobs:
+  cloud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: { lane: [ios, android-real] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Start simulator
+        working-directory: apps/tide-and-tackle
+        run: |
+          npx expo export --platform web --output-dir sim-dist
+          npm i -g playwright@1.63.0 && npx -y playwright@1.63.0 install --with-deps chromium
+          CONTENT_FROM=https://purenative-control.purenative.workers.dev nohup node sim/server.mjs > sim.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
+      - name: Parity on ${{ matrix.lane }}
+        working-directory: apps/tide-and-tackle
+        env:
+          LT_USER: ${{ secrets.LAMBDATEST_USERNAME }}
+          LT_KEY: ${{ secrets.LAMBDATEST_ACCESS_KEY }}
+        run: |
+          APP=${{ matrix.lane == 'ios' && (inputs.ios_app || 'lt://APP10160321611793349355349356') || (inputs.android_app || 'lt://APP10160321611793349347978846') }}
+          node sim/parity-cloud.mjs --lane ${{ matrix.lane }} --app "$APP" || true
+          cat parity-${{ matrix.lane }}.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || cat parity-${{ matrix.lane }}.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: "parity-${{ matrix.lane }}", path: "apps/tide-and-tackle/parity-*" }
