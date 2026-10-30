@@ -90,11 +90,9 @@ export async function type(s, label, text) {
   // A person closes the keyboard before tapping what it covers.
   if (s.platform === "ios") {
     await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: hideKeyboard", args: [{ keys: ["return", "Return", "done", "Done", "search", "Search", "go", "Go"] }] }).catch(() => {});
-    // A number pad has no return key: tap empty space above the field, as a person would.
-    if (await wd("GET", `/session/${s.id}/appium/device/is_keyboard_shown`).catch(() => false)) {
-      const r = await wd("GET", `/session/${s.id}/element/${id}/rect`).catch(() => null);
-      if (r) await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: tap", args: [{ x: 4, y: Math.max(120, Math.round(r.y - 12)) }] }).catch(() => {});
-    }
+    // A number pad has no return key: drag the page down a little, as a person would, which closes it.
+    if (await wd("GET", `/session/${s.id}/appium/device/is_keyboard_shown`).catch(() => false))
+      await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: dragFromToForDuration", args: [{ duration: 0.3, fromX: 200, fromY: 260, toX: 200, toY: 420 }] }).catch(() => {});
   }
   else await wd("POST", `/session/${s.id}/appium/device/hide_keyboard`, {}).catch(() => {});
   await new Promise((r) => setTimeout(r, 600));

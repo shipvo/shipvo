@@ -172,7 +172,7 @@ function Search({ ctx, initial }: { ctx: Ctx; initial: { query?: string; departm
   const r = call(ctx.shop, "search_products", { query: q, department: dept, in_stock_only: inStock });
   const items: any[] = r?.ok ? (r.result as any[]) : [];
   return (
-    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" accessibilityLabel="Search">
+    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets accessibilityLabel="Search">
       <TextInput value={q} onChangeText={setQ} placeholder="Search rods, lures, line…" placeholderTextColor={T.text2}
         style={s.input} accessibilityLabel="Search products" testID="search-input" autoCorrect={false} returnKeyType="search" />
       <View style={s.chips}>
@@ -250,7 +250,7 @@ function Cart({ ctx }: { ctx: Ctx }) {
       <Btn ctx={ctx} label="Browse products" onPress={() => go({ screen: "search" })} /></View>
   );
   return (
-    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" accessibilityLabel="Cart">
+    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets accessibilityLabel="Cart">
       <Text style={s.h1} accessibilityRole="header">Cart</Text>
       {t.lines.map((l) => (
         <View key={l.product_id} style={s.listItem} accessibilityLabel={`${l.name}, quantity ${l.quantity}, ${fcfa(l.line_total)}`}>
@@ -314,7 +314,7 @@ function Checkout({ ctx }: { ctx: Ctx }) {
     onOrder?.(o.result); go({ screen: "done", order: o.result });
   };
   return (
-    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" accessibilityLabel="Checkout">
+    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets accessibilityLabel="Checkout">
       <Text style={s.h1} accessibilityRole="header">Delivery and payment</Text>
       <Text style={s.h2} accessibilityRole="header">Delivery slot</Text>
       {slots.map((x) => (
