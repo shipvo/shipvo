@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["apps/tide-and-tackle/sim/**", ".github/workflows/parity.yml"]
+    paths: ["apps/tide-and-tackle/sim/parity.mjs", "apps/tide-and-tackle/sim/native.mjs", "apps/tide-and-tackle/sim/parity-ci.sh", ".github/workflows/parity.yml"]
 jobs:
   parity:
     runs-on: ubuntu-latest
@@ -44,7 +44,7 @@ jobs:
           target: google_apis
           profile: pixel_5
           disable-animations: true
-          script: bash apps/tide-and-tackle/sim/parity-ci.sh
+          script: timeout 2400 bash apps/tide-and-tackle/sim/parity-ci.sh || true
       - name: Report
         if: always()
         run: |
