@@ -10,7 +10,7 @@ Three pillars:
 
 1. **Publish.** Signed OTA updates (64 KB patches, crash-loop rollback, staged rollouts), a built-in owner admin at `/app/<id>/admin`, and a control plane you can self-host on Cloudflare.
 2. **Simulate.** `@shipvo/mcp` opens any Shipvo app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@shipvo/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
-3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% matching controls on both platforms across two purchase flows (`docs/parity-results.md`).
+3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% matching controls on both platforms across two purchase flows, with the orders themselves compared; native-feature flows are being added (`docs/parity-results.md`, which also says exactly what the score does and does not measure).
 
 [![CI](https://github.com/shipvo/shipvo/actions/workflows/ci.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/ci.yml)
 [![Deploy](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml)
@@ -44,19 +44,35 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Simulated device:** `@shipvo/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
 - **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/shipvo-design`.
 
-## How an update reaches a phone
+## Use an app as an AI agent (no phone)
+
+Add the MCP server to Claude, Claude Code, Cursor or PiPilot:
+
+```json
+{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
+```
+
+Then: `open_app("tide@latest")` returns a phone-sized session and the first screen as an accessibility tree with refs; `tap`, `type`, `scroll`, `back` and `screenshot` act on it; `set_device` decides what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether a payment is approved, network off); `device_log` reports every device event, all marked simulated; `end_session` returns the steps taken and the orders the app sent. `tide@r13` opens exactly the release phones are running; `tide` opens a local build. Full tool list: `packages/mcp/README.md`.
+
+What the agent sees is what a person with a screen reader would: only the items of a rail that are on screen (swipe to see more), nothing behind a modal sheet, system dialogs worded as Android or iOS word them.
+
+## How a release reaches phones and agents
 
 ```
-pnpm publish:ota            Build Hermes bundle → SHA-256 → sign pointer (Ed25519)
-        │
+shipvo publish              Build Hermes bundle → SHA-256 → sign pointer (Ed25519)
+        │                   Build web artifact of the same commit (platform adapters only)
         ▼
 Cloudflare edge             /p/{app}/{shell_major}/{band}.json   (signed envelope, ETag)
-        │                   /b/{app}/r{release}.hbc              (immutable bundle)
+        │                   /b/{app}/r{release}.hbc              (immutable bundle, bsdiff patches)
+        │                   /w/{app}/r{release}/                 (the same release for agents)
+        ├──────────────────────────────┐
+        ▼                              ▼
+Device runtime (Kotlin)        Simulator / sim.shipvo.dev
+verify → download → verify     open_app("tide@r13") → accessibility tree
+→ stage → reload → healthy     → tap/type/scroll → device sheets → report
+or revert after 3 failed boots
         ▼
-Device runtime (Kotlin)     verify signature → download → verify hash → stage
-        │                   → reload → mark healthy → promote, or revert after 3 failed boots
-        ▼
-Telemetry                   POST /t → D1
+Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 ```
 
 ## Repository layout
@@ -64,9 +80,12 @@ Telemetry                   POST /t → D1
 | Path | What it is |
 | --- | --- |
 | `packages/schema` | Contracts: shell manifest, add-on manifest, release pointer, signed envelope, gate report, change log, telemetry (Zod) |
-| `packages/cli` | Ed25519 signing, hashing, publishing |
-| `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, telemetry, admin |
-| `apps/tide-and-tackle` | Sample app and native runtime module used for the spike |
+| `packages/cli` | `shipvo` CLI: Ed25519 signing, hashing, publishing |
+| `packages/mcp` | `@shipvo/mcp`: the MCP server agents use to open, see and operate apps, control the simulated device, and run owner commands |
+| `packages/device` | `@shipvo/device`: one device API (camera, location, biometrics, payments, notifications, share, network), real on phones, simulated in the simulator, plus Metro aliases for raw Expo imports |
+| `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
+| `apps/tide-and-tackle` | Sample shop app, native runtime module, UI simulator (`sim/`), device drivers and the parity harness |
+| `docs/` | Measured results: spike, agent gate, parity |
 | `skills/shipvo-design` | Design skill with runnable checks |
 
 ## Try the sample app
@@ -74,6 +93,8 @@ Telemetry                   POST /t → D1
 1. Download the latest `tide-and-tackle-shell.apk` from [Releases](https://github.com/shipvo/shipvo/releases) and install it on an Android 7+ phone.
 2. Edit `apps/tide-and-tackle/src/release.ts` and push to `main`. The `publish-ota` workflow signs and publishes the release.
 3. The app checks every 10 seconds while open, verifies the update, applies it, and logs the timings on screen.
+4. Change prices or the home screen at `/app/tide/admin` on your control plane; the phone shows it in about 10 seconds.
+5. Open the same release as an agent: `cd apps/tide-and-tackle && node sim/server.mjs`, then `open_app("tide@latest")` through `@shipvo/mcp`, or `scripts/ui screen` from a terminal.
 
 ## Develop
 
