@@ -3,7 +3,16 @@ import { Platform, Share, Linking } from "react-native";
 import type { Device, PermissionStatus, Notification } from "./types";
 export * from "./types";
 
-function opt<T>(name: string): T | null { try { return require(name) as T; } catch { return null; } }
+// Metro needs static requires; each module is optional so an app only pays for what it installs.
+const tryReq = (f: () => any) => { try { return f(); } catch { return null; } };
+const MODS: Record<string, any> = {
+  "expo-camera": tryReq(() => require("expo-camera")),
+  "expo-location": tryReq(() => require("expo-location")),
+  "expo-local-authentication": tryReq(() => require("expo-local-authentication")),
+  "expo-notifications": tryReq(() => require("expo-notifications")),
+  "expo-clipboard": tryReq(() => require("expo-clipboard")),
+};
+function opt<T>(name: string): T | null { return (MODS[name] as T) ?? null; }
 const map = (s: string): PermissionStatus => (s === "granted" ? "granted" : s === "denied" ? "denied" : "undetermined");
 let online = true; const netSubs = new Set<(o: boolean) => void>();
 
