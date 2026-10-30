@@ -10,8 +10,8 @@ Three pillars:
 2. **Simulate.** `@shipvo/mcp` opens any Shipvo app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@shipvo/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
 3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% matching controls on both platforms across two purchase flows (`docs/parity-results.md`).
 
-[![CI](https://github.com/purenativedev/purenative/actions/workflows/ci.yml/badge.svg)](https://github.com/purenativedev/purenative/actions/workflows/ci.yml)
-[![Deploy](https://github.com/purenativedev/purenative/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/purenativedev/purenative/actions/workflows/deploy-control-plane.yml)
+[![CI](https://github.com/shipvo/shipvo/actions/workflows/ci.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/ci.yml)
+[![Deploy](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Status: pre-launch](https://img.shields.io/badge/status-pre--launch-orange)
 
@@ -69,7 +69,7 @@ Telemetry                   POST /t → D1
 
 ## Try the sample app
 
-1. Download the latest `tide-and-tackle-shell.apk` from [Releases](https://github.com/purenativedev/purenative/releases) and install it on an Android 7+ phone.
+1. Download the latest `tide-and-tackle-shell.apk` from [Releases](https://github.com/shipvo/shipvo/releases) and install it on an Android 7+ phone.
 2. Edit `apps/tide-and-tackle/src/release.ts` and push to `main`. The `publish-ota` workflow signs and publishes the release.
 3. The app checks every 10 seconds while open, verifies the update, applies it, and logs the timings on screen.
 

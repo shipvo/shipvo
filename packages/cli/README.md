@@ -1,6 +1,6 @@
 # @shipvo/cli
 
-Command-line tools for [Shipvo](https://github.com/purenativedev/purenative), the open-source React Native framework for signed over-the-air updates.
+Command-line tools for [Shipvo](https://github.com/shipvo/shipvo), the open-source React Native framework for signed over-the-air updates.
 
 ```bash
 npx @shipvo/cli keygen --out seed.txt   # Ed25519 release signing key

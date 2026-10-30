@@ -47,10 +47,10 @@
     "biometrics",
     "payments"
   ],
-  "homepage": "https://github.com/purenativedev/purenative#readme",
+  "homepage": "https://github.com/shipvo/shipvo#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/purenativedev/purenative.git",
+    "url": "git+https://github.com/shipvo/shipvo.git",
     "directory": "packages/device"
   },
   "publishConfig": {

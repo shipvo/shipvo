@@ -42,13 +42,13 @@
     "mobile-cms",
     "ai-agents"
   ],
-  "homepage": "https://github.com/purenativedev/purenative#readme",
+  "homepage": "https://github.com/shipvo/shipvo#readme",
   "bugs": {
-    "url": "https://github.com/purenativedev/purenative/issues"
+    "url": "https://github.com/shipvo/shipvo/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/purenativedev/purenative.git",
+    "url": "git+https://github.com/shipvo/shipvo.git",
     "directory": "packages/cli"
   },
   "files": [
