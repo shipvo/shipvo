@@ -26,6 +26,7 @@ const FLOWS = [
     { tap: /^Place order$/, name: "Order placed" },
   ] },
   { title: "B: search, promo, pickup, mobile money", steps: [
+    { tap: /^Allow$/, optional: true }, { wait: 6000 },   // notification permission (API 33+ / iOS) and the confirmation banner
     { tap: /^Back to shop$/ },
     { tap: /^Open search$/, name: "Search" },
     { type: /^Search products$/, text: "popper", name: "Search results" },
@@ -48,6 +49,7 @@ const FLOWS = [
   // the system permission dialogs, the in-app mobile money prompt. The emulator has no enrolled fingerprint,
   // so the simulated phone is told the same (biometrics.enrolled=false) and the app skips that prompt on both.
   { title: "C: scan, location, mobile money", steps: [
+    { wait: 6000 },
     { tap: /^Back to shop$/ },
     { tap: /^Scan a product barcode$/, name: "Camera permission" },
     { tap: /^Allow camera$/, optional: true },            // a person taps the app's button if the system dialog has not shown
@@ -154,6 +156,7 @@ await sim.start(); await native.start();
 for (const d of [sim, native]) d.ok = true;
 for (const [fi, flow] of FLOWS.entries()) {
   for (const step of flow.steps) {
+    if (step.wait) { await new Promise((r) => setTimeout(r, step.wait)); continue; }
     for (const [nm, d] of [["sim", sim], ["native", native]]) {
       try { if (step.tap) await d.tap(step.tap); if (step.type) await d.type(step.type, step.text); if (step.waitFor) await d.waitFor(step.waitFor, step.timeoutMs ?? 15000); }
       catch (e) { if (step.optional) continue; d.ok = false; const msg = `${nm} ${flow.title} ${step.name ?? step.tap ?? step.type ?? step.waitFor}: ${e.message}`; (report.flow.errors ??= []).push(msg); console.log(`[parity] ERROR ${msg}`);

@@ -147,10 +147,11 @@ export const device: Device = {
 // A notification banner at the top, like a heads-up notification: tapping it opens the app's handler.
 function showBanner(n: Notification) {
   const b = document.createElement("div"); b.setAttribute("role", "button"); b.setAttribute("aria-label", `Notification: ${n.title}. ${n.body}`); b.tabIndex = 0; b.setAttribute("data-pn-banner", "1");
-  Object.assign(b.style, { position: "fixed", top: "8px", left: "8px", right: "8px", background: "#fff", color: "#111", borderRadius: "14px", padding: "12px 14px", boxShadow: "0 6px 24px rgba(0,0,0,.25)", zIndex: "9998", fontFamily: "system-ui, sans-serif" });
-  b.innerHTML = `<div style="font-weight:700;font-size:14px">${n.title}</div><div style="font-size:14px">${n.body}</div>`;
+  // Like a heads-up notification: slim, over the status bar, gone after 5 s unless tapped.
+  Object.assign(b.style, { position: "fixed", top: "4px", left: "8px", right: "8px", height: "44px", overflow: "hidden", background: "#fff", color: "#111", borderRadius: "12px", padding: "6px 12px", boxShadow: "0 6px 24px rgba(0,0,0,.25)", zIndex: "9998", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textOverflow: "ellipsis" });
+  b.innerHTML = `<div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis">${n.title}</div><div style="font-size:12px;overflow:hidden;text-overflow:ellipsis">${n.body}</div>`;
   b.onclick = () => { b.remove(); openSubs.forEach((f) => f(n)); };
-  document.body.appendChild(b); setTimeout(() => b.remove(), 15000);
+  document.body.appendChild(b); setTimeout(() => b.remove(), 5000);
 }
 
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
