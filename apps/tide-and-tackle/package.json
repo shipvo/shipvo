@@ -19,7 +19,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "publish:ota": "node scripts/publish-ota.mjs"
+    "publish:ota": "node scripts/publish-ota.mjs",
+    "rollback:ota": "node scripts/rollback-ota.mjs"
   },
   "private": true
 }

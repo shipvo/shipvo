@@ -54,4 +54,6 @@ for (const band of bands) {
   const envelope = JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) });
   await kvPut(`p/${APP_ID}/${SHELL_MAJOR}/${band}`, envelope, "application/json");
 }
+// Keep a small history record so rollback knows each release's shell requirement.
+await kvPut(`h/${APP_ID}/r${release}`, JSON.stringify({ release, issued_at, sha256: sha256Hex(bytes), size: bytes.length, min_shell_version: args["min-shell"] || MIN_SHELL }), "application/json");
 console.log(JSON.stringify({ release, bands, bytes: bytes.length, file, issued_at }));
