@@ -49,8 +49,12 @@ jobs:
           for i in $(seq 1 60); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
           curl -sf -X POST localhost:4545/session -H "content-type: application/json" -d '{"session":"warmup"}' | head -c 200 || { echo SIMULATOR FAILED; cat sim.log; }
           node sim/parity-cloud.mjs --lane ios-local --app "$UDID" || true
-          tail -20 sim.log; echo "---- appium"; tail -30 appium.log
+          tail -5 sim.log; echo "---- checkout source (iOS)"; head -c 6000 source-ios-local-checkout.xml 2>/dev/null
           cat parity-ios-local.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || cat parity-ios-local.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: parity-ios-local, path: "apps/tide-and-tackle/parity-*" }
+        with:
+          name: parity-ios-local
+          path: |
+            apps/tide-and-tackle/parity-*
+            apps/tide-and-tackle/source-*

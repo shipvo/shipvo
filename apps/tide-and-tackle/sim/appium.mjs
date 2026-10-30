@@ -34,6 +34,7 @@ export async function elements(s) {
       label = (a.label || a.name || a.value || "").trim();
       role = tag.endsWith("Button") ? "button" : tag.endsWith("TextField") ? "textbox" : tag.endsWith("StaticText") ? "text" : tag.endsWith("Other") && a.accessible === "true" && label ? "text" : null;
       if (a.traits?.includes("Button")) role = "button";
+      if (/RadioButton|Switch|Cell/.test(tag) || /Selected|Adjustable|RadioButton/.test(a.traits ?? "") || (tag.endsWith("Other") && a.accessible === "true" && a.enabled === "true" && /, (\d[\d\s]* FCFA|free)/i.test(label))) role = "button";
       if (a.traits?.includes("Header")) role = "heading";
     } else {
       label = (a["content-desc"] || a.text || "").trim();
@@ -71,8 +72,12 @@ export async function type(s, label, text) {
   const id = await find(s, label);
   await wd("POST", `/session/${s.id}/element/${id}/click`, {});
   await wd("POST", `/session/${s.id}/element/${id}/value`, { text });
+  // A person closes the keyboard before tapping what it covers.
+  if (s.platform === "ios") await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: hideKeyboard", args: [{ keys: ["return", "Return", "done", "Done"] }] }).catch(() => {});
+  else await wd("POST", `/session/${s.id}/appium/device/hide_keyboard`, {}).catch(() => {});
   await new Promise((r) => setTimeout(r, 600));
 }
+export const source = (s) => wd("GET", `/session/${s.id}/source`);
 /** Whole screen, like the simulator's full page: scroll through and collect. */
 export async function fullScreen(s) {
   const seen = new Map(); let stale = 0;
