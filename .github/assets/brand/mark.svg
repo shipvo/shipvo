@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#113A46"/><stop offset="1" stop-color="#0B2630"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- two surfaces: the same release moving to phones (light) and to agents (amber) -->
+  <path d="M128 318 L384 182 L318 346 L270 288 Z" fill="#F2F6F7"/>
+  <path d="M128 318 L270 288 L318 346 L256 384 Z" fill="#C97C00"/>
+  <!-- motion lines -->
+  <path d="M86 236 h74" stroke="#F2F6F7" stroke-opacity=".55" stroke-width="16" stroke-linecap="round"/>
+  <path d="M60 292 h58" stroke="#C97C00" stroke-opacity=".8" stroke-width="16" stroke-linecap="round"/>
+</svg>

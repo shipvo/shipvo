@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 320" width="1320" height="320">
+  <rect width="1320" height="320" fill="none"/>
+  <g transform="translate(40,40) scale(0.47)">
+    <rect width="512" height="512" rx="112" fill="#0E2E3A"/>
+    <path d="M128 318 L384 182 L318 346 L270 288 Z" fill="#F2F6F7"/>
+    <path d="M128 318 L270 288 L318 346 L256 384 Z" fill="#C97C00"/>
+    <path d="M86 236 h74" stroke="#F2F6F7" stroke-opacity=".55" stroke-width="16" stroke-linecap="round"/>
+    <path d="M60 292 h58" stroke="#C97C00" stroke-opacity=".8" stroke-width="16" stroke-linecap="round"/>
+  </g>
+  <text x="320" y="205" font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif" font-weight="700" font-size="168" letter-spacing="-6" fill="#0E2E3A">Shipvo</text>
+  <text x="326" y="268" font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif" font-size="34" fill="#4A6B76">Build once. Publish for people and AI agents.</text>
+</svg>

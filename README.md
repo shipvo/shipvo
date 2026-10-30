@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/assets/brand/mark-512.png" width="112" alt="Shipvo"></p>
+
 # Shipvo: build once, publish for people and AI agents
 
 **One React Native app, two places it runs.** People get a native Android or iOS app from the stores, kept current with signed over-the-air updates. AI agents get the same release in a phone-sized simulator they can see and operate over MCP, with no device, including native features (camera, location, biometrics, payments, notifications). Every claim about the simulator is measured against real Android and iOS and published.
