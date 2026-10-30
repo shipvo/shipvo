@@ -29,11 +29,8 @@ jobs:
           mkdir app && tar -xzf app.tar.gz -C app && ls app
           xcrun simctl install "$UDID" app/*.app
           xcrun simctl list devices | grep Booted
-      - name: Start Appium (XCUITest)
-        run: |
-          npm i -g appium@3 && appium driver install xcuitest
-          nohup appium --port 4723 > appium.log 2>&1 &
-          for i in $(seq 1 60); do curl -sf localhost:4723/status >/dev/null && break; sleep 2; done
+      - name: Install Appium (XCUITest)
+        run: npm i -g appium@3 && appium driver install xcuitest
       - name: Build our simulator
         working-directory: apps/tide-and-tackle
         run: |
@@ -41,13 +38,16 @@ jobs:
           npm i -g playwright@1.63.0 && npx -y playwright@1.63.0 install chromium
       - name: Parity on iOS Simulator
         working-directory: apps/tide-and-tackle
-        env: { APPIUM_HUB: "http://localhost:4723", APPIUM_LOCAL: "1" }
+        env: { APPIUM_HUB: "http://127.0.0.1:4723", APPIUM_LOCAL: "1" }
         run: |
+          appium --address 127.0.0.1 --port 4723 > appium.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf 127.0.0.1:4723/status >/dev/null && break; sleep 2; done
+          curl -sf 127.0.0.1:4723/status | head -c 200 || { echo APPIUM FAILED; tail -40 appium.log; }
           CONTENT_FROM=https://purenative-control.purenative.workers.dev node sim/server.mjs > sim.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
           curl -sf -X POST localhost:4545/session -H "content-type: application/json" -d '{"session":"warmup"}' | head -c 200 || { echo SIMULATOR FAILED; cat sim.log; }
           node sim/parity-cloud.mjs --lane ios-local --app "$UDID" || true
-          tail -20 sim.log
+          tail -20 sim.log; echo "---- appium"; tail -30 appium.log
           cat parity-ios-local.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || cat parity-ios-local.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
