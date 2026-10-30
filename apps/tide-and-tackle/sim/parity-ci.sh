@@ -18,7 +18,7 @@ sleep 60                      # first launch: fetch live content and any newer s
 adb shell am force-stop dev.purenative.tide
 adb shell monkey -p dev.purenative.tide -c android.intent.category.LAUNCHER 1
 sleep 25
-timeout 1800 node apps/tide-and-tackle/sim/parity.mjs --out . || true
+timeout 3000 node apps/tide-and-tackle/sim/parity.mjs --out . || true
 echo "---- simulator log"; tail -20 "$ROOT/sim.log"
 cleanup
 exit 0

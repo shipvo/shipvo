@@ -9,7 +9,7 @@ on:
 jobs:
   parity:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - name: Enable KVM
@@ -55,7 +55,7 @@ jobs:
           profile: pixel_5
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back virtualscene -virtualscene-poster wall=${{ github.workspace }}/barcode.png
-          script: timeout 2400 bash apps/tide-and-tackle/sim/parity-ci.sh || true
+          script: timeout 3400 bash apps/tide-and-tackle/sim/parity-ci.sh || true
       - name: Report
         if: always()
         run: |

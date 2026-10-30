@@ -152,11 +152,14 @@ for (const [fi, flow] of FLOWS.entries()) {
   for (const step of flow.steps) {
     for (const [nm, d] of [["sim", sim], ["native", native]]) {
       try { if (step.tap) await d.tap(step.tap); if (step.type) await d.type(step.type, step.text); if (step.waitFor) await d.waitFor(step.waitFor, step.timeoutMs ?? 15000); }
-      catch (e) { d.ok = false; (report.flow.errors ??= []).push(`${nm} ${flow.title} ${step.name ?? step.tap ?? step.type}: ${e.message}`); }
+      catch (e) { d.ok = false; const msg = `${nm} ${flow.title} ${step.name ?? step.tap ?? step.type ?? step.waitFor}: ${e.message}`; (report.flow.errors ??= []).push(msg); console.log(`[parity] ERROR ${msg}`); }
     }
     if (step.name) {
       const [a, b] = [await sim.elements(), await native.elements()];
-      report.screens.push({ flow: flow.title, screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b) });
+      const row = { flow: flow.title, screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b) };
+      report.screens.push(row);
+      console.log(`[parity] ${flow.title} / ${step.name}: actionable ${(row.actionable_parity * 100).toFixed(0)}%, text ${(row.text_coverage * 100).toFixed(0)}% (${a.length}/${b.length})`);
+      writeFileSync(join(OUT, "parity-report.json"), JSON.stringify(report, null, 2)); // partial results survive a timeout
     }
   }
 }
