@@ -1,4 +1,4 @@
-<p align="center"><img src=".github/assets/brand/mark-512.png" width="112" alt="Shipvo"></p>
+<p align="center"><img src=".github/assets/brand/banner.png" width="720" alt="Shipvo: build once, publish for people and AI agents"></p>
 
 # Shipvo: build once, publish for people and AI agents
 
