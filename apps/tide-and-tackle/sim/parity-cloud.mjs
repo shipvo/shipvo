@@ -10,6 +10,7 @@ const FLOW = [
   { name: "Home" }, { tap: "Chrome Spoon 30 g", name: "Product" }, { tap: "Increase quantity" }, { tap: "Add 2 to cart", name: "Added" },
   { tap: "Open cart", name: "Cart" }, { tap: "Choose delivery and pay", name: "Checkout" }, { tap: "Friday 14:00" },
   { type: "Delivery address", text: "Bonapriso Douala" }, { tap: "Place order", name: "Order placed" },
+  { tap: "Allow", exact: true, optional: true },   // iOS asks to send notifications after the first order; a person taps Allow
   // Flow B: search, promo code, shop pickup, mobile money.
   { tap: "Back to shop", flow: "B" }, { tap: "Open search", name: "Search" }, { type: "Search products", text: "popper", name: "Search results" },
   { tap: "Surface Popper 9 cm", name: "Product B" }, { tap: "Increase quantity" }, { tap: "Increase quantity" }, { tap: "Add 3 to cart" },
@@ -75,8 +76,8 @@ await new Promise((r) => setTimeout(r, 15000)); // let live content load
 await simCall("/session", { session: "pc", device: { platform: LANE.startsWith("ios") ? "ios" : "android", api: LANE.startsWith("ios") ? 17 : 30, biometrics: { enrolled: false } } });
 let simOk = true, devOk = true;
 for (const step of FLOW) {
-  try { await simDo(step); } catch (e) { simOk = false; report.errors.push(e.message); }
-  try { if (step.tap) await cloud.tap(s, step.tap); if (step.type) await cloud.type(s, step.type, step.text); } catch (e) { devOk = false; report.errors.push(`device: ${e.message}`); }
+  try { await simDo(step); } catch (e) { if (!step.optional) { simOk = false; report.errors.push(e.message); } }
+  try { if (step.tap) await cloud.tap(s, step.tap, { once: !!step.optional }); if (step.type) await cloud.type(s, step.type, step.text); } catch (e) { if (!step.optional) { devOk = false; report.errors.push(`device: ${e.message}`); } }
   if (step.name) {
     const [a, b] = [await simEls(), await cloud.fullScreen(s).catch((e) => { report.errors.push(`device screen: ${e.message}`); return []; })];
     report.screens.push({ screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b) });

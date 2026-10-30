@@ -68,10 +68,10 @@ async function scroll(s, dir = "down") {
   if (s.platform === "ios") return wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: swipe", args: [{ direction: dir === "down" ? "up" : "down" }] }).catch(() => {});
   return wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: scrollGesture", args: [{ left: 100, top: 300, width: 600, height: 1200, direction: dir, percent: 0.8 }] }).catch(() => {});
 }
-export async function tap(s, label) {
-  for (let i = 0; i < 6; i++) {
+export async function tap(s, label, { once = false } = {}) {
+  for (let i = 0; i < (once ? 1 : 6); i++) {
     try { const id = await find(s, label); await wd("POST", `/session/${s.id}/element/${id}/click`, {}); await new Promise((r) => setTimeout(r, 900)); return; }
-    catch (e) { if (i === 5) throw e; await scroll(s, "down"); }
+    catch (e) { if (once || i === 5) throw e; await scroll(s, "down"); }
   }
 }
 // A heading can share a field's label ("Promo code"): look for the text field itself first.
