@@ -130,7 +130,11 @@ async function act(id, body) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, "http://x"); const send = (code, obj, type = "application/json") => { res.writeHead(code, { "content-type": type, "access-control-allow-origin": "*", "access-control-allow-headers": "*" }); res.end(type === "application/json" ? JSON.stringify(obj) : obj); };
+  const url = new URL(req.url, "http://x");
+  // CORS plus Chromium's private-network preflight: the app page comes from the public control plane (https) and
+  // posts orders and telemetry to this loopback backend.
+  const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-private-network": "true" };
+  const send = (code, obj, type = "application/json") => { res.writeHead(code, { "content-type": type, ...CORS }); res.end(type === "application/json" ? JSON.stringify(obj) : obj); };
   try {
     if (req.method === "OPTIONS") return send(204, "", "text/plain");
     // the app's static web build
@@ -147,9 +151,10 @@ const server = http.createServer(async (req, res) => {
       const [, id, rest] = m;
       if (rest.startsWith("c/")) {
         // Use the same live content as devices when CONTENT_FROM points at a control plane; else the bundled default.
-        if (process.env.CONTENT_FROM) { try { const r = await fetch(`${process.env.CONTENT_FROM}/${rest}`); if (r.ok) { res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" }); return res.end(await r.text()); } } catch {} }
+        if (process.env.CONTENT_FROM) { try { const r = await fetch(`${process.env.CONTENT_FROM}/${rest}`); if (r.ok) { res.writeHead(200, { "content-type": "application/json", ...CORS }); return res.end(await r.text()); } } catch {} }
         return send(404, { error: "no_content" });
       }
+      if (rest === "orders" && req.method === "GET") { try { return send(200, JSON.parse(readFileSync(join(DIR, `${id}.json`), "utf8"))); } catch { return send(404, { error: "no_session" }); } }
       if (rest.startsWith("o/") && req.method === "POST") {
         let b = ""; for await (const ch of req) b += ch;
         const f = join(DIR, `${id}.json`); const st = JSON.parse(readFileSync(f, "utf8")); st.orders.push(JSON.parse(b).order); writeFileSync(f, JSON.stringify(st));
