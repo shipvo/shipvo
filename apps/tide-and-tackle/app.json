@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tide & Tackle",
     "slug": "tide-and-tackle",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -19,7 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "dev.purenative.tide",
-      "versionCode": 3
+      "versionCode": 4
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -34,6 +34,28 @@
           "appId": "tide",
           "shellMajor": 1
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Tide & Tackle uses the camera to scan product barcodes."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Tide & Tackle uses your location to suggest pickup or delivery near you."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Tide & Tackle uses Face ID to confirm payments."
+        }
+      ],
+      [
+        "expo-notifications",
+        {}
       ]
     ],
     "owner": "hansade"

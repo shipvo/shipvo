@@ -36,7 +36,7 @@ jobs:
       - name: Build our simulator
         working-directory: apps/tide-and-tackle
         run: |
-          npx expo export --platform web --output-dir sim-dist
+          PN_SIM=1 npx expo export --platform web --output-dir sim-dist
           npm i -g playwright@1.63.0 && npx -y playwright@1.63.0 install chromium
       - name: Parity on iOS Simulator
         working-directory: apps/tide-and-tackle

@@ -30,6 +30,7 @@ const server = new McpServer({ name: "purenative", version: "0.0.1" }, { instruc
 `You can use PureNative apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
 Only what is on screen is listed, like a phone: a horizontal product rail shows a few items, so "scroll right" on the rail (its ref) to see more; "scroll down" the page for the rest.
+System sheets (permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners, the share sheet) appear in the tree like any other screen: answer them by tapping, as a person would. Use set_device to decide what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether the payment is approved, network off) before the app asks for it.
 Finish a task by checking the final screen says what you expected (for example "Order placed"). Call end_session when done to get a report.` });
 
 server.tool("list_apps", "Apps this server can open, with what each one does.", {}, async () =>
@@ -62,6 +63,21 @@ server.tool("screenshot", "A PNG of the phone screen (for checking layout, colou
   if (!r.ok || !r.path) throw new Error(r.error ?? "no screenshot");
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
 });
+// The simulated device: what the phone has, and what happens to it.
+server.tool("set_device", "Change what the simulated phone has: location, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
+  session: sid,
+  location: z.object({ latitude: z.number(), longitude: z.number(), accuracy: z.number().optional() }).optional(),
+  camera: z.object({ barcode: z.object({ type: z.string(), data: z.string() }).nullable().optional(), delayMs: z.number().optional() }).optional(),
+  permissions: z.object({ camera: z.enum(["granted", "denied", "undetermined"]).optional(), location: z.enum(["granted", "denied", "undetermined"]).optional(), notifications: z.enum(["granted", "denied", "undetermined"]).optional() }).optional(),
+  biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
+  payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
+  online: z.boolean().optional(),
+}, async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "set_device", device })); });
+server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() },
+  async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
+server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid },
+  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[] }; return text(JSON.stringify(r.log ?? [], null, 2)); });
+
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, async ({ session }) => {
   need(session); const s = sessions.get(session)!; sessions.delete(session);
   let orders: unknown[] = [];

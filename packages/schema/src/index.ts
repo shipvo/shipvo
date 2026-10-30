@@ -179,7 +179,7 @@ export const AppContent = z.object({
   theme: z.object({ accent: hex }),
   departments: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/), name: z.string().min(1) })).min(1),
   products: z.array(z.object({
-    id: z.string().regex(/^[a-z0-9-]+$/), name: z.string().min(1).max(80), department: z.string(), price: z.number().int().positive(), stock: z.number().int().nonnegative(),
+    id: z.string().regex(/^[a-z0-9-]+$/), name: z.string().min(1).max(80), department: z.string(), price: z.number().int().positive(), stock: z.number().int().nonnegative(), barcode: z.string().regex(/^\d{8,14}$/).optional(),
     water: z.enum(["salt", "fresh", "both"]), tags: z.array(z.string()), description: z.string().max(400), image_url: z.string().url().optional(),
   })),
   promos: z.array(z.object({ code: z.string().regex(/^[A-Z0-9]{3,16}$/), percent: z.number().int().min(1).max(90), min_subtotal: z.number().int().nonnegative(),

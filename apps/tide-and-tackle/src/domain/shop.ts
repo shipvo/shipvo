@@ -12,7 +12,7 @@ export type CartLine = { product_id: string; quantity: number };
 export type Order = {
   id: string; lines: (CartLine & { name: string; unit_price: number })[]; subtotal: number; discount: number;
   delivery_fee: number; total: number; promo: string | null; slot_id: string; address: string;
-  payment: "cash_on_delivery" | "mobile_money"; phone: string | null; status: "placed";
+  payment: "cash_on_delivery" | "mobile_money"; phone: string | null; receipt?: string | null; status: "placed";
 };
 export type ShopState = {
   cart: CartLine[]; promo: string | null; delivery: { slot_id: string; address: string } | null; orders: Order[];
@@ -116,6 +116,11 @@ export const COMMANDS: Record<string, CommandSpec> = {
       return { code: p.code, description: p.description, min_subtotal_fcfa: p.min_subtotal, departments: p.departments ?? "all", discount_on_current_cart_fcfa: t.discount };
     }),
   },
+  find_by_barcode: {
+    description: "Find the product whose barcode (EAN) was scanned.",
+    params: { code: { type: "string", required: true, description: "The scanned code." } },
+    run: (_s, a) => { const code = String(a.code).trim(); const p = C.products.find((x) => x.barcode === code || x.id === code) ?? fail("not_found", `No product has barcode ${code}.`); return { id: p.id, name: p.name, price_fcfa: p.price }; },
+  },
   list_delivery_slots: { description: "List delivery slots with fees and whether they are available.", params: {}, run: (s) => C.slots.map((x) => ({ id: x.id, day: x.day, window: x.window, fee_fcfa: x.fee, available: slotCap(s, x.id) > 0 })) },
   set_delivery: {
     description: "Choose a delivery slot and address (address is ignored for shop pickup).",
@@ -133,19 +138,21 @@ export const COMMANDS: Record<string, CommandSpec> = {
     params: {
       payment: { type: "string", required: true, description: "How the customer pays.", enum: ["cash_on_delivery", "mobile_money"] },
       phone: { type: "string", description: "Mobile money number (required for mobile_money), 9 digits starting with 6." },
+      receipt: { type: "string", description: "Payment receipt from the mobile money provider (required for mobile_money)." },
     },
     run: (s, a) => {
       if (!s.cart.length) fail("empty_cart", "The cart is empty.");
       const delivery = s.delivery ?? fail("no_delivery", "Choose a delivery slot first (set_delivery).");
       if (!["cash_on_delivery", "mobile_money"].includes(a.payment)) fail("bad_payment", "payment must be cash_on_delivery or mobile_money");
       if (a.payment === "mobile_money" && !/^6\d{8}$/.test(String(a.phone ?? "").replace(/\s/g, ""))) fail("bad_phone", "Mobile money needs a 9-digit number starting with 6.");
+      if (a.payment === "mobile_money" && !String(a.receipt ?? "").trim()) fail("payment_required", "Mobile money must be confirmed first (pay through the app's payment prompt).");
       for (const l of s.cart) if (l.quantity > stockOf(s, l.product_id)) fail("out_of_stock", `Not enough stock for ${l.product_id}.`);
       const t = totals(s);
       const order: Order = {
         id: `TT-${1001 + s.orders.length}`, lines: t.lines.map(({ product_id, quantity, name, unit_price }) => ({ product_id, quantity, name, unit_price })),
         subtotal: t.subtotal, discount: t.discount, delivery_fee: t.delivery_fee, total: t.total, promo: s.promo,
         slot_id: delivery.slot_id, address: delivery.address, payment: a.payment,
-        phone: a.payment === "mobile_money" ? String(a.phone).replace(/\s/g, "") : null, status: "placed",
+        phone: a.payment === "mobile_money" ? String(a.phone).replace(/\s/g, "") : null, receipt: a.payment === "mobile_money" ? String(a.receipt) : null, status: "placed",
       };
       for (const l of s.cart) s.stock[l.product_id] = stockOf(s, l.product_id) - l.quantity;
       s.slot_capacity[order.slot_id] = slotCap(s, order.slot_id) - 1;

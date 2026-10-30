@@ -32,3 +32,4 @@ jobs:
           pub @purenative/schema
           pub @purenative/cli
           pub @purenative/mcp
+          pub @purenative/device

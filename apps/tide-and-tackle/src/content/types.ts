@@ -1,6 +1,8 @@
 // The app's live content: everything an owner can change from the admin without a code release.
 export type Department = { id: string; name: string };
 export type Product = {
+  /** EAN-13 printed on the pack, for the in-app scanner. */
+  barcode?: string;
   id: string; name: string; department: string; price: number; stock: number;
   water: "salt" | "fresh" | "both"; tags: string[]; description: string; image_url?: string;
 };

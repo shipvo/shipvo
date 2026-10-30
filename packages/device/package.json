@@ -1,0 +1,70 @@
+{
+  "name": "@purenative/device",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "One device API for PureNative apps: camera, location, biometrics, payments, notifications, share, network. Real native modules on phones; a simulated device with on-screen system sheets in the PureNative simulator, so AI agents can use and test native features with no phone.",
+  "main": "src/index",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "metro.cjs",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "expo-camera": "*",
+    "expo-location": "*",
+    "expo-local-authentication": "*",
+    "expo-notifications": "*",
+    "expo-clipboard": "*",
+    "react-native": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo-camera": {
+      "optional": true
+    },
+    "expo-location": {
+      "optional": true
+    },
+    "expo-local-authentication": {
+      "optional": true
+    },
+    "expo-notifications": {
+      "optional": true
+    },
+    "expo-clipboard": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "purenative",
+    "expo",
+    "react-native",
+    "simulator",
+    "ai-agents",
+    "camera",
+    "location",
+    "biometrics",
+    "payments"
+  ],
+  "homepage": "https://github.com/purenativedev/purenative#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/purenativedev/purenative.git",
+    "directory": "packages/device"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "react-native": "./src/index.ts",
+      "browser": "./src/index.web.ts",
+      "default": "./src/index.ts"
+    },
+    "./metro": "./metro.cjs",
+    "./package.json": "./package.json"
+  }
+}

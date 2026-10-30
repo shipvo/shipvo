@@ -25,7 +25,7 @@ jobs:
       - name: Start simulator
         working-directory: apps/tide-and-tackle
         run: |
-          npx expo export --platform web --output-dir sim-dist
+          PN_SIM=1 npx expo export --platform web --output-dir sim-dist
           npm i -g playwright@1.63.0 && npx -y playwright@1.63.0 install --with-deps chromium
           CONTENT_FROM=https://purenative-control.purenative.workers.dev nohup node sim/server.mjs > sim.log 2>&1 &
           for i in $(seq 1 30); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done

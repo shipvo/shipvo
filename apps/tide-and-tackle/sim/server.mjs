@@ -28,7 +28,7 @@ async function newSession(id, opts = {}) {
   if (sessions.has(id)) await sessions.get(id).ctx.close();
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
   const ctx = await browser.newContext({ ...phone, colorScheme: opts.dark ? "dark" : "light" });
-  await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: "tide", seed_cart: opts.seed_cart ?? null });
+  await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: "tide", appName: "Tide & Tackle", seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
   await page.goto(`http://localhost:${PORT}/app/`, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
@@ -96,9 +96,13 @@ async function act(id, body) {
       await page.mouse.wheel(body.direction === "right" ? 300 : body.direction === "left" ? -300 : 0, body.direction === "up" ? -600 : body.direction === "down" ? 600 : 0);
       break;
     }
+    // Simulated device: what the phone "has" and what happens to it. See @purenative/device.
+    case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); break;
+    case "push_notification": await page.evaluate((n) => globalThis.__pnDevice?.push(n), { title: body.title ?? "", body: body.body ?? "", data: body.data ?? {} }); break;
+    case "device_log": return { log: await page.evaluate(() => globalThis.__pnDevice?.log() ?? []), screen: await screen(page) };
     case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) await b.first().click(); else throw new Error("no Back button on this screen"); break; }
     case "screenshot": { const p = join(DIR, `${id}-${Date.now()}.png`); await page.screenshot({ path: p }); return { path: p, screen: await screen(page) }; }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, device_log`);
   }
   return { screen: await screen(page) };
 }
