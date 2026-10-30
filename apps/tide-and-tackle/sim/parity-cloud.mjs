@@ -9,8 +9,8 @@ const LANE = arg("lane", "ios"), APP = arg("app"), SIM = arg("sim", "http://loca
 const FLOW = [
   { name: "Home" }, { tap: "Chrome Spoon 30 g", name: "Product" }, { tap: "Increase quantity" }, { tap: "Add 2 to cart", name: "Added" },
   { tap: "Open cart", name: "Cart" }, { tap: "Choose delivery and pay", name: "Checkout" }, { tap: "Friday 14:00" },
-  { type: "Delivery address", text: "Bonapriso Douala" }, { tap: "Place order", name: "Order placed" },
-  { tap: "Allow", exact: true, optional: true },   // iOS asks to send notifications after the first order; a person taps Allow
+  { type: "Delivery address", text: "Bonapriso Douala" }, { tap: "Place order" },
+  { tap: "Allow", exact: true, optional: true, name: "Order placed" },   // iOS asks to send notifications after the first order; a person taps Allow, then sees the order
   { wait: 6000 },                                   // the "order confirmed" banner clears
   // Flow B: search, promo code, shop pickup, mobile money.
   { tap: "Back to shop", flow: "B" }, { tap: "Open search", name: "Search" }, { type: "Search products", text: "popper", name: "Search results" },

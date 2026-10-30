@@ -100,6 +100,9 @@ export async function type(s, label, text) {
 export const source = (s) => wd("GET", `/session/${s.id}/source`);
 /** Whole screen, like the simulator's full page: scroll through and collect. */
 export async function fullScreen(s) {
+  // A keyboard left open (number pad after a PIN) is not part of the screen: close it first, as a person would.
+  if (s.platform === "ios" && (await wd("GET", `/session/${s.id}/appium/device/is_keyboard_shown`).catch(() => false)))
+    await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: dragFromToForDuration", args: [{ duration: 0.3, fromX: 200, fromY: 260, toX: 200, toY: 420 }] }).catch(() => {});
   const seen = new Map(); let stale = 0;
   for (let i = 0; i < 6 && stale < 2; i++) { const before = seen.size; for (const e of await elements(s)) seen.set(`${e.role}|${e.label}`, e); stale = seen.size === before ? stale + 1 : 0; await scroll(s, "down"); }
   for (let i = 0; i < 6; i++) await scroll(s, "up");
