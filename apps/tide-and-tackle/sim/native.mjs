@@ -50,6 +50,19 @@ function rawDump() {
   return nodes;
 }
 
+/** Diagnostic: large nodes (≥ 85% of the screen) with their class, label and bounds, to tune the modal rule. */
+export function largeNodes() {
+  let xml = ""; try { adb("shell", "uiautomator", "dump", "/sdcard/pn.xml"); xml = adb("shell", "cat", "/sdcard/pn.xml"); } catch {}
+  const out = []; let rootArea = 0;
+  for (const m of xml.matchAll(/<node ([^>]*?)\/?>/g)) {
+    const a = Object.fromEntries([...m[1].matchAll(/([\w-]+)="([^"]*)"/g)].map((x) => [x[1], x[2]]));
+    const b = (a.bounds || "").match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/); if (!b) continue;
+    const [x1, y1, x2, y2] = b.slice(1).map(Number); const area = (x2 - x1) * (y2 - y1); if (!rootArea) rootArea = area;
+    if (area >= rootArea * 0.85) out.push({ cls: (a.class || "").split(".").pop(), desc: a["content-desc"], bounds: a.bounds, pct: +(area / rootArea).toFixed(3) });
+  }
+  return out;
+}
+
 export function render(nodes) {
   const refs = {}; const lines = [];
   nodes.forEach((n, i) => {

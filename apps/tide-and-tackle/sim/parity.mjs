@@ -169,14 +169,16 @@ for (const [fi, flow] of FLOWS.entries()) {
           const n = (report.flow.debug?.length ?? 0) + 1; const shot = join(OUT, `debug-${n}.png`);
           try { writeFileSync(shot, execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20 })); } catch {}
           let focus = ""; try { focus = execFileSync("adb", ["shell", "dumpsys", "window"]).toString().split("\n").filter((l) => /mCurrentFocus|mFocusedApp/.test(l)).join(" | ").trim(); } catch {}
+          let logcat = ""; try { logcat = execFileSync("adb", ["logcat", "-d", "-t", "400"], { maxBuffer: 64 << 20 }).toString().split("\n").filter((l) => /[Pp]ermission|ExpoCamera|expo\.modules|ReactNativeJS|AndroidRuntime/.test(l)).slice(-40).join("\n"); } catch {}
           let perms = ""; try { perms = execFileSync("adb", ["shell", "dumpsys", "package", "dev.purenative.tide"]).toString().split("\n").filter((l) => /CAMERA|ACCESS_FINE_LOCATION/.test(l) && /granted/.test(l)).map((l) => l.trim()).join(" | "); } catch {}
-          (report.flow.debug ??= []).push({ at: msg.slice(0, 80), screenshot: shot, focus, perms, sim: (await sim.elements()).map((x) => `${x.role}:${x.label}`).slice(0, 40), device: nativeDump().map((x) => `${x.role}:${x.label}`).slice(0, 40) });
+          (report.flow.debug ??= []).push({ at: msg.slice(0, 80), screenshot: shot, focus, perms, logcat, sim: (await sim.elements()).map((x) => `${x.role}:${x.label}`).slice(0, 40), device: nativeDump().map((x) => `${x.role}:${x.label}`).slice(0, 40) });
         } catch {} }
     }
     if (step.name) {
       const [a, b] = [await sim.elements(), await native.elements()];
       const row = { flow: flow.title, screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b), ...(/^Order placed/.test(step.name) ? sameOutcome(a, b) : {}) };
       report.screens.push(row);
+      if (/Payment prompt/.test(step.name)) { try { (report.flow.probe ??= {})[step.name] = nativeMod.largeNodes(); } catch {} }
       console.log(`[parity] ${flow.title} / ${step.name}: actionable ${(row.actionable_parity * 100).toFixed(0)}%, text ${(row.text_coverage * 100).toFixed(0)}% (${a.length}/${b.length})`);
       writeFileSync(join(OUT, "parity-report.json"), JSON.stringify(report, null, 2)); // partial results survive a timeout
     }
