@@ -20,6 +20,9 @@ export function dump() {
   for (let i = 0; i < 6; i++) { const n = rawDump(); if (!dismissAnr(n)) return n; }
   return rawDump();
 }
+let lastXml = "";
+/** The last raw uiautomator XML (diagnostics). */
+export const lastDumpXml = () => lastXml;
 function rawDump() {
   let xml = "";
   for (let i = 0; i < 3 && !xml.includes("<hierarchy"); i++) {
@@ -51,7 +54,9 @@ function rawDump() {
     nodes.push({ role, label, value: cls === "EditText" ? a.text : undefined, x: (x1 + x2) >> 1, y: (y1 + y2) >> 1,
       selected: a.selected === "true" || a.checked === "true", disabled: a.enabled === "false", id, ancestors });
   }
-  const out = modal === null ? nodes : nodes.filter((n) => n.id === modal || n.ancestors.includes(modal));
+  const inModal = modal === null ? [] : nodes.filter((n) => n.id === modal || n.ancestors.includes(modal));
+  const out = inModal.length >= 2 ? inModal : nodes;   // a "modal" with nothing inside it is not a modal
+  lastXml = xml;
   return out.map(({ id, ancestors, ...n }) => n);
 }
 

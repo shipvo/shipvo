@@ -68,3 +68,4 @@ jobs:
           path: |
             parity-report.*
             debug-*.png
+            ui-*.xml

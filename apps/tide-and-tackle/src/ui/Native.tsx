@@ -22,7 +22,7 @@ export function ScanScreen({ T, onCode, onCancel, prompt }: { T: Tokens; onCode:
           onBarcodeScanned={(r) => { if (done) return; setDone(true); onCode(r.data); }} />
       ) : (
         <View style={[s.camera, { alignItems: "center", justifyContent: "center" }]} accessibilityLabel="Camera unavailable">
-          <Text style={[s.body, { color: "#fff", textAlign: "center" }]}>{perm && !perm.granted ? "Camera permission is needed to scan." : "Starting camera…"}</Text>
+          <Text style={[s.body, { color: "#fff", textAlign: "center" }]}>{perm && !perm.granted ? `Camera permission is needed to scan. (${perm.status}${(perm as any).canAskAgain === false ? ", ask again: no" : ""})` : "Starting camera…"}</Text>
           {perm && !perm.granted && <Pressable accessibilityRole="button" accessibilityLabel="Allow camera" onPress={() => request()} style={[s.btn, { backgroundColor: T.accent, marginTop: 12 }]}><Text style={s.btnText}>Allow camera</Text></Pressable>}
         </View>
       )}
