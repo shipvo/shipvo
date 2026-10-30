@@ -104,4 +104,6 @@ const server = http.createServer(async (req, res) => {
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }
 });
+// Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
+server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
 server.listen(PORT, () => console.log(`PureNative UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));

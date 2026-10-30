@@ -25,7 +25,13 @@ const FLOW = [
 ];
 
 /* ---------- simulator driver ---------- */
-const simCall = async (path, body) => (await fetch(SIM + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json();
+// Fresh connection per call, with retries: the device side can pause long enough for an idle socket to close.
+const simCall = async (p, b) => {
+  for (let i = 0; ; i++) {
+    try { return await (await fetch(SIM + p, { method: "POST", headers: { "content-type": "application/json", connection: "close" }, body: JSON.stringify(b) })).json(); }
+    catch (e) { if (i >= 3) throw e; await new Promise((r) => setTimeout(r, 1000 * (i + 1))); }
+  }
+};
 function parseSim(tree) {
   const out = [];
   for (const line of tree.split("\n")) {

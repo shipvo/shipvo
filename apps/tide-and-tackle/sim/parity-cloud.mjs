@@ -19,7 +19,13 @@ const CANDIDATES = {
   "android-real": [["Galaxy A12", "11"], ["Galaxy A13", "12"], ["Galaxy A21s", "10"], ["Pixel 6", "12"]],
 };
 
-const simCall = async (p, b) => (await fetch(SIM + p, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) })).json();
+// Fresh connection per call, with retries: the device side can pause long enough for an idle socket to close.
+const simCall = async (p, b) => {
+  for (let i = 0; ; i++) {
+    try { return await (await fetch(SIM + p, { method: "POST", headers: { "content-type": "application/json", connection: "close" }, body: JSON.stringify(b) })).json(); }
+    catch (e) { if (i >= 3) throw e; await new Promise((r) => setTimeout(r, 1000 * (i + 1))); }
+  }
+};
 function parseSim(tree) {
   const out = [];
   for (const line of tree.split("\n")) {
