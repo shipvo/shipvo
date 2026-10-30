@@ -7,7 +7,12 @@ import http from "node:http";
 import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync } from "node:fs";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, devices } from "playwright";
+import { createRequire } from "node:module";
+import { execSync } from "node:child_process";
+// Use the project's Playwright if installed, else a global one.
+const require_ = createRequire(import.meta.url);
+let pw; try { pw = require_("playwright"); } catch { pw = require_(join(execSync("npm root -g").toString().trim(), "playwright")); }
+const { chromium, devices } = pw;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };

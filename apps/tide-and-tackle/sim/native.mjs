@@ -1,0 +1,62 @@
+#!/usr/bin/env node
+// Native driver: the same commands as the simulator (screen, tap, type, scroll, back), against a real Android
+// app on an emulator or phone, through Android's own accessibility tree (uiautomator) over adb.
+//   ANDROID_SERIAL=<device> node sim/native.mjs screen | tap <ref> | type <ref> "<text>" | scroll <up|down> | back
+import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+
+const REFS = process.env.PN_NATIVE_REFS || "/tmp/pn-native-refs.json";
+const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 32 << 20 });
+
+export function dump() {
+  let xml = "";
+  for (let i = 0; i < 3 && !xml.includes("<hierarchy"); i++) {
+    try { adb("shell", "uiautomator", "dump", "/sdcard/pn.xml"); xml = adb("shell", "cat", "/sdcard/pn.xml"); } catch {}
+  }
+  const nodes = [];
+  for (const m of xml.matchAll(/<node ([^>]*?)\/?>/g)) {
+    const a = Object.fromEntries([...m[1].matchAll(/([\w-]+)="([^"]*)"/g)].map((x) => [x[1], x[2].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#10;/g, " ")]));
+    const b = (a.bounds || "").match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+    if (!b) continue;
+    const [x1, y1, x2, y2] = b.slice(1).map(Number);
+    if (x2 - x1 < 2 || y2 - y1 < 2) continue;
+    const cls = (a.class || "").split(".").pop();
+    const role = a.checkable === "true" && /Radio/.test(cls) ? "radio"
+      : cls === "EditText" ? "textbox"
+      : a.clickable === "true" || cls === "Button" ? "button"
+      : a.heading === "true" ? "heading" : "text";
+    const label = (a["content-desc"] || a.text || "").trim();
+    if (!label && role === "text") continue;
+    nodes.push({ role, label, value: cls === "EditText" ? a.text : undefined, x: (x1 + x2) >> 1, y: (y1 + y2) >> 1,
+      selected: a.selected === "true" || a.checked === "true", disabled: a.enabled === "false" });
+  }
+  return nodes;
+}
+
+export function render(nodes) {
+  const refs = {}; const lines = [];
+  nodes.forEach((n, i) => {
+    const ref = `n${i + 1}`; refs[ref] = { x: n.x, y: n.y };
+    lines.push(`- ${n.role} "${n.label}"${n.selected ? " [selected]" : ""}${n.disabled ? " [disabled]" : ""} [ref=${ref}]${n.value ? `: ${n.value}` : ""}`);
+  });
+  writeFileSync(REFS, JSON.stringify(refs));
+  return lines.join("\n");
+}
+
+const settle = () => execFileSync("sleep", ["0.6"]);
+export function act(cmd, a, b) {
+  const refs = existsSync(REFS) ? JSON.parse(readFileSync(REFS, "utf8")) : {};
+  const at = (r) => refs[r] ?? (() => { throw new Error(`unknown ref ${r}; run screen first`); })();
+  if (cmd === "tap") { const p = at(a); adb("shell", "input", "tap", String(p.x), String(p.y)); }
+  else if (cmd === "type") { const p = at(a); adb("shell", "input", "tap", String(p.x), String(p.y)); settle(); adb("shell", "input", "text", String(b).replace(/ /g, "%s").replace(/([&|<>;()$`\\"'])/g, "\\$1")); adb("shell", "input", "keyevent", "111"); }
+  else if (cmd === "scroll") { const up = a === "up"; adb("shell", "input", "swipe", "540", up ? "700" : "1700", "540", up ? "1700" : "700", "250"); }
+  else if (cmd === "back") { const n = dump().find((x) => x.role === "button" && x.label === "Back"); if (!n) throw new Error("no Back button on this screen"); adb("shell", "input", "tap", String(n.x), String(n.y)); }
+  else if (cmd !== "screen") throw new Error(`unknown command ${cmd}`);
+  if (cmd !== "screen") settle();
+  return render(dump());
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const [cmd, a, b] = process.argv.slice(2);
+  try { console.log(act(cmd || "screen", a, b)); } catch (e) { console.log(`ERROR: ${e.message}`); process.exit(1); }
+}

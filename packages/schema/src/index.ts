@@ -141,7 +141,7 @@ export type ChangeLogEntry = z.infer<typeof ChangeLogEntry>;
 export const Telemetry = z.object({
   schema_version: z.literal("1.0"),
   app_id: z.string(), release: z.number().int().nonnegative(),
-  event: z.enum(["applied", "rolled_back", "crash_loop_revert", "download_failed", "verify_failed"]),
+  event: z.enum(["applied", "rolled_back", "crash_loop_revert", "download_failed", "verify_failed", "content_applied"]),
   cold_start_ms: z.number().nonnegative().optional(),
   bytes_downloaded: z.number().int().nonnegative().optional(),
   apply_ms: z.number().nonnegative().optional(),
