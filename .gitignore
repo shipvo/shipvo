@@ -4,3 +4,4 @@ dist
 .dev.vars
 *.keystore
 .env*
+__pycache__/

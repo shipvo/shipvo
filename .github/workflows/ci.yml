@@ -12,10 +12,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @purenative/schema build
+      - run: pnpm --filter @shipvo/schema build
       - run: pnpm -r test
       - name: Design skill checks
         run: |
-          cd skills/purenative-design
+          cd skills/shipvo-design
           python3 scripts/check_screen.py examples/screen-home.json --theme examples/theme.json --manifest examples/manifest.json
           python3 scripts/genericness_check.py --theme examples/theme.json --screen examples/screen-home.json

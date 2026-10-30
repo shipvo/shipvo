@@ -1,9 +1,9 @@
 {
-  "name": "@purenative/control-plane",
+  "name": "@shipvo/control-plane",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": { "dev": "wrangler dev", "deploy": "wrangler deploy", "test": "vitest run" },
-  "dependencies": { "@noble/ed25519": "^2.1.0", "@purenative/schema": "workspace:*", "hono": "^4.6.8" },
+  "dependencies": { "@noble/ed25519": "^2.1.0", "@shipvo/schema": "workspace:*", "hono": "^4.6.8" },
   "devDependencies": { "wrangler": "^3.84.0", "typescript": "^5.6.3", "vitest": "^2.1.4", "@cloudflare/workers-types": "^4.20241106.0" }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a PureNative screen JSON against the block vocabulary, token rules and accessibility/performance floors.
+"""Validate a Shipvo screen JSON against the block vocabulary, token rules and accessibility/performance floors.
 
 Usage: check_screen.py screen.json [--theme theme.json] [--manifest manifest.json]
 Exit 1 on errors; warnings don't fail. Standard library only.

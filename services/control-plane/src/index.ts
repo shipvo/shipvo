@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@purenative/schema";
+import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
 import { describeOwner, runOwnerCommand } from "./owner";
 

@@ -1,6 +1,6 @@
-# purenative-design
+# shipvo-design
 
-A skill for agents that design PureNative screens and themes. Read `SKILL.md` first; it tells the agent the three passes to run and when to call each script.
+A skill for agents that design Shipvo screens and themes. Read `SKILL.md` first; it tells the agent the three passes to run and when to call each script.
 
 - `references/` — tokens, blocks, profiles, platform conventions, anti-patterns, accessibility and performance floors, the screen schema.
 - `scripts/` — `make_theme.py` (seeds to a full theme with contrast report), `check_screen.py` (schema, token and floor validation), `genericness_check.py` (default looks and template patterns). Python 3.9+, standard library only.

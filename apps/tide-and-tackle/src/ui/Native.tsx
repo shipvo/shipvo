@@ -1,9 +1,9 @@
 // Native-feature UI shared by phones and the simulator: scanner, payment prompt, location helper.
-// Everything here goes through @purenative/device, so the simulator can stand in for the phone.
+// Everything here goes through @shipvo/device, so the simulator can stand in for the phone.
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { device, type PaymentRequest, type PaymentResult } from "@purenative/device";
+import { device, type PaymentRequest, type PaymentResult } from "@shipvo/device";
 import type { Tokens } from "./theme";
 import { fcfa } from "./theme";
 

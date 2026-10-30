@@ -13,7 +13,7 @@ importers:
       '@expo/metro-runtime':
         specifier: ~58.0.15
         version: 58.0.15(@expo/log-box@58.0.13)(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
-      '@purenative/device':
+      '@shipvo/device':
         specifier: workspace:*
         version: link:../../packages/device
       expo:
@@ -53,7 +53,7 @@ importers:
         specifier: ^0.21.4
         version: 0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
-      '@purenative/cli':
+      '@shipvo/cli':
         specifier: workspace:*
         version: link:../../packages/cli
       '@types/react':
@@ -71,7 +71,7 @@ importers:
       '@noble/hashes':
         specifier: ^1.5.0
         version: 1.8.0
-      '@purenative/schema':
+      '@shipvo/schema':
         specifier: workspace:*
         version: link:../schema
     devDependencies:
@@ -143,7 +143,7 @@ importers:
       '@noble/ed25519':
         specifier: ^2.1.0
         version: 2.3.0
-      '@purenative/schema':
+      '@shipvo/schema':
         specifier: workspace:*
         version: link:../../packages/schema
       hono:

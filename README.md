@@ -1,11 +1,13 @@
-# PureNative: build once, publish for people and AI agents
+# Shipvo: build once, publish for people and AI agents
 
 **One React Native app, two places it runs.** People get a native Android or iOS app from the stores, kept current with signed over-the-air updates. AI agents get the same release in a phone-sized simulator they can see and operate over MCP, with no device, including native features (camera, location, biometrics, payments, notifications). Every claim about the simulator is measured against real Android and iOS and published.
+
+> Shipvo was briefly called PureNative. Internal identifiers that phones already depend on (the Android package `dev.purenative.tide`, the native runtime module, the current control-plane URL) keep the old name until a shell release migrates them; everything people type or install says Shipvo.
 
 Three pillars:
 
 1. **Publish.** Signed OTA updates (64 KB patches, crash-loop rollback, staged rollouts), a built-in owner admin at `/app/<id>/admin`, and a control plane you can self-host on Cloudflare.
-2. **Simulate.** `@purenative/mcp` opens any PureNative app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@purenative/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
+2. **Simulate.** `@shipvo/mcp` opens any Shipvo app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@shipvo/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
 3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% matching controls on both platforms across two purchase flows (`docs/parity-results.md`).
 
 [![CI](https://github.com/purenativedev/purenative/actions/workflows/ci.yml/badge.svg)](https://github.com/purenativedev/purenative/actions/workflows/ci.yml)
@@ -15,9 +17,9 @@ Three pillars:
 
 > **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is being measured now and will be published the same way.
 
-## Why PureNative
+## Why Shipvo
 
-Every change to a native mobile app normally means a new build, a store submission, a review, and then waiting for users to update. Many never do. PureNative separates what has to go through the store from what doesn't:
+Every change to a native mobile app normally means a new build, a store submission, a review, and then waiting for users to update. Many never do. Shipvo separates what has to go through the store from what doesn't:
 
 | Layer | Ships through | Contains |
 | --- | --- | --- |
@@ -36,9 +38,9 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Telemetry for every release:** applied, reverted, cold-start time, download size and time.
 - **Control plane on Cloudflare Workers:** KV, D1 and R2. It's self-hostable, with a Docker target planned.
 - **Admin per app** at `/app/<id>/admin`: live content, prices, offers, orders, history, publish to every phone in seconds; the same typed owner commands are available to agents with a token.
-- **Agent-operable apps:** every app exposes typed commands and a UI simulator; `@purenative/mcp` plugs both into Claude, Cursor, Claude Code or PiPilot.
-- **Simulated device:** `@purenative/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
-- **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/purenative-design`.
+- **Agent-operable apps:** every app exposes typed commands and a UI simulator; `@shipvo/mcp` plugs both into Claude, Cursor, Claude Code or PiPilot.
+- **Simulated device:** `@shipvo/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
+- **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/shipvo-design`.
 
 ## How an update reaches a phone
 
@@ -63,7 +65,7 @@ Telemetry                   POST /t → D1
 | `packages/cli` | Ed25519 signing, hashing, publishing |
 | `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, telemetry, admin |
 | `apps/tide-and-tackle` | Sample app and native runtime module used for the spike |
-| `skills/purenative-design` | Design skill with runnable checks |
+| `skills/shipvo-design` | Design skill with runnable checks |
 
 ## Try the sample app
 
@@ -76,14 +78,14 @@ Telemetry                   POST /t → D1
 ```bash
 pnpm install
 pnpm -r test
-pnpm --filter @purenative/control-plane dev
+pnpm --filter @shipvo/control-plane dev
 ```
 
 Requires Node 22 and pnpm 10.
 
 ## Compared with other OTA tools
 
-PureNative sits alongside tools like Expo Updates (EAS Update) and self-hosted CodePush servers, which replaced Microsoft App Center CodePush after it was retired in 2025. What PureNative adds: a declared-capability shell manifest, signed add-ons, a per-app admin, cohort rollouts from static edge files, and apps that AI agents can operate.
+Shipvo sits alongside tools like Expo Updates (EAS Update) and self-hosted CodePush servers, which replaced Microsoft App Center CodePush after it was retired in 2025. What Shipvo adds: a declared-capability shell manifest, signed add-ons, a per-app admin, cohort rollouts from static edge files, and apps that AI agents can operate.
 
 ## License
 

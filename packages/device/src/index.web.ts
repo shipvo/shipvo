@@ -1,4 +1,4 @@
-// Simulated device: the same API, backed by a device state the PureNative simulator controls, with system sheets
+// Simulated device: the same API, backed by a device state the Shipvo simulator controls, with system sheets
 // (permission dialog, camera viewfinder, fingerprint prompt, payment prompt, notification banner, share sheet)
 // drawn as real dialogs so an agent sees and operates them exactly as it would a phone's.
 import type { Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification } from "./types";

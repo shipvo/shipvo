@@ -16,7 +16,7 @@ textarea{min-height:70px}label{display:grid;gap:4px;font-size:13px;color:var(--t
 
 export function loginPage(appId: string, error?: string) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in · PureNative admin</title><style>${BASE_CSS}
+<title>Sign in · Shipvo admin</title><style>${BASE_CSS}
 .box{max-width:380px;margin:12vh auto;padding:28px;background:var(--panel);border:1px solid var(--border);border-radius:16px;display:grid;gap:14px}
 h1{margin:0;font-size:22px}.muted{color:var(--text2);font-size:14px}.err{color:var(--bad);font-weight:600}</style></head><body>
 <form class="box" method="post" action="/app/${esc(appId)}/admin/login">
@@ -28,7 +28,7 @@ ${error ? `<p class="err" role="alert">${esc(error)}</p>` : ""}
 
 export function adminPage(appId: string) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin · ${esc(appId)} · PureNative</title><style>${BASE_CSS}
+<title>Admin · ${esc(appId)} · Shipvo</title><style>${BASE_CSS}
 header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--border)}
 .brand{display:flex;gap:10px;align-items:baseline}.brand b{font-size:17px}.brand span{color:var(--text2);font-size:13px}
 .status{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pill{font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--sunken)}
@@ -61,7 +61,7 @@ td input{min-height:34px;padding:4px 8px}.num{width:110px}
 .empty{padding:20px;text-align:center;color:var(--text2)}
 code,pre{font:13px ui-monospace,SFMono-Regular,Menlo,monospace}pre{background:var(--sunken);border-radius:8px;padding:12px;overflow:auto;margin:0}
 </style></head><body>
-<header><div class="brand"><b id="shopName">${esc(appId)}</b><span>PureNative admin</span></div>
+<header><div class="brand"><b id="shopName">${esc(appId)}</b><span>Shipvo admin</span></div>
 <div class="status"><span id="draftPill" class="pill">Loading…</span><span class="pill" id="livePill"></span>
 <button class="btn" id="discardBtn">Discard changes</button><button class="btn primary" id="publishBtn">Publish to phones</button></div></header>
 <nav role="tablist" aria-label="Sections">
