@@ -113,6 +113,7 @@ function nativeFull() {
   for (let i = 0; i < 8; i++) nativeAct("scroll", "up");
   return [...seen.values()];
 }
+const DIALOG = /^(While using the app|Only this time|Deny|Allow|Don.t allow|Allow all the time)$/;
 const native = {
   async start() {},
   async restart() {
@@ -120,7 +121,8 @@ const native = {
     execFileSync("adb", ["shell", "monkey", "-p", "dev.purenative.tide", "-c", "android.intent.category.LAUNCHER", "1"]);
     sleep(8000);
   },
-  async elements() { return nativeFull(); },
+  // System dialogs are modal: read them in place, never scroll over them (a swipe dismisses and denies).
+  async elements() { const d = nativeDump(); return d.some((n) => DIALOG.test(n.label)) ? d : nativeFull(); },
   async waitFor(re, timeoutMs) { const t0 = Date.now(); while (Date.now() - t0 < timeoutMs) { if (nativeDump().some((n) => re.test(n.label))) return; sleep(1000); } throw new Error(`native: never saw ${re}`); },
   async find(re, roles) {
     for (let i = 0; i < 8; i++) {
@@ -134,7 +136,9 @@ const native = {
   // Scroll back up only as far as find() scrolled down, and only when no dialog is showing.
   async tap(re) {
     const el = await this.find(re, ["button", "radio"]); execFileSync("adb", ["shell", "input", "tap", String(el.x), String(el.y)]); sleep(800);
-    if (el.scrolled > 0 && !nativeDump().some((n) => /^(While using the app|Only this time|Deny|Allow|Don.t allow)$/.test(n.label))) for (let i = 0; i < el.scrolled + 1; i++) nativeAct("scroll", "up");
+    // Settle: a permission dialog can take a few seconds to appear; wait until two dumps agree before doing anything else.
+    let prev = ""; for (let i = 0; i < 6; i++) { const cur = nativeDump().map((n) => n.role + n.label).join("|"); if (cur === prev) break; prev = cur; sleep(700); }
+    if (el.scrolled > 0 && !nativeDump().some((n) => DIALOG.test(n.label))) for (let i = 0; i < el.scrolled + 1; i++) nativeAct("scroll", "up");
   },
   async type(re, text) { const el = await this.find(re, ["textbox"]); execFileSync("adb", ["shell", "input", "tap", String(el.x), String(el.y)]); sleep(400); execFileSync("adb", ["shell", "input", "text", text.replace(/ /g, "%s")]); execFileSync("adb", ["shell", "input", "keyevent", "111"]); sleep(400);
     // A phone pad may ignore Escape; close the keyboard with Back, as a person would, so it does not cover the screen.

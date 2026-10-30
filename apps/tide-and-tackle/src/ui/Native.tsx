@@ -1,7 +1,7 @@
 // Native-feature UI shared by phones and the simulator: scanner, payment prompt, location helper.
 // Everything here goes through @shipvo/device, so the simulator can stand in for the phone.
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { device, type PaymentRequest, type PaymentResult } from "@shipvo/device";
 import type { Tokens } from "./theme";
@@ -43,8 +43,9 @@ export function PaymentSheet({ T, req, onDone, onCancel }: { T: Tokens; req: Pay
     setErr(r.reason === "declined" ? "Payment declined. Check your PIN and try again." : r.reason === "insufficient_funds" ? "Insufficient funds." : r.reason === "timeout" ? "The provider did not answer. Try again." : "Payment cancelled.");
   };
   return (
-    <View style={s.overlay} accessibilityViewIsModal {...({ "aria-modal": true } as any)} accessibilityLabel="Mobile money payment">
-      <View style={s.sheet}>
+    <View style={s.overlay} collapsable={false} accessibilityViewIsModal {...({ "aria-modal": true } as any)} accessibilityLabel="Mobile money payment">
+      {/* The number pad must never cover Confirm: the sheet rises above the keyboard. */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={s.sheet}>
         <Text style={s.h2} accessibilityRole="header">Mobile money payment</Text>
         <Text style={s.body}>Pay {fcfa(req.amount)} to {req.to}</Text>
         <Text style={s.caption}>Reference {req.reference}{req.phone ? ` · ${req.phone}` : ""}</Text>
@@ -55,7 +56,7 @@ export function PaymentSheet({ T, req, onDone, onCancel }: { T: Tokens; req: Pay
           <Text style={s.btnText}>{busy ? "Confirming…" : "Confirm payment"}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Cancel payment" onPress={onCancel} style={[s.btn, s.ghost]}><Text style={[s.btnText, { color: T.text }]}>Cancel</Text></Pressable>
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }

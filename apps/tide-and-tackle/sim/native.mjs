@@ -42,6 +42,7 @@ function rawDump() {
     if (x2 - x1 < 2 || y2 - y1 < 2) continue;
     const area = (x2 - x1) * (y2 - y1); if (!rootArea) rootArea = area;
     const ancestors = [...stack.slice(0, self ? stack.length : stack.length - 1)];
+    if (a["content-desc"] && area >= rootArea * 0.96 && parent !== null && !self) modal = id;
     // A labelled view covering the screen, drawn over sibling content, is a modal sheet: TalkBack and iOS expose only it.
     const cls = (a.class || "").split(".").pop();
     const role = a.checkable === "true" && /Radio/.test(cls) ? "radio"
@@ -53,9 +54,11 @@ function rawDump() {
     nodes.push({ role, label, value: cls === "EditText" ? a.text : undefined, x: (x1 + x2) >> 1, y: (y1 + y2) >> 1,
       selected: a.selected === "true" || a.checked === "true", disabled: a.enabled === "false", id, ancestors });
   }
-  // Modal sheets: the app marks what is behind them importantForAccessibility="no-hide-descendants", which Android's
-  // accessibility tree (and this dump) already omits, so no heuristic is needed here.
-  const out = nodes; void modal; void rootArea;
+  // Modal sheets: TalkBack hides what is behind them (the app marks it no-hide-descendants), but uiautomator's dump
+  // includes not-important views, so apply the same rule here: a labelled view covering the screen, with content
+  // inside it, is a modal sheet; expose only its subtree.
+  const inModal = modal === null ? [] : nodes.filter((n) => n.id === modal || n.ancestors.includes(modal));
+  const out = inModal.length >= 2 ? inModal : nodes;
   lastXml = xml;
   return out.map(({ id, ancestors, ...n }) => n);
 }
