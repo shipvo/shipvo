@@ -1,0 +1,52 @@
+name: parity-ios
+# Simulator vs a real iOS Simulator on a GitHub macOS runner (free for public repos, no Apple account):
+# install the EAS simulator build, drive it with Appium (XCUITest), same flow and comparison as the other lanes.
+on:
+  workflow_dispatch:
+    inputs:
+      build_url: { description: "EAS iOS simulator build (.tar.gz)", default: "https://expo.dev/artifacts/eas/cpTFtmQaQQefga5ZlJKduVJ2Rr4EBwPsfUFLI9BE2PU.tar.gz" }
+  push:
+    branches: [main]
+    paths: [".github/workflows/parity-ios.yml", "apps/tide-and-tackle/sim/appium.mjs"]
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Boot an iPhone simulator and install the app
+        run: |
+          xcrun simctl list devices available | grep -E "iPhone" | head -5
+          UDID=$(xcrun simctl list devices available -j | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s).devices;for(const k of Object.keys(d).reverse()){const x=d[k].find(v=>/^iPhone \d+$/.test(v.name));if(x){console.log(x.udid);return}}})")
+          echo "UDID=$UDID" >> $GITHUB_ENV
+          xcrun simctl boot "$UDID" || true
+          curl -sSL "${{ inputs.build_url || 'https://expo.dev/artifacts/eas/cpTFtmQaQQefga5ZlJKduVJ2Rr4EBwPsfUFLI9BE2PU.tar.gz' }}" -o app.tar.gz
+          mkdir app && tar -xzf app.tar.gz -C app && ls app
+          xcrun simctl install "$UDID" app/*.app
+          xcrun simctl list devices | grep Booted
+      - name: Start Appium (XCUITest)
+        run: |
+          npm i -g appium@2 && appium driver install xcuitest
+          nohup appium --port 4723 > appium.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:4723/status >/dev/null && break; sleep 2; done
+      - name: Start our simulator
+        working-directory: apps/tide-and-tackle
+        run: |
+          npx expo export --platform web --output-dir sim-dist
+          npm i -g playwright@1.63.0 && npx -y playwright@1.63.0 install chromium
+          CONTENT_FROM=https://purenative-control.purenative.workers.dev nohup node sim/server.mjs > sim.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
+      - name: Parity on iOS Simulator
+        working-directory: apps/tide-and-tackle
+        env: { APPIUM_HUB: "http://localhost:4723", APPIUM_LOCAL: "1" }
+        run: |
+          node sim/parity-cloud.mjs --lane ios-local --app "$UDID" || true
+          cat parity-ios-local.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || cat parity-ios-local.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: parity-ios-local, path: "apps/tide-and-tackle/parity-*" }

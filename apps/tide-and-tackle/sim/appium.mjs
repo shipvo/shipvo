@@ -1,19 +1,24 @@
 #!/usr/bin/env node
 // Cloud device driver: the same commands (screen, tap, type, scroll) on LambdaTest real phones, emulators and
 // iOS simulators over Appium (plain WebDriver over fetch, no dependencies). Used by sim/parity-cloud.mjs.
-const HUB = "https://mobile-hub.lambdatest.com/wd/hub";
-const auth = () => "Basic " + Buffer.from(`${process.env.LT_USER}:${process.env.LT_KEY}`).toString("base64");
+// LambdaTest by default; a local Appium server (e.g. on a macOS runner) when APPIUM_HUB is set.
+const HUB = process.env.APPIUM_HUB || "https://mobile-hub.lambdatest.com/wd/hub";
+const auth = () => process.env.APPIUM_HUB ? "" : "Basic " + Buffer.from(`${process.env.LT_USER}:${process.env.LT_KEY}`).toString("base64");
 
 async function wd(method, path, body) {
-  const r = await fetch(HUB + path, { method, headers: { authorization: auth(), "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const headers = { "content-type": "application/json" }; const a = auth(); if (a) headers.authorization = a;
+  const r = await fetch(HUB + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.value?.error) throw new Error(`${method} ${path}: ${r.status} ${j.value?.error ?? ""} ${(j.value?.message ?? "").split("\n")[0]}`);
   return j.value;
 }
 
 export async function startSession(caps) {
-  const v = await wd("POST", "/session", { capabilities: { alwaysMatch: { "lt:options": caps } } });
-  return { id: v.sessionId ?? v.sessionId, platform: caps.platformName.toLowerCase() };
+  const always = process.env.APPIUM_LOCAL
+    ? { platformName: "iOS", "appium:automationName": "XCUITest", "appium:udid": caps.udid, "appium:bundleId": "dev.purenative.tide", "appium:noReset": true, "appium:newCommandTimeout": 300, "appium:wdaLaunchTimeout": 240000 }
+    : { "lt:options": caps };
+  const v = await wd("POST", "/session", { capabilities: { alwaysMatch: always } });
+  return { id: v.sessionId, platform: caps.platformName.toLowerCase() };
 }
 export const endSession = (s, status = "passed") => wd("DELETE", `/session/${s.id}`).catch(() => {});
 

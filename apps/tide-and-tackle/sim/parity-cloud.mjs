@@ -13,6 +13,7 @@ const FLOW = [
 ];
 const CANDIDATES = {
   ios: [["iPhone 16", "18"], ["iPhone 15", "17"], ["iPhone 14", "16"]],
+  "ios-local": [["local iPhone simulator", "latest"]],
   "android-real": [["Galaxy A12", "11"], ["Galaxy A13", "12"], ["Galaxy A21s", "10"], ["Pixel 6", "12"]],
 };
 
@@ -48,9 +49,9 @@ const report = { lane: LANE, started_at: new Date().toISOString(), device: null,
 let s = null;
 for (const [deviceName, platformVersion] of CANDIDATES[LANE]) {
   try {
-    s = await cloud.startSession({ platformName: LANE === "ios" ? "iOS" : "Android", deviceName, platformVersion, app: APP,
+    s = await cloud.startSession({ platformName: LANE.startsWith("ios") ? "iOS" : "Android", deviceName, platformVersion, app: APP, udid: APP,
       isRealMobile: LANE !== "ios", build: "PureNative parity", name: `parity ${LANE}`, w3c: true, autoGrantPermissions: true });
-    report.device = `${deviceName} (${LANE === "ios" ? "iOS" : "Android"} ${platformVersion})`; break;
+    report.device = `${deviceName} (${LANE.startsWith("ios") ? "iOS" : "Android"} ${platformVersion})`; break;
   } catch (e) { report.errors.push(`session ${deviceName} ${platformVersion}: ${e.message}`); }
 }
 if (!s) { writeFileSync(`parity-${LANE}.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2)); process.exit(0); }
