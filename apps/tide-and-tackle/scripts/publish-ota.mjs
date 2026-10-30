@@ -4,7 +4,8 @@
 //      PURENATIVE_KV_ID (defaults to the control plane's POINTERS namespace).
 // Usage: node scripts/publish-ota.mjs [--bands b0,b1,b2] [--release N] [--min-shell 1.0.0] [--skip-export]
 import { execSync } from "node:child_process";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, writeFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { signBytes, sha256Hex } from "@purenative/cli";
 
@@ -21,6 +22,11 @@ const kvUrl = (k) => `https://api.cloudflare.com/client/v4/accounts/${ACC}/stora
 const auth = { Authorization: `Bearer ${TOKEN}` };
 
 async function kvGet(k) { const r = await fetch(kvUrl(k), { headers: auth }); return r.ok ? r.text() : null; }
+async function kvGetBytes(k) { const r = await fetch(kvUrl(k), { headers: auth }); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; }
+async function kvKeys(prefix) {
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACC}/storage/kv/namespaces/${KV}/keys?prefix=${encodeURIComponent(prefix)}&limit=1000`, { headers: auth });
+  return r.ok ? (await r.json()).result.map((k) => k.name) : [];
+}
 async function kvPut(k, body, type) {
   const r = await fetch(kvUrl(k), { method: "PUT", headers: { ...auth, "content-type": type }, body });
   if (!r.ok) throw new Error(`KV put ${k}: ${r.status} ${await r.text()}`);
@@ -44,11 +50,36 @@ const bytes = new Uint8Array(readFileSync(join(jsDir, file)));
 const name = `r${release}.hbc`;
 await kvPut(`b/${APP_ID}/${name}`, bytes, "application/octet-stream");
 
+// Patches: from the last few releases' bundles and from each shell's embedded (APK) bundle, so even the
+// first update after install is a patch. Devices verify the patched result against the signed sha256.
+const MAX_BASES = Number(args["max-bases"] || 6);
+const bases = new Map(); // sha256 -> kv key of base bytes
+const hist = (await Promise.all((await kvKeys(`h/${APP_ID}/r`)).map(async (k) => { try { return JSON.parse(await kvGet(k)); } catch { return null; } })))
+  .filter((h) => h && h.release < release).sort((a, b) => b.release - a.release).slice(0, MAX_BASES - 2);
+for (const h of hist) bases.set(h.sha256, `b/${APP_ID}/r${h.release}.hbc`);
+for (const k of await kvKeys(`base/${APP_ID}/`)) { try { const b = JSON.parse(await kvGet(k)); bases.set(b.sha256, b.key); } catch {} }
+const newSha = sha256Hex(bytes);
+const patches = [];
+const work = mkdtempSync(join(tmpdir(), "pn-"));
+writeFileSync(join(work, "new.hbc"), bytes);
+for (const [fromSha, key] of bases) {
+  if (fromSha === newSha) continue;
+  const base = await kvGetBytes(key); if (!base) continue;
+  writeFileSync(join(work, "old.hbc"), base);
+  execSync(`python3 -c "import bsdiff4; bsdiff4.file_diff('${join(work, "old.hbc")}', '${join(work, "new.hbc")}', '${join(work, "p.bsdiff")}')"`);
+  const patch = new Uint8Array(readFileSync(join(work, "p.bsdiff")));
+  if (patch.length >= bytes.length * 0.6) continue; // not worth it
+  const pkey = `b/${APP_ID}/d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
+  await kvPut(pkey, patch, "application/octet-stream");
+  patches.push({ from_sha256: fromSha, url: pkey, size: patch.length, sha256: sha256Hex(patch) });
+}
+console.error(`patches: ${patches.map((p) => `${p.from_sha256.slice(0, 8)}=${(p.size / 1024).toFixed(1)}KB`).join(", ") || "none"}`);
+
 const issued_at = new Date().toISOString();
 for (const band of bands) {
   const body = JSON.stringify({
     schema_version: "1.0", app_id: APP_ID, shell_major: SHELL_MAJOR, band, release, issued_at,
-    core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${APP_ID}/${name}` },
+    core: { version: `1.0.${release}`, sha256: newSha, size: bytes.length, url: `b/${APP_ID}/${name}`, patches },
     addons: [], screens: [], min_shell_version: args["min-shell"] || MIN_SHELL,
   });
   const envelope = JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) });
@@ -56,4 +87,4 @@ for (const band of bands) {
 }
 // Keep a small history record so rollback knows each release's shell requirement.
 await kvPut(`h/${APP_ID}/r${release}`, JSON.stringify({ release, issued_at, sha256: sha256Hex(bytes), size: bytes.length, min_shell_version: args["min-shell"] || MIN_SHELL }), "application/json");
-console.log(JSON.stringify({ release, bands, bytes: bytes.length, file, issued_at }));
+console.log(JSON.stringify({ release, bands, bytes: bytes.length, file, issued_at, patches: patches.map((p) => ({ from: p.from_sha256.slice(0, 12), kb: +(p.size / 1024).toFixed(1) })) }));

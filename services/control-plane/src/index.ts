@@ -42,11 +42,12 @@ app.post("/t", async (c) => {
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
   await c.env.DB.prepare(
-    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api) VALUES (?,?,?,?,?,?,?,?,?,?)"
+    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(d.app_id, d.release, d.event, d.cold_start_ms ?? null, d.bytes_downloaded ?? null, d.apply_ms ?? null, d.device_class ?? null,
     typeof extra.published_at === "string" ? extra.published_at.slice(0, 40) : null,
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
-    Number.isInteger(extra.android_api) ? extra.android_api : null).run();
+    Number.isInteger(extra.android_api) ? extra.android_api : null,
+    extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
   return c.json({ ok: true }, 202);
 });
 

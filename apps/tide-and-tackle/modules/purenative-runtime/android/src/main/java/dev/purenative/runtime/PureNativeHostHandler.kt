@@ -69,7 +69,7 @@ class PureNativeHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
     internal fun revertToPrevious(s: Store) {
       s.currentPath?.let { if (it != s.previousPath) File(it).delete() }
-      s.currentPath = s.previousPath; s.currentRelease = s.previousRelease
+      s.currentPath = s.previousPath; s.currentRelease = s.previousRelease; s.currentSha = null
       s.previousPath = null; s.previousRelease = 0
       s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
     }

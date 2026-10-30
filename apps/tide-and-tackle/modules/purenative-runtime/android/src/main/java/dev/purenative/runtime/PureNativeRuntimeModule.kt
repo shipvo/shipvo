@@ -47,7 +47,7 @@ class PureNativeRuntimeModule : Module() {
         if (s.pendingRelease != 0 && Store.runningRelease == s.pendingRelease) {
           s.previousPath?.let { old -> if (old != s.currentPath) File(old).delete() }
           s.previousRelease = s.currentRelease; s.previousPath = s.currentPath
-          s.currentRelease = s.pendingRelease; s.currentPath = s.pendingPath
+          s.currentRelease = s.pendingRelease; s.currentPath = s.pendingPath; s.currentSha = s.pendingSha
           s.pendingRelease = 0; s.pendingPath = null; s.trialBoots = 0
           s.addEvent("applied:${s.currentRelease}")
           promoted = true
@@ -87,6 +87,8 @@ class PureNativeRuntimeModule : Module() {
       etag?.let { setRequestProperty("If-None-Match", it) }
     }
 
+  private fun resolve(s: Store, url: String) = if (url.startsWith("http")) url else "${s.baseUrl}/${url.trimStart('/')}"
+
   private fun check(): Map<String, Any?> {
     val s = Store(ctx)
     require(s.baseUrl.isNotEmpty() && s.publicKey.isNotEmpty() && s.appId.isNotEmpty()) { "runtime not configured" }
@@ -110,17 +112,46 @@ class PureNativeRuntimeModule : Module() {
     val verifyPointerMs = SystemClock.elapsedRealtime() - t0
 
     val core = body.getJSONObject("core")
-    val url = core.getString("url").let { if (it.startsWith("http")) it else "${s.baseUrl}/${it.trimStart('/')}" }
+    val wantSha = core.getString("sha256"); val wantSize = core.getLong("size")
     val tmp = File(s.dir, "dl-$release.tmp")
     val d0 = SystemClock.elapsedRealtime()
-    val dl = http(url, null)
-    require(dl.responseCode == 200) { "bundle HTTP ${dl.responseCode}" }
-    dl.inputStream.use { ins -> tmp.outputStream().use { ins.copyTo(it, 64 * 1024) } }
-    dl.disconnect()
+    var via = "full"; var bytesDownloaded = 0L; var patchError: String? = null
+
+    // 1. Try a patch against the bundle this device already has (last good release, else the APK's own bundle).
+    val patches = core.optJSONArray("patches")
+    if (patches != null && patches.length() > 0) {
+      try {
+        val baseFile = s.currentPath?.let { File(it) }?.takeIf { it.exists() }
+        val baseSha = if (baseFile != null) (s.currentSha ?: Verify.sha256Hex(baseFile).also { s.currentSha = it }) else s.embeddedSha()
+        var match: JSONObject? = null
+        for (i in 0 until patches.length()) { val p = patches.getJSONObject(i); if (p.getString("from_sha256") == baseSha) { match = p; break } }
+        if (match != null) {
+          val patchBytes = http(resolve(s, match.getString("url")), null).let { c ->
+            require(c.responseCode == 200) { "patch HTTP ${c.responseCode}" }
+            c.inputStream.use { it.readBytes() }.also { c.disconnect() }
+          }
+          require(patchBytes.size.toLong() == match.getLong("size") && Verify.sha256Hex(patchBytes) == match.getString("sha256")) { "patch hash mismatch" }
+          val base = baseFile?.readBytes() ?: s.embeddedBundle() ?: error("no base bundle")
+          val out = Patch.apply(base, patchBytes)
+          require(out.size.toLong() == wantSize && Verify.sha256Hex(out) == wantSha) { "patched bundle hash mismatch" }
+          tmp.writeBytes(out)
+          via = "patch"; bytesDownloaded = patchBytes.size.toLong()
+        }
+      } catch (e: Exception) { patchError = e.message; tmp.delete() }
+    }
+
+    // 2. Fall back to the full bundle.
+    if (via == "full") {
+      val dl = http(resolve(s, core.getString("url")), null)
+      require(dl.responseCode == 200) { "bundle HTTP ${dl.responseCode}" }
+      dl.inputStream.use { ins -> tmp.outputStream().use { ins.copyTo(it, 64 * 1024) } }
+      dl.disconnect()
+      bytesDownloaded = tmp.length()
+    }
     val downloadMs = SystemClock.elapsedRealtime() - d0
 
     val v0 = SystemClock.elapsedRealtime()
-    val ok = tmp.length() == core.getLong("size") && Verify.sha256Hex(tmp) == core.getString("sha256")
+    val ok = tmp.length() == wantSize && Verify.sha256Hex(tmp) == wantSha
     if (!ok) { tmp.delete(); s.addEvent("verify_failed:$release"); throw IllegalStateException("bundle hash/size mismatch") }
     val verifyMs = SystemClock.elapsedRealtime() - v0 + verifyPointerMs
 
@@ -128,11 +159,12 @@ class PureNativeRuntimeModule : Module() {
     require(tmp.renameTo(dest)) { "could not stage bundle" }
     synchronized(PureNativeHostHandler.LOCK) {
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
-      s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0
+      s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
       if (s.binaryVersion == null) s.binaryVersion = s.installedBinaryVersion
       s.pendingIssuedAt = body.optString("issued_at")
     }
-    return mapOf("status" to "staged", "release" to release, "bytes" to dest.length(),
+    return mapOf("status" to "staged", "release" to release, "bytes" to bytesDownloaded, "via" to via, "bundleBytes" to dest.length(),
+      "patchError" to patchError,
       "downloadMs" to downloadMs, "verifyMs" to verifyMs, "issuedAt" to body.optString("issued_at"))
   }
 }

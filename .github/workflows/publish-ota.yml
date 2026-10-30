@@ -12,6 +12,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     concurrency: publish-ota
+    # Put [no-ota] in a commit message to change app code without publishing a release (e.g. alongside a shell build).
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[no-ota]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -19,6 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pip install --break-system-packages bsdiff4
       - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
       - name: Build, sign and publish
         working-directory: apps/tide-and-tackle

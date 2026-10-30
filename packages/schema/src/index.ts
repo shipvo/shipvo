@@ -64,7 +64,11 @@ export const ReleasePointer = z.object({
   band: Band,
   release: z.number().int().positive(),
   issued_at: z.string().datetime(),
-  core: z.object({ version: semver, sha256, size: z.number().int().positive(), url: z.string().min(1) }),
+  core: z.object({
+    version: semver, sha256, size: z.number().int().positive(), url: z.string().min(1),
+    /** BSDIFF40 patches to this bundle from bundles devices may already have (earlier releases, the APK's own bundle). */
+    patches: z.array(z.object({ from_sha256: sha256, url: z.string().min(1), size: z.number().int().positive(), sha256 })).optional(),
+  }),
   addons: z.array(AddonRef).default([]),
   screens: z.array(z.object({ id: z.string(), sha256, size: z.number().int().positive(), url: z.string().min(1) })).default([]),
   min_shell_version: semver,

@@ -19,4 +19,6 @@ dependencies {
   implementation 'com.facebook.react:react-android'
   // Ed25519 verification on Android 7+ (no platform Ed25519 before API 33). Pure Java, ~60 KB.
   implementation 'net.i2p.crypto:eddsa:0.3.0'
+  // bzip2 for standard BSDIFF40 patches. 1.21 has no transitive dependencies; R8 keeps only the bzip2 reader.
+  implementation 'org.apache.commons:commons-compress:1.21'
 }

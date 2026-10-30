@@ -59,9 +59,11 @@ export default function App() {
     try {
       const r = await Runtime.checkForUpdate(true);
       if (r.status === "staged") {
-        add(`Release ${r.release} verified: ${Math.round((r.bytes ?? 0) / 1024)} KB in ${r.downloadMs} ms. Applying…`);
+        const kb = ((r.bytes ?? 0) / 1024).toFixed(1);
+        add(`Release ${r.release} verified: ${r.via === "patch" ? `patch ${kb} KB` : `full ${kb} KB`} in ${r.downloadMs} ms. Applying…`);
+        if (r.patchError) add(`Patch skipped (${r.patchError}); used full download`);
         const s = Runtime.getState();
-        report(s, "applied", { bytes_downloaded: r.bytes, apply_ms: r.downloadMs, published_at: r.issuedAt });
+        report(s, "applied", { bytes_downloaded: r.bytes, apply_ms: r.downloadMs, published_at: r.issuedAt, via: r.via ?? "full" });
       } else if (r.status === "error") { add(`Check failed: ${r.error}`); }
       else if (manual) add("Up to date");
     } finally { busyRef.current = false; setBusy(false); }

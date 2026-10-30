@@ -8,6 +8,8 @@ export type RuntimeState = {
 };
 export type CheckResult = {
   status: "none" | "staged" | "error"; release?: number; bytes?: number; downloadMs?: number; verifyMs?: number;
+  /** Shell 1.0.2+: "patch" when a bsdiff patch was applied, "full" otherwise. */
+  via?: "patch" | "full"; bundleBytes?: number; patchError?: string | null;
   issuedAt?: string; error?: string;
 };
 export type HealthyResult = {

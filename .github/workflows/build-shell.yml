@@ -38,6 +38,20 @@ jobs:
           cp "$APK" tide-and-tackle-shell.apk
           echo "size=$(stat -c %s tide-and-tackle-shell.apk)" >> $GITHUB_OUTPUT
           sha256sum tide-and-tackle-shell.apk
+      - name: Register the APK's embedded bundle as a patch baseline
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          KV: c0851feca4c5486d8ed844d16f0b36df
+        run: |
+          unzip -p tide-and-tackle-shell.apk assets/index.android.bundle > embedded.hbc
+          SHA=$(sha256sum embedded.hbc | cut -d' ' -f1); SIZE=$(stat -c %s embedded.hbc)
+          V=$(node -p "require('./apps/tide-and-tackle/app.json').expo.version")
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$KV/values"
+          curl -fsS -X PUT "$API/b%2Ftide%2Fbase-$SHA.hbc" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "content-type: application/octet-stream" --data-binary @embedded.hbc >/dev/null
+          curl -fsS -X PUT "$API/base%2Ftide%2F$V" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "content-type: application/json" \
+            --data "{\"shell_version\":\"$V\",\"sha256\":\"$SHA\",\"size\":$SIZE,\"key\":\"b/tide/base-$SHA.hbc\"}" >/dev/null
+          echo "Embedded bundle for shell $V: $SHA ($SIZE bytes)" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with: { name: tide-and-tackle-shell, path: tide-and-tackle-shell.apk }
       - name: Publish to GitHub Release

@@ -45,7 +45,21 @@ internal class Store(private val ctx: Context) {
     p.edit().remove("current_release").remove("current_path").remove("previous_release").remove("previous_path")
       .remove("pending_release").remove("pending_path").remove("pending_issued_at").remove("trial_boots")
       .remove("unhealthy_boots").remove("first_unhealthy_at").remove("blocked_release")
+      .remove("current_sha").remove("pending_sha")
       .putString("binary_version", installedBinaryVersion).commit()
+  }
+
+  /** sha256 of the current (last good) bundle file, cached so we don't hash 1.5 MB on every check. */
+  var currentSha: String? get() = p.getString("current_sha", null); set(v) { p.edit().putString("current_sha", v).commit() }
+  var pendingSha: String? get() = p.getString("pending_sha", null); set(v) { p.edit().putString("pending_sha", v).commit() }
+
+  /** The bundle embedded in the APK, used as the first patch baseline. */
+  fun embeddedBundle(): ByteArray? = try { ctx.assets.open("index.android.bundle").use { it.readBytes() } } catch (_: Exception) { null }
+  fun embeddedSha(): String? {
+    val key = "embedded_sha:" + installedBinaryVersion
+    p.getString(key, null)?.let { return it }
+    val sha = embeddedBundle()?.let { Verify.sha256Hex(it) } ?: return null
+    p.edit().putString(key, sha).commit(); return sha
   }
 
   var trialBoots: Int get() = p.getInt("trial_boots", 0); set(v) { p.edit().putInt("trial_boots", v).commit() }

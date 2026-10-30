@@ -25,6 +25,9 @@ internal object Verify {
     return md.digest().joinToString("") { "%02x".format(it) }
   }
 
+  fun sha256Hex(b: ByteArray): String =
+    MessageDigest.getInstance("SHA-256").digest(b).joinToString("") { "%02x".format(it) }
+
   /** a < b for x.y.z */
   fun semverLess(a: String, b: String): Boolean {
     val pa = a.split('-')[0].split('.').map { it.toIntOrNull() ?: 0 }
