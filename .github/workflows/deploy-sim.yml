@@ -1,0 +1,36 @@
+name: deploy-sim
+# sim.shipvo.dev: builds the simulator container image and deploys the Worker in front of it.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["services/sim/**", "packages/mcp/**", "apps/tide-and-tackle/sim/server.mjs", ".github/workflows/deploy-sim.yml"]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shipvo/mcp build
+      - name: Apply control-plane migrations (api_keys)
+        working-directory: services/control-plane
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 migrations apply purenative --remote
+      - name: Deploy shipvo-sim (container image + worker)
+        working-directory: services/sim
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy 2>&1 | tee deploy.log; grep -E "https://|Deployed|error" deploy.log | tail -5 >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Smoke
+        run: |
+          U=https://shipvo-sim.purenative.workers.dev
+          curl -s $U/health; echo
+          curl -s -o /dev/null -w "no key -> %{http_code}\n" -X POST $U/mcp -H 'content-type: application/json' -d '{}'

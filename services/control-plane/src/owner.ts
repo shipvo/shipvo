@@ -135,6 +135,23 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
     } },
   list_orders: { description: "Recent orders from the app, newest first.", params: { limit: { type: "number", description: "How many (default 50)" } }, mutates: false,
     run: async (_d, a, env) => (await env.db.prepare("SELECT order_id, total, received_at, json FROM orders WHERE app_id = ? ORDER BY id DESC LIMIT ?").bind(env.appId, Math.min(200, Number(a.limit ?? 50))).all()).results.map((r: any) => ({ ...JSON.parse(r.json), received_at: r.received_at })) },
+  // Agent API keys for the hosted simulator (sim.shipvo.dev). The key is shown once; only its hash is stored.
+  create_api_key: {
+    description: "Create an API key that lets an AI agent open this app in the hosted simulator. Scope 'test' = sandbox sessions only; 'owner' = may also run owner commands; 'read' = reports only. The key is returned once.",
+    params: { scope: { type: "string", required: true, description: "test, owner or read", enum: ["test", "owner", "read"] }, label: { type: "string", description: "What this key is for, e.g. 'Claude Code', 'PiPilot CI'" } }, mutates: false,
+    run: async (_d, a, env) => {
+      const scope = String(a.scope); if (!["test", "owner", "read"].includes(scope)) fail("bad_scope", "scope must be test, owner or read");
+      const rand = crypto.getRandomValues(new Uint8Array(24)); const body = btoa(String.fromCharCode(...rand)).replace(/[+/=]/g, (c) => ({ "+": "a", "/": "b", "=": "" }[c]!));
+      const key = `sv_${scope}_${body}`; const prefix = key.slice(0, 12);
+      const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      await env.db.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label) VALUES (?,?,?,?,?)").bind(env.appId, hash, prefix, scope, String(a.label ?? "")).run();
+      return { key, prefix, scope, label: a.label ?? "", note: "Store this key now; it is not shown again. Use it as Authorization: Bearer <key> at https://sim.shipvo.dev/mcp" };
+    },
+  },
+  list_api_keys: { description: "API keys for this app (prefix, scope, label, last use); never the key itself.", params: {}, mutates: false,
+    run: async (_d, _a, env) => (await env.db.prepare("SELECT prefix, scope, label, created_at, last_used_at, revoked_at FROM api_keys WHERE app_id = ? ORDER BY id DESC").bind(env.appId).all()).results },
+  revoke_api_key: { description: "Revoke an API key by its prefix (from list_api_keys).", params: { prefix: { type: "string", required: true, description: "Key prefix, e.g. sv_test_abc1" } }, mutates: false,
+    run: async (_d, a, env) => { const r = await env.db.prepare("UPDATE api_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE app_id = ? AND prefix = ? AND revoked_at IS NULL").bind(env.appId, String(a.prefix)).run(); return { revoked: (r.meta?.changes ?? 0) > 0 }; } },
   audit_log: { description: "Who changed what, newest first.", params: {}, mutates: false,
     run: async (_d, _a, env) => (await env.db.prepare("SELECT at, actor, command, args_json, ok FROM audit WHERE app_id = ? ORDER BY id DESC LIMIT 100").bind(env.appId).all()).results },
 };

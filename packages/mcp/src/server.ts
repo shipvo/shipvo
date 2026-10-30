@@ -31,7 +31,8 @@ const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error: ${r.error}\n\nScreen now:\n${r.screen ?? ""}`); };
 const need = (sid: string) => { if (!sessions.has(sid)) throw new Error(`no session "${sid}". Call open_app first.`); };
 
-function makeServer() {
+type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string };
+function makeServer(ctx: Ctx = {}) {
 const server = new McpServer({ name: "shipvo", version: "0.0.1" }, { instructions:
 `You can use Shipvo apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
@@ -39,8 +40,9 @@ Only what is on screen is listed, like a phone: a horizontal product rail shows 
 System sheets (permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners, the share sheet) appear in the tree like any other screen: answer them by tapping, as a person would. Use set_device to decide what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether the payment is approved, network off) before the app asks for it.
 Finish a task by checking the final screen says what you expected (for example "Order placed"). Call end_session when done to get a report.` });
 
+const allowed = (id: string) => (ctx.app ? id === ctx.app : !!APPS[id]);
 server.tool("list_apps", "Apps this server can open, with what each one does.", {}, async () =>
-  text(Object.entries(APPS).map(([id, a]) => `${id}: ${a.name}. ${a.description}`).join("\n")));
+  text(Object.entries(APPS).filter(([id]) => allowed(id)).map(([id, a]) => `${id}: ${a.name}. ${a.description}`).join("\n") || `(this key opens ${ctx.app})`));
 
 server.tool("open_app", "Open an app in a fresh phone-sized session and return its first screen.", {
   app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"),
@@ -49,7 +51,8 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   dark: z.boolean().optional().describe("Dark mode"),
 }, async ({ app, session, seed_cart, dark }) => {
   const id = app.split("@")[0];
-  if (!APPS[id]) throw new Error(`unknown app "${id}". Apps: ${Object.keys(APPS).join(", ")}`);
+  if (!allowed(id)) throw new Error(ctx.app ? `this key opens "${ctx.app}" only` : `unknown app "${id}". Apps: ${Object.keys(APPS).join(", ")}`);
+  if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const r = await sim("/session", { session: sid, app, seed_cart, dark }) as Act & { release?: string | number };
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
@@ -101,8 +104,11 @@ server.tool("owner_describe", "List the owner commands of an app (content, price
 });
 server.tool("owner_command", "Run an owner command against the live app (changes are audited; `publish` makes them live on every phone within seconds).", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional() },
   async ({ app, command, args }) => {
-    if (!OWNER_TOKEN) throw new Error("PN_OWNER_TOKEN is not set: owner commands are disabled.");
-    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${OWNER_TOKEN}` }, body: JSON.stringify({ command, args: args ?? {} }) });
+    if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": owner commands need an owner key`);
+    if (ctx.app && app !== ctx.app) throw new Error(`this key is for "${ctx.app}"`);
+    const token = ctx.ownerToken || OWNER_TOKEN;
+    if (!token) throw new Error("owner commands are not enabled on this server.");
+    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ command, args: args ?? {} }) });
     return text(await r.text());
   });
 
@@ -129,8 +135,10 @@ if (argi < 0) {
       if (req.method !== "POST") { res.writeHead(400); return res.end("missing session"); }
       transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID(), onsessioninitialized: (id) => { transports.set(id, transport!); } });
       transport.onclose = () => { for (const [id, t] of transports) if (t === transport) transports.delete(id); };
-      // One McpServer per client connection, same tools.
-      await makeServer().connect(transport);
+      // One McpServer per client connection. Behind sim.shipvo.dev the Worker has checked the key and says which
+      // app and scope it grants; locally there are no such headers and every app is allowed.
+      const scope = req.headers["x-shipvo-scope"] as Ctx["scope"] | undefined;
+      await makeServer({ app: (req.headers["x-shipvo-app"] as string) || undefined, scope, ownerToken: (req.headers["x-shipvo-owner-token"] as string) || undefined }).connect(transport);
     }
     let body: unknown = undefined;
     if (req.method === "POST") { let raw = ""; for await (const ch of req) raw += ch; body = raw ? JSON.parse(raw) : undefined; }

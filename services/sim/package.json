@@ -1,0 +1,10 @@
+{
+  "name": "@shipvo/sim",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "sim.shipvo.dev: the hosted simulator agents connect to over MCP. Worker (keys, routing) + container (simulator, MCP over HTTP).",
+  "scripts": { "deploy": "wrangler deploy", "dev": "wrangler dev" },
+  "dependencies": { "@cloudflare/containers": "^0.0.28" },
+  "devDependencies": { "wrangler": "^4.40.0", "typescript": "^5.6.3", "@cloudflare/workers-types": "^4.20251001.0" }
+}

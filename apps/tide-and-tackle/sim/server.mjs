@@ -22,7 +22,8 @@ const CONTROL = (process.env.PN_CONTROL || process.env.CONTENT_FROM || "https://
 async function resolveApp(spec) {
   const m = /^([a-z0-9-]+)(?:@(?:r?(\d+)|(latest)))?$/.exec(String(spec || "tide")); if (!m) throw new Error(`bad app spec "${spec}": use "tide", "tide@r13" or "tide@latest"`);
   const [, app, rel, latest] = m;
-  if (!rel && !latest) return { app, url: `http://localhost:${PORT}/app/`, release: "local" };   // the local build (development)
+  if (!rel && !latest && existsSync(join(DIST, "index.html"))) return { app, url: `http://localhost:${PORT}/app/`, release: "local" };   // the local build (development)
+  if (!rel) latest = "latest";   // hosted: no local build, open the published release
   let n = rel ? Number(rel) : null;
   if (!n) { const r = await fetch(`${CONTROL}/w/${app}/releases.json`); if (!r.ok) throw new Error(`no published web artifact for ${app}`); n = (await r.json()).latest; }
   return { app, url: `${CONTROL}/w/${app}/r${n}/index.html`, release: n };
