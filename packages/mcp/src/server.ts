@@ -37,16 +37,17 @@ server.tool("list_apps", "Apps this server can open, with what each one does.", 
   text(Object.entries(APPS).map(([id, a]) => `${id}: ${a.name}. ${a.description}`).join("\n")));
 
 server.tool("open_app", "Open an app in a fresh phone-sized session and return its first screen.", {
-  app: z.string().describe("App id from list_apps, e.g. 'tide'"),
+  app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"),
   session: z.string().optional().describe("Session name (default: generated). One session is one phone."),
   seed_cart: z.array(z.object({ id: z.string(), qty: z.number().int().positive() })).optional().describe("Start with these items already in the cart (test shortcuts)."),
   dark: z.boolean().optional().describe("Dark mode"),
 }, async ({ app, session, seed_cart, dark }) => {
-  if (!APPS[app]) throw new Error(`unknown app "${app}". Apps: ${Object.keys(APPS).join(", ")}`);
-  const sid = session ?? `${app}-${Date.now().toString(36)}`;
-  const r = await sim("/session", { session: sid, seed_cart, dark });
-  sessions.set(sid, { app, steps: 0, startedAt: Date.now() });
-  return text(`session: ${sid}\n\n${r.screen ?? ""}`);
+  const id = app.split("@")[0];
+  if (!APPS[id]) throw new Error(`unknown app "${id}". Apps: ${Object.keys(APPS).join(", ")}`);
+  const sid = session ?? `${id}-${Date.now().toString(36)}`;
+  const r = await sim("/session", { session: sid, app, seed_cart, dark }) as Act & { release?: string | number };
+  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
+  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
 });
 
 const sid = z.string().describe("Session from open_app");

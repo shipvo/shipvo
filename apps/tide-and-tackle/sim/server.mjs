@@ -17,6 +17,16 @@ const { chromium, devices } = pw;
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const PORT = Number(arg("port", 4545)), DIR = arg("dir", "/tmp/pn-ui"), DIST = join(here, "..", "sim-dist");
+// Published releases: open_app("tide@r13") loads the web artifact that `shipvo publish` stored next to the phone bundle.
+const CONTROL = (process.env.PN_CONTROL || process.env.CONTENT_FROM || "https://purenative-control.purenative.workers.dev").replace(/\/$/, "");
+async function resolveApp(spec) {
+  const m = /^([a-z0-9-]+)(?:@(?:r?(\d+)|(latest)))?$/.exec(String(spec || "tide")); if (!m) throw new Error(`bad app spec "${spec}": use "tide", "tide@r13" or "tide@latest"`);
+  const [, app, rel, latest] = m;
+  if (!rel && !latest) return { app, url: `http://localhost:${PORT}/app/`, release: "local" };   // the local build (development)
+  let n = rel ? Number(rel) : null;
+  if (!n) { const r = await fetch(`${CONTROL}/w/${app}/releases.json`); if (!r.ok) throw new Error(`no published web artifact for ${app}`); n = (await r.json()).latest; }
+  return { app, url: `${CONTROL}/w/${app}/r${n}/index.html`, release: n };
+}
 mkdirSync(DIR, { recursive: true });
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".ico": "image/x-icon", ".ttf": "font/ttf", ".css": "text/css" };
 const browser = await chromium.launch();
@@ -26,13 +36,14 @@ const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
 
 async function newSession(id, opts = {}) {
   if (sessions.has(id)) await sessions.get(id).ctx.close();
+  const target = await resolveApp(opts.app);
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
   const ctx = await browser.newContext({ ...phone, colorScheme: opts.dark ? "dark" : "light" });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: "tide", appName: "Tide & Tackle", seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
-  await page.goto(`http://localhost:${PORT}/app/`, { waitUntil: "networkidle" });
+  await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page });
+  sessions.set(id, { ctx, page, app: target.app, release: target.release });
 }
 
 async function screen(page) {
@@ -143,7 +154,7 @@ const server = http.createServer(async (req, res) => {
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
-    if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true); return send(200, { ok: true, screen: await screen(s.page) }); }
+    if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], screen: s ? await screen(s.page) : null }); }
