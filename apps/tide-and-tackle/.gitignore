@@ -42,3 +42,6 @@ yarn-error.*
 
 # PureNative OTA export
 dist-ota/
+
+# UI simulator build
+sim-dist/

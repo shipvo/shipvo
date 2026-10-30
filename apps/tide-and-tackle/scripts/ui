@@ -1,0 +1,13 @@
+#!/usr/bin/env node
+// Drive the app's real UI in the simulator, like a person with a screen reader.
+//   PN_UI_SESSION=<id> scripts/ui screen | tap <ref> | type <ref> "<text>" [--enter] | scroll <up|down|left|right> [ref] | back
+const [cmd, a, b] = process.argv.slice(2);
+const session = process.env.PN_UI_SESSION; const host = process.env.PN_UI_HOST || "http://localhost:4545";
+if (!session || !cmd) { console.log("usage: PN_UI_SESSION=<id> ui screen | tap <ref> | type <ref> \"<text>\" [--enter] | scroll <up|down|left|right> [ref] | back"); process.exit(1); }
+const body = { session, action: cmd };
+if (cmd === "tap") body.ref = a;
+if (cmd === "type") { body.ref = a; body.text = b; body.enter = process.argv.includes("--enter"); }
+if (cmd === "scroll") { body.direction = a; body.ref = b; }
+const r = await (await fetch(`${host}/act`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json();
+if (!r.ok) console.log(`ERROR: ${r.error}\n`);
+console.log(r.screen ?? "");

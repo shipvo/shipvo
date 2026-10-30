@@ -18,7 +18,12 @@ type Ctx = {
 };
 
 export function useShop() {
-  const ref = useRef<ShopState>(initialState());
+  const ref = useRef<ShopState>((() => {
+    const st = initialState();
+    const seed = (globalThis as any).__PN_SIM__?.seed_cart; // simulator only: start a session with items in the cart
+    if (Array.isArray(seed)) st.cart = seed.map((l: any) => ({ product_id: String(l.product_id), quantity: Number(l.quantity) }));
+    return st;
+  })());
   const [, bump] = useState(0);
   const run = (name: string, args: Record<string, unknown> = {}) => { const r = call(ref.current, name, args); bump((n) => n + 1); return r as any; };
   return { shop: ref.current, run };
