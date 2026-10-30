@@ -69,7 +69,11 @@ async function screen(page) {
       }
     }
   });
+  // What is hidden from assistive tech must not appear at all: this Playwright keeps aria-hidden nodes but strips
+  // their names. `inert` removes them from the accessibility tree; it is set only for the snapshot and removed after.
+  await page.evaluate(() => { for (const el of document.querySelectorAll('[aria-hidden="true"]')) { el.setAttribute("data-pn-prev-display", el.style.display || ""); el.style.setProperty("display", "none", "important"); } });
   const tree = await page.locator("body").ariaSnapshot({ mode: "ai" });
+  await page.evaluate(() => { for (const el of document.querySelectorAll("[data-pn-prev-display]")) { const prev = el.getAttribute("data-pn-prev-display"); if (prev) el.style.display = prev; else el.style.removeProperty("display"); el.removeAttribute("data-pn-prev-display"); } });
   const lines = tree.split("\n").filter((l) => !/^\s*- generic \[ref=e\d+\]:?\s*$/.test(l));
   // A screen reader announces a control's label, not the words inside it (Android and iOS group a pressable's
   // children into one element). Drop the inner text lines of labelled controls, as the phones do.
