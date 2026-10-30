@@ -29,8 +29,10 @@ jobs:
           mkdir app && tar -xzf app.tar.gz -C app && ls app
           xcrun simctl install "$UDID" app/*.app
           xcrun simctl list devices | grep Booted
-      - name: Install Appium (XCUITest)
-        run: npm i -g appium@3 && appium driver install xcuitest
+      - name: Install Appium (XCUITest) and pre-build WebDriverAgent
+        run: |
+          npm i -g appium@3 && appium driver install xcuitest
+          appium driver run xcuitest build-wda --sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)" --name="$(xcrun simctl list devices booted | grep -o 'iPhone [^(]*' | head -1 | xargs)" || appium driver run xcuitest build-wda || true
       - name: Build our simulator
         working-directory: apps/tide-and-tackle
         run: |

@@ -14,7 +14,8 @@ const FLOW = [
 const CANDIDATES = {
   ios: [["iPhone 13", "15"], ["iPhone 14", "16"], ["iPhone 13", "14"], ["iPhone 12", "14"], ["iPhone 14 Pro", "16"], ["iPhone 15", "17"], ["iPhone 15 Pro", "17"], ["iPhone 16", "18"], ["iPhone 11", "13"]],
   "android-virtual": [["Galaxy A33 5G", "13"], ["Galaxy Tab S4", "10"], ["Pixel 7", "13"], ["Pixel 6", "12"], ["Galaxy S21", "11"]],
-  "ios-local": [["local iPhone simulator", "latest"]],
+  // The first session builds/launches WebDriverAgent and can exceed a single request's timeout: try three times.
+  "ios-local": [["local iPhone simulator", "latest"], ["local iPhone simulator", "latest"], ["local iPhone simulator", "latest"]],
   "android-real": [["Galaxy A12", "11"], ["Galaxy A13", "12"], ["Galaxy A21s", "10"], ["Pixel 6", "12"]],
 };
 
