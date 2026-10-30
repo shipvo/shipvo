@@ -12,6 +12,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ?
 const SIM = arg("sim", "http://localhost:4545"), OUT = arg("out", ".");
 const sleep = (ms) => execFileSync("sleep", [String(ms / 1000)]);
 
+const PRE = process.env.PN_PREGRANTED === "1"; // optional: pre-granted permissions on both sides (default: real system dialogs)
 // Two real purchases, by visible labels (no refs, no ids). Each starts from a fresh app.
 const FLOWS = [
   { title: "A: browse, delivery, cash", steps: [
@@ -51,8 +52,8 @@ const FLOWS = [
   { title: "C: scan, location, mobile money", steps: [
     { wait: 6000 },
     { tap: /^Back to shop$/ },
-    { tap: /^Scan a product barcode$/, name: "Scanner" },
-    { tap: /^While using the app$/, optional: PRE, name: PRE ? undefined : "Camera permission" },
+    { tap: /^Scan a product barcode$/, name: PRE ? "Scanner" : "Camera permission" },
+    { tap: /^While using the app$/, optional: PRE, name: PRE ? undefined : "Scanner" },
     { waitFor: /^Add 1 to cart$/, timeoutMs: 45000, name: "Scanned product" },
     { tap: /^Add 1 to cart$/ },
     { tap: /^Open cart/ },
@@ -69,7 +70,6 @@ const FLOWS = [
     { waitFor: /^Share order$/, timeoutMs: 15000, name: "Order placed C" },
   ] },
 ];
-const PRE = process.env.PN_PREGRANTED === "1"; // CI emulator: permissions pre-granted on both sides (dialogs are probed separately)
 const SIM_DEVICE = { platform: "android", api: 30, biometrics: { enrolled: false }, camera: { barcode: { type: "ean13", data: "6181234567890" }, delayMs: 1500 },
   ...(PRE ? { permissions: { camera: "granted", location: "granted", notifications: "granted" } } : {}) };
 
@@ -125,12 +125,17 @@ const native = {
   async find(re, roles) {
     for (let i = 0; i < 8; i++) {
       const el = nativeDump().find((n) => roles.includes(n.role) && re.test(n.label));
-      if (el) return el;
+      if (el) return { ...el, scrolled: i };
       nativeAct("scroll", "down");
     }
     throw new Error(`native: no element ${re}`);
   },
-  async tap(re) { const el = await this.find(re, ["button", "radio"]); execFileSync("adb", ["shell", "input", "tap", String(el.x), String(el.y)]); sleep(800); for (let i = 0; i < 8; i++) nativeAct("scroll", "up"); },
+  // A swipe over a system dialog dismisses it, and Android counts that as a denial: never swipe blindly after a tap.
+  // Scroll back up only as far as find() scrolled down, and only when no dialog is showing.
+  async tap(re) {
+    const el = await this.find(re, ["button", "radio"]); execFileSync("adb", ["shell", "input", "tap", String(el.x), String(el.y)]); sleep(800);
+    if (el.scrolled > 0 && !nativeDump().some((n) => /^(While using the app|Only this time|Deny|Allow|Don.t allow)$/.test(n.label))) for (let i = 0; i < el.scrolled + 1; i++) nativeAct("scroll", "up");
+  },
   async type(re, text) { const el = await this.find(re, ["textbox"]); execFileSync("adb", ["shell", "input", "tap", String(el.x), String(el.y)]); sleep(400); execFileSync("adb", ["shell", "input", "text", text.replace(/ /g, "%s")]); execFileSync("adb", ["shell", "input", "keyevent", "111"]); sleep(400);
     // A phone pad may ignore Escape; close the keyboard with Back, as a person would, so it does not cover the screen.
     if (/mInputShown=true/.test(execFileSync("adb", ["shell", "dumpsys", "input_method"]).toString())) { execFileSync("adb", ["shell", "input", "keyevent", "4"]); sleep(500); } },

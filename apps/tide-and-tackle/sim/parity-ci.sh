@@ -35,13 +35,13 @@ sleep 25
     });'
   adb logcat -d | grep -iE "GrantPermissions|PermissionController|permissioncontroller" | tail -5 || true
 } 2>&1 | tee probe-permissions.log
+# The probe left the dialog open: answer it with Deny would poison the run, so reset and relaunch cleanly.
+adb shell input keyevent 4 || true
 adb shell am force-stop dev.purenative.tide
-# For the measured flows the emulator pre-grants camera and location, and the simulated phone is told the same.
-adb shell pm grant dev.purenative.tide android.permission.CAMERA || true
-adb shell pm grant dev.purenative.tide android.permission.ACCESS_FINE_LOCATION || true
+adb shell pm reset-permissions -p dev.purenative.tide 2>/dev/null || true
 adb shell monkey -p dev.purenative.tide -c android.intent.category.LAUNCHER 1
 sleep 15
-PN_PREGRANTED=1 timeout 3000 node apps/tide-and-tackle/sim/parity.mjs --out . || true
+timeout 3000 node apps/tide-and-tackle/sim/parity.mjs --out . || true
 echo "---- simulator log"; tail -20 "$ROOT/sim.log"
 cleanup
 exit 0
