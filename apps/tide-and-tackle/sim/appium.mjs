@@ -18,7 +18,7 @@ export async function startSession(caps) {
     ? { platformName: "iOS", "appium:automationName": "XCUITest", "appium:udid": caps.udid, "appium:bundleId": "dev.purenative.tide", "appium:noReset": true, "appium:newCommandTimeout": 300, "appium:wdaLaunchTimeout": 240000 }
     : { "lt:options": caps };
   const v = await wd("POST", "/session", { capabilities: { alwaysMatch: always } });
-  return { id: v.sessionId, platform: caps.platformName.toLowerCase() };
+  return { id: v.sessionId, platform: String(caps.platformName).toLowerCase() };
 }
 export const endSession = (s, status = "passed") => wd("DELETE", `/session/${s.id}`).catch(() => {});
 

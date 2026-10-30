@@ -12,7 +12,8 @@ const FLOW = [
   { type: "Delivery address", text: "Bonapriso Douala" }, { tap: "Place order", name: "Order placed" },
 ];
 const CANDIDATES = {
-  ios: [["iPhone 16", "18"], ["iPhone 15", "17"], ["iPhone 14", "16"]],
+  ios: [["iPhone 13", "15"], ["iPhone 14", "16"], ["iPhone 13", "14"], ["iPhone 12", "14"], ["iPhone 14 Pro", "16"], ["iPhone 15", "17"], ["iPhone 15 Pro", "17"], ["iPhone 16", "18"], ["iPhone 11", "13"]],
+  "android-virtual": [["Galaxy A33 5G", "13"], ["Galaxy Tab S4", "10"], ["Pixel 7", "13"], ["Pixel 6", "12"], ["Galaxy S21", "11"]],
   "ios-local": [["local iPhone simulator", "latest"]],
   "android-real": [["Galaxy A12", "11"], ["Galaxy A13", "12"], ["Galaxy A21s", "10"], ["Pixel 6", "12"]],
 };
@@ -49,8 +50,8 @@ const report = { lane: LANE, started_at: new Date().toISOString(), device: null,
 let s = null;
 for (const [deviceName, platformVersion] of CANDIDATES[LANE]) {
   try {
-    s = await cloud.startSession({ platformName: LANE.startsWith("ios") ? "iOS" : "Android", deviceName, platformVersion, app: APP, udid: APP,
-      isRealMobile: LANE !== "ios", build: "PureNative parity", name: `parity ${LANE}`, w3c: true, autoGrantPermissions: true });
+    s = await cloud.startSession({ platformName: LANE.startsWith("ios") ? "ios" : "android", deviceName, platformVersion, app: APP, udid: APP,
+      isRealMobile: LANE === "android-real", build: "PureNative parity", name: `parity ${LANE}`, w3c: true, autoGrantPermissions: true });
     report.device = `${deviceName} (${LANE.startsWith("ios") ? "iOS" : "Android"} ${platformVersion})`; break;
   } catch (e) { report.errors.push(`session ${deviceName} ${platformVersion}: ${e.message}`); }
 }

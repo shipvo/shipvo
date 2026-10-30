@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ios_app: { description: "LambdaTest app URL of the iOS simulator build", default: "lt://APP10160321611793349355349356" }
-      android_app: { description: "LambdaTest app URL of the Android APK (real devices)", default: "lt://APP10160321611793349347978846" }
+      android_app: { description: "LambdaTest app URL of the Android APK (emulators)", default: "lt://APP10160321271793349351672359" }
   push:
     branches: [main]
     paths: ["apps/tide-and-tackle/sim/appium.mjs", "apps/tide-and-tackle/sim/parity-cloud.mjs", ".github/workflows/parity-cloud.yml"]
@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix: { lane: [ios, android-real] }
+      matrix: { lane: [ios, android-virtual] }
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -35,7 +35,7 @@ jobs:
           LT_USER: ${{ secrets.LAMBDATEST_USERNAME }}
           LT_KEY: ${{ secrets.LAMBDATEST_ACCESS_KEY }}
         run: |
-          APP=${{ matrix.lane == 'ios' && (inputs.ios_app || 'lt://APP10160321611793349355349356') || (inputs.android_app || 'lt://APP10160321611793349347978846') }}
+          APP=${{ matrix.lane == 'ios' && (inputs.ios_app || 'lt://APP10160321611793349355349356') || (inputs.android_app || 'lt://APP10160321271793349351672359') }}
           node sim/parity-cloud.mjs --lane ${{ matrix.lane }} --app "$APP" || true
           cat parity-${{ matrix.lane }}.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || cat parity-${{ matrix.lane }}.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
