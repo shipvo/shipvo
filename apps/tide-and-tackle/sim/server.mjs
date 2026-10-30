@@ -27,7 +27,8 @@ async function resolveApp(spec) {
   // otherwise a published release: the one asked for, or the latest (hosted: there is no local build)
   let n = rel ? Number(rel) : null;
   if (!n) { const r = await fetch(`${CONTROL}/w/${app}/releases.json`); if (!r.ok) throw new Error(`no published web artifact for ${app}`); n = (await r.json()).latest; }
-  return { app, url: `${CONTROL}/w/${app}/r${n}/index.html`, release: n };
+  // Served through this process so the page and its mock backend share one origin (a page on https cannot fetch http://localhost).
+  return { app, url: `http://localhost:${PORT}/w/${app}/r${n}/index.html`, release: n };
 }
 mkdirSync(DIR, { recursive: true });
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".ico": "image/x-icon", ".ttf": "font/ttf", ".css": "text/css" };
@@ -138,6 +139,7 @@ async function act(id, body) {
   return { screen: await screen(page) };
 }
 
+const WCACHE = new Map();
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   // CORS plus Chromium's private-network preflight: the app page comes from the public control plane (https) and
@@ -149,6 +151,12 @@ const server = http.createServer(async (req, res) => {
     // the app's static web build
     if (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/") || url.pathname === "/favicon.ico") {
       const p = join(DIST, decodeURIComponent(url.pathname)); if (existsSync(p)) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
+    }
+    // released web artifacts, proxied from the control plane and cached (immutable per release)
+    if (url.pathname.startsWith("/w/")) {
+      const key = url.pathname; let hit = WCACHE.get(key);
+      if (!hit) { const r = await fetch(`${CONTROL}${key}`); if (!r.ok) return send(r.status, { error: "artifact" }); hit = { type: r.headers.get("content-type") ?? "application/octet-stream", body: Buffer.from(await r.arrayBuffer()) }; WCACHE.set(key, hit); }
+      return send(200, hit.body, hit.type);
     }
     if (url.pathname.startsWith("/app/")) {
       let p = join(DIST, url.pathname.slice(5) || "index.html"); if (!existsSync(p) || statSync(p).isDirectory()) p = join(DIST, "index.html");
