@@ -1,0 +1,28 @@
+[
+  {
+    "id": "T1",
+    "task": "Hi, I want two of the cheapest lures you have in stock that work in saltwater, under 5,000 FCFA. Deliver to Bonapriso, Douala on the earliest delivery slot you have. I'll pay cash on delivery.",
+    "expect": { "lines": { "lure-spoon-30": 2 }, "slot_id": "fri-pm", "address_contains": "Bonapriso", "payment": "cash_on_delivery", "promo": null }
+  },
+  {
+    "id": "T2",
+    "seed_cart": [{ "product_id": "hooks-circle-4", "quantity": 3 }],
+    "task": "I left 3 packs of circle hooks in my cart but I only need one. Also add the cheapest saltwater line. Use my code TIDE10 if it works. Deliver Saturday morning to Akwa, Douala, and I'll pay with mobile money on 699 88 77 66.",
+    "expect": { "lines": { "hooks-circle-4": 1, "line-mono-salt-30": 1 }, "slot_id": "sat-am", "address_contains": "Akwa", "payment": "mobile_money", "phone": "699887766", "promo": null }
+  },
+  {
+    "id": "T3",
+    "task": "Is the Okuma Ceymar 3000 reel in stock? If not, buy me the closest alternative: same size, works in both salt and fresh water, and not more expensive. I'll pick it up at the shop and pay cash.",
+    "expect": { "lines": { "reel-spin-3000": 1 }, "slot_id": "pickup", "payment": "cash_on_delivery", "promo": null }
+  },
+  {
+    "id": "T4",
+    "task": "I'm going surf casting at Kribi. Get me one rod, one reel and one saltwater line for surf or beach casting, the cheapest in-stock option for each. Deliver Saturday afternoon to Bonanjo, Douala. Use any promo code that applies. I'll pay cash.",
+    "expect": { "lines": { "rod-surf-36": 1, "reel-surf-6000": 1, "line-mono-salt-30": 1 }, "slot_id": "sat-pm", "address_contains": "Bonanjo", "payment": "cash_on_delivery", "promo": "TIDE10" }
+  },
+  {
+    "id": "T5",
+    "task": "Order 3 Surface Poppers and a Sun Cap. Use whichever promo code saves me the most. Deliver Friday afternoon to Bali, Douala. Mobile money: 677 000 111.",
+    "expect": { "lines": { "lure-popper-9": 3, "apparel-cap": 1 }, "slot_id": "fri-pm", "address_contains": "Bali", "payment": "mobile_money", "phone": "677000111", "promo": "LURES15" }
+  }
+]
