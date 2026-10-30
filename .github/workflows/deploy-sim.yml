@@ -35,8 +35,8 @@ jobs:
         env: { E2B_API_KEY: "${{ secrets.E2B_API_KEY }}" }
         run: |
           set -o pipefail
-          npx -y @e2b/cli@2 template build 2>&1 | tee e2b-build.log
-          grep -iE "template|built|id" e2b-build.log | tail -5 >> "$GITHUB_STEP_SUMMARY" || true
+          npx -y @e2b/cli@2 template create shipvo-sim --dockerfile Dockerfile --cmd "/app/entry.sh" --ready-cmd "curl -sf http://localhost:8787/health" --cpu-count 2 --memory-mb 2048 2>&1 | tee e2b-build.log
+          grep -iE "finished|error" e2b-build.log | tail -3 >> "$GITHUB_STEP_SUMMARY" || true
       - name: Worker secrets (E2B key, owner token)
         working-directory: services/sim
         env:

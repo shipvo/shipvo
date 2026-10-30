@@ -1,6 +1,0 @@
-# E2B template for the hosted simulator: one sandbox = one phone an agent can use.
-# Build: e2b template build  (in services/sim, after staging build/ as the deploy workflow does)
-template_name = "shipvo-sim"
-dockerfile = "Dockerfile"
-start_cmd = "/app/entry.sh"
-ready_cmd = "curl -sf http://localhost:8787/health"
