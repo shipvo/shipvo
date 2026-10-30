@@ -24,5 +24,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
         run: |
-          if npm view @purenative/schema@$(node -p "require('./packages/schema/package.json').version") version >/dev/null 2>&1; then echo "schema already published"; else pnpm --filter @purenative/schema publish --no-git-checks --access public; fi
-          pnpm --filter @purenative/cli publish --no-git-checks --access public
+          pub() {
+            out=$(pnpm --filter "$1" publish --no-git-checks --access public 2>&1); code=$?; echo "$out"
+            if [ $code -ne 0 ] && echo "$out" | grep -q "cannot publish over the previously published"; then echo "$1: version already on npm, skipping"; return 0; fi
+            return $code
+          }
+          pub @purenative/schema
+          pub @purenative/cli
