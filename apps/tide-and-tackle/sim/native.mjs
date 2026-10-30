@@ -8,7 +8,19 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 const REFS = process.env.PN_NATIVE_REFS || "/tmp/pn-native-refs.json";
 const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 32 << 20 });
 
+export let anrCount = 0;
+/** Android's "isn't responding" dialog: a person taps Wait. Count it so it shows in the report. */
+function dismissAnr(nodes) {
+  const wait = nodes.find((n) => n.role === "button" && /^wait$/i.test(n.label));
+  const close = nodes.find((n) => n.role === "button" && /^close app$/i.test(n.label));
+  if (wait && close) { anrCount++; adb("shell", "input", "tap", String(wait.x), String(wait.y)); execFileSync("sleep", ["3"]); return true; }
+  return false;
+}
 export function dump() {
+  for (let i = 0; i < 6; i++) { const n = rawDump(); if (!dismissAnr(n)) return n; }
+  return rawDump();
+}
+function rawDump() {
   let xml = "";
   for (let i = 0; i < 3 && !xml.includes("<hierarchy"); i++) {
     try { adb("shell", "uiautomator", "dump", "/sdcard/pn.xml"); xml = adb("shell", "cat", "/sdcard/pn.xml"); } catch {}

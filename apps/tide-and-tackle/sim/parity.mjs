@@ -5,6 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dump as nativeDump, act as nativeAct } from "./native.mjs";
+import * as nativeMod from "./native.mjs";
 import { execFileSync } from "node:child_process";
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
@@ -114,12 +115,13 @@ report.summary = {
   mean_actionable_parity: +(report.screens.reduce((a, s) => a + s.actionable_parity, 0) / report.screens.length).toFixed(3),
   mean_text_coverage: +(report.screens.reduce((a, s) => a + s.text_coverage, 0) / report.screens.length).toFixed(3),
   flow_parity: report.flow.same_outcome,
+  android_not_responding_dialogs: nativeMod.anrCount,
 };
 writeFileSync(join(OUT, "parity-report.json"), JSON.stringify(report, null, 2));
 const md = [`# Simulator vs device parity`, ``, `Flow: buy 2 × Chrome Spoon, Friday afternoon delivery, cash.`, ``,
   `| Screen | Elements (sim / device) | Actionable parity | Text coverage | Only in sim | Only on device |`, `| --- | --- | --- | --- | --- | --- |`,
   ...report.screens.map((s) => `| ${s.screen} | ${s.sim_elements} / ${s.device_elements} | ${(s.actionable_parity * 100).toFixed(0)}% | ${(s.text_coverage * 100).toFixed(0)}% | ${s.only_in_sim.join("<br>")} | ${s.only_on_device.join("<br>")} |`),
-  ``, `**Mean actionable parity:** ${(report.summary.mean_actionable_parity * 100).toFixed(1)}%  ·  **Mean text coverage:** ${(report.summary.mean_text_coverage * 100).toFixed(1)}%  ·  **Same outcome:** ${report.flow.same_outcome ? "yes" : "no"}`,
+  ``, `**Mean actionable parity:** ${(report.summary.mean_actionable_parity * 100).toFixed(1)}%  ·  **Mean text coverage:** ${(report.summary.mean_text_coverage * 100).toFixed(1)}%  ·  **Same outcome:** ${report.flow.same_outcome ? "yes" : "no"}  ·  **"App isn't responding" dialogs on device:** ${nativeMod.anrCount}`,
   report.flow.sim_error ? `\nSimulator error: ${report.flow.sim_error}` : "", report.flow.native_error ? `\nDevice error: ${report.flow.native_error}` : ""].join("\n");
 writeFileSync(join(OUT, "parity-report.md"), md);
 console.log(md);
