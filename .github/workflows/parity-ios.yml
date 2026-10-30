@@ -34,18 +34,20 @@ jobs:
           npm i -g appium@2 && appium driver install xcuitest
           nohup appium --port 4723 > appium.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:4723/status >/dev/null && break; sleep 2; done
-      - name: Start our simulator
+      - name: Build our simulator
         working-directory: apps/tide-and-tackle
         run: |
           npx expo export --platform web --output-dir sim-dist
           npm i -g playwright@1.63.0 && npx -y playwright@1.63.0 install chromium
-          CONTENT_FROM=https://purenative-control.purenative.workers.dev nohup node sim/server.mjs > sim.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
       - name: Parity on iOS Simulator
         working-directory: apps/tide-and-tackle
         env: { APPIUM_HUB: "http://localhost:4723", APPIUM_LOCAL: "1" }
         run: |
+          CONTENT_FROM=https://purenative-control.purenative.workers.dev node sim/server.mjs > sim.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
+          curl -sf -X POST localhost:4545/session -H "content-type: application/json" -d '{"session":"warmup"}' | head -c 200 || { echo SIMULATOR FAILED; cat sim.log; }
           node sim/parity-cloud.mjs --lane ios-local --app "$UDID" || true
+          tail -20 sim.log
           cat parity-ios-local.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || cat parity-ios-local.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
