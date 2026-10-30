@@ -158,3 +158,38 @@ export function canonicalize(value: unknown): string {
   const { signature: _s, ...rest } = (value as any) ?? {};
   return JSON.stringify(strip(rest));
 }
+
+/* ---------- live app content (edited in the admin, served to devices) ---------- */
+const hex = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "colour as #RRGGBB");
+const actionSchema = z.object({ screen: z.enum(["home", "search", "product", "cart", "orders"]), params: z.record(z.union([z.string(), z.number(), z.boolean()])).optional() });
+export const ContentBlock = z.discriminatedUnion("type", [
+  z.object({ id: z.string().min(1), type: z.literal("hero"), title: z.string().min(1).max(120), body: z.string().max(240).optional(), color: hex.optional() }),
+  z.object({ id: z.string().min(1), type: z.literal("banner"), text: z.string().min(1).max(140), tone: z.enum(["info", "success", "warning", "critical"]), action: actionSchema.optional() }),
+  z.object({ id: z.string().min(1), type: z.literal("departments"), title: z.string().min(1).max(60) }),
+  z.object({ id: z.string().min(1), type: z.literal("product_rail"), title: z.string().min(1).max(60), limit: z.number().int().min(1).max(20),
+    filter: z.object({ department: z.string().optional(), tag: z.string().optional(), water: z.enum(["salt", "fresh"]).optional(), max_price: z.number().positive().optional(), in_stock_only: z.boolean().optional() }) }),
+  z.object({ id: z.string().min(1), type: z.literal("promos"), title: z.string().min(1).max(60) }),
+  z.object({ id: z.string().min(1), type: z.literal("text"), text: z.string().min(1).max(500), role: z.enum(["title", "body", "caption"]) }),
+  z.object({ id: z.string().min(1), type: z.literal("button"), label: z.string().min(1).max(40), action: actionSchema }),
+]);
+export type ContentBlock = z.infer<typeof ContentBlock>;
+export const AppContent = z.object({
+  schema_version: z.literal("1.0"), app_id: z.string().min(1), version: z.number().int().nonnegative(), published_at: z.string(),
+  brand: z.object({ name: z.string().min(1).max(40), tagline: z.string().max(80) }),
+  theme: z.object({ accent: hex }),
+  departments: z.array(z.object({ id: z.string().regex(/^[a-z0-9-]+$/), name: z.string().min(1) })).min(1),
+  products: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9-]+$/), name: z.string().min(1).max(80), department: z.string(), price: z.number().int().positive(), stock: z.number().int().nonnegative(),
+    water: z.enum(["salt", "fresh", "both"]), tags: z.array(z.string()), description: z.string().max(400), image_url: z.string().url().optional(),
+  })),
+  promos: z.array(z.object({ code: z.string().regex(/^[A-Z0-9]{3,16}$/), percent: z.number().int().min(1).max(90), min_subtotal: z.number().int().nonnegative(),
+    departments: z.array(z.string()).optional(), description: z.string().min(1).max(120), active: z.boolean() })),
+  slots: z.array(z.object({ id: z.string(), day: z.string(), window: z.string(), fee: z.number().int().nonnegative(), capacity: z.number().int().nonnegative() })),
+  screens: z.object({ home: z.array(ContentBlock).max(30) }),
+}).superRefine((c, ctx) => {
+  const depts = new Set(c.departments.map((d) => d.id));
+  c.products.forEach((p, i) => { if (!depts.has(p.department)) ctx.addIssue({ code: "custom", path: ["products", i, "department"], message: `unknown department '${p.department}'` }); });
+  const ids = new Set<string>(); c.screens.home.forEach((b, i) => { if (ids.has(b.id)) ctx.addIssue({ code: "custom", path: ["screens", "home", i, "id"], message: "duplicate block id" }); ids.add(b.id); });
+  const codes = new Set<string>(); c.promos.forEach((p, i) => { if (codes.has(p.code)) ctx.addIssue({ code: "custom", path: ["promos", i, "code"], message: "duplicate code" }); codes.add(p.code); });
+});
+export type AppContent = z.infer<typeof AppContent>;

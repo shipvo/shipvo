@@ -1,8 +1,28 @@
 import { Hono } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@purenative/schema";
+import { adminPage, loginPage } from "./admin";
+import { describeOwner, runOwnerCommand } from "./owner";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database };
+type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string };
 const app = new Hono<{ Bindings: Env }>();
+
+/* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
+const enc = new TextEncoder();
+async function hmac(secret: string, msg: string) {
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return [...new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(msg)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function safeEqual(a: string, b: string) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
+async function owner(c: any, appId: string): Promise<string | null> {
+  const auth = c.req.header("authorization") ?? "";
+  if (c.env.OWNER_TOKEN && auth.startsWith("Bearer ") && safeEqual(auth.slice(7), c.env.OWNER_TOKEN)) return "agent (owner token)";
+  const cookie = getCookie(c, "pn_admin");
+  if (!cookie || !c.env.ADMIN_PASSWORD) return null;
+  const [app_, exp, sig] = cookie.split(".");
+  if (app_ !== appId || Number(exp) < Date.now()) return null;
+  return safeEqual(sig ?? "", await hmac(c.env.ADMIN_PASSWORD, `${app_}.${exp}`)) ? "owner (admin)" : null;
+}
 const ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 app.get("/health", (c) => c.json({ ok: true, service: "purenative-control", time: new Date().toISOString() }));
@@ -64,6 +84,60 @@ app.get("/band/:cohort", (c) => {
   catch { return c.json({ error: "cohort must be 0-999" }, 400); }
 });
 
-app.get("/app/:id/admin", (c) => c.html(`<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>PureNative admin</title><h1>PureNative admin</h1><p>App <code>${c.req.param("id").replace(/[^a-zA-Z0-9_-]/g, "")}</code>. Admin UI arrives in a later build step.</p>`));
+/* ---------- live content: what every device renders; the admin publishes new versions ---------- */
+app.get("/c/:app/content.json", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const raw = await c.env.POINTERS.get(`c/${appId}/content.json`);
+  if (!raw) return c.json({ error: "no_content" }, 404);
+  const version = (raw.match(/"version":(\d+)/) ?? [])[1] ?? "0";
+  const etag = `"${version}"`;
+  const h = { ETag: etag, "cache-control": "no-cache", "access-control-allow-origin": "*", "access-control-expose-headers": "ETag" };
+  if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: h });
+  return new Response(raw, { headers: { ...h, "content-type": "application/json" } });
+});
+
+/* ---------- orders placed in the app ---------- */
+app.post("/o/:app", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  let body: any; try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
+  const o = body?.order;
+  if (!o || typeof o.id !== "string" || !Array.isArray(o.lines) || !Number.isFinite(o.total)) return c.json({ error: "bad_order" }, 400);
+  const json = JSON.stringify({ order: o, content_version: body.content_version ?? null, release: body.release ?? null });
+  if (json.length > 20_000) return c.json({ error: "too_large" }, 413);
+  await c.env.DB.prepare("INSERT INTO orders (app_id, order_id, total, json) VALUES (?,?,?,?)").bind(appId, o.id.slice(0, 40), Math.round(o.total), json).run();
+  return c.json({ ok: true }, 202);
+});
+
+/* ---------- admin ---------- */
+app.get("/app/:id/admin", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.text("bad app id", 400);
+  if (!(await owner(c, appId))) return c.html(loginPage(appId));
+  return c.html(adminPage(appId));
+});
+app.post("/app/:id/admin/login", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.text("bad app id", 400);
+  const form = await c.req.parseBody();
+  if (!c.env.ADMIN_PASSWORD || !safeEqual(String(form.password ?? ""), c.env.ADMIN_PASSWORD)) return c.html(loginPage(appId, "Wrong password"), 401);
+  const exp = Date.now() + 7 * 24 * 3600 * 1000;
+  setCookie(c, "pn_admin", `${appId}.${exp}.${await hmac(c.env.ADMIN_PASSWORD, `${appId}.${exp}`)}`, { httpOnly: true, secure: true, sameSite: "Strict", path: `/app/${appId}`, maxAge: 7 * 24 * 3600 });
+  return c.redirect(`/app/${appId}/admin`, 303);
+});
+app.get("/app/:id/api/describe", async (c) => {
+  const appId = c.req.param("id");
+  if (!(await owner(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  return c.json({ app: appId, commands: describeOwner() });
+});
+app.post("/app/:id/api/command", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const actor = await owner(c, appId);
+  if (!actor) return c.json({ ok: false, error: { code: "unauthorized", message: "Sign in or send the owner token" } }, 401);
+  let body: any; try { body = await c.req.json(); } catch { return c.json({ ok: false, error: { code: "bad_json", message: "JSON body required" } }, 400); }
+  return c.json(await runOwnerCommand({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, String(body?.name ?? ""), body?.args ?? {}));
+});
 
 export default app;

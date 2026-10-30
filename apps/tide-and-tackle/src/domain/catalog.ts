@@ -1,11 +1,7 @@
 // Tide & Tackle catalogue. Prices in FCFA (XAF). Pure data: shared by the app UI and the agent surface.
-export type Department = "rods" | "reels" | "lines" | "lures" | "hooks" | "bait" | "apparel";
-export type Product = {
-  id: string; name: string; department: Department; price: number; stock: number;
-  water: "salt" | "fresh" | "both"; tags: string[]; description: string;
-};
+import type { AppContent, Department, Product, Promo, Slot } from "../content/types.ts";
 
-export const DEPARTMENTS: { id: Department; name: string }[] = [
+export const DEPARTMENTS: Department[] = [
   { id: "rods", name: "Rods" }, { id: "reels", name: "Reels" }, { id: "lines", name: "Lines" },
   { id: "lures", name: "Lures" }, { id: "hooks", name: "Hooks" }, { id: "bait", name: "Bait" }, { id: "apparel", name: "Apparel" },
 ];
@@ -33,12 +29,11 @@ export const PRODUCTS: Product[] = [
   { id: "apparel-cap", name: "Tide & Tackle Sun Cap", department: "apparel", price: 4500, stock: 18, water: "both", tags: ["sun"], description: "Wide-brim cap." },
 ];
 
-export const PROMOS: Record<string, { percent: number; minSubtotal: number; departments?: Department[]; description: string }> = {
-  TIDE10: { percent: 10, minSubtotal: 20000, description: "10% off orders of 20,000 FCFA or more" },
-  LURES15: { percent: 15, minSubtotal: 0, departments: ["lures"], description: "15% off lures" },
-};
+export const PROMOS: Promo[] = [
+  { code: "TIDE10", percent: 10, min_subtotal: 20000, description: "10% off orders of 20,000 FCFA or more", active: true },
+  { code: "LURES15", percent: 15, min_subtotal: 0, departments: ["lures"], description: "15% off lures", active: true },
+];
 
-export type Slot = { id: string; day: string; window: string; fee: number; capacity: number };
 export const SLOTS: Slot[] = [
   { id: "fri-am", day: "Friday", window: "08:00-12:00", fee: 1500, capacity: 0 },
   { id: "fri-pm", day: "Friday", window: "14:00-18:00", fee: 1500, capacity: 3 },
@@ -46,3 +41,20 @@ export const SLOTS: Slot[] = [
   { id: "sat-pm", day: "Saturday", window: "14:00-18:00", fee: 2000, capacity: 2 },
   { id: "pickup", day: "Any day", window: "Shop pickup, Bonanjo 09:00-19:00", fee: 0, capacity: 99 },
 ];
+
+/** Content shipped inside the bundle: used offline and before the first fetch. The admin publishes newer versions. */
+export const DEFAULT_CONTENT: AppContent = {
+  schema_version: "1.0", app_id: "tide", version: 0, published_at: "2026-10-30T00:00:00Z",
+  brand: { name: "Tide & Tackle", tagline: "Fishing supplies, Douala" },
+  theme: { accent: "#1F4E5F" },
+  departments: DEPARTMENTS, products: PRODUCTS, promos: PROMOS, slots: SLOTS,
+  screens: {
+    home: [
+      { id: "hero", type: "hero", title: "High tide 06:42. Bass are feeding.", body: "Gear for the Wouri, Limbe and Kribi, delivered in Douala." },
+      { id: "promo-banner", type: "banner", text: "15% off all lures with LURES15", tone: "success", action: { screen: "search", params: { department: "lures" } } },
+      { id: "depts", type: "departments", title: "Shop by department" },
+      { id: "salt", type: "product_rail", title: "For the sea", filter: { water: "salt", in_stock_only: true }, limit: 6 },
+      { id: "promos", type: "promos", title: "Current offers" },
+    ],
+  },
+};

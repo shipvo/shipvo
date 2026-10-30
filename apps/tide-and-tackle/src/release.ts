@@ -1,6 +1,6 @@
 // Content that changes with each over-the-air release. Edit this file, then push to main.
 export const RELEASE = {
-  headline: "Kribi this weekend: calm sea, clear water. Bring poppers.",
-  note: "Release 7: a small content change, delivered as a patch from release 6.",
-  accent: "#2F6B3A",
+  headline: "Release 8: the shop arrived over the air.",
+  note: "Home, search, product, cart and checkout, rendered from live content the owner edits in the admin.",
+  accent: "#1F4E5F",
 };
