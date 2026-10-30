@@ -9,6 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env: { E2B_API_KEY: "${{ secrets.E2B_API_KEY }}" }
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -17,7 +18,7 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @shipvo/mcp build
-      - name: Apply control-plane migrations (api_keys)
+      - name: Apply control-plane migrations (api_keys, sim_sessions)
         working-directory: services/control-plane
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -28,7 +29,25 @@ jobs:
           mkdir -p services/sim/build/sim services/sim/build/mcp
           cp apps/tide-and-tackle/sim/server.mjs services/sim/build/sim/
           cp -r packages/mcp/dist services/sim/build/mcp/dist
-      - name: Deploy shipvo-sim (container image + worker)
+      - name: Build the E2B template (one sandbox = one phone)
+        if: ${{ env.E2B_API_KEY != '' }}
+        working-directory: services/sim
+        env: { E2B_API_KEY: "${{ secrets.E2B_API_KEY }}" }
+        run: |
+          set -o pipefail
+          npx -y @e2b/cli@2 template build 2>&1 | tee e2b-build.log
+          grep -iE "template|built|id" e2b-build.log | tail -5 >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Worker secrets (E2B key, owner token)
+        working-directory: services/sim
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
+          SIM_OWNER_TOKEN: ${{ secrets.SIM_OWNER_TOKEN }}
+        run: |
+          [ -n "$E2B_API_KEY" ] && printf '%s' "$E2B_API_KEY" | npx wrangler@4 secret put E2B_API_KEY || echo "E2B_API_KEY secret not set in GitHub: Worker will report backend=none"
+          [ -n "$SIM_OWNER_TOKEN" ] && printf '%s' "$SIM_OWNER_TOKEN" | npx wrangler@4 secret put OWNER_TOKEN || true
+      - name: Deploy shipvo-sim (worker)
         working-directory: services/sim
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
