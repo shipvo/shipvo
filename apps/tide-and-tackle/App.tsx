@@ -26,6 +26,7 @@ async function report(state: RuntimeState, event: string, extra: Record<string, 
 export default function App() {
   const [state, setState] = useState<RuntimeState | null>(null);
   const [cold, setCold] = useState<number | null>(null);
+  const [applyMs, setApplyMs] = useState<number | null>(null);
   const [log, setLog] = useState<Line[]>([]);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -34,14 +35,17 @@ export default function App() {
   useEffect(() => {
     const h = Runtime.markHealthy();
     const s = Runtime.getState();
-    setState(s); setCold(h.coldStartMs);
+    // After an over-the-air apply the JS reloads inside the running process, so "since process start" is not a
+    // cold start. Treat it as a reload when the bundle was selected well after the process started.
+    const isReload = h.sinceLoadMs >= 0 && h.coldStartMs - h.sinceLoadMs > 2000;
+    setState(s); setCold(isReload ? null : h.coldStartMs); setApplyMs(isReload ? h.sinceLoadMs : null);
     const events = Runtime.consumeEvents();
     events.forEach((e) => add(e.replace(":", " release ")));
-    if (h.promoted) report(s, "applied", { cold_start_ms: h.coldStartMs, apply_ms: h.sinceLoadMs });
-    else report(s, "applied", { cold_start_ms: h.coldStartMs });
+    report(s, "applied", isReload ? { apply_ms: h.sinceLoadMs } : { cold_start_ms: h.coldStartMs });
     events.filter((e) => e.startsWith("crash_loop_revert")).forEach(() => report(s, "crash_loop_revert"));
     events.filter((e) => e.startsWith("rolled_back")).forEach(() => report(s, "rolled_back"));
-    add(`Running release ${s.runningRelease} (${h.coldStartMs} ms since process start)`);
+    add(isReload ? `Running release ${s.runningRelease} (applied in ${h.sinceLoadMs} ms, no restart)`
+      : `Running release ${s.runningRelease} (cold start ${h.coldStartMs} ms)`);
   }, []);
 
   const check = async (manual: boolean) => {
@@ -77,7 +81,9 @@ export default function App() {
         <Text style={s.title}>Spike read-out</Text>
         <Row k="Running release" v={String(state?.runningRelease ?? "…")} />
         <Row k="Last good / previous" v={state ? `${state.currentRelease} / ${state.previousRelease}` : "…"} />
-        <Row k="Cold start" v={cold == null ? "…" : `${cold} ms`} good={cold != null && cold < 1000} />
+        {applyMs != null
+          ? <Row k="Applied in (no restart)" v={`${applyMs} ms`} good={applyMs < 1000} />
+          : <Row k="Cold start" v={cold == null ? "…" : `${cold} ms`} good={cold != null && cold < 1000} />}
         <Row k="Cohort / band" v={state ? `${state.cohort} / ${state.band}` : "…"} />
         <Row k="Checks every" v={`${POLL_MS / 1000} s while open`} />
       </View>
