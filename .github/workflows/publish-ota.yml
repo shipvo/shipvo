@@ -1,0 +1,29 @@
+name: publish-ota
+on:
+  workflow_dispatch:
+    inputs:
+      bands:
+        description: "Cohort bands to release to (b0=1%, b1=10%, b2=rest)"
+        default: "b0,b1,b2"
+  push:
+    branches: [main]
+    paths: ["apps/tide-and-tackle/src/**", "apps/tide-and-tackle/App.tsx"]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    concurrency: publish-ota
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
+      - name: Build, sign and publish
+        working-directory: apps/tide-and-tackle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PURENATIVE_SIGNING_SEED: ${{ secrets.PURENATIVE_SIGNING_SEED }}
+        run: node scripts/publish-ota.mjs --bands "${{ inputs.bands || 'b0,b1,b2' }}" | tee -a "$GITHUB_STEP_SUMMARY"
