@@ -44,10 +44,14 @@ The device drivers also learned to close the on-screen keyboard like a person (B
 
 On iOS, the mobile-money number field opens a number pad with no Done key, and the checkout screen did not dismiss it on drag, so **Place order** was unreachable: a real customer paying by mobile money could not finish. Fixed in release 11 (keyboard closes on drag; content moves above it). The simulator, which has no on-screen keyboard, could not have found this; the device lanes exist for exactly this reason.
 
-## Definitions
+## Definitions (what the numbers do and do not measure)
 
-- **Actionable parity:** shared actionable elements (buttons, radio options, text fields; role and label) divided by all actionable elements seen on either side. Disabled controls count on both sides. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name.
+- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** It is not a full accessibility-tree diff: enabled/disabled state, element order, bounds and field values are not part of the score yet.
 - **Text coverage:** the share of text the simulator shows that also appears on the device, exactly or contained in a longer label.
+- **Same order:** on every "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical on both sides; receipts differ by provider (`SIMULATED-` vs `SANDBOX-`) and are normalised.
+- **Visibility rules applied on both sides:** only on-screen items of a horizontal rail; nothing behind a modal sheet (the rule TalkBack and iOS apply; Android's uiautomator tree does not, so the Android driver applies it); the on-screen keyboard is never part of the app.
+
+Planned, in this order: enabled/selected state in the match key; element order; nightly runs on clean installs with the published number being "runs at the bar out of runs"; a permission-denied flow.
 
 ## Known differences
 
