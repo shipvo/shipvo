@@ -41,7 +41,30 @@ const FLOWS = [
     { type: /^Mobile money number$/, text: "677000111" },
     { tap: /^Place order$/, name: "Order placed B" },
   ] },
+  // Native features: camera scan (the emulator's virtual scene shows the barcode), location (adb geo fix),
+  // the system permission dialogs, the in-app mobile money prompt. The emulator has no enrolled fingerprint,
+  // so the simulated phone is told the same (biometrics.enrolled=false) and the app skips that prompt on both.
+  { title: "C: scan, location, mobile money", steps: [
+    { tap: /^Back to shop$/ },
+    { tap: /^Scan a product barcode$/, name: "Camera permission" },
+    { tap: /^While using the app$/, name: "Scanner" },
+    { waitFor: /^Add 1 to cart$/, timeoutMs: 45000, name: "Scanned product" },
+    { tap: /^Add 1 to cart$/ },
+    { tap: /^Open cart/ },
+    { tap: /^Choose delivery and pay$/ },
+    { tap: /^Use my location$/, name: "Location permission" },
+    { tap: /^While using the app$/ },
+    { waitFor: /km from the shop/, timeoutMs: 20000, name: "Located" },
+    { tap: /^Any day Shop pickup/ },
+    { tap: /^Mobile money$/ },
+    { type: /^Mobile money number$/, text: "677000111" },
+    { tap: /^Place order$/, name: "Payment prompt" },
+    { type: /^Mobile money PIN$/, text: "1234" },
+    { tap: /^Confirm payment$/ },
+    { waitFor: /^Share order$/, timeoutMs: 15000, name: "Order placed C" },
+  ] },
 ];
+const SIM_DEVICE = { platform: "android", api: 30, biometrics: { enrolled: false }, camera: { barcode: { type: "ean13", data: "6181234567890" }, delayMs: 1500 } };
 
 /* ---------- simulator driver ---------- */
 // Fresh connection per call, with retries: the device side can pause long enough for an idle socket to close.
@@ -62,8 +85,9 @@ function parseSim(tree) {
   return out;
 }
 const sim = {
-  async start() { await simCall("/session", { session: "parity" }); },
-  async restart() { await simCall("/session", { session: "parity" }); },
+  async start() { await simCall("/session", { session: "parity", device: SIM_DEVICE }); },
+  async restart() { await simCall("/session", { session: "parity", device: SIM_DEVICE }); },
+  async waitFor(re, timeoutMs) { const t0 = Date.now(); while (Date.now() - t0 < timeoutMs) { if ((await this.elements()).some((e) => re.test(e.label))) return; await new Promise((r) => setTimeout(r, 700)); } throw new Error(`sim: never saw ${re}`); },
   async elements() { return parseSim((await simCall("/act", { session: "parity", action: "screen" })).screen); },
   async tap(re) { const el = (await this.elements()).find((e) => ["button", "radio", "link"].includes(e.role) && re.test(e.label)); if (!el) throw new Error(`sim: no element ${re}`); await simCall("/act", { session: "parity", action: "tap", ref: el.ref }); },
   async type(re, text) { const el = (await this.elements()).find((e) => e.role === "textbox" && re.test(e.label)); if (!el) throw new Error(`sim: no field ${re}`); await simCall("/act", { session: "parity", action: "type", ref: el.ref, text }); },
@@ -90,6 +114,7 @@ const native = {
     sleep(8000);
   },
   async elements() { return nativeFull(); },
+  async waitFor(re, timeoutMs) { const t0 = Date.now(); while (Date.now() - t0 < timeoutMs) { if (nativeDump().some((n) => re.test(n.label))) return; sleep(1000); } throw new Error(`native: never saw ${re}`); },
   async find(re, roles) {
     for (let i = 0; i < 8; i++) {
       const el = nativeDump().find((n) => roles.includes(n.role) && re.test(n.label));
@@ -126,7 +151,7 @@ for (const d of [sim, native]) d.ok = true;
 for (const [fi, flow] of FLOWS.entries()) {
   for (const step of flow.steps) {
     for (const [nm, d] of [["sim", sim], ["native", native]]) {
-      try { if (step.tap) await d.tap(step.tap); if (step.type) await d.type(step.type, step.text); }
+      try { if (step.tap) await d.tap(step.tap); if (step.type) await d.type(step.type, step.text); if (step.waitFor) await d.waitFor(step.waitFor, step.timeoutMs ?? 15000); }
       catch (e) { d.ok = false; (report.flow.errors ??= []).push(`${nm} ${flow.title} ${step.name ?? step.tap ?? step.type}: ${e.message}`); }
     }
     if (step.name) {

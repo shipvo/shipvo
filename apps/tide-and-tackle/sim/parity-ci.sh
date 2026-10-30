@@ -11,6 +11,7 @@ cleanup() { kill "$SIMPID" 2>/dev/null; sleep 1; kill -9 "$SIMPID" 2>/dev/null; 
 trap cleanup EXIT
 for i in $(seq 1 60); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
 curl -sf -X POST localhost:4545/session -H "content-type: application/json" -d '{"session":"warmup"}' | head -c 300 || { echo "SIMULATOR FAILED"; cat "$ROOT/sim.log"; }
+adb emu geo fix 9.6967 4.0225      # Bonapriso, Douala: 0.7 km from the shop
 adb install -r emu.apk
 adb shell monkey -p dev.purenative.tide -c android.intent.category.LAUNCHER 1
 sleep 60                      # first launch: fetch live content and any newer signed release

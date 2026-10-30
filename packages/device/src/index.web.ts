@@ -6,6 +6,8 @@ export * from "./types";
 
 export type DeviceState = {
   appName: string;
+  /** Which phone this simulates: dialog wording and defaults follow it. */
+  platform: "android" | "ios"; api: number;
   permissions: Record<"camera" | "location" | "notifications", PermissionStatus>;
   location: Coords;
   /** What the camera "sees": a barcode in view, or nothing. */
@@ -18,9 +20,11 @@ export type DeviceState = {
 };
 const g = globalThis as any;
 const cfg = g.__PN_SIM__ ?? {};
+const platform: "android" | "ios" = cfg.device?.platform ?? "android"; const api: number = cfg.device?.api ?? 30;
 const state: DeviceState = {
-  appName: cfg.appName ?? "This app",
-  permissions: { camera: "undetermined", location: "undetermined", notifications: "undetermined" },
+  appName: cfg.appName ?? "This app", platform, api,
+  // Before Android 13 (API 33) notifications need no runtime permission.
+  permissions: { camera: "undetermined", location: "undetermined", notifications: platform === "android" && api < 33 ? "granted" : "undetermined" },
   location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, // Bonapriso, Douala
   camera: { barcode: null, delayMs: 800 },
   biometrics: { enrolled: true, nextResult: "success" },
@@ -55,11 +59,17 @@ const p = (text: string) => { const e = document.createElement("p"); e.textConte
 
 async function askPermission(name: "camera" | "location" | "notifications"): Promise<PermissionStatus> {
   if (state.permissions[name] !== "undetermined") return state.permissions[name];
-  const what = name === "camera" ? "take pictures and record video" : name === "location" ? "access this device's location" : "send you notifications";
   let result: PermissionStatus = "denied";
-  await sheet(`Allow ${state.appName} to ${what}?`, (card, close) => {
+  // The system's own dialog, worded as the platform words it.
+  const title = state.platform === "ios"
+    ? (name === "camera" ? `“${state.appName}” Would Like to Access the Camera` : name === "location" ? `Allow “${state.appName}” to use your location?` : `“${state.appName}” Would Like to Send You Notifications`)
+    : `Allow ${state.appName} to ${name === "camera" ? "take pictures and record video" : name === "location" ? "access this device's location" : "send you notifications"}?`;
+  const choices: [string, PermissionStatus][] = state.platform === "ios"
+    ? (name === "location" ? [["Allow Once", "granted"], ["Allow While Using App", "granted"], ["Don’t Allow", "denied"]] : name === "camera" ? [["Allow", "granted"], ["Don’t Allow", "denied"]] : [["Allow", "granted"], ["Don’t Allow", "denied"]])
+    : (name === "notifications" ? [["Allow", "granted"], ["Don’t allow", "denied"]] : [["While using the app", "granted"], ["Only this time", "granted"], ["Deny", "denied"]]);
+  await sheet(title, (card, close) => {
     const row = document.createElement("div"); Object.assign(row.style, { display: "grid", gap: "8px" });
-    row.append(btn(name === "location" ? "While using the app" : "Allow", () => { result = "granted"; close(); }, true), btn("Don't allow", () => { result = "denied"; close(); }));
+    for (const [label, st] of choices) row.append(btn(label, () => { result = st; close(); }, st === "granted"));
     card.append(row);
   });
   state.permissions[name] = result; log("permission", { name, result }); return result;
