@@ -1,0 +1,18 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'dev.purenative'
+version = '0.0.1'
+
+android {
+  namespace "dev.purenative.runtime"
+  defaultConfig { versionCode 1; versionName "0.0.1" }
+}
+
+dependencies {
+  implementation 'com.facebook.react:react-android'
+  // Ed25519 verification on Android 7+ (no platform Ed25519 before API 33). Pure Java, ~60 KB.
+  implementation 'net.i2p.crypto:eddsa:0.3.0'
+}

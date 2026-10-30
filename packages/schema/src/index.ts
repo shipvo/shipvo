@@ -73,6 +73,21 @@ export const ReleasePointer = z.object({
 });
 export type ReleasePointer = z.infer<typeof ReleasePointer>;
 
+/** Body of a release pointer as signed on the wire (no signature inside). */
+export const ReleasePointerBody = ReleasePointer.omit({ signature: true });
+export type ReleasePointerBody = z.infer<typeof ReleasePointerBody>;
+
+/**
+ * Wire envelope: `body` is the exact JSON string that was signed; `signature` is Ed25519 over its UTF-8 bytes.
+ * Devices verify bytes, then parse. No canonicalisation needed on device.
+ */
+export const SignedEnvelope = z.object({
+  body: z.string().min(2),
+  signature: b64,
+  key_id: z.string().optional(),
+});
+export type SignedEnvelope = z.infer<typeof SignedEnvelope>;
+
 /** .pnpkg add-on manifest (inside the signed package). */
 export const AddonManifest = z.object({
   schema_version: z.literal("1.0"),

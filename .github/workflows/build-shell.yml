@@ -1,0 +1,49 @@
+name: build-shell
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Shell version (versionName)"
+        default: "1.0.0"
+  push:
+    branches: [main]
+    paths: ["apps/tide-and-tackle/modules/**", "apps/tide-and-tackle/app.json", "apps/tide-and-tackle/plugins/**", "apps/tide-and-tackle/package.json", ".github/workflows/build-shell.yml"]
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
+      - name: Prebuild
+        working-directory: apps/tide-and-tackle
+        run: CI=1 npx expo prebuild -p android --no-install
+      - name: Assemble release APK (armeabi-v7a + arm64-v8a)
+        working-directory: apps/tide-and-tackle/android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a --no-daemon
+      - name: Collect APK
+        id: apk
+        run: |
+          APK=$(ls apps/tide-and-tackle/android/app/build/outputs/apk/release/*.apk | head -1)
+          cp "$APK" tide-and-tackle-shell.apk
+          echo "size=$(stat -c %s tide-and-tackle-shell.apk)" >> $GITHUB_OUTPUT
+          sha256sum tide-and-tackle-shell.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: tide-and-tackle-shell, path: tide-and-tackle-shell.apk }
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="shell-${{ inputs.version || '1.0.0' }}-${{ github.run_number }}"
+          gh release create "$TAG" tide-and-tackle-shell.apk --title "Tide & Tackle shell $TAG" \
+            --notes "Sample shell APK for the PureNative spike. Size: ${{ steps.apk.outputs.size }} bytes. Install by sideloading; updates after this arrive over the air." --prerelease

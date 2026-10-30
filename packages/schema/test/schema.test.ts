@@ -43,3 +43,13 @@ describe("canonicalize", () => {
   it("is key-order independent and excludes signature", () =>
     expect(canonicalize({ b: 1, a: { d: 1, c: 2 }, signature: "x" })).toBe(canonicalize({ a: { c: 2, d: 1 }, b: 1 })));
 });
+import { SignedEnvelope, ReleasePointerBody } from "../src/index";
+describe("envelope", () => {
+  it("parses envelope and unsigned body", () => {
+    const h = "a".repeat(64);
+    const body = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 1, issued_at: "2026-10-30T00:00:00Z",
+      core: { version: "1.0.0", sha256: h, size: 10, url: "c" }, min_shell_version: "1.0.0" };
+    expect(ReleasePointerBody.safeParse(body).success).toBe(true);
+    expect(SignedEnvelope.safeParse({ body: JSON.stringify(body), signature: "AAAA" }).success).toBe(true);
+  });
+});
