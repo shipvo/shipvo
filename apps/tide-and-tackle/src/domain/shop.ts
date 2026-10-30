@@ -90,7 +90,7 @@ export const COMMANDS: Record<string, CommandSpec> = {
   view_cart: { description: "Show the cart with subtotal, discount, delivery fee and total in FCFA.", params: {}, run: (s) => ({ ...totals(s), promo: s.promo, delivery: s.delivery }) },
   apply_promo: {
     description: "Apply a promo code to the cart. Only one code at a time.",
-    params: { code: { type: "string", required: true, description: "Promo code, e.g. TIDE10." } },
+    params: { code: { type: "string", required: true, description: "Promo code from list_promos." } },
     run: (s, a) => {
       const code = String(a.code).trim().toUpperCase();
       const promo = PROMOS[code] ?? fail("invalid_promo", `'${a.code}' is not a valid code.`);
@@ -98,6 +98,15 @@ export const COMMANDS: Record<string, CommandSpec> = {
       if (t.subtotal < promo.minSubtotal) fail("promo_minimum", `${code} needs a subtotal of ${promo.minSubtotal} FCFA; cart is ${t.subtotal}.`);
       s.promo = code; return { applied: code, description: promo.description, ...totals(s) };
     },
+  },
+  list_promos: {
+    description: "List current promo codes with their rules, and the discount each would give on the current cart (0 if it does not qualify).",
+    params: {},
+    run: (s) => Object.entries(PROMOS).map(([code, p]) => {
+      const trial: ShopState = { ...s, promo: code };
+      const t = totals(trial);
+      return { code, description: p.description, min_subtotal_fcfa: p.minSubtotal, departments: p.departments ?? "all", discount_on_current_cart_fcfa: t.discount };
+    }),
   },
   list_delivery_slots: { description: "List delivery slots with fees and whether they are available.", params: {}, run: (s) => SLOTS.map((x) => ({ id: x.id, day: x.day, window: x.window, fee_fcfa: x.fee, available: s.slot_capacity[x.id] > 0 })) },
   set_delivery: {
