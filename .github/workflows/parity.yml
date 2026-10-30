@@ -54,7 +54,7 @@ jobs:
           target: google_apis
           profile: pixel_5
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back virtualscene -virtualscene-poster wall=${{ github.workspace }}/barcode.png
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back virtualscene -virtualscene-poster wall=${{ github.workspace }}/barcode.png -virtualscene-poster table=${{ github.workspace }}/barcode.png
           script: timeout 3400 bash apps/tide-and-tackle/sim/parity-ci.sh || true
       - name: Report
         if: always()
