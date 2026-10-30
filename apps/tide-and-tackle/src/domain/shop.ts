@@ -119,7 +119,14 @@ export const COMMANDS: Record<string, CommandSpec> = {
   find_by_barcode: {
     description: "Find the product whose barcode (EAN) was scanned.",
     params: { code: { type: "string", required: true, description: "The scanned code." } },
-    run: (_s, a) => { const code = String(a.code).trim(); const p = C.products.find((x) => x.barcode === code || x.id === code) ?? fail("not_found", `No product has barcode ${code}.`); return { id: p.id, name: p.name, price_fcfa: p.price }; },
+    run: (_s, a) => {
+      const code = String(a.code).trim();
+      // Live content published before barcodes existed has none: fall back to the bundled catalogue's codes by product id.
+      const byLive = C.products.find((x) => x.barcode === code || x.id === code);
+      const bundled = DEFAULT_CONTENT.products.find((x) => x.barcode === code);
+      const p = byLive ?? (bundled ? C.products.find((x) => x.id === bundled.id) ?? bundled : null) ?? fail("not_found", `No product has barcode ${code}.`);
+      return { id: p.id, name: p.name, price_fcfa: p.price };
+    },
   },
   list_delivery_slots: { description: "List delivery slots with fees and whether they are available.", params: {}, run: (s) => C.slots.map((x) => ({ id: x.id, day: x.day, window: x.window, fee_fcfa: x.fee, available: slotCap(s, x.id) > 0 })) },
   set_delivery: {

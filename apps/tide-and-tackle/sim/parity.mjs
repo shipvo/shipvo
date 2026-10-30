@@ -50,6 +50,7 @@ const FLOWS = [
   { title: "C: scan, location, mobile money", steps: [
     { tap: /^Back to shop$/ },
     { tap: /^Scan a product barcode$/, name: "Camera permission" },
+    { tap: /^Allow camera$/, optional: true },            // a person taps the app's button if the system dialog has not shown
     { tap: /^While using the app$/, name: "Scanner" },
     { waitFor: /^Add 1 to cart$/, timeoutMs: 45000, name: "Scanned product" },
     { tap: /^Add 1 to cart$/ },
@@ -155,7 +156,8 @@ for (const [fi, flow] of FLOWS.entries()) {
   for (const step of flow.steps) {
     for (const [nm, d] of [["sim", sim], ["native", native]]) {
       try { if (step.tap) await d.tap(step.tap); if (step.type) await d.type(step.type, step.text); if (step.waitFor) await d.waitFor(step.waitFor, step.timeoutMs ?? 15000); }
-      catch (e) { d.ok = false; const msg = `${nm} ${flow.title} ${step.name ?? step.tap ?? step.type ?? step.waitFor}: ${e.message}`; (report.flow.errors ??= []).push(msg); console.log(`[parity] ERROR ${msg}`); }
+      catch (e) { if (step.optional) continue; d.ok = false; const msg = `${nm} ${flow.title} ${step.name ?? step.tap ?? step.type ?? step.waitFor}: ${e.message}`; (report.flow.errors ??= []).push(msg); console.log(`[parity] ERROR ${msg}`);
+        try { (report.flow.debug ??= []).push({ at: msg.slice(0, 80), sim: (await sim.elements()).map((x) => `${x.role}:${x.label}`).slice(0, 40), device: nativeDump().map((x) => `${x.role}:${x.label}`).slice(0, 40) }); } catch {} }
     }
     if (step.name) {
       const [a, b] = [await sim.elements(), await native.elements()];

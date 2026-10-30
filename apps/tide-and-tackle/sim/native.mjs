@@ -26,12 +26,15 @@ function rawDump() {
     try { adb("shell", "uiautomator", "dump", "/sdcard/pn.xml"); xml = adb("shell", "cat", "/sdcard/pn.xml"); } catch {}
   }
   const nodes = [];
+  let rootArea = 0, modal = null; // a labelled view covering the screen, drawn over other content, is a modal sheet
   for (const m of xml.matchAll(/<node ([^>]*?)\/?>/g)) {
     const a = Object.fromEntries([...m[1].matchAll(/([\w-]+)="([^"]*)"/g)].map((x) => [x[1], x[2].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#10;/g, " ")]));
     const b = (a.bounds || "").match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
     if (!b) continue;
     const [x1, y1, x2, y2] = b.slice(1).map(Number);
     if (x2 - x1 < 2 || y2 - y1 < 2) continue;
+    const area = (x2 - x1) * (y2 - y1); if (!rootArea) rootArea = area;
+    if (a["content-desc"] && area >= rootArea * 0.96 && nodes.length > 0) modal = { x1, y1, x2, y2, from: nodes.length };
     const cls = (a.class || "").split(".").pop();
     const role = a.checkable === "true" && /Radio/.test(cls) ? "radio"
       : cls === "EditText" ? "textbox"
@@ -42,6 +45,8 @@ function rawDump() {
     nodes.push({ role, label, value: cls === "EditText" ? a.text : undefined, x: (x1 + x2) >> 1, y: (y1 + y2) >> 1,
       selected: a.selected === "true" || a.checked === "true", disabled: a.enabled === "false" });
   }
+  // TalkBack and iOS expose only the modal sheet; uiautomator lists everything, so apply the same rule here.
+  if (modal) return nodes.slice(modal.from).filter((n) => n.x >= modal.x1 && n.x <= modal.x2 && n.y >= modal.y1 && n.y <= modal.y2);
   return nodes;
 }
 
