@@ -39,23 +39,21 @@ async function newSandbox(env: Env, app: string, scope: string) {
 const killSandbox = (env: Env, id: string) => e2b(env, "DELETE", `/sandboxes/${id}`).catch(() => {});
 const touchSandbox = (env: Env, id: string) => e2b(env, "POST", `/sandboxes/${id}/timeout`, { timeout: Number(env.SESSION_TIMEOUT_S ?? 1800) }).catch(() => {});
 
-async function viaE2B(req: Request, env: Env, row: { app_id: string; scope: string }, headers: Headers): Promise<Response> {
-  const sid = req.headers.get("mcp-session-id");
-  let target: { host: string; id: string } | null = null;
-  if (sid) {
-    const s = await env.DB.prepare("SELECT sandbox_id, sandbox_host FROM sim_sessions WHERE mcp_session = ?").bind(sid).first<{ sandbox_id: string; sandbox_host: string }>();
-    if (!s) return json({ error: "unknown_session", hint: "the session expired; start again with initialize" }, 404);
-    target = { host: s.sandbox_host, id: s.sandbox_id };
-    env.DB.prepare("UPDATE sim_sessions SET last_seen_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE mcp_session = ?").bind(sid).run().catch(() => {});
-    touchSandbox(env, s.sandbox_id);
-  } else {
-    if (req.method !== "POST") return json({ error: "missing_session" }, 400);
-    const sb = await newSandbox(env, row.app_id, row.scope); target = sb;
+// One sandbox ("phone pool") per API key: clients such as ChatGPT reconnect between tool calls, and the agent's
+// simulator sessions must survive that. The sandbox is created on first use and expires after idle time.
+async function sandboxForKey(env: Env, keyId: number, app: string, scope: string) {
+  const row = await env.DB.prepare("SELECT sandbox_id, sandbox_host FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).first<{ sandbox_id: string; sandbox_host: string }>();
+  if (row) {
+    try { const h = await fetch(`${row.sandbox_host}/health`, { signal: AbortSignal.timeout(4000) }); if (h.ok) { touchSandbox(env, row.sandbox_id); return { id: row.sandbox_id, host: row.sandbox_host }; } } catch {}
+    await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).run();   // expired: make a new one
   }
+  const sb = await newSandbox(env, app, scope);
+  await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope) VALUES (?,?,?,?,?)").bind(`key:${keyId}`, sb.id, sb.host, app, scope).run();
+  return sb;
+}
+async function viaE2B(req: Request, env: Env, row: { id: number; app_id: string; scope: string }, headers: Headers): Promise<Response> {
+  const target = await sandboxForKey(env, row.id, row.app_id, row.scope);
   const res = await fetch(`${target.host}/mcp`, { method: req.method, headers, body: req.body, redirect: "manual" });
-  const newSid = res.headers.get("mcp-session-id");
-  if (!sid && newSid) await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope) VALUES (?,?,?,?,?)").bind(newSid, target.id, target.host, row.app_id, row.scope).run();
-  if (req.method === "DELETE" && sid) { await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(sid).run(); killSandbox(env, target.id); }
   const h = new Headers(res.headers); for (const [k, v] of Object.entries(CORS)) h.set(k, v);
   return new Response(res.body, { status: res.status, headers: h });
 }

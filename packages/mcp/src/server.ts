@@ -28,8 +28,10 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
 }
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
-const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error: ${r.error}\n\nScreen now:\n${r.screen ?? ""}`); };
-const need = (sid: string) => { if (!sessions.has(sid)) throw new Error(`no session "${sid}". Call open_app first.`); };
+const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}`); };
+// Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
+// (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
+const need = (_sid: string) => {};
 
 type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string };
 function makeServer(ctx: Ctx = {}) {
@@ -92,7 +94,7 @@ server.tool("device_reset", "Put the simulated phone back to a known state (perm
   async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
 
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, async ({ session }) => {
-  need(session); const s = sessions.get(session)!; sessions.delete(session);
+  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
