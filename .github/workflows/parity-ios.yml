@@ -4,7 +4,7 @@ name: parity-ios
 on:
   workflow_dispatch:
     inputs:
-      build_url: { description: "EAS iOS simulator build (.tar.gz)", default: "https://expo.dev/artifacts/eas/w-5N_nUdN6PHMnRFjMtMv2pKECMDBFHXQYxWGenaoq8.tar.gz" }
+      build_url: { description: "EAS iOS simulator build (.tar.gz)", default: "https://expo.dev/artifacts/eas/pku2Of1559Xu-SjLQUvl6bZ1WlKuaQUOGk9-RbWnTeo.tar.gz" }
   push:
     branches: [main]
     paths: [".github/workflows/parity-ios.yml", "apps/tide-and-tackle/sim/appium.mjs", "apps/tide-and-tackle/sim/parity-cloud.mjs"]
@@ -25,7 +25,7 @@ jobs:
           UDID=$(xcrun simctl list devices available -j | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s).devices;for(const k of Object.keys(d).reverse()){const x=d[k].find(v=>/^iPhone \d+$/.test(v.name));if(x){console.log(x.udid);return}}})")
           echo "UDID=$UDID" >> $GITHUB_ENV
           xcrun simctl boot "$UDID" || true
-          curl -sSL "${{ inputs.build_url || 'https://expo.dev/artifacts/eas/w-5N_nUdN6PHMnRFjMtMv2pKECMDBFHXQYxWGenaoq8.tar.gz' }}" -o app.tar.gz
+          curl -sSL "${{ inputs.build_url || 'https://expo.dev/artifacts/eas/pku2Of1559Xu-SjLQUvl6bZ1WlKuaQUOGk9-RbWnTeo.tar.gz' }}" -o app.tar.gz
           mkdir app && tar -xzf app.tar.gz -C app && ls app
           xcrun simctl install "$UDID" app/*.app
           xcrun simctl list devices | grep Booted
