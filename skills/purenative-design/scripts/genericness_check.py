@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Flag default looks, reflexive pairings and template patterns in a Liveo theme and/or screen.
+"""Flag default looks, reflexive pairings and template patterns in a PureNative theme and/or screen.
 
 Usage: genericness_check.py [--theme theme.json] [--screen screen.json]
 Prints findings with severity. Exit 1 if any 'default look' is detected without an explicit

@@ -1,6 +1,6 @@
 // Owner commands: everything the admin can do, as typed commands. The admin UI calls these, and so can an agent
 // holding the owner token. Commands edit the DRAFT; `publish` validates it and makes it live on every device.
-import { AppContent, ContentBlock } from "@liveo/schema";
+import { AppContent, ContentBlock } from "@purenative/schema";
 
 type Content = AppContent;
 type P = { type: "string" | "number" | "boolean" | "object"; required?: boolean; description: string; enum?: string[] };

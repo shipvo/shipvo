@@ -1,6 +1,6 @@
 # Tokens
 
-Liveo styles everything through semantic tokens. Screens reference token names; the theme maps names to values; the renderer resolves them per platform and colour scheme. A screen never contains a hex value, a pixel size or a font family.
+PureNative styles everything through semantic tokens. Screens reference token names; the theme maps names to values; the renderer resolves them per platform and colour scheme. A screen never contains a hex value, a pixel size or a font family.
 
 ## Colour roles
 

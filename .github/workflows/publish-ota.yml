@@ -22,7 +22,7 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pip install --break-system-packages bsdiff4
-      - run: pnpm --filter @liveo/schema build && pnpm --filter @liveo/cli build
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
       - name: Build, sign and publish
         working-directory: apps/tide-and-tackle
         env:

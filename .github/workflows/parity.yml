@@ -1,5 +1,5 @@
 name: parity
-# Simulator vs real Android: run the same flow on the Liveo UI simulator and on the app on an Android
+# Simulator vs real Android: run the same flow on the PureNative UI simulator and on the app on an Android
 # emulator, compare every screen, and publish the parity report.
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @liveo/schema build && pnpm --filter @liveo/cli build
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
       - name: Build emulator APK (x86_64)
         working-directory: apps/tide-and-tackle
         run: |

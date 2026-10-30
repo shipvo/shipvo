@@ -64,7 +64,7 @@ let s = null;
 for (const [deviceName, platformVersion] of CANDIDATES[LANE]) {
   try {
     s = await cloud.startSession({ platformName: LANE.startsWith("ios") ? "ios" : "android", deviceName, platformVersion, app: APP, udid: APP,
-      isRealMobile: LANE === "android-real", build: "Liveo parity", name: `parity ${LANE}`, w3c: true, autoGrantPermissions: true });
+      isRealMobile: LANE === "android-real", build: "PureNative parity", name: `parity ${LANE}`, w3c: true, autoGrantPermissions: true });
     report.device = `${deviceName} (${LANE.startsWith("ios") ? "iOS" : "Android"} ${platformVersion})`; break;
   } catch (e) { report.errors.push(`session ${deviceName} ${platformVersion}: ${e.message}`); }
 }

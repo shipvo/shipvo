@@ -2,9 +2,9 @@
 // so an over-the-air bundle can never change which key it is verified against.
 const { withAndroidManifest, AndroidConfig } = require("expo/config-plugins");
 
-module.exports = function withLiveo(config, props) {
+module.exports = function withPureNative(config, props) {
   const { baseUrl, publicKey, appId, shellMajor = 1 } = props || {};
-  if (!baseUrl || !publicKey || !appId) throw new Error("withLiveo: baseUrl, publicKey and appId are required");
+  if (!baseUrl || !publicKey || !appId) throw new Error("withPureNative: baseUrl, publicKey and appId are required");
   return withAndroidManifest(config, (cfg) => {
     const app = AndroidConfig.Manifest.getMainApplicationOrThrow(cfg.modResults);
     const set = (name, value) => AndroidConfig.Manifest.addMetaDataItemToMainApplication(app, name, String(value));

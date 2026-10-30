@@ -1,4 +1,4 @@
-// The device API every Liveo app talks to. Same shape on phones and in the simulator.
+// The device API every PureNative app talks to. Same shape on phones and in the simulator.
 export type PermissionStatus = "granted" | "denied" | "undetermined";
 export type Coords = { latitude: number; longitude: number; accuracy?: number };
 export type ScanResult = { type: string; data: string };

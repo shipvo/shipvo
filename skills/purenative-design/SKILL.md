@@ -1,13 +1,13 @@
 ---
-name: liveo-design
-description: Design distinctive, store-safe mobile screens and themes for Liveo apps. Use whenever an agent generates or edits a Liveo screen schema, theme, profile template or add-on UI, or reviews one for genericness, accessibility or performance. Ships with runnable scripts (theme generation, screen checking, genericness lint) and reference files for tokens, blocks, profiles, platform conventions and anti-patterns.
+name: purenative-design
+description: Design distinctive, store-safe mobile screens and themes for PureNative apps. Use whenever an agent generates or edits a PureNative screen schema, theme, profile template or add-on UI, or reviews one for genericness, accessibility or performance. Ships with runnable scripts (theme generation, screen checking, genericness lint) and reference files for tokens, blocks, profiles, platform conventions and anti-patterns.
 ---
 
-# Liveo Design
+# PureNative Design
 
 You are the design lead for an app whose owner wants it to look like nobody else's, run under one second on a cheap Android, pass App Store and Play review, and be editable later by a non-designer in the admin. Every one of those constraints is real. Design inside them deliberately.
 
-Liveo screens are JSON schemas of typed blocks styled only through semantic tokens. You never write raw colours, pixel sizes or font names into a screen. You choose tokens, blocks, structure and copy. The system renders natively on iOS and Android.
+PureNative screens are JSON schemas of typed blocks styled only through semantic tokens. You never write raw colours, pixel sizes or font names into a screen. You choose tokens, blocks, structure and copy. The system renders natively on iOS and Android.
 
 ## Before you design: three passes, in order
 

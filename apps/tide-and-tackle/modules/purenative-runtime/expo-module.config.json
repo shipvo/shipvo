@@ -1,4 +1,4 @@
 {
   "platforms": ["android"],
-  "android": { "modules": ["dev.purenative.runtime.LiveoRuntimeModule"] }
+  "android": { "modules": ["dev.purenative.runtime.PureNativeRuntimeModule"] }
 }

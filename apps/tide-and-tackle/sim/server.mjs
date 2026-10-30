@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Liveo UI simulator: runs the real app UI (React Native Web build) in a phone-sized headless browser,
+// PureNative UI simulator: runs the real app UI (React Native Web build) in a phone-sized headless browser,
 // and lets an agent see the screen as an accessibility tree and act on it: tap, type, scroll, back.
 // No emulator, no device. Each session also gets a mock control plane that records orders for grading.
 //   node sim/server.mjs [--port 4545] [--dir /tmp/pn-ui]
@@ -96,7 +96,7 @@ async function act(id, body) {
       await page.mouse.wheel(body.direction === "right" ? 300 : body.direction === "left" ? -300 : 0, body.direction === "up" ? -600 : body.direction === "down" ? 600 : 0);
       break;
     }
-    // Simulated device: what the phone "has" and what happens to it. See @liveo/device.
+    // Simulated device: what the phone "has" and what happens to it. See @purenative/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); break;
     case "push_notification": await page.evaluate((n) => globalThis.__pnDevice?.push(n), { title: body.title ?? "", body: body.body ?? "", data: body.data ?? {} }); break;
     case "device_log": return { log: await page.evaluate(() => globalThis.__pnDevice?.log() ?? []), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
@@ -149,4 +149,4 @@ const server = http.createServer(async (req, res) => {
 });
 // Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
-server.listen(PORT, () => console.log(`Liveo UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));
+server.listen(PORT, () => console.log(`PureNative UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));

@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @liveo/schema build && pnpm --filter @liveo/cli build
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
       - name: Link EAS project
         working-directory: apps/tide-and-tackle
         env: { EXPO_TOKEN: "${{ secrets.EXPO_TOKEN }}" }

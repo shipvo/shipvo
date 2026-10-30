@@ -3,7 +3,7 @@
 // Devices only accept releases newer than what they have, so rollback is "roll forward to old code".
 // Usage: node scripts/rollback-ota.mjs --to <release> [--bands b0,b1,b2]
 import { readFileSync } from "node:fs";
-import { signBytes, sha256Hex } from "@liveo/cli";
+import { signBytes, sha256Hex } from "@purenative/cli";
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, x, i, all) => (x.startsWith("--") ? [...a, [x.slice(2), all[i + 1]]] : a), []));
 const APP_ID = "tide", SHELL_MAJOR = 1;

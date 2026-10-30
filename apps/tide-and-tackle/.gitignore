@@ -40,7 +40,7 @@ yarn-error.*
 /ios
 /android
 
-# Liveo OTA export
+# PureNative OTA export
 dist-ota/
 
 # UI simulator build

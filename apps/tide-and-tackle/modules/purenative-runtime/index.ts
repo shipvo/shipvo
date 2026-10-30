@@ -36,4 +36,4 @@ const fallback: Native = {
   markHealthy: () => ({ release: 0, coldStartMs: Date.now() - t0, sinceLoadMs: 0, promoted: false, kind: "cold" }),
   consumeEvents: () => [], rollback: () => {}, reload: () => {},
 };
-export const Runtime: Native = requireOptionalNativeModule<Native>("LiveoRuntime") ?? fallback;
+export const Runtime: Native = requireOptionalNativeModule<Native>("PureNativeRuntime") ?? fallback;

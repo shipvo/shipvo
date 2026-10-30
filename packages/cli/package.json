@@ -1,10 +1,10 @@
 {
-  "name": "@liveo/cli",
+  "name": "@purenative/cli",
   "version": "0.0.1",
   "type": "module",
   "license": "Apache-2.0",
   "bin": {
-    "liveo": "dist/cli.js"
+    "purenative": "dist/cli.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,14 +16,14 @@
   "dependencies": {
     "@noble/ed25519": "^2.1.0",
     "@noble/hashes": "^1.5.0",
-    "@liveo/schema": "workspace:*"
+    "@purenative/schema": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
     "vitest": "^2.1.4",
     "@types/node": "^22.8.0"
   },
-  "description": "Liveo CLI: Ed25519 signing, hashing and publishing of over-the-air React Native releases.",
+  "description": "PureNative CLI: Ed25519 signing, hashing and publishing of over-the-air React Native releases.",
   "keywords": [
     "react-native",
     "expo",

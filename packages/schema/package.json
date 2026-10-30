@@ -1,5 +1,5 @@
 {
-  "name": "@liveo/schema",
+  "name": "@purenative/schema",
   "version": "0.0.1",
   "type": "module",
   "license": "Apache-2.0",
@@ -18,7 +18,7 @@
     "vitest": "^2.1.4",
     "@types/node": "^22.8.0"
   },
-  "description": "Liveo contracts: shell manifest, release pointer, signed envelope, gate report, telemetry.",
+  "description": "PureNative contracts: shell manifest, release pointer, signed envelope, gate report, telemetry.",
   "keywords": [
     "react-native",
     "expo",
