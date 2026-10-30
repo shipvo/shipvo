@@ -11,6 +11,7 @@ import { fcfa } from "./theme";
 export function ScanScreen({ T, onCode, onCancel, prompt }: { T: Tokens; onCode: (code: string) => void; onCancel: () => void; prompt: string }) {
   const [perm, request] = useCameraPermissions();
   const [done, setDone] = useState(false);
+  const [typed, setTyped] = useState("");
   useEffect(() => { if (perm && !perm.granted && (perm as any).canAskAgain !== false) request(); }, [perm?.granted]);
   const s = st(T);
   return (
@@ -26,6 +27,14 @@ export function ScanScreen({ T, onCode, onCancel, prompt }: { T: Tokens; onCode:
           {perm && !perm.granted && <Pressable accessibilityRole="button" accessibilityLabel="Allow camera" onPress={() => request()} style={[s.btn, { backgroundColor: T.accent, marginTop: 12 }]}><Text style={s.btnText}>Allow camera</Text></Pressable>}
         </View>
       )}
+      {/* Poor light, a scratched pack, a weak camera: the code can always be typed. */}
+      <Text style={s.caption}>Can't scan? Type the number under the barcode.</Text>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <TextInput value={typed} onChangeText={(v) => setTyped(v.replace(/\D/g, "").slice(0, 14))} keyboardType="number-pad" placeholder="e.g. 6181234567890" placeholderTextColor={T.text2}
+          style={[s.input, { flex: 1, letterSpacing: 0, fontSize: 16 }]} accessibilityLabel="Barcode number" testID="barcode-input" />
+        <Pressable accessibilityRole="button" accessibilityLabel="Find product by barcode" accessibilityState={{ disabled: typed.length < 8 }} disabled={typed.length < 8} onPress={() => { if (!done) { setDone(true); onCode(typed); } }}
+          style={[s.btn, { backgroundColor: T.accent }, typed.length < 8 && { opacity: 0.6 }]}><Text style={s.btnText}>Find</Text></Pressable>
+      </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Cancel scan" onPress={onCancel} style={[s.btn, s.ghost]}><Text style={[s.btnText, { color: T.text }]}>Cancel</Text></Pressable>
     </View>
   );

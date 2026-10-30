@@ -190,7 +190,7 @@ for (const [fi, flow] of FLOWS.entries()) {
       const [a, b] = [await sim.elements(), await native.elements()];
       const row = { flow: flow.title, screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b), ...(/^Order placed/.test(step.name) ? sameOutcome(a, b) : {}) };
       report.screens.push(row);
-      if (/Payment prompt|Order placed/.test(step.name)) { try { (report.flow.probe ??= {})[step.name] = nativeMod.largeNodes(); writeFileSync(join(OUT, `ui-${step.name.replace(/\W+/g, "_")}.xml`), nativeMod.lastDumpXml()); } catch {} }
+      if (/Payment prompt|Order placed|permission/.test(step.name)) { try { (report.flow.probe ??= {})[step.name] = nativeMod.largeNodes(); writeFileSync(join(OUT, `ui-${step.name.replace(/\W+/g, "_")}.xml`), nativeMod.lastDumpXml()); } catch {} }
       console.log(`[parity] ${flow.title} / ${step.name}: actionable ${(row.actionable_parity * 100).toFixed(0)}%, text ${(row.text_coverage * 100).toFixed(0)}% (${a.length}/${b.length})`);
       writeFileSync(join(OUT, "parity-report.json"), JSON.stringify(report, null, 2)); // partial results survive a timeout
     }

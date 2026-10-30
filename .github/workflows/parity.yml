@@ -38,13 +38,13 @@ jobs:
           npm i -g playwright@1.63.0 && npx -y playwright@1.63.0 install --with-deps chromium
       - name: Barcode poster for the emulator's virtual camera scene
         run: |
-          pip install --quiet python-barcode pillow
+          pip install --quiet qrcode pillow
           python3 - <<'PY'
-          import barcode; from barcode.writer import ImageWriter
-          from PIL import Image
-          img = barcode.get("ean13", "618123456789", writer=ImageWriter()).render({"module_width": 0.6, "module_height": 30, "font_size": 14, "quiet_zone": 10})
-          canvas = Image.new("RGB", (1024, 1024), "white"); w, h = img.size; s = min(900 / w, 900 / h); img = img.resize((int(w * s), int(h * s)))
-          canvas.paste(img, ((1024 - img.width) // 2, (1024 - img.height) // 2)); canvas.save("barcode.png"); print("poster", canvas.size)
+          # A big QR code (the scanner accepts EAN and QR; QR decodes reliably at the emulator camera's low resolution).
+          import qrcode; from PIL import Image
+          q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=28, border=4); q.add_data("6181234567890"); q.make(fit=True)
+          img = q.make_image(fill_color="black", back_color="white").convert("RGB")
+          canvas = Image.new("RGB", (1024, 1024), "white"); img = img.resize((960, 960), Image.NEAREST); canvas.paste(img, (32, 32)); canvas.save("barcode.png"); print("poster", canvas.size)
           PY
       - name: Run parity on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
