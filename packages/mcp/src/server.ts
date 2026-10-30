@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 // Shipvo MCP: agents use Shipvo apps with no phone.
 //   PN_SIM=http://localhost:4545  PN_CONTROL=https://purenative-control.purenative.workers.dev  PN_OWNER_TOKEN=...  shipvo-mcp
+// Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
+//   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
 // Tools: list_apps, open_app, screen, tap, type, scroll, back, screenshot, end_session (UI simulator);
 //        owner_describe, owner_command (the app's live content, prices, orders: owner token required).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import http from "node:http";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
@@ -26,6 +31,7 @@ const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error: ${r.error}\n\nScreen now:\n${r.screen ?? ""}`); };
 const need = (sid: string) => { if (!sessions.has(sid)) throw new Error(`no session "${sid}". Call open_app first.`); };
 
+function makeServer() {
 const server = new McpServer({ name: "shipvo", version: "0.0.1" }, { instructions:
 `You can use Shipvo apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
@@ -100,4 +106,35 @@ server.tool("owner_command", "Run an owner command against the live app (changes
     return text(await r.text());
   });
 
-await server.connect(new StdioServerTransport());
+return server;
+}
+
+// ---- transport: stdio (local) or Streamable HTTP (remote) ----
+const argi = process.argv.indexOf("--http");
+if (argi < 0) {
+  await makeServer().connect(new StdioServerTransport());
+} else {
+  const port = Number(process.argv[argi + 1] || 8787);
+  const keys = new Set((process.env.PN_API_KEYS ?? "").split(",").map((k) => k.trim()).filter(Boolean));
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+  const httpServer = http.createServer(async (req, res) => {
+    const url = new URL(req.url ?? "/", "http://x");
+    if (url.pathname === "/health") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: true, sessions: transports.size })); }
+    if (url.pathname !== "/mcp") { res.writeHead(404); return res.end(); }
+    // Keys: Bearer <key>. With no keys configured, the server is open (local use behind a tunnel you control).
+    if (keys.size) { const k = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""); if (!keys.has(k)) { res.writeHead(401, { "content-type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_api_key" })); } }
+    const sid = req.headers["mcp-session-id"] as string | undefined;
+    let transport = sid ? transports.get(sid) : undefined;
+    if (!transport) {
+      if (req.method !== "POST") { res.writeHead(400); return res.end("missing session"); }
+      transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID(), onsessioninitialized: (id) => { transports.set(id, transport!); } });
+      transport.onclose = () => { for (const [id, t] of transports) if (t === transport) transports.delete(id); };
+      // One McpServer per client connection, same tools.
+      await makeServer().connect(transport);
+    }
+    let body: unknown = undefined;
+    if (req.method === "POST") { let raw = ""; for await (const ch of req) raw += ch; body = raw ? JSON.parse(raw) : undefined; }
+    await transport.handleRequest(req, res, body);
+  });
+  httpServer.listen(port, () => console.error(`Shipvo MCP over HTTP on http://localhost:${port}/mcp (${keys.size ? keys.size + " key(s)" : "no auth"})`));
+}

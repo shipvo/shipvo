@@ -1,18 +1,50 @@
 {
   "name": "@shipvo/mcp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "license": "Apache-2.0",
   "description": "MCP server that lets AI agents open, see and operate Shipvo apps without a phone: a phone-sized simulator of the real app, plus the app's typed commands and owner API.",
-  "bin": { "shipvo-mcp": "dist/server.js" },
+  "bin": {
+    "shipvo-mcp": "dist/server.js"
+  },
   "main": "dist/server.js",
-  "scripts": { "build": "tsc -p tsconfig.json", "prepublishOnly": "pnpm build" },
-  "dependencies": { "@modelcontextprotocol/sdk": "^1.32.2", "zod": "^3.23.8" },
-  "devDependencies": { "typescript": "^5.6.3", "@types/node": "^22.8.0" },
-  "keywords": ["mcp", "model-context-protocol", "ai-agents", "react-native", "expo", "mobile-testing", "simulator", "shipvo"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.8.0"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "react-native",
+    "expo",
+    "mobile-testing",
+    "simulator",
+    "shipvo"
+  ],
   "homepage": "https://github.com/shipvo/shipvo#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/shipvo/shipvo.git", "directory": "packages/mcp" },
-  "files": ["dist", "README.md"],
-  "publishConfig": { "access": "public", "provenance": true },
-  "engines": { "node": ">=20" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipvo/shipvo.git",
+    "directory": "packages/mcp"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }
