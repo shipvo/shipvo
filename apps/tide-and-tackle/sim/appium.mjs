@@ -24,7 +24,9 @@ export const endSession = (s, status = "passed") => wd("DELETE", `/session/${s.i
 
 /** Parse page source into the same element list as the other drivers. */
 export async function elements(s) {
-  const xml = await wd("GET", `/session/${s.id}/source`);
+  let xml = await wd("GET", `/session/${s.id}/source`);
+  // The on-screen keyboard is the system's, not the app's.
+  xml = xml.replace(/<XCUIElementTypeKeyboard[\s\S]*?<\/XCUIElementTypeKeyboard>/g, "");
   const out = [];
   for (const m of xml.matchAll(/<([\w.]+) ([^>]*?)\/?>/g)) {
     const tag = m[1]; const a = Object.fromEntries([...m[2].matchAll(/([\w-]+)="([^"]*)"/g)].map((x) => [x[1], x[2].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#10;/g, " ")]));
@@ -33,6 +35,8 @@ export async function elements(s) {
       // Platform chrome (scroll indicators, keyboard keys) is marked not accessible: not part of the app.
       if (a.accessible === "false" && !tag.endsWith("Button") && !tag.endsWith("StaticText") && !tag.endsWith("TextField")) continue;
       if (/Keyboard|Key$/.test(tag)) continue;
+      // What is not on screen is not on screen: items scrolled out of a horizontal rail report visible="false".
+      if (a.visible === "false") continue;
       label = (a.label || a.name || a.value || "").trim();
       role = tag.endsWith("Button") ? "button" : tag.endsWith("TextField") ? "textbox" : tag.endsWith("StaticText") ? "text" : tag.endsWith("Other") && a.accessible === "true" && label ? "text" : null;
       if (/\bButton\b/.test(a.traits ?? "")) role = "button";
@@ -84,7 +88,14 @@ export async function type(s, label, text) {
   await wd("POST", `/session/${s.id}/element/${id}/click`, {});
   await wd("POST", `/session/${s.id}/element/${id}/value`, { text });
   // A person closes the keyboard before tapping what it covers.
-  if (s.platform === "ios") await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: hideKeyboard", args: [{ keys: ["return", "Return", "done", "Done"] }] }).catch(() => {});
+  if (s.platform === "ios") {
+    await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: hideKeyboard", args: [{ keys: ["return", "Return", "done", "Done", "search", "Search", "go", "Go"] }] }).catch(() => {});
+    // A number pad has no return key: tap empty space above the field, as a person would.
+    if (await wd("GET", `/session/${s.id}/appium/device/is_keyboard_shown`).catch(() => false)) {
+      const r = await wd("GET", `/session/${s.id}/element/${id}/rect`).catch(() => null);
+      if (r) await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: tap", args: [{ x: 4, y: Math.max(120, Math.round(r.y - 12)) }] }).catch(() => {});
+    }
+  }
   else await wd("POST", `/session/${s.id}/appium/device/hide_keyboard`, {}).catch(() => {});
   await new Promise((r) => setTimeout(r, 600));
 }
