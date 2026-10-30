@@ -23,12 +23,12 @@ importers:
         specifier: 0.88.1
         version: 0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)
     devDependencies:
-      '@purenative/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
       '@types/react':
         specifier: ~19.3.0
         version: 19.3.0
+      purenative:
+        specifier: workspace:*
+        version: link:../../packages/cli
       typescript:
         specifier: ~6.0.3
         version: 6.0.3

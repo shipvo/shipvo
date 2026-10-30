@@ -1,5 +1,5 @@
 {
-  "name": "@purenative/cli",
+  "name": "purenative",
   "version": "0.0.1",
   "type": "module",
   "license": "Apache-2.0",
@@ -10,7 +10,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@noble/ed25519": "^2.1.0",
@@ -49,5 +50,16 @@
     "type": "git",
     "url": "git+https://github.com/purenativedev/purenative.git",
     "directory": "packages/cli"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

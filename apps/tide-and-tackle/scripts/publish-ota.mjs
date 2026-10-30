@@ -6,7 +6,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { signBytes, sha256Hex } from "@purenative/cli";
+import { signBytes, sha256Hex } from "purenative";
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, x, i, all) => (x.startsWith("--") ? [...a, [x.slice(2), all[i + 1]?.startsWith("--") || all[i + 1] === undefined ? "true" : all[i + 1]]] : a), []));
 const APP_ID = "tide", SHELL_MAJOR = 1;
