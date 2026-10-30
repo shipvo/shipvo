@@ -51,6 +51,11 @@ async function simDo(step) {
   if (step.type) { const e = els.find((x) => x.role === "textbox" && starts(x, step.type)); if (!e) throw new Error(`sim: no ${step.type}`); await simCall("/act", { session: "pc", action: "type", ref: e.ref, text: step.text }); }
 }
 const norm = (s) => s.toLowerCase().replace(/[  ]/g, " ").replace(/\s+/g, " ").trim();
+
+// Outcome parity: on an "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical.
+const ORDER_RE = [/^order [a-z]+-\d+ placed$/, /^\d+ × /, /^total /, /(cash|mobile money)/];
+function outcomeOf(els) { return [...new Set(els.map((e) => norm(e.label).replace(/\s*\(paid [^)]*\)/, " (paid)")).filter((l) => ORDER_RE.some((r) => r.test(l))))].sort(); } // receipts differ by provider (SIMULATED- vs SANDBOX-)
+function sameOutcome(a, b) { const A = outcomeOf(a), B = outcomeOf(b); return { same_order: A.length > 0 && A.length === B.length && A.every((x, i) => x === B[i]), order_sim: A, order_device: B }; }
 function compare(a, b) {
   const ACT = new Set(["button", "radio", "textbox", "link"]);
   const act = (xs) => new Set(xs.filter((x) => ACT.has(x.role)).map((x) => `${x.role === "radio" ? "button" : x.role}:${norm(x.label)}`));
@@ -82,7 +87,7 @@ for (const step of FLOW) {
   try { if (step.tap) await cloud.tap(s, step.tap, { once: !!step.optional }); if (step.type) await cloud.type(s, step.type, step.text); } catch (e) { if (!step.optional) { devOk = false; report.errors.push(`device: ${e.message}`); } }
   if (step.name) {
     const [a, b] = [await simEls(), await cloud.fullScreen(s).catch((e) => { report.errors.push(`device screen: ${e.message}`); return []; })];
-    report.screens.push({ screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b) });
+    report.screens.push({ screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b), ...(/^Order placed/.test(step.name) ? sameOutcome(a, b) : {}) });
     if (step.name === "Checkout") { try { writeFileSync(`source-${LANE}-checkout.xml`, await cloud.source(s)); } catch {} }
   }
 }
@@ -92,7 +97,7 @@ const n = report.screens.length || 1;
 report.summary = { mean_actionable_parity: +(report.screens.reduce((x, y) => x + y.actionable_parity, 0) / n).toFixed(3), mean_text_coverage: +(report.screens.reduce((x, y) => x + y.text_coverage, 0) / n).toFixed(3) };
 writeFileSync(`parity-${LANE}.json`, JSON.stringify(report, null, 2));
 const md = [`# Parity: simulator vs ${report.device}`, ``, `| Screen | Elements (sim / device) | Actionable parity | Text coverage | Only in sim | Only on device |`, `| --- | --- | --- | --- | --- | --- |`,
-  ...report.screens.map((x) => `| ${x.screen} | ${x.sim_elements} / ${x.device_elements} | ${(x.actionable_parity * 100).toFixed(0)}% | ${(x.text_coverage * 100).toFixed(0)}% | ${x.only_in_sim.join("<br>")} | ${x.only_on_device.join("<br>")} |`),
+  ...report.screens.map((x) => `| ${x.screen}${"same_order" in x ? (x.same_order ? " (same order ✓)" : " (ORDER DIFFERS)") : ""} | ${x.sim_elements} / ${x.device_elements} | ${(x.actionable_parity * 100).toFixed(0)}% | ${(x.text_coverage * 100).toFixed(0)}% | ${x.only_in_sim.join("<br>")} | ${x.only_on_device.join("<br>")} |`),
   ``, `**Mean actionable parity:** ${(report.summary.mean_actionable_parity * 100).toFixed(1)}% · **Mean text coverage:** ${(report.summary.mean_text_coverage * 100).toFixed(1)}% · Flow completed: sim ${simOk ? "yes" : "no"}, device ${devOk ? "yes" : "no"}`,
   report.errors.length ? `\nErrors:\n${report.errors.map((e) => `- ${e}`).join("\n")}` : ""].join("\n");
 writeFileSync(`parity-${LANE}.md`, md); console.log(md);

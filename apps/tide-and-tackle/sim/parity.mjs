@@ -138,6 +138,11 @@ const native = {
 /* ---------- compare ---------- */
 const norm = (s) => s.toLowerCase().replace(/[  ]/g, " ").replace(/\s+/g, " ").trim();
 const ACTION = new Set(["button", "radio", "textbox", "checkbox", "link"]);
+
+// Outcome parity: on an "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical.
+const ORDER_RE = [/^order [a-z]+-\d+ placed$/, /^\d+ × /, /^total /, /(cash|mobile money)/];
+function outcomeOf(els) { return [...new Set(els.map((e) => norm(e.label).replace(/\s*\(paid [^)]*\)/, " (paid)")).filter((l) => ORDER_RE.some((r) => r.test(l))))].sort(); } // receipts differ by provider (SIMULATED- vs SANDBOX-)
+function sameOutcome(a, b) { const A = outcomeOf(a), B = outcomeOf(b); return { same_order: A.length > 0 && A.length === B.length && A.every((x, i) => x === B[i]), order_sim: A, order_device: B }; }
 function compare(a, b) {
   const act = (xs) => new Set(xs.filter((x) => ACTION.has(x.role)).map((x) => `${x.role === "radio" ? "button" : x.role}:${norm(x.label)}`));
   const txt = (xs) => new Set(xs.map((x) => norm(x.label)).filter((l) => l.length > 1));
@@ -164,7 +169,7 @@ for (const [fi, flow] of FLOWS.entries()) {
     }
     if (step.name) {
       const [a, b] = [await sim.elements(), await native.elements()];
-      const row = { flow: flow.title, screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b) };
+      const row = { flow: flow.title, screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b), ...(/^Order placed/.test(step.name) ? sameOutcome(a, b) : {}) };
       report.screens.push(row);
       console.log(`[parity] ${flow.title} / ${step.name}: actionable ${(row.actionable_parity * 100).toFixed(0)}%, text ${(row.text_coverage * 100).toFixed(0)}% (${a.length}/${b.length})`);
       writeFileSync(join(OUT, "parity-report.json"), JSON.stringify(report, null, 2)); // partial results survive a timeout
@@ -174,7 +179,7 @@ for (const [fi, flow] of FLOWS.entries()) {
 const last = report.screens.at(-1);
 report.flow.sim_completed = sim.ok; report.flow.device_completed = native.ok;
 const finals = report.screens.filter((x) => /^Order placed/.test(x.screen));
-report.flow.same_outcome = sim.ok && native.ok && finals.length === FLOWS.length && finals.every((x) => x.actionable_parity >= 0.99);
+report.flow.same_outcome = sim.ok && native.ok && finals.length === FLOWS.length && finals.every((x) => x.actionable_parity >= 0.99 && x.same_order === true);
 report.summary = {
   screens: report.screens.length,
   mean_actionable_parity: +(report.screens.reduce((a, s) => a + s.actionable_parity, 0) / report.screens.length).toFixed(3),
@@ -185,7 +190,7 @@ report.summary = {
 writeFileSync(join(OUT, "parity-report.json"), JSON.stringify(report, null, 2));
 const md = [`# Simulator vs device parity`, ``, `Flows: ${FLOWS.map((f) => f.title).join("; ")}.`, ``,
   `| Flow | Screen | Elements (sim / device) | Actionable parity | Text coverage | Only in sim | Only on device |`, `| --- | --- | --- | --- | --- | --- | --- |`,
-  ...report.screens.map((s) => `| ${s.flow.slice(0, 1)} | ${s.screen} | ${s.sim_elements} / ${s.device_elements} | ${(s.actionable_parity * 100).toFixed(0)}% | ${(s.text_coverage * 100).toFixed(0)}% | ${s.only_in_sim.join("<br>")} | ${s.only_on_device.join("<br>")} |`),
+  ...report.screens.map((s) => `| ${s.flow.slice(0, 1)} | ${s.screen}${"same_order" in s ? (s.same_order ? " (same order ✓)" : " (ORDER DIFFERS)") : ""} | ${s.sim_elements} / ${s.device_elements} | ${(s.actionable_parity * 100).toFixed(0)}% | ${(s.text_coverage * 100).toFixed(0)}% | ${s.only_in_sim.join("<br>")} | ${s.only_on_device.join("<br>")} |`),
   ``, `**Mean actionable parity:** ${(report.summary.mean_actionable_parity * 100).toFixed(1)}%  ·  **Mean text coverage:** ${(report.summary.mean_text_coverage * 100).toFixed(1)}%  ·  **Same outcome:** ${report.flow.same_outcome ? "yes" : "no"}  ·  **"App isn't responding" dialogs on device:** ${nativeMod.anrCount}`,
   report.flow.errors?.length ? `\nErrors:\n${report.flow.errors.map((e) => `- ${e}`).join("\n")}` : ""].join("\n");
 writeFileSync(join(OUT, "parity-report.md"), md);
