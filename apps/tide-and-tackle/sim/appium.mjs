@@ -86,7 +86,13 @@ export async function type(s, label, text) {
   let id;
   for (let i = 0; i < 4 && !id; i++) { try { id = await findField(s, label); } catch (e) { if (i === 3) throw e; await scroll(s, "down"); } }
   await wd("POST", `/session/${s.id}/element/${id}/click`, {});
-  await wd("POST", `/session/${s.id}/element/${id}/value`, { text });
+  await new Promise((r) => setTimeout(r, 500)); // let the keyboard settle: typing into a moving field drops characters
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await wd("POST", `/session/${s.id}/element/${id}/clear`, {}).catch(() => {});
+    await wd("POST", `/session/${s.id}/element/${id}/value`, { text });
+    const v = await wd("GET", `/session/${s.id}/element/${id}/attribute/value`).catch(() => null);
+    if (v == null || String(v).replace(/\s/g, "") === text.replace(/\s/g, "") || (s.platform === "ios" && /secure|•/.test(String(v)))) break;
+  }
   // A person closes the keyboard before tapping what it covers.
   if (s.platform === "ios") {
     await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: hideKeyboard", args: [{ keys: ["return", "Return", "done", "Done", "search", "Search", "go", "Go"] }] }).catch(() => {});

@@ -88,7 +88,7 @@ for (const step of FLOW) {
   if (step.name) {
     const [a, b] = [await simEls(), await cloud.fullScreen(s).catch((e) => { report.errors.push(`device screen: ${e.message}`); return []; })];
     report.screens.push({ screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b), ...(/^Order placed/.test(step.name) ? sameOutcome(a, b) : {}) });
-    if (step.name === "Checkout") { try { writeFileSync(`source-${LANE}-checkout.xml`, await cloud.source(s)); } catch {} }
+    if (step.name === "Checkout" || b.length < 3) { try { writeFileSync(`source-${LANE}-${step.name.replace(/\W+/g, "_")}.xml`, await cloud.source(s)); } catch {} }
   }
 }
 await cloud.endSession(s);
