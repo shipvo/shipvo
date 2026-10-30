@@ -52,13 +52,15 @@ const FLOWS = [
   { title: "C: scan, location, mobile money", steps: [
     { wait: 6000 },
     { tap: /^Back to shop$/ },
-    { tap: /^Scan a product barcode$/, name: PRE ? "Scanner" : "Camera permission" },
-    { tap: /^While using the app$/, optional: PRE, name: PRE ? undefined : "Scanner" },
+    { tap: /^Scan a product barcode$/ },
+    { waitFor: /^While using the app$/, timeoutMs: 12000, name: "Camera permission", optional: PRE },   // the system dialog can take a few seconds
+    { tap: /^While using the app$/, optional: PRE, name: "Scanner" },
     { waitFor: /^Add 1 to cart$/, timeoutMs: 45000, name: "Scanned product" },
     { tap: /^Add 1 to cart$/ },
     { tap: /^Open cart/ },
     { tap: /^Choose delivery and pay$/ },
-    { tap: /^Use my location$/, name: PRE ? undefined : "Location permission" },
+    { tap: /^Use my location$/ },
+    { waitFor: /^While using the app$/, timeoutMs: 12000, name: "Location permission", optional: PRE },
     { tap: /^While using the app$/, optional: PRE },
     { waitFor: /km from the shop/, timeoutMs: 20000, name: "Located" },
     { tap: /^Any day Shop pickup/ },
