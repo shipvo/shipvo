@@ -17,9 +17,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm, registry-url: "https://registry.npmjs.org" }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build && pnpm --filter @purenative/mcp build
       - run: pnpm -r test
-      - name: Publish @purenative/schema then @purenative/cli
+      - name: Publish @purenative/schema, @purenative/cli, @purenative/mcp
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
@@ -31,3 +31,4 @@ jobs:
           }
           pub @purenative/schema
           pub @purenative/cli
+          pub @purenative/mcp

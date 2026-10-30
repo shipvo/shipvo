@@ -79,7 +79,14 @@ async function act(id, body) {
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
       let t = loc(body.ref);
-      if (!(await t.evaluate((el) => /^(INPUT|TEXTAREA)$/.test(el.tagName) || el.isContentEditable).catch(() => false))) t = t.locator("input, textarea").first();
+      const kind = await t.evaluate((el) => (/^(INPUT|TEXTAREA)$/.test(el.tagName) || el.isContentEditable) ? "field" : el.querySelector("input, textarea") ? "wrapper" : (el.getAttribute("aria-label") || el.textContent || "").trim(), { timeout: 3000 });
+      if (kind === "wrapper") t = t.locator("input, textarea").first();
+      else if (kind !== "field") {
+        // Typing "on" a label or heading: a person would go to the field of that name. One match, or a clear error.
+        const named = page.getByRole("textbox", { name: kind, exact: true });
+        if ((await named.count()) !== 1) throw new Error(`${body.ref} is not a text field. Type into a "textbox" ref.`);
+        t = named;
+      }
       await t.fill(String(body.text ?? ""), { timeout: 3000 }); if (body.enter) await t.press("Enter"); break;
     }
     case "scroll": {
