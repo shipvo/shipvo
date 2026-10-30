@@ -57,7 +57,7 @@ class PureNativeHostHandler(private val ctx: Context) : ReactNativeHostHandler {
     const val WINDOW_MS = 60_000L
     val LOCK = Any()
 
-    fun revertToPrevious(s: Store) {
+    internal fun revertToPrevious(s: Store) {
       s.currentPath?.let { if (it != s.previousPath) File(it).delete() }
       s.currentPath = s.previousPath; s.currentRelease = s.previousRelease
       s.previousPath = null; s.previousRelease = 0
