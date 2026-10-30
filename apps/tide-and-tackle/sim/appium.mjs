@@ -30,12 +30,14 @@ export async function elements(s) {
     const tag = m[1]; const a = Object.fromEntries([...m[2].matchAll(/([\w-]+)="([^"]*)"/g)].map((x) => [x[1], x[2].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#10;/g, " ")]));
     let role, label;
     if (s.platform === "ios") {
-      if (a.visible === "false" && a.accessible !== "true") continue;
+      // Platform chrome (scroll indicators, keyboard keys) is marked not accessible: not part of the app.
+      if (a.accessible === "false" && !tag.endsWith("Button") && !tag.endsWith("StaticText") && !tag.endsWith("TextField")) continue;
+      if (/Keyboard|Key$/.test(tag)) continue;
       label = (a.label || a.name || a.value || "").trim();
       role = tag.endsWith("Button") ? "button" : tag.endsWith("TextField") ? "textbox" : tag.endsWith("StaticText") ? "text" : tag.endsWith("Other") && a.accessible === "true" && label ? "text" : null;
-      if (a.traits?.includes("Button")) role = "button";
-      if (/RadioButton|Switch|Cell/.test(tag) || /Selected|Adjustable|RadioButton/.test(a.traits ?? "") || (tag.endsWith("Other") && a.accessible === "true" && a.enabled === "true" && /, (\d[\d\s]* FCFA|free)/i.test(label))) role = "button";
-      if (a.traits?.includes("Header")) role = "heading";
+      if (/\bButton\b/.test(a.traits ?? "")) role = "button";
+      if (/\bHeader\b/.test(a.traits ?? "")) role = "heading";
+      if (a.value === "radio button") role = "radio";   // React Native accessibilityRole="radio" on iOS
     } else {
       label = (a["content-desc"] || a.text || "").trim();
       const cls = (a.class || tag).split(".").pop();

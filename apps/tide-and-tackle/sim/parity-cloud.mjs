@@ -29,7 +29,7 @@ const simCall = async (p, b) => {
 function parseSim(tree) {
   const out = [];
   for (const line of tree.split("\n")) {
-    const m = line.match(/^\s*- (button|textbox|radio|heading|generic|link|checkbox) "([^"]+)"(.*?)\[ref=(e\d+)\]/);
+    const m = line.match(/^\s*- (button|textbox|radio|heading|generic|link|checkbox) "([^"]+)"(.*?)(?:\[ref=(e\d+)\]|:?\s*$)/);
     const t = line.match(/^\s*- generic \[ref=(e\d+)\]: (.+)$/);
     if (m) out.push({ role: m[1] === "generic" ? "text" : m[1], label: m[2].trim(), ref: m[4] }); else if (t) out.push({ role: "text", label: t[2].trim(), ref: t[1] });
   }
