@@ -1,0 +1,51 @@
+name: ios-simulator
+# Build the app for the iOS Simulator on Expo's cloud (no Apple Developer account needed), then check what our
+# LambdaTest account can run: upload the iOS simulator build and the Android APK to the virtual and real device clouds.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["apps/tide-and-tackle/eas.json", ".github/workflows/ios-simulator.yml"]
+jobs:
+  build-and-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
+      - name: Link EAS project
+        working-directory: apps/tide-and-tackle
+        env: { EXPO_TOKEN: "${{ secrets.EXPO_TOKEN }}" }
+        run: |
+          npx -y eas-cli@latest whoami
+          npx -y eas-cli@latest init --non-interactive --force
+      - name: Build for iOS Simulator (EAS cloud)
+        working-directory: apps/tide-and-tackle
+        env: { EXPO_TOKEN: "${{ secrets.EXPO_TOKEN }}" }
+        run: |
+          npx -y eas-cli@latest build -p ios --profile simulator --non-interactive --wait --json > build.json
+          URL=$(node -p "JSON.parse(require('fs').readFileSync('build.json','utf8'))[0].artifacts.buildUrl")
+          echo "iOS simulator build: $URL" | tee -a "$GITHUB_STEP_SUMMARY"
+          curl -sSL "$URL" -o ios-sim.tar.gz && mkdir -p ios && tar -xzf ios-sim.tar.gz -C ios && ls ios
+          (cd ios && zip -qr ../tide-ios-sim.zip *.app) && ls -la ../tide-and-tackle/tide-ios-sim.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: tide-ios-simulator, path: apps/tide-and-tackle/tide-ios-sim.zip }
+      - name: Probe LambdaTest (what this account can run)
+        if: always()
+        env:
+          LT_USER: ${{ secrets.LAMBDATEST_USERNAME }}
+          LT_KEY: ${{ secrets.LAMBDATEST_ACCESS_KEY }}
+        run: |
+          APK_URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{console.log(JSON.parse(s)[0].assets[0].browser_download_url)})")
+          curl -sSL "$APK_URL" -o tide.apk
+          probe() { echo "### $1"; curl -s -u "$LT_USER:$LT_KEY" -X POST "https://manual-api.lambdatest.com/app/upload/$2" -F "name=$3" -F "appFile=@$4" | head -c 600; echo; }
+          { echo "## LambdaTest probe"; 
+            probe "Android APK to real devices" realDevice tide-android tide.apk
+            probe "Android APK to emulators" virtualDevice tide-android-emu tide.apk
+            [ -f apps/tide-and-tackle/tide-ios-sim.zip ] && probe "iOS simulator build to simulators" virtualDevice tide-ios-sim apps/tide-and-tackle/tide-ios-sim.zip
+          } | tee -a "$GITHUB_STEP_SUMMARY"

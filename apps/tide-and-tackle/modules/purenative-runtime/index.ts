@@ -1,4 +1,4 @@
-import { requireNativeModule } from "expo-modules-core";
+import { requireOptionalNativeModule } from "expo-modules-core";
 
 export type RuntimeState = {
   cohort: number; band: "b0" | "b1" | "b2";
@@ -27,4 +27,13 @@ type Native = {
   reload(): void;
 };
 
-export const Runtime: Native = requireNativeModule("PureNativeRuntime");
+// The runtime is Android-only for now. On iOS (and the simulator) the app runs on its embedded bundle and live content.
+const t0 = Date.now();
+const fallback: Native = {
+  getState: () => ({ cohort: 0, band: "b0", runningRelease: 0, currentRelease: 0, pendingRelease: 0, previousRelease: 0,
+    shellVersion: "no-runtime", baseUrl: "https://purenative-control.purenative.workers.dev", appId: "tide", shellMajor: 1 }),
+  checkForUpdate: async () => ({ status: "none" }),
+  markHealthy: () => ({ release: 0, coldStartMs: Date.now() - t0, sinceLoadMs: 0, promoted: false, kind: "cold" }),
+  consumeEvents: () => [], rollback: () => {}, reload: () => {},
+};
+export const Runtime: Native = requireOptionalNativeModule<Native>("PureNativeRuntime") ?? fallback;
