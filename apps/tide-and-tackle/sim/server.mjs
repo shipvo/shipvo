@@ -83,7 +83,7 @@ const server = http.createServer(async (req, res) => {
       const [, id, rest] = m;
       if (rest.startsWith("c/")) {
         // Use the same live content as devices when CONTENT_FROM points at a control plane; else the bundled default.
-        if (process.env.CONTENT_FROM) { try { const r = await fetch(`${process.env.CONTENT_FROM}/${rest}`); if (r.ok) return send(200, await r.text()); } catch {} }
+        if (process.env.CONTENT_FROM) { try { const r = await fetch(`${process.env.CONTENT_FROM}/${rest}`); if (r.ok) { res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" }); return res.end(await r.text()); } } catch {} }
         return send(404, { error: "no_content" });
       }
       if (rest.startsWith("o/") && req.method === "POST") {

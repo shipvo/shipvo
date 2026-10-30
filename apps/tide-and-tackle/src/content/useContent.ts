@@ -16,10 +16,19 @@ function cacheStore(): Store {
   } catch { return { read: () => null, write: () => {} }; }
 }
 
+/** Never apply content that would break rendering: a bad publish or a mangled response keeps the last good copy. */
+export function isUsableContent(c: unknown): c is AppContent {
+  const x = c as AppContent;
+  return !!x && typeof x === "object" && typeof x.version === "number" && !!x.theme && /^#[0-9A-Fa-f]{6}$/.test(x.theme.accent ?? "")
+    && !!x.brand && typeof x.brand.name === "string" && Array.isArray(x.products) && Array.isArray(x.departments)
+    && Array.isArray(x.promos) && Array.isArray(x.slots) && !!x.screens && Array.isArray(x.screens.home)
+    && x.screens.home.every((b) => b && typeof b.id === "string" && typeof b.type === "string");
+}
+
 export function useContent(baseUrl: string | undefined, appId: string | undefined) {
   const store = useRef<Store>(cacheStore());
   const [content, setC] = useState<AppContent>(() => {
-    try { const cached = store.current.read(); if (cached) { const c = JSON.parse(cached) as AppContent; if (c.version >= DEFAULT_CONTENT.version) { setContent(c); return c; } } } catch {}
+    try { const cached = store.current.read(); if (cached) { const c = JSON.parse(cached); if (isUsableContent(c) && c.version >= DEFAULT_CONTENT.version) { setContent(c); return c; } } } catch {}
     setContent(DEFAULT_CONTENT); return DEFAULT_CONTENT;
   });
   const versionRef = useRef(content.version);
@@ -30,8 +39,8 @@ export function useContent(baseUrl: string | undefined, appId: string | undefine
     try {
       const r = await fetch(`${baseUrl}/c/${appId}/content.json`, { headers: { "If-None-Match": `"${versionRef.current}"` } });
       if (r.status !== 200) return { changed: false, version: versionRef.current, ms: Date.now() - t0 };
-      const text = await r.text(); const c = JSON.parse(text) as AppContent;
-      if (c.version <= versionRef.current) return { changed: false, version: versionRef.current, ms: Date.now() - t0 };
+      const text = await r.text(); const c = JSON.parse(text);
+      if (!isUsableContent(c) || c.version <= versionRef.current) return { changed: false, version: versionRef.current, ms: Date.now() - t0 };
       versionRef.current = c.version; setContent(c); setC(c); store.current.write(text);
       return { changed: true, version: c.version, ms: Date.now() - t0 };
     } catch { return { changed: false, version: versionRef.current, ms: Date.now() - t0 }; }

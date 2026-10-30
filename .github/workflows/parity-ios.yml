@@ -7,7 +7,7 @@ on:
       build_url: { description: "EAS iOS simulator build (.tar.gz)", default: "https://expo.dev/artifacts/eas/cpTFtmQaQQefga5ZlJKduVJ2Rr4EBwPsfUFLI9BE2PU.tar.gz" }
   push:
     branches: [main]
-    paths: [".github/workflows/parity-ios.yml", "apps/tide-and-tackle/sim/appium.mjs"]
+    paths: [".github/workflows/parity-ios.yml", "apps/tide-and-tackle/sim/**"]
 jobs:
   ios:
     runs-on: macos-latest
