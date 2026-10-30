@@ -66,10 +66,13 @@ export default {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response("", { status: 204, headers: CORS });
     if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, service: "shipvo-sim", backend: env.E2B_API_KEY ? "e2b" : env.SIM ? "containers" : "none", mcp: "/mcp", docs: "https://github.com/shipvo/shipvo/tree/main/packages/mcp" });
-    if (url.pathname !== "/mcp") return json({ error: "not_found" }, 404);
+    // /mcp with Authorization: Bearer <key>, or, for clients that cannot send headers (ChatGPT's custom MCP
+    // connectors offer only OAuth or none), /mcp/<key> or /mcp?key=<key>.
+    const pathKey = url.pathname.match(/^\/mcp\/([A-Za-z0-9_-]{8,})$/)?.[1];
+    if (url.pathname !== "/mcp" && !pathKey) return json({ error: "not_found" }, 404);
 
     // API key → app and scope. Keys come from the owner command create_api_key; only hashes are stored.
-    const key = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    const key = ((req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim()) || pathKey || url.searchParams.get("key") || "";
     if (!key) return json({ error: "missing_api_key", hint: "Authorization: Bearer <key> (create one with the owner command create_api_key)" }, 401);
     const row = await env.DB.prepare("SELECT id, app_id, scope FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").bind(await sha256(key)).first<{ id: number; app_id: string; scope: string }>();
     if (!row) return json({ error: "invalid_api_key" }, 401);
