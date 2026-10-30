@@ -69,3 +69,4 @@ jobs:
             parity-report.*
             debug-*.png
             ui-*.xml
+            probe-permissions.log

@@ -43,7 +43,6 @@ function rawDump() {
     const area = (x2 - x1) * (y2 - y1); if (!rootArea) rootArea = area;
     const ancestors = [...stack.slice(0, self ? stack.length : stack.length - 1)];
     // A labelled view covering the screen, drawn over sibling content, is a modal sheet: TalkBack and iOS expose only it.
-    if (a["content-desc"] && area >= rootArea * 0.96 && parent !== null) modal = id;
     const cls = (a.class || "").split(".").pop();
     const role = a.checkable === "true" && /Radio/.test(cls) ? "radio"
       : cls === "EditText" ? "textbox"
@@ -54,8 +53,9 @@ function rawDump() {
     nodes.push({ role, label, value: cls === "EditText" ? a.text : undefined, x: (x1 + x2) >> 1, y: (y1 + y2) >> 1,
       selected: a.selected === "true" || a.checked === "true", disabled: a.enabled === "false", id, ancestors });
   }
-  const inModal = modal === null ? [] : nodes.filter((n) => n.id === modal || n.ancestors.includes(modal));
-  const out = inModal.length >= 2 ? inModal : nodes;   // a "modal" with nothing inside it is not a modal
+  // Modal sheets: the app marks what is behind them importantForAccessibility="no-hide-descendants", which Android's
+  // accessibility tree (and this dump) already omits, so no heuristic is needed here.
+  const out = nodes; void modal; void rootArea;
   lastXml = xml;
   return out.map(({ id, ancestors, ...n }) => n);
 }

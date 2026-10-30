@@ -51,15 +51,14 @@ const FLOWS = [
   { title: "C: scan, location, mobile money", steps: [
     { wait: 6000 },
     { tap: /^Back to shop$/ },
-    { tap: /^Scan a product barcode$/, name: "Camera permission" },
-    { tap: /^Allow camera$/, optional: true },            // a person taps the app's button if the system dialog has not shown
-    { tap: /^While using the app$/, name: "Scanner" },
+    { tap: /^Scan a product barcode$/, name: "Scanner" },
+    { tap: /^While using the app$/, optional: PRE, name: PRE ? undefined : "Camera permission" },
     { waitFor: /^Add 1 to cart$/, timeoutMs: 45000, name: "Scanned product" },
     { tap: /^Add 1 to cart$/ },
     { tap: /^Open cart/ },
     { tap: /^Choose delivery and pay$/ },
-    { tap: /^Use my location$/, name: "Location permission" },
-    { tap: /^While using the app$/ },
+    { tap: /^Use my location$/, name: PRE ? undefined : "Location permission" },
+    { tap: /^While using the app$/, optional: PRE },
     { waitFor: /km from the shop/, timeoutMs: 20000, name: "Located" },
     { tap: /^Any day Shop pickup/ },
     { tap: /^Mobile money$/ },
@@ -70,7 +69,9 @@ const FLOWS = [
     { waitFor: /^Share order$/, timeoutMs: 15000, name: "Order placed C" },
   ] },
 ];
-const SIM_DEVICE = { platform: "android", api: 30, biometrics: { enrolled: false }, camera: { barcode: { type: "ean13", data: "6181234567890" }, delayMs: 1500 } };
+const PRE = process.env.PN_PREGRANTED === "1"; // CI emulator: permissions pre-granted on both sides (dialogs are probed separately)
+const SIM_DEVICE = { platform: "android", api: 30, biometrics: { enrolled: false }, camera: { barcode: { type: "ean13", data: "6181234567890" }, delayMs: 1500 },
+  ...(PRE ? { permissions: { camera: "granted", location: "granted", notifications: "granted" } } : {}) };
 
 /* ---------- simulator driver ---------- */
 // Fresh connection per call, with retries: the device side can pause long enough for an idle socket to close.

@@ -17,6 +17,8 @@ type Ctx = {
   T: Tokens; s: ReturnType<typeof styles>; content: AppContent; shop: ShopState;
   run: (name: string, args?: Record<string, unknown>) => { ok: boolean; result?: any; error?: { code: string; message: string } };
   go: (r: Route) => void; back: () => void; onOrder?: (o: Order) => void;
+  /** While a sheet is open, everything behind it is hidden from assistive tech (and so from agents), on every platform. */
+  setSheetOpen: (open: boolean) => void; sheetOpen: boolean;
 };
 
 export function useShop() {
@@ -38,7 +40,9 @@ export function ShopApp({ T, content, about, onOrder }: { T: Tokens; content: Ap
   const route = stack[stack.length - 1];
   const go = (r: Route) => setStack((st) => [...st, r]);
   const back = () => setStack((st) => (st.length > 1 ? st.slice(0, -1) : st));
-  const ctx: Ctx = { T, s, content, shop, run, go, back, onOrder };
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const ctx: Ctx = { T, s, content, shop, run, go, back, onOrder, sheetOpen, setSheetOpen };
+  const behind = sheetOpen ? ("no-hide-descendants" as const) : ("auto" as const);
   const cartCount = shop.cart.reduce((a, l) => a + l.quantity, 0);
   const [online, setOnline] = useState(device.net.online());
   useEffect(() => device.net.onChange(setOnline), []);
@@ -51,7 +55,7 @@ export function ShopApp({ T, content, about, onOrder }: { T: Tokens; content: Ap
 
   return (
     <View style={{ flex: 1, backgroundColor: T.surface }}>
-      <View style={s.topbar}>
+      <View style={s.topbar} importantForAccessibility={behind}>
         {stack.length > 1
           ? <Btn ctx={ctx} label="Back" onPress={back} kind="ghost" small />
           : <Text style={s.brand} accessibilityRole="header">{content.brand.name}</Text>}
@@ -319,7 +323,8 @@ function Checkout({ ctx }: { ctx: Ctx }) {
   const [phone, setPhone] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [locating, setLocating] = useState(false); const [near, setNear] = useState<string | null>(null);
-  const [payReq, setPayReq] = useState<PaymentRequest | null>(null);
+  const [payReq, setPayReqState] = useState<PaymentRequest | null>(null);
+  const setPayReq = (r: PaymentRequest | null) => { setPayReqState(r); ctx.setSheetOpen(!!r); };
   const t = totals(shop);
   const fee = slot ? (slots.find((x) => x.id === slot)?.fee_fcfa ?? 0) : 0;
   const total = t.subtotal - t.discount + fee;
@@ -351,7 +356,7 @@ function Checkout({ ctx }: { ctx: Ctx }) {
   };
   return (
     <>
-    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets accessibilityLabel="Checkout">
+    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets accessibilityLabel="Checkout" importantForAccessibility={payReq ? "no-hide-descendants" : "auto"}>
       <Text style={s.h1} accessibilityRole="header">Delivery and payment</Text>
       <Text style={s.h2} accessibilityRole="header">Delivery slot</Text>
       {slots.map((x) => (
