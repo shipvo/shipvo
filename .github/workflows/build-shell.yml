@@ -49,7 +49,7 @@ jobs:
           V=$(node -p "require('./apps/tide-and-tackle/app.json').expo.version")
           API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$KV/values"
           curl -fsS -X PUT "$API/b%2Ftide%2Fbase-$SHA.hbc" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "content-type: application/octet-stream" --data-binary @embedded.hbc >/dev/null
-          curl -fsS -X PUT "$API/base%2Ftide%2F$V" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "content-type: application/json" \
+          curl -fsS -X PUT "$API/base%2Ftide%2F$V-${SHA:0:12}" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "content-type: application/json" \
             --data "{\"shell_version\":\"$V\",\"sha256\":\"$SHA\",\"size\":$SIZE,\"key\":\"b/tide/base-$SHA.hbc\"}" >/dev/null
           echo "Embedded bundle for shell $V: $SHA ($SIZE bytes)" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4

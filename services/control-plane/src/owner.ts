@@ -109,7 +109,9 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
     params: { note: { type: "string", description: "What changed, for the history" } },
     run: async (d, a, env) => {
       const live = await liveContent(env);
-      const next = { ...d, version: (live?.version ?? 0) + 1, published_at: new Date().toISOString() };
+      // Next version comes from history as well as the live copy, so a missing or stale KV entry can't collide.
+      const maxRow = await env.db.prepare("SELECT MAX(version) AS v FROM content_versions WHERE app_id = ?").bind(env.appId).first<{ v: number | null }>();
+      const next = { ...d, version: Math.max(live?.version ?? 0, maxRow?.v ?? 0) + 1, published_at: new Date().toISOString() };
       const ok = AppContent.safeParse(next); if (!ok.success) fail("invalid_content", ok.error.issues.slice(0, 5).map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
       const json = JSON.stringify(ok.data!);
       await env.db.prepare("INSERT INTO content_versions (app_id, version, json, published_at, published_by, note) VALUES (?,?,?,?,?,?)")
