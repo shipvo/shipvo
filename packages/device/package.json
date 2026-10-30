@@ -1,9 +1,9 @@
 {
-  "name": "@purenative/device",
+  "name": "@liveo/device",
   "version": "0.0.1",
   "type": "module",
   "license": "Apache-2.0",
-  "description": "One device API for PureNative apps: camera, location, biometrics, payments, notifications, share, network. Real native modules on phones; a simulated device with on-screen system sheets in the PureNative simulator, so AI agents can use and test native features with no phone.",
+  "description": "One device API for Liveo apps: camera, location, biometrics, payments, notifications, share, network. Real native modules on phones; a simulated device with on-screen system sheets in the Liveo simulator, so AI agents can use and test native features with no phone.",
   "main": "src/index",
   "types": "src/index.ts",
   "files": [
@@ -37,7 +37,7 @@
     }
   },
   "keywords": [
-    "purenative",
+    "liveo",
     "expo",
     "react-native",
     "simulator",

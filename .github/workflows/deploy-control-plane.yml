@@ -15,8 +15,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @purenative/schema build
-      - run: pnpm --filter @purenative/control-plane test
+      - run: pnpm --filter @liveo/schema build
+      - run: pnpm --filter @liveo/control-plane test
       - name: Apply D1 migrations
         working-directory: services/control-plane
         env:

@@ -2,7 +2,7 @@
 // and every interactive element has an accessibility label, so the screen is as readable to an agent as to a person.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { device, type PaymentRequest } from "@purenative/device";
+import { device, type PaymentRequest } from "@liveo/device";
 import { ScanScreen, PaymentSheet, locateCustomer } from "./Native";
 import type { Action, AppContent, Block, Product } from "../content/types";
 import { call, initialState, stockOf, totals, type Order, type ShopState } from "../domain/shop";

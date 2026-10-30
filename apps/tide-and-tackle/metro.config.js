@@ -1,9 +1,9 @@
-// Monorepo Metro config, plus the PureNative simulator aliases (PN_SIM=1 web builds use the simulated device).
+// Monorepo Metro config, plus the Liveo simulator aliases (PN_SIM=1 web builds use the simulated device).
 const { getDefaultConfig } = require("expo/metro-config");
 const path = require("node:path");
-const withPureNativeSim = require("@purenative/device/metro");
+const withLiveoSim = require("@liveo/device/metro");
 const root = path.resolve(__dirname, "../..");
 const config = getDefaultConfig(__dirname);
 config.watchFolders = [root];
 config.resolver.nodeModulesPaths = [path.resolve(__dirname, "node_modules"), path.resolve(root, "node_modules")];
-module.exports = withPureNativeSim(config);
+module.exports = withLiveoSim(config);

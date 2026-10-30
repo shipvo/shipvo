@@ -1,6 +1,6 @@
 # Simulator vs device parity
 
-Can an agent trust the PureNative UI simulator? We ran two complete purchases on the simulator and on the real app, then compared what an agent can act on and read on every screen.
+Can an agent trust the Liveo UI simulator? We ran two complete purchases on the simulator and on the real app, then compared what an agent can act on and read on every screen.
 
 - **Flow A:** browse the home rail → 2 × Chrome Spoon → Friday afternoon delivery → cash on delivery.
 - **Flow B:** search "popper" → 3 × Surface Popper → promo code LURES15 → shop pickup → mobile money.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// PureNative MCP: agents use PureNative apps with no phone.
-//   PN_SIM=http://localhost:4545  PN_CONTROL=https://purenative-control.purenative.workers.dev  PN_OWNER_TOKEN=...  purenative-mcp
+// Liveo MCP: agents use Liveo apps with no phone.
+//   PN_SIM=http://localhost:4545  PN_CONTROL=https://purenative-control.purenative.workers.dev  PN_OWNER_TOKEN=...  liveo-mcp
 // Tools: list_apps, open_app, screen, tap, type, scroll, back, screenshot, end_session (UI simulator);
 //        owner_describe, owner_command (the app's live content, prices, orders: owner token required).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -26,8 +26,8 @@ const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error: ${r.error}\n\nScreen now:\n${r.screen ?? ""}`); };
 const need = (sid: string) => { if (!sessions.has(sid)) throw new Error(`no session "${sid}". Call open_app first.`); };
 
-const server = new McpServer({ name: "purenative", version: "0.0.1" }, { instructions:
-`You can use PureNative apps the way a person uses them on a phone, without a phone.
+const server = new McpServer({ name: "liveo", version: "0.0.1" }, { instructions:
+`You can use Liveo apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
 Only what is on screen is listed, like a phone: a horizontal product rail shows a few items, so "scroll right" on the rail (its ref) to see more; "scroll down" the page for the rest.
 System sheets (permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners, the share sheet) appear in the tree like any other screen: answer them by tapping, as a person would. Use set_device to decide what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether the payment is approved, network off) before the app asks for it.

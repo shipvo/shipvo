@@ -24,7 +24,7 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
+      - run: pnpm --filter @liveo/schema build && pnpm --filter @liveo/cli build
       - name: Prebuild
         working-directory: apps/tide-and-tackle
         run: CI=1 npx expo prebuild -p android --no-install
@@ -61,4 +61,4 @@ jobs:
           V=$(node -p "require('./apps/tide-and-tackle/app.json').expo.version")
           TAG="shell-$V-${{ github.run_number }}"
           gh release create "$TAG" tide-and-tackle-shell.apk --title "Tide & Tackle shell $TAG" \
-            --notes "Sample shell APK for the PureNative spike. Size: ${{ steps.apk.outputs.size }} bytes. Install by sideloading; updates after this arrive over the air." --prerelease
+            --notes "Sample shell APK for the Liveo spike. Size: ${{ steps.apk.outputs.size }} bytes. Install by sideloading; updates after this arrive over the air." --prerelease

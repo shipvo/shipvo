@@ -44,7 +44,7 @@ export const device: Device = {
     },
   },
   camera: {
-    // The scanner screen is UI; apps mount <ScanScreen> from "@purenative/device/scan" and this resolves when it reports.
+    // The scanner screen is UI; apps mount <ScanScreen> from "@liveo/device/scan" and this resolves when it reports.
     scan: (opts) => scanBridge.open(opts?.prompt),
   },
   auth: {

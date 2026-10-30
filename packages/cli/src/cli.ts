@@ -9,7 +9,7 @@ const seed = () => {
   if (!s) { console.error("Set PURENATIVE_SIGNING_SEED or PURENATIVE_SIGNING_SEED_FILE"); process.exit(2); }
   return s;
 };
-const help = `purenative <command>
+const help = `liveo <command>
 
   keygen [--out seed.txt]     Create an Ed25519 release signing key; prints the public key
   pubkey                      Print the public key for the seed in PURENATIVE_SIGNING_SEED

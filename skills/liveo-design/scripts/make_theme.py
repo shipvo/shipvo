@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a full PureNative theme from a few seeds.
+"""Generate a full Liveo theme from a few seeds.
 
 Usage:
   make_theme.py --name "Tide & Tackle" --primary "#1F4E5F" [--secondary "#D98E04"] [--neutral "#2B2B28"]

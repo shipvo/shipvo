@@ -17,9 +17,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm, registry-url: "https://registry.npmjs.org" }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build && pnpm --filter @purenative/mcp build
+      - run: pnpm --filter @liveo/schema build && pnpm --filter @liveo/cli build && pnpm --filter @liveo/mcp build
       - run: pnpm -r test
-      - name: Publish @purenative/schema, @purenative/cli, @purenative/mcp
+      - name: Publish @liveo/schema, @liveo/cli, @liveo/mcp
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
@@ -29,7 +29,7 @@ jobs:
             if [ $code -ne 0 ] && echo "$out" | grep -q "cannot publish over the previously published"; then echo "$1: version already on npm, skipping"; return 0; fi
             return $code
           }
-          pub @purenative/schema
-          pub @purenative/cli
-          pub @purenative/mcp
-          pub @purenative/device
+          pub @liveo/schema
+          pub @liveo/cli
+          pub @liveo/mcp
+          pub @liveo/device

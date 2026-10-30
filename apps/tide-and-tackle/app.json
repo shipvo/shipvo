@@ -27,7 +27,7 @@
     },
     "plugins": [
       [
-        "./plugins/withPureNative.js",
+        "./plugins/withLiveo.js",
         {
           "baseUrl": "https://purenative-control.purenative.workers.dev",
           "publicKey": "oERUkFs2xdjaEm9xAPZDULoDLV9gjksjyDvSJ9lSYZE=",
