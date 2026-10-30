@@ -2,6 +2,7 @@ name: publish-npm
 on:
   push:
     tags: ["v*"]
+    branches: [release]   # push main to `release` to publish the versions in package.json
   workflow_dispatch:
 permissions:
   contents: read
