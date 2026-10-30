@@ -54,7 +54,7 @@ const norm = (s) => s.toLowerCase().replace(/[  ]/g, " ").replace(/\s+/g, " "
 
 // Outcome parity: on an "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical.
 const ORDER_RE = [/^order [a-z]+-\d+ placed$/, /^\d+ × /, /^total /, /(cash|mobile money)/];
-function outcomeOf(els) { return [...new Set(els.map((e) => norm(e.label).replace(/\s*\(paid [^)]*\)/, " (paid)")).filter((l) => ORDER_RE.some((r) => r.test(l))))].sort(); } // receipts differ by provider (SIMULATED- vs SANDBOX-)
+function outcomeOf(els) { return [...new Set(els.map((e) => norm(e.label).replace(/,?\s*paid \([^)]*\)/, ", paid")).filter((l) => ORDER_RE.some((r) => r.test(l))))].sort(); } // receipts differ by provider (SIMULATED- vs SANDBOX-)
 function sameOutcome(a, b) { const A = outcomeOf(a), B = outcomeOf(b); return { same_order: A.length > 0 && A.length === B.length && A.every((x, i) => x === B[i]), order_sim: A, order_device: B }; }
 function compare(a, b) {
   const ACT = new Set(["button", "radio", "textbox", "link"]);
