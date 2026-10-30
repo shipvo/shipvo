@@ -108,7 +108,7 @@ server.tool("owner_command", "Run an owner command against the live app (changes
     if (ctx.app && app !== ctx.app) throw new Error(`this key is for "${ctx.app}"`);
     const token = ctx.ownerToken || OWNER_TOKEN;
     if (!token) throw new Error("owner commands are not enabled on this server.");
-    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ command, args: args ?? {} }) });
+    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ name: command, args: args ?? {} }) });
     return text(await r.text());
   });
 
