@@ -99,7 +99,9 @@ const native = {
     throw new Error(`native: no element ${re}`);
   },
   async tap(re) { const el = await this.find(re, ["button", "radio"]); execFileSync("adb", ["shell", "input", "tap", String(el.x), String(el.y)]); sleep(800); for (let i = 0; i < 8; i++) nativeAct("scroll", "up"); },
-  async type(re, text) { const el = await this.find(re, ["textbox"]); execFileSync("adb", ["shell", "input", "tap", String(el.x), String(el.y)]); sleep(400); execFileSync("adb", ["shell", "input", "text", text.replace(/ /g, "%s")]); execFileSync("adb", ["shell", "input", "keyevent", "111"]); sleep(400); },
+  async type(re, text) { const el = await this.find(re, ["textbox"]); execFileSync("adb", ["shell", "input", "tap", String(el.x), String(el.y)]); sleep(400); execFileSync("adb", ["shell", "input", "text", text.replace(/ /g, "%s")]); execFileSync("adb", ["shell", "input", "keyevent", "111"]); sleep(400);
+    // A phone pad may ignore Escape; close the keyboard with Back, as a person would, so it does not cover the screen.
+    if (/mInputShown=true/.test(execFileSync("adb", ["shell", "dumpsys", "input_method"]).toString())) { execFileSync("adb", ["shell", "input", "keyevent", "4"]); sleep(500); } },
 };
 
 /* ---------- compare ---------- */

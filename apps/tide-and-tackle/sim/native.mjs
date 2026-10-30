@@ -60,7 +60,8 @@ export function act(cmd, a, b) {
   const refs = existsSync(REFS) ? JSON.parse(readFileSync(REFS, "utf8")) : {};
   const at = (r) => refs[r] ?? (() => { throw new Error(`unknown ref ${r}; run screen first`); })();
   if (cmd === "tap") { const p = at(a); adb("shell", "input", "tap", String(p.x), String(p.y)); }
-  else if (cmd === "type") { const p = at(a); adb("shell", "input", "tap", String(p.x), String(p.y)); settle(); adb("shell", "input", "text", String(b).replace(/ /g, "%s").replace(/([&|<>;()$`\\"'])/g, "\\$1")); adb("shell", "input", "keyevent", "111"); }
+  else if (cmd === "type") { const p = at(a); adb("shell", "input", "tap", String(p.x), String(p.y)); settle(); adb("shell", "input", "text", String(b).replace(/ /g, "%s").replace(/([&|<>;()$`\\"'])/g, "\\$1")); adb("shell", "input", "keyevent", "111"); settle();
+    if (/mInputShown=true/.test(adb("shell", "dumpsys", "input_method").toString())) adb("shell", "input", "keyevent", "4"); }
   else if (cmd === "scroll" && (a === "left" || a === "right")) {
     const p = b ? at(b) : { x: 540, y: 1100 }; const dx = a === "right" ? -500 : 500;
     adb("shell", "input", "swipe", String(p.x + (dx < 0 ? 250 : -250)), String(p.y), String(p.x + (dx < 0 ? 250 : -250) + dx), String(p.y), "300");
