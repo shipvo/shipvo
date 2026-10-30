@@ -1,8 +1,6 @@
 // Content that changes with each over-the-air release. Edit this file, then push to main.
-// RELEASE 4 IS A DELIBERATE CRASH to test the crash-loop guard: the device must revert to release 3 after 3 failed boots.
 export const RELEASE = {
-  headline: "This release crashes on purpose.",
-  note: "If you can read this, the crash test failed.",
-  accent: "#B94642",
+  headline: "Dusk at Limbe: mackerel close to shore.",
+  note: "Release 5: the fix after the crash test. Release 4 stays blocked on this phone; newer releases still flow.",
+  accent: "#1F4E5F",
 };
-throw new Error("PureNative crash-loop test: release 4 fails at startup on purpose");
