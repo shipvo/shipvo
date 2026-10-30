@@ -1,4 +1,4 @@
 {
   "platforms": ["android"],
-  "android": { "modules": ["dev.purenative.runtime.ShipvoRuntimeModule"] }
+  "android": { "modules": ["dev.purenative.runtime.PureNativeRuntimeModule"] }
 }
