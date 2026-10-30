@@ -1,0 +1,57 @@
+name: parity
+# Simulator vs real Android: run the same flow on the PureNative UI simulator and on the app on an Android
+# emulator, compare every screen, and publish the parity report.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["apps/tide-and-tackle/sim/**", ".github/workflows/parity.yml"]
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @purenative/schema build && pnpm --filter @purenative/cli build
+      - name: Build emulator APK (x86_64)
+        working-directory: apps/tide-and-tackle
+        run: |
+          CI=1 npx expo prebuild -p android --no-install
+          cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+          cp app/build/outputs/apk/release/*.apk "$GITHUB_WORKSPACE/emu.apk"
+      - name: Build simulator (web) and start it
+        working-directory: apps/tide-and-tackle
+        run: |
+          npx expo export --platform web --output-dir sim-dist
+          npm i -g playwright@1.63.0 && npx -y playwright@1.63.0 install --with-deps chromium
+          CONTENT_FROM=https://purenative-control.purenative.workers.dev nohup node sim/server.mjs > sim.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
+      - name: Run parity on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          script: bash apps/tide-and-tackle/sim/parity-ci.sh
+      - name: Report
+        if: always()
+        run: |
+          cat parity-report.md >> "$GITHUB_STEP_SUMMARY" || true
+          cat parity-report.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: parity-report, path: "parity-report.*" }

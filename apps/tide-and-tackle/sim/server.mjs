@@ -81,7 +81,11 @@ const server = http.createServer(async (req, res) => {
     const m = url.pathname.match(/^\/s\/([\w-]+)\/(.*)$/);
     if (m) {
       const [, id, rest] = m;
-      if (rest.startsWith("c/")) return send(404, { error: "no_content" }); // use the bundled content
+      if (rest.startsWith("c/")) {
+        // Use the same live content as devices when CONTENT_FROM points at a control plane; else the bundled default.
+        if (process.env.CONTENT_FROM) { try { const r = await fetch(`${process.env.CONTENT_FROM}/${rest}`); if (r.ok) return send(200, await r.text()); } catch {} }
+        return send(404, { error: "no_content" });
+      }
       if (rest.startsWith("o/") && req.method === "POST") {
         let b = ""; for await (const ch of req) b += ch;
         const f = join(DIR, `${id}.json`); const st = JSON.parse(readFileSync(f, "utf8")); st.orders.push(JSON.parse(b).order); writeFileSync(f, JSON.stringify(st));
