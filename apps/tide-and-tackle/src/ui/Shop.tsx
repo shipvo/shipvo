@@ -196,11 +196,11 @@ function Search({ ctx, initial }: { ctx: Ctx; initial: { query?: string; departm
   );
 }
 
-function Chip({ ctx, label, on, onPress }: { ctx: Ctx; label: string; on: boolean; onPress: () => void }) {
+function Chip({ ctx, label, on, onPress, kind = "filter" }: { ctx: Ctx; label: string; on: boolean; onPress: () => void; kind?: "filter" | "choice" }) {
   const { s, T } = ctx;
   return (
     <Pressable onPress={onPress} style={[s.chip, on && { backgroundColor: T.accent, borderColor: T.accent }]} accessibilityRole="button"
-      accessibilityState={{ selected: on }} accessibilityLabel={`Filter ${label}`} testID={`filter-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+      accessibilityState={{ selected: on }} accessibilityLabel={kind === "filter" ? `Filter ${label}` : label} testID={`${kind}-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <Text style={[s.chipText, on && { color: T.onAccent }]}>{label}</Text>
     </Pressable>
   );
@@ -276,14 +276,17 @@ function Cart({ ctx }: { ctx: Ctx }) {
   );
 }
 
-function Totals({ ctx }: { ctx: Ctx }) {
+function Totals({ ctx, slotFee }: { ctx: Ctx; slotFee?: number | null }) {
   const { s, shop } = ctx;
-  const t = totals(shop);
+  const t0 = totals(shop);
+  // On checkout, show the fee of the slot being chosen before the order is placed.
+  const fee = slotFee != null ? slotFee : t0.delivery_fee;
+  const t = { ...t0, delivery_fee: fee, total: t0.subtotal - t0.discount + fee };
   return (
     <View style={s.card} accessibilityLabel={`Total ${fcfa(t.total)}`}>
       <Line ctx={ctx} k="Subtotal" v={fcfa(t.subtotal)} />
       {t.discount > 0 && <Line ctx={ctx} k={`Discount (${shop.promo})`} v={`− ${fcfa(t.discount)}`} />}
-      {shop.delivery && <Line ctx={ctx} k="Delivery" v={fcfa(t.delivery_fee)} />}
+      {(shop.delivery || slotFee != null) && <Line ctx={ctx} k="Delivery" v={t.delivery_fee ? fcfa(t.delivery_fee) : "Free"} />}
       <Line ctx={ctx} k="Total" v={fcfa(t.total)} strong />
     </View>
   );
@@ -328,14 +331,14 @@ function Checkout({ ctx }: { ctx: Ctx }) {
       )}
       <Text style={s.h2} accessibilityRole="header">Payment</Text>
       <View style={s.chips}>
-        <Chip ctx={ctx} label="Cash on delivery" on={payment === "cash_on_delivery"} onPress={() => setPayment("cash_on_delivery")} />
-        <Chip ctx={ctx} label="Mobile money" on={payment === "mobile_money"} onPress={() => setPayment("mobile_money")} />
+        <Chip ctx={ctx} label={slot === "pickup" ? "Cash at pickup" : "Cash on delivery"} on={payment === "cash_on_delivery"} onPress={() => setPayment("cash_on_delivery")} kind="choice" />
+        <Chip ctx={ctx} label="Mobile money" on={payment === "mobile_money"} onPress={() => setPayment("mobile_money")} kind="choice" />
       </View>
       {payment === "mobile_money" && (
         <TextInput value={phone} onChangeText={setPhone} placeholder="6XX XX XX XX" placeholderTextColor={T.text2} keyboardType="phone-pad"
           style={s.input} accessibilityLabel="Mobile money number" testID="phone-input" />
       )}
-      <Totals ctx={ctx} />
+      <Totals ctx={ctx} slotFee={slot ? (slots.find((x) => x.id === slot)?.fee_fcfa ?? 0) : null} />
       {err && <Text style={[s.body, { color: T.critical }]} accessibilityLiveRegion="assertive">{err}</Text>}
       <Btn ctx={ctx} label="Place order" onPress={place} />
       <Text style={s.caption}>{content.brand.name} delivers in Douala. Mobile money is confirmed on delivery.</Text>
