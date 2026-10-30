@@ -71,7 +71,8 @@ for (const [deviceName, platformVersion] of CANDIDATES[LANE]) {
 }
 if (!s) { writeFileSync(`parity-${LANE}.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2)); process.exit(0); }
 await new Promise((r) => setTimeout(r, 15000)); // let live content load
-await simCall("/session", { session: "pc" });
+// The simulated phone mirrors the device under test: platform wording, and no enrolled biometrics (CI simulators have none).
+await simCall("/session", { session: "pc", device: { platform: LANE.startsWith("ios") ? "ios" : "android", api: LANE.startsWith("ios") ? 17 : 30, biometrics: { enrolled: false } } });
 let simOk = true, devOk = true;
 for (const step of FLOW) {
   try { await simDo(step); } catch (e) { simOk = false; report.errors.push(e.message); }
