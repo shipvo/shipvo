@@ -3,6 +3,7 @@
 // with a grouped sidebar, a client-side search index, an on-page outline and "edit on GitHub" links.
 //   node build-docs.mjs            → public/docs/<slug>/index.html + public/docs/index.json
 import { marked } from "marked";
+import { head as headTag, nav as navTag, footer as footTag } from "./shell.mjs";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -72,17 +73,10 @@ function layout(page, body, headings, prev, next) {
   return `<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(page.title)} — Shipvo Docs</title>
-<meta name="description" content="${esc(page.desc)}">
-<meta property="og:title" content="${esc(page.title)} — Shipvo Docs"><meta property="og:description" content="${esc(page.desc)}"><meta property="og:image" content="https://shipvo.dev/og.png">
-<link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/site.css"><link rel="stylesheet" href="/docs.css">
+${headTag({ title: `${esc(page.title)} — Shipvo Docs`, desc: esc(page.desc), path: `/docs/${page.slug}/`, extraCss: '<link rel="stylesheet" href="/docs.css">' })}
 </head>
 <body class="docs">
-<header class="nav"><div class="wrap"><a class="logo" href="/"><img src="/logo-256.png" alt="" width="28" height="28">Shipvo</a><a class="docs-badge" href="/docs/">Docs</a><nav><a href="/#how">How it works</a><a href="/apps" class="keep">Apps</a><a class="btn keep" href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></header>
+${navTag("docs")}
 <div class="docs-shell">
   <aside class="side" id="side">
     <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="docsearch" type="search" placeholder="Search docs" aria-label="Search docs" autocomplete="off"><kbd>/</kbd></label>
@@ -97,6 +91,7 @@ function layout(page, body, headings, prev, next) {
   </main>
   <aside class="toc">${toc ? `<div class="side-title">On this page</div>${toc}` : ""}</aside>
 </div>
+${footTag()}
 <script src="/docs.js" defer></script>
 </body>
 </html>`;
@@ -115,3 +110,22 @@ writeFileSync(join(OUT, "index.json"), JSON.stringify(index));
 // /docs/ → the overview
 writeFileSync(join(OUT, "index.html"), `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/docs/overview/"><link rel="canonical" href="/docs/overview/"><title>Shipvo Docs</title>`);
 console.log(`docs: ${index.length} pages`);
+
+// Site pages: pages/*.html with <!--HEAD …-->, <!--NAV x-->, <!--FOOTER--> stamped in.
+import { readdirSync } from "node:fs";
+const PUB = join(here, "public");
+for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html"))) {
+  let s = readFileSync(join(here, "pages", f), "utf8");
+  s = s.replace(/<!--HEAD (.*?)-->/s, (_, attrs) => { const a = Object.fromEntries([...attrs.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]])); return headTag(a); });
+  s = s.replace(/<!--NAV ?(\w*)-->/, (_, k) => navTag(k)).replace("<!--FOOTER-->", footTag());
+  writeFileSync(join(PUB, f), s);
+}
+// Changelog from CHANGELOG.md
+{
+  const md = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8").replace(/^# .*\n/, "");
+  marked.use({ renderer: new marked.Renderer(), gfm: true });
+  const body = marked.parse(md);
+  mkdirSync(join(PUB, "changelog"), { recursive: true });
+  writeFileSync(join(PUB, "changelog", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Changelog — Shipvo", desc: "What shipped in Shipvo, dated, newest first.", path: "/changelog/" })}</head><body>${navTag("changelog")}<main><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Changelog</div><h2 style="margin-top:12px">What shipped.</h2><p class="lede" style="margin-top:14px">Dated, newest first. Package versions are on npm under <code>@shipvo</code>; the full history is the <a class="link" href="https://github.com/shipvo/shipvo/commits/main" rel="noopener">commit log</a>.</p><article class="log">${body}</article></div></section></main>${footTag()}</body></html>`);
+}
+console.log("pages + changelog built");

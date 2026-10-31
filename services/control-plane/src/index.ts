@@ -27,7 +27,7 @@ async function owner(c: any, appId: string): Promise<string | null> {
 }
 const ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
-app.get("/health", (c) => c.json({ ok: true, service: "purenative-control", time: new Date().toISOString() }));
+app.get("/health", (c) => c.json({ ok: true, service: "shipvo-control", time: new Date().toISOString() }, 200, { "access-control-allow-origin": "*", "cache-control": "no-store" }));
 
 /** Static hot path: signed release pointer envelope per app / shell major / band. No device registry. */
 app.get("/p/:app/:major/:band", async (c) => {

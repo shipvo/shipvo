@@ -3,7 +3,7 @@ name: deploy-site
 on:
   push:
     branches: [main]
-    paths: ["services/site/**", ".github/workflows/deploy-site.yml"]
+    paths: ["services/site/**", "docs/**", "README.md", "CHANGELOG.md", "packages/*/README.md", ".github/workflows/deploy-site.yml"]
   workflow_dispatch:
 jobs:
   deploy:
@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Build docs from the repo Markdown
-        run: npm i --no-audit --no-fund --no-save marked@14 && node services/site/build-docs.mjs
+        run: npm i --no-audit --no-fund --no-save marked@14 && node services/site/build.mjs
       - name: Deploy
         working-directory: services/site
         env:

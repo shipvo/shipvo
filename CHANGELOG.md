@@ -1,0 +1,30 @@
+# Changelog
+
+Dated, newest first. Package versions are on npm under `@shipvo`.
+
+## 2026-10-31
+
+- **shipvo.dev** goes live: landing page, public marketplace (`/apps`), and a docs site built from this repo's Markdown on every deploy.
+- **Hosted publishing.** `shipvo app create` registers an app under your GitHub account and returns a publish token scoped to that app; `shipvo publish` writes through `api.shipvo.dev`, and every release pointer is verified against the app's registered public key. `shipvo app list` and `shipvo app delete`.
+- **Marketplace.** Set `listing.public` in `shipvo.json`; after review the app appears on shipvo.dev/apps, in `list_apps` for every signed-in key, and any agent can `open_app("<id>@latest")`.
+- **Self-serve login.** `shipvo login` signs in with GitHub (device flow) and issues a 30-day key with a sandbox-minute quota; a new login replaces the previous key.
+- **Custom domains.** `api.shipvo.dev` (control plane) and `sim.shipvo.dev` (hosted simulator); the earlier `workers.dev` addresses stay live for installed shells.
+- **MCP** 0.0.4: `list_apps(query)`, `list_sessions`, `notifications`, `open_notification`.
+- **iOS parity flow C** (camera permission, scanner, location permission, distance, mobile money): 100 % actionable parity; the harness now drives iOS system dialogs through the alert API. Nightly parity runs on Android and iOS.
+- **Device E2E** regression: ChatGPT's 18-step purchase runs in CI through MCP on every push.
+- **Tide & Tackle** releases 19–22; shell 1.1.0 as `dev.shipvo.tide`.
+- Packages: `@shipvo/cli` 0.1.1, `@shipvo/mcp` 0.0.4, `@shipvo/sim` 0.1.1, `@shipvo/runtime` 0.1.0, `@shipvo/device` 0.1.0.
+
+## 2026-10-30
+
+- **Hosted simulator** on E2B: one sandbox per API key, sessions survive client reconnects, the key may travel in the URL for clients that cannot send headers (ChatGPT).
+- **Modal semantics** on every platform: a sheet hides what is behind it from the accessibility tree, in the app itself rather than in a driver heuristic.
+- **Found by parity, fixed in the app:** the iOS number pad covered "Confirm payment"; the payment sheet now rises above the keyboard.
+- Android and iOS drivers stop swiping over system dialogs, verify typed values, and save raw trees at key screens.
+- `@shipvo/mcp` 0.0.2: Streamable HTTP transport with API keys.
+
+## 2026-10-29 and earlier
+
+- Shipvo (then PureNative): Ed25519-signed release pointers, SHA-256 bundles, bsdiff patches, cohort bands, `min_shell_version` gating, OTA measured on a 2 GB Redmi 9A.
+- The UI simulator over Playwright with accessibility-tree screens and refs; the simulated device (camera, location, biometrics, payments, notifications); the agent gate.
+- First parity runs against an Android emulator and an iPhone simulator; the design skill.

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--HEAD title="Shipvo — Build once. Publish for people and AI agents." desc="Open-source React Native framework: signed over-the-air updates for the phones people carry, and a simulator AI agents operate over MCP to test the same release end to end. Parity with real devices is measured and published." path="/"-->
+</head>
+<body>
+<!--NAV home-->
+<main>
+<section class="hero" style="border-top:0">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow reveal">Open-source React Native framework</div>
+      <h1 class="reveal">Build once.<br>Publish for people <em>and AI agents.</em></h1>
+      <p class="lede reveal">One codebase. People install it from the stores and get signed over-the-air updates in seconds. AI agents open the very same release in a simulator they can see and operate, so you test the whole app end to end with the assistant you already use. No emulator, no device lab.</p>
+      <div class="cta reveal">
+        <a class="btn primary" href="/docs/getting-started/">Build your first app <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn" href="/apps">Browse apps agents can use</a>
+      </div>
+      <div class="cmd reveal"><span class="p">$</span><span>npx -y @shipvo/cli init myshop</span><button type="button" data-copy="npx -y @shipvo/cli init myshop">Copy</button></div>
+      <div class="facts reveal"><span><b>Android</b> OTA today</span><span><b>iOS</b> simulator parity 100%</span><span><b>MIT</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
+    </div>
+    <div class="phone-stage reveal">
+      <div class="bubble"><small>YOU ASK YOUR ASSISTANT</small><b>Buy a Surface Popper with mobile money. Tell me if anything breaks.</b></div>
+      <div class="phone" aria-label="Simulated phone showing the accessibility tree an agent reads"><div class="tree" id="tree"></div></div>
+      <div class="result" id="result"><small>BACKEND CONFIRMS</small><code>Order TT-1001 · 4 200 FCFA<br>mobile money · receipt SIMULATED-…</code></div>
+    </div>
+  </div>
+</section>
+
+<section class="strip">
+  <div class="wrap">
+    <div class="strip-row">
+      <span class="strip-label">Works with the assistants you already use</span>
+      <div class="agents"><span class="chip"><b>Claude</b> Desktop · Code</span><span class="chip"><b>ChatGPT</b> connector</span><span class="chip"><b>Cursor</b></span><span class="chip"><b>PiPilot</b></span><span class="chip">any <b>MCP</b> client</span></div>
+    </div>
+    <div class="strip-row">
+      <span class="strip-label">Live right now</span>
+      <div class="agents live" data-live>
+        <span class="chip"><b data-live-release>…</b> latest Tide &amp; Tackle release</span>
+        <span class="chip"><b data-live-apps>…</b> public apps</span>
+        <span class="chip"><b data-live-api>…</b> api.shipvo.dev</span>
+        <span class="chip"><b data-live-sim>…</b> sim.shipvo.dev</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head"><h2>How it works</h2><p class="lede">Four stages, one codebase. Click through; every panel is the real thing, not a mock.</p></div>
+    <div class="tabs" data-tabs>
+      <div class="tab-list" role="tablist" aria-label="How it works">
+        <button role="tab" aria-selected="true" id="t-dev" aria-controls="p-dev"><span class="n">01</span>Develop</button>
+        <button role="tab" aria-selected="false" id="t-test" aria-controls="p-test"><span class="n">02</span>Test with an agent</button>
+        <button role="tab" aria-selected="false" id="t-pub" aria-controls="p-pub"><span class="n">03</span>Publish</button>
+        <button role="tab" aria-selected="false" id="t-ver" aria-controls="p-ver"><span class="n">04</span>Verify</button>
+      </div>
+      <div class="tab-panels">
+        <div role="tabpanel" id="p-dev" aria-labelledby="t-dev">
+          <div class="panel-grid"><div><h3>A complete Expo app in one command.</h3><p><code>shipvo init</code> writes the OTA runtime, the device API, a simulator build, a publish workflow and your signing key. Your screens use one API for camera, location, biometrics, payments and notifications; it is real on phones and simulated for agents, and never pretends otherwise.</p><a class="link" href="/docs/getting-started/">Build your first app →</a></div>
+<pre class="term"><span class="g">$</span> <span class="c">npx -y @shipvo/cli init myshop --name "My Shop"</span>
+<span class="d">✓ shipvo.json · app.json · App.tsx · metro.config.js</span>
+<span class="d">✓ .github/workflows/publish.yml</span>
+<span class="d">✓ .shipvo/seed.txt  (Ed25519 signing key, git-ignored)</span>
+
+<span class="d">// App.tsx</span>
+<span class="c">import</span> { device } <span class="c">from</span> "@shipvo/device";
+<span class="c">const</span> code = <span class="c">await</span> device.camera.scan();
+<span class="c">const</span> here = <span class="c">await</span> device.location.current();
+<span class="c">const</span> ok   = <span class="c">await</span> device.auth.confirm("Pay 4 200 FCFA");</pre></div>
+        </div>
+        <div role="tabpanel" id="p-test" aria-labelledby="t-test" hidden>
+          <div class="panel-grid"><div><h3>Ask Claude or ChatGPT to use it.</h3><p>One line of MCP config. The agent gets each screen as an accessibility tree with refs, then taps, types and scrolls. Permission dialogs, the fingerprint prompt and payment sheets appear in the tree and it answers them like a person. <code>end_session</code> reports what your backend actually received.</p><a class="link" href="/docs/agents/">How agents see your app →</a></div>
+<pre class="term"><span class="d">// Claude Desktop · Cursor · Claude Code</span>
+{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
+
+<span class="g">›</span> <span class="c">open_app("myshop")</span>
+  - heading "My Shop" [ref=e6]
+  - button "Scan a code" [ref=e11]
+<span class="g">›</span> <span class="c">set_device(camera: { barcode: { data: "6181234567890" } })</span>
+<span class="g">›</span> <span class="c">tap(e11)</span>
+  - dialog "Allow My Shop to take pictures and record video?"
+  - button "While using the app" [ref=e14]
+<span class="g">›</span> <span class="c">end_session()</span>
+  { steps: 18, orders: [{ total: 4200, payment: "mobile_money" }] }</pre></div>
+        </div>
+        <div role="tabpanel" id="p-pub" aria-labelledby="t-pub" hidden>
+          <div class="panel-grid"><div><h3>Push to main. Every phone has it.</h3><p>The workflow signs a release pointer (Ed25519), ships bsdiff patches from each installed version, and rolls out by cohort: 1 %, then 10 %, then everyone. Phones verify signature, hash and size, apply without a restart, and discard a release that fails to boot. <code>shipvo rollback --to 7</code> when you need it.</p><a class="link" href="/docs/getting-started/#5-publish-over-the-air">Publishing, step by step →</a></div>
+<pre class="term"><span class="g">$</span> <span class="c">npx -y @shipvo/cli login</span>        <span class="d">GitHub sign-in</span>
+<span class="g">$</span> <span class="c">npx -y @shipvo/cli app create</span>   <span class="d">publish token, scoped to this app</span>
+<span class="g">$</span> <span class="c">git push</span>
+<span class="d">release 2 · bundle 1.7 MB · patch from r1 31.4 KB</span>
+<span class="d">bands b0 (1%) b1 (10%) b2 (all) · signed · web artifact /w/myshop/r2/</span>
+
+<span class="g">›</span> <span class="c">open_app("myshop@latest")</span>  <span class="d">the exact release phones run</span></pre></div>
+        </div>
+        <div role="tabpanel" id="p-ver" aria-labelledby="t-ver" hidden>
+          <div class="panel-grid"><div><h3>Simulator vs real device, scored every night.</h3><p>The same scripted flows run in the simulator, on an Android emulator and on an iPhone simulator. We compare every actionable element and every text on every screen and publish the gaps as well as the score. This is how the simulator earned the right to replace your emulator for most of the loop.</p><a class="link" href="/docs/parity-results/">Read the parity results →</a></div>
+<pre class="term"><span class="d">| Screen              | Elements  | Actionable | Text  |</span>
+<span class="d">| ------------------- | --------- | ---------- | ----- |</span>
+| Camera permission   | 3 / 4     | <span class="g">100%</span>       | 100%  |
+| Scanner             | 11 / 10   | <span class="g">100%</span>       | 100%  |
+| Location permission | 4 / 5     | <span class="g">100%</span>       | 100%  |
+| Payment prompt      | 7 / 6     | <span class="g">100%</span>       | 100%  |
+| Order placed        | 13 / 10   | <span class="g">100%</span>       | 77%   |  <span class="d">same order ✓</span>
+
+<span class="d">iOS · 21 screens · mean actionable 100% · text 95.3%</span></pre></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pillars">
+  <div class="wrap">
+    <div class="sec-head"><h2>Everything an agent-ready app needs.</h2><p class="lede">Each card is a shipped, documented piece. Nothing here is a roadmap item.</p></div>
+    <div class="bento">
+      <article class="cell wide"><div class="n">PUBLISH</div><h3>Signed over-the-air updates</h3><p>Ed25519 pointers, SHA-256 bundles, bsdiff patches, cohort bands, <code>min_shell_version</code> gating and one-command rollback. The shell pins your public key; nothing delivered over the air can change it.</p><div class="k">Typical update <b>tens of KB</b> · applied on a 2 GB Redmi 9A <b>without a restart</b></div></article>
+      <article class="cell"><div class="n">SIMULATE</div><h3>A phone agents can operate</h3><p>Accessibility-tree screens with refs over MCP. Local with <code>npm run sim</code>, hosted with a key from <code>shipvo login</code>.</p><div class="k">ChatGPT placed a full order in <b>18 steps, 76 s</b></div></article>
+      <article class="cell"><div class="n">DEVICE</div><h3>One device API, two truths</h3><p>Camera, location, biometrics, payments, notifications. Real on phones, simulated for agents, labelled <code>simulated</code> every time.</p><div class="k">Receipts say <b>SIMULATED-</b>; logs say <b>simulated: true</b></div></article>
+      <article class="cell"><div class="n">VERIFY</div><h3>Parity, not promises</h3><p>Nightly runs on an Android emulator and an iPhone simulator; every gap published.</p><div class="k">Actionable parity <b>100 %</b> · text <b>98.6 % / 96.2 %</b></div></article>
+      <article class="cell"><div class="n">MARKETPLACE</div><h3>Listed for every agent</h3><p>Flip <code>listing.public</code> and your app appears on <a href="/apps">shipvo.dev/apps</a> and in every signed-in agent's <code>list_apps</code>.</p><div class="k">Review before listing · <b>3 apps</b> per account in the beta</div></article>
+      <article class="cell wide"><div class="n">OWN IT</div><h3>Self-host in ten minutes, or use ours</h3><p>The control plane is a Cloudflare Worker with KV and D1. Run it in your account with your keys, or register on the hosted one with <code>shipvo app create</code>; publish tokens are scoped to one app and every pointer is checked against your public key.</p><div class="k"><b>api.shipvo.dev</b> hosted · <b>MIT</b> everywhere</div></article>
+    </div>
+  </div>
+</section>
+
+<section id="proof">
+  <div class="wrap">
+    <div class="sec-head"><h2>Numbers, not adjectives.</h2><p class="lede">Taken on a 2 GB Redmi 9A, an Android emulator and an iPhone simulator in CI. Method and gaps in <a class="link" href="/docs/parity-results/">parity results</a>.</p></div>
+    <div class="proof">
+      <div class="stat"><div class="v">100<small>%</small></div><div class="l">Actionable parity, simulator vs device, Android and iOS, 3 flows, 21 screens</div><div class="s">parity-results</div></div>
+      <div class="stat"><div class="v">18 <small>steps</small></div><div class="l">For ChatGPT to scan, locate, pay by mobile money with a fingerprint and reopen the notification. 76 s. Order confirmed by the backend.</div><div class="s">agents</div></div>
+      <div class="stat"><div class="v">&lt;1 <small>s</small></div><div class="l">Cold start of the native shell on a 2 GB Android after an over-the-air update applied without a restart</div><div class="s">spike-results</div></div>
+      <div class="stat"><div class="v">3</div><div class="l">Known gaps listed, not hidden: two unlabeled Android dialog buttons and a payment-sheet cancel the Android tree does not expose</div><div class="s">parity-results</div></div>
+    </div>
+    <div class="honest">
+      <div><b>What the simulator is not</b>It is not a real device. Payments, biometrics and the camera are simulated and say so. Use it for most of your testing, and a phone for the last mile.</div>
+      <div><b>What agents do today</b>They test and demonstrate your app. They do not yet buy things for real people through it: that needs OAuth consent, spend limits and a checkout contract, which is on the roadmap, not in the product.</div>
+    </div>
+  </div>
+</section>
+
+<section id="market">
+  <div class="wrap">
+    <div class="sec-head"><h2>Apps an agent can open right now.</h2><p class="lede">Published with Shipvo and listed by their owners. Sign in once; any MCP client can <code>open_app</code> them. <a class="link" href="/apps">See all →</a></p></div>
+    <div class="grid" id="market-grid" aria-live="polite"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap beta">
+    <div><div class="eyebrow">Private beta</div><h2 style="margin-top:12px">Five developers. One honest hour.</h2><p class="lede" style="margin-top:14px">Build and publish an app from the guide alone, then tell us where it broke. Free hosting during the beta and a say in what gets built next.</p></div>
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:220px"><a class="btn primary" href="https://x.com/HansCadx" rel="noopener">DM on X</a><a class="btn" href="mailto:hans@pipilot.dev">hans@pipilot.dev</a></div>
+  </div>
+</section>
+</main>
+<!--FOOTER-->
+<script src="/home.js" defer></script>
+</body>
+</html>
