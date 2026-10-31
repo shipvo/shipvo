@@ -39,6 +39,10 @@ export const device: Device = {
   location: {
     async current() {
       const L = opt<any>("expo-location"); if (!L) throw new Error("expo-location is not installed");
+      // Ask first, like the system flow on a phone: without this the read fails silently and no dialog is ever shown.
+      let st = (await L.getForegroundPermissionsAsync()).status;
+      if (st !== "granted") st = (await L.requestForegroundPermissionsAsync()).status;
+      if (st !== "granted") throw new Error("Location permission denied");
       const p = await L.getCurrentPositionAsync({ accuracy: L.Accuracy.Balanced });
       return { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy ?? undefined };
     },
