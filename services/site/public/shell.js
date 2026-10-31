@@ -1,4 +1,17 @@
 (function(){
+  // theme: automatic (follows the system) -> light -> dark; the choice is remembered in this browser
+  var KEY='shipvo.theme',root=document.documentElement,NAMES={auto:'automatic',light:'light',dark:'dark'};
+  function mode(){var t=root.getAttribute('data-theme');return t==='light'||t==='dark'?t:'auto'}
+  function paint(){var m=mode();
+    document.querySelectorAll('[data-theme-toggle]').forEach(function(b){b.setAttribute('data-mode',m);b.title='Theme: '+NAMES[m];b.setAttribute('aria-label','Colour theme: '+NAMES[m]+'. Click to change.')});
+    var meta=document.querySelector('meta[name=theme-color]');
+    if(meta){var light=m==='light'||(m==='auto'&&matchMedia('(prefers-color-scheme: light)').matches);meta.setAttribute('content',light?'#FAF8F3':'#090D16')}}
+  document.querySelectorAll('[data-theme-toggle]').forEach(function(b){b.addEventListener('click',function(){
+    var next={auto:'light',light:'dark',dark:'auto'}[mode()];
+    if(next==='auto')root.removeAttribute('data-theme');else root.setAttribute('data-theme',next);
+    try{if(next==='auto')localStorage.removeItem(KEY);else localStorage.setItem(KEY,next)}catch(e){}
+    paint()})});
+  paint();
   // dropdown menus: hover on desktop, click/keyboard everywhere
   document.querySelectorAll('.has-menu').forEach(function(w){var b=w.querySelector('button');
     function open(o){w.classList.toggle('open',o);b.setAttribute('aria-expanded',o)}

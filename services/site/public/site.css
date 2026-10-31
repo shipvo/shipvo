@@ -295,6 +295,23 @@ footer.old{display:none}
 .skip{position:absolute;left:12px;top:-60px;z-index:100;background:var(--accent);color:var(--accent-ink);padding:10px 16px;border-radius:10px;font-weight:700;transition:top .15s}
 .skip:focus{top:12px}
 
+/* explicit theme choice (nav toggle) */
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+
+  :root[data-theme=light]{--ink:#FAF8F3;--ink-2:#FFFFFF;--ink-3:#F1EEE6;--line:#E3DED2;--line-2:#CFC8B8;--paper:#14181F;--mute:#454C5B;--dim:#5A6272;--faint:#6A7183;--accent:#E8780A;--accent-ink:#FFFFFF;--sky:#0B6FC4}
+  :root[data-theme=light] body::before{opacity:.03}
+  :root[data-theme=light] .nav{background:rgba(250,248,243,.85)}
+  :root[data-theme=light] .term,:root[data-theme=light] .tree,:root[data-theme=light] .agentview,:root[data-theme=light] .result{--paper:#F4F2EC;--mute:#B6BDCB;--dim:#8891A3;--faint:#7C88A3;--line:#1F2A3F;--line-2:#2A3850;--ink-3:#151D2E;--accent:#FF9A2E;--accent-ink:#120B03;--sky:#5FB8FF}
+  :root[data-theme=light] .term{background:#0B0F0E}
+  :root[data-theme=light] .agentview{background:rgba(15,21,34,.9)}
+  :root[data-theme=light] .bubble{background:#14181F;color:#F4F2EC}
+  :root[data-theme=light] .bubble small{color:#8891A3}
+
+.theme-btn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line-2);background:transparent;color:var(--mute);display:inline-grid;place-items:center;cursor:pointer;transition:color .15s,border-color .15s}
+.theme-btn:hover{color:var(--paper);border-color:var(--dim)}
+.theme-btn svg{width:18px;height:18px;display:none}
+.theme-btn[data-mode=auto] .i-auto,.theme-btn[data-mode=light] .i-light,.theme-btn[data-mode=dark] .i-dark{display:block}
+.mm-theme{display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);font-size:16px}
 @media (prefers-color-scheme: light){
   :root:not([data-theme=dark]){--ink:#FAF8F3;--ink-2:#FFFFFF;--ink-3:#F1EEE6;--line:#E3DED2;--line-2:#CFC8B8;--paper:#14181F;--mute:#454C5B;--dim:#5A6272;--faint:#6A7183;--accent:#E8780A;--accent-ink:#FFFFFF;--sky:#0B6FC4}
   :root:not([data-theme=dark]) body::before{opacity:.03}
