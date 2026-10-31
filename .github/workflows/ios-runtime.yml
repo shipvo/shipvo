@@ -39,3 +39,108 @@ jobs:
       - name: Summary
         if: always()
         run: grep -E "Executed|error:|failed" "$RUNNER_TEMP/swift-test.log" | tail -20 | tee -a "$GITHUB_STEP_SUMMARY"
+
+  simulator-e2e:
+    if: github.event_name != 'workflow_dispatch' || inputs.e2e
+    needs: swift-tests
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      E2E_PORT: "8100"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
+
+      - name: Point the sample app at a local control plane
+        working-directory: apps/tide-and-tackle
+        run: |
+          node ../../scripts/ios-e2e/keygen.mjs > "$RUNNER_TEMP/key.json"
+          node - <<'JS'
+          const fs = require("fs"), key = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/key.json", "utf8"));
+          const j = JSON.parse(fs.readFileSync("app.json", "utf8"));
+          const p = j.expo.plugins.find((x) => Array.isArray(x) && x[0] === "@shipvo/runtime");
+          p[1] = { baseUrl: "http://localhost:" + process.env.E2E_PORT, publicKey: key.publicKey, appId: "e2e", shellMajor: 1 };
+          fs.writeFileSync("app.json", JSON.stringify(j, null, 2));
+          JS
+          grep -A6 '"@shipvo/runtime"' app.json
+
+      - name: Prebuild iOS and install pods
+        working-directory: apps/tide-and-tackle
+        run: |
+          CI=1 npx expo prebuild -p ios --no-install
+          cd ios && pod install 2>&1 | tail -15
+          grep -n "ShipvoRuntime" Podfile.lock | head -3
+
+      - name: Build for the iOS Simulator (Release, embedded bundle)
+        working-directory: apps/tide-and-tackle/ios
+        run: |
+          WS=$(ls -d *.xcworkspace | head -1); SCHEME="${WS%.xcworkspace}"
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*Shipvo|BUILD (SUCCEEDED|FAILED)" | head -40
+          test ${PIPESTATUS[0]} -eq 0
+          ls -d build/Build/Products/Release-iphonesimulator/*.app
+
+      - name: Build the over-the-air release (a different bundle from the embedded one)
+        working-directory: apps/tide-and-tackle
+        run: |
+          sed -i.bak 's/headline: "[^"]*"/headline: "Release 1 over the air on iOS"/' src/release.ts
+          npx expo export --platform ios --output-dir dist-e2e --clear 2>&1 | tail -5
+          HBC=$(ls dist-e2e/_expo/static/js/ios/*.hbc | head -1)
+          mkdir -p "$RUNNER_TEMP/cp"
+          SEED=$(node -p "require(process.env.RUNNER_TEMP + '/key.json').seed")
+          node ../../scripts/ios-e2e/make-release.mjs "$RUNNER_TEMP/cp" e2e "$SEED" 1 "$HBC"
+
+      - name: Start the fake control plane
+        run: |
+          nohup node scripts/ios-e2e/server.mjs "$RUNNER_TEMP/cp" "$E2E_PORT" "$RUNNER_TEMP/server.log" > "$RUNNER_TEMP/server.out" 2>&1 &
+          sleep 2; curl -sf "http://localhost:$E2E_PORT/p/e2e/1/ios/b0.json" | head -c 120; echo
+          : > "$RUNNER_TEMP/server.log"
+
+      - name: Boot a simulator, install, launch
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes available | grep -i "iOS" | tail -1 | grep -o "com.apple.CoreSimulator.SimRuntime.iOS-[0-9-]*")
+          DEVICE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-1[0-9]-*[A-Za-z]*" | head -1)
+          UDID=$(xcrun simctl create shipvo-e2e "$DEVICE" "$RUNTIME")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" && xcrun simctl bootstatus "$UDID" -b
+          APP=$(ls -d apps/tide-and-tackle/ios/build/Build/Products/Release-iphonesimulator/*.app | head -1)
+          BID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist"); echo "BID=$BID" >> "$GITHUB_ENV"
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" "$BID"
+
+      - name: Wait for the app to fetch, verify, stage and reload into release 1
+        run: |
+          for i in $(seq 1 60); do
+            if grep -q '^POST /t .*"release":1' "$RUNNER_TEMP/server.log" 2>/dev/null; then echo "app reported running release 1"; break; fi
+            sleep 3
+          done
+          echo "--- server log"; cat "$RUNNER_TEMP/server.log" | cut -c1-260
+          grep -q '^GET /p/e2e/1/ios/b[012].json 200' "$RUNNER_TEMP/server.log" || { echo "FAIL: app never fetched the iOS pointer"; exit 1; }
+          grep -q '^GET /b/e2e/ios-r1.hbc 200' "$RUNNER_TEMP/server.log" || { echo "FAIL: app never downloaded the bundle"; exit 1; }
+          grep -q '^POST /t .*"release":1' "$RUNNER_TEMP/server.log" || { echo "FAIL: app never reported running release 1 after the update"; exit 1; }
+          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/after-update.png"
+
+      - name: Relaunch from cold, it must start on release 1 without downloading again
+        run: |
+          : > "$RUNNER_TEMP/server.log"
+          xcrun simctl terminate "$UDID" "$BID"; sleep 2; xcrun simctl launch "$UDID" "$BID"
+          for i in $(seq 1 30); do grep -q '^POST /t .*"release":1' "$RUNNER_TEMP/server.log" && break; sleep 2; done
+          cat "$RUNNER_TEMP/server.log" | cut -c1-260
+          grep -q '^POST /t .*"release":1' "$RUNNER_TEMP/server.log" || { echo "FAIL: cold start did not run release 1"; exit 1; }
+          ! grep -q '^GET /b/e2e/ios-r1.hbc' "$RUNNER_TEMP/server.log" || { echo "FAIL: downloaded the bundle again"; exit 1; }
+          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/cold-start.png"
+          echo "iOS OTA verified on a simulator: fetch, verify, stage, reload, promote, cold start on the new bundle." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-e2e
+          path: |
+            ${{ runner.temp }}/server.log
+            ${{ runner.temp }}/*.png
+            ${{ runner.temp }}/xcodebuild.log
