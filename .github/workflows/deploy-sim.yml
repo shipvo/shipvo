@@ -54,7 +54,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -o pipefail
-          npx wrangler@4 deploy 2>&1 | tee deploy.log
+          npx wrangler@4 deploy --var SIM_REV:${{ github.sha }} 2>&1 | tee deploy.log
           grep -E "https://|Deployed|Current Version" deploy.log | tail -5 >> "$GITHUB_STEP_SUMMARY" || true
       - name: Smoke (health, auth, and a real agent loop across reconnects)
         env: { SIM_SMOKE_KEY: "${{ secrets.SIM_SMOKE_KEY }}" }

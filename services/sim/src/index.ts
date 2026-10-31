@@ -7,7 +7,7 @@ import { Container, getContainer } from "@cloudflare/containers";
 
 type Env = {
   SIM?: DurableObjectNamespace<SimContainer>; DB: D1Database; CONTROL: string; OWNER_TOKEN?: string;
-  E2B_API_KEY?: string; E2B_TEMPLATE?: string; E2B_API?: string; E2B_SANDBOX_DOMAIN?: string; SESSION_TIMEOUT_S?: string;
+  SIM_REV?: string; E2B_API_KEY?: string; E2B_TEMPLATE?: string; E2B_API?: string; E2B_SANDBOX_DOMAIN?: string; SESSION_TIMEOUT_S?: string;
 };
 
 export class SimContainer extends Container<Env> {
@@ -44,8 +44,9 @@ const touchSandbox = (env: Env, id: string) => e2b(env, "POST", `/sandboxes/${id
 // One sandbox ("phone pool") per API key: clients such as ChatGPT reconnect between tool calls, and the agent's
 // simulator sessions must survive that. The sandbox is created on first use and expires after idle time.
 async function sandboxForKey(env: Env, keyId: number, app: string, scope: string) {
-  const row = await env.DB.prepare("SELECT sandbox_id, sandbox_host FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).first<{ sandbox_id: string; sandbox_host: string }>();
-  if (row) {
+  const row = await env.DB.prepare("SELECT sandbox_id, sandbox_host, rev FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).first<{ sandbox_id: string; sandbox_host: string; rev: string | null }>();
+  if (row && env.SIM_REV && row.rev !== env.SIM_REV) { await killSandbox(env, row.sandbox_id); await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).run(); }   // built by an older deploy
+  else if (row) {
     try { const h = await fetch(`${row.sandbox_host}/health`, { signal: AbortSignal.timeout(4000) }); if (h.ok) { touchSandbox(env, row.sandbox_id); return { id: row.sandbox_id, host: row.sandbox_host }; } } catch {}
     await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).run();   // expired: make a new one
   }
@@ -55,7 +56,7 @@ async function sandboxForKey(env: Env, keyId: number, app: string, scope: string
   if (q && q.quota_minutes > 0 && q.used_minutes + cost > q.quota_minutes) throw new QuotaError(q.quota_minutes, q.used_minutes);
   const sb = await newSandbox(env, app, scope);
   await env.DB.prepare("UPDATE api_keys SET used_minutes = used_minutes + ? WHERE id = ?").bind(cost, keyId).run();
-  await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope) VALUES (?,?,?,?,?)").bind(`key:${keyId}`, sb.id, sb.host, app, scope).run();
+  await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope, rev) VALUES (?,?,?,?,?,?)").bind(`key:${keyId}`, sb.id, sb.host, app, scope, env.SIM_REV ?? null).run();
   return sb;
 }
 async function viaE2B(req: Request, env: Env, row: { id: number; app_id: string; scope: string }, headers: Headers): Promise<Response> {

@@ -30,7 +30,9 @@ export function seed(): string {
   const e = process.env;
   const s = e.SHIPVO_SIGNING_SEED || e.PURENATIVE_SIGNING_SEED
     || ((e.SHIPVO_SIGNING_SEED_FILE || e.PURENATIVE_SIGNING_SEED_FILE) && readFileSync((e.SHIPVO_SIGNING_SEED_FILE || e.PURENATIVE_SIGNING_SEED_FILE)!, "utf8").trim());
-  if (!s) { console.error("Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE (the seed `shipvo keygen` printed)."); process.exit(2); }
+  const local = (() => { try { return readFileSync(join(process.cwd(), ".shipvo", "seed.txt"), "utf8").trim(); } catch { return ""; } })();   // what `shipvo init` wrote
+  if (!s && local) return local;
+  if (!s) { console.error("Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE (the seed `shipvo keygen` printed), or keep it at .shipvo/seed.txt."); process.exit(2); }
   return s;
 }
 
