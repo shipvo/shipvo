@@ -30,6 +30,26 @@ Previous run (one flow, before the simulator was made phone-faithful): Android 9
 - **iOS:** Expo simulator build on the newest iPhone simulator, GitHub macOS runner. Driven with Appium XCUITest. No Apple Developer account.
 - **Simulator:** the app's React Native Web build in a phone-sized headless browser, showing the same live content as devices.
 
+## Flow C: native features (Android, release 19)
+
+- **Flow C:** scan a product (manual barcode entry on both sides, see below) → "Use my location" → shop pickup → mobile money → order placed.
+
+| Screen | Actionable | Text |
+| --- | --- | --- |
+| Camera permission dialog | 75% | 100% |
+| Scanner | 100% | 100% |
+| Scanned product | 100% | 100% |
+| Location permission dialog | 75% | 75% |
+| Located (distance shown, pickup) | 100% | 96% |
+| Payment prompt | 67% | 83% |
+| Order placed (same order ✓) | 100% | 91% |
+
+Across all three flows on Android the orders match exactly; 18 of 21 screens are at 100% actionable parity. The three below 100% are known and listed here, not hidden: both system permission dialogs have one extra unlabeled button on the device, and the payment sheet's "Cancel payment" button is not exposed by Android's accessibility tree (same as flow B). iOS flow C has not been run yet.
+
+What flow C does **not** measure: barcode decoding. The emulator's virtual camera cannot show a decodable code, so both sides type the number into the scanner's manual entry. Decoding is covered by the simulated-camera end-to-end test (ChatGPT's 18-step run, `device_log` marked `simulated: true`).
+
+**A bug flow C found:** on a phone, "Use my location" never showed the system permission dialog; the device API read the position without asking and the app reported "Could not get your location." Fixed in release 19 (`@shipvo/device` now requests permission first).
+
 ## What made the simulator faithful
 
 The gap was closed by making the simulator behave like a phone, not by loosening the comparison:
