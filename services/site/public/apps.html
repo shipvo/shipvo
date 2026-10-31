@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apps agents can use — Shipvo</title>
+<meta name="description" content="Shipvo apps their owners have listed publicly. Any signed-in agent can open them in the hosted simulator with open_app.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap"><a class="logo" href="/"><i></i>Shipvo</a><nav><a href="/#how">How it works</a><a href="/#proof">Proof</a><a href="/apps" class="keep" style="color:var(--paper)">Apps</a><a href="/docs/getting-started">Docs</a><a class="btn keep" href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></header>
+<main>
+<section style="border-top:0;padding-top:clamp(40px,6vw,72px)">
+  <div class="wrap">
+    <div class="eyebrow">Marketplace</div>
+    <h2 style="margin-top:12px">Apps an agent can open right now.</h2>
+    <p class="lede" style="margin-top:14px">Every app here was published with Shipvo and listed by its owner. Sign in once with <code>npx -y @shipvo/cli login</code>; then any MCP client can <code>open_app("&lt;id&gt;@latest")</code> and use it like a person would, in a simulated phone.</p>
+    <div class="market-head" style="margin-top:32px">
+      <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search apps, e.g. shop, douala, mobile money" aria-label="Search apps"></label>
+      <div class="cats" id="cats" role="group" aria-label="Category"></div>
+    </div>
+    <div class="grid" id="grid" aria-live="polite"></div>
+  </div>
+</section>
+</main>
+<footer><div class="wrap"><span class="logo" style="font-size:16px"><i></i>Shipvo</span><span>Want yours here? Set <code>listing.public</code> in shipvo.json and run <code>shipvo app create</code>.</span><nav><a href="/docs/agents">How listing works</a><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></footer>
+<script>
+(function(){
+  var grid=document.getElementById('grid'),cats=document.getElementById('cats'),q=document.getElementById('q');
+  var all=[],cat='',esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+  var labels={shop:'Shops',food:'Food',travel:'Travel',finance:'Finance',health:'Health',education:'Education',services:'Services',tools:'Tools',games:'Games',other:'Other'};
+  function render(){
+    var t=q.value.trim().toLowerCase();
+    var rows=all.filter(function(a){return(!cat||a.category===cat)&&(!t||(a.app_id+' '+a.name+' '+a.description+' '+a.category).toLowerCase().indexOf(t)>=0)});
+    if(!rows.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1"><b>'+(all.length?'No apps match.':'The shelf is being stocked.')+'</b>'+(all.length?'Try another word or category.':'Publish yours with <code>shipvo app create</code> and set <code>listing.public</code> to true.')+'</div>';return}
+    grid.innerHTML=rows.map(function(a){var d=a.published_at?new Date(a.published_at):null;return '<a class="card" href="/apps/'+esc(a.app_id)+'"><div class="top"><div class="ico" aria-hidden="true">'+esc(a.name.trim().slice(0,1).toUpperCase())+'</div><div><h3>'+esc(a.name)+'</h3><div class="by">'+esc(a.app_id)+' · by '+esc(a.owner)+'</div></div></div><p>'+esc(a.description||'No description yet.')+'</p><div class="meta"><span>release <b>r'+esc(a.latest_release)+'</b></span>'+(d?'<span>updated <b>'+d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+'</b></span>':'')+'<span><b>'+esc(labels[a.category]||a.category)+'</b></span></div></a>'}).join('');
+  }
+  function renderCats(list){cats.innerHTML=['<button type="button" aria-pressed="'+(cat===''?'true':'false')+'" data-c="">All</button>'].concat(list.map(function(c){return '<button type="button" aria-pressed="'+(cat===c?'true':'false')+'" data-c="'+c+'">'+(labels[c]||c)+'</button>'})).join('');}
+  cats.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;cat=b.dataset.c;renderCats(window.__cats||[]);render()});
+  q.addEventListener('input',render);
+  grid.innerHTML='<div class="empty" style="grid-column:1/-1">Loading…</div>';
+  fetch('/api/apps').then(function(r){return r.json()}).then(function(d){all=d.apps||[];var present={};all.forEach(function(a){present[a.category]=1});window.__cats=(d.categories||[]).filter(function(c){return present[c]});renderCats(window.__cats);render()}).catch(function(){grid.innerHTML='<div class="empty" style="grid-column:1/-1"><b>Could not load the directory.</b>Try again in a moment.</div>'});
+})();
+</script>
+</body>
+</html>

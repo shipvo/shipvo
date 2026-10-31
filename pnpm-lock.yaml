@@ -221,6 +221,18 @@ importers:
         specifier: ^4.40.0
         version: 4.156.0(@cloudflare/workers-types@4.20260702.1)
 
+  services/site:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20250620.0
+        version: 4.20260702.1
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.20.0
+        version: 4.156.0(@cloudflare/workers-types@4.20260702.1)
+
 packages:
 
   2g@1.0.1:
@@ -4879,7 +4891,7 @@ snapshots:
       '@expo/router-server': 58.0.19(@expo/metro-runtime@58.0.15)(expo-constants@58.0.14(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(typescript@6.0.3))(expo-font@58.0.11(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(expo-server@58.0.6)(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@expo/schema-utils': 58.0.2
       '@expo/spawn-async': 1.8.0
-      '@expo/ws-tunnel': 2.0.1(ws@8.18.0)
+      '@expo/ws-tunnel': 2.0.1(ws@8.21.0)
       '@expo/xcpretty': 4.4.7
       '@react-native/asset-utils': 0.88.1
       '@react-native/dev-middleware': 0.88.1
@@ -4918,7 +4930,7 @@ snapshots:
       terminal-link: 2.1.1
       toqr: 0.1.1
       wrap-ansi: 7.0.0
-      ws: 8.18.0
+      ws: 8.21.0
       zod: 3.25.76
     optionalDependencies:
       react-native: 0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)
@@ -4960,7 +4972,7 @@ snapshots:
       '@expo/router-server': 58.0.19(@expo/metro-runtime@58.0.15)(expo-constants@58.0.14(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)))(expo-font@58.0.11(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(expo-server@58.0.6)(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@expo/schema-utils': 58.0.2
       '@expo/spawn-async': 1.8.0
-      '@expo/ws-tunnel': 2.0.1(ws@8.18.0)
+      '@expo/ws-tunnel': 2.0.1(ws@8.21.0)
       '@expo/xcpretty': 4.4.7
       '@react-native/asset-utils': 0.88.1
       '@react-native/dev-middleware': 0.88.1
@@ -4999,7 +5011,7 @@ snapshots:
       terminal-link: 2.1.1
       toqr: 0.1.1
       wrap-ansi: 7.0.0
-      ws: 8.18.0
+      ws: 8.21.0
       zod: 3.25.76
     optionalDependencies:
       react-native: 0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)
@@ -5368,9 +5380,9 @@ snapshots:
 
   '@expo/sudo-prompt@9.3.2': {}
 
-  '@expo/ws-tunnel@2.0.1(ws@8.18.0)':
+  '@expo/ws-tunnel@2.0.1(ws@8.21.0)':
     dependencies:
-      ws: 8.18.0
+      ws: 8.21.0
 
   '@expo/xcpretty@4.4.7':
     dependencies:

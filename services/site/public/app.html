@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App — Shipvo</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap"><a class="logo" href="/"><i></i>Shipvo</a><nav><a href="/#how">How it works</a><a href="/#proof">Proof</a><a href="/apps" class="keep">Apps</a><a href="/docs/getting-started">Docs</a><a class="btn keep" href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></header>
+<main>
+<section style="border-top:0;padding-top:clamp(40px,6vw,72px)">
+  <div class="wrap" id="root"><p class="lede">Loading…</p></div>
+</section>
+</main>
+<footer><div class="wrap"><span class="logo" style="font-size:16px"><i></i>Shipvo</span><nav><a href="/apps">All apps</a><a href="/docs/agents">Agent docs</a><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></footer>
+<script>
+(function(){
+  var id=(location.pathname.match(/^\/apps\/([a-z0-9-]+)/)||[])[1],root=document.getElementById('root');
+  var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+  if(!id){location.replace('/apps');return}
+  fetch('/api/apps/'+id).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(a){
+    document.title=a.name+' — Shipvo';
+    var mcp=JSON.stringify({mcpServers:{shipvo:{url:'https://sim.shipvo.dev/mcp',headers:{Authorization:'Bearer <your key>'}}}},null,2);
+    root.innerHTML='<a href="/apps" class="eyebrow">← All apps</a>'+
+      '<div class="detail" style="margin-top:18px"><div><div class="top" style="display:flex;align-items:center;gap:16px"><div class="ico" style="width:64px;height:64px;border-radius:18px;display:grid;place-items:center;font-weight:800;font-size:28px;background:var(--lime);color:var(--lime-ink)" aria-hidden="true">'+esc(a.name.trim().slice(0,1).toUpperCase())+'</div><div><h2 style="font-size:clamp(30px,4vw,44px)">'+esc(a.name)+'</h2><div class="mono" style="color:var(--dim);font-size:13px;margin-top:4px">'+esc(a.app_id)+' · by '+esc(a.owner)+'</div></div></div>'+
+      '<p class="lede" style="margin-top:22px">'+esc(a.description||'No description yet.')+'</p>'+
+      '<dl class="kv"><dt>release</dt><dd>r'+esc(a.latest_release)+(a.published_at?' · published '+esc(new Date(a.published_at).toLocaleDateString()):'')+'</dd><dt>category</dt><dd>'+esc(a.category)+'</dd><dt>opened by agents</dt><dd>'+esc(a.opens)+' sessions</dd><dt>device</dt><dd>simulated: camera, location, biometrics, payments and notifications are labelled <code>simulated</code>; no money moves</dd></dl></div>'+
+      '<div><div class="eyebrow">Open it with your agent</div><p style="margin-top:10px;color:var(--mute)">Sign in once, then paste the config into Claude, Cursor or ChatGPT and ask it to open the app.</p>'+
+      '<div class="cmd"><span class="p">$</span><span>npx -y @shipvo/cli login</span><button type="button" data-copy="npx -y @shipvo/cli login">Copy</button></div>'+
+      '<pre class="term" style="position:static;margin-top:14px">'+esc(mcp)+'</pre>'+
+      '<div class="cmd"><span class="p">›</span><span>open_app("'+esc(a.app_id)+'@latest")</span><button type="button" data-copy=\'open_app("'+esc(a.app_id)+'@latest")\'>Copy</button></div>'+
+      '<p class="mono" style="margin-top:14px;font-size:12.5px;color:var(--dim)">ChatGPT connectors cannot send headers: use https://sim.shipvo.dev/mcp/&lt;your key&gt; instead. Opening an app spends your sandbox minutes.</p></div></div>';
+    root.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){navigator.clipboard&&navigator.clipboard.writeText(b.dataset.copy).then(function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1400)})})});
+  }).catch(function(){root.innerHTML='<div class="empty"><b>No public app called “'+esc(id)+'”.</b>It may be private, withdrawn or still under review. <a href="/apps" style="color:var(--lime)">See all apps</a>.</div>'});
+})();
+</script>
+</body>
+</html>

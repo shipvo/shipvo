@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shipvo — Build once. Publish for people and AI agents.</title>
+<meta name="description" content="Open-source React Native framework: signed over-the-air updates for the phones people carry, and a simulator AI agents can operate over MCP to test the same release end to end. Parity with real devices is measured and published.">
+<meta property="og:title" content="Shipvo — Build once. Publish for people and AI agents.">
+<meta property="og:description" content="Signed OTA updates for phones. A simulator agents can use. Parity with real devices, measured.">
+<meta property="og:url" content="https://shipvo.dev"><meta property="og:type" content="website"><meta property="og:image" content="https://shipvo.dev/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="logo" href="/"><i></i>Shipvo</a>
+  <nav>
+    <a href="#how">How it works</a><a href="#proof">Proof</a><a href="/apps" class="keep">Apps</a><a href="/docs/getting-started">Docs</a>
+    <a class="btn keep" href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a>
+  </nav>
+</div></header>
+
+<main>
+<section class="hero" style="border-top:0">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow reveal">Open-source React Native framework</div>
+      <h1 class="reveal">Build once.<br>Publish for people <em>and AI agents.</em></h1>
+      <p class="lede reveal">One codebase. People install it from the stores and get signed over-the-air updates in seconds. AI agents open the very same release in a simulator they can see and operate, so you test the whole app end to end with the assistant you already use, no emulator, no device lab.</p>
+      <div class="cta reveal">
+        <a class="btn primary" href="/docs/getting-started">Build your first app <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn" href="/apps">Browse apps agents can use</a>
+      </div>
+      <div class="cmd reveal"><span class="p">$</span><span>npx -y @shipvo/cli init myshop</span><button type="button" data-copy="npx -y @shipvo/cli init myshop">Copy</button></div>
+      <div class="facts reveal"><span><b>Android</b> OTA today</span><span><b>iOS</b> simulator parity 100%</span><span><b>MIT</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
+    </div>
+    <div class="phone-stage reveal">
+      <div class="bubble"><small>YOU ASK YOUR ASSISTANT</small><b>Buy a Surface Popper with mobile money. Tell me if anything breaks.</b></div>
+      <div class="phone" aria-label="Simulated phone showing the accessibility tree an agent reads"><div class="tree" id="tree"></div></div>
+      <div class="result" id="result"><small>BACKEND CONFIRMS</small><code>Order TT-1001 · 4 200 FCFA<br>mobile money · receipt SIMULATED-…</code></div>
+    </div>
+  </div>
+</section>
+
+<section id="pillars">
+  <div class="wrap">
+    <div class="sec-head"><h2>Three things, each measured.</h2><p class="lede">Shipvo does not ask you to trust it. Every claim below links to a number taken on real hardware and published in the repo.</p></div>
+    <div class="pillars">
+      <article class="pillar"><div class="n">01 · PUBLISH</div><h3>Push to main. Every phone has it.</h3><p>Ed25519-signed release pointers, SHA-256-verified bundles, bsdiff patches from each installed version, staged cohorts (1 % → 10 % → everyone) and a one-command rollback. The shell pins your public key; nothing delivered over the air can change it.</p><div class="k">Typical update <b>tens of KB</b> · applied on a 2 GB Redmi 9A <b>without a restart</b></div></article>
+      <article class="pillar"><div class="n">02 · SIMULATE</div><h3>Agents use your app like a person does.</h3><p>Over MCP an agent gets each screen as an accessibility tree with refs, then taps, types and scrolls. Camera, location, fingerprint, payments and notifications are simulated and clearly labelled so. Local with one command, or hosted with a key.</p><div class="k">Works in <b>Claude, ChatGPT, Cursor, Claude Code</b> · ChatGPT placed a full order in <b>18 steps, 76 s</b></div></article>
+      <article class="pillar"><div class="n">03 · VERIFY</div><h3>Simulator vs real device, scored nightly.</h3><p>The same scripted flows run in the simulator, on an Android emulator and on an iPhone simulator. We compare every actionable element and every text, and publish the gaps, not just the score.</p><div class="k">Actionable parity <b>100 %</b> on 3 flows, both platforms · text <b>98.6 % / 96.2 %</b></div></article>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head"><h2>From nothing to an agent-tested, OTA-updated app.</h2><p class="lede">About twenty minutes. You need Node 22. No Android Studio, no Xcode, no phone, until you want one.</p></div>
+    <div class="steps">
+      <ol>
+        <li><div><b>Create the app</b><p><code>shipvo init</code> writes a complete Expo app: the OTA runtime wired in, the device API, a simulator build, a publish workflow and your signing key.</p></div></li>
+        <li><div><b>Let an agent use it</b><p><code>npm run sim</code> serves it. Add one line of MCP config and ask Claude or ChatGPT to open it, scan a barcode, pay, and tell you what broke.</p></div></li>
+        <li><div><b>Register and publish</b><p><code>shipvo login</code>, <code>shipvo app create</code>, then push. The workflow signs the release and every phone and simulator gets it. Open <code>myshop@latest</code> to see exactly what phones run.</p></div></li>
+        <li><div><b>List it, if you want</b><p>Flip <code>listing.public</code> in <code>shipvo.json</code> and your app appears on <a href="/apps" style="color:var(--lime)">shipvo.dev/apps</a>, where any signed-in agent can open it.</p></div></li>
+      </ol>
+      <pre class="term"><span class="g">$</span> <span class="c">npx -y @shipvo/cli init myshop --name "My Shop"</span>
+<span class="d">✓ shipvo.json · app.json · App.tsx · publish workflow · .shipvo/seed.txt</span>
+<span class="g">$</span> <span class="c">npm run sim</span>
+<span class="d">simulator on http://localhost:4545  →  open_app("myshop")</span>
+
+<span class="d">// Claude Desktop / Cursor / ChatGPT</span>
+{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
+
+<span class="g">$</span> <span class="c">npx -y @shipvo/cli login</span>      <span class="d">GitHub sign-in</span>
+<span class="g">$</span> <span class="c">npx -y @shipvo/cli app create</span> <span class="d">publish token, scoped to this app</span>
+<span class="g">$</span> <span class="c">git push</span>
+<span class="d">release 2 · 31.4 KB patch · bands b0,b1,b2 · web artifact /w/myshop/r2/</span>
+<span class="g">›</span> <span class="c">open_app("myshop@latest")</span>   <span class="d">the release phones are running</span></pre>
+    </div>
+  </div>
+</section>
+
+<section id="proof">
+  <div class="wrap">
+    <div class="sec-head"><h2>Numbers, not adjectives.</h2><p class="lede">Taken on a 2 GB Redmi 9A, an Android emulator and an iPhone simulator in CI. Method and gaps in <a href="https://github.com/shipvo/shipvo/blob/main/docs/parity-results.md" style="color:var(--lime)">parity-results.md</a>.</p></div>
+    <div class="proof">
+      <div class="stat"><div class="v">100<small>%</small></div><div class="l">Actionable parity, simulator vs device, Android and iOS, 3 flows, 21 screens</div><div class="s">parity-results.md</div></div>
+      <div class="stat"><div class="v">18 <small>steps</small></div><div class="l">For ChatGPT to scan, locate, pay by mobile money with a fingerprint and reopen the notification. 76 s. Order confirmed by the backend.</div><div class="s">agents.md</div></div>
+      <div class="stat"><div class="v">&lt;1 <small>s</small></div><div class="l">Cold start of the native shell on a 2 GB Android after an over-the-air update applied without a restart</div><div class="s">spike-results.md</div></div>
+      <div class="stat"><div class="v">3</div><div class="l">Known gaps listed, not hidden: two unlabeled Android dialog buttons and a payment-sheet cancel the Android tree does not expose</div><div class="s">parity-results.md</div></div>
+    </div>
+    <div class="honest">
+      <div><b>What the simulator is not</b>It is not a real device. Payments, biometrics and the camera are simulated and say so (<code>SIMULATED-</code> receipts, <code>simulated: true</code> in every log line). Use it for most of your testing, and a phone for the last mile.</div>
+      <div><b>What agents do today</b>They test and demonstrate your app. They do not yet buy things for real people through it: that needs OAuth consent, spend limits and a checkout contract, which is on the roadmap, not in the product.</div>
+    </div>
+    <div class="agents"><span class="chip"><b>Claude</b> Desktop · Code</span><span class="chip"><b>ChatGPT</b> custom connector</span><span class="chip"><b>Cursor</b></span><span class="chip"><b>PiPilot</b></span><span class="chip">any <b>MCP</b> client</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap beta">
+    <div><div class="eyebrow">Private beta</div><h2 style="margin-top:12px">Five developers. One honest hour.</h2><p class="lede" style="margin-top:14px">Build and publish an app from the guide alone, then tell us where it broke. Free hosting during the beta and a say in what gets built next.</p></div>
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:220px"><a class="btn primary" href="https://x.com/HansCadx" rel="noopener">DM on X</a><a class="btn" href="mailto:hans@pipilot.dev">hans@pipilot.dev</a></div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">
+  <span class="logo" style="font-size:16px"><i></i>Shipvo</span><span>MIT · Douala → everywhere</span>
+  <nav><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a><a href="/docs/getting-started">Docs</a><a href="/docs/agents">Agents</a><a href="/docs/self-hosting">Self-host</a><a href="/apps">Apps</a><a href="https://www.npmjs.com/org/shipvo" rel="noopener">npm</a></nav>
+</div></footer>
+
+<script>
+(function(){
+  var lines=[
+    '- heading "Checkout" [level=1] [ref=e6]',
+    '- button "Scan a product barcode" [ref=e8]',
+    '<span class="dlg">Allow Tide &amp; Tackle to take pictures and record video?<br>- button "While using the app" [ref=e12]</span>',
+    '- heading "Surface Popper 9 cm" [ref=e14]',
+    '- generic [ref=e15]: 4 200 FCFA',
+    '- button "Add 1 to cart" [ref=e16]',
+    '- button "Use my location" [ref=e21]',
+    '- generic [ref=e23]: You\'re 0.7 km from the shop',
+    '- radio "Mobile money" [ref=e31]',
+    '- textbox "Mobile money number" [ref=e33]',
+    '<span class="hi">- button "Place order" [ref=e42]</span>',
+    '<span class="dlg">Confirm with fingerprint<br>- button "Use fingerprint" [ref=e57]</span>',
+    '- textbox "Mobile money PIN" [ref=e61]',
+    '- button "Confirm payment" [ref=e63]',
+    '- heading "Order TT-1001 placed" [ref=e70]'
+  ];
+  var tree=document.getElementById('tree'),res=document.getElementById('result');
+  if(!tree)return;
+  function run(){
+    tree.innerHTML='';res.classList.remove('on');var i=0;
+    (function step(){
+      if(i>=lines.length){res.classList.add('on');setTimeout(run,6000);return;}
+      var el=document.createElement('span');el.className='l';el.innerHTML=lines[i++];tree.appendChild(el);
+      requestAnimationFrame(function(){el.classList.add('on')});
+      while(tree.scrollHeight>tree.clientHeight&&tree.children.length>1)tree.removeChild(tree.firstChild);
+      setTimeout(step,i===11||i===12?1100:520);
+    })();
+  }
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){tree.innerHTML=lines.map(function(l){return '<span class="l on">'+l+'</span>'}).slice(-9).join('');res.classList.add('on');}else run();
+  document.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){navigator.clipboard&&navigator.clipboard.writeText(b.dataset.copy).then(function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1400)})})});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "shipvo-site",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-06-01",
+  "assets": { "directory": "./public", "binding": "ASSETS", "html_handling": "auto-trailing-slash" },
+  "routes": [
+    { "pattern": "shipvo.dev", "custom_domain": true },
+    { "pattern": "www.shipvo.dev", "custom_domain": true }
+  ],
+  "vars": { "API": "https://api.shipvo.dev" },
+  "observability": { "enabled": true }
+}
