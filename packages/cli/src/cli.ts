@@ -7,6 +7,7 @@ import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
 import { sim } from "./sim.js";
 import { keys, login, mcp } from "./login.js";
+import { signingKey } from "./signing.js";
 import { appCmd } from "./app.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -19,6 +20,8 @@ const help = `shipvo <command>
   app create | list | delete  Register this app with the hosted control plane (publish token), list yours, or remove one
   login                       Sign in with GitHub and get a key for the hosted simulator
   keys                        Show the stored key's status and quota
+  keys export [--out f]       Print (or save) this app's release signing seed, to back it up or move machines
+  keys import [seed|--file f] Restore the signing seed on a new machine (checked against shipvo.json)
   mcp                         Print the MCP config agents need (hosted and local)
 
   keygen [--out seed.txt]     Create an Ed25519 release signing key; prints the public key
@@ -36,7 +39,7 @@ switch (cmd) {
   case "rollback": await rollback(rest); break;
   case "login": await login(rest); break;
   case "app": await appCmd(rest); break;
-  case "keys": await keys(); break;
+  case "keys": if (rest[0] === "export" || rest[0] === "import") await signingKey(rest); else await keys(); break;
   case "mcp": mcp(); break;
   case "keygen": {
     const s = b64(randomBytes(32)); const out = rest[rest.indexOf("--out") + 1];

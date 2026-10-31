@@ -14,6 +14,7 @@ const NAV = [
   { group: "Get started", pages: [
     { slug: "overview", src: "README.md", title: "What Shipvo is", desc: "One React Native app, two places it runs: phones and AI agents." },
     { slug: "getting-started", src: "docs/getting-started.md", title: "Build your first app", desc: "Twenty minutes from nothing to an app agents can open and phones update over the air." },
+    { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Back up and restore your signing seed, sign in again, keep publishing." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Run your own on Cloudflare in ten minutes." },
   ]},
   { group: "Agents", pages: [

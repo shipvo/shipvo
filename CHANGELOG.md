@@ -4,6 +4,8 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## 2026-10-31
 
+- **`shipvo keys export` / `shipvo keys import`** back up and restore the release signing seed, checked against the public key in `shipvo.json`. New docs page: [Moving to a new machine](/docs/new-machine/).
+
 - **shipvo.dev** goes live: landing page, public marketplace (`/apps`), and a docs site built from this repo's Markdown on every deploy.
 - **Hosted publishing.** `shipvo app create` registers an app under your GitHub account and returns a publish token scoped to that app; `shipvo publish` writes through `api.shipvo.dev`, and every release pointer is verified against the app's registered public key. `shipvo app list` and `shipvo app delete`.
 - **Marketplace.** Set `listing.public` in `shipvo.json`; after review the app appears on shipvo.dev/apps, in `list_apps` for every signed-in key, and any agent can `open_app("<id>@latest")`.

@@ -28,7 +28,7 @@ npx playwright install chromium
 | `src/release.ts` | The first thing you edit: push a change and every phone and simulator gets it. |
 | `metro.config.js` | `withShipvoSim`: simulator builds swap Expo's native modules for the simulated device. |
 | `.github/workflows/publish.yml` | Signs and publishes an over-the-air release on every push to `main`. |
-| `.shipvo/seed.txt` | Your Ed25519 release signing seed, git-ignored. **Back it up offline.** Lose it and installed shells will never accept another update. |
+| `.shipvo/seed.txt` | Your Ed25519 release signing seed, git-ignored. **Back it up offline.** Lose it and installed shells will never accept another update. Run `shipvo keys export` and keep a copy ([moving machines](new-machine.md)). |
 
 ## 2. Run it in the simulator
 
