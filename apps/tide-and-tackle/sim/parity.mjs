@@ -55,7 +55,11 @@ const FLOWS = [
     { tap: /^Scan a product barcode$/ },
     { waitFor: /^While using the app$/, timeoutMs: 12000, name: "Camera permission", optional: PRE },   // the system dialog can take a few seconds
     { tap: /^While using the app$/, optional: PRE, name: "Scanner" },
-    { waitFor: /^Add 1 to cart$/, timeoutMs: 45000, name: "Scanned product" },
+    // The emulator's virtual camera scene cannot be given a decodable barcode, so both sides use the scanner's manual entry
+    // (camera permission, live preview and the system dialog are still compared; decoding is covered by the simulated camera E2E).
+    { type: /^Barcode number$/, text: "6181234567890" },
+    { tap: /^Find product by barcode$/ },
+    { waitFor: /^Add 1 to cart$/, timeoutMs: 20000, name: "Scanned product" },
     { tap: /^Add 1 to cart$/ },
     { tap: /^Open cart/ },
     { tap: /^Choose delivery and pay$/ },
@@ -72,7 +76,7 @@ const FLOWS = [
     { waitFor: /^Share order$/, timeoutMs: 15000, name: "Order placed C" },
   ] },
 ];
-const SIM_DEVICE = { platform: "android", api: 30, biometrics: { enrolled: false }, camera: { barcode: { type: "ean13", data: "6181234567890" }, delayMs: 1500 },
+const SIM_DEVICE = { platform: "android", api: 30, biometrics: { enrolled: false }, camera: { barcode: { type: "ean13", data: "6181234567890" }, delayMs: 3600000 },
   ...(PRE ? { permissions: { camera: "granted", location: "granted", notifications: "granted" } } : {}) };
 
 /* ---------- simulator driver ---------- */
