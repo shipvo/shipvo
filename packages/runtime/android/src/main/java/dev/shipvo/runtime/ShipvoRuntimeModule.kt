@@ -1,4 +1,4 @@
-package dev.purenative.runtime
+package dev.shipvo.runtime
 
 import android.content.Context
 import android.os.Handler
@@ -14,11 +14,11 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-class PureNativeRuntimeModule : Module() {
+class ShipvoRuntimeModule : Module() {
   private val ctx: Context get() = appContext.reactContext?.applicationContext ?: throw Exceptions.ReactContextLost()
 
   override fun definition() = ModuleDefinition {
-    Name("PureNativeRuntime")
+    Name("ShipvoRuntime")
 
     Function("getState") {
       val s = Store(ctx)
@@ -43,7 +43,7 @@ class PureNativeRuntimeModule : Module() {
       val coldStart = now - Process.getStartElapsedRealtime()
       val sinceLoad = if (Store.bundleSelectedAt > 0) now - Store.bundleSelectedAt else -1
       var promoted = false
-      synchronized(PureNativeHostHandler.LOCK) {
+      synchronized(ShipvoHostHandler.LOCK) {
         if (s.pendingRelease != 0 && Store.runningRelease == s.pendingRelease) {
           s.previousPath?.let { old -> if (old != s.currentPath) File(old).delete() }
           s.previousRelease = s.currentRelease; s.previousPath = s.currentPath
@@ -62,12 +62,12 @@ class PureNativeRuntimeModule : Module() {
 
     Function("rollback") {
       val s = Store(ctx)
-      synchronized(PureNativeHostHandler.LOCK) {
+      synchronized(ShipvoHostHandler.LOCK) {
         s.pendingPath?.let { File(it).delete() }
         s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
         s.addEvent("rolled_back:${s.currentRelease}")
         s.block(s.currentRelease)
-        PureNativeHostHandler.revertToPrevious(s)
+        ShipvoHostHandler.revertToPrevious(s)
       }
       reloadHost()
     }
@@ -77,7 +77,7 @@ class PureNativeRuntimeModule : Module() {
 
   private fun reloadHost() {
     Handler(Looper.getMainLooper()).post {
-      (ctx as? ReactApplication)?.reactHost?.reload("purenative-update")
+      (ctx as? ReactApplication)?.reactHost?.reload("shipvo-update")
     }
   }
 
@@ -157,7 +157,7 @@ class PureNativeRuntimeModule : Module() {
 
     val dest = File(s.dir, "r$release.hbc")
     require(tmp.renameTo(dest)) { "could not stage bundle" }
-    synchronized(PureNativeHostHandler.LOCK) {
+    synchronized(ShipvoHostHandler.LOCK) {
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
       if (s.binaryVersion == null) s.binaryVersion = s.installedBinaryVersion

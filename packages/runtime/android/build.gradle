@@ -3,11 +3,11 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 
-group = 'dev.purenative'
+group = "dev.shipvo"
 version = '0.0.1'
 
 android {
-  namespace "dev.purenative.runtime"
+  namespace "dev.shipvo.runtime"
   defaultConfig {
     versionCode 1
     versionName "0.0.1"

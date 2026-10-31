@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/cli",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
   "bin": {
@@ -23,7 +23,7 @@
     "vitest": "^2.1.4",
     "@types/node": "^22.8.0"
   },
-  "description": "Shipvo CLI: Ed25519 signing, hashing and publishing of over-the-air React Native releases.",
+  "description": "Shipvo CLI: create an app (init), run it in the simulator (sim), sign and publish over-the-air releases (publish, rollback), manage signing keys.",
   "keywords": [
     "react-native",
     "expo",

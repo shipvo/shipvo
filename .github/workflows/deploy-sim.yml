@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["services/sim/**", "packages/mcp/**", "apps/tide-and-tackle/sim/server.mjs", ".github/workflows/deploy-sim.yml"]
+    paths: ["services/sim/**", "packages/mcp/**", "packages/sim/server.mjs", ".github/workflows/deploy-sim.yml"]
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -27,7 +27,7 @@ jobs:
       - name: Stage container build context
         run: |
           mkdir -p services/sim/build/sim services/sim/build/mcp
-          cp apps/tide-and-tackle/sim/server.mjs services/sim/build/sim/
+          cp packages/sim/server.mjs services/sim/build/sim/
           cp -r packages/mcp/dist services/sim/build/mcp/dist
       - name: Build the E2B template (one sandbox = one phone)
         if: ${{ env.E2B_API_KEY != '' }}

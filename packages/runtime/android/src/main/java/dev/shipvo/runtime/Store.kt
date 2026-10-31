@@ -1,4 +1,4 @@
-package dev.purenative.runtime
+package dev.shipvo.runtime
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -9,8 +9,8 @@ import kotlin.random.Random
 
 /** Persistent runtime state. All bundle decisions go through here so the host handler and module agree. */
 internal class Store(private val ctx: Context) {
-  private val p: SharedPreferences = ctx.getSharedPreferences("purenative.runtime", Context.MODE_PRIVATE)
-  val dir: File get() = File(ctx.filesDir, "purenative").apply { mkdirs() }
+  private val p: SharedPreferences = ctx.getSharedPreferences("shipvo.runtime", Context.MODE_PRIVATE)
+  val dir: File get() = File(ctx.filesDir, "shipvo").apply { mkdirs() }
 
   val cohort: Int
     get() {
@@ -79,10 +79,10 @@ internal class Store(private val ctx: Context) {
     val ai = ctx.packageManager.getApplicationInfo(ctx.packageName, PackageManager.GET_META_DATA)
     ai.metaData?.getString(key)
   } catch (_: Exception) { null }
-  val baseUrl: String get() = (meta("dev.purenative.BASE_URL") ?: "").trimEnd('/')
-  val publicKey: String get() = meta("dev.purenative.PUBLIC_KEY") ?: ""
-  val appId: String get() = meta("dev.purenative.APP_ID") ?: ""
-  val shellMajor: Int get() = (meta("dev.purenative.SHELL_MAJOR") ?: "1").toIntOrNull() ?: 1
+  val baseUrl: String get() = (meta("dev.shipvo.BASE_URL") ?: "").trimEnd('/')
+  val publicKey: String get() = meta("dev.shipvo.PUBLIC_KEY") ?: ""
+  val appId: String get() = meta("dev.shipvo.APP_ID") ?: ""
+  val shellMajor: Int get() = (meta("dev.shipvo.SHELL_MAJOR") ?: "1").toIntOrNull() ?: 1
 
   companion object {
     /** Which release the JS that is running right now came from (set at bundle-selection time). */

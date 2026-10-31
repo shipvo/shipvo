@@ -15,7 +15,7 @@ async function wd(method, path, body) {
 
 export async function startSession(caps) {
   const always = process.env.APPIUM_LOCAL
-    ? { platformName: "iOS", "appium:automationName": "XCUITest", "appium:udid": caps.udid, "appium:bundleId": "dev.purenative.tide", "appium:noReset": true, "appium:newCommandTimeout": 300, "appium:wdaLaunchTimeout": 240000 }
+    ? { platformName: "iOS", "appium:automationName": "XCUITest", "appium:udid": caps.udid, "appium:bundleId": "dev.shipvo.tide", "appium:noReset": true, "appium:newCommandTimeout": 300, "appium:wdaLaunchTimeout": 240000 }
     : { "lt:options": caps };
   const v = await wd("POST", "/session", { capabilities: { alwaysMatch: always } });
   return { id: v.sessionId, platform: String(caps.platformName).toLowerCase() };

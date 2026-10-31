@@ -8,7 +8,7 @@ const t0 = Date.now();
 export const Runtime = {
   getState(): RuntimeState {
     return { cohort: 0, band: "b0", runningRelease: 0, currentRelease: 0, pendingRelease: 0, previousRelease: 0,
-      shellVersion: "simulator", baseUrl: sim.baseUrl ?? "", appId: sim.appId ?? "tide", shellMajor: 1 };
+      shellVersion: "simulator", baseUrl: sim.baseUrl ?? "", appId: sim.appId ?? "", shellMajor: 1 };
   },
   async checkForUpdate(_apply: boolean): Promise<CheckResult> { return { status: "none" }; },
   markHealthy(): HealthyResult { return { release: 0, coldStartMs: Date.now() - t0, sinceLoadMs: 0, promoted: false, kind: "cold" }; },

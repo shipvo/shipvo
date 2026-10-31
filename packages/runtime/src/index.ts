@@ -27,13 +27,16 @@ type Native = {
   reload(): void;
 };
 
-// The runtime is Android-only for now. On iOS (and the simulator) the app runs on its embedded bundle and live content.
+// The OTA runtime is Android-only for now. On iOS the app runs on its embedded bundle and live content; it still
+// knows its control plane and app id from the config the plugin writes into expo.extra.shipvo.
 const t0 = Date.now();
+let extra: any = {};
+try { extra = require("expo-constants").default?.expoConfig?.extra?.shipvo ?? {}; } catch {}
 const fallback: Native = {
   getState: () => ({ cohort: 0, band: "b0", runningRelease: 0, currentRelease: 0, pendingRelease: 0, previousRelease: 0,
-    shellVersion: "no-runtime", baseUrl: "https://purenative-control.purenative.workers.dev", appId: "tide", shellMajor: 1 }),
+    shellVersion: "no-runtime", baseUrl: extra.baseUrl ?? "", appId: extra.appId ?? "", shellMajor: extra.shellMajor ?? 1 }),
   checkForUpdate: async () => ({ status: "none" }),
   markHealthy: () => ({ release: 0, coldStartMs: Date.now() - t0, sinceLoadMs: 0, promoted: false, kind: "cold" }),
   consumeEvents: () => [], rollback: () => {}, reload: () => {},
 };
-export const Runtime: Native = requireOptionalNativeModule<Native>("PureNativeRuntime") ?? fallback;
+export const Runtime: Native = requireOptionalNativeModule<Native>("ShipvoRuntime") ?? fallback;

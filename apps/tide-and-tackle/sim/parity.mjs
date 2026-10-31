@@ -123,8 +123,8 @@ const DIALOG = /^(While using the app|Only this time|Deny|Allow|Don.t allow|Allo
 const native = {
   async start() {},
   async restart() {
-    execFileSync("adb", ["shell", "am", "force-stop", "dev.purenative.tide"]);
-    execFileSync("adb", ["shell", "monkey", "-p", "dev.purenative.tide", "-c", "android.intent.category.LAUNCHER", "1"]);
+    execFileSync("adb", ["shell", "am", "force-stop", "dev.shipvo.tide"]);
+    execFileSync("adb", ["shell", "monkey", "-p", "dev.shipvo.tide", "-c", "android.intent.category.LAUNCHER", "1"]);
     sleep(8000);
   },
   // System dialogs are modal: read them in place, never scroll over them (a swipe dismisses and denies).
@@ -185,8 +185,8 @@ for (const [fi, flow] of FLOWS.entries()) {
           const n = (report.flow.debug?.length ?? 0) + 1; const shot = join(OUT, `debug-${n}.png`);
           try { writeFileSync(shot, execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20 })); } catch {}
           let focus = ""; try { focus = execFileSync("adb", ["shell", "dumpsys", "window"]).toString().split("\n").filter((l) => /mCurrentFocus|mFocusedApp/.test(l)).join(" | ").trim(); } catch {}
-          let logcat = ""; try { const pid = execFileSync("adb", ["shell", "pidof", "dev.purenative.tide"]).toString().trim(); logcat = execFileSync("adb", ["logcat", "-d", `--pid=${pid}`, "-t", "300"], { maxBuffer: 64 << 20 }).toString().split("\n").slice(-120).join("\n"); } catch {}
-          let perms = ""; try { perms = execFileSync("adb", ["shell", "dumpsys", "package", "dev.purenative.tide"]).toString().split("\n").filter((l) => /CAMERA|ACCESS_FINE_LOCATION/.test(l) && /granted/.test(l)).map((l) => l.trim()).join(" | "); } catch {}
+          let logcat = ""; try { const pid = execFileSync("adb", ["shell", "pidof", "dev.shipvo.tide"]).toString().trim(); logcat = execFileSync("adb", ["logcat", "-d", `--pid=${pid}`, "-t", "300"], { maxBuffer: 64 << 20 }).toString().split("\n").slice(-120).join("\n"); } catch {}
+          let perms = ""; try { perms = execFileSync("adb", ["shell", "dumpsys", "package", "dev.shipvo.tide"]).toString().split("\n").filter((l) => /CAMERA|ACCESS_FINE_LOCATION/.test(l) && /granted/.test(l)).map((l) => l.trim()).join(" | "); } catch {}
           (report.flow.debug ??= []).push({ at: msg.slice(0, 80), screenshot: shot, focus, perms, logcat, sim: (await sim.elements()).map((x) => `${x.role}:${x.label}`).slice(0, 40), device: nativeDump().map((x) => `${x.role}:${x.label}`).slice(0, 40) });
         } catch {} }
     }

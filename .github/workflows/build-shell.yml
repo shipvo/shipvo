@@ -7,7 +7,7 @@ on:
         default: "1.0.0"
   push:
     branches: [main]
-    paths: ["apps/tide-and-tackle/modules/**", "apps/tide-and-tackle/app.json", "apps/tide-and-tackle/plugins/**", "apps/tide-and-tackle/package.json", ".github/workflows/build-shell.yml"]
+    paths: ["packages/runtime/**", "apps/tide-and-tackle/app.json", "apps/tide-and-tackle/package.json", ".github/workflows/build-shell.yml"]
 permissions:
   contents: write
 jobs:

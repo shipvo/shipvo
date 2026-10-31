@@ -16,7 +16,10 @@
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-web": "^0.21.4",
-    "@shipvo/device": "workspace:*"
+    "@shipvo/device": "workspace:*",
+    "@shipvo/runtime": "workspace:*",
+    "expo-constants": "~58.0.0",
+    "@shipvo/sim": "workspace:*"
   },
   "devDependencies": {
     "@shipvo/cli": "workspace:*",
@@ -28,8 +31,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "publish:ota": "node scripts/publish-ota.mjs",
-    "rollback:ota": "node scripts/rollback-ota.mjs"
+    "publish:ota": "shipvo publish",
+    "rollback:ota": "shipvo rollback",
+    "sim": "shipvo sim"
   },
   "private": true
 }

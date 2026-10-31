@@ -1,0 +1,38 @@
+{
+  "name": "@shipvo/sim",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The Shipvo simulator: runs a Shipvo app's web build in a phone-sized headless browser and exposes it to agents (accessibility tree, tap/type/scroll, simulated device, mock backend). Used by @shipvo/mcp and `shipvo sim`.",
+  "bin": {
+    "shipvo-sim": "server.mjs"
+  },
+  "exports": {
+    "./server.mjs": "./server.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "server.mjs",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "playwright": ">=1.50"
+  },
+  "keywords": [
+    "shipvo",
+    "simulator",
+    "react-native-web",
+    "playwright",
+    "ai-agents"
+  ],
+  "homepage": "https://github.com/shipvo/shipvo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipvo/shipvo.git",
+    "directory": "packages/sim"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

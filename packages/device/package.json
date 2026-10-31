@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/device",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
   "description": "One device API for Shipvo apps: camera, location, biometrics, payments, notifications, share, network. Real native modules on phones; a simulated device with on-screen system sheets in the Shipvo simulator, so AI agents can use and test native features with no phone.",
@@ -17,7 +17,8 @@
     "expo-local-authentication": "*",
     "expo-notifications": "*",
     "expo-clipboard": "*",
-    "react-native": "*"
+    "react-native": "*",
+    "react": "*"
   },
   "peerDependenciesMeta": {
     "expo-camera": {
@@ -65,6 +66,12 @@
       "default": "./src/index.ts"
     },
     "./metro": "./metro.cjs",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./scan": {
+      "types": "./src/scan.tsx",
+      "react-native": "./src/scan.tsx",
+      "browser": "./src/scan.web.tsx",
+      "default": "./src/scan.tsx"
+    }
   }
 }

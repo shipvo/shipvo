@@ -1,4 +1,4 @@
-package dev.purenative.runtime
+package dev.shipvo.runtime
 
 import android.util.Base64
 import net.i2p.crypto.eddsa.EdDSAEngine

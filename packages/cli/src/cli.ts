@@ -2,17 +2,21 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { b64, keyFromSeed, sha256Hex, signBytes, signDoc, verifyDoc } from "./index.js";
+import { seed } from "./config.js";
+import { init } from "./init.js";
+import { publish, rollback } from "./publish.js";
+import { sim } from "./sim.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
-const seed = () => {
-  const s = process.env.PURENATIVE_SIGNING_SEED || (process.env.PURENATIVE_SIGNING_SEED_FILE && readFileSync(process.env.PURENATIVE_SIGNING_SEED_FILE, "utf8").trim());
-  if (!s) { console.error("Set PURENATIVE_SIGNING_SEED or PURENATIVE_SIGNING_SEED_FILE"); process.exit(2); }
-  return s;
-};
 const help = `shipvo <command>
 
+  init <dir>                  New app wired to Shipvo: OTA runtime, device API, simulator, publish workflow
+  sim [--port 4545]           Build the app for the simulator and serve it (agents: open_app("<appId>"))
+  publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release (+ the agent-facing web artifact)
+  rollback --to <release>     Republish an earlier release's code as a new release
+
   keygen [--out seed.txt]     Create an Ed25519 release signing key; prints the public key
-  pubkey                      Print the public key for the seed in PURENATIVE_SIGNING_SEED
+  pubkey                      Print the public key for the seed in SHIPVO_SIGNING_SEED
   hash <file>                 SHA-256 and size of a bundle
   sign-file <file>            Ed25519 signature (base64) over a file's bytes
   sign-json <file.json>       Sign a JSON document (canonical form); writes signature into it
@@ -20,6 +24,10 @@ const help = `shipvo <command>
 `;
 
 switch (cmd) {
+  case "init": await init(rest); break;
+  case "sim": await sim(rest); break;
+  case "publish": await publish(rest); break;
+  case "rollback": await rollback(rest); break;
   case "keygen": {
     const s = b64(randomBytes(32)); const out = rest[rest.indexOf("--out") + 1];
     if (rest.includes("--out") && out) { writeFileSync(out, s, { mode: 0o600 }); console.error(`Seed written to ${out}. Back it up offline; never commit it.`); }

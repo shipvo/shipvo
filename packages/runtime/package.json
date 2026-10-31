@@ -1,0 +1,55 @@
+{
+  "name": "@shipvo/runtime",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "The Shipvo native runtime: a tiny Expo module that verifies (Ed25519 + SHA-256), downloads (bsdiff patches), stages and applies signed over-the-air releases, with crash-loop rollback. Plus the config plugin that pins the trust root in the native shell.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "react-native": "./src/index.ts",
+      "browser": "./src/index.web.ts",
+      "default": "./src/index.ts"
+    },
+    "./app.plugin.js": "./app.plugin.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "android",
+    "app.plugin.js",
+    "expo-module.config.json",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "expo": "*",
+    "expo-modules-core": "*",
+    "expo-constants": "*",
+    "react-native": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo-constants": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "shipvo",
+    "expo",
+    "react-native",
+    "ota",
+    "over-the-air",
+    "updates",
+    "ed25519"
+  ],
+  "homepage": "https://github.com/shipvo/shipvo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipvo/shipvo.git",
+    "directory": "packages/runtime"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

@@ -19,7 +19,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build && pnpm --filter @shipvo/mcp build
       - run: pnpm -r test
-      - name: Publish @shipvo/schema, @shipvo/cli, @shipvo/mcp
+      - name: Publish @shipvo packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
@@ -33,3 +33,5 @@ jobs:
           pub @shipvo/cli
           pub @shipvo/mcp
           pub @shipvo/device
+          pub @shipvo/runtime
+          pub @shipvo/sim

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { Runtime, type RuntimeState } from "./modules/purenative-runtime";
+import { Runtime, type RuntimeState } from "@shipvo/runtime";
 import { RELEASE } from "./src/release";
 import { useContent } from "./src/content/useContent";
 import { ShopApp } from "./src/ui/Shop";

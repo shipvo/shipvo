@@ -1,4 +1,4 @@
-package dev.purenative.runtime
+package dev.shipvo.runtime
 
 import android.content.Context
 import expo.modules.core.interfaces.ReactNativeHostHandler
@@ -9,7 +9,7 @@ import java.io.File
  * else the bundle embedded in the APK. A pending release that fails to reach markHealthy within 3 boots is
  * discarded; a current release that boots unhealthy 3 times inside 60 s falls back to the previous one.
  */
-class PureNativeHostHandler(private val ctx: Context) : ReactNativeHostHandler {
+class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
   override fun getJSBundleFile(useDeveloperSupport: Boolean): String? {
     if (useDeveloperSupport) return null
     synchronized(LOCK) {

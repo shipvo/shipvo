@@ -1,4 +1,4 @@
-package dev.purenative.runtime
+package dev.shipvo.runtime
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
 import java.io.ByteArrayInputStream
