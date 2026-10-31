@@ -145,7 +145,9 @@ export const device: Device = {
 };
 
 // A notification banner at the top, like a heads-up notification: tapping it opens the app's handler.
+const recent: Notification[] = [];
 function showBanner(n: Notification) {
+  recent.push(n); if (recent.length > 20) recent.shift();
   const b = document.createElement("div"); b.setAttribute("role", "button"); b.setAttribute("aria-label", `Notification: ${n.title}. ${n.body}`); b.tabIndex = 0; b.setAttribute("data-pn-banner", "1");
   // Like a heads-up notification: slim, over the status bar, gone after 5 s unless tapped.
   Object.assign(b.style, { position: "fixed", top: "4px", left: "8px", right: "8px", height: "44px", overflow: "hidden", background: "#fff", color: "#111", borderRadius: "12px", padding: "6px 12px", boxShadow: "0 6px 24px rgba(0,0,0,.25)", zIndex: "9998", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textOverflow: "ellipsis" });
@@ -160,11 +162,16 @@ g.__pnDevice = {
   set(patch: Partial<DeviceState>) { Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, camera: { ...state.camera, ...(patch.camera ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (patch.online !== undefined) netSubs.forEach((f) => f(state.online)); },
   push(n: Omit<Notification, "id">) { const id = `n${Date.now().toString(36)}`; showBanner({ id, ...n }); },
   log: () => state.log,
+  /** Notifications delivered so far (the banner is gone after 5 s, like a heads-up on a phone; this is the notification shade). */
+  notifications: () => recent.map((n) => ({ id: n.id, title: n.title, body: n.body })),
+  /** Tap a notification from the shade: same handler as tapping its banner. */
+  openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   capabilities: () => device.capabilities(),
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
     Object.assign(state, { permissions: { camera: "undetermined", location: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
       location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", log: [] }, profile ?? {});
+    recent.length = 0;
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
 };

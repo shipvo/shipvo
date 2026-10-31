@@ -87,6 +87,10 @@ server.tool("set_device", "Change what the simulated phone has: location, a barc
 }, async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "set_device", device })); });
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() },
   async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
+server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid },
+  async ({ session }) => { need(session); return text(JSON.stringify((await sim("/act", { session, action: "notifications" }) as { notifications?: unknown }).notifications ?? [], null, 2)); });
+server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() },
+  async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid },
   async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; return text(JSON.stringify({ note: "Everything here is simulated: no real biometric check or money movement took place.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 

@@ -121,6 +121,8 @@ async function act(id, body) {
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); break;
     case "push_notification": await page.evaluate((n) => globalThis.__pnDevice?.push(n), { title: body.title ?? "", body: body.body ?? "", data: body.data ?? {} }); break;
+    case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
+    case "open_notification": { const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "device_log": return { log: await page.evaluate(() => globalThis.__pnDevice?.log() ?? []), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
@@ -134,7 +136,7 @@ async function act(id, body) {
     case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
     case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) await b.first().click(); else throw new Error("no Back button on this screen"); break; }
     case "screenshot": { const p = join(DIR, `${id}-${Date.now()}.png`); await page.screenshot({ path: p }); return { path: p, screen: await screen(page) }; }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, device_log, device_reset`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, device_log, device_reset`);
   }
   return { screen: await screen(page) };
 }

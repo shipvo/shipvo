@@ -10,7 +10,7 @@ Lets AI agents (Claude, Cursor, Claude Code, PiPilot…) **use a Shipvo app with
 
 Start the simulator first (`node sim/server.mjs` in the app, or `shipvo sim` soon). The hosted version at `sim.shipvo.dev` needs no local setup.
 
-Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `device_log`, `end_session`, `owner_describe`, `owner_command`.
+Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `end_session`, `owner_describe`, `owner_command`.
 
 Native features work with no phone: the simulated device (see `@shipvo/device`) shows permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners and the share sheet as real dialogs in the tree; `set_device` decides what the phone has (location, a barcode in view, whether the fingerprint matches, whether a payment is approved, network off).
 
