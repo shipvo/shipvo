@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/runtime",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "Apache-2.0",
   "description": "The Shipvo native runtime: a tiny Expo module that verifies (Ed25519 + SHA-256), downloads (bsdiff patches), stages and applies signed over-the-air releases, with crash-loop rollback. Plus the config plugin that pins the trust root in the native shell.",
   "main": "src/index.ts",
