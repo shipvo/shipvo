@@ -59,14 +59,14 @@ server.tool("list_apps", "Apps this server can open, with what each one does. Op
 server.tool("open_app", "Open an app in a fresh phone-sized session and return its first screen.", {
   app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"),
   session: z.string().optional().describe("Session name (default: generated). One session is one phone."),
-  seed_cart: z.array(z.object({ id: z.string(), qty: z.number().int().positive() })).optional().describe("Start with these items already in the cart (test shortcuts)."),
+  seed_cart: z.array(z.object({ product_id: z.string().optional(), id: z.string().optional(), quantity: z.number().int().positive().optional(), qty: z.number().int().positive().optional() }).refine((l) => (l.product_id ?? l.id) && (l.quantity ?? l.qty), "each line needs product_id (or id) and quantity (or qty)")).optional().describe("Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."),
   dark: z.boolean().optional().describe("Dark mode"),
 }, async ({ app, session, seed_cart, dark }) => {
   const id = app.split("@")[0];
   if (!allowed(id)) throw new Error(keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(APPS).join(", ")}`);
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
-  const r = await sim("/session", { session: sid, app, seed_cart, dark }) as Act & { release?: string | number };
+  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
 });

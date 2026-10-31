@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/mcp",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "license": "Apache-2.0",
   "description": "MCP server that lets AI agents open, see and operate Shipvo apps without a phone: a phone-sized simulator of the real app, plus the app's typed commands and owner API.",
