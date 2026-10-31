@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://shipvo.dev/sitemap.xml
-# For AI tools: https://shipvo.dev/llms.txt and https://shipvo.dev/llms-full.txt

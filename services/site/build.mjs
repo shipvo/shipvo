@@ -6,6 +6,9 @@ import { marked } from "marked";
 import { head as headTag, nav as navTag, footer as footTag } from "./shell.mjs";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { corona } from "./corona.mjs";
+import { mark, symbol, animated } from "./brand.mjs";
+import { copyFileSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -182,11 +185,29 @@ Things to know before answering questions about Shipvo:
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (cli, mcp, runtime, device, sim, schema). Source: https://github.com/shipvo/shipvo`;
 const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");
-writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
+writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
 writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}/docs/${p.slug}/\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);
 writeFileSync(join(PUB, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n# For AI tools: ${SITE}/llms.txt and ${SITE}/llms-full.txt\n`);
-const staticPaths = ["/", "/apps", "/changelog/", ...all.map((p) => `/docs/${p.slug}/`), ...LEGAL.map((l) => `/${l.slug}/`)];
+const staticPaths = ["/", "/apps", "/brand", "/changelog/", ...all.map((p) => `/docs/${p.slug}/`), ...LEGAL.map((l) => `/${l.slug}/`)];
 writeFileSync(join(PUB, "sitemap-static.txt"), staticPaths.join("\n") + "\n");
 writeFileSync(join(PUB, "security.txt"), `Contact: mailto:hans@pipilot.dev\nExpires: ${new Date(Date.now() + 365 * 864e5).toISOString().replace(/\.\d+Z$/, "Z")}\nPreferred-Languages: en, fr\nCanonical: ${SITE}/.well-known/security.txt\nPolicy: ${SITE}/security/\n`);
 
-console.log("pages + changelog + legal + llms built");
+// ---------- Brand kit: vectors generated from brand.mjs, PNGs from the final renders, one zip ----------
+{
+  const B = join(PUB, "brand"); mkdirSync(B, { recursive: true });
+  const BR = join(ROOT, ".github", "assets", "brand");
+  writeFileSync(join(B, "shipvo-mark.svg"), mark());
+  writeFileSync(join(B, "shipvo-symbol-light.svg"), symbol("#F4F2EC"));
+  writeFileSync(join(B, "shipvo-symbol-dark.svg"), symbol("#090D16"));
+  writeFileSync(join(B, "shipvo-logo-animated.svg"), animated());
+  for (const [from, to] of [[join(BR, "mark-1024.png"), "shipvo-mark-1024.png"], [join(BR, "mark-512.png"), "shipvo-mark-512.png"], [join(BR, "favicon-64.png"), "shipvo-favicon-64.png"], [join(BR, "banner.png"), "shipvo-banner.png"], [join(PUB, "wordmark.png"), "shipvo-lockup.png"]]) if (existsSync(from)) copyFileSync(from, join(B, to));
+  const files = ["shipvo-mark.svg", "shipvo-symbol-light.svg", "shipvo-symbol-dark.svg", "shipvo-logo-animated.svg", "shipvo-mark-1024.png", "shipvo-mark-512.png", "shipvo-favicon-64.png", "shipvo-lockup.png", "shipvo-banner.png"].filter((f) => existsSync(join(B, f)));
+  const KIT = join(here, ".kit", "shipvo-brand-kit"); rmSync(join(here, ".kit"), { recursive: true, force: true }); mkdirSync(KIT, { recursive: true });
+  for (const f of files) copyFileSync(join(B, f), join(KIT, f));
+  writeFileSync(join(KIT, "README.txt"), `Shipvo brand kit\n${SITE}/brand\n\nMARK         shipvo-mark.svg (full colour), PNGs at 1024 / 512 / 64\nSYMBOL       shipvo-symbol-light.svg (for dark backgrounds), shipvo-symbol-dark.svg (for light backgrounds and print)\nANIMATED     shipvo-logo-animated.svg (plays in browsers; for arrivals and loading, not as a decorative loop)\nLOCKUP       shipvo-lockup.png (mark + wordmark + tagline, on dark); shipvo-banner.png (1672 x 941)\n\nCOLOUR       Ink #090D16 | Ink 2 #0F1522 | Orange #FF9A2E | Sky #5FB8FF | Paper #F4F2EC | Mute #B6BDCB\nTYPE         Bricolage Grotesque (800 headlines, 500 body), JetBrains Mono (code, labels) - both open-source Google Fonts\nNAME         Shipvo (one word, capital S)\n\nRULES        Keep clear space of at least 1/4 of the mark's width. Minimum 24 px on screen, 8 mm in print.\n             Do not stretch, recolour, rotate, add effects, or place on busy backgrounds.\n\nLICENCE      The Shipvo code is Apache-2.0. That licence does not grant rights to the name or logo.\n             Saying your app is built with Shipvo, or showing the mark in an article, talk or integrations list, is fine.\n             Do not suggest Shipvo endorses your product. For anything larger: hans@pipilot.dev\n`);
+  try { rmSync(join(B, "shipvo-brand-kit.zip"), { force: true }); execFileSync("zip", ["-qr", join(B, "shipvo-brand-kit.zip"), "shipvo-brand-kit"], { cwd: join(here, ".kit") }); }
+  catch (e) { console.error("zip not available, brand kit zip skipped:", e.message); }
+  rmSync(join(here, ".kit"), { recursive: true, force: true });
+}
+
+console.log("pages + changelog + legal + llms + brand built");

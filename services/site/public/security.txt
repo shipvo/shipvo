@@ -1,5 +1,0 @@
-Contact: mailto:hans@pipilot.dev
-Expires: 2027-10-31T16:11:24Z
-Preferred-Languages: en, fr
-Canonical: https://shipvo.dev/.well-known/security.txt
-Policy: https://shipvo.dev/security/
