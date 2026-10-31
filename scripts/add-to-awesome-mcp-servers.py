@@ -2,7 +2,7 @@
 """Insert the Shipvo entry into punkpeye/awesome-mcp-servers README.md (Developer Tools, alphabetical).
 usage: add-to-awesome-mcp-servers.py README.md"""
 import re, sys
-ENTRY = ("- [shipvo/shipvo](https://github.com/shipvo/shipvo) 📇 ☁️ 🏠 - Open a React Native app in a simulated phone: "
+ENTRY = ("- [shipvo/shipvo](https://github.com/shipvo/shipvo) [![shipvo/shipvo MCP server](https://glama.ai/mcp/servers/shipvo/shipvo/badges/score.svg)](https://glama.ai/mcp/servers/shipvo/shipvo) 📇 ☁️ 🏠 - Open a React Native app in a simulated phone: "
          "read the accessibility tree, tap, type, and set device state such as permissions, connectivity and payment results.")
 KEY = "shipvo/shipvo"
 p = sys.argv[1]
