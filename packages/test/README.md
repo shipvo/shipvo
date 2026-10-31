@@ -20,4 +20,4 @@ npx shipvo sim          # the simulator, http://localhost:4545
 npx vitest run
 ```
 
-Works with any runner through `openApp` from `@shipvo/test`. Full guide, CI workflow and API: [Test your app in CI](/docs/testing/).
+Works with any runner through `openApp` from `@shipvo/test`. Full guide, CI workflow and API: [Test your app in CI](https://shipvo.dev/docs/testing/).

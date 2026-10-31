@@ -105,9 +105,9 @@ test("search opens", async () => {
 
 ## What this catches, and what it does not
 
-It catches what breaks in logic and flow: wrong screens, broken navigation, missing validation, mishandled permission answers, payment and notification handling, regressions between releases. The simulator renders your app with React Native Web and simulates the device API, so it does not catch native crashes, real-camera or real-GPU behaviour, OS-specific layout, or performance on a slow phone. Every simulated device feature is checked against real Android and iOS and the gaps are published in [simulator vs device parity](/docs/parity-results/). Use the simulator to catch bugs early and on every commit, and keep a short pass on real devices before a store release.
+It catches what breaks in logic and flow: wrong screens, broken navigation, missing validation, mishandled permission answers, payment and notification handling, regressions between releases. The simulator renders your app with React Native Web and simulates the device API, so it does not catch native crashes, real-camera or real-GPU behaviour, OS-specific layout, or performance on a slow phone. Every simulated device feature is checked against real Android and iOS and the gaps are published in [simulator vs device parity](parity-results.md). Use the simulator to catch bugs early and on every commit, and keep a short pass on real devices before a store release.
 
-For open-ended exploration, point an AI assistant at the same simulator over [MCP](/docs/agents/): scripted tests are deterministic and belong in CI, an agent finds the things you did not think to write down.
+For open-ended exploration, point an AI assistant at the same simulator over [MCP](agents.md): scripted tests are deterministic and belong in CI, an agent finds the things you did not think to write down.
 
 ## API
 

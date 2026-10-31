@@ -26,7 +26,7 @@ jobs:
         run: |
           pub() {
             code=0; out=$(pnpm --filter "$1" publish --no-git-checks --access public 2>&1) || code=$?; echo "$out"
-            if [ $code -ne 0 ] && echo "$out" | grep -q "cannot publish over the previously published"; then echo "$1: version already on npm, skipping"; return 0; fi
+            if [ $code -ne 0 ] && echo "$out" | grep -qE "cannot publish over the previously published|Cannot publish over previously staged"; then echo "$1: version already on npm, skipping"; return 0; fi
             return $code
           }
           pub @shipvo/schema
