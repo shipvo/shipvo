@@ -85,7 +85,7 @@ ${navTag("docs")}
     ${side}
   </aside>
   <button class="side-toggle" type="button" aria-controls="side" aria-expanded="false">Menu</button>
-  <main class="doc">
+  <main class="doc" id="main">
     <div class="doc-head"><div><div class="eyebrow">${esc(page.group)}</div><h1>${esc(page.title)}</h1><p class="sub">${esc(page.desc)}</p></div><a class="edit" href="${REPO}${page.src}" rel="noopener">Edit on GitHub</a></div>
     <article class="prose">${body}</article>
     <nav class="pager">${prev ? `<a href="/docs/${prev.slug}/"><small>Previous</small>${esc(prev.title)}</a>` : "<span></span>"}${next ? `<a href="/docs/${next.slug}/" class="next"><small>Next</small>${esc(next.title)}</a>` : ""}</nav>
@@ -118,7 +118,7 @@ const PUB = join(here, "public");
 for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html"))) {
   let s = readFileSync(join(here, "pages", f), "utf8");
   s = s.replace(/<!--HEAD (.*?)-->/s, (_, attrs) => { const a = Object.fromEntries([...attrs.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]])); return headTag(a); });
-  s = s.replace(/<!--NAV ?(\w*)-->/, (_, k) => navTag(k)).replace("<!--FOOTER-->", footTag());
+  s = s.replace(/<!--NAV ?(\w*)-->/, (_, k) => navTag(k)).replace("<!--FOOTER-->", footTag()).replace(/<main(?![^>]*\bid=)/, '<main id="main"');
   writeFileSync(join(PUB, f), s);
 }
 // Changelog from CHANGELOG.md
@@ -127,6 +127,6 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
   marked.use({ renderer: new marked.Renderer(), gfm: true });
   const body = marked.parse(md);
   mkdirSync(join(PUB, "changelog"), { recursive: true });
-  writeFileSync(join(PUB, "changelog", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Changelog — Shipvo", desc: "What shipped in Shipvo, dated, newest first.", path: "/changelog/" })}</head><body>${navTag("changelog")}<main><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Changelog</div><h2 style="margin-top:12px">What shipped.</h2><p class="lede" style="margin-top:14px">Dated, newest first. Package versions are on npm under <code>@shipvo</code>; the full history is the <a class="link" href="https://github.com/shipvo/shipvo/commits/main" rel="noopener">commit log</a>.</p><article class="log">${body}</article></div></section></main>${footTag()}</body></html>`);
+  writeFileSync(join(PUB, "changelog", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Changelog — Shipvo", desc: "What shipped in Shipvo, dated, newest first.", path: "/changelog/" })}</head><body>${navTag("changelog")}<main id="main"><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Changelog</div><h2 style="margin-top:12px">What shipped.</h2><p class="lede" style="margin-top:14px">Dated, newest first. Package versions are on npm under <code>@shipvo</code>; the full history is the <a class="link" href="https://github.com/shipvo/shipvo/commits/main" rel="noopener">commit log</a>.</p><article class="log">${body}</article></div></section></main>${footTag()}</body></html>`);
 }
 console.log("pages + changelog built");

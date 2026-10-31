@@ -19,9 +19,18 @@
       <div class="cmd reveal"><span class="p">$</span><span>npx -y @shipvo/cli init myshop</span><button type="button" data-copy="npx -y @shipvo/cli init myshop">Copy</button></div>
       <div class="facts reveal"><span><b>Android</b> OTA today</span><span><b>iOS</b> simulator parity 100%</span><span><b>MIT</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
     </div>
-    <div class="phone-stage reveal">
+    <div class="phone-stage reveal" id="stage">
       <div class="bubble"><small>YOU ASK YOUR ASSISTANT</small><b>Buy a Surface Popper with mobile money. Tell me if anything breaks.</b></div>
-      <div class="phone" aria-label="Simulated phone showing the accessibility tree an agent reads"><div class="tree" id="tree"></div></div>
+      <div class="device" aria-label="Tide &amp; Tackle running in the Shipvo simulator">
+        <div class="screen">
+          <img src="/img/tide-1.webp" width="400" height="867" alt="Tide and Tackle home screen" class="on" fetchpriority="high">
+          <img src="/img/tide-2.webp" width="400" height="867" alt="Product page for a chrome spoon lure">
+          <img src="/img/tide-4.webp" width="400" height="867" alt="Camera permission dialog">
+          <img src="/img/tide-3.webp" width="400" height="867" alt="Delivery and payment screen">
+          <span class="tap" id="tap" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="agentview" aria-live="off"><small><i></i>THE AGENT SEES</small><div class="tree" id="tree"></div></div>
       <div class="result" id="result"><small>BACKEND CONFIRMS</small><code>Order TT-1001 · 4 200 FCFA<br>mobile money · receipt SIMULATED-…</code></div>
     </div>
   </div>
@@ -37,6 +46,7 @@
       <span class="strip-label">Live right now</span>
       <div class="agents live" data-live>
         <span class="chip"><b data-live-release>…</b> latest Tide &amp; Tackle release</span>
+        <span class="chip"><b data-live-npm>…</b> @shipvo/cli on npm</span>
         <span class="chip"><b data-live-apps>…</b> public apps</span>
         <span class="chip"><b data-live-api>…</b> api.shipvo.dev</span>
         <span class="chip"><b data-live-sim>…</b> sim.shipvo.dev</span>
@@ -111,6 +121,27 @@
   </div>
 </section>
 
+<section id="views" class="band">
+  <div class="wrap">
+    <div class="sec-head"><h2>One app. Two ways to see it.</h2><p class="lede">The same release, from the same signed bundle. Your customer sees pixels. Your assistant reads the screen like a person would, then taps by reference. This is a real Tide &amp; Tackle screen, not a mock.</p></div>
+    <div class="views">
+      <figure class="v-phone"><div class="device sm"><div class="screen"><img class="on" src="/img/tide-3.webp" width="400" height="867" alt="Delivery and payment screen of Tide and Tackle" loading="lazy"></div></div><figcaption><b>What a customer sees</b>Delivery slots, a mobile money option, one tap to pay.</figcaption></figure>
+      <div class="v-link" aria-hidden="true"><span></span><i>same release</i><span></span></div>
+      <figure class="v-tree"><pre class="term"><span class="d">// what the agent reads, from MCP get_screen</span>
+<span class="c">- heading "Delivery and payment" [level=1] [ref=e30]</span>
+- heading "Delivery slot" [ref=e31]
+- button "Friday 14:00-18:00, 1 500 FCFA" [ref=e33]
+- button "Saturday 08:00-12:00, 2 000 FCFA" [ref=e34]
+- button "Use my location" [ref=e38]
+- textbox "Delivery address" [ref=e39]
+- radio "Mobile money" [ref=e41]
+- textbox "Mobile money number" [ref=e42]
+<span class="g">- button "Place order" [ref=e44]</span>
+<span class="d">// then: tap(e44) · the backend receives the order</span></pre><figcaption><b>What an agent reads</b>Roles, names and references. No pixels, no guessing at coordinates.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
 <section id="pillars">
   <div class="wrap">
     <div class="sec-head"><h2>Everything an agent-ready app needs.</h2><p class="lede">Each card is a shipped, documented piece. Nothing here is a roadmap item.</p></div>
@@ -125,7 +156,7 @@
   </div>
 </section>
 
-<section id="proof">
+<section id="proof" class="band">
   <div class="wrap">
     <div class="sec-head"><h2>Numbers, not adjectives.</h2><p class="lede">Taken on a 2 GB Redmi 9A, an Android emulator and an iPhone simulator in CI. Method and gaps in <a class="link" href="/docs/parity-results/">parity results</a>.</p></div>
     <div class="proof">

@@ -1,26 +1,21 @@
 (function(){
-  // the replaying agent run in the hero
-  var lines=[
-    '- heading "Checkout" [level=1] [ref=e6]',
-    '- button "Scan a product barcode" [ref=e8]',
-    '<span class="dlg">Allow Tide &amp; Tackle to take pictures and record video?<br>- button "While using the app" [ref=e12]</span>',
-    '- heading "Surface Popper 9 cm" [ref=e14]',
-    '- generic [ref=e15]: 4 200 FCFA',
-    '- button "Add 1 to cart" [ref=e16]',
-    '- button "Use my location" [ref=e21]',
-    '- generic [ref=e23]: You\'re 0.7 km from the shop',
-    '- radio "Mobile money" [ref=e31]',
-    '- textbox "Mobile money number" [ref=e33]',
-    '<span class="hi">- button "Place order" [ref=e42]</span>',
-    '<span class="dlg">Confirm with fingerprint<br>- button "Use fingerprint" [ref=e57]</span>',
-    '- textbox "Mobile money PIN" [ref=e61]',
-    '- button "Confirm payment" [ref=e63]',
-    '- heading "Order TT-1001 placed" [ref=e70]'
+  // the replaying agent run in the hero: one screen at a time, what the agent reads, and where it taps
+  var steps=[
+    {img:0,tap:[69,48],lines:['- heading "High tide 06:42. Bass are feeding." [ref=e6]','- button "Lures" [ref=e9]','<span class="hi">- button "Lures" \u2192 tap</span>']},
+    {img:1,tap:[50,71],lines:['- heading "Chrome Spoon 30 g" [ref=e14]','- generic [ref=e15]: 2 800 FCFA','<span class="hi">- button "Add 1 to cart" [ref=e16]</span>']},
+    {img:2,tap:[50,83],lines:['<span class="dlg">Allow Tide &amp; Tackle to take pictures?</span>','- button "Only this time" [ref=e12]','<span class="hi">- button "While using the app" [ref=e11]</span>']},
+    {img:3,tap:[58,90],lines:['- heading "Delivery and payment" [ref=e30]','- radio "Mobile money" [ref=e31]','<span class="hi">- button "Place order" [ref=e42]</span>']}
   ];
-  var tree=document.getElementById('tree'),res=document.getElementById('result');
+  var tree=document.getElementById('tree'),res=document.getElementById('result'),tap=document.getElementById('tap'),imgs=[].slice.call(document.querySelectorAll('.screen img'));
+  function show(i){imgs.forEach(function(m,k){m.classList.toggle('on',k===steps[i].img)})}
   if(tree){
-    function run(){tree.innerHTML='';res.classList.remove('on');var i=0;(function step(){if(i>=lines.length){res.classList.add('on');setTimeout(run,6000);return}var el=document.createElement('span');el.className='l';el.innerHTML=lines[i++];tree.appendChild(el);requestAnimationFrame(function(){el.classList.add('on')});while(tree.scrollHeight>tree.clientHeight&&tree.children.length>1)tree.removeChild(tree.firstChild);setTimeout(step,i===11||i===12?1100:520)})()}
-    if(matchMedia('(prefers-reduced-motion: reduce)').matches){tree.innerHTML=lines.slice(-9).map(function(l){return '<span class="l on">'+l+'</span>'}).join('');res.classList.add('on')}else run();
+    var timer;
+    function run(){var n=0;res.classList.remove('on');tap.classList.remove('on');
+      (function screen(){if(n>=steps.length){res.classList.add('on');tap.classList.remove('on');timer=setTimeout(run,4500);return}
+        var st=steps[n++];show(n-1);tree.innerHTML='';tap.classList.remove('on');tap.style.left=st.tap[0]+'%';tap.style.top=st.tap[1]+'%';
+        var k=0;(function line(){if(k>=st.lines.length){tap.classList.add('on');timer=setTimeout(screen,1500);return}
+          var el=document.createElement('span');el.className='l';el.innerHTML=st.lines[k++];tree.appendChild(el);requestAnimationFrame(function(){el.classList.add('on')});timer=setTimeout(line,450)})()})()}
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){show(3);var st=steps[3];tree.innerHTML=st.lines.map(function(l){return '<span class="l on">'+l+'</span>'}).join('');res.classList.add('on')}else run();
   }
   // tabs
   document.querySelectorAll('[data-tabs]').forEach(function(t){var tabs=[].slice.call(t.querySelectorAll('[role=tab]')),panels=tabs.map(function(b){return document.getElementById(b.getAttribute('aria-controls'))});
@@ -32,6 +27,12 @@
   fetch('https://api.shipvo.dev/w/tide/releases.json').then(function(r){return r.json()}).then(function(d){set('[data-live-release]','r'+d.latest)}).catch(function(){set('[data-live-release]','—')});
   fetch('https://api.shipvo.dev/health',{cache:'no-store'}).then(function(r){set('[data-live-api]',r.ok?'live':'down',r.ok)}).catch(function(){set('[data-live-api]','down',false)});
   fetch('https://sim.shipvo.dev/health',{cache:'no-store'}).then(function(r){set('[data-live-sim]',r.ok?'live':'down',r.ok)}).catch(function(){set('[data-live-sim]','down',false)});
+  fetch('https://registry.npmjs.org/@shipvo/cli/latest').then(function(r){return r.json()}).then(function(d){set('[data-live-npm]','v'+d.version)}).catch(function(){set('[data-live-npm]','—')});
+  // scroll reveal
+  if('IntersectionObserver' in window&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{rootMargin:'0px 0px -8% 0px',threshold:.08});
+    document.querySelectorAll('main section:not(.hero) .sec-head,main .tabs,.pillar,.cell,.stat,.honest>div,.views figure,.beta,.card').forEach(function(el,i){el.classList.add('rv');el.style.transitionDelay=(i%4)*70+'ms';io.observe(el)});
+  }
   // marketplace preview
   var grid=document.getElementById('market-grid');
   var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};

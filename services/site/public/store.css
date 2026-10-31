@@ -24,7 +24,7 @@
 .featured .f-text p{color:var(--mute);font-size:16.5px;line-height:1.55;max-width:50ch}
 .featured .f-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
 .featured .f-art{position:relative;min-height:320px;background:radial-gradient(70% 80% at 70% 30%,rgba(255,154,46,.16),transparent 70%),radial-gradient(50% 60% at 20% 90%,rgba(95,184,255,.14),transparent 70%),var(--ink-3);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.featured .f-art img.shot{height:92%;max-height:520px;border-radius:26px;border:8px solid var(--line);box-shadow:0 40px 80px -30px rgba(0,0,0,.8)}
+.featured .f-art img.shot{height:440px;width:auto;border-radius:26px;border:8px solid var(--line);box-shadow:0 40px 80px -30px rgba(0,0,0,.8)}
 .featured .f-art .big-ico{width:160px;height:160px;border-radius:40px;box-shadow:0 40px 80px -30px rgba(0,0,0,.8)}
 @media(max-width:900px){.featured{grid-template-columns:minmax(0,1fr)}.featured .f-art{min-height:240px;order:-1}.store-head{grid-template-columns:minmax(0,1fr)}}
 
@@ -120,3 +120,5 @@
 
 .store .block{padding:0;border-top:0}
 .store section.block{padding:0;border-top:0}
+
+.app-card.slot{border-style:dashed;background:transparent}.app-card.slot:hover{background:var(--ink-2)}.app-card.slot .app-ico.ph{font-size:26px;color:var(--accent);background:transparent;border:1px dashed var(--line-2)}

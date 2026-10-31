@@ -30,7 +30,7 @@ const SOLUTIONS = [
 ];
 const menu = (items) => `<div class="menu"><div class="menu-grid">${items.map(([t, h, d]) => `<a href="${h}"><b>${t}</b><span>${d}</span></a>`).join("")}</div></div>`;
 
-export const nav = (active = "") => `<header class="nav"><div class="wrap">
+export const nav = (active = "") => `<a class="skip" href="#main">Skip to content</a><header class="nav"><div class="wrap">
   <a class="logo" href="/" aria-label="Shipvo home"><img src="/logo-256.png" alt="" width="28" height="28">Shipvo</a>
   <nav class="primary" aria-label="Primary">
     <a href="/docs/" class="${active === "docs" ? "on" : ""}">Docs</a>
