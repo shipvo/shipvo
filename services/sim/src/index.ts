@@ -19,6 +19,8 @@ const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.diges
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS", "access-control-expose-headers": "mcp-session-id" };
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", ...CORS } });
 
+class QuotaError extends Error { constructor(public quota: number, public used: number) { super(`quota exhausted: ${used}/${quota} sandbox minutes used`); } }
+
 /* ---------- E2B backend ---------- */
 const e2bApi = (env: Env) => (env.E2B_API ?? "https://api.e2b.app").replace(/\/$/, "");
 async function e2b(env: Env, method: string, path: string, body?: unknown) {
@@ -47,7 +49,12 @@ async function sandboxForKey(env: Env, keyId: number, app: string, scope: string
     try { const h = await fetch(`${row.sandbox_host}/health`, { signal: AbortSignal.timeout(4000) }); if (h.ok) { touchSandbox(env, row.sandbox_id); return { id: row.sandbox_id, host: row.sandbox_host }; } } catch {}
     await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).run();   // expired: make a new one
   }
+  // Quota: starting a sandbox costs its lifetime in minutes (it idles out after SESSION_TIMEOUT_S).
+  const q = await env.DB.prepare("SELECT quota_minutes, used_minutes FROM api_keys WHERE id = ?").bind(keyId).first<{ quota_minutes: number; used_minutes: number }>();
+  const cost = Math.ceil(Number(env.SESSION_TIMEOUT_S ?? 1800) / 60);
+  if (q && q.quota_minutes > 0 && q.used_minutes + cost > q.quota_minutes) throw new QuotaError(q.quota_minutes, q.used_minutes);
   const sb = await newSandbox(env, app, scope);
+  await env.DB.prepare("UPDATE api_keys SET used_minutes = used_minutes + ? WHERE id = ?").bind(cost, keyId).run();
   await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope) VALUES (?,?,?,?,?)").bind(`key:${keyId}`, sb.id, sb.host, app, scope).run();
   return sb;
 }
@@ -88,6 +95,6 @@ export default {
         return new Response(res.body, { status: res.status, headers: h });
       }
       return json({ error: "no_backend", hint: "set E2B_API_KEY (E2B sandboxes) or deploy with wrangler.containers.jsonc" }, 503);
-    } catch (e: any) { return json({ error: "backend_error", message: String(e?.message ?? e) }, 502); }
+    } catch (e: any) { if (e instanceof QuotaError) return json({ error: "quota_exhausted", message: e.message, quota_minutes: e.quota, used_minutes: e.used }, 429); return json({ error: "backend_error", message: String(e?.message ?? e) }, 502); }
   },
 };

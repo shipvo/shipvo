@@ -3,8 +3,9 @@ import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
 import { describeOwner, runOwnerCommand } from "./owner";
+import { auth } from "./auth";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string };
+type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
 const app = new Hono<{ Bindings: Env }>();
 
 /* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
@@ -156,5 +157,7 @@ app.post("/app/:id/api/command", async (c) => {
   let body: any; try { body = await c.req.json(); } catch { return c.json({ ok: false, error: { code: "bad_json", message: "JSON body required" } }, 400); }
   return c.json(await runOwnerCommand({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, String(body?.name ?? ""), body?.args ?? {}));
 });
+
+app.route("/auth", auth);
 
 export default app;

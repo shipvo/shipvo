@@ -105,7 +105,7 @@ Agents open the exact release phones run with `open_app("myshop@r8")` or `open_a
 
 ## 6. Give agents a key, not a laptop
 
-The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open your app with a URL and nothing installed. See [agents.md](agents.md).
+The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config. During the beta the hosted simulator opens the sample app; hosting your own app there is by arrangement, and self-hosting is always open. See [agents.md](agents.md).
 
 ## Where things are measured
 
