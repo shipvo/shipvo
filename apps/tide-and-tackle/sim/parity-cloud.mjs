@@ -19,6 +19,15 @@ const FLOW = [
   { tap: "Choose delivery and pay" }, { tap: "Any day Shop pickup" }, { tap: "Mobile money", exact: true, name: "Checkout B" },
   { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Payment prompt B" },
   { type: "Mobile money PIN", text: "1234" }, { tap: "Confirm payment" }, { wait: 1500 }, { tap: "Allow", exact: true, optional: true, name: "Order placed B" },
+  { wait: 6000 },
+  // Flow C: camera permission + scanner (manual entry on both sides: a simulator camera has nothing to decode), location
+  // permission + distance, shop pickup, mobile money. The iOS dialogs are worded as iOS words them.
+  { tap: "Back to shop", flow: "C" }, { tap: "Scan a product barcode", name: "Camera permission" }, { tap: "Allow", exact: true, optional: true, name: "Scanner" },
+  { type: "Barcode number", text: "6181234567890" }, { tap: "Find product by barcode", name: "Scanned product" }, { tap: "Add 1 to cart" },
+  { tap: "Open cart" }, { tap: "Choose delivery and pay" }, { tap: "Use my location", name: "Location permission" }, { tap: "Allow While Using App", optional: true },
+  { wait: 5000 }, { name: "Located" },
+  { tap: "Any day Shop pickup" }, { tap: "Mobile money", exact: true }, { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Payment prompt C" },
+  { type: "Mobile money PIN", text: "1234" }, { tap: "Confirm payment" }, { wait: 1500 }, { name: "Order placed C" },
 ];
 const CANDIDATES = {
   ios: [["iPhone 13", "15"], ["iPhone 14", "16"], ["iPhone 13", "14"], ["iPhone 12", "14"], ["iPhone 14 Pro", "16"], ["iPhone 15", "17"], ["iPhone 15 Pro", "17"], ["iPhone 16", "18"], ["iPhone 11", "13"]],

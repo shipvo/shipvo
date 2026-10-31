@@ -42,6 +42,7 @@ jobs:
         working-directory: apps/tide-and-tackle
         env: { APPIUM_HUB: "http://127.0.0.1:4723", APPIUM_LOCAL: "1" }
         run: |
+          xcrun simctl location "$UDID" set 4.0225,9.6967 || true   # Bonanjo, Douala: 0.7 km from the shop (flow C)
           appium --address 127.0.0.1 --port 4723 > appium.log 2>&1 &
           for i in $(seq 1 90); do curl -sf 127.0.0.1:4723/status >/dev/null && break; sleep 2; done
           curl -sf 127.0.0.1:4723/status | head -c 200 || { echo APPIUM FAILED; tail -40 appium.log; }
