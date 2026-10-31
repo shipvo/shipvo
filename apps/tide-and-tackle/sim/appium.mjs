@@ -22,8 +22,21 @@ export async function startSession(caps) {
 }
 export const endSession = (s, status = "passed") => wd("DELETE", `/session/${s.id}`).catch(() => {});
 
+/** An iOS system dialog (permission prompt) lives outside the app's page source: ask WebDriverAgent's alert API. */
+async function alertInfo(s) {
+  if (s.platform !== "ios") return null;
+  try {
+    const text = await wd("GET", `/session/${s.id}/alert/text`);
+    const buttons = await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: alert", args: [{ action: "getButtons" }] }).catch(() => []);
+    return { text: String(text ?? ""), buttons: Array.isArray(buttons) ? buttons : [] };
+  } catch { return null; }
+}
+
 /** Parse page source into the same element list as the other drivers. */
 export async function elements(s) {
+  // A system dialog is modal: while it is up, it is the whole screen (the simulator hides what is behind a dialog too).
+  const al = await alertInfo(s);
+  if (al) return [...(al.text ? al.text.split("\n").map((l) => l.trim()).filter(Boolean).map((label) => ({ role: "text", label, disabled: false })) : []), ...al.buttons.map((label) => ({ role: "button", label: String(label), disabled: false }))];
   let xml = await wd("GET", `/session/${s.id}/source`);
   // The on-screen keyboard is the system's, not the app's.
   xml = xml.replace(/<XCUIElementTypeKeyboard[\s\S]*?<\/XCUIElementTypeKeyboard>/g, "");
@@ -68,7 +81,13 @@ async function scroll(s, dir = "down") {
   if (s.platform === "ios") return wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: swipe", args: [{ direction: dir === "down" ? "up" : "down" }] }).catch(() => {});
   return wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: scrollGesture", args: [{ left: 100, top: 300, width: 600, height: 1200, direction: dir, percent: 0.8 }] }).catch(() => {});
 }
-export async function tap(s, label, { once = false } = {}) {
+export async function tap(s, label, { once = false, exact = false } = {}) {
+  const al = await alertInfo(s);
+  if (al) {
+    const want = label.toLowerCase();
+    const b = al.buttons.find((x) => String(x).toLowerCase() === want) ?? (exact ? null : al.buttons.find((x) => String(x).toLowerCase().startsWith(want)));
+    if (b) { await wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: alert", args: [{ action: "accept", buttonLabel: String(b) }] }); await new Promise((r) => setTimeout(r, 900)); return; }
+  }
   for (let i = 0; i < (once ? 1 : 6); i++) {
     try { const id = await find(s, label); await wd("POST", `/session/${s.id}/element/${id}/click`, {}); await new Promise((r) => setTimeout(r, 900)); return; }
     catch (e) { if (once || i === 5) throw e; await scroll(s, "down"); }

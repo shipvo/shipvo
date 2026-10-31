@@ -26,7 +26,7 @@ const FLOW = [
   { type: "Barcode number", text: "6181234567890" }, { tap: "Find product by barcode", name: "Scanned product" }, { tap: "Add 1 to cart" },
   { tap: "Open cart" }, { tap: "Choose delivery and pay" }, { tap: "Use my location" }, { wait: 2500 }, { name: "Location permission" }, { tap: "Allow While Using App", optional: true },
   { wait: 5000 }, { name: "Located" },
-  { wait: 1500 }, { tap: "Any day Shop pickup" }, { wait: 1000 }, { tap: "Mobile money", exact: true }, { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Payment prompt C" },
+  { wait: 1500 }, { tap: "Any day Shop pickup", verifyGone: "Choose a delivery slot" }, { wait: 1000 }, { tap: "Mobile money", exact: true }, { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Payment prompt C" },
   { type: "Mobile money PIN", text: "1234" }, { tap: "Confirm payment" }, { wait: 1500 }, { name: "Order placed C" },
 ];
 const CANDIDATES = {
@@ -94,7 +94,8 @@ let simOk = true, devOk = true;
 for (const step of FLOW) {
   if (step.wait) { await new Promise((r) => setTimeout(r, step.wait)); continue; }
   try { await simDo(step); } catch (e) { if (!step.optional) { simOk = false; report.errors.push(e.message); } }
-  try { if (step.tap) await cloud.tap(s, step.tap, { once: !!step.optional }); if (step.type) await cloud.type(s, step.type, step.text); } catch (e) { if (!step.optional) { devOk = false; report.errors.push(`device: ${e.message}`); } }
+  try { if (step.tap) await cloud.tap(s, step.tap, { once: !!step.optional, exact: !!step.exact });
+    if (step.tap && step.verifyGone) for (let i = 0; i < 3; i++) { const els = await cloud.elements(s).catch(() => []); if (!els.some((e) => norm(e.label).startsWith(norm(step.verifyGone)))) break; await new Promise((r) => setTimeout(r, 1200)); await cloud.tap(s, step.tap).catch(() => {}); } if (step.type) await cloud.type(s, step.type, step.text); } catch (e) { if (!step.optional) { devOk = false; report.errors.push(`device: ${e.message}`); } }
   if (step.name) {
     const [a, b] = [await simEls(), await cloud.fullScreen(s).catch((e) => { report.errors.push(`device screen: ${e.message}`); return []; })];
     report.screens.push({ screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b), ...(/^Order placed/.test(step.name) ? sameOutcome(a, b) : {}) });
