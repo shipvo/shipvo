@@ -5,6 +5,7 @@
   "compatibility_date": "2025-06-01",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [{ "binding": "DB", "database_name": "purenative", "database_id": "292c3334-c9a8-4215-a947-6e47d4792a59" }],
-  "vars": { "CONTROL": "https://purenative-control.purenative.workers.dev", "E2B_TEMPLATE": "shipvo-sim", "SESSION_TIMEOUT_S": "1800" },
+  "vars": { "CONTROL": "https://api.shipvo.dev", "E2B_TEMPLATE": "shipvo-sim", "SESSION_TIMEOUT_S": "1800" },
+  "routes": [{ "pattern": "sim.shipvo.dev", "custom_domain": true }],
   "observability": { "enabled": true }
 }

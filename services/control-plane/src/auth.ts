@@ -44,7 +44,7 @@ auth.post("/device/poll", async (c) => {
   const expires_at = new Date(Date.now() + KEY_TTL_DAYS * 86400_000).toISOString();
   await c.env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")
     .bind(BETA_APPS[0], await sha256(key), prefix, "test", `shipvo login (${u.login})`, acct.id, DEFAULT_QUOTA_MIN, expires_at).run();
-  const simUrl = (c.env.SIM_URL ?? "https://shipvo-sim.purenative.workers.dev").replace(/\/$/, "");
+  const simUrl = (c.env.SIM_URL ?? "https://sim.shipvo.dev").replace(/\/$/, "");
   return c.json({ login: u.login, key, prefix, scope: "test", apps: BETA_APPS, quota_minutes: DEFAULT_QUOTA_MIN, expires_at,
     mcp: { url: `${simUrl}/mcp`, header: `Authorization: Bearer ${key}`, url_with_key: `${simUrl}/mcp/${key}` },
     note: `Store the key now; it is not shown again. It expires in ${KEY_TTL_DAYS} days; run shipvo login again to renew. It opens the beta apps in the hosted simulator; quota is sandbox minutes.` });

@@ -59,7 +59,7 @@ jobs:
       - name: Smoke (health, auth, and a real agent loop across reconnects)
         env: { SIM_SMOKE_KEY: "${{ secrets.SIM_SMOKE_KEY }}" }
         run: |
-          U=https://shipvo-sim.purenative.workers.dev
+          U=https://sim.shipvo.dev
           curl -s $U/health; echo
           curl -s -o /dev/null -w "no key -> %{http_code}\n" -X POST $U/mcp -H 'content-type: application/json' -d '{}'
           if [ -n "$SIM_SMOKE_KEY" ]; then node services/sim/smoke.mjs $U/mcp "$SIM_SMOKE_KEY" | tee -a "$GITHUB_STEP_SUMMARY"; else echo "SIM_SMOKE_KEY not set: agent-loop smoke skipped"; fi

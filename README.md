@@ -4,7 +4,7 @@
 
 **One React Native app, two places it runs.** People get a native Android or iOS app from the stores, kept current with signed over-the-air updates. AI agents get the same release in a phone-sized simulator they can see and operate over MCP, with no device, including native features (camera, location, biometrics, payments, notifications). Every claim about the simulator is measured against real Android and iOS and published.
 
-> Shipvo was briefly called PureNative. The hosted control plane still answers at a `purenative.workers.dev` URL until the custom domain is in place; everything else says Shipvo.
+> Shipvo was briefly called PureNative. The hosted control plane is `api.shipvo.dev` and the hosted simulator `sim.shipvo.dev`; the older `purenative.workers.dev` addresses keep answering for apps whose shell was built against them.
 
 Three pillars:
 

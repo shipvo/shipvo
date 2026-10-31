@@ -2,6 +2,9 @@ name = "purenative-control"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
+# api.shipvo.dev is the public address; the purenative-control.purenative.workers.dev URL keeps answering for shells already installed.
+routes = [{ pattern = "api.shipvo.dev", custom_domain = true }]
+
 [[kv_namespaces]]
 binding = "POINTERS"
 id = "c0851feca4c5486d8ed844d16f0b36df"
@@ -13,5 +16,5 @@ database_id = "292c3334-c9a8-4215-a947-6e47d4792a59"
 migrations_dir = "migrations"
 
 [vars]
-SIM_URL = "https://shipvo-sim.purenative.workers.dev"
+SIM_URL = "https://sim.shipvo.dev"
 GITHUB_CLIENT_ID = "Ov23liAQ86H1hYxN9DuD"   # public GitHub OAuth app id (device flow needs no client secret)

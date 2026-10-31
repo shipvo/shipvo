@@ -40,4 +40,4 @@ jobs:
           else echo "GITHUB_OAUTH_CLIENT_ID secret not set; shipvo login stays disabled"; fi
       - name: Smoke test
         run: |
-          for i in 1 2 3 4 5; do curl -fsS https://purenative-control.purenative.workers.dev/health && exit 0; sleep 5; done; exit 1
+          for i in 1 2 3 4 5; do curl -fsS https://api.shipvo.dev/health && exit 0; sleep 5; done; exit 1

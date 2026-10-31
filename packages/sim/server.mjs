@@ -25,7 +25,7 @@ let CFG = {}; try { CFG = JSON.parse(readFileSync(join(process.cwd(), "shipvo.js
 const PORT = Number(arg("port", 4545)), DIR = arg("dir", "/tmp/pn-ui"), DIST = arg("dist", join(process.cwd(), "sim-dist"));
 const DEFAULT_APP = arg("app", CFG.appId || "tide"), APP_NAME = CFG.name || "Tide & Tackle";
 // Published releases: open_app("tide@r13") loads the web artifact that `shipvo publish` stored next to the phone bundle.
-const CONTROL = (process.env.PN_CONTROL || process.env.CONTENT_FROM || CFG.controlPlane || "https://purenative-control.purenative.workers.dev").replace(/\/$/, "");
+const CONTROL = (process.env.PN_CONTROL || process.env.CONTENT_FROM || CFG.controlPlane || "https://api.shipvo.dev").replace(/\/$/, "");
 async function resolveApp(spec) {
   const m = /^([a-z0-9-]+)(?:@(?:r?(\d+)|(latest)))?$/.exec(String(spec || DEFAULT_APP)); if (!m) throw new Error(`bad app spec "${spec}": use "${DEFAULT_APP}", "${DEFAULT_APP}@r13" or "${DEFAULT_APP}@latest"`);
   const [, app, rel] = m;

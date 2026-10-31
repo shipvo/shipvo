@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Shipvo MCP: agents use Shipvo apps with no phone.
-//   PN_SIM=http://localhost:4545  PN_CONTROL=https://purenative-control.purenative.workers.dev  PN_OWNER_TOKEN=...  shipvo-mcp
+//   PN_SIM=http://localhost:4545  PN_CONTROL=https://api.shipvo.dev  PN_OWNER_TOKEN=...  shipvo-mcp
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
 // Tools: list_apps, open_app, screen, tap, type, scroll, back, screenshot, end_session (UI simulator);
@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
-const CONTROL = (process.env.PN_CONTROL ?? "https://purenative-control.purenative.workers.dev").replace(/\/$/, "");
+const CONTROL = (process.env.PN_CONTROL ?? "https://api.shipvo.dev").replace(/\/$/, "");
 const OWNER_TOKEN = process.env.PN_OWNER_TOKEN ?? "";
 // Apps this server can open. Hosted: the account's apps. Local: one app served by the simulator.
 const APPS: Record<string, { name: string; description: string }> = process.env.PN_APPS ? JSON.parse(process.env.PN_APPS)

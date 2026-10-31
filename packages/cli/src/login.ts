@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { args as parse } from "./config.js";
 
-const HOSTED = "https://purenative-control.purenative.workers.dev";
+const HOSTED = "https://api.shipvo.dev";
 const credFile = () => join(process.env.SHIPVO_HOME || join(homedir(), ".shipvo"), "credentials.json");
 export function savedCreds(): { key: string; control: string; mcp_url: string; login?: string } | null {
   try { return JSON.parse(readFileSync(credFile(), "utf8")); } catch { return null; }

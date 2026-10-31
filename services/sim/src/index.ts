@@ -12,7 +12,7 @@ type Env = {
 
 export class SimContainer extends Container<Env> {
   defaultPort = 8787; sleepAfter = "15m";
-  envVars = { PN_CONTROL: "https://purenative-control.purenative.workers.dev", CONTENT_FROM: "https://purenative-control.purenative.workers.dev", PN_SIM_DIR: "/tmp/pn-ui" };
+  envVars = { PN_CONTROL: "https://api.shipvo.dev", CONTENT_FROM: "https://api.shipvo.dev", PN_SIM_DIR: "/tmp/pn-ui" };
 }
 
 const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
