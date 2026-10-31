@@ -44,7 +44,7 @@ Previous run (one flow, before the simulator was made phone-faithful): Android 9
 | Payment prompt | 67% | 83% |
 | Order placed (same order ✓) | 100% | 91% |
 
-Across all three flows on Android the orders match exactly; 18 of 21 screens are at 100% actionable parity. The three below 100% are known and listed here, not hidden: both system permission dialogs have one extra unlabeled button on the device, and the payment sheet's "Cancel payment" button is not exposed by Android's accessibility tree (same as flow B). iOS flow C has not been run yet.
+Across all three flows on Android the orders match exactly; 18 of 21 screens are at 100% actionable parity. The three below 100% are known and listed here, not hidden: both system permission dialogs have one extra unlabeled button on the device, and the payment sheet's "Cancel payment" button is not exposed by Android's accessibility tree (same as flow B). On iOS (iPhone simulator, shell `dev.shipvo.tide`) flow C is at **100% actionable parity on all 6 screens, 95.3% mean text coverage on the full run, same order placed**: the iOS camera and location dialogs match word for word, driven through WebDriverAgent's alert interface (iOS system dialogs are outside the app's accessibility tree). Flows A and B on iOS are unchanged at 100%.
 
 What flow C does **not** measure: barcode decoding. The emulator's virtual camera cannot show a decodable code, so both sides type the number into the scanner's manual entry. Decoding is covered by the simulated-camera end-to-end test (ChatGPT's 18-step run, `device_log` marked `simulated: true`).
 
