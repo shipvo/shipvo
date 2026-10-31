@@ -55,6 +55,7 @@ code,kbd{font-family:var(--mono);font-size:.92em}
 @media(max-width:900px){.hero .wrap{grid-template-columns:minmax(0,1fr)}}
 .reveal{opacity:0;transform:translateY(18px);animation:up .8s cubic-bezier(.2,.7,.2,1) forwards}
 .reveal:nth-child(2){animation-delay:.08s}.reveal:nth-child(3){animation-delay:.16s}.reveal:nth-child(4){animation-delay:.24s}.reveal:nth-child(5){animation-delay:.32s}.reveal:nth-child(6){animation-delay:.4s}
+.hero h1.reveal{animation:none;opacity:1;transform:none}
 @keyframes up{to{opacity:1;transform:none}}
 
 /* phone */
@@ -402,3 +403,5 @@ footer.old{display:none}
 .ci-note{color:var(--dim);font-size:14px;margin-top:18px;max-width:70ch}.ci-note a{color:var(--sky)}
 @media(max-width:1000px){.ci-grid{grid-template-columns:minmax(0,1fr)}.cases{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.ci-sec{padding:64px 0}.cases{grid-template-columns:minmax(0,1fr)}}
+
+main p a:not(.btn):not(.card){text-decoration:underline;text-underline-offset:2px}
