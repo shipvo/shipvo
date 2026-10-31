@@ -305,3 +305,4 @@ footer.old{display:none}
   :root:not([data-theme=dark]) .bubble{background:#14181F;color:#F4F2EC}
   :root:not([data-theme=dark]) .bubble small{color:#8891A3}
 }
+@media(max-width:520px){.cmd{font-size:13px;gap:10px;padding:10px 10px 10px 14px}.cmd button{flex:none}}
