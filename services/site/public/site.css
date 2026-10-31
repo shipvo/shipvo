@@ -332,3 +332,4 @@ footer.old{display:none}
 .reach-art{margin:-60px -40px -60px 0}.reach-art svg{display:block;width:100%;height:auto;aspect-ratio:1;overflow:visible}
 .reach-art svg{--thread:var(--mute);--node:var(--mute);--go:var(--accent);--ret:var(--sky);--tile-glow:rgba(255,154,46,.5)}
 @media(max-width:900px){.reach{grid-template-columns:minmax(0,1fr)}.reach-art{margin:0 auto;max-width:520px;order:-1}.reach-facts li{grid-template-columns:minmax(0,1fr)}}
+.legal .anchor{display:none}
