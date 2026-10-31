@@ -35,7 +35,7 @@ const need = (_sid: string) => {};
 
 type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
 function makeServer(ctx: Ctx = {}) {
-const server = new McpServer({ name: "shipvo", version: "0.0.1" }, { instructions:
+const server = new McpServer({ name: "shipvo", version: "0.0.4" }, { instructions:
 `You can use Shipvo apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
 Only what is on screen is listed, like a phone: a horizontal product rail shows a few items, so "scroll right" on the rail (its ref) to see more; "scroll down" the page for the rest.

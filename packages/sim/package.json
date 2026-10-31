@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/sim",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "Apache-2.0",
   "description": "The Shipvo simulator: runs a Shipvo app's web build in a phone-sized headless browser and exposes it to agents (accessibility tree, tap/type/scroll, simulated device, mock backend). Used by @shipvo/mcp and `shipvo sim`.",
