@@ -50,7 +50,7 @@ const bySrc = Object.fromEntries(all.map((p) => [p.src.replace(/^docs\//, "").re
 
 // Links between docs → site paths; relative repo links → GitHub.
 function rewriteHref(href, src) {
-  if (/^(https?:|mailto:|#)/.test(href) || /^\/(docs|apps|brand|changelog|terms|privacy|security|acceptable-use|llms\.txt|llms-full\.txt)(\/|$|#)|^\/docs\.md$/.test(href)) return href;
+  if (/^(https?:|mailto:|#)/.test(href) || /^\/(docs|apps|brand|changelog|terms|privacy|security|acceptable-use|llms\.txt|llms-full\.txt)(\/|$|#)|^\/(docs\.md|\.well-known\/security\.txt)$/.test(href)) return href;
   const clean = href.replace(/^\.\//, "");
   const [path, hash = ""] = clean.split("#");
   const key = path.replace(/^docs\//, "").replace(/\.md$/, "");
