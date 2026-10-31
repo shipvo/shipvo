@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.shipvo/shipvo",
+  "title": "Shipvo",
+  "description": "Open a React Native app in a simulated phone: read the accessibility tree, tap, type, and set device state.",
+  "repository": {
+    "url": "https://github.com/shipvo/shipvo",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "version": "0.0.6",
+  "websiteUrl": "https://shipvo.dev",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@shipvo/mcp",
+      "version": "0.0.6",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://sim.shipvo.dev/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <key from `npx @shipvo/cli login`>",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
