@@ -10,7 +10,7 @@ export default {
       const r = await fetch(`${env.API}/apps/public${url.pathname.slice("/api/apps".length)}${url.search}`, { cf: { cacheTtl: 30 } } as any);
       return new Response(r.body, { status: r.status, headers: { "content-type": "application/json", "cache-control": "public, max-age=30" } });
     }
-    if (url.pathname.startsWith("/docs")) { const page = url.pathname.replace(/^\/docs\/?/, "").replace(/\/$/, "") || "getting-started"; return Response.redirect(`https://github.com/shipvo/shipvo/blob/main/docs/${page}.md`, 302); }
+    if (url.pathname === "/docs") return Response.redirect("https://shipvo.dev/docs/overview/", 301);
     if (/^\/apps\/[a-z0-9-]+\/?$/.test(url.pathname)) return env.ASSETS.fetch(new Request(new URL("/app.html", url).toString(), req));
     const res = await env.ASSETS.fetch(req);
     const h = new Headers(res.headers);

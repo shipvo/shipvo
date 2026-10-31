@@ -2,6 +2,16 @@
   "name": "@shipvo/site",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "wrangler dev", "deploy": "wrangler deploy", "typecheck": "tsc --noEmit -p ." },
-  "devDependencies": { "@cloudflare/workers-types": "^4.20250620.0", "typescript": "^5.6.0", "wrangler": "^4.20.0" }
+  "scripts": {
+    "build": "node build-docs.mjs",
+    "dev": "node build-docs.mjs && wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "marked": "^14.1.4",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.20.0"
+  }
 }

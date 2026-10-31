@@ -7,7 +7,7 @@ Twenty minutes from nothing to an app that AI agents can open in a simulator, th
 - Node 22 and npm (or pnpm / bun).
 - For the simulator: Chromium via Playwright (one command below). No Android Studio, no Xcode, no phone.
 - For phones: Android Studio once (`npx expo run:android`), or EAS Build.
-- For publishing: a control plane. Use the hosted one during the beta (ask for an app id) or self-host yours on Cloudflare in ten minutes ([self-hosting.md](self-hosting.md)).
+- For publishing: a control plane. Use the hosted one (`shipvo login`, then `shipvo app create`, both below) or self-host yours on Cloudflare in ten minutes ([self-hosting.md](self-hosting.md)).
 
 ## 1. Create the app
 

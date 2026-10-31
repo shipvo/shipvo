@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>App — Shipvo</title>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<header class="nav"><div class="wrap"><a class="logo" href="/"><i></i>Shipvo</a><nav><a href="/#how">How it works</a><a href="/#proof">Proof</a><a href="/apps" class="keep">Apps</a><a href="/docs/getting-started">Docs</a><a class="btn keep" href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></header>
+<header class="nav"><div class="wrap"><a class="logo" href="/"><img src="/logo-256.png" alt="" width="28" height="28">Shipvo</a><nav><a href="/#how">How it works</a><a href="/#proof">Proof</a><a href="/apps" class="keep">Apps</a><a href="/docs/getting-started">Docs</a><a class="btn keep" href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></header>
 <main>
 <section style="border-top:0;padding-top:clamp(40px,6vw,72px)">
   <div class="wrap" id="root"><p class="lede">Loading…</p></div>
 </section>
 </main>
-<footer><div class="wrap"><span class="logo" style="font-size:16px"><i></i>Shipvo</span><nav><a href="/apps">All apps</a><a href="/docs/agents">Agent docs</a><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></footer>
+<footer><div class="wrap"><span class="logo" style="font-size:16px"><img src="/logo-256.png" alt="" width="22" height="22" style="width:22px;height:22px">Shipvo</span><nav><a href="/apps">All apps</a><a href="/docs/agents">Agent docs</a><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></nav></div></footer>
 <script>
 (function(){
   var id=(location.pathname.match(/^\/apps\/([a-z0-9-]+)/)||[])[1],root=document.getElementById('root');
@@ -34,7 +34,7 @@
       '<div class="cmd"><span class="p">›</span><span>open_app("'+esc(a.app_id)+'@latest")</span><button type="button" data-copy=\'open_app("'+esc(a.app_id)+'@latest")\'>Copy</button></div>'+
       '<p class="mono" style="margin-top:14px;font-size:12.5px;color:var(--dim)">ChatGPT connectors cannot send headers: use https://sim.shipvo.dev/mcp/&lt;your key&gt; instead. Opening an app spends your sandbox minutes.</p></div></div>';
     root.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){navigator.clipboard&&navigator.clipboard.writeText(b.dataset.copy).then(function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1400)})})});
-  }).catch(function(){root.innerHTML='<div class="empty"><b>No public app called “'+esc(id)+'”.</b>It may be private, withdrawn or still under review. <a href="/apps" style="color:var(--lime)">See all apps</a>.</div>'});
+  }).catch(function(){root.innerHTML='<div class="empty"><b>No public app called “'+esc(id)+'”.</b>It may be private, withdrawn or still under review. <a href="/apps" style="color:var(--sky)">See all apps</a>.</div>'});
 })();
 </script>
 </body>

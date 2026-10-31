@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
+      - name: Build docs from the repo Markdown
+        run: npm i --no-audit --no-fund --no-save marked@14 && node services/site/build-docs.mjs
       - name: Deploy
         working-directory: services/site
         env:
@@ -20,4 +22,4 @@ jobs:
         run: npx wrangler@4 deploy 2>&1 | tee deploy.log && grep -E "https://|Deployed|Current Version" deploy.log | tail -5 >> "$GITHUB_STEP_SUMMARY" || true
       - name: Smoke test
         run: |
-          for i in 1 2 3 4 5 6; do curl -fsS https://shipvo.dev/ | grep -q "Build once" && curl -fsS https://shipvo.dev/api/apps | grep -q '"apps"' && exit 0; sleep 10; done; exit 1
+          for i in 1 2 3 4 5 6; do curl -fsS https://shipvo.dev/ | grep -q "Build once" && curl -fsS https://shipvo.dev/api/apps | grep -q '"apps"' && curl -fsS https://shipvo.dev/docs/getting-started/ | grep -q "Build your first app" && exit 0; sleep 10; done; exit 1
