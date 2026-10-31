@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check token
-        env: { GH_TOKEN: "${{ secrets.PR_TOKEN }}" }
+        env: { GH_TOKEN: "${{ secrets.PR_TOKEN || secrets.ADMIN_TOKEN }}" }
         run: |
           [ -n "$GH_TOKEN" ] || { echo "::error::Add the PR_TOKEN secret first"; exit 1; }
           echo "ME=$(gh api user --jq .login)" >> "$GITHUB_ENV"
@@ -32,7 +32,7 @@ jobs:
           git --no-pager diff -U1 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Open the pull request
         if: ${{ !inputs.dry_run }}
-        env: { GH_TOKEN: "${{ secrets.PR_TOKEN }}" }
+        env: { GH_TOKEN: "${{ secrets.PR_TOKEN || secrets.ADMIN_TOKEN }}" }
         run: |
           set -e
           gh repo fork "$UP" --clone=false || true
