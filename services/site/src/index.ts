@@ -11,7 +11,7 @@ export default {
       return new Response(r.body, { status: r.status, headers: { "content-type": "application/json", "cache-control": "public, max-age=30" } });
     }
     if (url.pathname === "/docs") return Response.redirect("https://shipvo.dev/docs/overview/", 301);
-    if (/^\/apps\/[a-z0-9-]+\/?$/.test(url.pathname)) return env.ASSETS.fetch(new Request(new URL("/app.html", url).toString(), req));
+    if (/^\/apps\/[a-z0-9-]+\/?$/.test(url.pathname)) return env.ASSETS.fetch(new Request(new URL("/app", url).toString(), req));
     const res = await env.ASSETS.fetch(req);
     const h = new Headers(res.headers);
     h.set("x-content-type-options", "nosniff"); h.set("referrer-policy", "strict-origin-when-cross-origin");
