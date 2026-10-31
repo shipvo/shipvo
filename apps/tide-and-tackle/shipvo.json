@@ -13,7 +13,12 @@
     "description": "Tide & Tackle is the Shipvo sample shop: a catalogue of lures, rods and line, a cart with promo codes, delivery slots or shop pickup, barcode scanning, distance from the shop by location, and payment by cash on delivery or mobile money confirmed with a fingerprint and PIN. Every release ships to real Android phones over the air and to this simulator; the three purchase flows are measured against real devices nightly.",
     "category": "shop",
     "icon": "assets/icon.png",
-    "screenshots": [],
+    "screenshots": [
+      "store/shot-1.png",
+      "store/shot-2.png",
+      "store/shot-3.png",
+      "store/shot-4.png"
+    ],
     "website": "https://shipvo.dev",
     "capabilities": [
       "camera",
