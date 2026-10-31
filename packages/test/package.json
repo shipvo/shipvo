@@ -1,0 +1,25 @@
+{
+  "name": "@shipvo/test",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Typed end-to-end tests for React Native apps that run in the Shipvo simulator: open the app, tap, type, set the phone's location, camera and permissions, and assert on what is on screen. Works in Vitest or any test runner, headless, in CI.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./vitest": { "types": "./dist/vitest.d.ts", "default": "./dist/vitest.js" }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": { "vitest": ">=2" },
+  "peerDependenciesMeta": { "vitest": { "optional": true } },
+  "devDependencies": { "@types/node": "^22.8.0", "typescript": "^5.6.3", "vitest": "^2.1.4" },
+  "keywords": ["react-native", "expo", "testing", "e2e", "simulator", "vitest", "ci", "shipvo"],
+  "homepage": "https://shipvo.dev/docs/testing/",
+  "repository": { "type": "git", "url": "git+https://github.com/shipvo/shipvo.git", "directory": "packages/test" }
+}

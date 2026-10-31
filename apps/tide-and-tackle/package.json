@@ -27,7 +27,9 @@
     "typescript": "~6.0.3",
     "playwright": "1.63.0",
     "@shipvo/mcp": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.32.2"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@shipvo/test": "workspace:*",
+    "vitest": "^2.1.4"
   },
   "scripts": {
     "start": "expo start",
@@ -37,7 +39,8 @@
     "publish:ota": "shipvo publish",
     "rollback:ota": "shipvo rollback",
     "sim": "shipvo sim",
-    "e2e:device": "node sim/e2e-device.mjs"
+    "e2e:device": "node sim/e2e-device.mjs",
+    "test:sim": "vitest run"
   },
   "private": true
 }

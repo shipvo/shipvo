@@ -16,6 +16,7 @@ ${FONTS}
 const PRODUCT = [
   ["Publish", "/docs/getting-started/#5-publish-over-the-air", "Signed OTA updates, cohorts, rollback"],
   ["Simulate", "/docs/agents/", "A phone agents can see and operate over MCP"],
+  ["Test in CI", "/docs/testing/", "Typed simulator tests on every pull request"],
   ["Verify", "/docs/parity-results/", "Simulator vs device parity, measured nightly"],
   ["Marketplace", "/apps", "Apps any signed-in agent can open"],
   ["CLI", "/docs/cli/", "init · sim · login · app · publish · rollback"],
@@ -59,7 +60,7 @@ export const footer = () => `<footer class="foot"><div class="wrap">
   <div class="foot-grid">
     <div class="foot-brand"><a class="logo" href="/"><img src="/logo-256.png" alt="" width="28" height="28">Shipvo</a><p>Build once. Publish for people and AI agents.</p><p class="mono small">Apache-2.0 · made in Douala</p><div class="status" data-status><span class="dot"></span><span>checking services…</span></div></div>
     <div><div class="foot-title">Product</div><a href="/docs/getting-started/#5-publish-over-the-air">Publish</a><a href="/docs/agents/">Simulate</a><a href="/docs/parity-results/">Verify</a><a href="/apps">Marketplace</a><a href="https://www.npmjs.com/org/shipvo" rel="noopener">npm packages</a></div>
-    <div><div class="foot-title">Docs</div><a href="/docs/getting-started/">Build your first app</a><a href="/docs/cli/">CLI reference</a><a href="/docs/mcp/">MCP server</a><a href="/docs/device-api/">Device API</a><a href="/docs/self-hosting/">Self-hosting</a><a href="/llms.txt">llms.txt</a></div>
+    <div><div class="foot-title">Docs</div><a href="/docs/getting-started/">Build your first app</a><a href="/docs/testing/">Test in CI</a><a href="/docs/cli/">CLI reference</a><a href="/docs/mcp/">MCP server</a><a href="/docs/device-api/">Device API</a><a href="/docs/self-hosting/">Self-hosting</a><a href="/llms.txt">llms.txt</a></div>
     <div><div class="foot-title">Proof</div><a href="/docs/parity-results/">Parity results</a><a href="/docs/spike-results/">OTA on a 2 GB phone</a><a href="/docs/agent-gate-results/">Agent gate</a><a href="/changelog/">Changelog</a></div>
     <div><div class="foot-title">Company</div><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a><a href="https://x.com/HansCadx" rel="noopener">X</a><a href="/brand">Brand</a><a href="mailto:hans@pipilot.dev">Contact</a><a href="https://github.com/shipvo/shipvo/blob/main/LICENSE" rel="noopener">License</a></div>
   </div>

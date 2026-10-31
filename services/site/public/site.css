@@ -389,3 +389,16 @@ footer.old{display:none}
 @media(max-width:1000px){.brand-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.swatches{grid-template-columns:repeat(3,minmax(0,1fr))}.usage{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){.brand-hero-grid,.b-lockup,.space-grid,.perm,.type-grid,.words{grid-template-columns:minmax(0,1fr)}.b-lockup>div{padding:0 22px 24px}.brand-stage{order:-1;max-width:300px}.rules li{grid-template-columns:minmax(0,1fr);gap:4px}}
 @media(max-width:520px){.brand-grid{grid-template-columns:minmax(0,1fr)}.swatches{grid-template-columns:repeat(2,minmax(0,1fr))}.usage{grid-template-columns:minmax(0,1fr)}}
+
+/* test in CI */
+.ci-sec{padding:96px 0}
+.ci-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:36px}
+.ci-grid figure{margin:0;min-width:0}.ci-grid .term{position:static;font-size:12.5px;line-height:1.7;margin:0;white-space:pre;overflow:auto}
+.ci-cap{font-size:14px;color:var(--mute);margin-bottom:10px}.ci-cap b{font-family:var(--mono);font-size:13px;color:var(--paper);margin-right:8px}.ci-cap code{font-family:var(--mono)}
+.cases{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:24px}
+.cases>div{background:var(--ink-2);border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:6px}
+.cases b{font-size:17px}.cases span{color:var(--mute);font-size:14.5px;line-height:1.5}
+.ci-cta{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-top:28px}.ci-cta .cmd{margin:0}
+.ci-note{color:var(--dim);font-size:14px;margin-top:18px;max-width:70ch}.ci-note a{color:var(--sky)}
+@media(max-width:1000px){.ci-grid{grid-template-columns:minmax(0,1fr)}.cases{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.ci-sec{padding:64px 0}.cases{grid-template-columns:minmax(0,1fr)}}

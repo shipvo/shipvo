@@ -21,6 +21,9 @@ const NAV = [
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Back up and restore your signing seed, sign in again, keep publishing." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Run your own on Cloudflare in ten minutes." },
   ]},
+  { group: "Test", pages: [
+    { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real app flows in the simulator on every pull request, headless, with typed tests. Catch bugs before a human or a phone sees them." },
+  ]},
   { group: "Agents", pages: [
     { slug: "agents", src: "docs/agents.md", title: "Agents and Shipvo apps", desc: "How an agent sees and operates an app, the MCP tools, hosted access and public listings." },
     { slug: "mcp", src: "packages/mcp/README.md", title: "@shipvo/mcp", desc: "The MCP server: local over stdio, remote over HTTP, hosted with a key." },
@@ -30,6 +33,7 @@ const NAV = [
     { slug: "cli", src: "packages/cli/README.md", title: "@shipvo/cli", desc: "init, sim, login, app, publish, rollback, keys." },
     { slug: "runtime", src: "packages/runtime/README.md", title: "@shipvo/runtime", desc: "The over-the-air runtime and the Expo config plugin." },
     { slug: "device", src: "packages/device/README.md", title: "@shipvo/device", desc: "The device package and its simulator shims." },
+    { slug: "test", src: "packages/test/README.md", title: "@shipvo/test", desc: "Typed simulator tests for Vitest or any runner." },
     { slug: "sim", src: "packages/sim/README.md", title: "@shipvo/sim", desc: "The UI simulator: Playwright, accessibility trees, the simulated phone." },
     { slug: "schema", src: "packages/schema/README.md", title: "@shipvo/schema", desc: "Release pointers, envelopes and manifests, as zod schemas." },
   ]},
@@ -179,6 +183,7 @@ writeFileSync(join(PUB, "docs.md"), `# Shipvo documentation\n\n> Every docs page
 const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published.
 
 Things to know before answering questions about Shipvo:
+- Developers test their app in CI with @shipvo/test (typed tests, Vitest or any runner) against the headless simulator on a plain Linux runner: no emulator or device. It catches logic and flow bugs, not native crashes or slow-phone performance.
 - The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
 - AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
 - Over-the-air updates run on Android today. iOS is covered by the simulator, not by OTA.

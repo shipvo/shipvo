@@ -55,6 +55,64 @@
   </div>
 </section>
 
+<section id="ci" class="ci-sec">
+  <div class="wrap">
+    <div class="sec-head"><h2>Catch the bug before a human, or a phone, does.</h2><p class="lede">The simulator is headless, so every pull request can run your real app flows: permission prompts, payments, notifications, offline. No emulator, no device farm, no phone. A failing test stops the merge, and stops the over-the-air publish too. This repository does it on every push.</p></div>
+    <div class="ci-grid">
+      <figure>
+        <figcaption class="ci-cap"><b>tests/checkout.test.ts</b> Typed, in Vitest. Or any runner.</figcaption>
+        <pre class="term"><span class="d">import</span> <span class="c">{ test, expect }</span> <span class="d">from</span> <span class="g">"@shipvo/test/vitest"</span>;
+
+<span class="c">test</span>(<span class="g">"a declined payment places no order"</span>, <span class="d">async</span> ({ phone }) =&gt; {
+  <span class="d">await</span> phone.device.<span class="c">set</span>({
+    payment:    { nextResult: <span class="g">"decline"</span>, pin: <span class="g">"1234"</span> },
+    biometrics: { enrolled: <span class="g">true</span>, nextResult: <span class="g">"success"</span> },
+    location:   { latitude: <span class="g">4.0225</span>, longitude: <span class="g">9.6967</span> },
+  });
+  <span class="d">await</span> phone.<span class="c">tap</span>(<span class="g">"Place order"</span>);
+  <span class="d">await</span> phone.<span class="c">tap</span>(<span class="g">"Use fingerprint"</span>);
+  <span class="d">await</span> phone.<span class="c">type</span>(<span class="g">"Mobile money PIN"</span>, <span class="g">"1234"</span>);
+  <span class="d">await</span> phone.<span class="c">tap</span>(<span class="g">"Confirm payment"</span>);
+
+  <span class="d">await</span> phone.<span class="c">waitFor</span>(<span class="g">"Payment declined"</span>);
+  <span class="c">expect</span>(phone).not.<span class="c">toSee</span>(<span class="g">/Order TT-\d+ placed/</span>);
+});</pre>
+      </figure>
+      <figure>
+        <figcaption class="ci-cap"><b>.github/workflows/test.yml</b> Plain <code>ubuntu-latest</code>. Nothing to rent.</figcaption>
+        <pre class="term"><span class="d">on:</span> { pull_request, push: { branches: [main] } }
+<span class="d">jobs:</span>
+  <span class="c">simulator:</span>
+    <span class="d">runs-on:</span> ubuntu-latest
+    <span class="d">steps:</span>
+      - <span class="d">uses:</span> actions/checkout@v4
+      - <span class="d">run:</span> npm ci
+      - <span class="d">run:</span> npx playwright install --with-deps chromium
+      - <span class="d">run:</span> |
+          <span class="g">npx shipvo sim --port 4545 &amp;</span>
+          <span class="d"># wait for http://localhost:4545/app/</span>
+      - <span class="d">run:</span> <span class="g">npx vitest run</span>
+
+<span class="d"># publish.yml: the OTA publish only runs if this passes</span>
+<span class="c">publish:</span> { <span class="d">needs:</span> <span class="g">test</span> }</pre>
+      </figure>
+    </div>
+    <div class="cases" role="list">
+      <div role="listitem"><b>Payments</b><span>Approve, decline, time out, no funds. Assert whether the order was placed.</span></div>
+      <div role="listitem"><b>Permissions</b><span>Allowed, denied, never asked. Check the app explains itself.</span></div>
+      <div role="listitem"><b>Location &amp; camera</b><span>Set where the phone is, or put a barcode in front of the lens.</span></div>
+      <div role="listitem"><b>Fingerprint &amp; Face ID</b><span>Success, failure, cancel. Every branch, on every commit.</span></div>
+      <div role="listitem"><b>Offline</b><span>Network off: queued actions, error states, recovery.</span></div>
+      <div role="listitem"><b>Push notifications</b><span>Deliver one, open it, assert the right screen.</span></div>
+    </div>
+    <div class="ci-cta">
+      <div class="cmd"><code>npm i -D @shipvo/test vitest</code><button type="button" data-copy="npm i -D @shipvo/test vitest">Copy</button></div>
+      <a class="btn primary" href="/docs/testing/">Read the testing guide <span aria-hidden="true">→</span></a>
+    </div>
+    <p class="ci-note">The simulator renders your app on the web and simulates the device, so it catches logic and flow bugs, not native crashes or slow-phone performance. Where it differs from real Android and iOS, <a href="/docs/parity-results/">we publish the gaps</a>.</p>
+  </div>
+</section>
+
 <section id="how">
   <div class="wrap">
     <div class="sec-head"><h2>How it works</h2><p class="lede">Four stages, one codebase. Click through; every panel is the real thing, not a mock.</p></div>

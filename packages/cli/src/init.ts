@@ -34,14 +34,14 @@ export async function init(argv: string[]) {
   w("shipvo.json", JSON.stringify({ appId, name, shellMajor: 1, controlPlane, publicKey, listing: { public: false, tagline: "", description: "", category: "other", icon: "assets/icon.png", screenshots: [], website: "", capabilities: ["camera", "location", "biometrics", "payments", "notifications"] } }, null, 2) + "\n");
   w("package.json", JSON.stringify({
     name: appId, version: "1.0.0", main: "index.ts", private: true,
-    scripts: { start: "expo start", android: "expo run:android", ios: "expo run:ios", web: "expo start --web", sim: "shipvo sim", publish: "shipvo publish", rollback: "shipvo rollback", typecheck: "tsc --noEmit" },
+    scripts: { start: "expo start", test: "vitest run", android: "expo run:android", ios: "expo run:ios", web: "expo start --web", sim: "shipvo sim", publish: "shipvo publish", rollback: "shipvo rollback", typecheck: "tsc --noEmit" },
     dependencies: {
       "@expo/metro-runtime": SDK.metroRuntime, expo: SDK.expo, "expo-camera": SDK.camera, "expo-clipboard": SDK.clipboard, "expo-constants": SDK.constants,
       "expo-local-authentication": SDK.localAuth, "expo-location": SDK.location, "expo-notifications": SDK.notifications, "expo-status-bar": SDK.statusBar,
       react: SDK.react, "react-dom": SDK.react, "react-native": SDK.rn, "react-native-web": SDK.rnw,
       "@shipvo/device": "^0.1.0", "@shipvo/runtime": "^0.1.0",
     },
-    devDependencies: { "@shipvo/cli": "^0.1.0", "@shipvo/sim": "^0.1.0", "@types/react": "~19.3.0", playwright: "^1.63.0", typescript: "~6.0.3" },
+    devDependencies: { "@shipvo/cli": "^0.1.0", "@shipvo/sim": "^0.1.0", "@shipvo/test": "^0.1.0", "@types/react": "~19.3.0", playwright: "^1.63.0", typescript: "~6.0.3", vitest: "^2.1.4" },
   }, null, 2) + "\n");
   w("app.json", JSON.stringify({ expo: {
     name, slug: appId, version: "1.0.0", orientation: "portrait", userInterfaceStyle: "automatic",
@@ -69,6 +69,9 @@ export const RELEASE = { headline: "Release 1: hello from ${name}.", note: "Edit
 `);
   w("App.tsx", APP_TSX(name, appId));
   w(".github/workflows/publish.yml", WORKFLOW);
+  w(".github/workflows/test.yml", TEST_WORKFLOW);
+  w("tests/app.test.ts", TEST_APP(name));
+  w("vitest.config.ts", VITEST_CONFIG);
   w("README.md", README(name, appId, controlPlane));
 
   console.log(`
@@ -80,7 +83,7 @@ Created ${name} in ${dirArg}
   npm run sim                 # the app in the simulator on http://localhost:4545
   npx -y @shipvo/mcp          # point Claude / Cursor / ChatGPT at it and open_app("${appId}")
 
-Phones:  npx expo run:android   (needs Android Studio once). iOS: `npx expo run:ios`, then `shipvo publish --platform all`
+Phones:  npx expo run:android   (needs Android Studio once). iOS: npx expo run:ios, then shipvo publish --platform all
 Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and SHIPVO_KV_ID (self-hosted); then npm run publish
          (self-hosting instead? see docs/self-hosting.md)
 
@@ -159,6 +162,82 @@ const s = StyleSheet.create({
 });
 `;
 
+const TEST_WORKFLOW = `name: test
+# Runs your app in the Shipvo simulator on a plain Linux runner (no emulator, no device) and fails the build if it breaks.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+jobs:
+  simulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build the app for the simulator and serve it
+        run: |
+          npx shipvo sim --port 4545 > sim.log 2>&1 &
+          for i in $(seq 1 180); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
+          curl -sf localhost:4545/app/ >/dev/null || { cat sim.log; exit 1; }
+      - name: Test the app in the simulator
+        run: npx vitest run
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: simulator-log, path: sim.log }
+`;
+
+const TEST_APP = (name: string) => `// Tests that run your app in the Shipvo simulator: a phone-sized, headless copy of the real app. No emulator, no device.
+// Run them with "npm test" (start the simulator first: npm run sim) and in CI (.github/workflows/test.yml).
+import { test, expect } from "@shipvo/test/vitest";
+
+test("the app opens and shows its release", async ({ phone }) => {
+  expect(phone).toSee(/Release \\d+/);
+  expect(phone.screen).not.toMatch(/something went wrong|unhandled|exception/i);
+});
+
+test("location: the app asks, then reads the phone's location", async ({ phone }) => {
+  await phone.device.set({ location: { latitude: 4.0511, longitude: 9.7679 } });
+  await phone.tap("Use my location");
+  expect(phone).toSee("access this device's location");
+  await phone.tap("While using the app");
+  await phone.waitFor(/4\\.05/);
+});
+
+test("camera: scanning reads what is in front of it", async ({ phone }) => {
+  await phone.device.set({ camera: { barcode: { type: "qr", data: "HELLO-123" } } });
+  await phone.tap("Scan a code");
+  await phone.tap("While using the app");
+  await phone.waitFor(/HELLO-123/);
+});
+
+test("fingerprint: success and failure are both handled", async ({ phone }) => {
+  await phone.device.set({ biometrics: { enrolled: true, nextResult: "success" } });
+  await phone.tap("Confirm with fingerprint");
+  await phone.tap("Use fingerprint");
+  await phone.waitFor("Confirmed");
+  await phone.device.set({ biometrics: { nextResult: "fail" } });
+  await phone.tap("Confirm with fingerprint");
+  await phone.tap("Use fingerprint");
+  await phone.waitFor(/Not confirmed/);
+});
+
+test("notifications: a push can be opened from the shade", async ({ phone }) => {
+  await phone.tap("Send a notification");
+  expect(await phone.notifications()).toHaveLength(1);
+  await phone.openNotification();
+  expect(await phone.deviceLog()).toContainEqual(expect.objectContaining({ kind: "notification_opened" }));
+});
+`;
+
+const VITEST_CONFIG = `import { defineConfig } from "vitest/config";
+export default defineConfig({ test: { include: ["tests/**/*.test.ts"], testTimeout: 30_000 } });
+`;
+
 const WORKFLOW = `name: publish
 on:
   push:
@@ -166,7 +245,10 @@ on:
     paths: ["src/**", "App.tsx"]
   workflow_dispatch:
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml   # the simulator test must pass before anything ships to phones
   publish:
+    needs: test
     runs-on: ubuntu-latest
     concurrency: shipvo-publish
     if: \${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[no-ota]') }}

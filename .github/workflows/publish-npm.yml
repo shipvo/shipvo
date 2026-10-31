@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm, registry-url: "https://registry.npmjs.org" }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build && pnpm --filter @shipvo/mcp build
+      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build && pnpm --filter @shipvo/mcp build && pnpm --filter @shipvo/test build
       - run: pnpm -r test
       - name: Publish @shipvo packages
         env:
@@ -35,3 +35,4 @@ jobs:
           pub @shipvo/device
           pub @shipvo/runtime
           pub @shipvo/sim
+          pub @shipvo/test

@@ -23,6 +23,11 @@ jobs:
           node sim/server.mjs --dir /tmp/pn-ui > sim.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
           PN_SIM_DIR=/tmp/pn-ui node sim/e2e-device.mjs | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Typed simulator tests (@shipvo/test + Vitest) against the same simulator
+        working-directory: apps/tide-and-tackle
+        run: |
+          pnpm --filter @shipvo/test build
+          SHIPVO_APP=tide npx vitest run | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Design skill checks
         run: |
           cd skills/shipvo-design
