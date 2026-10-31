@@ -1,0 +1,584 @@
+[
+ {
+  "name": "list_apps",
+  "description": "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string"
+    }
+   },
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "open_app",
+  "description": "Open an app in a fresh phone-sized session and return its first screen.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "app": {
+     "type": "string",
+     "description": "App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"
+    },
+    "session": {
+     "type": "string",
+     "description": "Session name (default: generated). One session is one phone."
+    },
+    "seed_cart": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "product_id": {
+        "type": "string"
+       },
+       "id": {
+        "type": "string"
+       },
+       "quantity": {
+        "type": "integer",
+        "exclusiveMinimum": 0
+       },
+       "qty": {
+        "type": "integer",
+        "exclusiveMinimum": 0
+       }
+      },
+      "additionalProperties": false
+     },
+     "description": "Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."
+    },
+    "dark": {
+     "type": "boolean",
+     "description": "Dark mode"
+    }
+   },
+   "required": [
+    "app"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "list_sessions",
+  "description": "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.",
+  "inputSchema": {
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "type": "object",
+   "properties": {}
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "screen",
+  "description": "The current screen as an accessibility tree with refs.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "tap",
+  "description": "Tap a button, link or choice by ref. Returns the new screen.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "ref": {
+     "type": "string",
+     "pattern": "^e\\d+$",
+     "description": "Element ref from the screen, e.g. e42"
+    }
+   },
+   "required": [
+    "session",
+    "ref"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "type",
+  "description": "Type into a text field by ref (replaces its content). Returns the new screen.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "ref": {
+     "type": "string",
+     "pattern": "^e\\d+$",
+     "description": "Element ref from the screen, e.g. e42"
+    },
+    "text": {
+     "type": "string"
+    },
+    "enter": {
+     "type": "boolean",
+     "description": "Press Enter afterwards"
+    }
+   },
+   "required": [
+    "session",
+    "ref",
+    "text"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "scroll",
+  "description": "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "direction": {
+     "type": "string",
+     "enum": [
+      "down",
+      "up",
+      "left",
+      "right"
+     ]
+    },
+    "ref": {
+     "type": "string",
+     "pattern": "^e\\d+$",
+     "description": "Scroll inside this element (a rail or list); omit for the page"
+    }
+   },
+   "required": [
+    "session",
+    "direction"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "back",
+  "description": "Go back one screen.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "screenshot",
+  "description": "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "set_device",
+  "description": "Change what the simulated phone has: location, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "location": {
+     "type": "object",
+     "properties": {
+      "latitude": {
+       "type": "number"
+      },
+      "longitude": {
+       "type": "number"
+      },
+      "accuracy": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "latitude",
+      "longitude"
+     ],
+     "additionalProperties": false
+    },
+    "camera": {
+     "type": "object",
+     "properties": {
+      "barcode": {
+       "anyOf": [
+        {
+         "type": "object",
+         "properties": {
+          "type": {
+           "type": "string"
+          },
+          "data": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "type",
+          "data"
+         ],
+         "additionalProperties": false
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "delayMs": {
+       "type": "number"
+      }
+     },
+     "additionalProperties": false
+    },
+    "permissions": {
+     "type": "object",
+     "properties": {
+      "camera": {
+       "type": "string",
+       "enum": [
+        "granted",
+        "denied",
+        "undetermined"
+       ]
+      },
+      "location": {
+       "type": "string",
+       "enum": [
+        "granted",
+        "denied",
+        "undetermined"
+       ]
+      },
+      "notifications": {
+       "type": "string",
+       "enum": [
+        "granted",
+        "denied",
+        "undetermined"
+       ]
+      }
+     },
+     "additionalProperties": false
+    },
+    "biometrics": {
+     "type": "object",
+     "properties": {
+      "enrolled": {
+       "type": "boolean"
+      },
+      "nextResult": {
+       "type": "string",
+       "enum": [
+        "success",
+        "fail",
+        "cancel"
+       ]
+      }
+     },
+     "additionalProperties": false
+    },
+    "payment": {
+     "type": "object",
+     "properties": {
+      "nextResult": {
+       "type": "string",
+       "enum": [
+        "approve",
+        "decline",
+        "timeout",
+        "insufficient_funds"
+       ]
+      },
+      "pin": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    },
+    "online": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "push_notification",
+  "description": "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "title": {
+     "type": "string"
+    },
+    "body": {
+     "type": "string"
+    },
+    "data": {
+     "type": "object",
+     "additionalProperties": {}
+    }
+   },
+   "required": [
+    "session",
+    "title",
+    "body"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "notifications",
+  "description": "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "open_notification",
+  "description": "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "id": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "device_log",
+  "description": "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "device_reset",
+  "description": "Put the simulated phone back to a known state (permissions undetermined, default location, nothing in front of the camera, log cleared), optionally with a new profile.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "platform": {
+     "type": "string",
+     "enum": [
+      "android",
+      "ios"
+     ]
+    },
+    "api": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "end_session",
+  "description": "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "owner_describe",
+  "description": "List the owner commands of an app (content, prices, offers, orders, publish). Needs PN_OWNER_TOKEN.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "app": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "app"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "owner_command",
+  "description": "Run an owner command against the live app (changes are audited; `publish` makes them live on every phone within seconds).",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "app": {
+     "type": "string"
+    },
+    "command": {
+     "type": "string"
+    },
+    "args": {
+     "type": "object",
+     "additionalProperties": {}
+    }
+   },
+   "required": [
+    "app",
+    "command"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ }
+]

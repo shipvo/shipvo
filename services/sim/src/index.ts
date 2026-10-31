@@ -4,6 +4,7 @@
 //     killed on DELETE or after idle. Perfect isolation, pay per second of use.
 //   - Cloudflare Containers backend (wrangler.containers.jsonc): one container per app.
 import { Container, getContainer } from "@cloudflare/containers";
+import TOOLS from "./tools.json";
 
 type Env = {
   SIM?: DurableObjectNamespace<SimContainer>; DB: D1Database; CONTROL: string; OWNER_TOKEN?: string;
@@ -79,6 +80,18 @@ export default {
 
     // API key → app and scope. Keys come from the owner command create_api_key; only hashes are stored.
     const key = ((req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim()) || pathKey || url.searchParams.get("key") || "";
+    // Without a key, answer only the discovery handshake (initialize, ping, tools/list) from a static list, so
+    // registries and checkers can verify the server. Nothing here opens a phone, costs a sandbox or touches an app.
+    if (!key && req.method === "POST" && url.pathname === "/mcp") {
+      const msg = await req.clone().json().catch(() => null) as { jsonrpc?: string; id?: unknown; method?: string; params?: { protocolVersion?: string } } | null;
+      if (msg && !Array.isArray(msg) && msg.jsonrpc === "2.0") {
+        if (msg.method === "notifications/initialized") return new Response(null, { status: 202, headers: CORS });
+        const rpc = (result: unknown) => json({ jsonrpc: "2.0", id: msg.id ?? null, result });
+        if (msg.method === "initialize") return rpc({ protocolVersion: msg.params?.protocolVersion ?? "2025-03-26", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "shipvo", version: "0.0.6" }, instructions: "Shipvo lets an assistant use a React Native app in a simulated phone. Tools that open or act on an app need an API key: Authorization: Bearer <key> (run `npx @shipvo/cli login`). https://shipvo.dev/docs/test-with-an-assistant/" });
+        if (msg.method === "ping") return rpc({});
+        if (msg.method === "tools/list") return rpc({ tools: TOOLS });
+      }
+    }
     if (!key) return json({ error: "missing_api_key", hint: "Authorization: Bearer <key> (create one with the owner command create_api_key)" }, 401);
     const row = await env.DB.prepare("SELECT id, app_id, scope, expires_at, account_id FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").bind(await sha256(key)).first<{ id: number; app_id: string; scope: string; expires_at: string | null; account_id: number | null }>();
     if (!row) return json({ error: "invalid_api_key" }, 401);
