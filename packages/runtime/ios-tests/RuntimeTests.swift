@@ -76,7 +76,8 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(s.currentRelease, 5); XCTAssertEqual(s.pendingRelease, 0); XCTAssertEqual(s.currentSha, bundleSha)
     XCTAssertEqual(s.consumeEvents(), ["applied:5"])
     XCTAssertEqual(load(s)?.path, s.currentPath, "next launch runs the promoted bundle")
-    XCTAssertEqual((try await Updater.check(s))["status"] as? String, "none", "already on release 5")
+    let again = try await Updater.check(s)
+    XCTAssertEqual(again["status"] as? String, "none", "already on release 5")
   }
 
   func testUnhealthyReleaseIsDroppedAfterThreeLoads() async throws {
@@ -87,7 +88,8 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(s.blockedRelease, 5); XCTAssertEqual(s.pendingRelease, 0)
     XCTAssertFalse(FileManager.default.fileExists(atPath: path))
     XCTAssertTrue(s.consumeEvents().contains("crash_loop_revert:5"))
-    XCTAssertEqual((try await Updater.check(s))["status"] as? String, "none", "a release this device refused is not fetched again")
+    let again = try await Updater.check(s)
+    XCTAssertEqual(again["status"] as? String, "none", "a release this device refused is not fetched again")
   }
 
   func testNewAppBinaryDiscardsOldBundles() async throws {
