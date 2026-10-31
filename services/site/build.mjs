@@ -5,6 +5,7 @@
 import { marked } from "marked";
 import { head as headTag, nav as navTag, footer as footTag } from "./shell.mjs";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { corona } from "./corona.mjs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -74,7 +75,7 @@ function layout(page, body, headings, prev, next) {
   return `<!doctype html>
 <html lang="en">
 <head>
-${headTag({ title: `${esc(page.title)} — Shipvo Docs`, desc: esc(page.desc), path: `/docs/${page.slug}/`, extraCss: '<link rel="stylesheet" href="/docs.css">' })}
+${headTag({ title: `${esc(page.title)} — Shipvo Docs`, desc: esc(page.desc), path: `/docs/${page.slug}/`, extraCss: `<link rel="stylesheet" href="/docs.css"><link rel="alternate" type="text/markdown" href="/docs/${page.slug}.md">` })}
 </head>
 <body class="docs">
 ${navTag("docs")}
@@ -119,7 +120,13 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
   let s = readFileSync(join(here, "pages", f), "utf8");
   s = s.replace(/<!--HEAD (.*?)-->/s, (_, attrs) => { const a = Object.fromEntries([...attrs.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]])); return headTag(a); });
   s = s.replace(/<!--NAV ?(\w*)-->/, (_, k) => navTag(k)).replace("<!--FOOTER-->", footTag()).replace(/<main(?![^>]*\bid=)/, '<main id="main"');
+  s = s.replace("<!--CORONA-->", corona({ logoHref: "/logo-256.png", id: "cor" }));
   writeFileSync(join(PUB, f), s);
+}
+{ // the same artwork as a standalone file (README, social cards, anywhere an <img> works): logo embedded, light and dark aware
+  const logo = readFileSync(join(here, "assets", "logo-192.png")).toString("base64");
+  mkdirSync(join(PUB, "img"), { recursive: true });
+  writeFileSync(join(PUB, "img", "shipvo-corona.svg"), corona({ logoHref: `data:image/png;base64,${logo}`, id: "cor", standalone: true }));
 }
 // Changelog from CHANGELOG.md
 {
@@ -129,4 +136,57 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
   mkdirSync(join(PUB, "changelog"), { recursive: true });
   writeFileSync(join(PUB, "changelog", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Changelog — Shipvo", desc: "What shipped in Shipvo, dated, newest first.", path: "/changelog/" })}</head><body>${navTag("changelog")}<main id="main"><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Changelog</div><h2 style="margin-top:12px">What shipped.</h2><p class="lede" style="margin-top:14px">Dated, newest first. Package versions are on npm under <code>@shipvo</code>; the full history is the <a class="link" href="https://github.com/shipvo/shipvo/commits/main" rel="noopener">commit log</a>.</p><article class="log">${body}</article></div></section></main>${footTag()}</body></html>`);
 }
-console.log("pages + changelog built");
+
+// ---------- Legal pages ----------
+const LEGAL = [
+  { slug: "terms", src: "legal/terms.md", desc: "The rules for using the hosted Shipvo services." },
+  { slug: "privacy", src: "legal/privacy.md", desc: "What the hosted Shipvo services collect, why, and who else touches it." },
+  { slug: "acceptable-use", src: "legal/acceptable-use.md", desc: "What you may not publish or do with Shipvo." },
+  { slug: "security", src: "legal/security.md", desc: "How to report a vulnerability, and how Shipvo is designed to protect you." },
+];
+const BUILD_DATE = new Date().toISOString().slice(0, 10);
+for (const l of LEGAL) {
+  const md = readFileSync(join(ROOT, l.src), "utf8");
+  const title = md.match(/^# (.*)/)[1], updated = (md.match(/^Last updated: (.*)$/m) || [])[1] || "";
+  marked.use({ renderer: new marked.Renderer(), gfm: true });
+  const body = marked.parse(md.replace(/^# .*\n/, "").replace(/^Last updated: .*\n/m, ""));
+  mkdirSync(join(PUB, l.slug), { recursive: true });
+  writeFileSync(join(PUB, l.slug, "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: `${title} — Shipvo`, desc: l.desc, path: `/${l.slug}/` })}</head><body>${navTag("")}<main id="main"><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Legal</div><h1 class="legal-h1">${esc(title)}</h1>${updated ? `<p class="mono small" style="color:var(--dim);margin-top:10px">Last updated ${esc(updated.replace(/^Last updated:?\s*/, ""))}</p>` : ""}<article class="legal">${body}</article><nav class="legal-nav" aria-label="Legal">${LEGAL.map((x) => `<a href="/${x.slug}/"${x.slug === l.slug ? ' aria-current="page"' : ""}>${esc(x.slug === "acceptable-use" ? "Acceptable use" : x.slug[0].toUpperCase() + x.slug.slice(1))}</a>`).join("")}</nav></div></section></main>${footTag()}</body></html>`);
+}
+
+// ---------- Machine-readable: per-page .md, docs.md, llms.txt, llms-full.txt, robots, sitemap list, security.txt ----------
+const SITE = "https://shipvo.dev";
+function mdFor(page) {
+  let md = readFileSync(join(ROOT, page.src), "utf8");
+  md = md.replace(/<p align="center"><img[^>]*><\/p>\s*/g, "");                         // README banner: decoration only
+  md = md.replace(/(!?)\[([^\]]*)\]\(([^)\s]+)(\s+"[^"]*")?\)/g, (m, bang, text, href, title) => {
+    if (bang) return `![${text}](${/^https?:/.test(href) ? href : SITE + "/img/brand/banner.webp"})`;
+    let h = rewriteHref(href, page.src);
+    const d = h.match(/^\/docs\/([\w-]+)\/(#.*)?$/); if (d) h = `${SITE}/docs/${d[1]}.md`;
+    else if (h.startsWith("/")) h = SITE + h;
+    return `[${text}](${h}${title || ""})`;
+  });
+  return md.replace(/^# .*\n/, "").trim();
+}
+const mdDocs = all.filter((p) => existsSync(join(ROOT, p.src))).map((p) => ({ ...p, md: mdFor(p) }));
+for (const p of mdDocs) writeFileSync(join(OUT, `${p.slug}.md`), `# ${p.title}\n\n> ${p.desc}\n\nCanonical page: ${SITE}/docs/${p.slug}/\n\n${p.md}\n`);
+const mdList = (pages) => pages.map((p) => `- [${p.title}](${SITE}/docs/${p.slug}.md): ${p.desc}`).join("\n");
+const groups = [...new Set(mdDocs.map((p) => p.group))];
+writeFileSync(join(PUB, "docs.md"), `# Shipvo documentation\n\n> Every docs page is also available as Markdown at \`/docs/<page>.md\`. Everything in one file: ${SITE}/llms-full.txt\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n`);
+const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published.
+
+Things to know before answering questions about Shipvo:
+- The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
+- AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
+- Over-the-air updates run on Android today. iOS is covered by the simulator, not by OTA.
+- Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
+- Packages are on npm under @shipvo (cli, mcp, runtime, device, sim, schema). Source: https://github.com/shipvo/shipvo`;
+const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");
+writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
+writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}/docs/${p.slug}/\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);
+writeFileSync(join(PUB, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n# For AI tools: ${SITE}/llms.txt and ${SITE}/llms-full.txt\n`);
+const staticPaths = ["/", "/apps", "/changelog/", ...all.map((p) => `/docs/${p.slug}/`), ...LEGAL.map((l) => `/${l.slug}/`)];
+writeFileSync(join(PUB, "sitemap-static.txt"), staticPaths.join("\n") + "\n");
+writeFileSync(join(PUB, "security.txt"), `Contact: mailto:hans@pipilot.dev\nExpires: ${new Date(Date.now() + 365 * 864e5).toISOString().replace(/\.\d+Z$/, "Z")}\nPreferred-Languages: en, fr\nCanonical: ${SITE}/.well-known/security.txt\nPolicy: ${SITE}/security/\n`);
+
+console.log("pages + changelog + legal + llms built");

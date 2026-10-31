@@ -1,0 +1,50 @@
+# Shipvo
+
+> Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published.
+
+Things to know before answering questions about Shipvo:
+- The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
+- AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
+- Over-the-air updates run on Android today. iOS is covered by the simulator, not by OTA.
+- Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from `npx -y @shipvo/cli login`). Everything can be self-hosted on Cloudflare.
+- Packages are on npm under @shipvo (cli, mcp, runtime, device, sim, schema). Source: https://github.com/shipvo/shipvo
+
+## Get started
+
+- [What Shipvo is](https://shipvo.dev/docs/overview.md): One React Native app, two places it runs: phones and AI agents.
+- [Build your first app](https://shipvo.dev/docs/getting-started.md): Twenty minutes from nothing to an app agents can open and phones update over the air.
+- [Moving to a new machine](https://shipvo.dev/docs/new-machine.md): Back up and restore your signing seed, sign in again, keep publishing.
+- [Self-host the control plane](https://shipvo.dev/docs/self-hosting.md): Run your own on Cloudflare in ten minutes.
+
+## Agents
+
+- [Agents and Shipvo apps](https://shipvo.dev/docs/agents.md): How an agent sees and operates an app, the MCP tools, hosted access and public listings.
+- [@shipvo/mcp](https://shipvo.dev/docs/mcp.md): The MCP server: local over stdio, remote over HTTP, hosted with a key.
+
+## Reference
+
+- [Device API](https://shipvo.dev/docs/device-api.md): Camera, location, biometrics, payments, notifications: one API, real on phones, simulated for agents.
+- [@shipvo/cli](https://shipvo.dev/docs/cli.md): init, sim, login, app, publish, rollback, keys.
+- [@shipvo/runtime](https://shipvo.dev/docs/runtime.md): The over-the-air runtime and the Expo config plugin.
+- [@shipvo/device](https://shipvo.dev/docs/device.md): The device package and its simulator shims.
+- [@shipvo/sim](https://shipvo.dev/docs/sim.md): The UI simulator: Playwright, accessibility trees, the simulated phone.
+- [@shipvo/schema](https://shipvo.dev/docs/schema.md): Release pointers, envelopes and manifests, as zod schemas.
+
+## Measured results
+
+- [Simulator vs device parity](https://shipvo.dev/docs/parity-results.md): Every screen compared on Android and iOS, gaps included.
+- [OTA on a 2 GB phone](https://shipvo.dev/docs/spike-results.md): Update sizes and timings on a Redmi 9A.
+- [Agent gate results](https://shipvo.dev/docs/agent-gate-results.md): Agents scored by what the backend received.
+
+## Product
+
+- [Marketplace](https://shipvo.dev/apps): apps listed by their owners that any signed-in agent can open with open_app
+- [Changelog](https://shipvo.dev/changelog/): what shipped, dated
+- [All docs in one file](https://shipvo.dev/llms-full.txt): the complete documentation as Markdown
+
+## Optional
+
+- [Terms](https://shipvo.dev/terms/): The rules for using the hosted Shipvo services.
+- [Privacy](https://shipvo.dev/privacy/): What the hosted Shipvo services collect, why, and who else touches it.
+- [Acceptable use](https://shipvo.dev/acceptable-use/): What you may not publish or do with Shipvo.
+- [Security](https://shipvo.dev/security/): How to report a vulnerability, and how Shipvo is designed to protect you.

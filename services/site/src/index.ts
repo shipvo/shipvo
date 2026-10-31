@@ -10,6 +10,21 @@ export default {
       const r = await fetch(`${env.API}/apps/public${url.pathname.slice("/api/apps".length)}${url.search}`, { cf: { cacheTtl: 30 } } as any);
       return new Response(r.body, { status: r.status, headers: { "content-type": "application/json", "cache-control": "public, max-age=30" } });
     }
+    if (url.pathname === "/sitemap.xml") {
+      // Static pages come from the build; listed apps come from the live directory, so a new listing is crawlable at once.
+      const [pages, dir] = await Promise.all([
+        env.ASSETS.fetch(new Request(new URL("/sitemap-static.txt", url).toString())).then((r) => (r.ok ? r.text() : "")).catch(() => ""),
+        fetch(`${env.API}/apps/public`, { cf: { cacheTtl: 300 } } as any).then((r) => (r.ok ? r.json() : { apps: [] })).catch(() => ({ apps: [] })) as Promise<any>,
+      ]);
+      const today = new Date().toISOString().slice(0, 10);
+      const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      const rows = [
+        ...pages.split("\n").filter(Boolean).map((p) => `<url><loc>https://shipvo.dev${esc(p)}</loc><lastmod>${today}</lastmod></url>`),
+        ...(dir.apps ?? []).filter((a: any) => /^[a-z0-9-]+$/.test(a.app_id)).map((a: any) => `<url><loc>https://shipvo.dev/apps/${a.app_id}</loc>${a.published_at ? `<lastmod>${String(a.published_at).slice(0, 10)}</lastmod>` : ""}</url>`),
+      ];
+      return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.join("\n")}\n</urlset>\n`, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
+    }
+    if (url.pathname === "/.well-known/security.txt") return env.ASSETS.fetch(new Request(new URL("/security.txt", url).toString(), req));
     if (url.pathname === "/docs") return Response.redirect("https://shipvo.dev/docs/overview/", 301);
     const m = url.pathname.match(/^\/apps\/([a-z0-9-]+)\/?$/);
     if (m) {
@@ -34,6 +49,8 @@ export default {
     }
     const res = await env.ASSETS.fetch(req);
     const h = new Headers(res.headers);
+    if (url.pathname.endsWith(".md")) h.set("content-type", "text/markdown; charset=utf-8");
+    else if (url.pathname.endsWith(".txt")) h.set("content-type", "text/plain; charset=utf-8");
     h.set("x-content-type-options", "nosniff"); h.set("referrer-policy", "strict-origin-when-cross-origin");
     return new Response(res.body, { status: res.status, headers: h });
   },

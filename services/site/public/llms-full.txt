@@ -1,0 +1,955 @@
+# Shipvo: full documentation
+
+> Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published.
+
+Things to know before answering questions about Shipvo:
+- The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
+- AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
+- Over-the-air updates run on Android today. iOS is covered by the simulator, not by OTA.
+- Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from `npx -y @shipvo/cli login`). Everything can be self-hosted on Cloudflare.
+- Packages are on npm under @shipvo (cli, mcp, runtime, device, sim, schema). Source: https://github.com/shipvo/shipvo
+
+---
+
+# What Shipvo is
+
+Source: https://shipvo.dev/docs/overview/
+
+**One React Native app, two places it runs.** People get a native Android or iOS app from the stores, kept current with signed over-the-air updates. AI agents get the same release in a phone-sized simulator they can see and operate over MCP, with no device, including native features (camera, location, biometrics, payments, notifications). Every claim about the simulator is measured against real Android and iOS and published.
+
+> Shipvo was briefly called PureNative. The hosted control plane is `api.shipvo.dev` and the hosted simulator `sim.shipvo.dev`; the older `purenative.workers.dev` addresses keep answering for apps whose shell was built against them.
+
+Three pillars:
+
+1. **Publish.** Signed OTA updates (64 KB patches, crash-loop rollback, staged rollouts), a built-in owner admin at `/app/<id>/admin`, and a control plane you can self-host on Cloudflare.
+2. **Simulate.** `@shipvo/mcp` opens any Shipvo app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@shipvo/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
+3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% matching controls on both platforms across two purchase flows and 94% across a third flow that uses the camera, location and payment prompts, with the orders themselves compared (`docs/parity-results.md`, which also says exactly what the score does and does not measure).
+
+[![CI](https://github.com/shipvo/shipvo/actions/workflows/ci.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/ci.yml)
+[![Deploy](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![Status: pre-launch](https://img.shields.io/badge/status-pre--launch-orange)
+
+> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on Android; iOS is next.
+
+### Why Shipvo
+
+Every change to a native mobile app normally means a new build, a store submission, a review, and then waiting for users to update. Many never do. Shipvo separates what has to go through the store from what doesn't:
+
+| Layer | Ships through | Contains |
+| --- | --- | --- |
+| **Native shell** | App Store / Google Play | Native modules, declared permissions, the signing trust root |
+| **Core runtime** | Over the air, signed | The app's JavaScript (Hermes bytecode) |
+| **Screens and add-ons** | Over the air, signed | New screens, features and fixes built on capabilities the shell already declares |
+
+Updates are interpreted JavaScript running on native capabilities the shell declares up front. The app never asks for a permission it hasn't declared.
+
+### Features
+
+- **Signed OTA updates:** Ed25519 signatures, verified natively on the device against a public key built into the app. An update can't replace its own trust root.
+- **Integrity checks:** SHA-256 and size are verified before a bundle is staged; staging is atomic.
+- **Crash-loop protection:** a release that fails to boot 3 times is discarded automatically, and you can roll back to the previous release in one call.
+- **Staged rollouts:** cohort bands (1%, 10%, everyone) served as static signed pointers from the edge, with no device registry.
+- **Telemetry for every release:** applied, reverted, cold-start time, download size and time.
+- **Control plane on Cloudflare Workers:** KV, D1 and R2. It's self-hostable, with a Docker target planned.
+- **Admin per app** at `/app/<id>/admin`: live content, prices, offers, orders, history, publish to every phone in seconds; the same typed owner commands are available to agents with a token.
+- **Agent-operable apps:** every app exposes typed commands and a UI simulator; `@shipvo/mcp` plugs both into Claude, Cursor, Claude Code or PiPilot.
+- **Simulated device:** `@shipvo/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
+- **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/shipvo-design`.
+
+### Start
+
+```bash
+npx -y @shipvo/cli init myshop && cd myshop && npm install && npx playwright install chromium
+npm run sim                      # the app in the simulator; agents: open_app("myshop") through @shipvo/mcp
+npx expo run:android             # the native shell; `shipvo publish` ships changes over the air
+```
+
+Guides: [Build your first app](https://shipvo.dev/docs/getting-started.md) · [Device API](https://shipvo.dev/docs/device-api.md) · [Agents and MCP](https://shipvo.dev/docs/agents.md) · [Self-hosting the control plane](https://shipvo.dev/docs/self-hosting.md) · measured results: [OTA on a 2 GB phone](https://shipvo.dev/docs/spike-results.md), [simulator vs device parity](https://shipvo.dev/docs/parity-results.md), [agent gate](https://shipvo.dev/docs/agent-gate-results.md).
+
+### Use an app as an AI agent (no phone)
+
+Add the MCP server to Claude, Claude Code, Cursor or PiPilot:
+
+```json
+{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
+```
+
+Then: `open_app("tide@latest")` returns a phone-sized session and the first screen as an accessibility tree with refs; `tap`, `type`, `scroll`, `back` and `screenshot` act on it; `set_device` decides what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether a payment is approved, network off); `device_log` reports every device event, all marked simulated; `end_session` returns the steps taken and the orders the app sent. `tide@r13` opens exactly the release phones are running; `tide` opens a local build. Full tool list: `packages/mcp/README.md`.
+
+What the agent sees is what a person with a screen reader would: only the items of a rail that are on screen (swipe to see more), nothing behind a modal sheet, system dialogs worded as Android or iOS word them.
+
+### How a release reaches phones and agents
+
+```
+shipvo publish              Build Hermes bundle → SHA-256 → bsdiff patches → sign pointer (Ed25519)
+        │                   Build web artifact of the same commit (platform adapters only)
+        ▼
+Cloudflare edge             /p/{app}/{shell_major}/{band}.json   (signed envelope, ETag)
+        │                   /b/{app}/r{release}.hbc              (immutable bundle, bsdiff patches)
+        │                   /w/{app}/r{release}/                 (the same release for agents)
+        ├──────────────────────────────┐
+        ▼                              ▼
+Device runtime (Kotlin)        Simulator / sim.shipvo.dev
+verify → download → verify     open_app("tide@r13") → accessibility tree
+→ stage → reload → healthy     → tap/type/scroll → device sheets → report
+or revert after 3 failed boots
+        ▼
+Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
+```
+
+### Repository layout
+
+| Path | What it is |
+| --- | --- |
+| `packages/schema` | Contracts: shell manifest, add-on manifest, release pointer, signed envelope, gate report, change log, telemetry (Zod) |
+| `packages/cli` | `shipvo` CLI: `init` a new app, `sim` it, `publish` / `rollback` signed releases, signing keys |
+| `packages/runtime` | `@shipvo/runtime`: the native OTA runtime (verify, patch, stage, apply, crash-loop rollback) and the config plugin that pins the trust root |
+| `packages/sim` | `@shipvo/sim`: the simulator (phone-sized headless browser, accessibility tree, simulated device, mock backend) |
+| `packages/mcp` | `@shipvo/mcp`: the MCP server agents use to open, see and operate apps, control the simulated device, and run owner commands |
+| `packages/device` | `@shipvo/device`: one device API (camera, location, biometrics, payments, notifications, share, network), real on phones, simulated in the simulator, plus Metro aliases for raw Expo imports |
+| `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
+| `services/sim` | Hosted simulator Worker: one sandbox per API key, the same MCP tools over HTTPS (sim.shipvo.dev) |
+| `services/site` | shipvo.dev: landing page and the public app marketplace |
+| `apps/tide-and-tackle` | Sample shop app built on the packages above, plus the device drivers and the parity harness (`sim/`) |
+| `docs/` | Measured results: spike, agent gate, parity |
+| `skills/shipvo-design` | Design skill with runnable checks |
+
+### Try the sample app
+
+1. Download the latest `tide-and-tackle-shell.apk` from [Releases](https://github.com/shipvo/shipvo/releases) and install it on an Android 7+ phone.
+2. Edit `apps/tide-and-tackle/src/release.ts` and run `shipvo publish` (or push to `main` and let the `publish-ota` workflow do it). It signs and publishes the release.
+3. The app checks every 10 seconds while open, verifies the update, applies it, and logs the timings on screen.
+4. Change prices or the home screen at `/app/tide/admin` on your control plane; the phone shows it in about 10 seconds.
+5. Open the same release as an agent: `cd apps/tide-and-tackle && pnpm sim`, then `open_app("tide@latest")` through `@shipvo/mcp`, or `scripts/ui screen` from a terminal.
+
+### Develop
+
+```bash
+pnpm install
+pnpm -r test
+pnpm --filter @shipvo/control-plane dev
+```
+
+Requires Node 22 and pnpm 10.
+
+### Compared with other OTA tools
+
+Shipvo sits alongside tools like Expo Updates (EAS Update) and self-hosted CodePush servers, which replaced Microsoft App Center CodePush after it was retired in 2025. What Shipvo adds: a declared-capability shell manifest, signed add-ons, a per-app admin, cohort rollouts from static edge files, and apps that AI agents can operate.
+
+### License
+
+Framework: [Apache-2.0](https://github.com/shipvo/shipvo/blob/main/LICENSE). The hosted control plane may be offered under a source-available license; self-hosting stays permitted.
+
+---
+
+# Build your first app
+
+Source: https://shipvo.dev/docs/getting-started/
+
+Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
+
+### 0. What you need
+
+- Node 22 and npm (or pnpm / bun).
+- For the simulator: Chromium via Playwright (one command below). No Android Studio, no Xcode, no phone.
+- For phones: Android Studio once (`npx expo run:android`), or EAS Build.
+- For publishing: a control plane. Use the hosted one (`shipvo login`, then `shipvo app create`, both below) or self-host yours on Cloudflare in ten minutes ([self-hosting.md](https://shipvo.dev/docs/self-hosting.md)).
+
+### 1. Create the app
+
+```bash
+npx -y @shipvo/cli init myshop --name "My Shop"
+cd myshop
+npm install
+npx playwright install chromium
+```
+
+`init` writes a complete Expo app:
+
+| File | What it is |
+| --- | --- |
+| `shipvo.json` | App id, name, control plane URL, the public key pinned in the shell. Every `shipvo` command reads it. |
+| `app.json` | Expo config with the `@shipvo/runtime` plugin (trust root + control plane go into the native shell) and the Expo permission strings. |
+| `App.tsx` | A small screen that boots the OTA runtime and exercises the device API: scan, location, fingerprint, notification. |
+| `src/release.ts` | The first thing you edit: push a change and every phone and simulator gets it. |
+| `metro.config.js` | `withShipvoSim`: simulator builds swap Expo's native modules for the simulated device. |
+| `.github/workflows/publish.yml` | Runs `shipvo publish` for you on every push to `main` (optional; you can always run it yourself). |
+| `.shipvo/seed.txt` | Your Ed25519 release signing seed, git-ignored. **Back it up offline.** Lose it and installed shells will never accept another update. Run `shipvo keys export` and keep a copy ([moving machines](https://shipvo.dev/docs/new-machine.md)). |
+
+### 2. Run it in the simulator
+
+```bash
+npm run sim
+```
+
+This builds the web bundle with the simulated device and serves it on `http://localhost:4545`. Now let an agent use it. In Claude Desktop, Claude Code, Cursor or PiPilot:
+
+```json
+{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
+```
+
+Ask the agent to `open_app("myshop")`. It gets the first screen as an accessibility tree with refs and can `tap`, `type`, `scroll`, `back`, `screenshot`. Tap "Scan a code" and the Android camera permission dialog appears in the tree; the agent answers it like a person would. `set_device` decides what the phone has:
+
+```
+set_device(session, camera: { barcode: { type: "qr", data: "HELLO-123" } }, location: { latitude: 4.05, longitude: 9.7 })
+```
+
+`device_log` lists every device event, each marked `simulated: true`. Nothing here is a real camera, fingerprint or payment, and the API never pretends otherwise: `device.capabilities()` returns `simulated` for each capability in the simulator and `real` on a phone.
+
+You can also drive the simulator from a terminal:
+
+```bash
+curl -s -X POST localhost:4545/session -H 'content-type: application/json' -d '{"session":"s1","app":"myshop"}'
+curl -s -X POST localhost:4545/act -H 'content-type: application/json' -d '{"session":"s1","action":"tap","ref":"e11"}'
+```
+
+### 3. Use the device API in your own screens
+
+```tsx
+import { device } from "@shipvo/device";
+import { ScanHost } from "@shipvo/device/scan";   // mount once at the root; device.camera.scan() then works on phones
+
+const code = await device.camera.scan({ prompt: "Point at the barcode" });   // { type, data } or null
+const here = await device.location.current();                               // asks permission first
+const auth = await device.auth.confirm("Confirm payment of 4 200 FCFA");    // { ok: true } | { ok: false, reason }
+const paid = await device.pay.charge({ provider: "mobile_money", amount: 4200, currency: "FCFA", to: "My Shop", reference: "MS-1", phone: "677000111" }, pin);
+await device.notifications.show({ title: "Order confirmed", body: "MS-1 is being prepared", data: { order: "MS-1" } });
+device.notifications.onOpen((n) => openOrder(n.data?.order));
+```
+
+The full reference is in [device-api.md](https://shipvo.dev/docs/device-api.md). Screens built on it run unchanged on phones and in the simulator; the system dialogs are worded as Android or iOS word them depending on the simulated device's platform.
+
+### 4. Put it on a phone
+
+```bash
+npx expo run:android          # or: npx eas build -p android
+```
+
+The shell contains your public key and control plane URL as manifest meta-data; nothing delivered over the air can change them. The embedded bundle is the first release; every later one is a signed download. iOS builds run the embedded bundle and live content (the OTA runtime is Android today).
+
+### 5. Publish over the air
+
+**Hosted control plane (the default).** Sign in once and register the app:
+
+```bash
+npx -y @shipvo/cli login          # GitHub sign-in; saves your key
+npx -y @shipvo/cli app create     # registers the app id + your public key, saves a publish token to .shipvo/publish-token
+```
+
+For CI, add two repository secrets (Settings → Secrets → Actions):
+
+| Secret | Value |
+| --- | --- |
+| `SHIPVO_SIGNING_SEED` | the contents of `.shipvo/seed.txt` |
+| `SHIPVO_PUBLISH_TOKEN` | the contents of `.shipvo/publish-token` (valid 90 days; run `shipvo app create` again for a new one) |
+
+The publish token can only write your app's own files, and every release pointer must verify against the public key you registered, so a leaked token cannot ship code to your users without your signing seed. The seed never leaves your machine or CI.
+
+**Self-hosted control plane.** Instead of the token, set `CLOUDFLARE_API_TOKEN` (Workers KV Storage: Edit), `CLOUDFLARE_ACCOUNT_ID` and `SHIPVO_KV_ID` (see [self-hosting.md](https://shipvo.dev/docs/self-hosting.md)) and point `controlPlane` in `shipvo.json` at your Worker.
+
+Then edit `src/release.ts` and run `shipvo publish`. (In a GitHub repo, the workflow does the same on every push to `main`.) It:
+
+1. builds the Hermes bundle and hashes it,
+2. builds bsdiff patches from recent releases and from each shell's embedded bundle, so most updates are tens of kilobytes,
+3. builds the web artifact of the same commit for the simulator (`/w/<app>/r<N>/`),
+4. signs the release pointer (Ed25519) and writes it for each cohort band (`b0` 1 %, `b1` 10 %, `b2` everyone).
+
+Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
+
+Agents open the exact release phones run with `open_app("myshop@r8")` or `open_app("myshop@latest")`.
+
+### 6. Give agents a key, not a laptop
+
+The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config. Your key opens the sample app and every app you registered with `shipvo app create`: after a publish, `open_app("myshop@latest")` opens the exact release phones run. The beta allows 3 apps per account and 500 MB each; self-hosting is always open. See [agents.md](https://shipvo.dev/docs/agents.md).
+
+### Where things are measured
+
+Everything above is claimed from measurements on real hardware, published in this repo: OTA sizes and timings on a 2 GB Redmi 9A ([spike-results.md](https://shipvo.dev/docs/spike-results.md)), and simulator-vs-device parity on an Android emulator and an iPhone simulator, including what the score does not cover ([parity-results.md](https://shipvo.dev/docs/parity-results.md)).
+
+---
+
+# Moving to a new machine
+
+Source: https://shipvo.dev/docs/new-machine/
+
+Switching laptops, or joining a teammate's repo, takes two small steps. One of them matters a lot: the **signing seed**.
+
+### What lives where
+
+| Thing | Where it lives | Lost with the old machine? | What to do |
+| --- | --- | --- | --- |
+| Your code | Git | No | `git clone` |
+| Sign-in key (`shipvo login`) | `~/.shipvo` on the machine | Yes | Run `shipvo login` again (30 seconds) |
+| Publish token | `.shipvo/publish-token` | Yes | Run `shipvo app create` again; it issues a new token and revokes the old one |
+| **Release signing seed** | `.shipvo/seed.txt`, git-ignored | **Yes, and nobody can recover it** | Restore it from your backup with `shipvo keys import` |
+
+The seed is the only thing that can update phones that already have your app installed, because every installed shell pins its public key. Shipvo never has your seed, by design, so we cannot reset it for you.
+
+### Before you switch: back the seed up
+
+On the machine that has it:
+
+```bash
+npx -y @shipvo/cli keys export          # prints the seed; copy it into a password manager
+npx -y @shipvo/cli keys export --out seed.txt   # or write it to a file, store it, then delete the file
+```
+
+Keep it in a password manager or an offline vault. Never paste it into chat, a ticket or a commit. If you already added it to your CI as the `SHIPVO_SIGNING_SEED` secret, that is a second copy, but GitHub never shows a secret again, so it cannot serve as your only backup.
+
+### On the new machine
+
+```bash
+git clone <your repo> && cd <your app>
+npm install
+
+npx -y @shipvo/cli keys import <seed>             # or: keys import --file seed.txt
+npx -y @shipvo/cli login                          # sign in with GitHub
+npx -y @shipvo/cli app create                     # new publish token for this machine
+npx -y @shipvo/cli publish
+```
+
+`keys import` checks the seed against the public key in `shipvo.json` and refuses one that does not match, so you find out now, not when a release is rejected. It writes `.shipvo/seed.txt` with owner-only permissions.
+
+### If the seed is truly lost
+
+- Phones that already have the app keep working on the release they have. They will never accept another update.
+- Generate a new key (`shipvo keygen`), put the new public key in `shipvo.json`, build a new shell, and ask users to install it from the store again.
+- Apps listed on the Shipvo marketplace need `shipvo app create` to register the new key; contact us if the old registration blocks it.
+
+So back it up once, today, even if you are not moving.
+
+### Teams
+
+Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`) and let CI publish, or keep it in a shared vault your team already trusts. Each person runs their own `shipvo login` and `shipvo app create`; publish tokens are per machine.
+
+---
+
+# Self-host the control plane
+
+Source: https://shipvo.dev/docs/self-hosting/
+
+The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. Free-tier Cloudflare is enough to start.
+
+### Deploy
+
+```bash
+git clone https://github.com/shipvo/shipvo && cd shipvo
+pnpm install
+cd services/control-plane
+npx wrangler login
+npx wrangler kv namespace create POINTERS          # note the id
+npx wrangler d1 create shipvo                      # note the database_id
+```
+
+Put both ids in `wrangler.toml` (`kv_namespaces[0].id`, `d1_databases[0].database_id`, and rename `name` to whatever you like), then:
+
+```bash
+npx wrangler d1 migrations apply shipvo --remote
+npx wrangler secret put ADMIN_PASSWORD             # the admin login for /app/<id>/admin
+npx wrangler secret put OWNER_TOKEN                # bearer token for agents using the owner API
+npx wrangler deploy
+```
+
+`https://<worker>.workers.dev/health` answers `{ "ok": true }`. Put a custom domain in front when you have one; the URL goes into every shell, so pick it before you build the first shell.
+
+### Point apps at it
+
+In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `controlPlane: "https://your-domain"`, and in `shipvo.json`: `kv: { namespaceId: "<POINTERS id>" }`. Publishing needs a Cloudflare API token with *Workers KV Storage: Edit* on the account (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), plus `SHIPVO_SIGNING_SEED`.
+
+### What lives where
+
+| Store | Keys | Purpose |
+| --- | --- | --- |
+| KV | `p/<app>/<shell_major>/<band>` | Signed release pointer per cohort band (the hot path; static, ETag-cached) |
+| KV | `b/<app>/r<N>.hbc`, `b/<app>/d-<sha>-r<N>.bsdiff`, `b/<app>/base-<sha>.hbc` | Bundles, patches, shells' embedded bundles |
+| KV | `w/<app>/r<N>/*`, `w/<app>/releases` | The web artifact of each release for the simulator |
+| KV | `h/<app>/r<N>` | Release history (sha, size, min shell) for rollback |
+| D1 | `telemetry` | applied / reverted / cold-start / download events from phones |
+| D1 | `content`, `content_history` | Live content per app, with an audit trail of owner changes |
+| D1 | `orders` | What apps post to `/o/<app>` |
+| D1 | `api_keys`, `sim_sessions` | Hosted simulator keys and sandboxes (only if you run the simulator service) |
+
+### Routes
+
+`GET /p/:app/:major/:band` pointer · `GET /b/:app/:file` bundle · `GET /w/:app/releases.json`, `GET /w/:app/:rel/*` web artifact · `GET /c/:app/content.json` live content · `POST /o/:app` orders · `POST /t` telemetry, `GET /t/:app` summary · `GET /app/:id/admin` admin · `GET /app/:id/api/describe`, `POST /app/:id/api/command` owner API (bearer `OWNER_TOKEN` or admin session).
+
+### The hosted simulator (optional)
+
+`services/sim` is a second Worker that gives agents the simulator over HTTPS without a laptop: it checks an API key (D1 `api_keys`, created with the owner command `create_api_key`), starts or reuses an [E2B](https://e2b.dev) sandbox per key from the `shipvo-sim` template (`services/sim/Dockerfile`: Playwright + `@shipvo/sim` + `@shipvo/mcp --http`), and proxies `/mcp`. Deploy with the `deploy-sim` workflow; it needs `E2B_API_KEY`, `SIM_OWNER_TOKEN` and `SIM_SMOKE_KEY` secrets. A Cloudflare Containers backend is kept in `wrangler.containers.jsonc` for accounts with Workers Paid.
+
+### Trust model, in one paragraph
+
+The shell carries the Ed25519 public key and the control plane URL as native manifest meta-data. Pointers are signed with the matching seed, which lives only in your CI secrets; the control plane never has it, so a compromised control plane can serve stale or no releases but cannot forge one. Bundles are verified by SHA-256 and size before staging; patches are verified by the hash of the *result*. A release can never add a permission the shell did not declare, because it is JavaScript running on the shell's native modules.
+
+---
+
+# Agents and Shipvo apps
+
+Source: https://shipvo.dev/docs/agents/
+
+An AI agent uses a Shipvo app the way a person with a screen reader does: it gets the screen as an accessibility tree with refs, and it taps, types, scrolls and goes back. It never sees DOM, React internals or test ids. That is deliberate: what the agent can do in the simulator is what a person can do on the phone, and we measure the match ([parity-results.md](https://shipvo.dev/docs/parity-results.md)).
+
+### Three ways to connect
+
+**1. Local, over stdio** (Claude Desktop, Claude Code, Cursor, PiPilot): run `shipvo sim` in the app, then
+
+```json
+{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
+```
+
+**2. Remote, over Streamable HTTP**: run the MCP server next to a simulator and put it behind HTTPS.
+
+```bash
+PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
+```
+```json
+{ "mcpServers": { "shipvo": { "url": "https://sim.example.com/mcp", "headers": { "Authorization": "Bearer key1" } } } }
+```
+
+**3. Hosted**: the Shipvo simulator service runs one sandbox per API key and exposes the same tools at `https://sim.shipvo.dev/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). Sessions persist across reconnects; the sandbox sleeps after 30 idle minutes and comes back on the next call. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta app and the apps you registered with `shipvo app create`; it expires after 30 days and a new login replaces it, `shipvo keys` shows the date), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT.
+
+### The tools
+
+| Tool | What it does |
+| --- | --- |
+| `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
+| `list_sessions` | Open sessions on this server, to resume after a reconnect |
+| `open_app(app, session?, seed_cart?, dark?)` | A phone-sized session; returns the first screen. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
+| `screen(session)` | The accessibility tree with refs (`[ref=e12]`) |
+| `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb |
+| `screenshot(session)` | PNG of the phone |
+| `set_device(...)` · `device_reset(...)` | What the simulated phone has: platform, permissions, location, barcode in view, biometrics, payment outcome, network |
+| `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
+| `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
+| `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
+| `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
+
+### What the tree shows (and hides), on purpose
+
+- **Rails show only what is on screen.** A horizontal list exposes its visible items; the agent swipes (`scroll right` with the rail's ref) to see more, as on a phone.
+- **A modal sheet hides what is behind it** (`aria-modal` / `accessibilityViewIsModal`), so the agent cannot tap through a payment prompt.
+- **System dialogs are worded per platform.** Set `platform: "ios"` and the camera prompt becomes "“My Shop” Would Like to Access the Camera" with *Allow / Don't Allow*.
+- **Notification banners last 5 seconds**, like a heads-up; after that the shade (`notifications`) is where they live.
+- **Nothing simulated is presented as real.** Receipts say `SIMULATED-`, the device log says `simulated: true`, and `device_log` carries a note that no biometric check or money movement took place.
+
+### A complete run (what ChatGPT did against Tide & Tackle)
+
+```
+open_app("tide@latest")                                 → Home
+set_device(camera: { barcode: { type: "qr", data: "6181234567890" } }, location: { latitude: 4.0225, longitude: 9.6967 })
+tap "Scan a product barcode" → dialog "Allow Tide & Tackle to take pictures and record video?" → tap "While using the app"
+                                                        → Scanner → "Surface Popper 9 cm · 4,200 FCFA" → tap "Add 1 to cart"
+tap "Open cart" → "Choose delivery and pay" → "Use my location" → dialog → "While using the app" → "0.7 km from the shop"
+tap "Any day · Shop pickup" → "Mobile money" → type 677000111 → "Place order"
+dialog "Confirm with fingerprint" → tap "Use fingerprint" → sheet "Mobile money payment" → type PIN 1234 → "Confirm payment"
+                                                        → "Order TT-1001 placed · Receipt SIMULATED-…" + notification banner
+notifications → open_notification                        → My orders
+device_log → 6 events, all simulated: true
+end_session → { steps: 18, orders: [{ id: "TT-1001", total: 4200, payment: "mobile_money", status: "placed", receipt: "SIMULATED-…" }] }
+```
+
+18 steps, 76 seconds, no phone. The same flow runs on a real Android emulator with identical screens and the same order ([parity-results.md](https://shipvo.dev/docs/parity-results.md)).
+
+### Owner API: agents that run the shop
+
+With an owner token, the same MCP server exposes the app's typed owner commands: change content, prices and offers, read orders, publish to every phone. Every change is audited with who made it. `owner_describe("tide")` lists the commands with their arguments; the admin at `/app/<id>/admin` is the same API with a form on top.
+
+### Grading an agent
+
+`end_session` returns what the app actually sent to its backend, not what the agent says it did. The Tide & Tackle repo has an agent-eval harness that scores tasks that way ([agent-gate-results.md](https://shipvo.dev/docs/agent-gate-results.md)).
+
+### Listing your app for every agent
+
+A published app is private to your key until you list it. In `shipvo.json`:
+
+```json
+{ "listing": { "public": true, "description": "Fishing-supplies shop in Douala: catalogue, cart, mobile money.", "category": "shop" } }
+```
+
+Run `shipvo app create` again. After a short review it appears on [shipvo.dev/apps](https://shipvo.dev/apps) and in `list_apps` for every signed-in key, and any agent can `open_app("<id>@latest")`. Opening a public app spends the opener's sandbox minutes, not yours. Set `public` to `false` and run `shipvo app create` to withdraw. Categories: shop, food, travel, finance, health, education, services, tools, games, other.
+
+---
+
+# @shipvo/mcp
+
+Source: https://shipvo.dev/docs/mcp/
+
+Lets AI agents (Claude, Cursor, Claude Code, PiPilot…) **use a Shipvo app without a phone**: open it, read the screen as an accessibility tree, tap, type, scroll, go back, take screenshots, and read what the app sent to its backend. Plus the owner API: change content, prices and offers, and publish to every phone.
+
+```json
+{ "mcpServers": { "shipvo": {
+  "command": "npx", "args": ["-y", "@shipvo/mcp"],
+  "env": { "PN_SIM": "http://localhost:4545", "PN_OWNER_TOKEN": "…optional…" } } } }
+```
+
+Start the simulator first (`shipvo sim` in the app). The hosted version needs no local setup: `{ "url": "https://<host>/mcp/<key>" }`.
+
+Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `end_session`, `owner_describe`, `owner_command`.
+
+Native features work with no phone: the simulated device (see `@shipvo/device`) shows permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners and the share sheet as real dialogs in the tree; `set_device` decides what the phone has (location, a barcode in view, whether the fingerprint matches, whether a payment is approved, network off).
+
+The simulator shows only what a phone would: a horizontal rail lists the visible items, so agents swipe it (`scroll right` with the rail's ref) exactly as on a device. Measured against a real Android emulator and iPhone simulator, see `docs/parity-results.md`.
+
+### Remote (Streamable HTTP)
+
+Run the server where the simulator runs and put it behind HTTPS (a Cloudflare Tunnel is enough):
+
+```
+PN_API_KEYS="key-for-claude,key-for-pipilot" shipvo-mcp --http 8787
+```
+
+Clients connect with a URL instead of a command:
+
+```json
+{ "mcpServers": { "shipvo": { "url": "https://sim.shipvo.dev/mcp", "headers": { "Authorization": "Bearer key-for-claude" } } } }
+```
+
+Each client connection gets its own MCP session; each `open_app` gets its own phone. Requests without a valid key are refused. The hosted version at `sim.shipvo.dev` will issue keys per account with scopes (test, owner, read).
+
+---
+
+# Device API
+
+Source: https://shipvo.dev/docs/device-api/
+
+One API, two implementations. On phones it wraps the Expo modules you install. In the simulator it is a **simulated device**: the system dialogs are drawn as real dialogs in the accessibility tree, and the agent (or test) sets what the phone has. The app code is identical.
+
+```ts
+import { device } from "@shipvo/device";
+```
+
+### Support levels
+
+```ts
+device.kind                 // "native" | "simulated"
+device.capabilities()       // { camera: "real" | "simulated" | "unavailable", location: …, biometrics, payments, notifications, share, clipboard, network }
+```
+
+Every capability declares how it is provided *here*. There is no silent fallback: on a phone without `expo-camera` installed, `camera` is `unavailable` and `scan()` throws; in the simulator every capability is `simulated`. Tests and agents read this to know what was actually exercised. Simulated results are also marked in what they return: receipts start with `SIMULATED-` (simulator) or `SANDBOX-` (the built-in sandbox provider on phones until a gateway is configured), and every entry in the simulator's device log carries `simulated: true`.
+
+### Permissions
+
+```ts
+await device.permissions.get("camera" | "location" | "notifications")      // "granted" | "denied" | "undetermined"
+await device.permissions.request("camera" | "location" | "notifications")
+```
+
+On phones: the Expo permission calls. In the simulator: the platform's own dialog, worded as Android ("Allow My Shop to take pictures and record video?" with *While using the app / Only this time / Deny*) or iOS ("“My Shop” Would Like to Access the Camera" with *Allow / Don't Allow*) words it, depending on the simulated device's `platform`. Android below API 33 grants notifications without asking, as the OS does. The answer is remembered for the session.
+
+### Location
+
+```ts
+const c = await device.location.current();     // { latitude, longitude, accuracy? }
+```
+
+Asks for foreground permission first (so the system dialog appears on the first use, on phones and in the simulator), then reads one position. Throws `Location permission denied` when refused. Simulator default: 4.0225, 9.6967 (Douala); set with `set_device`.
+
+### Camera: scanning codes
+
+```ts
+const r = await device.camera.scan({ prompt: "Point at the barcode" });   // { type, data } | null (cancelled)
+```
+
+On phones the scanner is a screen; mount `<ScanHost accent="#1F4E5F" />` from `@shipvo/device/scan` once at your app root and `scan()` shows it (camera preview with EAN-13/EAN-8/QR/Code-128 decoding, a manual-entry field for scratched packs and weak cameras, cancel). Apps with their own scanner screen can skip `ScanHost` and use `expo-camera` directly; the simulator swaps `expo-camera` for its simulated one through the Metro alias.
+
+In the simulator the camera "sees" whatever `set_device` put in front of it: `camera: { barcode: { type: "qr", data: "6181234567890" }, delayMs: 800 }`. With no barcode set, the viewfinder stays open until cancelled.
+
+### Biometrics
+
+```ts
+const ok = await device.auth.available();                       // hardware present and enrolled
+const r = await device.auth.confirm("Confirm payment of 4 200 FCFA");
+// { ok: true } | { ok: false, reason: "cancelled" | "failed" | "unavailable" | "not_enrolled" }
+```
+
+Phones: `expo-local-authentication` (fingerprint, Face ID, device PIN fallback). Simulator: a fingerprint (Android) or Face ID (iOS) prompt in the tree; `set_device` chooses `biometrics: { enrolled, nextResult: "success" | "fail" | "cancel" }`. Nothing is verified; the log says so.
+
+### Payments
+
+```ts
+const r = await device.pay.charge({ provider: "mobile_money" | "card", amount, currency, to, reference, phone? }, pin);
+// { ok: true, receipt } | { ok: false, reason: "declined" | "cancelled" | "timeout" | "insufficient_funds" }
+```
+
+The amount/PIN prompt is your app's own sheet, identical on every platform (Tide & Tackle's `PaymentSheet` is a reference). The provider decides the outcome. Today the provider on phones is a sandbox (PIN 1234 approves, receipt `SANDBOX-…`); the simulator approves, declines, times out or reports insufficient funds as `set_device` says (`payment: { nextResult, pin }`), receipt `SIMULATED-…`. **No money moves anywhere yet**; a real mobile-money or card gateway plugs in behind this interface.
+
+### Notifications
+
+```ts
+const id = await device.notifications.show({ title, body, data? });
+const off = device.notifications.onOpen((n) => { /* n.data */ });
+```
+
+Phones: a local notification through `expo-notifications`; tapping it fires `onOpen`. Simulator: a heads-up banner over the status bar for 5 seconds (as on a phone), then it lives in the notification shade: agents list it with the `notifications` MCP tool and tap it with `open_notification`, which fires `onOpen` exactly as a banner tap would.
+
+### Share and clipboard
+
+```ts
+await device.share.text("Order TT-1001: …", "My order");   // true if shared
+await device.clipboard.set(text); await device.clipboard.get();
+```
+
+Simulator: a share sheet with WhatsApp / Messages / Copy; Copy writes the simulated clipboard.
+
+### Network
+
+```ts
+device.net.online();                        // boolean
+device.net.onChange((online) => …);
+```
+
+Simulator: `set_device(online: false)` takes the phone offline; the app's offline banner and queued actions can be tested without touching a radio.
+
+### The simulated device from the agent's side
+
+| MCP tool | Effect |
+| --- | --- |
+| `set_device(session, platform?, api?, permissions?, location?, camera?, biometrics?, payment?, online?)` | Change any part of the device state mid-session |
+| `device_reset(session, profile?)` | Back to a known state: permissions undetermined, default location, nothing in view, log cleared |
+| `push_notification(session, title, body, data?)` | Deliver a notification to the phone |
+| `notifications(session)` / `open_notification(session, id?)` | The shade; tap one |
+| `device_log(session)` | Every device event in the session (permission prompts and answers, location reads, scans, auth, payments, notifications, shares), each `simulated: true`, plus `capabilities()` |
+
+### Using raw Expo modules
+
+Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication` or `expo-notifications` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.
+
+---
+
+# @shipvo/cli
+
+Source: https://shipvo.dev/docs/cli/
+
+Command-line tools for [Shipvo](https://github.com/shipvo/shipvo), the open-source React Native framework for signed over-the-air updates.
+
+```bash
+npx -y @shipvo/cli init my-app          # new app wired to Shipvo
+npx -y @shipvo/cli login                # sign in with GitHub, get a key for the hosted simulator
+npx -y @shipvo/cli app create           # register the app, save a publish token
+npx -y @shipvo/cli publish              # build, sign and ship an over-the-air release
+npx -y @shipvo/cli sim                  # serve the app in the simulator for agents
+```
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `init <dir>` | New app with the OTA runtime, device API, simulator and publish workflow |
+| `sim [--port 4545]` | Build for the simulator and serve it |
+| `publish [--bands b0,b1,b2]` | Build, sign and publish a release plus the agent-facing web artifact |
+| `rollback --to <release>` | Republish an earlier release's code as a new release |
+| `login` | Sign in with GitHub; issues a 30-day key |
+| `app create` / `list` / `delete <id> --yes` | Register the app (publish token), list yours, or remove one |
+| `keys` | Status and quota of the stored sign-in key |
+| `keys export [--out file]` | Print or save the release signing seed so you can back it up |
+| `keys import <seed>` / `--file f` / stdin | Restore the seed on a new machine; refused if it does not match `shipvo.json` |
+| `mcp` | Print the MCP config agents need |
+| `keygen [--out seed.txt]` | Create an Ed25519 release signing key |
+| `pubkey` | Print the public key for the current seed |
+| `hash <file>`, `sign-file <file>`, `sign-json <file>`, `verify-json <file> <key>` | Low-level signing helpers |
+
+Changing computers? See [Moving to a new machine](https://shipvo.dev/docs/new-machine.md).
+
+Also usable as a library: `signDoc`, `verifyDoc`, `signBytes`, `sha256Hex`, `keyFromSeed`.
+
+License: Apache-2.0
+
+---
+
+# @shipvo/runtime
+
+Source: https://shipvo.dev/docs/runtime/
+
+The native half of Shipvo's over-the-air updates, as an Expo module.
+
+- Verifies every release pointer (Ed25519) and bundle (SHA-256 + size) against a public key built into the shell.
+- Downloads bsdiff patches when it has the previous release, full bundles otherwise; stages atomically.
+- Applies without restart, marks the release healthy when the app says so, and discards a release that fails to boot 3 times.
+- Android today; on iOS and in the simulator the app runs its embedded bundle and the same live content.
+
+```json
+{ "expo": { "plugins": [["@shipvo/runtime", { "baseUrl": "https://<your control plane>", "publicKey": "<base64 Ed25519 public key>", "appId": "myshop" }]] } }
+```
+
+```ts
+import { Runtime } from "@shipvo/runtime";
+const s = Runtime.getState();            // running / pending / previous release, band, baseUrl, appId
+await Runtime.checkForUpdate(true);      // verify, download (patch if possible), stage, apply
+Runtime.markHealthy();                   // call once the first screen rendered
+```
+
+`shipvo init` wires all of this for you.
+
+---
+
+# @shipvo/device
+
+Source: https://shipvo.dev/docs/device/
+
+One device API for Shipvo apps, implemented twice:
+
+- **On phones:** thin wrappers over the Expo modules you install (`expo-camera`, `expo-location`, `expo-local-authentication`, `expo-notifications`, `expo-clipboard`).
+- **In the Shipvo simulator:** a simulated device. Permission dialogs, the camera viewfinder, the fingerprint prompt, the payment prompt, notification banners and the share sheet are drawn as real dialogs, so an AI agent sees and operates them exactly as on a phone, and the simulator can set what the device "has": location, a barcode in front of the camera, whether the fingerprint will match, whether the payment will be approved, network on or off.
+
+```ts
+import { device } from "@shipvo/device";
+const here = await device.location.current();          // permission dialog appears the first time
+const code = await device.camera.scan({ prompt: "Scan the product barcode" });
+const auth = await device.auth.confirm("Confirm payment of 10 710 FCFA");   // { ok } | { ok: false, reason }
+const paid = await device.pay.charge({ provider: "mobile_money", amount: 10710, currency: "FCFA", to: "Tide & Tackle", reference: "TT-1001", phone: "677000111" }, pin);
+await device.notifications.show({ title: "Order confirmed", body: "TT-1001 is being prepared" });
+```
+
+Apps that import Expo modules directly also work in the simulator: add `withShipvoSim` from `@shipvo/device/metro` to `metro.config.js`.
+
+
+On phones, mount `<ScanHost />` from `@shipvo/device/scan` once at the app root so `device.camera.scan()` has a screen to show. Full reference: `docs/device-api.md` in the repo.
+
+---
+
+# @shipvo/sim
+
+Source: https://shipvo.dev/docs/sim/
+
+Runs a Shipvo app in a phone-sized headless browser (Playwright, Pixel 5 viewport) and gives agents what a person with a screen reader gets: the accessibility tree with refs, tap/type/scroll/back, screenshots, system permission sheets, and a simulated device (camera, location, biometrics, payments, notifications, share, network) whose state the agent sets.
+
+```bash
+shipvo sim                  # in an app created with `shipvo init`: builds the web bundle and serves it on :4545
+npx shipvo-sim --dist ./sim-dist --app myshop
+```
+
+HTTP API (used by `@shipvo/mcp`): `POST /session {session, app, seed_cart, dark, device}`, `POST /act {session, action, ...}` with actions `screen tap type scroll back screenshot set_device push_notification notifications open_notification device_log device_reset`, and a per-session mock control plane at `/s/<session>/...` that records the orders the app posts (`GET /s/<session>/orders`).
+
+`app` can be `myshop` (the local build), `myshop@r13` (a published release) or `myshop@latest`.
+
+---
+
+# @shipvo/schema
+
+Source: https://shipvo.dev/docs/schema/
+
+Zod schemas and types for [Shipvo](https://github.com/shipvo/shipvo): shell manifest, add-on manifest, release pointer, signed envelope, gate report, change log and telemetry. Includes `canonicalize()` for signing and `bandForCohort()` for staged rollouts.
+
+License: Apache-2.0
+
+---
+
+# Simulator vs device parity
+
+Source: https://shipvo.dev/docs/parity-results/
+
+Can an agent trust the Shipvo UI simulator? We ran two complete purchases on the simulator and on the real app, then compared what an agent can act on and read on every screen.
+
+- **Flow A:** browse the home rail → 2 × Chrome Spoon → Friday afternoon delivery → cash on delivery.
+- **Flow B:** search "popper" → 3 × Surface Popper → promo code LURES15 → shop pickup → mobile money.
+
+**Result: 100% actionable parity on both Android and iOS across all 13 screens; text coverage 98.6% (Android) and 96.2% (iOS). Both purchases completed on every side.** Bar: ≥ 99% actionable, ≥ 95% text.
+
+| Flow | Screen | Android: actionable | Android: text | iOS: actionable | iOS: text |
+| --- | --- | --- | --- | --- | --- |
+| A | Home | 100% | 96% | 100% | 96% |
+| A | Product | 100% | 100% | 100% | 100% |
+| A | Added to cart | 100% | 100% | 100% | 100% |
+| A | Cart | 100% | 95% | 100% | 95% |
+| A | Checkout | 100% | 100% | 100% | 95% |
+| A | Order placed | 100% | 100% | 100% | 89% |
+| B | Search | 100% | 100% | 100% | 100% |
+| B | Search results | 100% | 100% | 100% | 100% |
+| B | Product | 100% | 100% | 100% | 100% |
+| B | Cart | 100% | 95% | 100% | 95% |
+| B | Promo applied | 100% | 96% | 100% | 96% |
+| B | Checkout | 100% | 100% | 100% | 96% |
+| B | Order placed | 100% | 100% | 100% | 89% |
+| | **Mean** | **100%** | **98.6%** | **100%** | **96.2%** |
+
+Previous run (one flow, before the simulator was made phone-faithful): Android 97.2% / 96.8%, iOS 100% / 90.0%.
+
+- **Android:** release APK (OTA release 11) on an Android 11 emulator (Pixel 5 profile), GitHub Actions. Driven through Android's own accessibility tree (uiautomator over adb). "App isn't responding" dialogs: 0.
+- **iOS:** Expo simulator build on the newest iPhone simulator, GitHub macOS runner. Driven with Appium XCUITest. No Apple Developer account.
+- **Simulator:** the app's React Native Web build in a phone-sized headless browser, showing the same live content as devices.
+
+### Flow C: native features (Android, release 19)
+
+- **Flow C:** scan a product (manual barcode entry on both sides, see below) → "Use my location" → shop pickup → mobile money → order placed.
+
+| Screen | Actionable | Text |
+| --- | --- | --- |
+| Camera permission dialog | 75% | 100% |
+| Scanner | 100% | 100% |
+| Scanned product | 100% | 100% |
+| Location permission dialog | 75% | 75% |
+| Located (distance shown, pickup) | 100% | 96% |
+| Payment prompt | 67% | 83% |
+| Order placed (same order ✓) | 100% | 91% |
+
+Across all three flows on Android the orders match exactly; 18 of 21 screens are at 100% actionable parity. The three below 100% are known and listed here, not hidden: both system permission dialogs have one extra unlabeled button on the device, and the payment sheet's "Cancel payment" button is not exposed by Android's accessibility tree (same as flow B). On iOS (iPhone simulator, shell `dev.shipvo.tide`) flow C is at **100% actionable parity on all 6 screens, 95.3% mean text coverage on the full run, same order placed**: the iOS camera and location dialogs match word for word, driven through WebDriverAgent's alert interface (iOS system dialogs are outside the app's accessibility tree). Flows A and B on iOS are unchanged at 100%.
+
+What flow C does **not** measure: barcode decoding. The emulator's virtual camera cannot show a decodable code, so both sides type the number into the scanner's manual entry. Decoding is covered by the simulated-camera end-to-end test (ChatGPT's 18-step run, `device_log` marked `simulated: true`).
+
+**A bug flow C found:** on a phone, "Use my location" never showed the system permission dialog; the device API read the position without asking and the app reported "Could not get your location." Fixed in release 19 (`@shipvo/device` now requests permission first).
+
+### What made the simulator faithful
+
+The gap was closed by making the simulator behave like a phone, not by loosening the comparison:
+
+1. **Only on-screen rail items are exposed.** A horizontal product rail lists the items in view; an agent swipes it (`scroll right` with the rail's ref) to see more, exactly as on a device.
+2. **Controls read as one label.** A button's inner text is grouped into its label, as Android and iOS do.
+3. **Typing goes to the field a label names.** Typing "on" the *Promo code* heading reaches the *Promo code* field, as a person would.
+
+The device drivers also learned to close the on-screen keyboard like a person (Back on Android, a drag on iOS), and to ignore the system keyboard and off-screen items in the device tree.
+
+### A bug the parity run found
+
+On iOS, the mobile-money number field opens a number pad with no Done key, and the checkout screen did not dismiss it on drag, so **Place order** was unreachable: a real customer paying by mobile money could not finish. Fixed in release 11 (keyboard closes on drag; content moves above it). The simulator, which has no on-screen keyboard, could not have found this; the device lanes exist for exactly this reason.
+
+### Definitions (what the numbers do and do not measure)
+
+- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** It is not a full accessibility-tree diff: enabled/disabled state, element order, bounds and field values are not part of the score yet.
+- **Text coverage:** the share of text the simulator shows that also appears on the device, exactly or contained in a longer label.
+- **Same order:** on every "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical on both sides; receipts differ by provider (`SIMULATED-` vs `SANDBOX-`) and are normalised.
+- **Visibility rules applied on both sides:** only on-screen items of a horizontal rail; nothing behind a modal sheet (the rule TalkBack and iOS apply; Android's uiautomator tree does not, so the Android driver applies it); the on-screen keyboard is never part of the app.
+
+Planned, in this order: enabled/selected state in the match key; element order; nightly runs on clean installs with the published number being "runs at the bar out of runs"; a permission-denied flow.
+
+### Known differences
+
+1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines; the agent sees the same information, grouped differently. That is the remaining text gap (89% on "Order placed").
+2. **On-screen keyboards** exist only on devices. Fields behave the same, but a device agent may need to dismiss the keyboard; the drivers do this.
+3. **Native-only features** (camera, push, payment sheets) aren't in the simulator. Flows that need them run on the emulator or device lanes.
+
+### Not covered yet
+
+- **Real phones in automation:** LambdaTest automation needs a paid plan on this account (real devices: "Real Mobile App Automation not allowed"; emulators: "Native App Automation Virtual not allowed"). Manual App Live works. The native driver also runs on any USB-connected Android phone.
+- **More flows:** two purchase flows today. The suite should grow with every template app.
+- **Do not run parity during an OTA publish:** the emulator applies the update mid-flow (as designed) and the run is invalid.
+
+How to reproduce: `.github/workflows/parity.yml` (Android) and `.github/workflows/parity-ios.yml` (iOS). Drivers: `apps/tide-and-tackle/sim/`.
+
+---
+
+# OTA on a 2 GB phone
+
+Source: https://shipvo.dev/docs/spike-results/
+
+Real-device numbers only. Nothing here is simulated. Raw rows come from the control plane's `telemetry` table (D1).
+
+### Device
+
+| | |
+| --- | --- |
+| Phone | Xiaomi Redmi 9A (MediaTek Helio G25, 2 GB-class RAM) |
+| OS | Android 11 (API 30), MIUI, force-dark enabled by the system |
+| Network | 4G / Wi-Fi, Douala, Cameroon |
+| Shell | `tide-and-tackle-shell.apk` 1.0.0 (`shell-1.0.0-3`), 1.0.1 (`shell-1.0.1-6`), then 1.0.2 with bsdiff patches (`shell-1.0.2-7`); Expo SDK 58, React Native 0.88, Hermes |
+| Control plane | Cloudflare Workers + KV + D1 on `workers.dev` |
+
+### Results so far (30 Oct 2026)
+
+| Bar | Target | Measured | Status |
+| --- | --- | --- | --- |
+| Publish to applied | under 60 s | **36 s** (release 1), **16 s** (release 2), from signed pointer to the new release running and healthy | Pass |
+| Push to applied (including CI build and signing) | not a bar | about 69 s for release 1 | Info |
+| Signature and hash verified on device | required | Ed25519 over the pointer, SHA-256 and size over the bundle, against a public key built into the APK | Pass |
+| Apply without restart | not a bar | **302 ms**, 279 ms, 240 ms (in-process reload) | Info |
+| Bundle download | not a bar | 1.57 MB in 1.4 to 2.0 s | Info |
+| Rollback on device | works | Rolled back to release 1, then re-applied release 2 from the server within about 10 s on shell 1.0.0; fixed in 1.0.1 by blocking rolled-back releases | Pass |
+| Update size | under 100 KB | **64 KB** patch for release 7 (from release 6, content change), against a 1.57 MB full bundle (96% smaller). Downloaded, patched and verified in 913 ms. First update after a fresh install, patched against the APK's own bundle: 291 KB. Bench tests: 17 to 112 KB between releases | Pass (steady state); first update after install is 291 KB |
+| Cold start | under 1 s on low-end Android | **877, 905, 878 ms** running an OTA bundle (shell 1.0.0); **931 ms** first launch on shell 1.0.1; **847 ms** right after a crash-loop revert. First launch after a fresh install: 1,051 ms | Pass |
+| Crash-loop revert | automatic after 3 failed boots | Release 4 crashed at startup on purpose; after 3 failed boots the phone discarded it, blocked it, and came back on release 3 by itself (07:11:35 UTC). It did not download release 4 again | Pass |
+| Shell-upgrade safety | OTA bundles from an older shell never run on a newer one | Installing shell 1.0.1 discarded release 2 and booted the embedded bundle; release 3 (min shell 1.0.1) was refused by shell 1.0.0 and accepted by 1.0.1 | Pass |
+
+### Timeline: release 1
+
+| Event | UTC |
+| --- | --- |
+| `git push` | 06:35:42 |
+| Pointer signed and published (CI) | 06:36:15.4 |
+| Phone downloaded, verified, staged | 06:36:50.1 |
+| Release 1 running and marked healthy | 06:36:51.1 |
+
+### Timeline: release 2
+
+| Event | UTC |
+| --- | --- |
+| Pointer signed and published (CI) | 06:39:24.7 |
+| Phone downloaded, verified, staged | 06:39:39.1 |
+| Release 2 running and marked healthy | 06:39:41.1 |
+
+### Timeline: crash-loop test (release 4)
+
+| Event | UTC |
+| --- | --- |
+| Release 4 (throws at startup) published | 07:08:47 |
+| Downloaded, verified, applied, crashed (boot 1) | 07:10:22 |
+| Boots 2 and 3 crashed (owner reopened the app) | before 07:11:35 |
+| `crash_loop_revert`: release 4 discarded and blocked | 07:11:35 |
+| Running release 3 again, cold start 847 ms | 07:11:37 |
+
+### Timeline: patch updates (shell 1.0.2, fresh install)
+
+| Event | UTC | Size |
+| --- | --- | --- |
+| Release 6 published (patches from 3 bases) | 07:51:08 | |
+| Release 6 applied via patch from the APK's own bundle | 07:52:38 | 291 KB (vs 1,530 KB full) |
+| Release 7 published | 07:53:44 | |
+| Release 7 applied via patch from release 6 (download, patch and verify: 913 ms; apply: 263 ms) | 07:54:00 | **64 KB** |
+
+### Gaps found and next actions
+
+1. ~~Update size.~~ Shell 1.0.2 ships BSDIFF40 patches against the last good bundle or the APK's embedded bundle, verified against the signed sha256, with full download as fallback. Measured on device: 64 KB steady state. Next: build the embedded bundle the same way as OTA bundles so the first patch after install shrinks from 291 KB, and send content edits (copy, prices, images) as CMS data rather than code, which takes them to a few KB.
+2. ~~Device rollback is undone by the next check.~~ Fixed in shell 1.0.1 (blocked releases). Fleet rollback added: `rollback-ota` workflow and `pnpm rollback:ota --to N`.
+3. ~~Reload vs cold-start detection is a heuristic in JS.~~ Fixed in shell 1.0.1 (native `kind`).
+4. ~~MIUI force-dark repaints the app.~~ Fixed in shell 1.0.1 (system dark mode with dark tokens).
+5. **Polling every 10 s while open** is a spike setting. Production uses check-on-foreground plus an optional push nudge.
+
+---
+
+# Agent gate results
+
+Source: https://shipvo.dev/docs/agent-gate-results/
+
+**Kill gate:** an off-the-shelf agent, given only the app's typed surface and a real user task, must succeed on at least 70% of the first five tasks, without screenshots or an emulator.
+
+**Result: pass.** Round 1 scored 4/5 (80%) on the first five tasks. After adding promo discovery, Haiku scored 5/5 (100%) and the Sonnet re-run of the failed task passed.
+
+### Setup
+
+- **Surface:** `apps/tide-and-tackle/scripts/agent`. These are the same typed commands as the app's own shop logic (`src/domain/shop.ts`): search, cart, promo codes, delivery slots and checkout. There's no screen, emulator or device.
+- **Agents:** a fresh general-purpose Claude agent per task. Each was told only how to call `describe` and `call`, and was forbidden to read files or source code.
+- **Tasks:** five customer requests in plain language (`agent-eval/tasks.json`), with deliberate traps:
+  - a full delivery slot (T1)
+  - a promo code below its minimum (T2, T5)
+  - an out-of-stock product that needs a substitute (T3)
+  - a cheaper product that is wrong for the purpose (T4)
+  - choosing the better of two promos (T5)
+- **Grading:** automatic, on the final state (`agent-eval/grade.mjs`): exactly one order with the right lines, slot, address, payment, phone and promo. A reference solution scores 5/5.
+
+### Round 1: Sonnet, first five tasks (the gate)
+
+| Task | Result | Calls | Failed calls | Seconds |
+| --- | --- | --- | --- | --- |
+| T1 cheapest saltwater lure, earliest slot | Pass | 6 | 0 | 4.8 |
+| T2 fix cart, add line, conditional promo | Pass | 8 | 1 (promo rejected, as expected) | 6.7 |
+| T3 out-of-stock reel, substitute | Pass | 6 | 0 | 4.3 |
+| T4 surf kit, cheapest of each, promo | Pass | 13 | 0 | 9.5 |
+| T5 best promo | **Fail** | 18 | 11 | 9.6 |
+
+**4/5 = 80%: pass.** T5 failed because the surface had no way to discover promo codes. The agent guessed 11 codes, then ordered without a discount. That is a gap in the app's surface, not in the agent's reasoning, and a human with no promo banner would hit the same wall.
+
+**Fix:** a `list_promos` command that lists codes, their rules and the discount each would give on the current cart. The promo hint was also removed from the command description.
+
+### Round 2: after the fix
+
+| Model | T1 | T2 | T3 | T4 | T5 | Score |
+| --- | --- | --- | --- | --- | --- | --- |
+| Haiku (smaller, cheaper) | Pass, 5 calls | Pass, 9 | Pass, 7 | Pass, 14 | Pass, 11 | **5/5 (100%)** |
+| Sonnet (T5 re-run) | | | | | Pass, 9 calls, 4.4 s | 1/1 |
+
+### What this shows
+
+1. A typed command surface is enough for agents to complete real, multi-step shopping tasks with traps. They need no screenshots, accessibility tree or emulator.
+2. Headless agent runs find gaps in the app itself (missing discovery) in seconds. That is a product feature: agent QA for every release.
+3. The surface comes from the app's own logic, so an agent can do exactly what a user can, and nothing more.
+
+Raw results: `apps/tide-and-tackle/agent-eval/results/`.

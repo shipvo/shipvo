@@ -5,3 +5,14 @@ dist
 *.keystore
 .env*
 __pycache__/
+
+public/llms.txt
+public/llms-full.txt
+public/docs.md
+public/robots.txt
+public/sitemap-static.txt
+public/security.txt
+public/terms/
+public/privacy/
+public/acceptable-use/
+public/security/

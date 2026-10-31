@@ -17,7 +17,7 @@
         <a class="btn" href="/apps">Browse apps agents can use</a>
       </div>
       <div class="cmd reveal"><span class="p">$</span><span>npx -y @shipvo/cli init myshop</span><button type="button" data-copy="npx -y @shipvo/cli init myshop">Copy</button></div>
-      <div class="facts reveal"><span><b>Android</b> OTA today</span><span><b>iOS</b> simulator parity 100%</span><span><b>MIT</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
+      <div class="facts reveal"><span><b>Android</b> OTA today</span><span><b>iOS</b> simulator parity 100%</span><span><b>Apache-2.0</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
     </div>
     <div class="phone-stage reveal" id="stage">
       <div class="bubble"><small>YOU ASK YOUR ASSISTANT</small><b>Buy a Surface Popper with mobile money. Tell me if anything breaks.</b></div>
@@ -142,6 +142,24 @@
   </div>
 </section>
 
+<section id="reach" class="reach-sec">
+  <div class="wrap reach">
+    <div class="reach-copy">
+      <div class="eyebrow">Publish</div>
+      <h2>One release leaves. Every device gets the same bytes.</h2>
+      <p class="lede">You publish once. Phones verify the signature, the hash and the size, apply the update without a restart, and roll back on their own if it fails to boot. Agents open that exact release in the simulator, so what you tested is what shipped.</p>
+      <ul class="reach-facts">
+        <li><b>Ed25519</b><span>signed release pointer, checked on every phone</span></li>
+        <li><b>1 % → 10 % → all</b><span>staged by cohort, with one-command rollback</span></li>
+        <li><b>tens of KB</b><span>typical update, patched from the version a phone already has</span></li>
+      </ul>
+      <div class="cta"><a class="btn primary" href="/docs/getting-started/#5-publish-over-the-air">See how publishing works <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+      <p class="reach-key"><span class="k go"></span>a release going out <span class="k ret"></span>an agent opening it <span class="mono small">· illustration</span></p>
+    </div>
+    <div class="reach-art"><!--CORONA--></div>
+  </div>
+</section>
+
 <section id="pillars">
   <div class="wrap">
     <div class="sec-head"><h2>Everything an agent-ready app needs.</h2><p class="lede">Each card is a shipped, documented piece. Nothing here is a roadmap item.</p></div>
@@ -151,7 +169,7 @@
       <article class="cell"><div class="n">DEVICE</div><h3>One device API, two truths</h3><p>Camera, location, biometrics, payments, notifications. Real on phones, simulated for agents, labelled <code>simulated</code> every time.</p><div class="k">Receipts say <b>SIMULATED-</b>; logs say <b>simulated: true</b></div></article>
       <article class="cell"><div class="n">VERIFY</div><h3>Parity, not promises</h3><p>Nightly runs on an Android emulator and an iPhone simulator; every gap published.</p><div class="k">Actionable parity <b>100 %</b> · text <b>98.6 % / 96.2 %</b></div></article>
       <article class="cell"><div class="n">MARKETPLACE</div><h3>Listed for every agent</h3><p>Flip <code>listing.public</code> and your app appears on <a href="/apps">shipvo.dev/apps</a> and in every signed-in agent's <code>list_apps</code>.</p><div class="k">Review before listing · <b>3 apps</b> per account in the beta</div></article>
-      <article class="cell wide"><div class="n">OWN IT</div><h3>Self-host in ten minutes, or use ours</h3><p>The control plane is a Cloudflare Worker with KV and D1. Run it in your account with your keys, or register on the hosted one with <code>shipvo app create</code>; publish tokens are scoped to one app and every pointer is checked against your public key.</p><div class="k"><b>api.shipvo.dev</b> hosted · <b>MIT</b> everywhere</div></article>
+      <article class="cell wide"><div class="n">OWN IT</div><h3>Self-host in ten minutes, or use ours</h3><p>The control plane is a Cloudflare Worker with KV and D1. Run it in your account with your keys, or register on the hosted one with <code>shipvo app create</code>; publish tokens are scoped to one app and every pointer is checked against your public key.</p><div class="k"><b>api.shipvo.dev</b> hosted · <b>Apache-2.0</b> everywhere</div></article>
     </div>
   </div>
 </section>

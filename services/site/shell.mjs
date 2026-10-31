@@ -8,7 +8,7 @@ export const head = ({ title, desc, path = "/", extraCss = "" }) => `<meta chars
 <link rel="canonical" href="https://shipvo.dev${path}">
 <meta property="og:title" content="${title}"><meta property="og:description" content="${desc}"><meta property="og:url" content="https://shipvo.dev${path}"><meta property="og:type" content="website"><meta property="og:image" content="https://shipvo.dev/og.png">
 <meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#090D16">
-<link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt"><link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 ${FONTS}
 <link rel="stylesheet" href="/site.css">${extraCss}`;
 
@@ -54,12 +54,12 @@ export const nav = (active = "") => `<a class="skip" href="#main">Skip to conten
 
 export const footer = () => `<footer class="foot"><div class="wrap">
   <div class="foot-grid">
-    <div class="foot-brand"><a class="logo" href="/"><img src="/logo-256.png" alt="" width="28" height="28">Shipvo</a><p>Build once. Publish for people and AI agents.</p><p class="mono small">MIT · made in Douala</p><div class="status" data-status><span class="dot"></span><span>checking services…</span></div></div>
+    <div class="foot-brand"><a class="logo" href="/"><img src="/logo-256.png" alt="" width="28" height="28">Shipvo</a><p>Build once. Publish for people and AI agents.</p><p class="mono small">Apache-2.0 · made in Douala</p><div class="status" data-status><span class="dot"></span><span>checking services…</span></div></div>
     <div><div class="foot-title">Product</div><a href="/docs/getting-started/#5-publish-over-the-air">Publish</a><a href="/docs/agents/">Simulate</a><a href="/docs/parity-results/">Verify</a><a href="/apps">Marketplace</a><a href="https://www.npmjs.com/org/shipvo" rel="noopener">npm packages</a></div>
-    <div><div class="foot-title">Docs</div><a href="/docs/getting-started/">Build your first app</a><a href="/docs/cli/">CLI reference</a><a href="/docs/mcp/">MCP server</a><a href="/docs/device-api/">Device API</a><a href="/docs/self-hosting/">Self-hosting</a></div>
+    <div><div class="foot-title">Docs</div><a href="/docs/getting-started/">Build your first app</a><a href="/docs/cli/">CLI reference</a><a href="/docs/mcp/">MCP server</a><a href="/docs/device-api/">Device API</a><a href="/docs/self-hosting/">Self-hosting</a><a href="/llms.txt">llms.txt</a></div>
     <div><div class="foot-title">Proof</div><a href="/docs/parity-results/">Parity results</a><a href="/docs/spike-results/">OTA on a 2 GB phone</a><a href="/docs/agent-gate-results/">Agent gate</a><a href="/changelog/">Changelog</a></div>
     <div><div class="foot-title">Company</div><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a><a href="https://x.com/HansCadx" rel="noopener">X</a><a href="mailto:hans@pipilot.dev">Contact</a><a href="https://github.com/shipvo/shipvo/blob/main/LICENSE" rel="noopener">License</a></div>
   </div>
-  <div class="foot-bottom"><span>© ${new Date().getFullYear()} Shipvo. Not affiliated with Expo, Apple, Google, OpenAI or Anthropic.</span><span class="mono small">api.shipvo.dev · sim.shipvo.dev</span></div>
+  <div class="foot-bottom"><span>© ${new Date().getFullYear()} Shipvo. Not affiliated with Expo, Apple, Google, OpenAI or Anthropic.</span><span class="legal-links"><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/security/">Security</a><a href="/acceptable-use/">Acceptable use</a></span></div>
 </div></footer>
 <script src="/shell.js" defer></script>`;

@@ -4,6 +4,10 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## 2026-10-31
 
+- **For AI tools:** [`/llms.txt`](/llms.txt), [`/llms-full.txt`](/llms-full.txt), every docs page as Markdown (`/docs/<page>.md`), a [`/docs.md`](/docs.md) index, `sitemap.xml` (includes listed apps) and `robots.txt`.
+- **Legal:** [Terms](/terms/), [Privacy](/privacy/), [Acceptable use](/acceptable-use/) and [Security](/security/) pages, plus `/.well-known/security.txt`.
+- **Site:** an animated release-to-devices illustration, a real device in the hero, and the licence is now stated correctly everywhere (Apache-2.0).
+
 - **`shipvo keys export` / `shipvo keys import`** back up and restore the release signing seed, checked against the public key in `shipvo.json`. New docs page: [Moving to a new machine](/docs/new-machine/).
 
 - **shipvo.dev** goes live: landing page, public marketplace (`/apps`), and a docs site built from this repo's Markdown on every deploy.
