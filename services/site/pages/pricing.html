@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--HEAD title="Pricing: Shipvo and Expo compared — Shipvo" desc="What Shipvo costs, what Expo and EAS cost, and worked monthly examples for over-the-air updates and for testing every pull request." path="/pricing/"-->
+<link rel="stylesheet" href="/blog.css">
+</head>
+<body>
+<!--NAV pricing-->
+<main>
+<section class="cmp-hero">
+  <div class="wrap">
+    <div class="eyebrow">Pricing</div>
+    <h1>Free in the beta. Open source always.</h1>
+    <p class="lede">There is no paid Shipvo plan today. The hosted services are free while we are in beta, and everything can run on your own account. Below is what that includes, and what the same jobs cost on Expo's plans so you can compare with real numbers.</p>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Shipvo</h2>
+    <div class="plans">
+      <div class="plan us"><h3>Hosted beta</h3><div class="price">$0</div><ul><li>Control plane at <code>api.shipvo.dev</code>: signed pointers, cohorts, rollback.</li><li>Hosted simulator at <code>sim.shipvo.dev</code>, one sandbox per key.</li><li>Test key with 600 sandbox minutes, valid for 30 days; renew with <code>shipvo login</code>.</li><li>Up to 3 listed apps per account.</li></ul></div>
+      <div class="plan us"><h3>Self-hosted</h3><div class="price t">Your Cloudflare bill</div><ul><li>Apache-2.0 software, no per-user fee.</li><li>Control plane on Cloudflare Workers, KV and D1, set up in about ten minutes.</li><li>The simulator runs on your laptop or any Linux CI runner.</li><li>We have not measured a typical monthly figure, so we do not quote one. See <a href="https://www.cloudflare.com/plans/developer-platform/" rel="noopener">Cloudflare's pricing</a>.</li></ul></div>
+      <div class="plan"><h3>After the beta</h3><div class="price t">Not decided</div><ul><li>The software stays open source.</li><li>Self-hosting stays free of Shipvo fees.</li><li>If hosted usage is ever charged, it will be announced here and in the <a href="/changelog/">changelog</a> first.</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Expo and EAS plans</h2>
+    <p class="lede">The list prices from <a href="https://expo.dev/pricing" rel="noopener">expo.dev/pricing</a> as of 31 October 2026. Plans include build credit, so the monthly fee is not only for updates.</p>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th></th><th>Free</th><th>Starter</th><th>Production</th><th>Enterprise</th></tr></thead>
+      <tbody>
+        <tr><th>Monthly price</th><td>$0</td><td>$19 + usage</td><td>$199 + usage</td><td>Custom</td></tr>
+        <tr><th>Build credit</th><td>Up to 15 Android + 15 iOS builds</td><td>$45</td><td>$225</td><td>$1,000</td></tr>
+        <tr><th>Update MAUs included</th><td>1,000</td><td>3,000</td><td>50,000</td><td>Custom</td></tr>
+        <tr><th>MAUs beyond that</th><td>n/a</td><td>$0.005 each up to 200,000, then lower tiers</td><td>$0.005 each from 50,001 up to 200,000, then lower tiers</td><td>Volume pricing</td></tr>
+        <tr><th>Bandwidth</th><td>100 GiB</td><td>100 GiB, then $0.10/GiB</td><td>1 TiB, then $0.10/GiB</td><td>40 TiB</td></tr>
+        <tr><th>Support</th><td>Community</td><td>Community</td><td>Priority</td><td>Priority, 99.9 % SLA</td></tr>
+      </tbody>
+    </table></div>
+    <p class="src">Build jobs beyond the credit: Android $1 (medium) or $2 (large), iOS $2 (medium) or $4 (large), per build. Source: <a href="https://expo.dev/pricing" rel="noopener">expo.dev/pricing</a>.</p>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Worked examples</h2>
+    <p class="lede">Over-the-air updates for one app, per month, using the list prices above. Builds, storage and bandwidth overage are excluded, so the real Expo bill can be higher.</p>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th>Monthly active users</th><th>Expo plan and cost</th><th>How it is worked out</th><th>Shipvo</th></tr></thead>
+      <tbody>
+        <tr><th>1,000</th><td>Free: <b>$0</b></td><td>Inside the free 1,000 MAUs.</td><td class="win">$0 hosted beta</td></tr>
+        <tr><th>5,000</th><td>Starter: <b>$29</b></td><td>$19 + 2,000 × $0.005 = $10 over the included 3,000.</td><td class="win">$0 hosted beta</td></tr>
+        <tr><th>50,000</th><td>Production: <b>$199</b></td><td>Starter would be $19 + 47,000 × $0.005 = $254, so Production is cheaper at this size.</td><td class="win">$0 hosted beta</td></tr>
+        <tr><th>100,000</th><td>Production: <b>$449</b></td><td>$199 + 50,000 × $0.005 = $250 over the included 50,000.</td><td class="win">$0 hosted beta</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note" style="margin-top:22px"><b>Read this fairly.</b> The Shipvo column is zero because the beta is free, not because hosting is free to run, and a young service with no paid support is not the same product as Expo's. The comparison that will hold after the beta is self-hosted: no per-user fee, and a Cloudflare bill that is yours.</p>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Testing every pull request</h2>
+    <p class="lede">The other cost is catching bugs before release. If your pipeline builds an iOS binary on EAS for each pull request to test it, that build is usage. The Shipvo simulator needs no binary, and runs on a standard Linux runner.</p>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th>Pull requests per month</th><th>One iOS build each on EAS</th><th>Shipvo simulator tests</th></tr></thead>
+      <tbody>
+        <tr><th>25</th><td>$50 (medium) to $100 (large)</td><td class="win">Your CI minutes only</td></tr>
+        <tr><th>100</th><td>$200 to $400</td><td class="win">Your CI minutes only</td></tr>
+        <tr><th>400</th><td>$800 to $1,600</td><td class="win">Your CI minutes only</td></tr>
+      </tbody>
+    </table></div>
+    <p class="src">Per-build list prices from Expo: iOS $2 medium, $4 large. These are usage charges beyond your plan's build credit, and teams can also test on their own macOS runners instead. The simulator does not replace a native test: it answers a different question, quickly and cheaply. <a href="/compare/">How they differ</a>.</p>
+    <div class="cta" style="margin-top:28px"><a class="btn primary" href="/docs/getting-started/">Build your first app</a> <a class="btn" href="/docs/testing/">Test in CI</a></div>
+  </div>
+</section>
+</main>
+<!--FOOTER-->
+</body>
+</html>

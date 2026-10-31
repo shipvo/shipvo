@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--HEAD title="Shipvo vs Expo: side by side — Shipvo" desc="An honest side-by-side of testing, simulating and updating a React Native app with Expo and EAS versus Shipvo: what each does, what each costs, and when to use which." path="/compare/"-->
+<link rel="stylesheet" href="/blog.css">
+</head>
+<body>
+<!--NAV-->
+<main>
+<section class="cmp-hero">
+  <div class="wrap">
+    <div class="eyebrow">Compare</div>
+    <h1>Shipvo and Expo, side by side.</h1>
+    <p class="lede">Shipvo is built on Expo, not against it: <code>shipvo init</code> writes a complete Expo app. The overlap is in two places, simulating the app so it can be tested, and updating it over the air. This page sets them next to each other, including where Expo is the better choice.</p>
+    <p class="src">Checked 31 October 2026 against <a href="https://expo.dev/pricing" rel="noopener">Expo's pricing page</a> and <a href="https://expo.dev/blog/introducing-expo-agent-cli" rel="noopener">their agent CLI announcement</a>. Expo changes often; if something here is out of date, <a href="mailto:hans@pipilot.dev">tell us</a> and we will fix it.</p>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>What each one is</h2>
+    <div class="pick">
+      <div><h3>Expo and EAS</h3><ul><li>The framework and toolchain for React Native apps.</li><li><b>EAS Build</b> compiles your iOS and Android binaries in the cloud.</li><li><b>EAS Update</b> ships JavaScript updates over the air, billed by monthly active users.</li><li>Real native testing: the iOS Simulator, the Android Emulator, Expo Go and development builds.</li></ul></div>
+      <div><h3>Shipvo</h3><ul><li>An open-source layer you add to an Expo app (Apache-2.0).</li><li>A <b>simulator</b> that runs your app headless, with the screen exposed as an accessibility tree that assistants drive over MCP and typed tests drive in CI.</li><li>A signed <b>over-the-air runtime</b> and a control plane you can use hosted or run on your own Cloudflare account.</li><li>It does not compile binaries. You still build with EAS or locally.</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Testing and simulating</h2>
+    <p class="lede">Both let you run your app without holding a phone. They do it differently, and the difference is the whole trade-off.</p>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th></th><th>Expo tooling</th><th>Shipvo simulator</th></tr></thead>
+      <tbody>
+        <tr><th>What runs your app</th><td>The real native app on the iOS Simulator or Android Emulator.</td><td>Your app rendered with React Native Web in headless Chromium, with the device simulated.</td></tr>
+        <tr><th>Fidelity</th><td class="win">Native: catches native crashes, real rendering and OS-specific layout.</td><td>Logic and flow: screens, navigation, validation, permissions, payments, notifications. Does not catch native crashes or slow-phone performance.</td></tr>
+        <tr><th>Needs a Mac and Xcode for iOS</th><td>Yes. The iOS Simulator runs only on macOS.</td><td class="win">No. Runs on a plain Linux runner or your laptop.</td></tr>
+        <tr><th>Setup</th><td>Xcode, Android Studio and emulator images, or a cloud service.</td><td class="win">One dependency and Chromium: <code>npm run sim</code>.</td></tr>
+        <tr><th>How an assistant sees the app</th><td>Expo's new <code>@expo/agent-cli</code> (experimental) lets coding agents start the app, navigate, reload and run a smoke check. Their announcement does not describe an accessibility-tree interface.</td><td class="win">A phone-sized session over MCP: the screen as an accessibility tree with refs, plus tap, type, scroll, back and screenshot.</td></tr>
+        <tr><th>Where it runs</th><td>Local by default. Their cloud simulator sessions (<em>Expo Simulators</em>) were in preview with a waitlist at the time of their announcement.</td><td class="win">Local, or hosted at <code>sim.shipvo.dev</code> with a key from <code>shipvo login</code>.</td></tr>
+        <tr><th>Camera, location, biometrics, payments</th><td>Real on a device. In simulators, support varies and some features, such as the camera and biometrics, are limited or manual.</td><td>Scriptable: set the location, put a barcode in front of the camera, approve or fail a payment, deny a permission, go offline.</td></tr>
+        <tr><th>Typed test API for CI</th><td>Bring your own: Maestro, Detox or similar.</td><td class="win"><code>@shipvo/test</code>: Playwright-style, in Vitest or any runner.</td></tr>
+        <tr><th>How closely it matches a phone</th><td class="win">It is a phone, simulated at the OS level.</td><td>Measured and published: 100 % actionable parity across 3 flows and 21 screens, text 98.6 % and 96.2 %, three known gaps listed. <a href="/docs/parity-results/">Parity results</a></td></tr>
+      </tbody>
+    </table></div>
+    <p class="note" style="margin-top:22px"><b>The honest summary.</b> If you need to know whether your app crashes on a real iPhone, use the iOS Simulator or a device. If you want to know on every pull request, in seconds, on a Linux runner, whether a customer can still scan, pay and get a confirmation, use the Shipvo simulator. Most teams want both: the simulator on every commit, a real device before a store release.</p>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Updating over the air</h2>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th></th><th>EAS Update</th><th>Shipvo runtime</th></tr></thead>
+      <tbody>
+        <tr><th>Hosting</th><td>Hosted by Expo.</td><td>Hosted free during the beta at <code>api.shipvo.dev</code>, or self-hosted on your own Cloudflare account in about ten minutes.</td></tr>
+        <tr><th>Trust model</th><td>Managed by Expo; code signing is available.</td><td>Your Ed25519 key is pinned in the app's native shell. Phones verify the signature, hash and size of every release; nothing delivered over the air can change the key.</td></tr>
+        <tr><th>Update size</th><td>Full bundle or assets that changed.</td><td>bsdiff patches from the version a phone already has; typically tens of KB.</td></tr>
+        <tr><th>Rollout and rollback</th><td>Channels and staged rollouts.</td><td>Cohorts at 1 %, 10 %, then everyone; <code>shipvo rollback --to 7</code>; phones discard a release that fails to boot.</td></tr>
+        <tr><th>Platforms</th><td class="win">Android and iOS, in production use at scale.</td><td>Android measured on a 2 GB phone. iOS verified on an iPhone simulator in CI, not yet measured on a physical iPhone.</td></tr>
+        <tr><th>Maturity</th><td class="win">Years in production, large user base, paid support on higher plans.</td><td>Beta. Small and young; the numbers we have are published, including the gaps.</td></tr>
+        <tr><th>Cost model</th><td>Plan fee plus per monthly active user above the included amount. See <a href="/pricing/">pricing</a>.</td><td class="win">No per-user fee in the software. Hosted is free in the beta; self-hosted costs whatever Cloudflare charges you.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Which one to use</h2>
+    <div class="pick">
+      <div><h3>Reach for Expo tooling when</h3><ul><li>You need to catch native crashes or test on real hardware.</li><li>You want a managed, mature update service with paid support.</li><li>You are building binaries: EAS Build is what you pay for there, and Shipvo does not replace it.</li></ul></div>
+      <div><h3>Reach for Shipvo when</h3><ul><li>You want assistants or CI to run your real flows on every change, without a Mac or an emulator.</li><li>You want the update trust root to be your own key, and the control plane in your own account.</li><li>You want your app to be openable by any agent, listed on <a href="/apps">the marketplace</a>.</li></ul></div>
+      <div><h3>Use them together</h3><ul><li>Build with EAS or locally; publish updates with <code>shipvo publish</code>.</li><li>Run the Shipvo simulator on every pull request and a real device before each store release.</li><li>Keep your free EAS tier for builds and spend nothing extra on testing.</li></ul></div>
+    </div>
+    <p class="src">Not affiliated with Expo. Expo, EAS and Expo Go are trademarks of 650 Industries, Inc. What does each cost? <a href="/pricing/">See pricing</a>. Want to test the claims? <a href="/docs/test-with-an-assistant/">Connect an assistant in four steps</a>.</p>
+  </div>
+</section>
+</main>
+<!--FOOTER-->
+</body>
+</html>

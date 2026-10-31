@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing: Shipvo and Expo compared — Shipvo</title>
+<meta name="description" content="What Shipvo costs, what Expo and EAS cost, and worked monthly examples for over-the-air updates and for testing every pull request.">
+<link rel="canonical" href="https://shipvo.dev/pricing/">
+<meta property="og:title" content="Pricing: Shipvo and Expo compared — Shipvo"><meta property="og:description" content="What Shipvo costs, what Expo and EAS cost, and worked monthly examples for over-the-air updates and for testing every pull request."><meta property="og:url" content="https://shipvo.dev/pricing/"><meta property="og:type" content="website"><meta property="og:image" content="https://shipvo.dev/og.png">
+<meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#090D16">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt"><link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>try{var t=localStorage.getItem("shipvo.theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="/site.css">
+<link rel="stylesheet" href="/blog.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a><header class="nav"><div class="wrap">
+  <a class="logo" href="/" aria-label="Shipvo home"><img src="/logo-256.png" alt="" width="28" height="28">Shipvo</a>
+  <nav class="primary" aria-label="Primary">
+    <a href="/docs/" class="">Docs</a>
+    <div class="has-menu"><button type="button" aria-expanded="false" aria-haspopup="true">Product<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="menu"><div class="menu-grid"><a href="/docs/getting-started/#5-publish-over-the-air"><b>Publish</b><span>Signed OTA updates, cohorts, rollback</span></a><a href="/docs/agents/"><b>Simulate</b><span>A phone agents can see and operate over MCP</span></a><a href="/docs/testing/"><b>Test in CI</b><span>Typed simulator tests on every pull request</span></a><a href="/docs/parity-results/"><b>Verify</b><span>Simulator vs device parity, measured nightly</span></a><a href="/apps"><b>Marketplace</b><span>Apps any signed-in agent can open</span></a><a href="/docs/cli/"><b>CLI</b><span>init · sim · login · app · publish · rollback</span></a><a href="/docs/mcp/"><b>MCP server</b><span>Local over stdio, hosted with a key</span></a><a href="/docs/device-api/"><b>Device API</b><span>Camera, location, biometrics, payments, notifications</span></a><a href="/docs/runtime/"><b>Runtime</b><span>The OTA runtime and Expo plugin</span></a></div></div></div>
+    <div class="has-menu"><button type="button" aria-expanded="false" aria-haspopup="true">Solutions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="menu"><div class="menu-grid"><a href="/#how"><b>Test with the assistant you use</b><span>Claude, ChatGPT or Cursor drives your app end to end, no emulator</span></a><a href="/docs/getting-started/"><b>Ship updates without the store</b><span>One command; phones have it in seconds</span></a><a href="/docs/agents/#listing-your-app-for-every-agent"><b>Make your app agent-ready</b><span>List it so any agent can open it</span></a><a href="/compare/"><b>Shipvo vs Expo</b><span>Side by side, including where Expo is the better choice</span></a><a href="/docs/self-hosting/"><b>Self-host everything</b><span>Your Cloudflare account, your keys, ten minutes</span></a></div></div></div>
+    <a href="/pricing/" class="on">Pricing</a>
+    <a href="/blog/" class="">Blog</a>
+    <a href="/apps" class="">Apps</a>
+    <a href="/changelog/" class="">Changelog</a>
+  </nav>
+  <div class="nav-right">
+    <button class="theme-btn" type="button" data-theme-toggle data-mode="auto" aria-label="Colour theme: automatic. Click to change." title="Theme: automatic"><svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <a class="gh" href="https://github.com/shipvo/shipvo" rel="noopener" aria-label="Shipvo on GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2.1c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.05.78 2.12v3.14c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg><span data-stars>Star</span></a>
+    <a class="btn primary" href="/docs/getting-started/">Get started</a>
+  </div>
+  <button class="burger" type="button" aria-label="Menu" aria-expanded="false"><span></span></button>
+</div>
+<div class="mobile-menu" hidden>
+  <div class="mm-theme"><span>Theme</span><button class="theme-btn" type="button" data-theme-toggle data-mode="auto" aria-label="Colour theme: automatic. Click to change." title="Theme: automatic"><svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button></div>
+  <a href="/docs/">Docs</a><a href="/pricing/">Pricing</a><a href="/blog/">Blog</a><a href="/apps">Apps</a><a href="/changelog/">Changelog</a>
+  <div class="mm-title">Product</div><a href="/docs/getting-started/#5-publish-over-the-air">Publish</a><a href="/docs/agents/">Simulate</a><a href="/docs/testing/">Test in CI</a><a href="/docs/parity-results/">Verify</a><a href="/apps">Marketplace</a><a href="/docs/cli/">CLI</a><a href="/docs/mcp/">MCP server</a><a href="/docs/device-api/">Device API</a><a href="/docs/runtime/">Runtime</a>
+  <div class="mm-title">Solutions</div><a href="/#how">Test with the assistant you use</a><a href="/docs/getting-started/">Ship updates without the store</a><a href="/docs/agents/#listing-your-app-for-every-agent">Make your app agent-ready</a><a href="/compare/">Shipvo vs Expo</a><a href="/docs/self-hosting/">Self-host everything</a>
+  <a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a>
+</div></header>
+<main id="main">
+<section class="cmp-hero">
+  <div class="wrap">
+    <div class="eyebrow">Pricing</div>
+    <h1>Free in the beta. Open source always.</h1>
+    <p class="lede">There is no paid Shipvo plan today. The hosted services are free while we are in beta, and everything can run on your own account. Below is what that includes, and what the same jobs cost on Expo's plans so you can compare with real numbers.</p>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Shipvo</h2>
+    <div class="plans">
+      <div class="plan us"><h3>Hosted beta</h3><div class="price">$0</div><ul><li>Control plane at <code>api.shipvo.dev</code>: signed pointers, cohorts, rollback.</li><li>Hosted simulator at <code>sim.shipvo.dev</code>, one sandbox per key.</li><li>Test key with 600 sandbox minutes, valid for 30 days; renew with <code>shipvo login</code>.</li><li>Up to 3 listed apps per account.</li></ul></div>
+      <div class="plan us"><h3>Self-hosted</h3><div class="price t">Your Cloudflare bill</div><ul><li>Apache-2.0 software, no per-user fee.</li><li>Control plane on Cloudflare Workers, KV and D1, set up in about ten minutes.</li><li>The simulator runs on your laptop or any Linux CI runner.</li><li>We have not measured a typical monthly figure, so we do not quote one. See <a href="https://www.cloudflare.com/plans/developer-platform/" rel="noopener">Cloudflare's pricing</a>.</li></ul></div>
+      <div class="plan"><h3>After the beta</h3><div class="price t">Not decided</div><ul><li>The software stays open source.</li><li>Self-hosting stays free of Shipvo fees.</li><li>If hosted usage is ever charged, it will be announced here and in the <a href="/changelog/">changelog</a> first.</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Expo and EAS plans</h2>
+    <p class="lede">The list prices from <a href="https://expo.dev/pricing" rel="noopener">expo.dev/pricing</a> as of 31 October 2026. Plans include build credit, so the monthly fee is not only for updates.</p>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th></th><th>Free</th><th>Starter</th><th>Production</th><th>Enterprise</th></tr></thead>
+      <tbody>
+        <tr><th>Monthly price</th><td>$0</td><td>$19 + usage</td><td>$199 + usage</td><td>Custom</td></tr>
+        <tr><th>Build credit</th><td>Up to 15 Android + 15 iOS builds</td><td>$45</td><td>$225</td><td>$1,000</td></tr>
+        <tr><th>Update MAUs included</th><td>1,000</td><td>3,000</td><td>50,000</td><td>Custom</td></tr>
+        <tr><th>MAUs beyond that</th><td>n/a</td><td>$0.005 each up to 200,000, then lower tiers</td><td>$0.005 each from 50,001 up to 200,000, then lower tiers</td><td>Volume pricing</td></tr>
+        <tr><th>Bandwidth</th><td>100 GiB</td><td>100 GiB, then $0.10/GiB</td><td>1 TiB, then $0.10/GiB</td><td>40 TiB</td></tr>
+        <tr><th>Support</th><td>Community</td><td>Community</td><td>Priority</td><td>Priority, 99.9 % SLA</td></tr>
+      </tbody>
+    </table></div>
+    <p class="src">Build jobs beyond the credit: Android $1 (medium) or $2 (large), iOS $2 (medium) or $4 (large), per build. Source: <a href="https://expo.dev/pricing" rel="noopener">expo.dev/pricing</a>.</p>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Worked examples</h2>
+    <p class="lede">Over-the-air updates for one app, per month, using the list prices above. Builds, storage and bandwidth overage are excluded, so the real Expo bill can be higher.</p>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th>Monthly active users</th><th>Expo plan and cost</th><th>How it is worked out</th><th>Shipvo</th></tr></thead>
+      <tbody>
+        <tr><th>1,000</th><td>Free: <b>$0</b></td><td>Inside the free 1,000 MAUs.</td><td class="win">$0 hosted beta</td></tr>
+        <tr><th>5,000</th><td>Starter: <b>$29</b></td><td>$19 + 2,000 × $0.005 = $10 over the included 3,000.</td><td class="win">$0 hosted beta</td></tr>
+        <tr><th>50,000</th><td>Production: <b>$199</b></td><td>Starter would be $19 + 47,000 × $0.005 = $254, so Production is cheaper at this size.</td><td class="win">$0 hosted beta</td></tr>
+        <tr><th>100,000</th><td>Production: <b>$449</b></td><td>$199 + 50,000 × $0.005 = $250 over the included 50,000.</td><td class="win">$0 hosted beta</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note" style="margin-top:22px"><b>Read this fairly.</b> The Shipvo column is zero because the beta is free, not because hosting is free to run, and a young service with no paid support is not the same product as Expo's. The comparison that will hold after the beta is self-hosted: no per-user fee, and a Cloudflare bill that is yours.</p>
+  </div>
+</section>
+
+<section class="cmp-sec">
+  <div class="wrap">
+    <h2>Testing every pull request</h2>
+    <p class="lede">The other cost is catching bugs before release. If your pipeline builds an iOS binary on EAS for each pull request to test it, that build is usage. The Shipvo simulator needs no binary, and runs on a standard Linux runner.</p>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th>Pull requests per month</th><th>One iOS build each on EAS</th><th>Shipvo simulator tests</th></tr></thead>
+      <tbody>
+        <tr><th>25</th><td>$50 (medium) to $100 (large)</td><td class="win">Your CI minutes only</td></tr>
+        <tr><th>100</th><td>$200 to $400</td><td class="win">Your CI minutes only</td></tr>
+        <tr><th>400</th><td>$800 to $1,600</td><td class="win">Your CI minutes only</td></tr>
+      </tbody>
+    </table></div>
+    <p class="src">Per-build list prices from Expo: iOS $2 medium, $4 large. These are usage charges beyond your plan's build credit, and teams can also test on their own macOS runners instead. The simulator does not replace a native test: it answers a different question, quickly and cheaply. <a href="/compare/">How they differ</a>.</p>
+    <div class="cta" style="margin-top:28px"><a class="btn primary" href="/docs/getting-started/">Build your first app</a> <a class="btn" href="/docs/testing/">Test in CI</a></div>
+  </div>
+</section>
+</main>
+<footer class="foot"><div class="wrap">
+  <div class="foot-grid">
+    <div class="foot-brand"><a class="logo" href="/"><img src="/logo-256.png" alt="" width="28" height="28">Shipvo</a><p>Build once. Publish for people and AI agents.</p><p class="mono small">Apache-2.0 · made in Douala</p><div class="status" data-status><span class="dot"></span><span>checking services…</span></div></div>
+    <div><div class="foot-title">Product</div><a href="/docs/getting-started/#5-publish-over-the-air">Publish</a><a href="/docs/agents/">Simulate</a><a href="/docs/parity-results/">Verify</a><a href="/apps">Marketplace</a><a href="/pricing/">Pricing</a><a href="/compare/">Shipvo vs Expo</a><a href="/blog/">Blog</a><a href="https://www.npmjs.com/org/shipvo" rel="noopener">npm packages</a></div>
+    <div><div class="foot-title">Docs</div><a href="/docs/getting-started/">Build your first app</a><a href="/docs/test-with-an-assistant/">Test with an assistant</a><a href="/docs/testing/">Test in CI</a><a href="/docs/cli/">CLI reference</a><a href="/docs/mcp/">MCP server</a><a href="/docs/device-api/">Device API</a><a href="/docs/self-hosting/">Self-hosting</a><a href="/llms.txt">llms.txt</a></div>
+    <div><div class="foot-title">Proof</div><a href="/docs/parity-results/">Parity results</a><a href="/docs/spike-results/">OTA on a 2 GB phone</a><a href="/docs/agent-gate-results/">Agent gate</a><a href="/changelog/">Changelog</a></div>
+    <div><div class="foot-title">Company</div><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a><a href="https://x.com/HansCadx" rel="noopener">X</a><a href="/brand">Brand</a><a href="mailto:hans@pipilot.dev">Contact</a><a href="https://github.com/shipvo/shipvo/blob/main/LICENSE" rel="noopener">License</a></div>
+  </div>
+  <div class="foot-bottom"><span>© 2026 Shipvo. Not affiliated with Expo, Apple, Google, OpenAI or Anthropic.</span><span class="legal-links"><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/security/">Security</a><a href="/acceptable-use/">Acceptable use</a></span></div>
+</div></footer>
+<script src="/shell.js" defer></script>
+</body>
+</html>

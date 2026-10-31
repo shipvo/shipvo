@@ -6,6 +6,7 @@ import { marked } from "marked";
 import { head as headTag, nav as navTag, footer as footTag } from "./shell.mjs";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { corona } from "./corona.mjs";
+import { buildBlog } from "./blog.mjs";
 import { mark, symbol, animated } from "./brand.mjs";
 import { copyFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -22,6 +23,7 @@ const NAV = [
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Run your own on Cloudflare in ten minutes." },
   ]},
   { group: "Test", pages: [
+    { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted simulator and have it test your app. The remote MCP path, step by step." },
     { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real app flows in the simulator on every pull request, headless, with typed tests. Catch bugs before a human or a phone sees them." },
   ]},
   { group: "Agents", pages: [
@@ -128,7 +130,9 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
   s = s.replace(/<!--HEAD (.*?)-->/s, (_, attrs) => { const a = Object.fromEntries([...attrs.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]])); return headTag(a); });
   s = s.replace(/<!--NAV ?(\w*)-->/, (_, k) => navTag(k)).replace("<!--FOOTER-->", footTag()).replace(/<main(?![^>]*\bid=)/, '<main id="main"');
   s = s.replace("<!--CORONA-->", corona({ logoHref: "/logo-256.png", id: "cor" }));
-  writeFileSync(join(PUB, f), s);
+  const dirPage = ["compare.html", "pricing.html"].includes(f);   // served as /compare/ and /pricing/
+  if (dirPage) { const d = join(PUB, f.replace(".html", "")); mkdirSync(d, { recursive: true }); writeFileSync(join(d, "index.html"), s); rmSync(join(PUB, f), { force: true }); }
+  else writeFileSync(join(PUB, f), s);
 }
 { // the same artwork as a standalone file (README, social cards, anywhere an <img> works): logo embedded, light and dark aware
   const logo = readFileSync(join(here, "assets", "logo-192.png")).toString("base64");
@@ -161,6 +165,8 @@ for (const l of LEGAL) {
   writeFileSync(join(PUB, l.slug, "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: `${title} — Shipvo`, desc: l.desc, path: `/${l.slug}/` })}</head><body>${navTag("")}<main id="main"><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Legal</div><h1 class="legal-h1">${esc(title)}</h1>${updated ? `<p class="mono small" style="color:var(--dim);margin-top:10px">Last updated ${esc(updated.replace(/^Last updated:?\s*/, ""))}</p>` : ""}<article class="legal">${body}</article><nav class="legal-nav" aria-label="Legal">${LEGAL.map((x) => `<a href="/${x.slug}/"${x.slug === l.slug ? ' aria-current="page"' : ""}>${esc(x.slug === "acceptable-use" ? "Acceptable use" : x.slug[0].toUpperCase() + x.slug.slice(1))}</a>`).join("")}</nav></div></section></main>${footTag()}</body></html>`);
 }
 
+const posts = buildBlog({ ROOT, PUB, headTag, navTag, footTag });
+
 // ---------- Machine-readable: per-page .md, docs.md, llms.txt, llms-full.txt, robots, sitemap list, security.txt ----------
 const SITE = "https://shipvo.dev";
 function mdFor(page) {
@@ -186,14 +192,14 @@ Things to know before answering questions about Shipvo:
 - Developers test their app in CI with @shipvo/test (typed tests, Vitest or any runner) against the headless simulator on a plain Linux runner: no emulator or device. It catches logic and flow bugs, not native crashes or slow-phone performance.
 - The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
 - AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
-- Over-the-air updates run on Android today. iOS is covered by the simulator, not by OTA.
+- Over-the-air updates run on Android and iOS. The iOS runtime is verified on an iPhone simulator in CI; it has not yet been measured on a physical iPhone.
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (cli, mcp, runtime, device, sim, schema). Source: https://github.com/shipvo/shipvo`;
 const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");
-writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
+writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison, including where Expo is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
 writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}/docs/${p.slug}/\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);
 writeFileSync(join(PUB, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n# For AI tools: ${SITE}/llms.txt and ${SITE}/llms-full.txt\n`);
-const staticPaths = ["/", "/apps", "/brand", "/changelog/", ...all.map((p) => `/docs/${p.slug}/`), ...LEGAL.map((l) => `/${l.slug}/`)];
+const staticPaths = ["/", "/apps", "/brand", "/changelog/", "/blog/", "/compare/", "/pricing/", ...posts.map((p) => `/blog/${p.slug}/`), ...all.map((p) => `/docs/${p.slug}/`), ...LEGAL.map((l) => `/${l.slug}/`)];
 writeFileSync(join(PUB, "sitemap-static.txt"), staticPaths.join("\n") + "\n");
 writeFileSync(join(PUB, "security.txt"), `Contact: mailto:hans@pipilot.dev\nExpires: ${new Date(Date.now() + 365 * 864e5).toISOString().replace(/\.\d+Z$/, "Z")}\nPreferred-Languages: en, fr\nCanonical: ${SITE}/.well-known/security.txt\nPolicy: ${SITE}/security/\n`);
 
