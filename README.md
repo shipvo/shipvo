@@ -10,7 +10,9 @@ Three pillars:
 
 1. **Publish.** Signed OTA updates (64 KB patches, crash-loop rollback, staged rollouts), a built-in owner admin at `/app/<id>/admin`, and a control plane you can self-host on Cloudflare.
 2. **Simulate.** `@shipvo/mcp` opens any Shipvo app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@shipvo/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
-3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% matching controls on both platforms across two purchase flows and 94% across a third flow that uses the camera, location and payment prompts, with the orders themselves compared (`docs/parity-results.md`, which also says exactly what the score does and does not measure).
+3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% actionable parity on Android and iOS across the 13-screen purchase flows; on the native-feature flow, 18 of 21 screens match at 100% on Android (the three gaps are listed) and 100% on iOS, with the orders themselves compared (`docs/parity-results.md`, which also says exactly what the score does and does not measure).
+
+[Website](https://shipvo.dev) · [Docs](https://shipvo.dev/docs/getting-started/) · [Blog](https://shipvo.dev/blog/) · [Shipvo vs Expo](https://shipvo.dev/compare/) · [Pricing](https://shipvo.dev/pricing/)
 
 [![CI](https://github.com/shipvo/shipvo/actions/workflows/ci.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/ci.yml)
 [![Deploy](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml)
