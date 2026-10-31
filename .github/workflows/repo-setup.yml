@@ -1,0 +1,43 @@
+name: repo-setup
+# One-click repo discoverability setup (topics, Discussions, labels, starter issues).
+# Needs a repo secret ADMIN_TOKEN: a fine-grained PAT for this repo with
+# Administration: read/write, Issues: read/write, Metadata: read.
+on:
+  workflow_dispatch:
+    inputs:
+      create_issues:
+        description: Create the starter good-first-issue issues
+        type: boolean
+        default: true
+permissions: {}
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      R: ${{ github.repository }}
+    steps:
+      - name: Check secret
+        run: '[ -n "$GH_TOKEN" ] || { echo "::error::Add the ADMIN_TOKEN repo secret first (Settings > Secrets and variables > Actions)"; exit 1; }'
+      - name: Discussions
+        run: gh api -X PATCH repos/$R -F has_discussions=true --jq '"discussions: \(.has_discussions)"'
+      - name: Topics
+        run: |
+          gh api -X PUT repos/$R/topics \
+            -f 'names[]=react-native' -f 'names[]=expo' -f 'names[]=ota-updates' -f 'names[]=react-native-ota' \
+            -f 'names[]=codepush-alternative' -f 'names[]=expo-updates' -f 'names[]=mcp' -f 'names[]=model-context-protocol' \
+            -f 'names[]=ai-agents' -f 'names[]=agent-native' -f 'names[]=mobile-testing' -f 'names[]=e2e-testing' \
+            -f 'names[]=react-native-testing' -f 'names[]=mobile-simulator' -f 'names[]=android' -f 'names[]=ios' \
+            -f 'names[]=hermes' -f 'names[]=cloudflare-workers' -f 'names[]=self-hosted' -f 'names[]=typescript' --jq '"topics: \(.names|length)"'
+      - name: Labels
+        run: |
+          gh label create "good first issue" -R $R -c 7057ff -d "Good for newcomers" || true
+          gh label create "help wanted" -R $R -c 008672 -d "Extra attention is needed" || true
+      - name: Starter issues
+        if: ${{ inputs.create_issues }}
+        run: |
+          mk() { gh issue list -R $R --search "in:title \"$1\"" --json number --jq length | grep -q '^0$' && gh issue create -R $R -t "$1" -b "$2" -l "good first issue,help wanted"; true; }
+          mk "Measure OTA apply time on a physical iPhone" "OTA on iOS is verified on the iOS Simulator in CI; physical iPhones are not yet measured. Run the spike on a real device and add the device model, cold start and apply time to docs/spike-results.md."
+          mk "Binary-diff (bsdiff) patches on iOS" "Android uses small patches; the iOS runtime path currently fetches the full bundle. Investigate bsdiff-style patching on iOS and report patch size versus bundle size."
+          mk "Add more typed-test examples to @shipvo/test" "Add example flows (permission denied, offline, payment decline) under packages/test with a short README snippet each."
+          mk "Docs: translate Getting started" "Translate docs/getting-started.md into your language. Open one PR per language."
