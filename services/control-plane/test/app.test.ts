@@ -15,6 +15,14 @@ describe("control plane", () => {
     expect(r.status).toBe(200); expect(r.headers.get("etag")).toBe('"3"');
     expect((await app.request("/p/tide/1/b0.json", { headers: { "if-none-match": '"3"' } }, env)).status).toBe(304);
   });
+  it("serves iOS pointers from their own key, never the Android one", async () => {
+    const ios = JSON.stringify({ body: JSON.stringify({ ...body, platform: "ios", release: 7 }), signature: "AAAA" });
+    const env = { POINTERS: kv({ "p/tide/1/b0": envl, "p/tide/1/ios/b0": ios }) } as any;
+    const r = await app.request("/p/tide/1/ios/b0.json", {}, env);
+    expect(r.status).toBe(200); expect(r.headers.get("etag")).toBe('"7"');
+    expect((await app.request("/p/tide/1/b0.json", {}, env)).headers.get("etag")).toBe('"3"');
+    expect((await app.request("/p/tide/1/ios/b0.json", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(404);
+  });
   it("404, 400 and corrupt", async () => {
     expect((await app.request("/p/tide/1/b0.json", {}, { POINTERS: kv({}) } as any)).status).toBe(404);
     expect((await app.request("/p/tide/1/zz.json", {}, { POINTERS: kv({}) } as any)).status).toBe(400);

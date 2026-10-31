@@ -1,4 +1,19 @@
 {
-  "platforms": ["android"],
-  "android": { "modules": ["dev.shipvo.runtime.ShipvoRuntimeModule"] }
+  "platforms": [
+    "android",
+    "apple"
+  ],
+  "android": {
+    "modules": [
+      "dev.shipvo.runtime.ShipvoRuntimeModule"
+    ]
+  },
+  "apple": {
+    "modules": [
+      "ShipvoRuntimeModule"
+    ],
+    "reactDelegateHandlers": [
+      "ShipvoReactDelegateHandler"
+    ]
+  }
 }

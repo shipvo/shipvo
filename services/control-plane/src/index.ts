@@ -29,13 +29,13 @@ const ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 app.get("/health", (c) => c.json({ ok: true, service: "shipvo-control", time: new Date().toISOString() }, 200, { "access-control-allow-origin": "*", "cache-control": "no-store" }));
 
-/** Static hot path: signed release pointer envelope per app / shell major / band. No device registry. */
-app.get("/p/:app/:major/:band", async (c) => {
+/** Static hot path: signed release pointer envelope per app / shell major / (platform /) band. No device registry. Android pointers live at /p/<app>/<major>/<band>, iOS at /p/<app>/<major>/ios/<band>. */
+async function servePointer(c: any, platform: "android" | "ios") {
   const { app: appId, major } = c.req.param();
   const band = c.req.param("band").replace(/\.json$/, "");
   if (!ID.test(appId) || !/^\d+$/.test(major)) return c.json({ error: "bad_request" }, 400);
   if (!["b0", "b1", "b2"].includes(band)) return c.json({ error: "bad_band" }, 400);
-  const raw = await c.env.POINTERS.get(`p/${appId}/${major}/${band}`);
+  const raw = await c.env.POINTERS.get(platform === "ios" ? `p/${appId}/${major}/ios/${band}` : `p/${appId}/${major}/${band}`);
   if (!raw) return c.json({ error: "no_release" }, 404);
   let release: number;
   try {
@@ -45,7 +45,9 @@ app.get("/p/:app/:major/:band", async (c) => {
   const etag = `"${release}"`;
   if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
   return new Response(raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
-});
+}
+app.get("/p/:app/:major/ios/:band", (c) => servePointer(c, "ios"));
+app.get("/p/:app/:major/:band", (c) => servePointer(c, "android"));
 
 /** Immutable bundle bytes. Integrity is checked on device against the sha256 inside the signed pointer. */
 // Agent-facing web artifact of a release: /w/<app>/r<N>/index.html and its files; /w/<app>/releases.json lists them.

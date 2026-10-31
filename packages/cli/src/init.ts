@@ -65,7 +65,7 @@ module.exports = withShipvoSim(getDefaultConfig(__dirname));
   w("index.ts", `import { registerRootComponent } from "expo";\nimport App from "./App";\nregisterRootComponent(App);\n`);
   w(".gitignore", `node_modules/\n.expo/\ndist/\ndist-ota/\ndist-web/\nsim-dist/\nweb-build/\n/ios\n/android\n.kotlin/\n*.jks\n*.p8\n*.p12\n*.key\n*.mobileprovision\n*.tsbuildinfo\n.env*.local\n.DS_Store\n# never commit the release signing seed\n.shipvo/\n`);
   w("src/release.ts", `// Edit and push: the publish workflow signs and ships this to every installed phone and to the simulator.
-export const RELEASE = { headline: "Release 1: hello from ${name}.", note: "Edit src/release.ts and run `shipvo publish`." };
+export const RELEASE = { headline: "Release 1: hello from ${name}.", note: "Edit src/release.ts and run \`shipvo publish\`." };
 `);
   w("App.tsx", APP_TSX(name, appId));
   w(".github/workflows/publish.yml", WORKFLOW);

@@ -8,7 +8,7 @@ export type RuntimeState = {
 };
 export type CheckResult = {
   status: "none" | "staged" | "error"; release?: number; bytes?: number; downloadMs?: number; verifyMs?: number;
-  /** Shell 1.0.2+: "patch" when a bsdiff patch was applied, "full" otherwise. */
+  /** Shell 1.0.2+ (Android): "patch" when a bsdiff patch was applied, "full" otherwise. iOS always downloads "full". */
   via?: "patch" | "full"; bundleBytes?: number; patchError?: string | null;
   issuedAt?: string; error?: string;
 };
@@ -27,8 +27,8 @@ type Native = {
   reload(): void;
 };
 
-// The OTA runtime is Android-only for now. On iOS the app runs on its embedded bundle and live content; it still
-// knows its control plane and app id from the config the plugin writes into expo.extra.shipvo.
+// The native runtime exists on Android and iOS. Where the module is missing (web, Expo Go, a shell built without it) the
+// app runs its embedded bundle and live content, and still knows its control plane and app id from expo.extra.shipvo.
 const t0 = Date.now();
 let extra: any = {};
 try { extra = require("expo-constants").default?.expoConfig?.extra?.shipvo ?? {}; } catch {}

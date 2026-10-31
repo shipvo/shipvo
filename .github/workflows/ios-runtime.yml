@@ -1,0 +1,41 @@
+name: ios-runtime
+# The iOS OTA runtime on a real macOS runner. Job 1 runs the runtime's logic (signature + hash checks, bundle choice,
+# crash-loop rollback) against a fake control plane. Job 2 builds the Tide app for the iOS Simulator with the runtime
+# linked in, then proves the whole chain on a simulator: fetch the signed iOS pointer, verify, stage, reload into the
+# new bundle, report healthy.
+on:
+  workflow_dispatch:
+    inputs:
+      e2e: { description: "Also run the simulator end-to-end (slow)", type: boolean, default: true }
+  push:
+    branches: [main]
+    paths: ["packages/runtime/**", "scripts/ios-fixture.mjs", "scripts/ios-e2e/**", "packages/cli/src/publish.ts", ".github/workflows/ios-runtime.yml"]
+  pull_request:
+    paths: ["packages/runtime/**", "scripts/ios-fixture.mjs", ".github/workflows/ios-runtime.yml"]
+
+jobs:
+  swift-tests:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
+      - name: Fake control plane (signed iOS pointers, good and bad)
+        run: |
+          node scripts/ios-fixture.mjs "$RUNNER_TEMP/fx"
+          cd "$RUNNER_TEMP/fx" && (python3 -m http.server 8099 --bind 127.0.0.1 >/dev/null 2>&1 &) && sleep 1
+          curl -sf http://127.0.0.1:8099/meta.json
+      - name: swift test
+        working-directory: packages/runtime
+        env:
+          SHIPVO_FIXTURE_BASE: http://127.0.0.1:8099
+          SHIPVO_FIXTURE_DIR: ${{ runner.temp }}/fx
+        run: swift test 2>&1 | tee "$RUNNER_TEMP/swift-test.log"; test ${PIPESTATUS[0]} -eq 0
+      - name: Summary
+        if: always()
+        run: grep -E "Executed|error:|failed" "$RUNNER_TEMP/swift-test.log" | tail -20 | tee -a "$GITHUB_STEP_SUMMARY"

@@ -18,6 +18,7 @@
   "files": [
     "src",
     "android",
+    "ios",
     "app.plugin.js",
     "expo-module.config.json",
     "README.md"

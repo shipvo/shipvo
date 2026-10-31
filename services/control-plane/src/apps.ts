@@ -172,13 +172,17 @@ apps.get("/:id/kv/*", async (c) => {
 
 /** A release pointer must be signed with the app's registered key and name this app, shell major and band. */
 async function pointerProblem(id: string, key: string, pub: string, buf: ArrayBuffer): Promise<string | null> {
-  const [, , major, band] = key.split("/");
+  const parts = key.split("/");
+  const ios = parts.length === 5 && parts[3] === "ios";
+  if (parts.length !== (ios ? 5 : 4)) return "pointer key must be p/<app>/<major>/[ios/]<band>";
+  const major = parts[2], band = parts[ios ? 4 : 3];
   let env: any, body: any;
   try { env = JSON.parse(new TextDecoder().decode(buf)); body = JSON.parse(env.body); } catch { return "a pointer is a JSON envelope { body, signature }"; }
   if (typeof env.signature !== "string") return "pointer has no signature";
   const shape = ReleasePointerBody.safeParse(body); if (!shape.success) return `pointer body is not a valid release pointer: ${shape.error.issues[0]?.path.join(".")} ${shape.error.issues[0]?.message}`;
   if (body.app_id !== id) return `pointer is for "${body.app_id}", not "${id}"`;
   if (String(body.shell_major) !== major || body.band !== band) return "pointer shell_major/band does not match its key";
+  if ((body.platform === "ios") !== ios) return "pointer platform does not match its key";
   for (const alg of ["Ed25519", "NODE-ED25519"]) {
     try {
       const k = await crypto.subtle.importKey("raw", unb64(pub), { name: alg, namedCurve: "Ed25519" } as any, false, ["verify"]);

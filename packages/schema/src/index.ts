@@ -62,6 +62,8 @@ export const ReleasePointer = z.object({
   app_id: z.string().min(1),
   shell_major: z.number().int().nonnegative(),
   band: Band,
+  /** Absent = Android (the original runtime). iOS pointers say so, so a signed pointer cannot be replayed across platforms. */
+  platform: z.enum(["ios"]).optional(),
   release: z.number().int().positive(),
   issued_at: z.string().datetime(),
   core: z.object({
