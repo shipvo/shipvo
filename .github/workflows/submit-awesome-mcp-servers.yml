@@ -43,5 +43,5 @@ jobs:
           git push --force fork "$BRANCH"
           url=$(gh pr create --repo "$UP" --head "$ME:$BRANCH" \
             --title "Add Shipvo (React Native mobile app simulator)" \
-            --body "Adds Shipvo, an MCP server that lets an assistant open a React Native app in a simulated phone, read the screen as an accessibility tree, tap and type, and change device state (deny camera, go offline, decline a payment). Hosted at https://sim.shipvo.dev/mcp and local via \`@shipvo/mcp\`. Apache-2.0, TypeScript. Also listed in the official MCP registry as \`io.github.shipvo/shipvo\`. I am the author.")
+            --body "Adds Shipvo, an MCP server that lets an assistant open a React Native app in a simulated phone, read the screen as an accessibility tree, tap and type, and change device state (deny camera, go offline, decline a payment). Hosted at https://sim.shipvo.dev/mcp and local via \`@shipvo/mcp\`. Apache-2.0, TypeScript. Also listed in the official MCP registry as \`io.github.shipvo/shipvo\`. I am the author." || gh pr view --repo "$UP" "$ME:$BRANCH" --json url --jq .url)
           echo "PR: $url" | tee -a "$GITHUB_STEP_SUMMARY"
