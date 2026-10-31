@@ -103,6 +103,11 @@ export async function type(s, label, text) {
   else await wd("POST", `/session/${s.id}/appium/device/hide_keyboard`, {}).catch(() => {});
   await new Promise((r) => setTimeout(r, 600));
 }
+/** Simulated GPS fix. iOS simulators: WebDriverAgent's mobile: setSimulatedLocation; Android: the W3C location endpoint. */
+export async function setLocation(s, latitude, longitude) {
+  if (s.platform === "ios") return wd("POST", `/session/${s.id}/execute/sync`, { script: "mobile: setSimulatedLocation", args: [{ latitude, longitude }] }).catch((e) => console.error("setSimulatedLocation:", e.message));
+  return wd("POST", `/session/${s.id}/location`, { location: { latitude, longitude, altitude: 10 } }).catch((e) => console.error("setLocation:", e.message));
+}
 export const source = (s) => wd("GET", `/session/${s.id}/source`);
 /** Whole screen, like the simulator's full page: scroll through and collect. */
 export async function fullScreen(s) {

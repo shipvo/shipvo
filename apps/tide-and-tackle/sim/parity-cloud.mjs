@@ -22,11 +22,11 @@ const FLOW = [
   { wait: 6000 },
   // Flow C: camera permission + scanner (manual entry on both sides: a simulator camera has nothing to decode), location
   // permission + distance, shop pickup, mobile money. The iOS dialogs are worded as iOS words them.
-  { tap: "Back to shop", flow: "C" }, { tap: "Scan a product barcode" }, { wait: 2500 }, { name: "Camera permission" }, { tap: "Allow", exact: true, optional: true }, { wait: 1500 }, { name: "Scanner" },
+  { tap: "Back to shop", flow: "C" }, { tap: "Scan a product barcode" }, { wait: 2500 }, { tap: "Allow camera", optional: true }, { wait: 2000 }, { name: "Camera permission" }, { tap: "Allow", exact: true, optional: true }, { wait: 1500 }, { name: "Scanner" },
   { type: "Barcode number", text: "6181234567890" }, { tap: "Find product by barcode", name: "Scanned product" }, { tap: "Add 1 to cart" },
   { tap: "Open cart" }, { tap: "Choose delivery and pay" }, { tap: "Use my location" }, { wait: 2500 }, { name: "Location permission" }, { tap: "Allow While Using App", optional: true },
   { wait: 5000 }, { name: "Located" },
-  { tap: "Any day Shop pickup" }, { tap: "Mobile money", exact: true }, { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Payment prompt C" },
+  { wait: 1500 }, { tap: "Any day Shop pickup" }, { wait: 1000 }, { tap: "Mobile money", exact: true }, { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Payment prompt C" },
   { type: "Mobile money PIN", text: "1234" }, { tap: "Confirm payment" }, { wait: 1500 }, { name: "Order placed C" },
 ];
 const CANDIDATES = {
@@ -81,11 +81,12 @@ let s = null;
 for (const [deviceName, platformVersion] of CANDIDATES[LANE]) {
   try {
     s = await cloud.startSession({ platformName: LANE.startsWith("ios") ? "ios" : "android", deviceName, platformVersion, app: APP, udid: APP,
-      isRealMobile: LANE === "android-real", build: "Shipvo parity", name: `parity ${LANE}`, w3c: true, autoGrantPermissions: true });
+      isRealMobile: LANE === "android-real", build: "Shipvo parity", name: `parity ${LANE}`, w3c: true, autoGrantPermissions: LANE !== "ios-local" });   // iOS simulator: let the system dialogs appear, as they do for a person
     report.device = `${deviceName} (${LANE.startsWith("ios") ? "iOS" : "Android"} ${platformVersion})`; break;
   } catch (e) { report.errors.push(`session ${deviceName} ${platformVersion}: ${e.message}`); }
 }
 if (!s) { writeFileSync(`parity-${LANE}.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2)); process.exit(0); }
+await cloud.setLocation(s, 4.0225, 9.6967);   // Bonanjo, Douala: 0.7 km from the shop (flow C)
 await new Promise((r) => setTimeout(r, 15000)); // let live content load
 // The simulated phone mirrors the device under test: platform wording, and no enrolled biometrics (CI simulators have none).
 await simCall("/session", { session: "pc", device: { platform: LANE.startsWith("ios") ? "ios" : "android", api: LANE.startsWith("ios") ? 17 : 30, biometrics: { enrolled: false } } });
