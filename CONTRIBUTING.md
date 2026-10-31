@@ -24,7 +24,7 @@ Node 22 and pnpm are required. Packages live in `packages/`, hosted services in 
 1. Open an issue first for anything larger than a small fix.
 2. Keep a change focused, add or update tests, and run `pnpm -r test`.
 3. Claims need evidence: if a doc states a number, link where it was measured.
-4. Sign off nothing special is needed; contributions are accepted under Apache-2.0.
+4. No sign-off is needed; contributions are accepted under Apache-2.0.
 
 ## Reporting security issues
 
