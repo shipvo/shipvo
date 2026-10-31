@@ -79,13 +79,16 @@ export default {
     // API key → app and scope. Keys come from the owner command create_api_key; only hashes are stored.
     const key = ((req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim()) || pathKey || url.searchParams.get("key") || "";
     if (!key) return json({ error: "missing_api_key", hint: "Authorization: Bearer <key> (create one with the owner command create_api_key)" }, 401);
-    const row = await env.DB.prepare("SELECT id, app_id, scope, expires_at FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").bind(await sha256(key)).first<{ id: number; app_id: string; scope: string; expires_at: string | null }>();
+    const row = await env.DB.prepare("SELECT id, app_id, scope, expires_at, account_id FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").bind(await sha256(key)).first<{ id: number; app_id: string; scope: string; expires_at: string | null; account_id: number | null }>();
     if (!row) return json({ error: "invalid_api_key" }, 401);
     if (row.expires_at && row.expires_at < new Date().toISOString()) return json({ error: "expired_api_key", expires_at: row.expires_at, hint: "Run `shipvo login` to get a new key." }, 401);
     env.DB.prepare("UPDATE api_keys SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").bind(row.id).run().catch(() => {});
 
+    if (row.scope === "publish") return json({ error: "wrong_key", message: "This is a publish token. Use the key from `shipvo login` for the simulator." }, 403);
+    // A signed-in developer's key opens the beta app plus the apps they registered.
+    const owned = row.account_id ? ((await env.DB.prepare("SELECT app_id FROM apps WHERE account_id = ?").bind(row.account_id).all()).results as { app_id: string }[]).map((r) => r.app_id) : [];
     const headers = new Headers(req.headers);
-    headers.set("x-shipvo-app", row.app_id); headers.set("x-shipvo-scope", row.scope); headers.delete("authorization"); headers.delete("host");
+    headers.set("x-shipvo-app", [row.app_id, ...owned].join(",")); headers.set("x-shipvo-scope", row.scope); headers.delete("authorization"); headers.delete("host");
     if (row.scope === "owner" && env.OWNER_TOKEN) headers.set("x-shipvo-owner-token", env.OWNER_TOKEN); else headers.delete("x-shipvo-owner-token");
 
     try {

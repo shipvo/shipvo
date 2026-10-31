@@ -83,14 +83,23 @@ The shell contains your public key and control plane URL as manifest meta-data; 
 
 ## 5. Publish over the air
 
-Set four secrets in your repository (Settings → Secrets → Actions):
+**Hosted control plane (the default).** Sign in once and register the app:
+
+```bash
+npx -y @shipvo/cli login          # GitHub sign-in; saves your key
+npx -y @shipvo/cli app create     # registers the app id + your public key, saves a publish token to .shipvo/publish-token
+```
+
+For CI, add two repository secrets (Settings → Secrets → Actions):
 
 | Secret | Value |
 | --- | --- |
 | `SHIPVO_SIGNING_SEED` | the contents of `.shipvo/seed.txt` |
-| `CLOUDFLARE_API_TOKEN` | a token with **Workers KV Storage: Edit** on the control plane's account |
-| `CLOUDFLARE_ACCOUNT_ID` | that account |
-| `SHIPVO_KV_ID` | the control plane's `POINTERS` KV namespace id |
+| `SHIPVO_PUBLISH_TOKEN` | the contents of `.shipvo/publish-token` (valid 90 days; run `shipvo app create` again for a new one) |
+
+The publish token can only write your app's own files, and every release pointer must verify against the public key you registered, so a leaked token cannot ship code to your users without your signing seed. The seed never leaves your machine or CI.
+
+**Self-hosted control plane.** Instead of the token, set `CLOUDFLARE_API_TOKEN` (Workers KV Storage: Edit), `CLOUDFLARE_ACCOUNT_ID` and `SHIPVO_KV_ID` (see [self-hosting.md](self-hosting.md)) and point `controlPlane` in `shipvo.json` at your Worker.
 
 Then edit `src/release.ts` and push to `main`. The workflow runs `shipvo publish`, which:
 
@@ -105,7 +114,7 @@ Agents open the exact release phones run with `open_app("myshop@r8")` or `open_a
 
 ## 6. Give agents a key, not a laptop
 
-The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config. During the beta the hosted simulator opens the sample app; hosting your own app there is by arrangement, and self-hosting is always open. See [agents.md](agents.md).
+The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config. Your key opens the sample app and every app you registered with `shipvo app create`: after a publish, `open_app("myshop@latest")` opens the exact release phones run. The beta allows 3 apps per account and 500 MB each; self-hosting is always open. See [agents.md](agents.md).
 
 ## Where things are measured
 

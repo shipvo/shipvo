@@ -34,11 +34,36 @@ export function seed(): string {
   return s;
 }
 
-/** Cloudflare KV access for publish/rollback. */
+/** The publish token `shipvo app create` issued: SHIPVO_PUBLISH_TOKEN (CI) or .shipvo/publish-token. */
+export function publishToken(): string | null {
+  if (process.env.SHIPVO_PUBLISH_TOKEN) return process.env.SHIPVO_PUBLISH_TOKEN.trim();
+  try { return readFileSync(join(process.cwd(), ".shipvo", "publish-token"), "utf8").trim() || null; } catch { return null; }
+}
+
+/** Publishing through the hosted control plane: the same get/put/keys, scoped to this app and signed-pointer checked server side. */
+function hostedKv(cfg: ShipvoConfig, token: string) {
+  const base = `${cfg.controlPlane.replace(/\/$/, "")}/apps/${cfg.appId}/kv`;
+  const auth = { Authorization: `Bearer ${token}` };
+  const path = (k: string) => `${base}/${k.split("/").map(encodeURIComponent).join("/")}`;
+  return {
+    async get(k: string) { const r = await fetch(path(k), { headers: auth }); if (r.status === 401) throw new Error("publish token rejected: run `shipvo app create` for a new one"); return r.ok ? r.text() : null; },
+    async getBytes(k: string) { const r = await fetch(path(k), { headers: auth }); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; },
+    async keys(prefix: string) { const r = await fetch(`${base}?prefix=${encodeURIComponent(prefix)}`, { headers: auth }); return r.ok ? ((await r.json()) as any).keys as string[] : []; },
+    async put(k: string, body: BodyInit, type: string) {
+      const r = await fetch(path(k), { method: "PUT", headers: { ...auth, "content-type": type }, body });
+      if (!r.ok) { let m = ""; try { const j: any = await r.json(); m = j.message ?? j.error; } catch {} throw new Error(`publish ${k}: ${r.status} ${m}`); }
+    },
+  };
+}
+
+/** Where publish/rollback write: your own Cloudflare KV (self-hosted control plane) or the hosted control plane with a publish token. */
 export function kv(cfg: ShipvoConfig) {
   const ACC = process.env.CLOUDFLARE_ACCOUNT_ID, TOKEN = process.env.CLOUDFLARE_API_TOKEN;
   const NS = process.env.SHIPVO_KV_ID || process.env.PURENATIVE_KV_ID || cfg.kv?.namespaceId;
-  if (!ACC || !TOKEN || !NS) { console.error("Need CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and the control plane's KV namespace (shipvo.json kv.namespaceId or SHIPVO_KV_ID)."); process.exit(2); }
+  if (!(ACC && TOKEN && NS)) {
+    const pt = publishToken(); if (pt) return hostedKv(cfg, pt);
+    console.error("Nothing to publish with. Hosted: run `shipvo login`, then `shipvo app create` (or set SHIPVO_PUBLISH_TOKEN). Self-hosted: set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and SHIPVO_KV_ID."); process.exit(2);
+  }
   const url = (k: string) => `https://api.cloudflare.com/client/v4/accounts/${ACC}/storage/kv/namespaces/${NS}/values/${encodeURIComponent(k)}`;
   const auth = { Authorization: `Bearer ${TOKEN}` };
   return {

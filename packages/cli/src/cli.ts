@@ -7,6 +7,7 @@ import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
 import { sim } from "./sim.js";
 import { keys, login, mcp } from "./login.js";
+import { appCmd } from "./app.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
 const help = `shipvo <command>
@@ -15,6 +16,7 @@ const help = `shipvo <command>
   sim [--port 4545]           Build the app for the simulator and serve it (agents: open_app("<appId>"))
   publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release (+ the agent-facing web artifact)
   rollback --to <release>     Republish an earlier release's code as a new release
+  app create | app list       Register this app with the hosted control plane (publish token), or list yours
   login                       Sign in with GitHub and get a key for the hosted simulator
   keys                        Show the stored key's status and quota
   mcp                         Print the MCP config agents need (hosted and local)
@@ -33,6 +35,7 @@ switch (cmd) {
   case "publish": await publish(rest); break;
   case "rollback": await rollback(rest); break;
   case "login": await login(rest); break;
+  case "app": await appCmd(rest); break;
   case "keys": await keys(); break;
   case "mcp": mcp(); break;
   case "keygen": {

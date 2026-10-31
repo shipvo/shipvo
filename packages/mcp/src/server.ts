@@ -42,9 +42,11 @@ Only what is on screen is listed, like a phone: a horizontal product rail shows 
 System sheets (permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners, the share sheet) appear in the tree like any other screen: answer them by tapping, as a person would. Use set_device to decide what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether the payment is approved, network off) before the app asks for it.
 Finish a task by checking the final screen says what you expected (for example "Order placed"). Call end_session when done to get a report.` });
 
-const allowed = (id: string) => (ctx.app ? id === ctx.app : !!APPS[id]);
+// ctx.app: the app(s) this key opens, comma-separated (the beta app plus any the key owner has registered).
+const keyApps = ctx.app ? ctx.app.split(",").map((s) => s.trim()).filter(Boolean) : null;
+const allowed = (id: string) => (keyApps ? keyApps.includes(id) : !!APPS[id]);
 server.tool("list_apps", "Apps this server can open, with what each one does.", {}, async () =>
-  text(Object.entries(APPS).filter(([id]) => allowed(id)).map(([id, a]) => `${id}: ${a.name}. ${a.description}`).join("\n") || `(this key opens ${ctx.app})`));
+  text((keyApps ?? Object.keys(APPS)).map((id) => APPS[id] ? `${id}: ${APPS[id].name}. ${APPS[id].description}` : `${id}: published with shipvo (open_app("${id}@latest"))`).join("\n")));
 
 server.tool("open_app", "Open an app in a fresh phone-sized session and return its first screen.", {
   app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"),
@@ -53,7 +55,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   dark: z.boolean().optional().describe("Dark mode"),
 }, async ({ app, session, seed_cart, dark }) => {
   const id = app.split("@")[0];
-  if (!allowed(id)) throw new Error(ctx.app ? `this key opens "${ctx.app}" only` : `unknown app "${id}". Apps: ${Object.keys(APPS).join(", ")}`);
+  if (!allowed(id)) throw new Error(keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(APPS).join(", ")}`);
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const r = await sim("/session", { session: sid, app, seed_cart, dark }) as Act & { release?: string | number };
@@ -111,7 +113,7 @@ server.tool("owner_describe", "List the owner commands of an app (content, price
 server.tool("owner_command", "Run an owner command against the live app (changes are audited; `publish` makes them live on every phone within seconds).", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional() },
   async ({ app, command, args }) => {
     if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": owner commands need an owner key`);
-    if (ctx.app && app !== ctx.app) throw new Error(`this key is for "${ctx.app}"`);
+    if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
     const token = ctx.ownerToken || OWNER_TOKEN;
     if (!token) throw new Error("owner commands are not enabled on this server.");
     const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ name: command, args: args ?? {} }) });

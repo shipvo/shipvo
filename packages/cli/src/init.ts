@@ -81,7 +81,7 @@ Created ${name} in ${dirArg}
   npx -y @shipvo/mcp          # point Claude / Cursor / ChatGPT at it and open_app("${appId}")
 
 Phones:  npx expo run:android   (needs Android Studio once; the OTA runtime is Android-first)
-Publish: set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, SHIPVO_KV_ID and SHIPVO_SIGNING_SEED, then npm run publish
+Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and SHIPVO_KV_ID (self-hosted); then npm run publish
          (self-host the control plane from services/control-plane, or ask for a hosted app id during the beta)
 
 ${seedNote}
@@ -178,9 +178,7 @@ jobs:
       - run: pip install --break-system-packages bsdiff4
       - name: Build, sign and publish over the air
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SHIPVO_KV_ID: \${{ secrets.SHIPVO_KV_ID }}
+          SHIPVO_PUBLISH_TOKEN: \${{ secrets.SHIPVO_PUBLISH_TOKEN }}   # from \`shipvo app create\`; self-hosting instead: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, SHIPVO_KV_ID
           SHIPVO_SIGNING_SEED: \${{ secrets.SHIPVO_SIGNING_SEED }}
         run: npx shipvo publish | tee -a "$GITHUB_STEP_SUMMARY"
 `;

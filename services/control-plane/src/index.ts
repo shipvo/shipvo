@@ -4,6 +4,7 @@ import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@s
 import { adminPage, loginPage } from "./admin";
 import { describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
+import { apps } from "./apps";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
 const app = new Hono<{ Bindings: Env }>();
@@ -159,5 +160,6 @@ app.post("/app/:id/api/command", async (c) => {
 });
 
 app.route("/auth", auth);
+app.route("/apps", apps);
 
 export default app;
