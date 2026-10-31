@@ -22,9 +22,9 @@ const FLOW = [
   { wait: 6000 },
   // Flow C: camera permission + scanner (manual entry on both sides: a simulator camera has nothing to decode), location
   // permission + distance, shop pickup, mobile money. The iOS dialogs are worded as iOS words them.
-  { tap: "Back to shop", flow: "C" }, { tap: "Scan a product barcode", name: "Camera permission" }, { tap: "Allow", exact: true, optional: true, name: "Scanner" },
+  { tap: "Back to shop", flow: "C" }, { tap: "Scan a product barcode" }, { wait: 2500 }, { name: "Camera permission" }, { tap: "Allow", exact: true, optional: true }, { wait: 1500 }, { name: "Scanner" },
   { type: "Barcode number", text: "6181234567890" }, { tap: "Find product by barcode", name: "Scanned product" }, { tap: "Add 1 to cart" },
-  { tap: "Open cart" }, { tap: "Choose delivery and pay" }, { tap: "Use my location", name: "Location permission" }, { tap: "Allow While Using App", optional: true },
+  { tap: "Open cart" }, { tap: "Choose delivery and pay" }, { tap: "Use my location" }, { wait: 2500 }, { name: "Location permission" }, { tap: "Allow While Using App", optional: true },
   { wait: 5000 }, { name: "Located" },
   { tap: "Any day Shop pickup" }, { tap: "Mobile money", exact: true }, { type: "Mobile money number", text: "677000111" }, { tap: "Place order", name: "Payment prompt C" },
   { type: "Mobile money PIN", text: "1234" }, { tap: "Confirm payment" }, { wait: 1500 }, { name: "Order placed C" },
@@ -97,7 +97,7 @@ for (const step of FLOW) {
   if (step.name) {
     const [a, b] = [await simEls(), await cloud.fullScreen(s).catch((e) => { report.errors.push(`device screen: ${e.message}`); return []; })];
     report.screens.push({ screen: step.name, sim_elements: a.length, device_elements: b.length, ...compare(a, b), ...(/^Order placed/.test(step.name) ? sameOutcome(a, b) : {}) });
-    if (step.name === "Checkout" || b.length < 3) { try { writeFileSync(`source-${LANE}-${step.name.replace(/\W+/g, "_")}.xml`, await cloud.source(s)); } catch {} }
+    if (step.name === "Checkout" || step.flowC || b.length < 3 || /Camera permission|Scanner|Location permission|Located|Payment prompt C|Order placed C/.test(step.name)) { try { writeFileSync(`source-${LANE}-${step.name.replace(/\W+/g, "_")}.xml`, await cloud.source(s)); } catch {} }
   }
 }
 await cloud.endSession(s);
