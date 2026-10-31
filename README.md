@@ -96,6 +96,8 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 | `packages/mcp` | `@shipvo/mcp`: the MCP server agents use to open, see and operate apps, control the simulated device, and run owner commands |
 | `packages/device` | `@shipvo/device`: one device API (camera, location, biometrics, payments, notifications, share, network), real on phones, simulated in the simulator, plus Metro aliases for raw Expo imports |
 | `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
+| `services/sim` | Hosted simulator Worker: one sandbox per API key, the same MCP tools over HTTPS (sim.shipvo.dev) |
+| `services/site` | shipvo.dev: landing page and the public app marketplace |
 | `apps/tide-and-tackle` | Sample shop app built on the packages above, plus the device drivers and the parity harness (`sim/`) |
 | `docs/` | Measured results: spike, agent gate, parity |
 | `skills/shipvo-design` | Design skill with runnable checks |
