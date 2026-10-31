@@ -11,7 +11,7 @@ export async function appCmd(argv: string[]) {
   if (sub === "list") {
     const r = await fetch(`${c.control}/apps`, { headers: { authorization: `Bearer ${c.key}` } }); const d: any = await r.json();
     if (!r.ok) { console.error(d.hint ?? d.error); process.exit(1); }
-    console.log(d.apps.length ? d.apps.map((a: any) => `${a.app_id}  ${a.name}  ${(a.bytes_used / 1048576).toFixed(1)} MB`).join("\n") : "No apps yet. Run `shipvo app create` inside an app made with `shipvo init`.");
+    console.log(d.apps.length ? d.apps.map((a: any) => `${a.app_id}  ${a.name}  r${a.latest_release ?? "-"}  ${(a.bytes_used / 1048576).toFixed(1)} MB  ${a.listed ? (a.approved ? "public" : "listing under review") : "private"}`).join("\n") : "No apps yet. Run `shipvo app create` inside an app made with `shipvo init`.");
     return;
   }
   if (sub === "delete") {
@@ -22,12 +22,14 @@ export async function appCmd(argv: string[]) {
   }
   if (sub !== "create") { console.error("Usage: shipvo app create | list | delete <id> --yes"); process.exit(2); }
   const cfg = loadConfig();
-  const r = await fetch(`${c.control}/apps`, { method: "POST", headers: { authorization: `Bearer ${c.key}`, "content-type": "application/json" }, body: JSON.stringify({ app_id: cfg.appId, name: cfg.name, public_key: cfg.publicKey }) });
+  const r = await fetch(`${c.control}/apps`, { method: "POST", headers: { authorization: `Bearer ${c.key}`, "content-type": "application/json" }, body: JSON.stringify({ app_id: cfg.appId, name: cfg.name, public_key: cfg.publicKey, description: cfg.listing?.description ?? "", category: cfg.listing?.category ?? "other", listed: !!cfg.listing?.public }) });
   const d: any = await r.json();
   if (!r.ok) { console.error(`Could not register "${cfg.appId}": ${d.message ?? d.hint ?? d.error}`); process.exit(1); }
   mkdirSync(join(process.cwd(), ".shipvo"), { recursive: true });
   writeFileSync(join(process.cwd(), ".shipvo", "publish-token"), d.publish_token + "\n", { mode: 0o600 });
-  console.log(`${d.created ? "Registered" : "Renewed the publish token for"} "${d.app_id}" (token expires ${String(d.expires_at).slice(0, 10)}).`);
+  console.log(`${d.created ? "Registered" : "Updated"} "${d.app_id}" (publish token expires ${String(d.expires_at).slice(0, 10)}).`);
+  if (cfg.listing?.public) console.log(`Listing requested: once reviewed, "${cfg.appId}" appears on shipvo.dev/apps and any signed-in agent can open it. Set listing.public to false in shipvo.json and run this again to withdraw.`);
+  else console.log(`Private: only your key opens it. To list it publicly, add { "listing": { "public": true, "description": "...", "category": "shop" } } to shipvo.json and run this again.`);
   console.log(`Token saved to .shipvo/publish-token (git-ignored), so \`shipvo publish\` works on this machine now.`);
   console.log(`For CI, add two repository secrets: SHIPVO_PUBLISH_TOKEN (the token) and SHIPVO_SIGNING_SEED (from .shipvo/seed.txt).`);
   if (cfg.controlPlane.replace(/\/$/, "") !== String(d.control_plane).replace(/\/$/, "")) console.log(`Note: shipvo.json controlPlane is ${cfg.controlPlane}, but you registered on ${d.control_plane}. Installed shells only trust the one built into them.`);

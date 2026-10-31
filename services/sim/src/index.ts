@@ -87,8 +87,10 @@ export default {
 
     // A signed-in developer's key opens the beta app plus the apps they registered.
     const owned = row.account_id ? ((await env.DB.prepare("SELECT app_id FROM apps WHERE account_id = ?").bind(row.account_id).all()).results as { app_id: string }[]).map((r) => r.app_id) : [];
+    const pub = row.account_id ? ((await env.DB.prepare("SELECT app_id FROM apps WHERE listed = 1 AND approved = 1 AND latest_release IS NOT NULL").all()).results as { app_id: string }[]).map((r) => r.app_id) : [];
     const headers = new Headers(req.headers);
-    headers.set("x-shipvo-app", [row.app_id, ...owned].join(",")); headers.set("x-shipvo-scope", row.scope); headers.delete("authorization"); headers.delete("host");
+    headers.set("x-shipvo-app", [...new Set([row.app_id, ...owned, ...pub])].join(","));
+    headers.set("x-shipvo-public", pub.join(",")); headers.set("x-shipvo-scope", row.scope); headers.delete("authorization"); headers.delete("host");
     if (row.scope === "owner" && env.OWNER_TOKEN) headers.set("x-shipvo-owner-token", env.OWNER_TOKEN); else headers.delete("x-shipvo-owner-token");
 
     try {

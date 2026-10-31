@@ -3,6 +3,8 @@ name: parity-ios
 # install the EAS simulator build, drive it with Appium (XCUITest), same flow and comparison as the other lanes.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"   # nightly: parity drifts when the app or the simulator changes
     inputs:
       build_url: { description: "EAS iOS simulator build (.tar.gz)", default: "https://expo.dev/artifacts/eas/3IKeDmTaD0sA_nvsR1omISmQsUbZfdql9bbCOTTQuik.tar.gz" }
   push:

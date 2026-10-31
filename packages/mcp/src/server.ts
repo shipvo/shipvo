@@ -33,7 +33,7 @@ const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
 const need = (_sid: string) => {};
 
-type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string };
+type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
 function makeServer(ctx: Ctx = {}) {
 const server = new McpServer({ name: "shipvo", version: "0.0.1" }, { instructions:
 `You can use Shipvo apps the way a person uses them on a phone, without a phone.
@@ -45,8 +45,16 @@ Finish a task by checking the final screen says what you expected (for example "
 // ctx.app: the app(s) this key opens, comma-separated (the beta app plus any the key owner has registered).
 const keyApps = ctx.app ? ctx.app.split(",").map((s) => s.trim()).filter(Boolean) : null;
 const allowed = (id: string) => (keyApps ? keyApps.includes(id) : !!APPS[id]);
-server.tool("list_apps", "Apps this server can open, with what each one does.", {}, async () =>
-  text((keyApps ?? Object.keys(APPS)).map((id) => APPS[id] ? `${id}: ${APPS[id].name}. ${APPS[id].description}` : `${id}: published with shipvo (open_app("${id}@latest"))`).join("\n")));
+server.tool("list_apps", "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').", { query: z.string().optional() }, async ({ query }) => {
+  const ids = keyApps ?? Object.keys(APPS); const q = (query ?? "").toLowerCase();
+  let dir: Record<string, { name: string; description: string; category: string }> = {};
+  try { const r = await fetch(`${CONTROL}/apps/public${q ? `?q=${encodeURIComponent(q)}` : ""}`); if (r.ok) for (const a of ((await r.json()) as any).apps) dir[a.app_id] = a; } catch {}
+  const lines = ids.map((id) => {
+    const d = dir[id] ?? APPS[id]; const desc = d ? `${d.name}. ${d.description}${"category" in d ? ` [${(d as any).category}]` : ""}` : `published with shipvo`;
+    return q && !`${id} ${desc}`.toLowerCase().includes(q) ? null : `${id}: ${desc} (open_app("${id}@latest"))`;
+  }).filter(Boolean);
+  return text(lines.join("\n") || `no apps match "${query}"`);
+});
 
 server.tool("open_app", "Open an app in a fresh phone-sized session and return its first screen.", {
   app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"),
@@ -63,6 +71,11 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
 });
 
+server.tool("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, async () => {
+  const r = await sim("/sessions", {}) as Act & { sessions?: { session: string; app: string; release: string | number; started_at: string | null }[] };
+  const rows = (r.sessions ?? []).filter((s) => !keyApps || keyApps.includes(s.app));
+  return text(rows.length ? rows.map((s) => `${s.session}: ${s.app} release ${s.release}${s.started_at ? ` since ${s.started_at}` : ""}`).join("\n") : "no open sessions");
+});
 const sid = z.string().describe("Session from open_app");
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
 server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); return result(session, await sim("/act", { session, action: "screen" })); });
@@ -146,7 +159,7 @@ if (argi < 0) {
       // One McpServer per client connection. Behind sim.shipvo.dev the Worker has checked the key and says which
       // app and scope it grants; locally there are no such headers and every app is allowed.
       const scope = req.headers["x-shipvo-scope"] as Ctx["scope"] | undefined;
-      await makeServer({ app: (req.headers["x-shipvo-app"] as string) || undefined, scope, ownerToken: (req.headers["x-shipvo-owner-token"] as string) || undefined }).connect(transport);
+      await makeServer({ app: (req.headers["x-shipvo-app"] as string) || undefined, publicApps: (req.headers["x-shipvo-public"] as string) || undefined, scope, ownerToken: (req.headers["x-shipvo-owner-token"] as string) || undefined }).connect(transport);
     }
     let body: unknown = undefined;
     if (req.method === "POST") { let raw = ""; for await (const ch of req) raw += ch; body = raw ? JSON.parse(raw) : undefined; }

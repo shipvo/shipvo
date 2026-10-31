@@ -3,6 +3,8 @@ name: parity
 # emulator, compare every screen, and publish the parity report.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"   # nightly: parity drifts when the app or the simulator changes
   push:
     branches: [main]
     paths: ["apps/tide-and-tackle/sim/parity.mjs", "apps/tide-and-tackle/sim/native.mjs", "apps/tide-and-tackle/sim/parity-ci.sh", ".github/workflows/parity.yml"]

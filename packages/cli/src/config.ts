@@ -12,6 +12,8 @@ export type ShipvoConfig = {
   publicKey: string;
   /** Where `shipvo publish` writes: the control plane's Cloudflare KV namespace. */
   kv?: { namespaceId: string };
+  /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */
+  listing?: { public?: boolean; description?: string; category?: string };
 };
 
 export function loadConfig(dir = process.cwd()): ShipvoConfig {

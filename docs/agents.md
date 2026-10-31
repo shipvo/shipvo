@@ -19,13 +19,14 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 { "mcpServers": { "shipvo": { "url": "https://sim.example.com/mcp", "headers": { "Authorization": "Bearer key1" } } } }
 ```
 
-**3. Hosted**: the Shipvo simulator service runs one sandbox per API key and exposes the same tools at `https://<host>/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). Sessions persist across reconnects; the sandbox sleeps after 30 idle minutes and comes back on the next call. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta app and the apps you registered with `shipvo app create`; it expires after 30 days and a new login replaces it, `shipvo keys` shows the date), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT.
+**3. Hosted**: the Shipvo simulator service runs one sandbox per API key and exposes the same tools at `https://sim.shipvo.dev/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). Sessions persist across reconnects; the sandbox sleeps after 30 idle minutes and comes back on the next call. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta app and the apps you registered with `shipvo app create`; it expires after 30 days and a new login replaces it, `shipvo keys` shows the date), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT.
 
 ## The tools
 
 | Tool | What it does |
 | --- | --- |
-| `list_apps` | Apps this server can open |
+| `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
+| `list_sessions` | Open sessions on this server, to resume after a reconnect |
 | `open_app(app, session?, seed_cart?, dark?)` | A phone-sized session; returns the first screen. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `screen(session)` | The accessibility tree with refs (`[ref=e12]`) |
 | `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb |
@@ -69,3 +70,13 @@ With an owner token, the same MCP server exposes the app's typed owner commands:
 ## Grading an agent
 
 `end_session` returns what the app actually sent to its backend, not what the agent says it did. The Tide & Tackle repo has an agent-eval harness that scores tasks that way ([agent-gate-results.md](agent-gate-results.md)).
+
+## Listing your app for every agent
+
+A published app is private to your key until you list it. In `shipvo.json`:
+
+```json
+{ "listing": { "public": true, "description": "Fishing-supplies shop in Douala: catalogue, cart, mobile money.", "category": "shop" } }
+```
+
+Run `shipvo app create` again. After a short review it appears on [shipvo.dev/apps](https://shipvo.dev/apps) and in `list_apps` for every signed-in key, and any agent can `open_app("<id>@latest")`. Opening a public app spends the opener's sandbox minutes, not yours. Set `public` to `false` and run `shipvo app create` to withdraw. Categories: shop, food, travel, finance, health, education, services, tools, games, other.

@@ -53,7 +53,7 @@ async function newSession(id, opts = {}) {
   const page = await ctx.newPage();
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, app: target.app, release: target.release });
+  sessions.set(id, { ctx, page, app: target.app, release: target.release, startedAt: new Date().toISOString() });
 }
 
 async function screen(page) {
@@ -191,6 +191,7 @@ const server = http.createServer(async (req, res) => {
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
+    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: [...sessions.entries()].map(([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, url: s.page.url() })) });
     if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
