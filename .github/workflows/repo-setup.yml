@@ -18,9 +18,11 @@ jobs:
       R: ${{ github.repository }}
     steps:
       - name: Check secret
-        run: '[ -n "$GH_TOKEN" ] || { echo "::error::Add the ADMIN_TOKEN repo secret first (Settings > Secrets and variables > Actions)"; exit 1; }'
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::Add the ADMIN_TOKEN repo secret first"; exit 1; }
       - name: Discussions
-        run: gh api -X PATCH repos/$R -F has_discussions=true --jq '"discussions: \(.has_discussions)"'
+        run: |
+          gh api -X PATCH repos/$R -F has_discussions=true --jq '.has_discussions'
       - name: Topics
         run: |
           gh api -X PUT repos/$R/topics \
