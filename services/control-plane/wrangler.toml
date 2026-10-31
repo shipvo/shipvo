@@ -14,4 +14,4 @@ migrations_dir = "migrations"
 
 [vars]
 SIM_URL = "https://shipvo-sim.purenative.workers.dev"
-# GITHUB_CLIENT_ID: set via `wrangler secret put GITHUB_CLIENT_ID` or in the deploy workflow (device flow needs no client secret).
+GITHUB_CLIENT_ID = "Ov23liAQ86H1hYxN9DuD"   # public GitHub OAuth app id (device flow needs no client secret)
