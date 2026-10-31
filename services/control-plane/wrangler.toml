@@ -3,6 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
 # api.shipvo.dev is the public address; the purenative-control.purenative.workers.dev URL keeps answering for shells already installed.
+workers_dev = true   # keep the old workers.dev address alive: installed shells are built against it
 routes = [{ pattern = "api.shipvo.dev", custom_domain = true }]
 
 [[kv_namespaces]]
