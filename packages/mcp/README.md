@@ -8,7 +8,7 @@ Lets AI agents (Claude, Cursor, Claude Code, PiPilot…) **use a Shipvo app with
   "env": { "PN_SIM": "http://localhost:4545", "PN_OWNER_TOKEN": "…optional…" } } } }
 ```
 
-Start the simulator first (`node sim/server.mjs` in the app, or `shipvo sim` soon). The hosted version at `sim.shipvo.dev` needs no local setup.
+Start the simulator first (`shipvo sim` in the app). The hosted version needs no local setup: `{ "url": "https://<host>/mcp/<key>" }`.
 
 Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `end_session`, `owner_describe`, `owner_command`.
 
