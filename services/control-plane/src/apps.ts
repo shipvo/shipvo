@@ -102,13 +102,15 @@ apps.delete("/:id", async (c) => {
 });
 
 /** Store assets uploaded by `shipvo publish` (w/<id>/store/manifest.json + icon + screenshots). */
-async function storeOf(kv: KVNamespace, id: string, origin: string) {
+async function storeOf(kv: KVNamespace, id: string, origin: string, row?: any) {
+  const out: any = { icon_url: null, screenshots: [], capabilities: [], release_note: null };
   try {
     const m = JSON.parse((await kv.get(`w/${id}/store/manifest.json`)) ?? "null");
-    if (!m) return { icon_url: null, screenshots: [], capabilities: [], release_note: null };
-    const u = (n: string) => `${origin}/w/${id}/store/${n}`;
-    return { icon_url: m.icon ? u(m.icon) : null, screenshots: (m.screenshots ?? []).map(u), capabilities: m.capabilities ?? [], release_note: m.release_note ?? null, tagline_m: m.tagline ?? "", website_m: m.website ?? "" };
-  } catch { return { icon_url: null, screenshots: [], capabilities: [], release_note: null }; }
+    if (m) { const u = (n: string) => `${origin}/w/${id}/store/${n}`; Object.assign(out, { icon_url: m.icon ? u(m.icon) : null, screenshots: (m.screenshots ?? []).map(u), capabilities: m.capabilities ?? [], release_note: m.release_note ?? null, tagline: (row?.tagline || m.tagline || ""), website: (row?.website || m.website || "") }); }
+  } catch {}
+  // The release index in KV is the truth (apps may publish straight to KV); the DB column is a cache.
+  try { const idx = JSON.parse((await kv.get(`w/${id}/releases`)) ?? "null"); if (idx && Number.isInteger(idx.latest)) { out.latest_release = idx.latest; out.releases = idx.releases?.length ?? null; if (row && row.latest_release !== idx.latest) { let at = row.published_at; try { at = JSON.parse((await kv.get(`h/${id}/r${idx.latest}`)) ?? "{}").issued_at ?? at; } catch {} out.published_at = at; } } } catch {}
+  return out;
 }
 /** Called by the simulator service when an agent opens a public app: activity, not analytics. */
 apps.post("/opened/:id", async (c) => {
@@ -123,7 +125,7 @@ apps.get("/public", async (c) => {
   const { results } = await c.env.DB.prepare("SELECT a.app_id, a.name, a.tagline, a.description, a.category, a.website, a.latest_release, a.published_at, a.opens, a.last_opened_at, a.created_at, acc.github_login AS owner FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.listed = 1 AND a.approved = 1 AND a.latest_release IS NOT NULL ORDER BY a.opens DESC, a.published_at DESC LIMIT 200").all();
   const rows = (results as any[]).filter((r) => (!cat || r.category === cat) && (!q || `${r.app_id} ${r.name} ${r.tagline} ${r.description} ${r.category}`.toLowerCase().includes(q)));
   const origin = new URL(c.req.url).origin;
-  const apps = await Promise.all(rows.map(async (r) => ({ ...r, ...(await storeOf(c.env.POINTERS, r.app_id, origin)) })));
+  const apps = await Promise.all(rows.map(async (r) => ({ ...r, ...(await storeOf(c.env.POINTERS, r.app_id, origin, r)) })));
   return c.json({ apps, categories: CATEGORIES }, 200, { "cache-control": "public, max-age=30", "access-control-allow-origin": "*" });
 });
 /** One public app. */
@@ -131,13 +133,13 @@ apps.get("/public/:id", async (c) => {
   const row: any = await c.env.DB.prepare("SELECT a.app_id, a.name, a.tagline, a.description, a.category, a.website, a.latest_release, a.published_at, a.opens, a.last_opened_at, a.created_at, acc.github_login AS owner FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ? AND a.listed = 1 AND a.approved = 1").bind(c.req.param("id")).first();
   if (!row) return c.json({ error: "not_found" }, 404);
   const origin = new URL(c.req.url).origin;
-  const store = await storeOf(c.env.POINTERS, row.app_id, origin);
+  const store = await storeOf(c.env.POINTERS, row.app_id, origin, row);
   let releases: number[] = []; try { releases = JSON.parse((await c.env.POINTERS.get(`w/${row.app_id}/releases`)) ?? "{}").releases ?? []; } catch {}
   const history: { release: number; issued_at: string; size: number; min_shell_version?: string }[] = [];
   for (const r of releases.slice(-5).reverse()) { try { const h = JSON.parse((await c.env.POINTERS.get(`h/${row.app_id}/r${r}`)) ?? ""); history.push({ release: h.release, issued_at: h.issued_at, size: h.size, min_shell_version: h.min_shell_version }); } catch {} }
   const { results: similar } = await c.env.DB.prepare("SELECT a.app_id, a.name, a.tagline, a.category, a.opens FROM apps a WHERE a.listed = 1 AND a.approved = 1 AND a.latest_release IS NOT NULL AND a.app_id != ? ORDER BY (a.category = ?) DESC, a.opens DESC LIMIT 4").bind(row.app_id, row.category).all();
   const sim = await Promise.all((similar as any[]).map(async (s) => ({ ...s, ...(await storeOf(c.env.POINTERS, s.app_id, origin)) })));
-  return c.json({ ...row, ...store, releases: releases.length, history, similar: sim }, 200, { "access-control-allow-origin": "*", "cache-control": "public, max-age=30" });
+  return c.json({ ...row, ...store, releases: releases.length || store.releases, history, similar: sim }, 200, { "access-control-allow-origin": "*", "cache-control": "public, max-age=30" });
 });
 /** Review queue and approval: owner token only. */
 apps.get("/review", async (c) => {
