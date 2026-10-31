@@ -84,7 +84,6 @@ export default {
     if (row.expires_at && row.expires_at < new Date().toISOString()) return json({ error: "expired_api_key", expires_at: row.expires_at, hint: "Run `shipvo login` to get a new key." }, 401);
     env.DB.prepare("UPDATE api_keys SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").bind(row.id).run().catch(() => {});
 
-    if (row.scope === "publish") return json({ error: "wrong_key", message: "This is a publish token. Use the key from `shipvo login` for the simulator." }, 403);
     // A signed-in developer's key opens the beta app plus the apps they registered.
     const owned = row.account_id ? ((await env.DB.prepare("SELECT app_id FROM apps WHERE account_id = ?").bind(row.account_id).all()).results as { app_id: string }[]).map((r) => r.app_id) : [];
     const headers = new Headers(req.headers);

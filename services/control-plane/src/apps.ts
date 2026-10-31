@@ -31,9 +31,9 @@ async function developer(c: any): Promise<{ account_id: number; login: string } 
 /** The publish token of one app. */
 async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number } | null> {
   const k = bearer(c); if (!k.startsWith("sv_publish_")) return null;
-  const key = await c.env.DB.prepare("SELECT id, expires_at FROM api_keys WHERE key_hash = ? AND scope = 'publish' AND app_id = ? AND revoked_at IS NULL").bind(await sha256(k), appId).first();
+  const key = await c.env.DB.prepare("SELECT id, expires_at FROM publish_tokens WHERE key_hash = ? AND app_id = ? AND revoked_at IS NULL").bind(await sha256(k), appId).first();
   if (!key || (key.expires_at && key.expires_at < now())) return null;
-  c.env.DB.prepare("UPDATE api_keys SET last_used_at = ? WHERE id = ?").bind(now(), key.id).run().catch(() => {});
+  c.env.DB.prepare("UPDATE publish_tokens SET last_used_at = ? WHERE id = ?").bind(now(), key.id).run().catch(() => {});
   return (await c.env.DB.prepare("SELECT public_key, bytes_used FROM apps WHERE app_id = ?").bind(appId).first()) ?? null;
 }
 
@@ -43,10 +43,10 @@ function newPublishToken() {
 }
 
 async function mintToken(c: any, appId: string, accountId: number, login: string) {
-  await c.env.DB.prepare("UPDATE api_keys SET revoked_at = ? WHERE app_id = ? AND scope = 'publish' AND revoked_at IS NULL").bind(now(), appId).run();
+  await c.env.DB.prepare("UPDATE publish_tokens SET revoked_at = ? WHERE app_id = ? AND revoked_at IS NULL").bind(now(), appId).run();
   const { key, prefix } = newPublishToken(); const expires_at = new Date(Date.now() + TOKEN_TTL_DAYS * 86400_000).toISOString();
-  await c.env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")
-    .bind(appId, await sha256(key), prefix, "publish", `shipvo publish (${login})`, accountId, 0, expires_at).run();
+  await c.env.DB.prepare("INSERT INTO publish_tokens (app_id, account_id, key_hash, prefix, label, expires_at) VALUES (?,?,?,?,?,?)")
+    .bind(appId, accountId, await sha256(key), prefix, `shipvo publish (${login})`, expires_at).run();
   return { key, expires_at };
 }
 
