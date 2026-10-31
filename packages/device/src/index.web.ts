@@ -176,6 +176,7 @@ g.__pnDevice = {
   },
 };
 export const simState = state;
+export const simLog = log;
 export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });
 export const openUrl = async (url: string) => { window.dispatchEvent(new CustomEvent("pn:url", { detail: url })); };
 // UI-owned bridges exist on native; on the simulated device the sheets are the UI, so they resolve immediately.

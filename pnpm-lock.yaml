@@ -62,12 +62,21 @@ importers:
         specifier: ^0.21.4
         version: 0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.32.2
+        version: 1.32.2(zod@3.25.76)
       '@shipvo/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@shipvo/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@types/react':
         specifier: ~19.3.0
         version: 19.3.0
+      playwright:
+        specifier: 1.63.0
+        version: 1.63.0
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -166,10 +175,10 @@ importers:
         version: 2.1.9(@types/node@22.20.5)(lightningcss@1.33.0)(terser@5.51.2)
 
   packages/sim:
-    dependencies:
+    devDependencies:
       playwright:
-        specifier: '>=1.50'
-        version: 1.64.1
+        specifier: 1.63.0
+        version: 1.63.0
 
   services/control-plane:
     dependencies:
@@ -3362,13 +3371,13 @@ packages:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
 
-  playwright-core@1.64.1:
-    resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
+  playwright-core@1.63.0:
+    resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
     engines: {node: '>=20'}
     hasBin: true
 
-  playwright@1.64.1:
-    resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==}
+  playwright@1.63.0:
+    resolution: {integrity: sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -7659,11 +7668,11 @@ snapshots:
 
   pkce-challenge@5.0.1: {}
 
-  playwright-core@1.64.1: {}
+  playwright-core@1.63.0: {}
 
-  playwright@1.64.1:
+  playwright@1.63.0:
     dependencies:
-      playwright-core: 1.64.1
+      playwright-core: 1.63.0
 
   plist@3.1.1:
     dependencies:

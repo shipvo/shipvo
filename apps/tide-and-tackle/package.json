@@ -24,7 +24,10 @@
   "devDependencies": {
     "@shipvo/cli": "workspace:*",
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "playwright": "1.63.0",
+    "@shipvo/mcp": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2"
   },
   "scripts": {
     "start": "expo start",
@@ -33,7 +36,8 @@
     "web": "expo start --web",
     "publish:ota": "shipvo publish",
     "rollback:ota": "shipvo rollback",
-    "sim": "shipvo sim"
+    "sim": "shipvo sim",
+    "e2e:device": "node sim/e2e-device.mjs"
   },
   "private": true
 }
