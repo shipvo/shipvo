@@ -81,6 +81,22 @@ apps.get("/", async (c) => {
   return c.json({ login: dev.login, apps: results });
 });
 
+/** Delete an app: its files, its publish tokens and its registration. Owner only; the id becomes free again. */
+apps.delete("/:id", async (c) => {
+  const dev = await developer(c); if (!dev) return c.json({ error: "unauthorized" }, 401);
+  const id = c.req.param("id");
+  const row = await c.env.DB.prepare("SELECT account_id FROM apps WHERE app_id = ?").bind(id).first<{ account_id: number }>();
+  if (!row || row.account_id !== dev.account_id) return c.json({ error: "not_found" }, 404);
+  let deleted = 0;
+  for (const p of PREFIXES) {
+    let cursor: string | undefined;
+    do { const l = await c.env.POINTERS.list({ prefix: `${p}/${id}/`, cursor, limit: 1000 }); for (const k of l.keys) { await c.env.POINTERS.delete(k.name); deleted++; } cursor = l.list_complete ? undefined : l.cursor; } while (cursor);
+  }
+  await c.env.DB.prepare("UPDATE publish_tokens SET revoked_at = ? WHERE app_id = ? AND revoked_at IS NULL").bind(now(), id).run();
+  await c.env.DB.prepare("DELETE FROM apps WHERE app_id = ?").bind(id).run();
+  return c.json({ ok: true, app_id: id, files_deleted: deleted });
+});
+
 const keyAllowed = (id: string, k: string) => k.length > 0 && k.length <= 300 && /^[A-Za-z0-9._\/-]+$/.test(k) && !k.includes("..") && PREFIXES.some((p) => k.startsWith(`${p}/${id}/`));
 const keyOf = (c: any, id: string) => decodeURIComponent((c.req.path.split(`/${id}/kv/`)[1] ?? ""));
 

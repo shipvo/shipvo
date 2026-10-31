@@ -14,7 +14,13 @@ export async function appCmd(argv: string[]) {
     console.log(d.apps.length ? d.apps.map((a: any) => `${a.app_id}  ${a.name}  ${(a.bytes_used / 1048576).toFixed(1)} MB`).join("\n") : "No apps yet. Run `shipvo app create` inside an app made with `shipvo init`.");
     return;
   }
-  if (sub !== "create") { console.error("Usage: shipvo app create | shipvo app list"); process.exit(2); }
+  if (sub === "delete") {
+    const id = argv[1]; if (!id || !argv.includes("--yes")) { console.error("Usage: shipvo app delete <app-id> --yes   (removes the app's published files, tokens and registration; installed shells keep the code they have)"); process.exit(2); }
+    const r = await fetch(`${c.control}/apps/${id}`, { method: "DELETE", headers: { authorization: `Bearer ${c.key}` } }); const d: any = await r.json();
+    if (!r.ok) { console.error(r.status === 404 ? `No app "${id}" on your account.` : d.hint ?? d.error); process.exit(1); }
+    console.log(`Deleted "${id}" (${d.files_deleted} files).`); return;
+  }
+  if (sub !== "create") { console.error("Usage: shipvo app create | list | delete <id> --yes"); process.exit(2); }
   const cfg = loadConfig();
   const r = await fetch(`${c.control}/apps`, { method: "POST", headers: { authorization: `Bearer ${c.key}`, "content-type": "application/json" }, body: JSON.stringify({ app_id: cfg.appId, name: cfg.name, public_key: cfg.publicKey }) });
   const d: any = await r.json();

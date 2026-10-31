@@ -16,7 +16,7 @@ const help = `shipvo <command>
   sim [--port 4545]           Build the app for the simulator and serve it (agents: open_app("<appId>"))
   publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release (+ the agent-facing web artifact)
   rollback --to <release>     Republish an earlier release's code as a new release
-  app create | app list       Register this app with the hosted control plane (publish token), or list yours
+  app create | list | delete  Register this app with the hosted control plane (publish token), list yours, or remove one
   login                       Sign in with GitHub and get a key for the hosted simulator
   keys                        Show the stored key's status and quota
   mcp                         Print the MCP config agents need (hosted and local)
