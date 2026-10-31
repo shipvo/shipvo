@@ -1,14 +1,14 @@
 name: submit-awesome-mcp-servers
 # Opens ONE pull request adding Shipvo to punkpeye/awesome-mcp-servers, from the account that owns PR_TOKEN.
 # Needs repo secret PR_TOKEN: a classic PAT with the public_repo scope (fork + push + PR).
-# Run it first with dry_run=true (default): it prints the exact diff and opens nothing.
+# dry_run defaults to false: running it opens the PR. Tick dry_run to only see the diff.
 on:
   workflow_dispatch:
     inputs:
       dry_run:
         description: Only show the diff, open no PR
         type: boolean
-        default: true
+        default: false
 permissions: {}
 jobs:
   submit:
