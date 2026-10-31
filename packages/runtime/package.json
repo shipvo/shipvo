@@ -36,12 +36,16 @@
   },
   "keywords": [
     "shipvo",
-    "expo",
     "react-native",
+    "expo",
     "ota",
     "over-the-air",
-    "updates",
-    "ed25519"
+    "ota-updates",
+    "codepush-alternative",
+    "hermes",
+    "ed25519",
+    "code-signing",
+    "rollback"
   ],
   "homepage": "https://github.com/shipvo/shipvo#readme",
   "repository": {

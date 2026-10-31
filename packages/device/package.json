@@ -39,14 +39,16 @@
   },
   "keywords": [
     "shipvo",
-    "expo",
     "react-native",
-    "simulator",
-    "ai-agents",
+    "expo",
+    "device-api",
     "camera",
     "location",
     "biometrics",
-    "payments"
+    "payments",
+    "permissions",
+    "simulator",
+    "ai-agents"
   ],
   "homepage": "https://github.com/shipvo/shipvo#readme",
   "repository": {

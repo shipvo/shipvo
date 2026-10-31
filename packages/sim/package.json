@@ -20,10 +20,15 @@
   },
   "keywords": [
     "shipvo",
-    "simulator",
+    "react-native",
     "react-native-web",
+    "mobile-simulator",
+    "headless",
     "playwright",
-    "ai-agents"
+    "mcp",
+    "ai-agents",
+    "mobile-testing",
+    "e2e-testing"
   ],
   "homepage": "https://github.com/shipvo/shipvo#readme",
   "repository": {
