@@ -82,7 +82,7 @@ Created ${name} in ${dirArg}
 
 Phones:  npx expo run:android   (needs Android Studio once; the OTA runtime is Android-first)
 Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and SHIPVO_KV_ID (self-hosted); then npm run publish
-         (self-host the control plane from services/control-plane, or ask for a hosted app id during the beta)
+         (self-hosting instead? see docs/self-hosting.md)
 
 ${seedNote}
 Public key pinned in the shell: ${publicKey}
