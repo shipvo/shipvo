@@ -19,7 +19,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 { "mcpServers": { "shipvo": { "url": "https://sim.example.com/mcp", "headers": { "Authorization": "Bearer key1" } } } }
 ```
 
-**3. Hosted**: the Shipvo simulator service runs one sandbox per API key and exposes the same tools at `https://<host>/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). Sessions persist across reconnects; the sandbox sleeps after 30 idle minutes and comes back on the next call. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta apps), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT.
+**3. Hosted**: the Shipvo simulator service runs one sandbox per API key and exposes the same tools at `https://<host>/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). Sessions persist across reconnects; the sandbox sleeps after 30 idle minutes and comes back on the next call. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta apps; it expires after 30 days and a new login replaces it, `shipvo keys` shows the date), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT.
 
 ## The tools
 

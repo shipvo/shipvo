@@ -5,6 +5,7 @@ import { Hono } from "hono";
 type Env = { DB: D1Database; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
 export const auth = new Hono<{ Bindings: Env }>();
 const BETA_APPS = ["tide"];   // apps anyone may open in the hosted simulator during the beta
+const KEY_TTL_DAYS = 30;
 const DEFAULT_QUOTA_MIN = 600;
 
 const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -38,19 +39,23 @@ auth.post("/device/poll", async (c) => {
   await c.env.DB.prepare("DELETE FROM device_logins WHERE device_code = ?").bind(device_code).run();
   // One test key per login, for every beta app (keys are per app today; the simulator reads app_id from the key).
   const { key, prefix } = newKey("test");
-  await c.env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes) VALUES (?,?,?,?,?,?,?)")
-    .bind(BETA_APPS[0], await sha256(key), prefix, "test", `shipvo login (${u.login})`, acct.id, DEFAULT_QUOTA_MIN).run();
+  // A new login replaces the account's earlier login keys, and the new key expires.
+  await c.env.DB.prepare("UPDATE api_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE account_id = ? AND scope = 'test' AND revoked_at IS NULL").bind(acct.id).run();
+  const expires_at = new Date(Date.now() + KEY_TTL_DAYS * 86400_000).toISOString();
+  await c.env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")
+    .bind(BETA_APPS[0], await sha256(key), prefix, "test", `shipvo login (${u.login})`, acct.id, DEFAULT_QUOTA_MIN, expires_at).run();
   const simUrl = (c.env.SIM_URL ?? "https://shipvo-sim.purenative.workers.dev").replace(/\/$/, "");
-  return c.json({ login: u.login, key, prefix, scope: "test", apps: BETA_APPS, quota_minutes: DEFAULT_QUOTA_MIN,
+  return c.json({ login: u.login, key, prefix, scope: "test", apps: BETA_APPS, quota_minutes: DEFAULT_QUOTA_MIN, expires_at,
     mcp: { url: `${simUrl}/mcp`, header: `Authorization: Bearer ${key}`, url_with_key: `${simUrl}/mcp/${key}` },
-    note: "Store the key now; it is not shown again. It opens the beta apps in the hosted simulator; quota is sandbox minutes." });
+    note: `Store the key now; it is not shown again. It expires in ${KEY_TTL_DAYS} days; run shipvo login again to renew. It opens the beta apps in the hosted simulator; quota is sandbox minutes.` });
 });
 
 /** A key's own status (the CLI's `shipvo keys`). */
 auth.get("/me", async (c) => {
   const k = (c.req.header("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!k) return c.json({ error: "unauthorized" }, 401);
-  const row = await c.env.DB.prepare("SELECT k.prefix, k.scope, k.app_id, k.label, k.quota_minutes, k.used_minutes, k.created_at, k.last_used_at, a.github_login FROM api_keys k LEFT JOIN accounts a ON a.id = k.account_id WHERE k.key_hash = ? AND k.revoked_at IS NULL").bind(await sha256(k)).first();
+  const row = await c.env.DB.prepare("SELECT k.prefix, k.scope, k.app_id, k.label, k.quota_minutes, k.used_minutes, k.created_at, k.last_used_at, k.expires_at, a.github_login FROM api_keys k LEFT JOIN accounts a ON a.id = k.account_id WHERE k.key_hash = ? AND k.revoked_at IS NULL").bind(await sha256(k)).first();
   if (!row) return c.json({ error: "unauthorized" }, 401);
+  if ((row as any).expires_at && (row as any).expires_at < new Date().toISOString()) return c.json({ error: "key_expired", expires_at: (row as any).expires_at, hint: "Run shipvo login to get a new key." }, 401);
   return c.json(row);
 });

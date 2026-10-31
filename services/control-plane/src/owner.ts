@@ -138,13 +138,14 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
   // Agent API keys for the hosted simulator (sim.shipvo.dev). The key is shown once; only its hash is stored.
   create_api_key: {
     description: "Create an API key that lets an AI agent open this app in the hosted simulator. Scope 'test' = sandbox sessions only; 'owner' = may also run owner commands; 'read' = reports only. The key is returned once.",
-    params: { scope: { type: "string", required: true, description: "test, owner or read", enum: ["test", "owner", "read"] }, label: { type: "string", description: "What this key is for, e.g. 'Claude Code', 'PiPilot CI'" } }, mutates: false,
+    params: { scope: { type: "string", required: true, description: "test, owner or read", enum: ["test", "owner", "read"] }, label: { type: "string", description: "What this key is for, e.g. 'Claude Code', 'PiPilot CI'" }, expires_in_days: { type: "number", description: "Optional: the key stops working after this many days (default: never)" } }, mutates: false,
     run: async (_d, a, env) => {
       const scope = String(a.scope); if (!["test", "owner", "read"].includes(scope)) fail("bad_scope", "scope must be test, owner or read");
       const rand = crypto.getRandomValues(new Uint8Array(24)); const body = btoa(String.fromCharCode(...rand)).replace(/[+/=]/g, (c) => ({ "+": "a", "/": "b", "=": "" }[c]!));
       const key = `sv_${scope}_${body}`; const prefix = key.slice(0, 12);
       const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)))].map((b) => b.toString(16).padStart(2, "0")).join("");
-      await env.db.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label) VALUES (?,?,?,?,?)").bind(env.appId, hash, prefix, scope, String(a.label ?? "")).run();
+      const days = Number(a.expires_in_days); const expires = days > 0 ? new Date(Date.now() + days * 86400_000).toISOString() : null;
+      await env.db.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, expires_at) VALUES (?,?,?,?,?,?)").bind(env.appId, hash, prefix, scope, String(a.label ?? ""), expires).run();
       return { key, prefix, scope, label: a.label ?? "", note: "Store this key now; it is not shown again. Use it as Authorization: Bearer <key> at https://sim.shipvo.dev/mcp" };
     },
   },

@@ -79,8 +79,9 @@ export default {
     // API key → app and scope. Keys come from the owner command create_api_key; only hashes are stored.
     const key = ((req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim()) || pathKey || url.searchParams.get("key") || "";
     if (!key) return json({ error: "missing_api_key", hint: "Authorization: Bearer <key> (create one with the owner command create_api_key)" }, 401);
-    const row = await env.DB.prepare("SELECT id, app_id, scope FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").bind(await sha256(key)).first<{ id: number; app_id: string; scope: string }>();
+    const row = await env.DB.prepare("SELECT id, app_id, scope, expires_at FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").bind(await sha256(key)).first<{ id: number; app_id: string; scope: string; expires_at: string | null }>();
     if (!row) return json({ error: "invalid_api_key" }, 401);
+    if (row.expires_at && row.expires_at < new Date().toISOString()) return json({ error: "expired_api_key", expires_at: row.expires_at, hint: "Run `shipvo login` to get a new key." }, 401);
     env.DB.prepare("UPDATE api_keys SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").bind(row.id).run().catch(() => {});
 
     const headers = new Headers(req.headers);
