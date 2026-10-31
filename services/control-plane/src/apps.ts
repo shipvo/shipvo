@@ -3,6 +3,7 @@
 // that app's own key prefixes, with every release pointer verified against the app's registered public key. The private
 // signing key never leaves the developer's machine or CI.
 import { Hono } from "hono";
+import { ReleasePointerBody } from "@shipvo/schema";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database };
 export const apps = new Hono<{ Bindings: Env }>();
@@ -102,6 +103,7 @@ async function pointerProblem(id: string, key: string, pub: string, buf: ArrayBu
   let env: any, body: any;
   try { env = JSON.parse(new TextDecoder().decode(buf)); body = JSON.parse(env.body); } catch { return "a pointer is a JSON envelope { body, signature }"; }
   if (typeof env.signature !== "string") return "pointer has no signature";
+  const shape = ReleasePointerBody.safeParse(body); if (!shape.success) return `pointer body is not a valid release pointer: ${shape.error.issues[0]?.path.join(".")} ${shape.error.issues[0]?.message}`;
   if (body.app_id !== id) return `pointer is for "${body.app_id}", not "${id}"`;
   if (String(body.shell_major) !== major || body.band !== band) return "pointer shell_major/band does not match its key";
   for (const alg of ["Ed25519", "NODE-ED25519"]) {
