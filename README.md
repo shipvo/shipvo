@@ -49,7 +49,7 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 ```bash
 npx -y @shipvo/cli init myshop && cd myshop && npm install && npx playwright install chromium
 npm run sim                      # the app in the simulator; agents: open_app("myshop") through @shipvo/mcp
-npx expo run:android             # the native shell; push to main to publish over the air
+npx expo run:android             # the native shell; `shipvo publish` ships changes over the air
 ```
 
 Guides: [Build your first app](docs/getting-started.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
@@ -105,7 +105,7 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 ## Try the sample app
 
 1. Download the latest `tide-and-tackle-shell.apk` from [Releases](https://github.com/shipvo/shipvo/releases) and install it on an Android 7+ phone.
-2. Edit `apps/tide-and-tackle/src/release.ts` and push to `main`. The `publish-ota` workflow signs and publishes the release.
+2. Edit `apps/tide-and-tackle/src/release.ts` and run `shipvo publish` (or push to `main` and let the `publish-ota` workflow do it). It signs and publishes the release.
 3. The app checks every 10 seconds while open, verifies the update, applies it, and logs the timings on screen.
 4. Change prices or the home screen at `/app/tide/admin` on your control plane; the phone shows it in about 10 seconds.
 5. Open the same release as an agent: `cd apps/tide-and-tackle && pnpm sim`, then `open_app("tide@latest")` through `@shipvo/mcp`, or `scripts/ui screen` from a terminal.

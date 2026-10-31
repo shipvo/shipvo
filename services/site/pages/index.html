@@ -95,7 +95,7 @@
   { steps: 18, orders: [{ total: 4200, payment: "mobile_money" }] }</pre></div>
         </div>
         <div role="tabpanel" id="p-pub" aria-labelledby="t-pub" hidden>
-          <div class="panel-grid"><div><h3>Push to main. Every phone has it.</h3><p>The workflow signs a release pointer (Ed25519), ships bsdiff patches from each installed version, and rolls out by cohort: 1 %, then 10 %, then everyone. Phones verify signature, hash and size, apply without a restart, and discard a release that fails to boot. <code>shipvo rollback --to 7</code> when you need it.</p><a class="link" href="/docs/getting-started/#5-publish-over-the-air">Publishing, step by step →</a></div>
+          <div class="panel-grid"><div><h3>One command. Every phone has it.</h3><p><code>shipvo publish</code> builds, signs and ships the update; in a GitHub repo the workflow runs it for you on every push. It signs a release pointer (Ed25519), ships bsdiff patches from each installed version, and rolls out by cohort: 1 %, then 10 %, then everyone. Phones verify signature, hash and size, apply without a restart, and discard a release that fails to boot. <code>shipvo rollback --to 7</code> when you need it.</p><a class="link" href="/docs/getting-started/#5-publish-over-the-air">Publishing, step by step →</a></div>
 <pre class="term"><span class="g">$</span> <span class="c">npx -y @shipvo/cli login</span>        <span class="d">GitHub sign-in</span>
 <span class="g">$</span> <span class="c">npx -y @shipvo/cli app create</span>   <span class="d">publish token, scoped to this app</span>
 <span class="g">$</span> <span class="c">git push</span>

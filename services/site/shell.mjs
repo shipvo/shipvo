@@ -24,7 +24,7 @@ const PRODUCT = [
 ];
 const SOLUTIONS = [
   ["Test with the assistant you use", "/#how", "Claude, ChatGPT or Cursor drives your app end to end, no emulator"],
-  ["Ship updates without the store", "/docs/getting-started/", "Push to main; phones have it in seconds"],
+  ["Ship updates without the store", "/docs/getting-started/", "One command; phones have it in seconds"],
   ["Make your app agent-ready", "/docs/agents/#listing-your-app-for-every-agent", "List it so any agent can open it"],
   ["Self-host everything", "/docs/self-hosting/", "Your Cloudflare account, your keys, ten minutes"],
 ];

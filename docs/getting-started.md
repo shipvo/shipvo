@@ -1,6 +1,6 @@
 # Build your first Shipvo app
 
-Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air by pushing to `main`.
+Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
 
 ## 0. What you need
 
@@ -27,7 +27,7 @@ npx playwright install chromium
 | `App.tsx` | A small screen that boots the OTA runtime and exercises the device API: scan, location, fingerprint, notification. |
 | `src/release.ts` | The first thing you edit: push a change and every phone and simulator gets it. |
 | `metro.config.js` | `withShipvoSim`: simulator builds swap Expo's native modules for the simulated device. |
-| `.github/workflows/publish.yml` | Signs and publishes an over-the-air release on every push to `main`. |
+| `.github/workflows/publish.yml` | Runs `shipvo publish` for you on every push to `main` (optional; you can always run it yourself). |
 | `.shipvo/seed.txt` | Your Ed25519 release signing seed, git-ignored. **Back it up offline.** Lose it and installed shells will never accept another update. Run `shipvo keys export` and keep a copy ([moving machines](new-machine.md)). |
 
 ## 2. Run it in the simulator
@@ -101,7 +101,7 @@ The publish token can only write your app's own files, and every release pointer
 
 **Self-hosted control plane.** Instead of the token, set `CLOUDFLARE_API_TOKEN` (Workers KV Storage: Edit), `CLOUDFLARE_ACCOUNT_ID` and `SHIPVO_KV_ID` (see [self-hosting.md](self-hosting.md)) and point `controlPlane` in `shipvo.json` at your Worker.
 
-Then edit `src/release.ts` and push to `main`. The workflow runs `shipvo publish`, which:
+Then edit `src/release.ts` and run `shipvo publish`. (In a GitHub repo, the workflow does the same on every push to `main`.) It:
 
 1. builds the Hermes bundle and hashes it,
 2. builds bsdiff patches from recent releases and from each shell's embedded bundle, so most updates are tens of kilobytes,
