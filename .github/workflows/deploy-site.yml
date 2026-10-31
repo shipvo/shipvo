@@ -3,13 +3,14 @@ name: deploy-site
 on:
   push:
     branches: [main]
-    paths: ["services/site/**", "docs/**", "README.md", "CHANGELOG.md", "packages/*/README.md", ".github/workflows/deploy-site.yml"]
+    paths: ["services/site/**", "docs/**", "blog/**", "README.md", "CHANGELOG.md", "packages/*/README.md", ".github/workflows/deploy-site.yml"]
   workflow_dispatch:
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Build docs from the repo Markdown

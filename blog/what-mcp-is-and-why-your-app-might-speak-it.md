@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 12
 author: Hans Ade
 tags: Guides, Agents
+seo_title: What is MCP, and why a mobile app should speak it
 summary: The Model Context Protocol lets AI assistants use tools and data in a standard way. What it is, why Shipvo exposes a phone through it, and what a mobile app can offer an agent beyond a screen.
 ---
 

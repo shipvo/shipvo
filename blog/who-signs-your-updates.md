@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 11
 author: Hans Ade
 tags: Guides, OTA, Engineering
+seo_title: OTA update code signing: Expo vs Shipvo
 summary: An over-the-air update is code arriving from a server. Code signing is what lets a phone refuse it if it was tampered with. How Expo's code signing works, how Shipvo does it, and the trade-offs of each.
 ---
 

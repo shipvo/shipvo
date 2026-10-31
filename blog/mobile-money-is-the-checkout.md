@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 8
 author: Hans Ade
 tags: Guides, Testing
+seo_title: Testing mobile money checkout flows
 summary: Mobile money moved more than two trillion dollars in 2025, and most of the growth came from Sub-Saharan Africa. If your app takes payments there, the failed payment is not an edge case. How to test it without moving real money.
 ---
 

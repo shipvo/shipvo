@@ -4,6 +4,7 @@ date: 2026-10-31
 author: Hans Ade
 order: 2
 tags: Stories, Testing, Engineering
+seo_title: Three bugs our first typed test found
 summary: We built @shipvo/test so developers can write Playwright-style tests against the simulator, then pointed it at our own sample shop. Three bugs came out before we had a green run, and all three were in our own tooling. What they were and what we changed.
 ---
 

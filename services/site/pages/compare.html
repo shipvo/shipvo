@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<!--HEAD title="Shipvo vs Expo: side by side — Shipvo" desc="An honest side-by-side of testing, simulating and updating a React Native app with Expo and EAS versus Shipvo: what each does, what each costs, and when to use which." path="/compare/"-->
+<!--HEAD title="Shipvo vs Expo: testing and OTA updates compared — Shipvo" desc="An honest side-by-side of Expo and EAS versus Shipvo for simulating, testing and over-the-air updates: what each does, costs and is best for." path="/compare/" image="/og/compare.png" imageAlt="Shipvo and Expo, side by side"-->
 <link rel="stylesheet" href="/blog.css">
 </head>
 <body>
@@ -41,7 +41,7 @@
         <tr><th>Where it runs</th><td>Local by default. Their cloud simulator sessions (<em>Expo Simulators</em>) were in preview with a waitlist at the time of their announcement.</td><td class="win">Local, or hosted at <code>sim.shipvo.dev</code> with a key from <code>shipvo login</code>.</td></tr>
         <tr><th>Camera, location, biometrics, payments</th><td>Real on a device. In simulators, support varies and some features, such as the camera and biometrics, are limited or manual.</td><td>Scriptable: set the location, put a barcode in front of the camera, approve or fail a payment, deny a permission, go offline.</td></tr>
         <tr><th>Typed test API for CI</th><td>Bring your own: Maestro, Detox or similar.</td><td class="win"><code>@shipvo/test</code>: Playwright-style, in Vitest or any runner.</td></tr>
-        <tr><th>How closely it matches a phone</th><td class="win">It is a phone, simulated at the OS level.</td><td>Measured and published: 100 % actionable parity across 3 flows and 21 screens, text 98.6 % and 96.2 %, three known gaps listed. <a href="/docs/parity-results/">Parity results</a></td></tr>
+        <tr><th>How closely it matches a phone</th><td class="win">It is a phone, simulated at the OS level.</td><td>Measured and published. Two full purchases: 100 % actionable parity on Android and iOS across 13 screens. The native-feature flow: 18 of 21 screens at 100 % on Android, with the three gaps listed, and 100 % on iOS. <a href="/docs/parity-results/">Parity results</a></td></tr>
       </tbody>
     </table></div>
     <p class="note" style="margin-top:22px"><b>The honest summary.</b> If you need to know whether your app crashes on a real iPhone, use the iOS Simulator or a device. If you want to know on every pull request, in seconds, on a Linux runner, whether a customer can still scan, pay and get a confirmation, use the Shipvo simulator. Most teams want both: the simulator on every commit, a real device before a store release.</p>

@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 7
 author: Hans Ade
 tags: Guides, Testing
+seo_title: Write mobile tests that do not flake
 summary: A test that sleeps for a second is a test that fails on a slow day. Wait for what you expect to see instead, and make the failure message tell you what the screen actually showed.
 ---
 

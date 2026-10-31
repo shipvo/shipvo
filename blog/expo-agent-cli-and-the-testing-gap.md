@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 13
 author: Hans Ade
 tags: Agents, Guides
+seo_title: Expo agent CLI vs a simulator agents operate
 summary: On 27 October, Expo introduced a CLI built for coding agents. What it does, what it deliberately does not, and where an agent that uses an app differs from an agent that builds one.
 ---
 

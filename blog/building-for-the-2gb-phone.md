@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 9
 author: Hans Ade
 tags: Stories, OTA, Quality
+seo_title: Building and updating apps for 2 GB phones
 summary: Entry-level Android phones are the default in much of the world, and Google builds a whole edition of Android for them. What an over-the-air update costs on one, in kilobytes and milliseconds, measured on a real phone in Douala.
 ---
 

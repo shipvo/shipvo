@@ -4,6 +4,7 @@ import { Marked, Renderer } from "marked";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { symbol } from "./brand.mjs";
+import { crumbs } from "./shell.mjs";
 
 const SITE = "https://shipvo.dev";
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -53,7 +54,7 @@ export function buildBlog({ ROOT, PUB, headTag, navTag, footTag }) {
   const dir = join(ROOT, "blog");
   const posts = readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => parse(f, readFileSync(join(dir, f), "utf8"))).sort((a, b) => b.date.localeCompare(a.date) || (a.order - b.order) || a.slug.localeCompare(b.slug));
   const css = '<link rel="stylesheet" href="/docs.css"><link rel="stylesheet" href="/blog.css">';
-  const shell = (title, desc, path, main, extra = "") => `<!doctype html><html lang="en"><head>${headTag({ title, desc, path, extraCss: css + extra })}</head><body class="blogpage">${navTag("blog")}<main id="main">${main}</main>${footTag()}<script src="/blog.js" defer></script></body></html>`;
+  const shell = (title, desc, path, main, extra = "", seo = {}) => `<!doctype html><html lang="en"><head>${headTag({ title, desc, path, extraCss: css + extra, ...seo })}</head><body class="blogpage">${navTag("blog")}<main id="main">${main}</main>${footTag()}<script src="/blog.js" defer></script></body></html>`;
 
   for (const p of posts) {
     mkdirSync(join(PUB, "blog", p.slug), { recursive: true });
@@ -64,7 +65,7 @@ export function buildBlog({ ROOT, PUB, headTag, navTag, footTag }) {
   const index = `<section class="blog-top"><div class="wrap"><div class="eyebrow">Blog</div><h1>Stories and guides from the Shipvo team</h1><p class="lede">How to test a mobile app with an assistant, what we found when we tested our own, and what we measured along the way.</p>
 <div class="tabs" role="tablist" aria-label="Filter posts">${tags.map((t, i) => `<button type="button" role="tab" aria-selected="${i === 0}" data-tag="${esc(t)}">${esc(t)} <span>${t === "All" ? posts.length : posts.filter((p) => p.tags.includes(t)).length}</span></button>`).join("")}</div></div></section>
 <section class="blog-list"><div class="wrap"><div class="grid" id="posts">${posts.map((p, i) => card(p, i === 0)).join("")}</div><p class="empty" hidden>No posts under this tag yet.</p><p class="feed">Follow along: <a href="/blog/rss.xml">RSS</a> · <a href="https://x.com/HansCadx" rel="noopener">X</a> · <a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></p></div></section>`;
-  writeFileSync(join(PUB, "blog", "index.html"), shell("Blog — Shipvo", "Stories and guides from the Shipvo team: testing mobile apps with assistants, what we found, what we measured.", "/blog/", index, '<link rel="alternate" type="application/rss+xml" title="Shipvo blog" href="/blog/rss.xml">'));
+    writeFileSync(join(PUB, "blog", "index.html"), shell("Shipvo Blog: mobile app testing, OTA updates and AI agents", "Guides and stories on testing React Native apps in CI, over-the-air updates, MCP and AI agents. Measured results, with sources.", "/blog/", index, "", { image: "/og/blog.png", imageAlt: "Shipvo blog", ld: [crumbs([["Home", "/"], ["Blog", "/blog/"]]), { "@context": "https://schema.org", "@type": "Blog", name: "Shipvo blog", url: `${SITE}/blog/`, description: "Guides and stories on testing mobile apps, over-the-air updates and AI agents.", publisher: { "@type": "Organization", name: "Shipvo", url: SITE } }] }));
 
   posts.forEach((p, i) => {
     const { html, heads } = render(p);
@@ -75,8 +76,9 @@ ${heads.length >= 3 ? `<nav class="contents" aria-label="In this article"><b>In 
 <div class="prose">${html}</div>
 <div class="share"><span>Share</span><a href="https://x.com/intent/post?text=${encodeURIComponent(p.title)}&url=${encodeURIComponent(`${SITE}/blog/${p.slug}/`)}" rel="noopener">X</a><a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${SITE}/blog/${p.slug}/`)}" rel="noopener">LinkedIn</a><button type="button" data-copy-url>Copy link</button></div>
 ${others.length ? `<aside class="related"><div class="related-head"><h2>Related articles</h2><a href="/blog/">All posts →</a></div><div class="grid two">${others.map((o) => card(o)).join("")}</div></aside>` : ""}</div></article>`;
-    const ld = `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "BlogPosting", headline: p.title, description: p.summary, datePublished: p.date, author: { "@type": "Person", name: p.author }, image: `${SITE}/blog/${p.slug}/cover.svg`, mainEntityOfPage: `${SITE}/blog/${p.slug}/` }).replace(/</g, "\\u003c")}</script>`;
-    writeFileSync(join(PUB, "blog", p.slug, "index.html"), shell(`${esc(p.title)} — Shipvo`, esc(p.summary), `/blog/${p.slug}/`, main, ld));
+    const ld = [{ "@context": "https://schema.org", "@type": "BlogPosting", headline: p.title, description: p.summary, datePublished: p.date, dateModified: p.date, author: { "@type": "Person", name: p.author, url: "https://x.com/HansCadx" }, publisher: { "@type": "Organization", name: "Shipvo", url: SITE, logo: { "@type": "ImageObject", url: `${SITE}/logo-256.png` } }, image: `${SITE}/og/blog-${p.slug}.png`, keywords: p.tags.join(", "), wordCount: p.body.split(/\s+/).length, inLanguage: "en", mainEntityOfPage: `${SITE}/blog/${p.slug}/` }, crumbs([["Home", "/"], ["Blog", "/blog/"], [p.title, `/blog/${p.slug}/`]])];
+    const seoTitle = `${p.seo_title || p.title} | Shipvo`;
+    writeFileSync(join(PUB, "blog", p.slug, "index.html"), shell(esc(seoTitle), esc(p.summary), `/blog/${p.slug}/`, main, "", { type: "article", image: `/og/blog-${p.slug}.png`, imageAlt: p.title, ld, published: p.date, modified: p.date }));
     writeFileSync(join(PUB, "blog", `${p.slug}.md`), `# ${p.title}\n\n> ${p.summary}\n\nBy ${p.author}, ${p.date}. Canonical: ${SITE}/blog/${p.slug}/\n\n${p.body.replace(/\]\((\/[^)\s]*)/g, `](${SITE}$1`)}\n`);
   });
 

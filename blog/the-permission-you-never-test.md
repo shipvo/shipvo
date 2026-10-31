@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 14
 author: Hans Ade
 tags: Guides, Testing
+seo_title: Test denied permissions in your mobile app
 summary: Google's own guidance says an app should keep working when a permission is denied, and that a second denial can be permanent. How to test the no path before your users find it.
 ---
 

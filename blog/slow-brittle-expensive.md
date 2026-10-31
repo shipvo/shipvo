@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 5
 author: Hans Ade
 tags: Guides, Testing
+seo_title: The test pyramid for mobile apps
 summary: Martin Fowler's test pyramid says to run few tests through the UI because they are slow, brittle and expensive. That advice still holds. Here is how to use a simulator without breaking it.
 ---
 

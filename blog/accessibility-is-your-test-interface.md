@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 6
 author: Hans Ade
 tags: Guides, Testing, Agents
+seo_title: Accessibility labels as a mobile test interface
 summary: The labels that let a screen reader user find your button are the same ones a test, or an AI assistant, uses to find it. Why that is a good thing to build on, and what it cannot replace.
 ---
 

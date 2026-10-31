@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 15
 author: Hans Ade
 tags: Guides, Testing
+seo_title: Test offline mode in React Native apps
 summary: Android's guidance on offline-first apps starts from a plain fact: connectivity comes and goes. How to test the moments your app has no network, and what a simulator can and cannot show.
 ---
 

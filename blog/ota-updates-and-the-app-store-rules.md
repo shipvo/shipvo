@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 3
 author: Hans Ade
 tags: Guides, OTA
+seo_title: OTA updates and app store rules explained
 summary: Both Apple and Google allow some code to change after review, and neither allows all of it. What the rules actually say, what that means for a React Native app, and where Shipvo draws the line.
 ---
 

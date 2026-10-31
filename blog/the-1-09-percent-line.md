@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 4
 author: Hans Ade
 tags: Guides, Quality
+seo_title: Google Play crash threshold: the 1.09% line
 summary: Google Play publishes the crash and not-responding rates at which it may reduce your app's visibility. The numbers, the 28-day window that makes a bad release expensive, and what a simulator can and cannot do about it.
 ---
 

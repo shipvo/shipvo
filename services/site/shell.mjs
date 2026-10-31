@@ -2,16 +2,39 @@
 export const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">`;
 
-export const head = ({ title, desc, path = "/", extraCss = "" }) => `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+// Trim to a search-result length without cutting a word; prefer ending on a full sentence.
+export const clip = (s, n = 155) => {
+  s = String(s).replace(/\s+/g, " ").trim();
+  if (s.length <= n) return s;
+  const cut = s.slice(0, n + 1), dot = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("; "));
+  if (dot > n * 0.6) return cut.slice(0, dot + 1);
+  return cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:\-\s]+$/, "") + "…";
+};
+export const crumbs = (items) => ({ "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: items.map(([name, path], i) => ({ "@type": "ListItem", position: i + 1, name, item: `https://shipvo.dev${path}` })) });
+const attr = (s) => String(s).replace(/&(?!(amp|lt|gt|quot|#\d+);)/g, "&amp;").replace(/"/g, "&quot;");
+
+export const head = ({ title, desc, path = "/", extraCss = "", type = "website", image = "/og.png", imageAlt = "Shipvo: build once, publish for people and AI agents", ld = [], published = "", modified = "" }) => {
+  const url = `https://shipvo.dev${path}`, img = /^https?:/.test(image) ? image : `https://shipvo.dev${image}`;
+  desc = attr(clip(desc.replace(/&amp;/g, "&").replace(/&quot;/g, '"')));
+  const jsonld = (Array.isArray(ld) ? ld : [ld]).filter(Boolean).map((o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, "\\u003c")}</script>`).join("\n");
+  return `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
 <meta name="description" content="${desc}">
-<link rel="canonical" href="https://shipvo.dev${path}">
-<meta property="og:title" content="${title}"><meta property="og:description" content="${desc}"><meta property="og:url" content="https://shipvo.dev${path}"><meta property="og:type" content="website"><meta property="og:image" content="https://shipvo.dev/og.png">
-<meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#090D16">
-<link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt"><link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="canonical" href="${url}">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="author" content="Hans Ade">
+<meta property="og:site_name" content="Shipvo"><meta property="og:locale" content="en_US">
+<meta property="og:title" content="${title}"><meta property="og:description" content="${desc}"><meta property="og:url" content="${url}"><meta property="og:type" content="${type}">
+<meta property="og:image" content="${img}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="${attr(imageAlt)}">
+${published ? `<meta property="article:published_time" content="${published}">` : ""}${modified ? `<meta property="article:modified_time" content="${modified}">` : ""}
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${title}"><meta name="twitter:description" content="${desc}"><meta name="twitter:image" content="${img}"><meta name="twitter:image:alt" content="${attr(imageAlt)}"><meta name="twitter:creator" content="@HansCadx">
+<meta name="theme-color" content="#090D16">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt"><link rel="alternate" type="application/rss+xml" title="Shipvo blog" href="/blog/rss.xml"><link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 ${FONTS}
 <script>try{var t=localStorage.getItem("shipvo.theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
-<link rel="stylesheet" href="/site.css">${extraCss}`;
+<link rel="stylesheet" href="/site.css">${extraCss}
+${jsonld}`;
+};
 
 const PRODUCT = [
   ["Publish", "/docs/getting-started/#5-publish-over-the-air", "Signed OTA updates, cohorts, rollback"],

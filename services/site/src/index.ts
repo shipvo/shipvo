@@ -19,7 +19,7 @@ export default {
       const today = new Date().toISOString().slice(0, 10);
       const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
       const rows = [
-        ...pages.split("\n").filter(Boolean).map((p) => `<url><loc>https://shipvo.dev${esc(p)}</loc><lastmod>${today}</lastmod></url>`),
+        ...pages.split("\n").filter(Boolean).map((l) => { const [p, d] = l.split("\t"); return `<url><loc>https://shipvo.dev${esc(p)}</loc><lastmod>${/^\d{4}-\d\d-\d\d$/.test(d ?? "") ? d : today}</lastmod></url>`; }),
         ...(dir.apps ?? []).filter((a: any) => /^[a-z0-9-]+$/.test(a.app_id)).map((a: any) => `<url><loc>https://shipvo.dev/apps/${a.app_id}</loc>${a.published_at ? `<lastmod>${String(a.published_at).slice(0, 10)}</lastmod>` : ""}</url>`),
       ];
       return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.join("\n")}\n</urlset>\n`, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });

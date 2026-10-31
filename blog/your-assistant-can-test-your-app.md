@@ -4,6 +4,7 @@ date: 2026-10-31
 author: Hans Ade
 order: 1
 tags: Guides, Testing, Agents
+seo_title: Test your app with Claude or ChatGPT over MCP
 summary: Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator and ask it to buy something from your app. What the remote MCP path looks like, the prompts that find real bugs, and what an assistant cannot tell you.
 ---
 

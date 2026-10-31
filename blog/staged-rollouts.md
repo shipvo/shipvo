@@ -4,6 +4,7 @@ date: 2026-10-31
 order: 10
 author: Hans Ade
 tags: Guides, OTA
+seo_title: Staged rollouts: Apple, Google and OTA cohorts
 summary: Apple and Google both let you release to a fraction of users first, and they do it differently. What each gives you, and how Shipvo's cohorts apply the same idea to over-the-air updates.
 ---
 
