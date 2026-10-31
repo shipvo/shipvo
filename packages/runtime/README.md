@@ -5,7 +5,7 @@ The native half of Shipvo's over-the-air updates, as an Expo module.
 - Verifies every release pointer (Ed25519) and bundle (SHA-256 + size) against a public key built into the shell.
 - Downloads bsdiff patches when it has the previous release, full bundles otherwise; stages atomically.
 - Applies without restart, marks the release healthy when the app says so, and discards a release that fails to boot 3 times.
-- Android today; on iOS and in the simulator the app runs its embedded bundle and the same live content.
+- Android and iOS. iOS downloads full bundles (patches are Android-only for now) and is verified on the iOS Simulator in CI; in the web simulator the app runs the same release as the web build.
 
 ```json
 { "expo": { "plugins": [["@shipvo/runtime", { "baseUrl": "https://<your control plane>", "publicKey": "<base64 Ed25519 public key>", "appId": "myshop" }]] } }

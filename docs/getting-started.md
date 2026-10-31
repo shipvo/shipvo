@@ -79,7 +79,7 @@ The full reference is in [device-api.md](device-api.md). Screens built on it run
 npx expo run:android          # or: npx eas build -p android
 ```
 
-The shell contains your public key and control plane URL as manifest meta-data; nothing delivered over the air can change them. The embedded bundle is the first release; every later one is a signed download. iOS builds run the embedded bundle and live content (the OTA runtime is Android today).
+The shell contains your public key and control plane URL as manifest meta-data; nothing delivered over the air can change them. The embedded bundle is the first release; every later one is a signed download. On iOS the same runtime verifies and applies releases published with `shipvo publish --platform ios` (or `all`); iOS downloads full bundles, not patches, for now.
 
 ## 5. Publish over the air
 

@@ -4,6 +4,10 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## 2026-10-31
 
+- **iOS over-the-air updates.** `@shipvo/runtime` now has a Swift runtime for iOS with the same rules as Android: Ed25519 and SHA-256 checks against the key pinned in the app, staged releases on trial, a healthy-start promotion, crash-loop rollback, and a new app binary discarding old bundles. Publish with `shipvo publish --platform ios` or `--platform all` (default stays Android); `shipvo rollback` takes `--platform` too. iOS pointers live at their own path and carry `platform: "ios"` in the signed body, so an Android pointer can never be replayed on iOS. Verified in CI on macOS: 11 logic tests, plus a simulator run that builds the sample app, updates it over the air to release 1 and cold-starts on it. Not yet: bsdiff patches on iOS (full bundles only) and measurement on physical iPhones.
+- **Site:** a theme switcher in the nav (automatic, light or dark), remembered in your browser.
+- **CLI fix:** the scaffolded `src/release.ts` could break the CLI build; fixed.
+
 - **For AI tools:** [`/llms.txt`](/llms.txt), [`/llms-full.txt`](/llms-full.txt), every docs page as Markdown (`/docs/<page>.md`), a [`/docs.md`](/docs.md) index, `sitemap.xml` (includes listed apps) and `robots.txt`.
 - **Legal:** [Terms](/terms/), [Privacy](/privacy/), [Acceptable use](/acceptable-use/) and [Security](/security/) pages, plus `/.well-known/security.txt`.
 - **Site:** an animated release-to-devices illustration, a real device in the hero, and the licence is now stated correctly everywhere (Apache-2.0).

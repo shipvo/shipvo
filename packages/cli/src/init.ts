@@ -80,7 +80,7 @@ Created ${name} in ${dirArg}
   npm run sim                 # the app in the simulator on http://localhost:4545
   npx -y @shipvo/mcp          # point Claude / Cursor / ChatGPT at it and open_app("${appId}")
 
-Phones:  npx expo run:android   (needs Android Studio once; the OTA runtime is Android-first)
+Phones:  npx expo run:android   (needs Android Studio once). iOS: `npx expo run:ios`, then `shipvo publish --platform all`
 Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and SHIPVO_KV_ID (self-hosted); then npm run publish
          (self-hosting instead? see docs/self-hosting.md)
 

@@ -17,7 +17,7 @@ Three pillars:
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Status: pre-launch](https://img.shields.io/badge/status-pre--launch-orange)
 
-> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on Android; iOS is next.
+> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on Android; iOS is next. The iOS OTA runtime is verified on the iOS Simulator in CI (fetch, verify, stage, reload, cold start); physical iPhones are not yet measured.
 
 ## Why Shipvo
 
