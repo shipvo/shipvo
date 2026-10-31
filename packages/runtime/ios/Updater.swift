@@ -50,20 +50,24 @@ enum Updater {
 
     let v0 = Store.now()
     let size = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? -1
-    let ok = size == wantSize && (try Verify.sha256Hex(file: tmp)) == wantSha
+    let ok = try (size == wantSize && Verify.sha256Hex(file: tmp) == wantSha)
     if !ok { try? FileManager.default.removeItem(at: tmp); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
     let verifyMs = (Store.now() - v0) * 1000 + verifyPointerMs
 
     let dest = s.dir.appendingPathComponent("r\(release).hbc")
     try? FileManager.default.removeItem(at: dest)
     try FileManager.default.moveItem(at: tmp, to: dest)
-    Store.lock.lock()
-    if let p = s.pendingPath, p != dest.path { try? FileManager.default.removeItem(atPath: p) }
-    s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
-    if s.binaryVersion == nil { s.binaryVersion = s.installedBinaryVersion }
-    s.pendingIssuedAt = body["issued_at"] as? String
-    Store.lock.unlock()
+    stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String)
     return ["status": "staged", "release": release, "bytes": size, "via": "full", "bundleBytes": size,
             "downloadMs": Int(downloadMs), "verifyMs": Int(verifyMs), "issuedAt": body["issued_at"] as? String ?? ""]
+  }
+
+  /// Synchronous so the lock is never held across a suspension point.
+  private static func stage(_ s: Store, dest: URL, release: Int, sha: String, issuedAt: String?) {
+    Store.lock.lock(); defer { Store.lock.unlock() }
+    if let p = s.pendingPath, p != dest.path { try? FileManager.default.removeItem(atPath: p) }
+    s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = sha
+    if s.binaryVersion == nil { s.binaryVersion = s.installedBinaryVersion }
+    s.pendingIssuedAt = issuedAt
   }
 }
