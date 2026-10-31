@@ -25,4 +25,4 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           SHIPVO_SIGNING_SEED: ${{ secrets.PURENATIVE_SIGNING_SEED }}
-        run: npx shipvo rollback --to "${{ inputs.to }}" --bands "${{ inputs.bands }}" | tee -a "$GITHUB_STEP_SUMMARY"
+        run: pnpm exec shipvo rollback --to "${{ inputs.to }}" --bands "${{ inputs.bands }}" | tee -a "$GITHUB_STEP_SUMMARY"
