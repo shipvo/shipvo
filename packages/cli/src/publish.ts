@@ -1,13 +1,13 @@
 // `shipvo publish`: build the Hermes bundle, sign a release pointer, publish bundle + patches + the agent-facing web
 // artifact to the control plane. `shipvo rollback --to N`: republish an earlier bundle as a new release.
 import { execSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
 import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
 
-const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".css": "text/css", ".ico": "image/x-icon", ".png": "image/png", ".ttf": "font/ttf", ".svg": "image/svg+xml" };
+const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".css": "text/css", ".ico": "image/x-icon", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ttf": "font/ttf", ".svg": "image/svg+xml" };
 const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
 
 async function currentRelease(kv: ReturnType<typeof kvFor>, app: string, major: number) {
@@ -73,6 +73,14 @@ export async function publish(argv: string[]) {
     idx.releases = [...new Set([...idx.releases, release])].sort((x, y) => x - y); idx.latest = Math.max(...idx.releases);
     await kv.put(idxKey, JSON.stringify(idx), "application/json");
     console.error(`web artifact: ${files.length} files at /${base}/`);
+    // Store listing assets (icon, screenshots) and the release note, read by shipvo.dev/apps and list_apps.
+    const L = cfg.listing ?? {}; const store = `w/${APP}/store`;
+    const up = async (file: string, name: string) => { if (!existsSync(file)) { console.error(`listing: ${file} not found, skipped`); return null; } const ext = file.slice(file.lastIndexOf(".")).toLowerCase(); await kv.put(`${store}/${name}${ext}`, new Uint8Array(readFileSync(file)), MIME[ext] ?? "application/octet-stream"); return `${name}${ext}`; };
+    const icon = L.icon ? await up(L.icon, "icon") : null;
+    const shots: string[] = []; for (const [i, f] of (L.screenshots ?? []).entries()) { const n = await up(f, `shot-${i + 1}`); if (n) shots.push(n); }
+    let note: { headline?: string; note?: string } = {};
+    try { const src = readFileSync("src/release.ts", "utf8"); note = { headline: src.match(/headline:\s*"([^"]*)"/)?.[1], note: src.match(/note:\s*"([^"]*)"/)?.[1] }; } catch {}
+    await kv.put(`${store}/manifest.json`, JSON.stringify({ icon, screenshots: shots, tagline: L.tagline ?? "", website: L.website ?? "", capabilities: L.capabilities ?? [], release, release_note: note, updated_at: new Date().toISOString() }), "application/json");
   }
 
   const issued_at = new Date().toISOString();

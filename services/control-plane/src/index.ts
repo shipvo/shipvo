@@ -54,6 +54,14 @@ app.get("/w/:app/releases.json", async (c) => {
   const raw = await c.env.POINTERS.get(`w/${appId}/releases`);
   return raw ? new Response(raw, { headers: { "content-type": "application/json", "cache-control": "public, max-age=5", "access-control-allow-origin": "*" } }) : c.json({ error: "not_found" }, 404);
 });
+app.get("/w/:app/store/:file", async (c) => {
+  const { app: appId, file } = c.req.param();
+  if (!ID.test(appId) || !/^[a-z0-9._-]{1,64}$/i.test(file)) return c.json({ error: "bad_request" }, 400);
+  const v = await c.env.POINTERS.get(`w/${appId}/store/${file}`, "arrayBuffer");
+  if (!v) return c.json({ error: "not_found" }, 404);
+  const type = file.endsWith(".png") ? "image/png" : /\.jpe?g$/.test(file) ? "image/jpeg" : file.endsWith(".webp") ? "image/webp" : file.endsWith(".svg") ? "image/svg+xml" : "application/json";
+  return new Response(v, { headers: { "content-type": type, "cache-control": "public, max-age=300", "access-control-allow-origin": "*" } });
+});
 app.get("/w/:app/:rel/*", async (c) => {
   const { app: appId, rel } = c.req.param();
   if (!ID.test(appId) || !/^r\d{1,6}$/.test(rel)) return c.json({ error: "bad_request" }, 400);

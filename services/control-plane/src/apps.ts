@@ -57,7 +57,8 @@ apps.post("/", async (c) => {
   const dev = await developer(c); if (!dev) return c.json({ error: "unauthorized", hint: "Run shipvo login first." }, 401);
   let b: any; try { b = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
   const id = String(b?.app_id ?? ""), name = String(b?.name ?? id).slice(0, 80), pub = String(b?.public_key ?? "");
-  const description = String(b?.description ?? "").slice(0, 280), category = CATEGORIES.includes(String(b?.category)) ? String(b.category) : "other", listed = b?.listed ? 1 : 0;
+  const tagline = String(b?.tagline ?? "").slice(0, 80), website = /^https?:\/\//.test(String(b?.website ?? "")) ? String(b.website).slice(0, 200) : "";
+  const description = String(b?.description ?? "").slice(0, 1200), category = CATEGORIES.includes(String(b?.category)) ? String(b.category) : "other", listed = b?.listed ? 1 : 0;
   if (!ID.test(id)) return c.json({ error: "bad_app_id", message: "App ids are 2-40 characters: lowercase letters, digits and hyphens." }, 400);
   if (RESERVED.has(id)) return c.json({ error: "reserved_app_id", message: `"${id}" is reserved. Pick another id.` }, 409);
   try { if (unb64(pub).length !== 32) throw 0; } catch { return c.json({ error: "bad_public_key", message: "public_key must be the base64 Ed25519 public key (32 bytes) that shipvo init wrote to shipvo.json." }, 400); }
@@ -65,13 +66,13 @@ apps.post("/", async (c) => {
   if (existing) {
     if (existing.account_id !== dev.account_id) return c.json({ error: "app_id_taken", message: `"${id}" belongs to someone else. Pick another id.` }, 409);
     if (existing.public_key !== pub) return c.json({ error: "public_key_mismatch", message: "This app is registered with a different signing key. Installed shells pin the key, so it cannot change." }, 409);
-    await c.env.DB.prepare("UPDATE apps SET name = ?, description = ?, category = ?, listed = ?, approved = CASE WHEN ? = 0 THEN 0 ELSE approved END WHERE app_id = ?").bind(name, description, category, listed, listed, id).run();
+    await c.env.DB.prepare("UPDATE apps SET name = ?, description = ?, category = ?, listed = ?, tagline = ?, website = ?, approved = CASE WHEN ? = 0 THEN 0 ELSE approved END WHERE app_id = ?").bind(name, description, category, listed, tagline, website, listed, id).run();
   } else {
     if ((await c.env.POINTERS.list({ prefix: `p/${id}/`, limit: 1 })).keys.length || (await c.env.POINTERS.list({ prefix: `w/${id}/`, limit: 1 })).keys.length)
       return c.json({ error: "app_id_taken", message: `"${id}" is already in use. Pick another id.` }, 409);
     const n = (await c.env.DB.prepare("SELECT COUNT(*) AS n FROM apps WHERE account_id = ?").bind(dev.account_id).first<{ n: number }>())!.n;
     if (n >= MAX_APPS_PER_ACCOUNT) return c.json({ error: "app_limit", message: `The beta allows ${MAX_APPS_PER_ACCOUNT} apps per account.` }, 403);
-    await c.env.DB.prepare("INSERT INTO apps (app_id, account_id, name, public_key, description, category, listed) VALUES (?,?,?,?,?,?,?)").bind(id, dev.account_id, name, pub, description, category, listed).run();
+    await c.env.DB.prepare("INSERT INTO apps (app_id, account_id, name, public_key, description, category, listed, tagline, website) VALUES (?,?,?,?,?,?,?,?,?)").bind(id, dev.account_id, name, pub, description, category, listed, tagline, website).run();
   }
   const t = await mintToken(c, id, dev.account_id, dev.login);
   return c.json({ app_id: id, created: !existing, publish_token: t.key, expires_at: t.expires_at, control_plane: new URL(c.req.url).origin,
@@ -100,17 +101,43 @@ apps.delete("/:id", async (c) => {
   return c.json({ ok: true, app_id: id, files_deleted: deleted });
 });
 
+/** Store assets uploaded by `shipvo publish` (w/<id>/store/manifest.json + icon + screenshots). */
+async function storeOf(kv: KVNamespace, id: string, origin: string) {
+  try {
+    const m = JSON.parse((await kv.get(`w/${id}/store/manifest.json`)) ?? "null");
+    if (!m) return { icon_url: null, screenshots: [], capabilities: [], release_note: null };
+    const u = (n: string) => `${origin}/w/${id}/store/${n}`;
+    return { icon_url: m.icon ? u(m.icon) : null, screenshots: (m.screenshots ?? []).map(u), capabilities: m.capabilities ?? [], release_note: m.release_note ?? null, tagline_m: m.tagline ?? "", website_m: m.website ?? "" };
+  } catch { return { icon_url: null, screenshots: [], capabilities: [], release_note: null }; }
+}
+/** Called by the simulator service when an agent opens a public app: activity, not analytics. */
+apps.post("/opened/:id", async (c) => {
+  if (!c.env.OWNER_TOKEN || bearer(c) !== c.env.OWNER_TOKEN) return c.json({ error: "unauthorized" }, 401);
+  await c.env.DB.prepare("UPDATE apps SET opens = opens + 1, last_opened_at = ? WHERE app_id = ?").bind(now(), c.req.param("id")).run();
+  return c.json({ ok: true });
+});
+
 /** The public directory: listed and approved apps with a published release. No auth. */
 apps.get("/public", async (c) => {
   const q = (c.req.query("q") ?? "").toLowerCase().slice(0, 80), cat = c.req.query("category") ?? "";
-  const { results } = await c.env.DB.prepare("SELECT a.app_id, a.name, a.description, a.category, a.latest_release, a.published_at, a.opens, acc.github_login AS owner FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.listed = 1 AND a.approved = 1 AND a.latest_release IS NOT NULL ORDER BY a.opens DESC, a.published_at DESC LIMIT 200").all();
-  const rows = (results as any[]).filter((r) => (!cat || r.category === cat) && (!q || `${r.app_id} ${r.name} ${r.description} ${r.category}`.toLowerCase().includes(q)));
-  return c.json({ apps: rows, categories: CATEGORIES }, 200, { "cache-control": "public, max-age=30", "access-control-allow-origin": "*" });
+  const { results } = await c.env.DB.prepare("SELECT a.app_id, a.name, a.tagline, a.description, a.category, a.website, a.latest_release, a.published_at, a.opens, a.last_opened_at, a.created_at, acc.github_login AS owner FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.listed = 1 AND a.approved = 1 AND a.latest_release IS NOT NULL ORDER BY a.opens DESC, a.published_at DESC LIMIT 200").all();
+  const rows = (results as any[]).filter((r) => (!cat || r.category === cat) && (!q || `${r.app_id} ${r.name} ${r.tagline} ${r.description} ${r.category}`.toLowerCase().includes(q)));
+  const origin = new URL(c.req.url).origin;
+  const apps = await Promise.all(rows.map(async (r) => ({ ...r, ...(await storeOf(c.env.POINTERS, r.app_id, origin)) })));
+  return c.json({ apps, categories: CATEGORIES }, 200, { "cache-control": "public, max-age=30", "access-control-allow-origin": "*" });
 });
 /** One public app. */
 apps.get("/public/:id", async (c) => {
-  const row = await c.env.DB.prepare("SELECT a.app_id, a.name, a.description, a.category, a.latest_release, a.published_at, a.opens, acc.github_login AS owner FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ? AND a.listed = 1 AND a.approved = 1").bind(c.req.param("id")).first();
-  return row ? c.json(row, 200, { "access-control-allow-origin": "*" }) : c.json({ error: "not_found" }, 404);
+  const row: any = await c.env.DB.prepare("SELECT a.app_id, a.name, a.tagline, a.description, a.category, a.website, a.latest_release, a.published_at, a.opens, a.last_opened_at, a.created_at, acc.github_login AS owner FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ? AND a.listed = 1 AND a.approved = 1").bind(c.req.param("id")).first();
+  if (!row) return c.json({ error: "not_found" }, 404);
+  const origin = new URL(c.req.url).origin;
+  const store = await storeOf(c.env.POINTERS, row.app_id, origin);
+  let releases: number[] = []; try { releases = JSON.parse((await c.env.POINTERS.get(`w/${row.app_id}/releases`)) ?? "{}").releases ?? []; } catch {}
+  const history: { release: number; issued_at: string; size: number; min_shell_version?: string }[] = [];
+  for (const r of releases.slice(-5).reverse()) { try { const h = JSON.parse((await c.env.POINTERS.get(`h/${row.app_id}/r${r}`)) ?? ""); history.push({ release: h.release, issued_at: h.issued_at, size: h.size, min_shell_version: h.min_shell_version }); } catch {} }
+  const { results: similar } = await c.env.DB.prepare("SELECT a.app_id, a.name, a.tagline, a.category, a.opens FROM apps a WHERE a.listed = 1 AND a.approved = 1 AND a.latest_release IS NOT NULL AND a.app_id != ? ORDER BY (a.category = ?) DESC, a.opens DESC LIMIT 4").bind(row.app_id, row.category).all();
+  const sim = await Promise.all((similar as any[]).map(async (s) => ({ ...s, ...(await storeOf(c.env.POINTERS, s.app_id, origin)) })));
+  return c.json({ ...row, ...store, releases: releases.length, history, similar: sim }, 200, { "access-control-allow-origin": "*", "cache-control": "public, max-age=30" });
 });
 /** Review queue and approval: owner token only. */
 apps.get("/review", async (c) => {

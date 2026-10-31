@@ -22,7 +22,7 @@ export async function appCmd(argv: string[]) {
   }
   if (sub !== "create") { console.error("Usage: shipvo app create | list | delete <id> --yes"); process.exit(2); }
   const cfg = loadConfig();
-  const r = await fetch(`${c.control}/apps`, { method: "POST", headers: { authorization: `Bearer ${c.key}`, "content-type": "application/json" }, body: JSON.stringify({ app_id: cfg.appId, name: cfg.name, public_key: cfg.publicKey, description: cfg.listing?.description ?? "", category: cfg.listing?.category ?? "other", listed: !!cfg.listing?.public }) });
+  const r = await fetch(`${c.control}/apps`, { method: "POST", headers: { authorization: `Bearer ${c.key}`, "content-type": "application/json" }, body: JSON.stringify({ app_id: cfg.appId, name: cfg.name, public_key: cfg.publicKey, description: cfg.listing?.description ?? "", category: cfg.listing?.category ?? "other", listed: !!cfg.listing?.public, tagline: cfg.listing?.tagline ?? "", website: cfg.listing?.website ?? "" }) });
   const d: any = await r.json();
   if (!r.ok) { console.error(`Could not register "${cfg.appId}": ${d.message ?? d.hint ?? d.error}`); process.exit(1); }
   mkdirSync(join(process.cwd(), ".shipvo"), { recursive: true });

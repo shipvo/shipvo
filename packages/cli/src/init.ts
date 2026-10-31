@@ -31,7 +31,7 @@ export async function init(argv: string[]) {
   }
   const w = (p: string, body: string) => { mkdirSync(join(dir, p, ".."), { recursive: true }); writeFileSync(join(dir, p), body); };
 
-  w("shipvo.json", JSON.stringify({ appId, name, shellMajor: 1, controlPlane, publicKey, listing: { public: false, description: "", category: "other" } }, null, 2) + "\n");
+  w("shipvo.json", JSON.stringify({ appId, name, shellMajor: 1, controlPlane, publicKey, listing: { public: false, tagline: "", description: "", category: "other", icon: "assets/icon.png", screenshots: [], website: "", capabilities: ["camera", "location", "biometrics", "payments", "notifications"] } }, null, 2) + "\n");
   w("package.json", JSON.stringify({
     name: appId, version: "1.0.0", main: "index.ts", private: true,
     scripts: { start: "expo start", android: "expo run:android", ios: "expo run:ios", web: "expo start --web", sim: "shipvo sim", publish: "shipvo publish", rollback: "shipvo rollback", typecheck: "tsc --noEmit" },

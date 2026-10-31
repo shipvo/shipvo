@@ -4,5 +4,24 @@
   "shellMajor": 1,
   "controlPlane": "https://purenative-control.purenative.workers.dev",
   "publicKey": "oERUkFs2xdjaEm9xAPZDULoDLV9gjksjyDvSJ9lSYZE=",
-  "kv": { "namespaceId": "c0851feca4c5486d8ed844d16f0b36df" }
+  "kv": {
+    "namespaceId": "c0851feca4c5486d8ed844d16f0b36df"
+  },
+  "listing": {
+    "public": true,
+    "tagline": "Fishing supplies in Douala, delivered or picked up, paid by cash or mobile money.",
+    "description": "Tide & Tackle is the Shipvo sample shop: a catalogue of lures, rods and line, a cart with promo codes, delivery slots or shop pickup, barcode scanning, distance from the shop by location, and payment by cash on delivery or mobile money confirmed with a fingerprint and PIN. Every release ships to real Android phones over the air and to this simulator; the three purchase flows are measured against real devices nightly.",
+    "category": "shop",
+    "icon": "assets/icon.png",
+    "screenshots": [],
+    "website": "https://shipvo.dev",
+    "capabilities": [
+      "camera",
+      "location",
+      "biometrics",
+      "payments",
+      "notifications",
+      "share"
+    ]
+  }
 }

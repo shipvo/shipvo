@@ -88,6 +88,8 @@ export default {
     // A signed-in developer's key opens the beta app plus the apps they registered.
     const owned = row.account_id ? ((await env.DB.prepare("SELECT app_id FROM apps WHERE account_id = ?").bind(row.account_id).all()).results as { app_id: string }[]).map((r) => r.app_id) : [];
     const pub = row.account_id ? ((await env.DB.prepare("SELECT app_id FROM apps WHERE listed = 1 AND approved = 1 AND latest_release IS NOT NULL").all()).results as { app_id: string }[]).map((r) => r.app_id) : [];
+    // Activity for the store: an open_app of a public app counts as one agent session (fire and forget).
+    if (req.method === "POST" && pub.length) { try { const txt = await req.clone().text(); const m = txt.match(/"name"\s*:\s*"open_app"[\s\S]{0,400}?"app"\s*:\s*"([a-z0-9-]+)/); if (m && pub.includes(m[1]) && env.OWNER_TOKEN) fetch(`${env.CONTROL}/apps/opened/${m[1]}`, { method: "POST", headers: { authorization: `Bearer ${env.OWNER_TOKEN}` } }).catch(() => {}); } catch {} }
     const headers = new Headers(req.headers);
     headers.set("x-shipvo-app", [...new Set([row.app_id, ...owned, ...pub])].join(","));
     headers.set("x-shipvo-public", pub.join(",")); headers.set("x-shipvo-scope", row.scope); headers.delete("authorization"); headers.delete("host");
