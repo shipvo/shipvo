@@ -58,6 +58,8 @@ Guides: [Build your first app](docs/getting-started.md) · [Device API](docs/dev
 
 ## Use an app as an AI agent (no phone)
 
+[![Shipvo MCP server](https://mcprush.com/badge/shipvo-mcp/card.svg)](https://mcprush.com/to/shipvo-mcp?ref=badge)
+
 Add the MCP server to Claude, Claude Code, Cursor or PiPilot:
 
 ```json
