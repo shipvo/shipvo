@@ -146,8 +146,10 @@ final class RuntimeTests: XCTestCase {
 
   func testResumesDownloadFromPartialFile() async throws {
     let s = store("good")
-    let partial = s.partialPath(for: bundleSha)
-    try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!).write(to: partial)
+    let partial = s.resumePath(for: bundleSha)
+    let bundleData = try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!)
+    // Write only half the bundle as a partial
+    try bundleData.prefix(bundleData.count / 2).write(to: partial)
     let r = try await Updater.check(s)
     XCTAssertEqual(r["status"] as? String, "staged")
     XCTAssertEqual(r["via"] as? String, "full")
@@ -157,8 +159,10 @@ final class RuntimeTests: XCTestCase {
 
   func testRestartsDownloadWhenServerReturns200ForRangeRequest() async throws {
     let s = store("good")
-    let partial = s.partialPath(for: bundleSha)
-    try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!).write(to: partial)
+    let partial = s.resumePath(for: bundleSha)
+    let bundleData = try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!)
+    // Write only half the bundle as a partial
+    try bundleData.prefix(bundleData.count / 2).write(to: partial)
     let r = try await Updater.check(s)
     XCTAssertEqual(r["status"] as? String, "staged")
     XCTAssertEqual(r["via"] as? String, "full")
@@ -168,7 +172,8 @@ final class RuntimeTests: XCTestCase {
 
   func testDeletesCorruptedPartialFileAndSucceeds() async throws {
     let s = store("good")
-    let partial = s.partialPath(for: bundleSha)
+    let partial = s.resumePath(for: bundleSha)
+    // Write corrupted data (not a valid partial)
     try Data([0xDE, 0xAD]).write(to: partial)
     let r = try await Updater.check(s)
     XCTAssertEqual(r["status"] as? String, "staged")
@@ -199,15 +204,3 @@ private extension Data {
   }
 }
 
-private extension FileManager {
-  func exists(atPath path: String) -> Bool { self.fileExists(atPath: path) }
-}
-
-private extension Data {
-  func append(to url: URL) throws {
-    if let data = try? Data(contentsOf: url) {
-      self = data + self
-    }
-    try write(to: url)
-  }
-}
