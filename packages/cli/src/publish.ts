@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFile
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
+import { checkBundle, parseDeclared } from "./hermes.js";
 import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
 
 const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".css": "text/css", ".ico": "image/x-icon", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ttf": "font/ttf", ".svg": "image/svg+xml" };
@@ -31,6 +32,7 @@ export async function publish(argv: string[]) {
   const a = parse(argv), cfg = loadConfig(), SEED = seed(), kv = kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor;
   const MIN_SHELL = a["min-shell"] || JSON.parse(readFileSync("app.json", "utf8")).expo.version; // a bundle needs the shell it was built against
+  const declaredHermes = parseDeclared(a["hermes-bytecode-version"] ?? cfg.hermesBytecodeVersion);
   const bands = (a.bands || "b0,b1,b2").split(",");
   const platforms = platformsOf(a);
   const release = Number(a.release || 0) || (await currentRelease(kv, APP, MAJOR)) + 1;
@@ -44,6 +46,7 @@ export async function publish(argv: string[]) {
     const file = readdirSync(jsDir).find((f) => f.endsWith(".hbc")) || readdirSync(jsDir).find((f) => f.endsWith(".js"));
     if (!file) throw new Error("no bundle in " + jsDir);
     const bytes = new Uint8Array(readFileSync(join(jsDir, file)));
+    const hermesVersion = checkBundle(file, bytes, declaredHermes); // fails before anything is uploaded
     const name = bundleName(release, pf), newSha = sha256Hex(bytes);
     await kv.put(`b/${APP}/${name}`, bytes, "application/octet-stream");
 
@@ -87,7 +90,7 @@ export async function publish(argv: string[]) {
     for (const band of bands) {
       const body = JSON.stringify({ schema_version: "1.0", app_id: APP, shell_major: MAJOR, band, ...(pf === "ios" ? { platform: "ios" } : {}), release, issued_at,
         core: { version: `1.0.${release}`, sha256: newSha, size: bytes.length, url: `b/${APP}/${name}`, patches },
-        addons: [], screens: [], min_shell_version: MIN_SHELL, ...(web ? { web } : {}) });
+        addons: [], screens: [], min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(web ? { web } : {}) });
       await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
     await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, web }), "application/json");
