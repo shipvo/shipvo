@@ -6,8 +6,11 @@ import { createServer } from "node:http";
 import { appendFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import { join, normalize } from "node:path";
 
-const [root, port, logFile] = [process.argv[2], Number(process.argv[3] || 8100), process.argv[4] || "server.log"];
-const log = (o) => appendFileSync(logFile, JSON.stringify(o) + "\n");
+const [root, port, logFile, jsonLogFile = "server.jsonl"] = [process.argv[2], Number(process.argv[3] || 8100), process.argv[4] || "server.log", process.argv[5]];
+const log = (o) => {
+  appendFileSync(logFile, JSON.stringify(o) + "\n");
+  appendFileSync(jsonLogFile, JSON.stringify(o) + "\n");
+};
 createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   if (req.method === "POST") {
