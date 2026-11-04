@@ -23,3 +23,15 @@ test("cues use the caption text and start after the lead", () => {
   assert.ok(p.cues.at(-1).end <= p.total);
 });
 test("vtt is well formed", () => assert.match(vtt(buildPlan(script, man)), /^WEBVTT\n\n1\n00:00:00\.500 --> /));
+
+test("doc video src points at a key the site media handler accepts", async () => {
+  const { readFileSync } = await import("node:fs");
+  for (const f of ["docs/getting-started.md", "docs/videos.md"]) {
+    const md = readFileSync(new URL(`../../${f}`, import.meta.url), "utf8");
+    const src = md.match(/<video[^>]*\ssrc="([^"]+)"/)?.[1];
+    assert.match(src, /^\/media\/videos\/[a-z0-9-]+-[0-9a-f]{8}\.mp4$/, f);
+    const key = src.slice("/media/".length);
+    assert.match(key, /^[a-z0-9][a-z0-9/_.-]*$/);
+    assert.ok(!key.includes(".."));
+  }
+});

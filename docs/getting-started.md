@@ -2,7 +2,7 @@
 
 Also in: [Français](fr/getting-started.md)
 
-<video controls preload="metadata" poster="/videos/ship-an-update.jpg" src="/videos/ship-an-update.mp4"><track kind="captions" src="/videos/ship-an-update.vtt" srclang="en" label="English" default></video>
+<video controls preload="metadata" poster="/videos/ship-an-update.jpg" src="/media/videos/ship-an-update-dacbf9ea.mp4"><track kind="captions" src="/videos/ship-an-update.vtt" srclang="en" label="English" default></video>
 
 Video: [Ship an update to phones in minutes](videos.md), 1 min 30 s, with captions and a transcript.
 
