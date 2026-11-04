@@ -51,16 +51,16 @@ export async function publish(argv: string[]) {
     const name = bundleName(release, pf), newSha = sha256Hex(bytes);
     await kv.put(`b/${APP}/${name}`, bytes, "application/octet-stream");
 
-    // Patches (Android): from recent releases and each shell's embedded bundle; devices verify the patched result against the signed sha256.
-    // iOS ships full bundles for now: the iOS runtime does not apply patches yet.
+    // Patches: from recent releases (and, on Android, each shell's embedded bundle); devices verify the patched result against the signed sha256.
+    // iOS patches only from earlier iOS releases: the iOS runtime has no embedded-bundle baseline yet.
     const patches: { from_sha256: string; url: string; size: number; sha256: string }[] = [];
-    if (pf === "android") {
+    {
       const MAX_BASES = Number(a["max-bases"] || 6);
       const bases = new Map<string, string>();
-      const hist = (await Promise.all((await kv.keys(`h/${APP}/r`)).map(async (k: string) => { try { return JSON.parse((await kv.get(k))!); } catch { return null; } })))
+      const hist = (await Promise.all((await kv.keys(pf === "ios" ? `h/${APP}/ios-r` : `h/${APP}/r`)).map(async (k: string) => { try { return JSON.parse((await kv.get(k))!); } catch { return null; } })))
         .filter((h) => h && h.release < release).sort((x, y) => y.release - x.release).slice(0, MAX_BASES - 2);
-      for (const h of hist) bases.set(h.sha256, `b/${APP}/r${h.release}.hbc`);
-      for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); bases.set(b.sha256, b.key); } catch {} }
+      for (const h of hist) bases.set(h.sha256, `b/${APP}/${bundleName(h.release, pf)}`);
+      if (pf === "android") for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); bases.set(b.sha256, b.key); } catch {} }
       let bsdiff = true; try { execSync("python3 -c 'import bsdiff4'", { stdio: "ignore" }); } catch { bsdiff = false; console.error("bsdiff4 not installed (pip install bsdiff4): publishing full bundles only"); }
       if (bsdiff) {
         const work = mkdtempSync(join(tmpdir(), "shipvo-")); writeFileSync(join(work, "new.hbc"), bytes);
@@ -71,7 +71,7 @@ export async function publish(argv: string[]) {
           execSync(`python3 -c "import bsdiff4; bsdiff4.file_diff('${join(work, "old.hbc")}', '${join(work, "new.hbc")}', '${join(work, "p.bsdiff")}')"`);
           const patch = new Uint8Array(readFileSync(join(work, "p.bsdiff")));
           if (patch.length >= bytes.length * 0.6) continue;
-          const pkey = `b/${APP}/d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
+          const pkey = `b/${APP}/${pf === "ios" ? "ios-" : ""}d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
           await kv.put(pkey, patch, "application/octet-stream");
           patches.push({ from_sha256: fromSha, url: pkey, size: patch.length, sha256: sha256Hex(patch) });
         }
@@ -95,7 +95,7 @@ export async function publish(argv: string[]) {
       await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
     await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), web }), "application/json");
-    summary[pf] = { bytes: bytes.length, ...(pf === "android" ? { patches: patches.map((p) => ({ from: p.from_sha256.slice(0, 12), kb: +(p.size / 1024).toFixed(1) })) } : {}) };
+    summary[pf] = { bytes: bytes.length, patches: patches.map((p) => ({ from: p.from_sha256.slice(0, 12), kb: +(p.size / 1024).toFixed(1) })) };
     if (web) summary.web = web;
   }
   if (platforms.length === 1 && platforms[0] === "android") { // original single-platform output shape

@@ -4,6 +4,8 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **bsdiff patches on iOS.** The iOS runtime now applies BSDIFF40 patches listed in the signed pointer when the patch starts from the bundle the device is running. It checks the patch hash, then the rebuilt bundle's signed hash and size, and falls back to the full bundle on any problem. `shipvo publish --platform ios` now publishes patches from earlier iOS releases (stored as `b/<app>/ios-d-*.bsdiff`). Migration: nothing is required. Pointers without `patches` still work. There is no patch from the app's embedded bundle on iOS yet, so the first update after install is a full download.
+
 - **Publish records the Hermes bytecode version.** `shipvo publish` reads the version from the `.hbc` header and adds an optional `hermes_bytecode_version` to the signed release. Set `hermesBytecodeVersion` (a number or list) in `shipvo.json`, or pass `--hermes-bytecode-version`, to make publish fail when the bundle is plain JavaScript or built with a different Hermes. Migration: nothing is required. Releases without the field still parse and apply as before. Shells do not check the field yet; that is a follow-up.
 
 ## 2026-10-31
