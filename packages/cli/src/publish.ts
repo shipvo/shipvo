@@ -60,7 +60,26 @@ function localKv(dir: string) {
 
 const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-bytecode-version", "max-bases", "skip-export", "skip-web", "dry-run", "out"];
 
+export const PUBLISH_HELP = `Usage: shipvo publish [flags]
+
+Build, sign and publish an over-the-air release.
+
+Flags (write a value after a space, not =):
+  --bands b0,b1,b2             Cohorts to publish to (default b0,b1,b2)
+  --platform android|ios|all   Platform to publish (default android)
+  --release N                  Release number (default: the next one)
+  --min-shell X.Y.Z            Oldest app shell that can run this release (default: version in app.json)
+  --hermes-bytecode-version V  Refuse bundles built for another Hermes version, for example 96 or 96,98
+  --max-bases N                How many older releases to build patches from (default 6)
+  --skip-export true           Reuse the last build in dist-ota/
+  --skip-web true              Do not publish the web copy for the simulator
+  --dry-run                    Build and sign, write files locally, send nothing
+  --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)
+  --help                       Show this help
+`;
+
 export async function publish(argv: string[]) {
+  if (argv.includes("--help") || argv.includes("-h")) { console.log(PUBLISH_HELP); return; }
   checkFlags(argv, PUBLISH_FLAGS);
   const a = parse(argv), cfg = loadConfig(), SEED = seed();
   const dry = a["dry-run"] !== undefined; // a plain switch: any use turns it on
@@ -78,6 +97,8 @@ export async function publish(argv: string[]) {
   const summary: Record<string, unknown> = { app: APP, release, bands, min_shell_version: MIN_SHELL, ...(dry ? { dry_run: true, out: outDir } : {}) };
   if (dry) console.error(`dry run: nothing is sent anywhere; files go to ${outDir}. No patches are built offline. Release is ${release}${a.release ? "" : " (pass --release N to match the control plane)"}.`);
 
+  let totalBytes = 0;
+  const patchInfo = { bases: 0, bsdiff: false, patches: 0 };
   for (const pf of platforms) {
     // Android published alone keeps the original dist-ota/ layout, so existing CI keeps working.
     const root = platforms.length === 1 && pf === "android" ? "dist-ota" : `dist-ota/${pf}`;
@@ -100,7 +121,9 @@ export async function publish(argv: string[]) {
         .filter((h) => h && h.release < release).sort((x, y) => y.release - x.release).slice(0, MAX_BASES - 2);
       for (const h of hist) bases.set(h.sha256, `b/${APP}/${bundleName(h.release, pf)}`);
       if (pf === "android") for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); bases.set(b.sha256, b.key); } catch {} }
-      let bsdiff = true; try { execSync("python3 -c 'import bsdiff4'", { stdio: "ignore" }); } catch { bsdiff = false; console.error("bsdiff4 not installed (pip install bsdiff4): publishing full bundles only"); }
+      // Only look for bsdiff4 when there is an older bundle to patch from; a first release needs no patches.
+      let bsdiff = false;
+      if (bases.size > 0) { try { execSync("python3 -c 'import bsdiff4'", { stdio: "ignore" }); bsdiff = true; } catch { console.error("Small patches are off because the Python tool bsdiff4 is not installed (pip install bsdiff4). Full bundles are published instead. Updates still work, they are just bigger."); } }
       if (bsdiff) {
         const work = mkdtempSync(join(tmpdir(), "shipvo-")); writeFileSync(join(work, "new.hbc"), bytes);
         for (const [fromSha, key] of bases) {
@@ -115,6 +138,7 @@ export async function publish(argv: string[]) {
           patches.push({ from_sha256: fromSha, url: pkey, size: patch.length, sha256: sha256Hex(patch) });
         }
       }
+      patchInfo.bases = bases.size; patchInfo.bsdiff = bsdiff; patchInfo.patches = patches.length;
       console.error(`patches: ${patches.map((p) => `${p.from_sha256.slice(0, 8)}=${(p.size / 1024).toFixed(1)}KB`).join(", ") || "none"}`);
     }
 
@@ -134,13 +158,35 @@ export async function publish(argv: string[]) {
       await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
     await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), web }), "application/json");
+    totalBytes += bytes.length;
     summary[pf] = { bytes: bytes.length, patches: patches.map((p) => ({ from: p.from_sha256.slice(0, 12), kb: +(p.size / 1024).toFixed(1) })) };
     if (web) summary.web = web;
   }
   if (platforms.length === 1 && platforms[0] === "android") { // original single-platform output shape
     const an = summary.android as { bytes: number; patches: unknown }; Object.assign(summary, { bytes: an.bytes, patches: an.patches }); delete summary.android;
   }
-  console.log(JSON.stringify(summary));
+  if (dry) console.log(dryRunSummary(release, totalBytes, outDir, patchInfo));
+  else console.log(JSON.stringify(summary));
+}
+
+/** Bytes in plain units: KB below 1 MB, so a small bundle never reads as 0.00 MB. */
+export function formatSize(bytes: number) {
+  return bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(2)} MB`;
+}
+
+/** The dry-run result in plain words. `info` says what happened with patches on Android. */
+export function dryRunSummary(release: number, bytes: number, outDir: string, info: { bases: number; bsdiff: boolean; patches: number } = { bases: 0, bsdiff: false, patches: 0 }) {
+  const lines = [
+    `Dry run complete. Nothing was sent.`,
+    `  Release:  ${release}`,
+    `  Size:     ${formatSize(bytes)}`,
+    `  Files:    ${outDir}`,
+  ];
+  if (info.bases === 0 && release > 1) lines.push(`Patches are not built in a dry run, because older releases are not read. Publish for real to build them.`);
+  else if (info.bases === 0) lines.push(`Full bundles are fine for a first release. Small patches matter once you have older releases to compare against.`);
+  else if (!info.bsdiff) lines.push(`Patches were skipped because bsdiff4 is not installed (pip install bsdiff4). Full bundles still work.`);
+  else lines.push(`Patches built: ${info.patches}.`);
+  return lines.join("\n");
 }
 
 async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number) {
