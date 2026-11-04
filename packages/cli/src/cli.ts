@@ -10,6 +10,7 @@ import { keys, login, mcp } from "./login.js";
 import { verifyPointer } from "./verify.js";
 import { signingKey } from "./signing.js";
 import { appCmd } from "./app.js";
+import { doctor } from "./doctor.js";
 import { help, unknownCommand } from "./help.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -19,6 +20,7 @@ switch (cmd) {
   case "publish": await publish(rest); break;
   case "rollback": await rollback(rest); break;
   case "login": await login(rest); break;
+  case "doctor": await doctor(rest); break;
   case "app": await appCmd(rest); break;
   case "keys": if (rest[0] === "export" || rest[0] === "import") await signingKey(rest); else await keys(); break;
   case "mcp": mcp(); break;
