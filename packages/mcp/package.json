@@ -10,7 +10,8 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "test": "vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
@@ -18,7 +19,8 @@
   },
   "devDependencies": {
     "typescript": "^5.6.3",
-    "@types/node": "^22.8.0"
+    "@types/node": "^22.8.0",
+    "vitest": "^2.1.4"
   },
   "keywords": [
     "mcp",
