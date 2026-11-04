@@ -23,6 +23,18 @@ describe("control plane", () => {
     expect((await app.request("/p/tide/1/b0.json", {}, env)).headers.get("etag")).toBe('"3"');
     expect((await app.request("/p/tide/1/ios/b0.json", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(404);
   });
+  it("filters releases by the shell's Hermes bytecode versions", async () => {
+    const withV = JSON.stringify({ body: JSON.stringify({ ...body, hermes_bytecode_version: 96 }), signature: "AAAA" });
+    const env = { POINTERS: kv({ "p/tide/1/b0": withV }) } as any;
+    const mismatch = await app.request("/p/tide/1/b0.json?hbc=98", {}, env);
+    expect(mismatch.status).toBe(404); expect((await mismatch.json() as any).error).toBe("hermes_bytecode_mismatch");
+    expect((await app.request("/p/tide/1/b0.json?hbc=96", {}, env)).status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json?hbc=94,96", {}, env)).status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json", {}, env)).status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json?hbc=x", {}, env)).status).toBe(400);
+    // release without the field is offered to any shell
+    expect((await app.request("/p/tide/1/b0.json?hbc=98", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(200);
+  });
   it("404, 400 and corrupt", async () => {
     expect((await app.request("/p/tide/1/b0.json", {}, { POINTERS: kv({}) } as any)).status).toBe(404);
     expect((await app.request("/p/tide/1/zz.json", {}, { POINTERS: kv({}) } as any)).status).toBe(400);

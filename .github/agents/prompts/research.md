@@ -11,7 +11,7 @@ Then research the web (WebSearch and WebFetch) and other projects' code (DeepWik
 
 For each finding that should change what Shipvo builds:
 1. Search the open and closed issues so you do not duplicate (`gh issue list --search "<words>" --state all`).
-2. File one issue with `gh issue create`: title, then sections **Evidence** (links to the sources you read, with the date and one-line summary each), **Prior art** (which repos you studied with DeepWiki and what they do), **Problem**, **What to do**, **Acceptance criteria**, **Files likely involved**. Labels: `agent:ready`, `research`, a type label, and one engineer label (`agent:claude` for design or cross-package work, `agent:copilot` for contained work, `agent:aider` for small named-file edits).
+2. File one issue with `gh issue create`: title, then sections **Evidence** (links to the sources you read, with the date and one-line summary each), **Prior art** (which repos you studied with DeepWiki and what they do), **Problem**, **What to do**, **Acceptance criteria**, **Files likely involved**. Labels: `agent:ready`, `research`, a type label, and one engineer label (`agent:claude` for design or cross-package work, `agent:mistral` for contained work, `agent:aider` for small named-file edits).
 3. File at most {{MAX_NEW}} issues per run. Quality over volume: every issue must be specific enough to build without asking.
 
 Rules:

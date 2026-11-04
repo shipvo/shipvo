@@ -6,7 +6,20 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 - **bsdiff patches on iOS.** The iOS runtime now applies BSDIFF40 patches listed in the signed pointer when the patch starts from the bundle the device is running. It checks the patch hash, then the rebuilt bundle's signed hash and size, and falls back to the full bundle on any problem. `shipvo publish --platform ios` now publishes patches from earlier iOS releases (stored as `b/<app>/ios-d-*.bsdiff`). Migration: nothing is required. Pointers without `patches` still work. There is no patch from the app's embedded bundle on iOS yet, so the first update after install is a full download.
 
+- **`shipvo verify <pointer> [public-key]`.** Checks the signature of a release pointer (`{body, signature}`, such as the files `publish --dry-run` writes) and prints `valid` or `INVALID`. The key defaults to the one from your signing seed. `verify-json` is unchanged and still checks `signDoc` documents only. Migration: none needed.
+- **`shipvo publish --dry-run`.** Builds the bundle, makes patches (none offline), signs the pointers and writes everything to a local directory (`--out <dir>`, default `.shipvo/dry-run`). It needs only the signing seed: no login, token or Cloudflare variables, and nothing is sent anywhere. Release is 1 unless you pass `--release N`. `shipvo rollback` has no dry run yet. `shipvo publish` and `shipvo rollback` now fail on unknown flags instead of ignoring them. Migration: a script that passed a misspelled or unsupported flag will now fail; remove the flag.
+- **Shells declare their Hermes bytecode versions.** `ShellManifest` has an optional `hermes_bytecode_versions` (a non-empty list of positive integers). The control plane pointer route takes an optional `?hbc=96,98` query. If the release sets `hermes_bytecode_version` and it is not in the list, the route answers 404 `hermes_bytecode_mismatch` and the release is not offered. Releases or shells without the field behave as before. Migration: none needed. To opt in, add the field to your shell manifest; the runtime does not send `?hbc=` yet (next slice).
 - **Publish records the Hermes bytecode version.** `shipvo publish` reads the version from the `.hbc` header and adds an optional `hermes_bytecode_version` to the signed release. Set `hermesBytecodeVersion` (a number or list) in `shipvo.json`, or pass `--hermes-bytecode-version`, to make publish fail when the bundle is plain JavaScript or built with a different Hermes. Migration: nothing is required. Releases without the field still parse and apply as before. Shells do not check the field yet; that is a follow-up.
+
+## 2026-11-04
+
+- **`shipvo sim` fails cleanly when the port is taken.** It checks the port before building. If it is in use, it prints `Port <n> is in use. Stop the other `shipvo sim` or pass --port <n>.`, exits 1 and leaves `sim-dist/` alone. `Simulator on ...` is printed only once the server accepts connections.
+- **Local MCP opens your own app.** The local `@shipvo/mcp` server now asks the simulator which app it serves, so `open_app("<your app>")` works after `shipvo sim`. `PN_APPS` still overrides it. If the simulator cannot be reached it falls back to the sample app. `shipvo mcp` prints the local config when you are not signed in.
+- **Clearer CLI help.** A mistyped command now says so and suggests the closest one (`shipvo: 'publsh' is not a command. Did you mean 'publish'?`), on stderr with exit 1. Help is grouped into Start, Ship and Advanced.
+- **Site:** the home page hero is rewritten in plain language with a first step for people who do not use a terminal, and light-mode small text now meets WCAG AA contrast.
+- **Docs:** French translation of Getting started.
+- **Device lab:** an Android emulator harness for OTA behaviour (`scripts/android-e2e/`) and its first report, `docs/product/device-lab/2026-11-04.md`.
+- The Hermes bytecode and `shipvo publish --dry-run` changes are listed under Unreleased above.
 
 ## 2026-10-31
 

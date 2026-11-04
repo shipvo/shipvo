@@ -1,7 +1,37 @@
 // shipvo.dev: static site + the marketplace. /apps/<id> is the same page as /apps with the id in the path;
 // the directory itself comes from the control plane (api.shipvo.dev/apps/public) and is proxied here so the
 // pages stay same-origin.
-type Env = { ASSETS: Fetcher; API: string };
+type Env = { ASSETS: Fetcher; API: string; MEDIA?: R2Bucket };
+
+// Videos and other large media live in R2 (bucket shipvo-media), never in git. Keys are content-addressed
+// (videos/<slug>-<sha8>.mp4), so they are immutable and cached for a year. Range requests let players seek.
+async function media(req: Request, env: Env, key: string): Promise<Response> {
+  if (!env.MEDIA || !/^[a-z0-9][a-z0-9/_.-]*$/.test(key) || key.includes("..")) return new Response("Not found", { status: 404 });
+  const head = await env.MEDIA.head(key);
+  if (!head) return new Response("Not found", { status: 404 });
+  const size = head.size;
+  const h = new Headers();
+  head.writeHttpMetadata(h);
+  h.set("etag", head.httpEtag);
+  h.set("accept-ranges", "bytes");
+  h.set("cache-control", "public, max-age=31536000, immutable");
+  if (!h.has("content-type")) h.set("content-type", key.endsWith(".mp4") ? "video/mp4" : "application/octet-stream");
+  const m = req.headers.get("range")?.match(/^bytes=(\d*)-(\d*)$/);
+  if (m && (m[1] || m[2])) {
+    let start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+    let end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+    if (start >= size || start > end) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
+    h.set("content-range", `bytes ${start}-${end}/${size}`);
+    h.set("content-length", String(end - start + 1));
+    if (req.method === "HEAD") return new Response(null, { status: 206, headers: h });
+    const part = await env.MEDIA.get(key, { range: { offset: start, length: end - start + 1 } });
+    return new Response(part?.body ?? null, { status: 206, headers: h });
+  }
+  h.set("content-length", String(size));
+  if (req.method === "HEAD") return new Response(null, { status: 200, headers: h });
+  const obj = await env.MEDIA.get(key);
+  return new Response(obj?.body ?? null, { status: 200, headers: h });
+}
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -24,6 +54,7 @@ export default {
       ];
       return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.join("\n")}\n</urlset>\n`, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
     }
+    if (url.pathname.startsWith("/media/")) return media(req, env, decodeURIComponent(url.pathname.slice("/media/".length)));
     if (url.pathname === "/.well-known/security.txt") return env.ASSETS.fetch(new Request(new URL("/security.txt", url).toString(), req));
     if (url.pathname === "/docs") return Response.redirect("https://shipvo.dev/docs/overview/", 301);
     const m = url.pathname.match(/^\/apps\/([a-z0-9-]+)\/?$/);

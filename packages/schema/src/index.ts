@@ -25,6 +25,8 @@ export const ShellManifest = z.object({
     physical_goods: z.enum(["none", "stub", "enabled"]),
   }),
   addon_api: z.number().int().positive(),
+  /** Hermes bytecode format version(s) this shell can run. Absent = unknown, so the control plane offers any release. */
+  hermes_bytecode_versions: z.array(z.number().int().positive()).min(1).optional(),
   control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }),
   public_key: b64,
   owner_root_public_key: b64,
