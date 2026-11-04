@@ -98,6 +98,7 @@ export async function publish(argv: string[]) {
   if (dry) console.error(`dry run: nothing is sent anywhere; files go to ${outDir}. No patches are built offline. Release is ${release}${a.release ? "" : " (pass --release N to match the control plane)"}.`);
 
   let totalBytes = 0;
+  const patchInfo = { bases: 0, bsdiff: false, patches: 0 };
   for (const pf of platforms) {
     // Android published alone keeps the original dist-ota/ layout, so existing CI keeps working.
     const root = platforms.length === 1 && pf === "android" ? "dist-ota" : `dist-ota/${pf}`;
@@ -137,6 +138,7 @@ export async function publish(argv: string[]) {
           patches.push({ from_sha256: fromSha, url: pkey, size: patch.length, sha256: sha256Hex(patch) });
         }
       }
+      patchInfo.bases = bases.size; patchInfo.bsdiff = bsdiff; patchInfo.patches = patches.length;
       console.error(`patches: ${patches.map((p) => `${p.from_sha256.slice(0, 8)}=${(p.size / 1024).toFixed(1)}KB`).join(", ") || "none"}`);
     }
 
@@ -163,20 +165,28 @@ export async function publish(argv: string[]) {
   if (platforms.length === 1 && platforms[0] === "android") { // original single-platform output shape
     const an = summary.android as { bytes: number; patches: unknown }; Object.assign(summary, { bytes: an.bytes, patches: an.patches }); delete summary.android;
   }
-  if (dry) {
-    console.log(dryRunSummary(release, totalBytes, outDir));
-  } else console.log(JSON.stringify(summary));
+  if (dry) console.log(dryRunSummary(release, totalBytes, outDir, patchInfo));
+  else console.log(JSON.stringify(summary));
 }
 
-/** The dry-run result in plain words. */
-export function dryRunSummary(release: number, bytes: number, outDir: string) {
-  return [
+/** Bytes in plain units: KB below 1 MB, so a small bundle never reads as 0.00 MB. */
+export function formatSize(bytes: number) {
+  return bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(2)} MB`;
+}
+
+/** The dry-run result in plain words. `info` says what happened with patches on Android. */
+export function dryRunSummary(release: number, bytes: number, outDir: string, info: { bases: number; bsdiff: boolean; patches: number } = { bases: 0, bsdiff: false, patches: 0 }) {
+  const lines = [
     `Dry run complete. Nothing was sent.`,
     `  Release:  ${release}`,
-    `  Size:     ${(bytes / 1048576).toFixed(2)} MB`,
+    `  Size:     ${formatSize(bytes)}`,
     `  Files:    ${outDir}`,
-    `Full bundles are fine for a first release. Small patches matter once you have older releases to compare against.`,
-  ].join("\n");
+  ];
+  if (info.bases === 0 && release > 1) lines.push(`Patches are not built in a dry run, because older releases are not read. Publish for real to build them.`);
+  else if (info.bases === 0) lines.push(`Full bundles are fine for a first release. Small patches matter once you have older releases to compare against.`);
+  else if (!info.bsdiff) lines.push(`Patches were skipped because bsdiff4 is not installed (pip install bsdiff4). Full bundles still work.`);
+  else lines.push(`Patches built: ${info.patches}.`);
+  return lines.join("\n");
 }
 
 async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number) {

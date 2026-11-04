@@ -20,7 +20,7 @@ vi.mock("../src/config.js", async (orig) => ({
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
 }));
-import { publish, rollback } from "../src/publish";
+import { publish, rollback, dryRunSummary } from "../src/publish";
 
 const fakeHbc = (version: number) => {
   const b = new Uint8Array(64);
@@ -82,7 +82,8 @@ describe("publish and the Hermes bytecode check", () => {
     const text = String((console.log as any).mock.calls[0][0]);
     expect(text).toContain("Nothing was sent");
     expect(text).toContain("Release:  1");
-    expect(text).toContain("0.00 MB");
+    expect(text).toMatch(/Size: +\d+\.\d KB/);
+    expect(text).not.toContain("0.00 MB");
     expect(text).toContain(".shipvo/dry-run");
     expect(text).toContain("Full bundles are fine for a first release");
     expect(text).not.toMatch(/^\{/);
@@ -178,5 +179,32 @@ describe("publish and the Hermes bytecode check", () => {
     const err = (console.error as any).mock.calls.join("\n");
     expect(err).toMatch(/pip install bsdiff4/);
     expect(err).toMatch(/Updates still work/);
+  });
+
+  it("dry run with --release 5 does not say first release", async () => {
+    withBundle(96);
+    await publish([...flags, "--dry-run", "--release", "5"]);
+    const text = String((console.log as any).mock.calls[0][0]);
+    expect(text).not.toContain("first release");
+    expect(text).toContain("Patches are not built in a dry run");
+  });
+
+  it("summary: bases exist but bsdiff4 is missing points to pip", () => {
+    const text = dryRunSummary(2, 5000, "out", { bases: 2, bsdiff: false, patches: 0 });
+    expect(text).not.toContain("first release");
+    expect(text).toContain("Patches were skipped");
+    expect(text).toContain("pip install bsdiff4");
+  });
+
+  it("summary: bases exist and patches were built shows the count", () => {
+    const text = dryRunSummary(2, 5000, "out", { bases: 2, bsdiff: true, patches: 2 });
+    expect(text).not.toContain("first release");
+    expect(text).not.toContain("pip");
+    expect(text).toContain("Patches built: 2");
+  });
+
+  it("summary: sizes switch to MB at 1 MB", () => {
+    expect(dryRunSummary(1, 2 * 1048576, "out")).toContain("2.00 MB");
+    expect(dryRunSummary(1, 64 * 1024, "out")).toContain("64.0 KB");
   });
 });
