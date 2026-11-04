@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { suggest } from "../src/help";
@@ -25,6 +26,16 @@ describe("cli", () => {
     expect(r.stderr).toContain("shipvo: 'publsh' is not a command. Did you mean 'publish'?");
     expect(r.stderr).toContain("Run 'shipvo --help' to see all commands.");
     expect(r.stdout).toBe("");
+  });
+
+  it("prints the local MCP config when not signed in", () => {
+    const home = mkdtempSync(join(tmpdir(), "shipvo-home-"));
+    try {
+      const r = spawnSync(process.execPath, [join(out, "cli.js"), "mcp"], { encoding: "utf8", env: { ...process.env, SHIPVO_HOME: home } });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain('"args": [\n        "-y",\n        "@shipvo/mcp"');
+      expect(r.stderr).not.toContain("Not signed in");
+    } finally { rmSync(home, { recursive: true, force: true }); }
   });
 
   it("does not suggest when nothing is close", () => {
