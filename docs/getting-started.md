@@ -2,6 +2,10 @@
 
 Also in: [Français](fr/getting-started.md)
 
+<video controls preload="metadata" playsinline poster="/videos/ship-an-update.jpg" src="/media/videos/ship-an-update-988335b3.mp4"><track kind="captions" src="/videos/ship-an-update.vtt" srclang="en" label="English" default>Your browser cannot play this video. See the video page for a transcript.</video>
+
+Video: [Ship an update to phones in minutes](videos.md), 1 min 30 s, with captions and a transcript.
+
 Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
 
 ## 0. What you need
@@ -111,6 +115,8 @@ Then edit `src/release.ts` and run `shipvo publish`. (In a GitHub repo, the work
 4. signs the release pointer (Ed25519) and writes it for each cohort band (`b0` 1 %, `b1` 10 %, `b2` everyone).
 
 To check a release before you have a control plane or token, run `shipvo publish --dry-run [--out dir]`. It builds, signs and writes everything to `dir` (default `.shipvo/dry-run`) and sends nothing. Layout: `b/<app>/r<N>.hbc` (bundle), `p/<app>/<major>/<band>` (signed pointers; iOS under `p/<app>/<major>/ios/`), `h/<app>/r<N>` (release record), `w/<app>/r<N>/` (web export; add `--skip-web true` to skip it and run faster). The release is 1 unless you pass `--release N`, and no patches are built offline. Old files in `dir` are not cleared. `rollback` has no dry run yet.
+
+If your first publish fails, run `shipvo doctor` first. It checks your Node version, `shipvo.json`, signing key match, control plane reachability, and `hermesBytecodeVersion` when present.
 
 Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
 

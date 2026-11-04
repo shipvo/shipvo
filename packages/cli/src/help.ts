@@ -1,6 +1,6 @@
 export const COMMANDS = [
-  "init", "sim", "publish", "rollback", "app", "login", "keys", "mcp",
-  "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json",
+  "init", "sim", "publish", "rollback", "app", "login", "doctor", "keys", "mcp",
+  "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
 export const help = `shipvo <command>
@@ -15,6 +15,7 @@ Ship
   rollback --to <release>     Republish an earlier release as a new release
   app create | list | delete  Register, list or remove apps on the hosted control plane
   login                       Sign in with GitHub and get a key for the hosted simulator
+  doctor                      Check setup before first publish
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine
@@ -26,6 +27,8 @@ Advanced
   hash <file>                 Print the SHA-256 and size of a file
   sign-file <file>            Print the Ed25519 signature (base64) of a file
   sign-json <file.json>       Sign a JSON document and write the signature into it
+  verify <pointer> [public-key-b64]
+                              Check a release pointer (such as one from publish --dry-run)
   verify-json <file.json> <public-key-b64>
                               Check the signature of a JSON document
 `;

@@ -255,8 +255,17 @@ jobs:
             fi
             exit 0
           fi
+          U="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           for a in 1 2 3 4; do
-            git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}" && break
+            git push "$U" "HEAD:refs/heads/${BRANCH}" && break
+            # The branch moved while we worked (merge bot updated it from main, or another fix landed): merge it in.
+            if [ "$MODE" = "pr-branch" ] && git fetch -q "$U" "refs/heads/${BRANCH}" 2>/dev/null; then
+              if ! git merge --no-edit FETCH_HEAD > /tmp/agent/merge-remote.txt 2>&1; then
+                git merge --abort || true
+                gh pr comment "$PR" -R "$REPO" --body "The branch changed while the fix was running and the two conflict, so this fix was not pushed. The next fix round will start from the new branch. Run: $RUN_URL" || true
+                exit 0
+              fi
+            fi
             [ $a = 4 ] && exit 1; echo "push failed, retrying in $(( a * 15 ))s"; sleep $(( a * 15 ))
           done
           echo "pushed=true" >> "$GITHUB_OUTPUT"
