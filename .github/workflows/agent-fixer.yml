@@ -1,6 +1,6 @@
 # Fix engineer: when CI fails on an agent PR, the reviewer asks for changes, or the branch conflicts,
-# Claude fixes its own PRs and Copilot is asked (with @copilot) to fix its PRs.
-# After AGENT_MAX_FIX_ROUNDS attempts the PR is closed and the issue goes to the other engineer.
+# Claude and Aider fix their own PRs and Copilot is asked (with @copilot) to fix its PRs.
+# After AGENT_MAX_FIX_ROUNDS attempts the PR is closed and the issue goes to the next engineer.
 # A red CI on main becomes an urgent issue for the Claude engineer.
 name: agent-fixer
 on:
@@ -18,6 +18,7 @@ jobs:
     outputs:
       pr: ${{ steps.r.outputs.pr }}
       branch: ${{ steps.r.outputs.branch }}
+      engine: ${{ steps.r.outputs.engine }}
       vars: ${{ steps.r.outputs.vars }}
     env:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
@@ -55,11 +56,12 @@ jobs:
               gh("pr", "close", str(n), "-R", R, "--delete-branch")
               for m in re.finditer(r"(?:fixes|closes|resolves)\s+#(\d+)", pr["body"] or "", re.I):
                   i = m.group(1); il = gh("issue", "view", i, "-R", R, "--json", "labels")
-                  was_claude = "agent:claude" in il
-                  gh("issue", "edit", i, "-R", R, "--add-label", "agent:ready", "--add-label", "agent:copilot" if was_claude else "agent:claude",
-                     "--remove-label", "agent:claude" if was_claude else "agent:copilot",
+                  order = ["agent:claude", "agent:copilot", "agent:aider"]
+                  cur = next((x for x in order if x in il), "agent:aider")
+                  nxt = order[(order.index(cur) + 1) % len(order)]
+                  gh("issue", "edit", i, "-R", R, "--add-label", "agent:ready", "--add-label", nxt, "--remove-label", cur,
                      "--remove-label", "agent:in-progress", "--remove-label", "agent:pr-open", "--remove-assignee", "Copilot")
-                  gh("issue", "comment", i, "-R", R, "--body", f"PR #{n} failed {rounds} fix rounds; reassigned to the {'Copilot' if was_claude else 'Claude'} engineer.")
+                  gh("issue", "comment", i, "-R", R, "--body", f"PR #{n} failed {rounds} fix rounds; handed to the next engineer ({nxt}).")
               raise SystemExit
           if rounds: gh("pr", "edit", str(n), "-R", R, "--remove-label", f"fix:{rounds}")
           gh("label", "create", f"fix:{rounds+1}", "-R", R, "--color", "fbca04", "--force")
@@ -74,8 +76,16 @@ jobs:
               gh("pr", "comment", str(n), "-R", R, "--body", f"@copilot {reason} Please fix it: address every required point in the latest review comment, keep the change focused, and make sure `pnpm -r test` passes. Do not skip or delete tests.")
               print(f"asked Copilot to fix #{n}"); raise SystemExit
           if not B.startswith("agent/"): raise SystemExit
-          v = json.dumps({"PR": n, "BRANCH": B, "REASON": reason, "RUN_ID": E.get("RUN_ID") or ""})
-          out.write(f"pr={n}\nbranch={B}\nvars<<__V__\n{v}\n__V__\n")
+          engine = "aider" if B.startswith("agent/aider/") else "claude"
+          details = ""
+          if engine == "aider":
+              # Aider has no GitHub tools, so hand it the failing log and the latest review comment.
+              if E.get("RUN_ID"):
+                  details += "Failing CI log (last 150 lines):\n" + "\n".join(gh("run", "view", E["RUN_ID"], "-R", R, "--log-failed").splitlines()[-150:])
+              cm = json.loads(gh("pr", "view", str(n), "-R", R, "--json", "comments") or "{}").get("comments", [])
+              if cm: details += "\n\nLatest review comment:\n" + cm[-1]["body"][:6000]
+          v = json.dumps({"PR": n, "BRANCH": B, "REASON": reason, "RUN_ID": E.get("RUN_ID") or "", "DETAILS": details})
+          out.write(f"pr={n}\nbranch={B}\nengine={engine}\nvars<<__V__\n{v}\n__V__\n")
           print(f"Claude will fix #{n} ({reason})")
           EOF
   fix:
@@ -84,7 +94,8 @@ jobs:
     uses: ./.github/workflows/_agent-claude.yml
     secrets: inherit
     with:
-      role: fixer
+      engine: ${{ needs.route.outputs.engine }}
+      role: ${{ needs.route.outputs.engine == 'aider' && 'fixer-aider' || 'fixer' }}
       mode: pr-branch
       branch: ${{ needs.route.outputs.branch }}
       pr: ${{ fromJSON(needs.route.outputs.pr) }}

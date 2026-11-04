@@ -1,6 +1,6 @@
 # The Shipvo agent team
 
-Shipvo is developed day and night by a team of AI agents in GitHub Actions: Claude in several roles and GitHub Copilot's coding agent as a second engineer. They plan work, write code, review each other, fix failures and merge. The rules every agent follows are in [`CLAUDE.md`](../../CLAUDE.md).
+Shipvo is developed day and night by a team of AI agents in GitHub Actions: Claude in several roles, GitHub Copilot's coding agent as a second engineer, and the open-source Aider agent as a third engineer running on any OpenAI-compatible provider (the Kilo AI Gateway by default). They plan work, write code, review each other, fix failures and merge. The rules every agent follows are in [`CLAUDE.md`](../../CLAUDE.md).
 
 ## Roster
 
@@ -9,8 +9,9 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Product lead | Claude | daily 05:17 UTC | `agent-planner.yml` |
 | Engineer | Claude | on `agent:claude` label, sweep every 2 h | `agent-engineer.yml` |
 | Engineer | Copilot | on `agent:copilot` label, sweep hourly | `agent-copilot.yml` |
+| Engineer | Aider (open source) via Kilo AI Gateway | on `agent:aider` label, sweep every 2 h | `agent-aider.yml` |
 | Code reviewer | Claude | every agent PR, on open and on each push | `agent-reviewer.yml` |
-| Fix engineer | Claude for Claude PRs, Copilot (via `@copilot`) for Copilot PRs | CI red, changes requested, merge conflict | `agent-fixer.yml` |
+| Fix engineer | each engineer fixes its own PRs (Copilot via `@copilot`) | CI red, changes requested, merge conflict | `agent-fixer.yml` |
 | Merge bot | rules, no AI | every 30 min and after CI | `agent-merger.yml` |
 | QA engineer | Claude | nightly 01:41 UTC | `agent-qa.yml` |
 | Security engineer | Claude | Mondays 03:11 UTC | `agent-security.yml` |
@@ -20,10 +21,10 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 
 ## How work flows
 
-1. The **product lead** reads `docs/ROADMAP.md`, open issues, CI and recent merges, and files small, self-contained issues with acceptance criteria, labelled `agent:ready` and either `agent:claude` or `agent:copilot`.
+1. The **product lead** reads `docs/ROADMAP.md`, open issues, CI and recent merges, and files small, self-contained issues with acceptance criteria, labelled `agent:ready` and `agent:claude`, `agent:copilot` or `agent:aider`.
 2. The **engineers** pick them up (a few at a time each), work on a branch and open a PR that says `Fixes #n`.
 3. The **reviewer** (Claude) reviews every PR, including Copilot's, and labels it `agent:approved` or `agent:changes-requested`.
-4. If CI fails or changes are requested, the **fix engineer** works on it. After 3 failed rounds the PR is closed and the issue goes to the other engineer.
+4. If CI fails or changes are requested, the **fix engineer** works on it. After 3 failed rounds the PR is closed and the issue goes to the next engineer (Claude, then Copilot, then Aider).
 5. The **merge bot** squash-merges a PR once it is approved, every check is green, it is up to date with main and it touches no protected path. Merges to `main` trigger the existing deploy workflows (site, control plane, simulator).
 6. A red CI on `main` becomes an urgent issue that the Claude engineer takes first.
 7. The **team lead** posts a daily report on the pinned "Agent team log" issue.
@@ -44,6 +45,7 @@ Repository secrets (Settings > Secrets and variables > Actions):
 | Secret | What |
 | --- | --- |
 | `CLAUDE_CODE_OAUTH_TOKEN` | From `claude setup-token` (uses your Claude subscription). Or set `ANTHROPIC_API_KEY` instead to pay per use. |
+| `OPENAI_COMPAT_API_KEY` | Your Kilo AI Gateway key (or any OpenAI-compatible provider key) for the Aider engineer. |
 | `AGENT_TOKEN` | Fine-grained personal access token for `shipvo/shipvo` with: Contents, Issues, Pull requests, Actions: read and write; Metadata: read; Repository security advisories: read and write. No Workflows permission, so agents can never change workflows. Your account needs a Copilot plan for the Copilot engineer. |
 
 Settings to turn on:
@@ -60,6 +62,9 @@ Settings to turn on:
 | `AGENT_MODEL_LEAD` | `claude-opus-5-5` | Model for the planner, reviewer and security roles. |
 | `AGENT_CLAUDE_MAX_ACTIVE` | 3 | Claude engineer tasks in flight. |
 | `AGENT_COPILOT_MAX_ACTIVE` | 3 | Copilot tasks in flight. |
+| `AGENT_AIDER_MAX_ACTIVE` | 2 | Aider tasks in flight. |
+| `OPENAI_COMPAT_BASE_URL` | `https://ai-gateway.kilo.ai/api/v1` | OpenAI-compatible endpoint for Aider. |
+| `AIDER_MODEL` | `anthropic/claude-sonnet-4.5` | Model id on that endpoint (any id the gateway lists at `/models`). |
 | `AGENT_MAX_BACKLOG` | 12 | Planner stops filing issues above this many `agent:ready` issues. |
 | `AGENT_MAX_NEW_ISSUES` | 5 | Most issues the planner files per day. |
 | `AGENT_MAX_MERGES_PER_DAY` | 20 | Merge bot cap. |

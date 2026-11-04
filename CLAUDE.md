@@ -43,7 +43,7 @@ Node 22, pnpm 10. CI (`.github/workflows/ci.yml`, job `test`) must pass before a
 
 ## Branches, commits and PRs
 
-- Claude branches: `agent/claude/issue-<n>`, `agent/qa/<date>`, `agent/security/<date>`, `agent/docs/<date>`. Copilot branches: `copilot/*`.
+- Aider branches: `agent/aider/issue-<n>`. Claude branches: `agent/claude/issue-<n>`, `agent/qa/<date>`, `agent/security/<date>`, `agent/docs/<date>`. Copilot branches: `copilot/*`.
 - Commit messages: `<area>: <what changed>` (for example `sim: keep refs stable across scroll`).
 - PR body: what changed, why, how it was tested, and `Fixes #<n>`.
 

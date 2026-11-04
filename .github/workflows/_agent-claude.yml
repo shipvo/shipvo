@@ -1,4 +1,5 @@
-# Runs one Claude agent role. Called by the agent-*.yml workflows; not run on its own.
+# Runs one agent role with Claude (claude-code-action) or Aider (open source, any OpenAI-compatible
+# provider such as the Kilo AI Gateway). Called by the agent-*.yml workflows; not run on its own.
 # Modes:
 #   read       - no code changes (planner, reviewer, triage, digest). gh uses AGENT_TOKEN.
 #   branch     - new branch from main; if Claude commits, the workflow pushes and opens a PR.
@@ -9,6 +10,7 @@ name: _agent-claude
 on:
   workflow_call:
     inputs:
+      engine: { type: string, default: claude }       # claude | aider
       role: { type: string, required: true }          # prompt file in .github/agents/prompts/<role>.md
       vars: { type: string, default: "{}" }           # JSON of {{KEY}} substitutions for the prompt
       mode: { type: string, default: read }
@@ -47,9 +49,12 @@ jobs:
         env:
           A: ${{ secrets.ANTHROPIC_API_KEY }}
           O: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          K: ${{ secrets.OPENAI_COMPAT_API_KEY }}
+          ENGINE: ${{ inputs.engine }}
         run: |
-          if [ -z "$AGENT_TOKEN" ] || [ -z "$A$O" ]; then
-            echo "::warning::Agent team not set up yet: add AGENT_TOKEN and CLAUDE_CODE_OAUTH_TOKEN (or ANTHROPIC_API_KEY). See .github/agents/README.md"
+          KEY="$A$O"; [ "$ENGINE" = "aider" ] && KEY="$K"
+          if [ -z "$AGENT_TOKEN" ] || [ -z "$KEY" ]; then
+            echo "::warning::Agent team not set up yet: add AGENT_TOKEN and the model key for the $ENGINE engine. See .github/agents/README.md"
             echo "ok=false" >> "$GITHUB_OUTPUT"
           else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
 
@@ -113,7 +118,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Run Claude (${{ inputs.role }})
-        if: steps.chk.outputs.ok == 'true'
+        if: steps.chk.outputs.ok == 'true' && inputs.engine == 'claude'
         uses: anthropics/claude-code-action@v1
         env:
           # read roles use gh with the agent token; code roles only get read access through GITHUB_TOKEN
@@ -129,6 +134,22 @@ jobs:
             ${{ (inputs.model || vars.AGENT_MODEL) && format('--model {0}', inputs.model || vars.AGENT_MODEL) || '' }}
             --allowedTools "Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*)"
             --disallowedTools "Bash(git push:*),Bash(gh pr merge:*),Bash(gh api:*),Bash(gh release:*),Bash(gh secret:*),Bash(gh workflow:*),Bash(npm publish:*),Bash(pnpm publish:*)"
+
+      - name: Run Aider (${{ inputs.role }}) via OpenAI-compatible gateway
+        if: steps.chk.outputs.ok == 'true' && inputs.engine == 'aider'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_COMPAT_API_KEY }}
+          OPENAI_API_BASE: ${{ vars.OPENAI_COMPAT_BASE_URL || 'https://ai-gateway.kilo.ai/api/v1' }}
+          MODEL: ${{ inputs.model || vars.AIDER_MODEL || 'anthropic/claude-sonnet-4.5' }}
+        run: |
+          pipx install aider-chat > /dev/null 2>&1 || python3 -m pip install --user aider-chat > /dev/null
+          export PATH="$HOME/.local/bin:$PATH"
+          aider --model "openai/$MODEL" --message-file /tmp/agent/prompt.md --read CLAUDE.md \
+            --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
+            --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 2>&1 | tail -n 400
+          # Aider cannot write outside the repo; keep its scratch notes out of commits.
+          for f in pr_title.txt pr_body.md blocked.md fix_note.md; do [ -f ".agent/$f" ] && mv ".agent/$f" /tmp/agent/; done
+          if [ -d .agent ]; then git rm -rq --cached .agent 2>/dev/null; rm -rf .agent; git diff --cached --quiet || git commit -qm "chore: drop agent notes"; fi
 
       - name: Push, open PR, post notes
         id: post
@@ -181,8 +202,11 @@ jobs:
             [ -f /tmp/agent/fix_note.md ] && gh pr comment "$PR" -R "$REPO" --body-file /tmp/agent/fix_note.md || true
             exit 0
           fi
-          TITLE=$(head -n1 /tmp/agent/pr_title.txt 2>/dev/null || true); [ -n "$TITLE" ] || TITLE="$(git log -1 --format=%s)"
-          [ -f /tmp/agent/pr_body.md ] || git log --format='- %s' "$(cat /tmp/agent/start_sha)..HEAD" > /tmp/agent/pr_body.md
+          TITLE=$(head -n1 /tmp/agent/pr_title.txt 2>/dev/null || true); [ -n "$TITLE" ] || TITLE="$(git log --reverse --format=%s "$(cat /tmp/agent/start_sha)..HEAD" | head -n1)"
+          if [ ! -f /tmp/agent/pr_body.md ]; then
+            { echo "Changes:"; git log --reverse --format='- %s' "$(cat /tmp/agent/start_sha)..HEAD"; echo; echo "Tested with \`pnpm -r test\` by the agent before committing."; [ "$ISSUE" != "0" ] && printf '\nFixes #%s\n' "$ISSUE"; } > /tmp/agent/pr_body.md
+          fi
+          [ "$ISSUE" != "0" ] && ! grep -qi "#$ISSUE" /tmp/agent/pr_body.md && printf '\nFixes #%s\n' "$ISSUE" >> /tmp/agent/pr_body.md
           printf '\n\n---\nOpened by the Shipvo agent team ([run](%s)).\n' "$RUN_URL" >> /tmp/agent/pr_body.md
           ARGS=(--label agent-pr); IFS=',' read -ra L <<< "$PR_LABELS"; for l in "${L[@]}"; do [ -n "$l" ] && ARGS+=(--label "$l"); done
           URL=$(gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md "${ARGS[@]}")
