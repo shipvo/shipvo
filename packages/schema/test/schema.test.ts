@@ -31,6 +31,16 @@ describe("release pointer", () => {
       issued_at: "2026-10-29T21:00:00Z", core: { version: "1.0.0", sha256: h, size: 10, url: "c" }, min_shell_version: "1.0.0", signature: sig });
     expect(ok.success).toBe(true);
   });
+  it("parses with and without hermes_bytecode_version", () => {
+    const h = "a".repeat(64);
+    const base = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 1,
+      issued_at: "2026-10-29T21:00:00Z", core: { version: "1.0.0", sha256: h, size: 10, url: "c" }, min_shell_version: "1.0.0", signature: sig };
+    const old = ReleasePointer.safeParse(base);
+    expect(old.success && old.data.hermes_bytecode_version).toBeUndefined();
+    const withV = ReleasePointer.safeParse({ ...base, hermes_bytecode_version: 96 });
+    expect(withV.success && withV.data.hermes_bytecode_version).toBe(96);
+    expect(ReleasePointer.safeParse({ ...base, hermes_bytecode_version: 1.5 }).success).toBe(false);
+  });
 });
 describe("gate report", () => {
   const ids = ["manifest_valid","permissions_declared","purpose_classifier","modules_in_manifest","sim_verified_modules","size_budget","accessibility","store_policy","signature"];

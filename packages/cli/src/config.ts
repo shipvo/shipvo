@@ -10,6 +10,8 @@ export type ShipvoConfig = {
   controlPlane: string;
   /** Base64 Ed25519 public key built into the shell. */
   publicKey: string;
+  /** Hermes bytecode version(s) the app's shells run. If set, `shipvo publish` refuses bundles that differ. */
+  hermesBytecodeVersion?: number | number[];
   /** Where `shipvo publish` writes: the control plane's Cloudflare KV namespace. */
   kv?: { namespaceId: string };
   /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */

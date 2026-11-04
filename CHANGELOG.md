@@ -2,6 +2,10 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## Unreleased
+
+- **Publish records the Hermes bytecode version.** `shipvo publish` reads the version from the `.hbc` header and adds an optional `hermes_bytecode_version` to the signed release. Set `hermesBytecodeVersion` (a number or list) in `shipvo.json`, or pass `--hermes-bytecode-version`, to make publish fail when the bundle is plain JavaScript or built with a different Hermes. Migration: nothing is required. Releases without the field still parse and apply as before. Shells do not check the field yet; that is a follow-up.
+
 ## 2026-10-31
 
 - **Site:** a [blog](/blog/) with 15 articles and an RSS feed, a [Shipvo vs Expo](/compare/) side-by-side, and [pricing](/pricing/) with worked examples against Expo's plans. New docs page [Test with an assistant](/docs/test-with-an-assistant/) covers the hosted remote MCP path step by step. The light theme was fixed sitewide for contrast and visibility.

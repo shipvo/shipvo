@@ -74,6 +74,8 @@ export const ReleasePointer = z.object({
   addons: z.array(AddonRef).default([]),
   screens: z.array(z.object({ id: z.string(), sha256, size: z.number().int().positive(), url: z.string().min(1) })).default([]),
   min_shell_version: semver,
+  /** Hermes bytecode format version of `core` (from the .hbc header). Absent on older releases and plain-JS bundles. */
+  hermes_bytecode_version: z.number().int().positive().optional(),
   /** The agent-facing web build of this same release, served by the control plane at `base` (sim.shipvo.dev opens it). */
   web: z.object({ base: z.string().min(1), entry: z.string().min(1), sha256, files: z.number().int().nonnegative() }).optional(),
   new_control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }).optional(),
