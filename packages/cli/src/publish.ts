@@ -73,7 +73,27 @@ Flags (write a value after a space, not =):
   --max-bases N                How many older releases to build patches from (default 6)
   --skip-export true           Reuse the last build in dist-ota/
   --skip-web true              Do not publish the web copy for the simulator
-  --dry-run                    Build and sign, write files locally, send nothing (also emits JSON with dry_run: true)
+  --dry-run                    Build and sign, write files locally, send nothing (files go to --out or .shipvo/dry-run)\n  --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)\n>>>>>>> REPLACE
+````
+
+packages/cli/test/publish.test.ts
+````python
+<<<<<<< SEARCH
+  it("a missing bundle under --dry-run exits 1", async () => {
+    // Don't create a bundle
+    await expect(publish([...flags, "--dry-run"])).rejects.toThrow(/no bundle in dist-ota\/_expo\/static\/js\/android/);
+    expect(puts).toEqual([]);
+  });
+
+  it("without --dry-run, pointers are written and JSON is printed", async () => {
+    withBundle(96);
+    await publish([...flags]);
+    // Check that puts contains the pointer keys
+    expect(puts).toContain("p/demo/1/b0");
+    // Check that console.log was called with JSON
+    const text = String((console.log as any).mock.calls[0][0]);
+    expect(text).toMatch(/^{/);
+  });
   --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)
   --help                       Show this help
 `;
