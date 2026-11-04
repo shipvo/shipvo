@@ -249,6 +249,10 @@ jobs:
           # A fixer may correct the PR description (reviews and the contract check it against the code).
           BODY_FIXED=no
           if [ "$MODE" = "pr-branch" ] && [ -s /tmp/agent/pr_body.md ]; then
+            # Never lose the "Fixes #n" link: GitHub uses it to close the issue when the PR merges.
+            gh pr view "$PR" -R "$REPO" --json body --jq .body | grep -oiE "(fixes|closes|resolves) #[0-9]+" | sort -u | while read -r k; do
+              grep -qiF "$k" /tmp/agent/pr_body.md || printf '\n%s\n' "$k" >> /tmp/agent/pr_body.md
+            done
             gh pr edit "$PR" -R "$REPO" --body-file /tmp/agent/pr_body.md && BODY_FIXED=yes || true
           fi
           AHEAD=$(git rev-list --count "$(cat /tmp/agent/start_sha)..HEAD")

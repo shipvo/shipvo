@@ -159,3 +159,21 @@ for (const pr of prs) {
   act(`delete branch ${pr.head.ref}`, () => gh("api", "-X", "DELETE", `repos/${REPO}/git/refs/heads/${pr.head.ref}`));
   budget--;
 }
+
+// Keep the issue queue honest. An issue marked agent:pr-open with no open PR is either done (a merged PR
+// fixes it: close it) or its PR died (put it back in the queue), otherwise no engineer would ever pick it up.
+try {
+  const fixesIn = (body) => [...(body || "").matchAll(/(?:fixes|closes|resolves)\s+#(\d+)/gi)].map((m) => Number(m[1]));
+  const openRefs = new Set(apiAll(`repos/${REPO}/pulls?state=open&per_page=100`).flatMap((p) => fixesIn(p.body)));
+  const merged = api(`repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=100`).filter((p) => p.merged_at);
+  for (const is of apiAll(`repos/${REPO}/issues?state=open&labels=agent:pr-open&per_page=100`)) {
+    if (is.pull_request || openRefs.has(is.number)) continue;
+    const done = merged.find((p) => fixesIn(p.body).includes(is.number) && new Date(p.merged_at) > new Date(is.created_at));
+    if (done) {
+      comment(is.number, `Done in #${done.number}.`);
+      act(`close issue #${is.number} (fixed by #${done.number})`, () => gh("api", "-X", "PATCH", `repos/${REPO}/issues/${is.number}`, "-f", "state=closed", "-f", "state_reason=completed"));
+    } else {
+      act(`requeue issue #${is.number} (no open PR)`, () => gh("api", "-X", "DELETE", `repos/${REPO}/issues/${is.number}/labels/agent:pr-open`));
+    }
+  }
+} catch (e) { log("skip issue queue check:", e.message); }
