@@ -172,9 +172,11 @@ jobs:
             if [ "$i" = "anon" ]; then export OPENAI_API_KEY="anonymous"; WHO="anonymous mode"; else export OPENAI_API_KEY="${K[$i]}"; WHO="key $(( i + 1 )) of $N"; fi
             # Mistral reasoning models return answers in parts; litellm's native mistral/ provider reads them, openai/ does not.
             if [ "$PROVIDER" = "mistral" ]; then export MISTRAL_API_KEY="$OPENAI_API_KEY"; LLM="mistral/$MODEL"; else LLM="openai/$MODEL"; fi
+            # Mistral rejects greedy sampling unless top_p is 1, and reasoning models need room to think.
+            printf -- '- name: %s\n  edit_format: diff\n  use_temperature: 0.2\n  extra_params:\n    top_p: 1\n    max_tokens: 32000\n' "$LLM" > /tmp/agent/aider-models.yml
             echo "running Aider with $WHO"
             set +e
-            aider --model "$LLM" --weak-model "$LLM" --timeout 900 --message-file /tmp/agent/prompt.md --read CLAUDE.md \
+            aider --model "$LLM" --weak-model "$LLM" --model-settings-file /tmp/agent/aider-models.yml --timeout 900 --message-file /tmp/agent/prompt.md --read CLAUDE.md \
               --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
               --edit-format diff --no-detect-urls --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
             set -e
