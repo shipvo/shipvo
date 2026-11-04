@@ -52,7 +52,7 @@ jobs:
           K: ${{ secrets.OPENAI_COMPAT_API_KEY }}
           ENGINE: ${{ inputs.engine }}
         run: |
-          KEY="$A$O"; [ "$ENGINE" = "aider" ] && KEY="$K"
+          KEY="$A$O"; [ "$ENGINE" = "aider" ] && KEY="${K:-anonymous}"   # Kilo serves free models without a key
           if [ -z "$AGENT_TOKEN" ] || [ -z "$KEY" ]; then
             echo "::warning::Agent team not set up yet: add AGENT_TOKEN and the model key for the $ENGINE engine. See .github/agents/README.md"
             echo "ok=false" >> "$GITHUB_OUTPUT"
@@ -143,7 +143,7 @@ jobs:
       - name: Run Aider (${{ inputs.role }}) via OpenAI-compatible gateway
         if: steps.chk.outputs.ok == 'true' && inputs.engine == 'aider'
         env:
-          KEYS: ${{ secrets.OPENAI_COMPAT_API_KEY }}   # one key, or many separated by commas; rotated per run and on rate limits
+          KEYS: ${{ secrets.OPENAI_COMPAT_API_KEY }}   # optional: one key or many, comma-separated; rotated, with anonymous fallback
           OPENAI_API_BASE: ${{ vars.OPENAI_COMPAT_BASE_URL || 'https://ai-gateway.kilo.ai/api/v1' }}
           MODEL: ${{ inputs.model || vars.AIDER_MODEL || 'kilo-auto/free' }}
           SEED: ${{ github.run_id }}
@@ -152,23 +152,28 @@ jobs:
           # Split the key list and mask every key on its own: GitHub only masks the secret as a whole string.
           mapfile -t K < <(printf '%s' "$KEYS" | tr ',\n' '\n\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
           for k in "${K[@]}"; do echo "::add-mask::$k"; done
-          N=${#K[@]}; [ "$N" -gt 0 ] || { echo "::error::OPENAI_COMPAT_API_KEY is empty"; exit 1; }
-          START=$(( SEED % N )); TRIES=$(( N < 5 ? N : 5 ))
-          echo "keys available: $N; starting at key $(( START + 1 )); up to $TRIES keys this run"
-          for t in $(seq 0 $(( TRIES - 1 ))); do
-            i=$(( (START + t) % N ))
-            export OPENAI_API_KEY="${K[$i]}"
+          N=${#K[@]}
+          # Try up to 5 keys starting at a different one each run. A rate-limited key is skipped for this run;
+          # a rejected (invalid or expired) key is discarded. If no key works, run anonymously: the gateway
+          # serves free models without a key, so a bad key never stops or fails the run.
+          ORDER=()
+          if [ "$N" -gt 0 ]; then START=$(( SEED % N )); TRIES=$(( N < 5 ? N : 5 )); for t in $(seq 0 $(( TRIES - 1 ))); do ORDER+=("$(( (START + t) % N ))"); done; fi
+          ORDER+=("anon")
+          echo "keys available: $N; will try ${#ORDER[@]} credential(s), ending with anonymous mode"
+          for i in "${ORDER[@]}"; do
+            if [ "$i" = "anon" ]; then export OPENAI_API_KEY="anonymous"; WHO="anonymous mode"; else export OPENAI_API_KEY="${K[$i]}"; WHO="key $(( i + 1 )) of $N"; fi
+            echo "running Aider with $WHO"
             set +e
             aider --model "openai/$MODEL" --weak-model "openai/$MODEL" --message-file /tmp/agent/prompt.md --read CLAUDE.md \
               --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
               --edit-format diff --no-detect-urls --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
-            rc=$?; set -e
+            set -e
             tail -n 300 /tmp/agent/aider.log
-            if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror" /tmp/agent/aider.log; then
-              echo "::warning::key $(( i + 1 )) of $N hit a rate limit or quota; rotating"; continue
-            fi
             if grep -qiE "AuthenticationError|authentication token is invalid|invalid api key|401 Unauthorized" /tmp/agent/aider.log; then
-              echo "::warning::key $(( i + 1 )) of $N was rejected (invalid or expired); rotating. Replace it in OPENAI_COMPAT_API_KEY."; continue
+              echo "::warning::$WHO was rejected (invalid or expired) and is discarded for this run. Replace it in OPENAI_COMPAT_API_KEY."; git checkout -q -- . 2>/dev/null || true; continue
+            fi
+            if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror" /tmp/agent/aider.log; then
+              echo "::warning::$WHO hit a rate limit or quota; trying the next credential"; git checkout -q -- . 2>/dev/null || true; continue
             fi
             break
           done

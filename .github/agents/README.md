@@ -45,7 +45,7 @@ Repository secrets (Settings > Secrets and variables > Actions):
 | Secret | What |
 | --- | --- |
 | `CLAUDE_CODE_OAUTH_TOKEN` | From `claude setup-token` (uses your Claude subscription). Or set `ANTHROPIC_API_KEY` instead to pay per use. |
-| `OPENAI_COMPAT_API_KEY` | Your Kilo AI Gateway keys for the Aider engineer, comma-separated (one is fine). Each run starts on a different key and moves to the next one on a rate limit or quota error (up to 5 per run). Every key is masked in logs. |
+| `OPENAI_COMPAT_API_KEY` | Your Kilo AI Gateway keys for the Aider engineer, comma-separated (one is fine). Each run starts on a different key and moves on when a key is rate-limited or rejected (up to 5 per run). If none works, or the secret is empty, Aider runs in Kilo's anonymous mode on free models, so a bad key never stops a run. Every key is masked in logs. |
 | `AGENT_TOKEN` | Fine-grained personal access token for `shipvo/shipvo` with: Contents, Issues, Pull requests, Actions: read and write; Metadata: read; Repository security advisories: read and write. No Workflows permission, so agents can never change workflows. Your account needs a Copilot plan for the Copilot engineer. |
 
 Settings to turn on:
