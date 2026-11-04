@@ -1,4 +1,7 @@
+// Marks file shape: either an array of run objects, or { runs: [...] }.
+// Each run: { pointer_published, app_launched, healthy } (epoch ms).
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 export function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
@@ -22,7 +25,7 @@ export function analyze(logText, marksInput) {
       (entry) => entry.time >= run.app_launched && entry.time <= run.healthy,
     );
     const downloads = inWindow.filter((entry) =>
-      /bundle|\.js|download/i.test(entry.path),
+      /\/b\//.test(entry.path) && (entry.status === undefined || entry.status === 200),
     );
     const downloadEntries = downloads.length > 0 ? downloads : inWindow;
     const bytes = downloadEntries.reduce((sum, entry) => sum + entry.bytes, 0);
@@ -58,8 +61,12 @@ export function formatMarkdown(result) {
   ].join("\n");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [logFile, marksFile] = process.argv.slice(2);
+  if (!logFile || !marksFile) {
+    console.error("usage: node analyze.mjs <logFile> <marksFile>");
+    process.exit(1);
+  }
   const logText = readFileSync(logFile, "utf8");
   const marks = JSON.parse(readFileSync(marksFile, "utf8"));
   console.log(formatMarkdown(analyze(logText, marks)));
