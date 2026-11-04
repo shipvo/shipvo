@@ -53,7 +53,7 @@ New `@shipvo/*` packages come only from an issue labelled `new-package` (see `do
 - has a README with install, a runnable example and the API, and tests run by `pnpm -r test`;
 - depends on other `@shipvo/*` packages with `workspace:^`, and adds no other dependency without saying why;
 - is listed in the README's package table and gets a docs entry.
-The release train publishes every non-private package automatically.
+The release train publishes every non-private package automatically. Keep packages lean: ship only built code in `files`, no tests, fixtures, media or source maps unless needed; CI fails any package over 10 MB unpacked. Large media (videos, recordings) goes to Cloudflare R2, never into git or npm.
 
 ## Branches, commits and PRs
 
