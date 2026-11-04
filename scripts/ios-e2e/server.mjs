@@ -17,7 +17,8 @@ createServer((req, res) => {
   if (req.method === "POST") {
     let b = ""; req.on("data", (d) => (b += d)).on("end", () => {
       const body = '{"ok":true}';
-      logText(`POST ${url.pathname} ${b}`);
+      // bytes is the response size ("bytes sent"), not the request body size.
+      logText(`POST ${url.pathname} ${b.slice(0, 2000)}`);
       logJson({ time: Date.now(), path: url.pathname, bytes: Buffer.byteLength(body), status: 200 });
       res.writeHead(200, { "content-type": "application/json" }).end(body);
     });
