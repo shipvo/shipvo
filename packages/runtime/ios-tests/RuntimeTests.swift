@@ -3,13 +3,13 @@ import XCTest
 
 /// Runs against the static fake control plane written by scripts/ios-fixture.mjs and served on SHIPVO_FIXTURE_BASE.
 final class RuntimeTests: XCTestCase {
-  private var base = "", pub = "", bundleSha = "", tmp: URL!
+  private var base = "", pub = "", bundleSha = "", tmp: URL!, meta: [String: Any] = [:]
 
   override func setUpWithError() throws {
     let env = ProcessInfo.processInfo.environment
     guard let b = env["SHIPVO_FIXTURE_BASE"], let dir = env["SHIPVO_FIXTURE_DIR"] else { throw XCTSkip("SHIPVO_FIXTURE_BASE / SHIPVO_FIXTURE_DIR not set") }
     base = b
-    let meta = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: dir).appendingPathComponent("meta.json"))) as! [String: Any]
+    meta = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: dir).appendingPathComponent("meta.json"))) as! [String: Any]
     pub = meta["publicKey"] as! String; bundleSha = meta["bundleSha"] as! String
     tmp = FileManager.default.temporaryDirectory.appendingPathComponent("shipvo-test-\(UUID().uuidString)")
     Store.runningRelease = 0; Store.loadsInProcess = 0; Store.selection = (nil, false); Store.bundleSelectedAt = 0
@@ -37,6 +37,39 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(r["via"] as? String, "full")
     XCTAssertEqual(s.pendingRelease, 5)
     XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+  }
+
+  /// A device that runs release 5 (the fixture's `good` bundle) and is offered release 6.
+  private func storeRunningRelease5(_ app: String) throws -> Store {
+    let s = store(app)
+    try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let path = tmp.appendingPathComponent("r5.hbc")
+    try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!).write(to: path)
+    s.currentPath = path.path; s.currentRelease = 5; s.currentSha = bundleSha
+    return s
+  }
+
+  func testAppliesAPatchFromTheRunningBundle() async throws {
+    let s = try storeRunningRelease5("patch")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["via"] as? String, "patch")
+    XCTAssertLessThan(r["bytes"] as! Int, 1000, "only the patch was downloaded")
+    XCTAssertEqual(r["bundleBytes"] as? Int, 200_019 + 50)
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), meta["bundle2Sha"] as? String)
+  }
+
+  func testFallsBackToTheFullBundleWhenThePatchIsBroken() async throws {
+    let s = try storeRunningRelease5("bad-patch")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["via"] as? String, "full")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), meta["bundle2Sha"] as? String)
+    XCTAssertTrue(s.consumeEvents().contains("patch_failed"))
+  }
+
+  func testUsesTheFullBundleWhenNothingIsRunningYet() async throws {
+    let r = try await Updater.check(store("patch"))
+    XCTAssertEqual(r["via"] as? String, "full")
   }
 
   func testRefusesWhatItCannotTrust() async throws {
