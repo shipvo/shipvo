@@ -299,7 +299,7 @@ footer.old{display:none}
 /* explicit theme choice (nav toggle) */
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 
-  :root[data-theme=light]{--ink:#FAF8F3;--ink-2:#FFFFFF;--ink-3:#F1EEE6;--line:#E3DED2;--line-2:#CFC8B8;--paper:#14181F;--mute:#454C5B;--dim:#5A6272;--faint:#6A7183;--accent:#A94A08;--accent-ink:#FFFFFF;--sky:#0A62AF;--prose:#2A303C;--code-inline:#7A3405;--strip:rgba(20,24,31,.035);--store-top:rgba(169,74,8,.05);--ok:#157347;--bad:#B42318;--ok-text:#0F6B3F;--sky-text:#0B5EA6}
+  :root[data-theme=light]{--ink:#FAF8F3;--ink-2:#FFFFFF;--ink-3:#F1EEE6;--line:#E3DED2;--line-2:#CFC8B8;--paper:#14181F;--mute:#454C5B;--dim:#5A6272;--faint:#5F6678;--accent:#A94A08;--accent-ink:#FFFFFF;--sky:#0A62AF;--prose:#2A303C;--code-inline:#7A3405;--strip:rgba(20,24,31,.035);--store-top:rgba(169,74,8,.05);--ok:#157347;--bad:#B42318;--ok-text:#0F6B3F;--sky-text:#0B5EA6}
   :root[data-theme=light] body::before{opacity:.03}
   :root[data-theme=light] .nav{background:rgba(250,248,243,.85)}
   :root[data-theme=light] .code,:root[data-theme=light] .term,:root[data-theme=light] .tree,:root[data-theme=light] .agentview,:root[data-theme=light] .result{--paper:#F4F2EC;--mute:#B6BDCB;--dim:#8891A3;--faint:#7C88A3;--line:#1F2A3F;--line-2:#2A3850;--ink-3:#151D2E;--accent:#FF9A2E;--accent-ink:#120B03;--sky:#5FB8FF}
@@ -314,7 +314,7 @@ footer.old{display:none}
 .theme-btn[data-mode=auto] .i-auto,.theme-btn[data-mode=light] .i-light,.theme-btn[data-mode=dark] .i-dark{display:block}
 .mm-theme{display:flex;align-items:center;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);font-size:16px}
 @media (prefers-color-scheme: light){
-  :root:not([data-theme=dark]){--ink:#FAF8F3;--ink-2:#FFFFFF;--ink-3:#F1EEE6;--line:#E3DED2;--line-2:#CFC8B8;--paper:#14181F;--mute:#454C5B;--dim:#5A6272;--faint:#6A7183;--accent:#A94A08;--accent-ink:#FFFFFF;--sky:#0A62AF;--prose:#2A303C;--code-inline:#7A3405;--strip:rgba(20,24,31,.035);--store-top:rgba(169,74,8,.05);--ok:#157347;--bad:#B42318;--ok-text:#0F6B3F;--sky-text:#0B5EA6}
+  :root:not([data-theme=dark]){--ink:#FAF8F3;--ink-2:#FFFFFF;--ink-3:#F1EEE6;--line:#E3DED2;--line-2:#CFC8B8;--paper:#14181F;--mute:#454C5B;--dim:#5A6272;--faint:#5F6678;--accent:#A94A08;--accent-ink:#FFFFFF;--sky:#0A62AF;--prose:#2A303C;--code-inline:#7A3405;--strip:rgba(20,24,31,.035);--store-top:rgba(169,74,8,.05);--ok:#157347;--bad:#B42318;--ok-text:#0F6B3F;--sky-text:#0B5EA6}
   :root:not([data-theme=dark]) body::before{opacity:.03}
   :root:not([data-theme=dark]) .nav{background:rgba(250,248,243,.85)}
   :root:not([data-theme=dark]) .code,:root:not([data-theme=dark]) .term,:root:not([data-theme=dark]) .tree,:root:not([data-theme=dark]) .agentview,:root:not([data-theme=dark]) .result{--paper:#F4F2EC;--mute:#B6BDCB;--dim:#8891A3;--faint:#7C88A3;--line:#1F2A3F;--line-2:#2A3850;--ink-3:#151D2E;--accent:#FF9A2E;--accent-ink:#120B03;--sky:#5FB8FF}

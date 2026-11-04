@@ -10,6 +10,13 @@ const manifest = {
   public_key: sig, owner_root_public_key: sig, signature: sig,
 };
 describe("manifest", () => {
+  it("parses a manifest with and without hermes_bytecode_versions", () => {
+    const old = ShellManifest.safeParse(manifest);
+    expect(old.success && old.data.hermes_bytecode_versions).toBeUndefined();
+    const v = ShellManifest.safeParse({ ...manifest, hermes_bytecode_versions: [96, 98] });
+    expect(v.success && v.data.hermes_bytecode_versions).toEqual([96, 98]);
+    expect(ShellManifest.safeParse({ ...manifest, hermes_bytecode_versions: [] }).success).toBe(false);
+  });
   it("accepts a valid manifest", () => expect(ShellManifest.safeParse(manifest).success).toBe(true));
   it("rejects vague purpose strings", () =>
     expect(ShellManifest.safeParse({ ...manifest, permissions: [{ name: "camera", tier: "elevated", purpose: "stuff" }] }).success).toBe(false));

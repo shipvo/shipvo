@@ -24,6 +24,9 @@ const NAV = [
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
+  { group: "Learn", pages: [
+    { slug: "videos", src: "docs/videos.md", title: "Videos", desc: "Short captioned videos that show how Shipvo works: over-the-air updates, signing, staged rollout and rollback, in plain words." },
+  ]},
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },
     { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real React Native app flows in a headless simulator on every pull request, with typed Vitest tests. No emulator, no device farm." },

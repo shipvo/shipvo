@@ -75,6 +75,34 @@ for (const pr of prs) {
   }
 
   if (L.includes("needs-human")) continue;
+
+  // Ask the fixer directly: label events can be lost, and GitHub sends no pull_request events at all
+  // for a PR with merge conflicts, so a label alone would never start it.
+  const fixNow = (label, why) => act(`dispatch fixer for #${n} (${why})`, () => gh("workflow", "run", "agent-fixer.yml", "-R", REPO,
+    "--ref", "main", "-f", `pr=${n}`, "-f", `branch=${pr.head.ref}`, "-f", `label=${label}`));
+  const quietMin = (Date.now() - new Date(pr.updated_at)) / 6e4;
+  // GitHub answers mergeable: null while it is still computing; ask again before deciding.
+  let full = api(`repos/${REPO}/pulls/${n}`);
+  for (let i = 0; i < 3 && full.mergeable === null; i++) { execFileSync("sleep", ["4"]); full = api(`repos/${REPO}/pulls/${n}`); }
+  if (full.mergeable === false && full.mergeable_state === "dirty") {
+    if (!L.includes("agent:conflict")) {
+      addLabel(n, "agent:conflict");
+      comment(n, "This branch has merge conflicts with main. The fixer agent has been asked to resolve them.");
+      fixNow("agent:conflict", "merge conflict");
+    } else if (quietMin > 60) fixNow("agent:conflict", "still conflicting");
+    continue;
+  }
+  if (quietMin > 60 && L.includes("agent:changes-requested")) {
+    fixNow("agent:changes-requested", "changes requested, quiet for an hour");
+    continue;
+  }
+  if (quietMin > 60 && !L.some((l) => ["agent:approved", "agent:changes-requested", "agent:contract-check", "contract:drift"].includes(l))) {
+    act(`re-request review on #${n} (close and reopen)`, () => {
+      gh("api", "-X", "PATCH", `repos/${REPO}/pulls/${n}`, "-f", "state=closed");
+      gh("api", "-X", "PATCH", `repos/${REPO}/pulls/${n}`, "-f", "state=open");
+    });
+    continue;
+  }
   const files = apiAll(`repos/${REPO}/pulls/${n}/files?per_page=100`).map((f) => f.filename);
   const locked = files.filter((f) => LOCKED.some((re) => re.test(f)));
   if (locked.length) {
@@ -84,18 +112,8 @@ for (const pr of prs) {
   }
   const guarded = files.some((f) => GUARDED.some((re) => re.test(f)));
   if (!L.includes("agent:approved")) { log(`#${n}: waiting for review approval`); continue; }
-  const full = api(`repos/${REPO}/pulls/${n}`);
   if (full.mergeable_state === "behind") {
     act(`update branch #${n}`, () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/update-branch`));
-    continue;
-  }
-  if (full.mergeable === false || full.mergeable_state === "dirty") {
-    if (!L.includes("agent:conflict")) {
-      addLabel(n, "agent:conflict");
-      comment(n, isCopilot(pr)
-        ? "@copilot this branch has merge conflicts with main. Please merge main into it and resolve them."
-        : "This branch has merge conflicts with main. The fixer agent will be asked to resolve them.");
-    }
     continue;
   }
 

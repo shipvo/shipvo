@@ -7,33 +7,13 @@ import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
 import { sim } from "./sim.js";
 import { keys, login, mcp } from "./login.js";
+import { verifyPointer } from "./verify.js";
 import { signingKey } from "./signing.js";
 import { appCmd } from "./app.js";
 import { doctor } from "./doctor.js";
+import { help, unknownCommand } from "./help.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
-const help = `shipvo <command>
-
-  init <dir>                  New app wired to Shipvo: OTA runtime, device API, simulator, publish workflow
-  sim [--port 4545]           Build the app for the simulator and serve it (agents: open_app("<appId>"))
-  publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release (+ the agent-facing web artifact)
-  rollback --to <release>     Republish an earlier release's code as a new release
-  app create | list | delete  Register this app with the hosted control plane (publish token), list yours, or remove one
-  login                       Sign in with GitHub and get a key for the hosted simulator
-  doctor                      Check setup before first publish
-  keys                        Show the stored key's status and quota
-  keys export [--out f]       Print (or save) this app's release signing seed, to back it up or move machines
-  keys import [seed|--file f] Restore the signing seed on a new machine (checked against shipvo.json)
-  mcp                         Print the MCP config agents need (hosted and local)
-
-  keygen [--out seed.txt]     Create an Ed25519 release signing key; prints the public key
-  pubkey                      Print the public key for the seed in SHIPVO_SIGNING_SEED
-  hash <file>                 SHA-256 and size of a bundle
-  sign-file <file>            Ed25519 signature (base64) over a file's bytes
-  sign-json <file.json>       Sign a JSON document (canonical form); writes signature into it
-  verify-json <file.json> <public-key-b64>
-`;
-
 switch (cmd) {
   case "init": await init(rest); break;
   case "sim": await sim(rest); break;
@@ -55,5 +35,13 @@ switch (cmd) {
   case "sign-file": console.log(signBytes(new Uint8Array(readFileSync(rest[0])), seed())); break;
   case "sign-json": { const d = JSON.parse(readFileSync(rest[0], "utf8")); writeFileSync(rest[0], JSON.stringify(signDoc(d, seed()), null, 2)); console.log("signed"); break; }
   case "verify-json": { const ok = verifyDoc(JSON.parse(readFileSync(rest[0], "utf8")), rest[1]); console.log(ok ? "valid" : "INVALID"); process.exit(ok ? 0 : 1); }
-  default: console.log(help); process.exit(cmd ? 1 : 0);
+  case "verify": {
+    if (!rest[0]) { console.error("Usage: shipvo verify <pointer file> [public-key-b64]"); process.exit(2); }
+    const key = rest[1] ?? b64(keyFromSeed(seed()).publicKey);
+    let text: string;
+    try { text = readFileSync(rest[0], "utf8"); } catch { console.error(`Cannot read ${rest[0]}`); process.exit(2); }
+    const ok = verifyPointer(text, key); console.log(ok ? "valid" : "INVALID"); process.exit(ok ? 0 : 1);
+  }
+  case undefined: case "--help": case "-h": case "help": console.log(help); break;
+  default: console.error(unknownCommand(cmd)); process.exit(1);
 }

@@ -8,6 +8,7 @@ import http from "node:http";
 import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync } from "node:fs";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { withAppName } from "./app-name.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -169,6 +170,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname.startsWith("/app/")) {
       let p = join(DIST, url.pathname.slice(5) || "index.html"); if (!existsSync(p) || statSync(p).isDirectory()) p = join(DIST, "index.html");
+      if (extname(p) === ".html") return send(200, withAppName(readFileSync(p, "utf8"), APP_NAME), MIME[".html"]);
       return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
     }
     // mock control plane per session
@@ -191,6 +193,7 @@ const server = http.createServer(async (req, res) => {
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
+    if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
     if (url.pathname === "/sessions") return send(200, { ok: true, sessions: [...sessions.entries()].map(([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, url: s.page.url() })) });
     if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {

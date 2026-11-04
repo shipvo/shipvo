@@ -13,7 +13,7 @@
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "tsc -p tsconfig.examples.json && vitest run",
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": { "vitest": ">=2" },

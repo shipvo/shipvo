@@ -6,6 +6,7 @@
     "build": "node build-docs.mjs",
     "dev": "node build-docs.mjs && wrangler dev",
     "deploy": "wrangler deploy",
+    "test": "node scripts/check-contrast.mjs",
     "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {

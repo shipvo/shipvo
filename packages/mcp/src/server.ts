@@ -16,9 +16,22 @@ import { z } from "zod";
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
 const CONTROL = (process.env.PN_CONTROL ?? "https://api.shipvo.dev").replace(/\/$/, "");
 const OWNER_TOKEN = process.env.PN_OWNER_TOKEN ?? "";
-// Apps this server can open. Hosted: the account's apps. Local: one app served by the simulator.
-const APPS: Record<string, { name: string; description: string }> = process.env.PN_APPS ? JSON.parse(process.env.PN_APPS)
-  : { tide: { name: "Tide & Tackle", description: "Fishing-supplies shop in Douala: catalogue, cart, promo codes, delivery slots, cash or mobile money." } };
+// Apps this server can open. Hosted: the account's apps. Local: the app the simulator serves (it is asked on
+// first use), or PN_APPS (JSON) to override. Falls back to the sample app when the simulator cannot be reached.
+const TIDE = { tide: { name: "Tide & Tackle", description: "Fishing-supplies shop in Douala: catalogue, cart, promo codes, delivery slots, cash or mobile money." } };
+type AppInfo = Record<string, { name: string; description: string }>;
+async function localApps(): Promise<AppInfo> {
+  if (process.env.PN_APPS) return JSON.parse(process.env.PN_APPS);
+  try {
+    const r = await fetch(SIM + "/apps", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    if (r.ok) {
+      const out: AppInfo = {};
+      for (const a of ((await r.json()) as { apps?: { id: string; name?: string }[] }).apps ?? []) out[a.id] = { name: a.name ?? a.id, description: "The app this simulator serves." };
+      if (Object.keys(out).length) return out;
+    }
+  } catch {}
+  return TIDE;
+}
 
 type Act = { ok: boolean; screen?: string | null; error?: string; path?: string };
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
@@ -44,9 +57,9 @@ Finish a task by checking the final screen says what you expected (for example "
 
 // ctx.app: the app(s) this key opens, comma-separated (the beta app plus any the key owner has registered).
 const keyApps = ctx.app ? ctx.app.split(",").map((s) => s.trim()).filter(Boolean) : null;
-const allowed = (id: string) => (keyApps ? keyApps.includes(id) : !!APPS[id]);
+const allowed = async (id: string) => (keyApps ? keyApps.includes(id) : !!(await localApps())[id]);
 server.tool("list_apps", "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').", { query: z.string().optional() }, async ({ query }) => {
-  const ids = keyApps ?? Object.keys(APPS); const q = (query ?? "").toLowerCase();
+  const APPS = await localApps(); const ids = keyApps ?? Object.keys(APPS); const q = (query ?? "").toLowerCase();
   let dir: Record<string, { name: string; description: string; category: string }> = {};
   try { const r = await fetch(`${CONTROL}/apps/public${q ? `?q=${encodeURIComponent(q)}` : ""}`); if (r.ok) for (const a of ((await r.json()) as any).apps) dir[a.app_id] = a; } catch {}
   const lines = ids.map((id) => {
@@ -63,7 +76,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   dark: z.boolean().optional().describe("Dark mode"),
 }, async ({ app, session, seed_cart, dark }) => {
   const id = app.split("@")[0];
-  if (!allowed(id)) throw new Error(keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(APPS).join(", ")}`);
+  if (!(await allowed(id))) throw new Error(keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}`);
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
