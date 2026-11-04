@@ -57,23 +57,27 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(s.pendingRelease, 0); XCTAssertNil(s.pendingPath)
     XCTAssertEqual(s.consumeEvents(), ["hermes_bytecode_mismatch:5"], "the typed reason is reported")
     XCTAssertEqual(s.blockedRelease, 5)
-    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "none", "not fetched again")
+    let again = try await Updater.check(s)
+    XCTAssertEqual(again["status"] as? String, "none", "not fetched again")
   }
 
   func testAppliesAReleaseWithTheSameHermesBytecodeVersion() async throws {
     let s = store("hbc-match", hbc: [96, 98])
-    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
     XCTAssertEqual(s.pendingRelease, 5)
   }
 
   func testAppliesWhenTheReleaseHasNoHermesBytecodeVersion() async throws {
     let s = store("good", hbc: [96])
-    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
   }
 
   func testAppliesWhenTheShellDeclaresNoHermesBytecodeVersion() async throws {
     let s = store("hbc-mismatch")
-    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
   }
 
   func testReleaseVersionRefusesNonIntegers() throws {

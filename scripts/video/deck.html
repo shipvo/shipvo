@@ -1,0 +1,58 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--ink:#090D16;--ink2:#0F1522;--or:#FF9A2E;--sky:#5FB8FF;--paper:#F4F2EC;--mute:#B6BDCB;--red:#FF6B6B;--green:#5BD6A0}
+*{box-sizing:border-box;margin:0}
+html,body{width:1280px;height:720px;overflow:hidden;background:var(--ink);color:var(--paper);font-family:"Bricolage Grotesque","Inter","Helvetica Neue","Liberation Sans","DejaVu Sans",sans-serif}
+.mono{font-family:"JetBrains Mono","DejaVu Sans Mono","Liberation Mono",monospace}
+#stage{position:absolute;inset:0;background:radial-gradient(900px 500px at 80% 0%,#142a52 0%,transparent 60%),radial-gradient(700px 400px at 0% 100%,#2a1a0a 0%,transparent 60%),var(--ink)}
+.scene{position:absolute;inset:0;display:none;padding:56px 72px 150px}
+.scene.on{display:block}
+.chip{position:absolute;left:72px;top:44px;font:600 22px/1 "JetBrains Mono","DejaVu Sans Mono",monospace;color:var(--sky);letter-spacing:.08em;text-transform:uppercase}
+.logo{position:absolute;right:56px;top:36px;width:52px;height:52px}
+h1{font-weight:800;font-size:68px;line-height:1.05;letter-spacing:-.02em}
+h2{font-weight:800;font-size:54px;line-height:1.08;letter-spacing:-.02em}
+.or{color:var(--or)}.sky{color:var(--sky)}.mute{color:var(--mute)}
+.abs{position:absolute}
+.in{animation:up .7s cubic-bezier(.2,.8,.2,1) var(--d,0s) both}
+.fade{animation:fade .6s ease-out var(--d,0s) both}
+.pop{animation:pop .5s cubic-bezier(.3,1.6,.5,1) var(--d,0s) both}
+@keyframes up{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+.card{background:var(--ink2);border:2px solid #22304d;border-radius:22px}
+.phone{width:250px;height:470px;border-radius:40px;background:#05080f;border:6px solid #2b3a5c;position:absolute;overflow:hidden}
+.phone .scr{position:absolute;inset:0;padding:48px 20px 20px;font-size:22px}
+.btn{display:inline-block;padding:14px 22px;border-radius:14px;background:var(--or);color:#1a1000;font-weight:700}
+.badge{display:inline-block;padding:8px 16px;border-radius:999px;font-weight:700;font-size:22px}
+/* terminal */
+.term{background:#05080f;border:2px solid #22304d;border-radius:18px;padding:30px 34px;font-size:34px;line-height:1.5}
+.term .dots{display:flex;gap:9px;margin-bottom:20px}.term .dots i{width:14px;height:14px;border-radius:50%;background:#2b3a5c}
+.type{display:inline-block;overflow:hidden;white-space:nowrap;vertical-align:bottom;width:0;animation:typing var(--tt,1.6s) steps(var(--n,20),end) var(--d,0s) forwards}
+@keyframes typing{to{width:calc(var(--n,20) * 1ch)}}
+.cur{display:inline-block;width:.6ch;height:1.1em;background:var(--or);vertical-align:text-bottom;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+/* captions */
+#cap{position:absolute;left:90px;right:90px;bottom:34px;text-align:center;font-weight:600;font-size:34px;line-height:1.3;color:#fff;text-shadow:0 2px 10px #000;min-height:90px}
+#cap span{background:rgba(5,8,15,.78);padding:4px 14px;border-radius:10px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+#bar{position:absolute;left:0;bottom:0;height:5px;background:var(--or)}
+.dot{position:absolute;width:26px;height:26px;border-radius:50%;background:#26334f}
+.dot.a{animation:dotA .4s ease-out var(--d) both}
+@keyframes dotA{from{background:#26334f;transform:scale(1)}50%{transform:scale(1.5)}to{background:var(--c);transform:scale(1)}}
+.flight{animation:fly 2.2s cubic-bezier(.5,0,.3,1) var(--d,0s) both}
+@keyframes fly{from{transform:translate(var(--fx),var(--fy));opacity:0}15%{opacity:1}to{transform:translate(var(--tx),var(--ty));opacity:1}}
+.shake{animation:shake .5s ease-in-out var(--d) both}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+</style></head><body><div id="stage">
+{{SCENES}}
+<div id="cap"></div><div id="bar"></div></div>
+<script>
+window.setup=(plan)=>{window.PLAN=plan;window.scenes=[...document.querySelectorAll('.scene')];};
+window.seek=(t)=>{
+  const P=window.PLAN;let i=P.scenes.findIndex(s=>t>=s.start&&t<s.end);if(i<0)i=P.scenes.length-1;
+  const s=P.scenes[i],lt=t-s.start;
+  window.scenes.forEach((e,k)=>e.classList.toggle('on',k===i));
+  window.scenes[i].getAnimations({subtree:true}).forEach(a=>{a.pause();a.currentTime=lt*1000});
+  const c=P.cues.find(c=>t>=c.start&&t<c.end);
+  document.getElementById('cap').innerHTML=c?`<span>${c.text}</span>`:'';
+  document.getElementById('bar').style.width=(t/P.total*1280)+'px';
+};
+</script></body></html>

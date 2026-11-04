@@ -2,6 +2,10 @@
 
 Also in: [Français](fr/getting-started.md)
 
+<video controls preload="metadata" playsinline poster="/videos/ship-an-update.jpg" src="/media/videos/ship-an-update-988335b3.mp4"><track kind="captions" src="/videos/ship-an-update.vtt" srclang="en" label="English" default>Your browser cannot play this video. See the video page for a transcript.</video>
+
+Video: [Ship an update to phones in minutes](videos.md), 1 min 30 s, with captions and a transcript.
+
 Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
 
 ## 0. What you need
