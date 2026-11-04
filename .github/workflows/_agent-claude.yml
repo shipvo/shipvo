@@ -11,6 +11,7 @@ on:
   workflow_call:
     inputs:
       engine: { type: string, default: claude }       # claude | aider
+      provider: { type: string, default: kilo }       # for aider: kilo (OpenAI-compatible gateway) | mistral
       role: { type: string, required: true }          # prompt file in .github/agents/prompts/<role>.md
       vars: { type: string, default: "{}" }           # JSON of {{KEY}} substitutions for the prompt
       mode: { type: string, default: read }
@@ -49,10 +50,13 @@ jobs:
           A: ${{ secrets.ANTHROPIC_API_KEY }}
           O: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           K: ${{ secrets.OPENAI_COMPAT_API_KEY }}
+          M: ${{ secrets.MISTRAL_API_KEY }}
+          PROVIDER: ${{ inputs.provider }}
           ENGINE: ${{ inputs.engine }}
           AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
         run: |
           KEY="$A$O"; [ "$ENGINE" = "aider" ] && KEY="${K:-anonymous}"   # Kilo serves free models without a key
+          [ "$ENGINE" = "aider" ] && [ "$PROVIDER" = "mistral" ] && KEY="$M"
           if [ -z "$AGENT_TOKEN" ] || [ -z "$KEY" ]; then
             echo "::warning::Agent team not set up yet: add AGENT_TOKEN and the model key for the $ENGINE engine. See .github/agents/README.md"
             echo "ok=false" >> "$GITHUB_OUTPUT"
@@ -145,9 +149,11 @@ jobs:
       - name: Run Aider (${{ inputs.role }}) via OpenAI-compatible gateway
         if: steps.chk.outputs.ok == 'true' && inputs.engine == 'aider'
         env:
-          KEYS: ${{ secrets.OPENAI_COMPAT_API_KEY }}   # optional: one key or many, comma-separated; rotated, with anonymous fallback
-          OPENAI_API_BASE: ${{ vars.OPENAI_COMPAT_BASE_URL || 'https://ai-gateway.kilo.ai/api/v1' }}
-          MODEL: ${{ inputs.model || vars.AIDER_MODEL || 'kilo-auto/free' }}
+          # Kilo: one key or many, comma-separated, rotated, with anonymous fallback. Mistral: MISTRAL_API_KEY (one or many).
+          KEYS: ${{ inputs.provider == 'mistral' && secrets.MISTRAL_API_KEY || secrets.OPENAI_COMPAT_API_KEY }}
+          OPENAI_API_BASE: ${{ inputs.provider == 'mistral' && 'https://api.mistral.ai/v1' || (vars.OPENAI_COMPAT_BASE_URL || 'https://ai-gateway.kilo.ai/api/v1') }}
+          MODEL: ${{ inputs.model || (inputs.provider == 'mistral' && (vars.MISTRAL_MODEL || 'labs-leanstral-1-5') || (vars.AIDER_MODEL || 'kilo-auto/free')) }}
+          PROVIDER: ${{ inputs.provider }}
           SEED: ${{ github.run_id }}
         run: |
           python -m pip install --quiet --disable-pip-version-check aider-chat
@@ -160,8 +166,8 @@ jobs:
           # serves free models without a key, so a bad key never stops or fails the run.
           ORDER=()
           if [ "$N" -gt 0 ]; then START=$(( SEED % N )); TRIES=$(( N < 5 ? N : 5 )); for t in $(seq 0 $(( TRIES - 1 ))); do ORDER+=("$(( (START + t) % N ))"); done; fi
-          ORDER+=("anon")
-          echo "keys available: $N; will try ${#ORDER[@]} credential(s), ending with anonymous mode"
+          [ "$PROVIDER" = "mistral" ] || ORDER+=("anon")   # anonymous mode exists only on the Kilo gateway
+          echo "provider: $PROVIDER; keys available: $N; will try ${#ORDER[@]} credential(s)"
           for i in "${ORDER[@]}"; do
             if [ "$i" = "anon" ]; then export OPENAI_API_KEY="anonymous"; WHO="anonymous mode"; else export OPENAI_API_KEY="${K[$i]}"; WHO="key $(( i + 1 )) of $N"; fi
             echo "running Aider with $WHO"

@@ -1,6 +1,6 @@
 # Shipvo: rules for AI agents
 
-This repository is built and maintained by a team of AI agents (Claude and GitHub Copilot) running in GitHub Actions. These rules apply to every agent and every role. The team roster and schedules are in `.github/agents/README.md`.
+This repository is built and maintained by a team of AI agents (Claude, Mistral and Aider) running in GitHub Actions. These rules apply to every agent and every role. The team roster and schedules are in `.github/agents/README.md`.
 
 ## What Shipvo is
 
@@ -57,7 +57,7 @@ The release train publishes every non-private package automatically.
 
 ## Branches, commits and PRs
 
-- Aider branches: `agent/aider/issue-<n>`. Claude branches: `agent/claude/issue-<n>`, `agent/pm/<n>`, `agent/design/<n>`, `agent/dogfood/<n>`, `agent/device-lab/<n>`, `agent/qa/<date>`, `agent/security/<date>`, `agent/docs/<date>`. Copilot branches: `copilot/*`.
+- Aider branches: `agent/aider/issue-<n>`. Mistral branches: `agent/mistral/issue-<n>`. Claude branches: `agent/claude/issue-<n>`, `agent/pm/<n>`, `agent/design/<n>`, `agent/dogfood/<n>`, `agent/device-lab/<n>`, `agent/qa/<date>`, `agent/security/<date>`, `agent/docs/<date>`. Copilot branches: `copilot/*`.
 - Commit messages: `<area>: <what changed>` (for example `sim: keep refs stable across scroll`).
 - PR body: what changed, why, how it was tested, and `Fixes #<n>`.
 
