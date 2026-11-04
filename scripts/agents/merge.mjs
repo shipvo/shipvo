@@ -121,6 +121,12 @@ for (const pr of prs) {
   const pending = runs.filter((r) => r.status !== "completed");
   const failed = runs.filter((r) => r.status === "completed" && !GREEN.has(r.conclusion));
   const hasCI = runs.some((r) => r.name === "test" && r.conclusion === "success");
+  // Jobs GitHub cancelled (no runner free, e.g. macOS capacity) are not code failures: run them again.
+  const cancelled = failed.filter((r) => r.conclusion === "cancelled" && r.app?.slug === "github-actions");
+  if (cancelled.length && cancelled.length === failed.length && !pending.length) {
+    for (const r of cancelled) act(`rerun cancelled job ${r.name} on #${n}`, () => gh("api", "-X", "POST", `repos/${REPO}/actions/jobs/${r.id}/rerun`));
+    continue;
+  }
   if (pending.length || failed.length || !hasCI) {
     log(`#${n}: checks not green (pending ${pending.length}, failed ${failed.length}, ci ${hasCI})`);
     continue;
