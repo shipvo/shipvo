@@ -24,6 +24,10 @@ const NAV = [
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
+  { group: "Learn", pages: [
+    { slug: "first-app", src: "docs/tutorials/first-app.md", title: "Make your first app", desc: "No coding needed. Make a phone app, see it in a simulator, let an AI assistant tap it, change its words and prepare a signed release in about 30 minutes." },
+    { slug: "glossary", src: "docs/glossary.md", title: "Glossary", desc: "Plain-English meanings for the words in the Shipvo docs: simulator, release, dry run, signing seed, cohort band and more." },
+  ]},
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },
     { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real React Native app flows in a headless simulator on every pull request, with typed Vitest tests. No emulator, no device farm." },
@@ -55,7 +59,7 @@ const bySrc = Object.fromEntries(all.map((p) => [p.src.replace(/^docs\//, "").re
 // Links between docs → site paths; relative repo links → GitHub.
 function rewriteHref(href, src) {
   if (/^(https?:|mailto:|#)/.test(href) || /^\/(docs|apps|brand|changelog|terms|privacy|security|acceptable-use|llms\.txt|llms-full\.txt)(\/|$|#)|^\/(docs\.md|\.well-known\/security\.txt)$/.test(href)) return href;
-  const clean = href.replace(/^\.\//, "");
+  const clean = href.replace(/^\.\//, "").replace(/^\.\.\//, src.startsWith("docs/tutorials/") ? "docs/" : "../");   // docs/tutorials/x.md links "../y.md" to docs/y.md
   const [path, hash = ""] = clean.split("#");
   const key = path.replace(/^docs\//, "").replace(/\.md$/, "");
   if (bySrc[key]) return `/docs/${bySrc[key]}/${hash ? "#" + hash : ""}`;
