@@ -21,7 +21,12 @@ enum Updater {
     let known = max(s.currentRelease, s.pendingRelease, s.blockedRelease)
     let (data, resp) = try await URLSession.shared.data(for: try request("\(s.baseUrl)/p/\(s.appId)/\(s.shellMajor)/ios/\(s.band).json", etag: known > 0 ? "\"\(known)\"" : nil))
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-    if code == 304 || code == 404 { return ["status": "none"] }
+    if code == 304 || code == 404 {
+      if let files = try? FileManager.default.contentsOfDirectory(at: s.dir, includingPropertiesForKeys: nil) {
+        for f in files where f.lastPathComponent.hasPrefix("partial-") { try? FileManager.default.removeItem(at: f) }
+      }
+      return ["status": "none"]
+    }
     try require(code == 200, "pointer HTTP \(code)")
     guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
           let bodyStr = envelope["body"] as? String, let sig = envelope["signature"] as? String else { throw UpdateError("pointer is not an envelope") }
@@ -32,7 +37,12 @@ enum Updater {
     try require(body["platform"] as? String == "ios", "pointer is not for iOS")
     try require(body["app_id"] as? String == s.appId && body["shell_major"] as? Int == s.shellMajor, "pointer for another app/shell")
     guard let release = body["release"] as? Int else { throw UpdateError("pointer has no release") }
-    if release <= known { return ["status": "none"] }
+    if release <= known {
+      if let files = try? FileManager.default.contentsOfDirectory(at: s.dir, includingPropertiesForKeys: nil) {
+        for f in files where f.lastPathComponent.hasPrefix("partial-") { try? FileManager.default.removeItem(at: f) }
+      }
+      return ["status": "none"]
+    }
     try require(!Verify.semverLess(s.shellVersion, body["min_shell_version"] as? String ?? "0.0.0"), "shell too old for release \(release)")
     let verifyPointerMs = (Store.now() - t0) * 1000
 
@@ -55,28 +65,53 @@ enum Updater {
     var downloadMs = (Store.now() - d0) * 1000
     if !ready {
       let f0 = Store.now()
-      let offset = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? 0
+      // If a partial file is already complete or oversized, restart from zero.
+      let existing = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? 0
+      var offset = existing
+      if offset >= wantSize { try? FileManager.default.removeItem(at: tmp); offset = 0 }
+      // Stream with bytes(for:) so a dropped connection leaves a partial file we can resume from.
       var req = try request(resolve(s, url), etag: nil)
       if offset > 0 { req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range") }
-      let (fileURL, dresp) = try await URLSession.shared.download(for: req)
-      let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
-      if offset > 0 && dcode == 200 {
+      let (bytes, resp) = try await URLSession.shared.bytes(for: req)
+      let http = resp as? HTTPURLResponse
+      let code = http?.statusCode ?? 0
+      if offset > 0 && code == 200 {
         // Server ignored Range: discard partial and start over.
         try? FileManager.default.removeItem(at: tmp)
-        try FileManager.default.moveItem(at: fileURL, to: tmp)
+        offset = 0
       } else if offset > 0 {
-        try require(dcode == 206, "bundle HTTP \(dcode)")
-        let downloaded = try Data(contentsOf: fileURL)
-        try? FileManager.default.removeItem(at: fileURL)
-        if let handle = try? FileHandle(forWritingTo: tmp) {
-          handle.seekToEndOfFile(); handle.write(downloaded); handle.closeFile()
+        if code == 416 {
+          try? FileManager.default.removeItem(at: tmp)
+          offset = 0
+          // retry from zero
+          var r2 = try request(resolve(s, url), etag: nil)
+          let (b2, resp2) = try await URLSession.shared.bytes(for: r2)
+          let c2 = (resp2 as? HTTPURLResponse)?.statusCode ?? 0
+          try require(c2 == 200, "bundle HTTP \(c2)")
+          try streamBytes(b2, to: tmp, append: false)
         } else {
-          try downloaded.write(to: tmp)
+          try require(code == 206, "bundle HTTP \(code)")
+          // validate Content-Range
+          if let cr = http?.value(forHTTPHeaderField: "Content-Range") {
+            // expected: bytes <offset>-<end>/<total>
+            let parts = cr.split(separator: " ")
+            if parts.count == 2 {
+              let rangePart = parts[1]
+              let segs = rangePart.split(separator: "/")
+              if segs.count == 2, let total = Int(segs[1]) {
+                try require(total == wantSize, "content-range total mismatch")
+              }
+              let bounds = segs[0].split(separator: "-")
+              if bounds.count == 2, let start = Int(bounds[0]) {
+                try require(start == offset, "content-range start mismatch")
+              }
+            }
+          }
+          try streamBytes(bytes, to: tmp, append: true)
         }
       } else {
-        try require(dcode == 200, "bundle HTTP \(dcode)")
-        try? FileManager.default.removeItem(at: tmp)
-        try FileManager.default.moveItem(at: fileURL, to: tmp)
+        try require(code == 200, "bundle HTTP \(code)")
+        try streamBytes(bytes, to: tmp, append: false)
       }
       downloadMs += (Store.now() - f0) * 1000
     }
@@ -115,6 +150,38 @@ enum Updater {
       return psize
     } catch {
       try? FileManager.default.removeItem(at: tmp); s.addEvent("patch_failed"); throw error
+    }
+  }
+
+  private static func streamBytes(_ bytes: URLSession.AsyncBytes, to tmp: URL, append: Bool) async throws {
+    let handle: FileHandle
+    if append {
+      if FileManager.default.fileExists(atPath: tmp.path) {
+        handle = try FileHandle(forWritingTo: tmp)
+        handle.seekToEndOfFile()
+      } else {
+        FileManager.default.createFile(atPath: tmp.path, contents: nil)
+        handle = try FileHandle(forWritingTo: tmp)
+      }
+    } else {
+      try? FileManager.default.removeItem(at: tmp)
+      FileManager.default.createFile(atPath: tmp.path, contents: nil)
+      handle = try FileHandle(forWritingTo: tmp)
+    }
+    defer { try? handle.close() }
+    var buffer = Data()
+    let flushSize = 64 * 1024
+    do {
+      for try await byte in bytes {
+        buffer.append(byte)
+        if buffer.count >= flushSize {
+          handle.write(buffer); buffer.removeAll(keepingCapacity: true)
+        }
+      }
+      if !buffer.isEmpty { handle.write(buffer) }
+    } catch {
+      if !buffer.isEmpty { handle.write(buffer) }
+      throw error
     }
   }
 
