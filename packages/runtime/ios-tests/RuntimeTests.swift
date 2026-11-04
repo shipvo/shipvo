@@ -76,6 +76,14 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
   }
 
+  func testReleaseVersionRefusesNonIntegers() throws {
+    XCTAssertNil(try HermesCheck.releaseVersion([:])); XCTAssertNil(try HermesCheck.releaseVersion(["hermes_bytecode_version": NSNull()]))
+    XCTAssertEqual(try HermesCheck.releaseVersion(["hermes_bytecode_version": 98]), 98)
+    for bad in [("98" as Any), 0, -1, 98.5, true] {
+      XCTAssertThrowsError(try HermesCheck.releaseVersion(["hermes_bytecode_version": bad]), "\(bad)")
+    }
+  }
+
   func testHermesCheckParsing() {
     XCTAssertEqual(HermesCheck.parse("96, 98"), [96, 98]); XCTAssertEqual(HermesCheck.parse(nil), []); XCTAssertEqual(HermesCheck.parse("96,x,-1,0"), [96])
   }

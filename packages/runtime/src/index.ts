@@ -9,7 +9,12 @@ export type RuntimeState = {
 export type CheckResult = {
   status: "none" | "staged" | "error"; release?: number;
   /** Set with status "none" when the runtime refused the release. Today: "hermes_bytecode_mismatch". */
-  reason?: "hermes_bytecode_mismatch"; releaseHermesBytecodeVersion?: number | null; shellHermesBytecodeVersions?: number[]; bytes?: number; downloadMs?: number; verifyMs?: number;
+  reason?: "hermes_bytecode_mismatch";
+  releaseHermesBytecodeVersion?: number | null;
+  shellHermesBytecodeVersions?: number[];
+  bytes?: number;
+  downloadMs?: number;
+  verifyMs?: number;
   /** Shell 1.0.2+ (Android): "patch" when a bsdiff patch was applied, "full" otherwise. iOS always downloads "full". */
   via?: "patch" | "full"; bundleBytes?: number; patchError?: string | null;
   issuedAt?: string; error?: string;

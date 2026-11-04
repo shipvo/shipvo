@@ -109,7 +109,7 @@ class ShipvoRuntimeModule : Module() {
     if (release <= known) return mapOf("status" to "none")
     val shellVersion = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "0.0.0"
     require(!Verify.semverLess(shellVersion, body.getString("min_shell_version"))) { "shell too old for release $release" }
-    val releaseHbc = if (body.has("hermes_bytecode_version")) body.optInt("hermes_bytecode_version").takeIf { it > 0 } else null
+    val releaseHbc = HermesCheck.releaseVersion(body.has("hermes_bytecode_version"), body.opt("hermes_bytecode_version").takeIf { it != JSONObject.NULL })
     if (HermesCheck.mismatch(s.hermesBytecodeVersions, releaseHbc)) {
       s.addEvent("${HermesCheck.REASON}:$release")
       s.block(release) // this release can never run on this shell; a newer release or a new shell is tried

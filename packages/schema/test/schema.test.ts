@@ -60,7 +60,12 @@ describe("canonicalize", () => {
   it("is key-order independent and excludes signature", () =>
     expect(canonicalize({ b: 1, a: { d: 1, c: 2 }, signature: "x" })).toBe(canonicalize({ a: { c: 2, d: 1 }, b: 1 })));
 });
-import { SignedEnvelope, ReleasePointerBody } from "../src/index";
+import { SignedEnvelope, ReleasePointerBody, Telemetry } from "../src/index";
+describe("telemetry", () => {
+  const base = { schema_version: "1.0", app_id: "a", release: 5 };
+  it("accepts hermes_bytecode_mismatch", () => expect(Telemetry.safeParse({ ...base, event: "hermes_bytecode_mismatch" }).success).toBe(true));
+  it("still rejects unknown events", () => expect(Telemetry.safeParse({ ...base, event: "nope" }).success).toBe(false));
+});
 describe("envelope", () => {
   it("parses envelope and unsigned body", () => {
     const h = "a".repeat(64);

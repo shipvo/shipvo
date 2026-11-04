@@ -40,6 +40,7 @@ export default function App() {
       report(s, "applied", isReload ? { apply_ms: h.sinceLoadMs } : { cold_start_ms: h.coldStartMs });
       events.filter((e) => e.startsWith("crash_loop_revert")).forEach(() => report(s, "crash_loop_revert"));
       events.filter((e) => e.startsWith("rolled_back")).forEach(() => report(s, "rolled_back"));
+      events.filter((e) => e.startsWith("hermes_bytecode_mismatch")).forEach(() => report(s, "hermes_bytecode_mismatch"));
       add(isReload ? `Running release ${s.runningRelease} (applied in ${h.sinceLoadMs} ms, no restart)` : `Running release ${s.runningRelease} (cold start ${h.coldStartMs} ms)`);
     } catch { add("Runtime unavailable (simulator)"); }
   }, []);
