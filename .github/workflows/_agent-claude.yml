@@ -167,6 +167,9 @@ jobs:
             if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror" /tmp/agent/aider.log; then
               echo "::warning::key $(( i + 1 )) of $N hit a rate limit or quota; rotating"; continue
             fi
+            if grep -qiE "AuthenticationError|authentication token is invalid|invalid api key|401 Unauthorized" /tmp/agent/aider.log; then
+              echo "::warning::key $(( i + 1 )) of $N was rejected (invalid or expired); rotating. Replace it in OPENAI_COMPAT_API_KEY."; continue
+            fi
             break
           done
           unset OPENAI_API_KEY
@@ -187,7 +190,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -u
-          V=$(tr -d '[:space:]' < /tmp/agent/verdict.txt 2>/dev/null || true); echo "verdict=$V" >> "$GITHUB_OUTPUT"
+          V=$(cat /tmp/agent/verdict.txt 2>/dev/null | tr -d '[:space:]' || true); echo "verdict=$V" >> "$GITHUB_OUTPUT"
           if [ -f /tmp/agent/report.md ]; then
             cat /tmp/agent/report.md >> "$GITHUB_STEP_SUMMARY"
             { echo 'report<<__R__'; head -c 60000 /tmp/agent/report.md; echo; echo '__R__'; } >> "$GITHUB_OUTPUT"
@@ -219,7 +222,10 @@ jobs:
             fi
             exit 0
           fi
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
+          for a in 1 2 3 4; do
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}" && break
+            [ $a = 4 ] && exit 1; echo "push failed, retrying in $(( a * 15 ))s"; sleep $(( a * 15 ))
+          done
           echo "pushed=true" >> "$GITHUB_OUTPUT"
           if [ "$MODE" = "pr-branch" ]; then
             [ -f /tmp/agent/fix_note.md ] && gh pr comment "$PR" -R "$REPO" --body-file /tmp/agent/fix_note.md || true
