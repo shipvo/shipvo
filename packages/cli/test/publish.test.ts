@@ -17,7 +17,7 @@ vi.mock("../src/config.js", async (orig) => ({
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
 }));
-import { publish } from "../src/publish";
+import { publish, rollback } from "../src/publish";
 
 const fakeHbc = (version: number) => {
   const b = new Uint8Array(64);
@@ -83,5 +83,27 @@ describe("publish and the Hermes bytecode check", () => {
     withBundle(96);
     await publish([...flags, "--dry-run", "--out", "out-x"]);
     expect(existsSync(join(cwd, "out-x/h/demo/r1"))).toBe(true);
+  });
+
+  it("--out without --dry-run is an error, not a real publish", async () => {
+    withBundle(96);
+    await expect(publish([...flags, "--out", "x"])).rejects.toThrow(/--out only works with --dry-run/);
+    expect(puts).toEqual([]);
+  });
+
+  it("--out with no value is an error", async () => {
+    withBundle(96);
+    await expect(publish([...flags, "--dry-run", "--out"])).rejects.toThrow(/--out needs a directory/);
+    expect(puts).toEqual([]);
+  });
+
+  it("--release=5 gets a hint", async () => {
+    withBundle(96);
+    await expect(publish([...flags, "--release=5"])).rejects.toThrow(/--release 5/);
+  });
+
+  it("rollback rejects unknown flags before any put", async () => {
+    await expect(rollback(["--to", "1", "--bogus"])).rejects.toThrow(/Unknown flag/);
+    expect(puts).toEqual([]);
   });
 });

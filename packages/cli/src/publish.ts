@@ -31,7 +31,11 @@ const platformsOf = (a: Record<string, string | undefined>): Platform[] => {
 /** Unknown flags are errors: a typo like --dryrun must not fall through to a real publish. */
 function checkFlags(argv: string[], known: string[]) {
   const bad = argv.filter((x) => x.startsWith("--") && !known.includes(x.slice(2)));
-  if (bad.length) throw new Error(`Unknown flag ${bad.join(", ")}. Known flags: ${known.map((k) => "--" + k).join(" ")}`);
+  if (bad.length) {
+    const eq = bad.find((x) => x.includes("="));
+    const hint = eq ? ` Write "${eq.replace("=", " ")}" (a space, not =).` : "";
+    throw new Error(`Unknown flag ${bad.join(", ")}.${hint} Known flags: ${known.map((k) => "--" + k).join(" ")}`);
+  }
 }
 
 /** A store that only writes files under `dir` (key `p/app/1/b0` becomes `dir/p/app/1/b0`). It reads nothing, so a dry run never needs a control plane. */
@@ -55,8 +59,10 @@ const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-byte
 export async function publish(argv: string[]) {
   checkFlags(argv, PUBLISH_FLAGS);
   const a = parse(argv), cfg = loadConfig(), SEED = seed();
-  const dry = a["dry-run"] !== undefined && a["dry-run"] !== "false";
-  const outDir = a.out && a.out !== "true" ? a.out : ".shipvo/dry-run";
+  const dry = a["dry-run"] !== undefined; // a plain switch: any use turns it on
+  if (a.out !== undefined && !dry) throw new Error("--out only works with --dry-run");
+  if (a.out === "true") throw new Error("--out needs a directory: pass --out <dir>");
+  const outDir = a.out || ".shipvo/dry-run";
   const kv = dry ? localKv(outDir) : kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor;
   const MIN_SHELL = a["min-shell"] || JSON.parse(readFileSync("app.json", "utf8")).expo.version; // a bundle needs the shell it was built against
