@@ -38,8 +38,13 @@ enum Updater {
 
     guard let core = body["core"] as? [String: Any], let wantSha = core["sha256"] as? String,
           let wantSize = (core["size"] as? NSNumber)?.intValue, let url = core["url"] as? String else { throw UpdateError("pointer core incomplete") }
-    let tmp = s.dir.appendingPathComponent("dl-\(release).tmp")
-    try? FileManager.default.removeItem(at: tmp)
+    let tmp = s.dir.appendingPathComponent("partial-\(wantSha)")
+    // Drop partial files left by other releases.
+    if let files = try? FileManager.default.contentsOfDirectory(at: s.dir, includingPropertiesForKeys: nil) {
+      for f in files where f.lastPathComponent.hasPrefix("partial-") && f.lastPathComponent != "partial-\(wantSha)" {
+        try? FileManager.default.removeItem(at: f)
+      }
+    }
 
     var via = "full", downloadedBytes = 0
     let d0 = Store.now()
@@ -50,11 +55,29 @@ enum Updater {
     var downloadMs = (Store.now() - d0) * 1000
     if !ready {
       let f0 = Store.now()
-      let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
+      let offset = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? 0
+      var req = request(resolve(s, url), etag: nil)
+      if offset > 0 { req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range") }
+      let (fileURL, dresp) = try await URLSession.shared.download(for: req)
       let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
-      try require(dcode == 200, "bundle HTTP \(dcode)")
-      try? FileManager.default.removeItem(at: tmp)
-      try FileManager.default.moveItem(at: fileURL, to: tmp)
+      if offset > 0 && dcode == 200 {
+        // Server ignored Range: discard partial and start over.
+        try? FileManager.default.removeItem(at: tmp)
+        try FileManager.default.moveItem(at: fileURL, to: tmp)
+      } else if offset > 0 {
+        try require(dcode == 206, "bundle HTTP \(dcode)")
+        let downloaded = try Data(contentsOf: fileURL)
+        try? FileManager.default.removeItem(at: fileURL)
+        if let handle = try? FileHandle(forWritingTo: tmp) {
+          handle.seekToEndOfFile(); handle.write(downloaded); handle.closeFile()
+        } else {
+          try downloaded.write(to: tmp)
+        }
+      } else {
+        try require(dcode == 200, "bundle HTTP \(dcode)")
+        try? FileManager.default.removeItem(at: tmp)
+        try FileManager.default.moveItem(at: fileURL, to: tmp)
+      }
       downloadMs += (Store.now() - f0) * 1000
     }
 
