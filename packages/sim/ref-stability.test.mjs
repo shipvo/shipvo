@@ -1,8 +1,9 @@
 // Refs from an old snapshot must keep working on the same element, or fail with `stale_ref`. They must never act on another element.
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +39,18 @@ const act = (session, body) => call("/act", { session, ...body });
 const refOf = (screen, label) => { const m = new RegExp(`${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^\\n]*\\[ref=(\\w+)\\]`).exec(screen); assert.ok(m, `no ref for ${label} in\n${screen}`); return m[1]; };
 const open = async (id) => { const r = await call("/session", { session: id }); assert.ok(r.ok, r.error); return r.screen; };
 
+// The `test` CI job does not install a browser, so fetch Chromium when it is missing.
+function ensureChromium() {
+  const require = createRequire(import.meta.url);
+  const pw = require("playwright");
+  if (existsSync(pw.chromium.executablePath())) return;
+  const cli = join(dirname(require.resolve("playwright/package.json")), "cli.js");
+  const r = spawnSync(process.execPath, [cli, "install", "chromium"], { stdio: "inherit" });
+  if (r.status !== 0) throw new Error("could not install Chromium for playwright");
+}
+
 before(async () => {
+  ensureChromium();
   const { mkdirSync } = await import("node:fs"); mkdirSync(dist, { recursive: true });
   writeFileSync(join(dist, "index.html"), ONE); writeFileSync(join(dist, "two.html"), TWO);
   proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", dir, "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
