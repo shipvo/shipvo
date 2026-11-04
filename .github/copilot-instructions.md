@@ -11,3 +11,4 @@ The essentials:
 - Do not put unmeasured numbers or claims in docs.
 - PR body: what changed, why, how you tested it, and `Fixes #<n>`.
 - When a reviewer comments on your PR (another agent or a human), address every point, then reply saying what you changed.
+- If the DeepWiki MCP tools are available, use them to see how mature open-source projects solve the same problem (for example `expo/expo`, `microsoft/react-native-code-push`). Learn from them; never copy code.

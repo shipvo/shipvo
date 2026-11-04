@@ -12,3 +12,7 @@ Steps:
 7. Write a short note of what you changed, point by point, to `/tmp/agent/fix_note.md`.
 
 If the PR cannot be fixed without breaking `CLAUDE.md`, make no commits and write why to `/tmp/agent/blocked.md`.
+
+## Learn from other open-source projects (DeepWiki)
+
+You have the DeepWiki MCP tools: `read_wiki_structure`, `read_wiki_contents` and `ask_wiki_question`, which take a public GitHub repo such as `expo/expo`. Use them to see how mature projects solve the same problem before you design your own: for example `expo/expo` (expo-updates), `microsoft/react-native-code-push`, `gronxb/hot-updater`, `Cap-go/capacitor-updater`, `mobile-dev-inc/maestro`, `mobile-next/mobile-mcp`, `modelcontextprotocol/typescript-sdk`, `facebook/react-native`. Learn the approach, edge cases and pitfalls, then write your own implementation. Never copy code; mention the projects you learned from in your PR or issue.

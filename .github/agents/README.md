@@ -42,6 +42,16 @@ By design, agents never:
 
 The daily report lists anything labelled `needs-human`. Everything else runs on its own.
 
+## Tools the agents have
+
+All Claude roles can use the [DeepWiki MCP server](https://docs.devin.ai/work-with-devin/deepwiki-mcp) (`https://mcp.deepwiki.com/mcp`, no key) to study how other public open-source projects implement something before building it. Research issues include a **Prior art** section from it.
+
+For Copilot, add it in **Settings > Copilot > Cloud agent > MCP configuration**:
+
+```json
+{ "mcpServers": { "deepwiki": { "type": "http", "url": "https://mcp.deepwiki.com/mcp", "tools": ["*"] } } }
+```
+
 ## Setup (one time)
 
 Repository secrets (Settings > Secrets and variables > Actions):
