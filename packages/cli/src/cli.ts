@@ -7,6 +7,7 @@ import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
 import { sim } from "./sim.js";
 import { keys, login, mcp } from "./login.js";
+import { verifyPointer } from "./verify.js";
 import { signingKey } from "./signing.js";
 import { appCmd } from "./app.js";
 import { help, unknownCommand } from "./help.js";
@@ -32,6 +33,11 @@ switch (cmd) {
   case "sign-file": console.log(signBytes(new Uint8Array(readFileSync(rest[0])), seed())); break;
   case "sign-json": { const d = JSON.parse(readFileSync(rest[0], "utf8")); writeFileSync(rest[0], JSON.stringify(signDoc(d, seed()), null, 2)); console.log("signed"); break; }
   case "verify-json": { const ok = verifyDoc(JSON.parse(readFileSync(rest[0], "utf8")), rest[1]); console.log(ok ? "valid" : "INVALID"); process.exit(ok ? 0 : 1); }
+  case "verify": {
+    if (!rest[0]) { console.error("Usage: shipvo verify <pointer file> [public-key-b64]"); process.exit(2); }
+    const key = rest[1] ?? b64(keyFromSeed(seed()).publicKey);
+    const ok = verifyPointer(readFileSync(rest[0], "utf8"), key); console.log(ok ? "valid" : "INVALID"); process.exit(ok ? 0 : 1);
+  }
   case undefined: case "--help": case "-h": case "help": console.log(help); break;
   default: console.error(unknownCommand(cmd)); process.exit(1);
 }
