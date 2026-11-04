@@ -19,6 +19,10 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @shipvo/schema build
+      # Package tests (e.g. @shipvo/sim) drive a headless browser, so install it before they run.
+      - name: Install Chromium for browser tests
+        working-directory: packages/sim
+        run: npx playwright install --with-deps chromium
       - run: pnpm -r test
       - name: npm package size budget (each @shipvo package under 10 MB unpacked)
         run: |
