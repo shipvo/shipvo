@@ -82,6 +82,8 @@ internal class Store(private val ctx: Context) {
   val baseUrl: String get() = (meta("dev.shipvo.BASE_URL") ?: "").trimEnd('/')
   val publicKey: String get() = meta("dev.shipvo.PUBLIC_KEY") ?: ""
   val appId: String get() = meta("dev.shipvo.APP_ID") ?: ""
+  /** Hermes bytecode versions this shell runs (manifest meta-data, set by the config plugin). Empty = not declared. */
+  val hermesBytecodeVersions: List<Int> get() = HermesCheck.parse(meta("dev.shipvo.HERMES_BYTECODE_VERSIONS"))
   val shellMajor: Int get() = (meta("dev.shipvo.SHELL_MAJOR") ?: "1").toIntOrNull() ?: 1
 
   companion object {

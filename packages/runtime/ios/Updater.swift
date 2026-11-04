@@ -34,6 +34,13 @@ enum Updater {
     guard let release = body["release"] as? Int else { throw UpdateError("pointer has no release") }
     if release <= known { return ["status": "none"] }
     try require(!Verify.semverLess(s.shellVersion, body["min_shell_version"] as? String ?? "0.0.0"), "shell too old for release \(release)")
+    let releaseHbc = (body["hermes_bytecode_version"] as? NSNumber)?.intValue
+    if HermesCheck.mismatch(shell: s.hermesBytecodeVersions, release: releaseHbc) {
+      s.addEvent("\(HermesCheck.reason):\(release)")
+      s.block(release) // this release can never run on this shell; a newer release or a new shell is tried
+      return ["status": "none", "release": release, "reason": HermesCheck.reason,
+              "releaseHermesBytecodeVersion": releaseHbc as Any, "shellHermesBytecodeVersions": s.hermesBytecodeVersions]
+    }
     let verifyPointerMs = (Store.now() - t0) * 1000
 
     guard let core = body["core"] as? [String: Any], let wantSha = core["sha256"] as? String,

@@ -53,7 +53,7 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 
 `shipvo publish` reads the Hermes bytecode version from the `.hbc` header (an 8-byte magic number, then a 32-bit little-endian version) and writes it to the signed release as `hermes_bytecode_version`. Releases without the field still work.
 
-To stop a mismatched bundle at publish time, set `hermesBytecodeVersion` in `shipvo.json` (a number, or a list for several shells), or pass `--hermes-bytecode-version 96,98`. Publish then fails if the bundle is plain JavaScript or its version is not in the list. Upgrading React Native can change the Hermes build, so update the value when you ship a new shell. Shells and the control plane do not check the field yet.
+To stop a mismatched bundle at publish time, set `hermesBytecodeVersion` in `shipvo.json` (a number, or a list for several shells), or pass `--hermes-bytecode-version 96,98`. Publish then fails if the bundle is plain JavaScript or its version is not in the list. Upgrading React Native can change the Hermes build, so update the value when you ship a new shell. The control plane skips mismatched releases when a shell sends `?hbc=`. The runtime also refuses a mismatched release itself: set `hermesBytecodeVersions` in the `@shipvo/runtime` config plugin props (for example `hermesBytecodeVersions: [96, 98]`) and rebuild the shell. The runtime then records `hermes_bytecode_mismatch:<release>` in its events and keeps the current release. A shell that declares nothing applies any release.
 
 ## Trust model, in one paragraph
 

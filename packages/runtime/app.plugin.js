@@ -4,14 +4,16 @@
 const { withAndroidManifest, withInfoPlist, AndroidConfig } = require("expo/config-plugins");
 
 module.exports = function withShipvo(config, props) {
-  const { baseUrl, publicKey, appId, shellMajor = 1 } = props || {};
+  const { baseUrl, publicKey, appId, shellMajor = 1, hermesBytecodeVersions } = props || {};
   if (!baseUrl || !publicKey || !appId) throw new Error("@shipvo/runtime: baseUrl, publicKey and appId are required");
+  const hbc = [].concat(hermesBytecodeVersions ?? []).join(",");
   config.extra = { ...(config.extra ?? {}), shipvo: { baseUrl, appId, shellMajor } };
   config = withInfoPlist(config, (cfg) => {
     cfg.modResults.ShipvoBaseURL = baseUrl;
     cfg.modResults.ShipvoPublicKey = publicKey;
     cfg.modResults.ShipvoAppId = appId;
     cfg.modResults.ShipvoShellMajor = String(shellMajor);
+    if (hbc) cfg.modResults.ShipvoHermesBytecodeVersions = hbc;
     return cfg;
   });
   return withAndroidManifest(config, (cfg) => {
@@ -21,6 +23,7 @@ module.exports = function withShipvo(config, props) {
     set("dev.shipvo.PUBLIC_KEY", publicKey);
     set("dev.shipvo.APP_ID", appId);
     set("dev.shipvo.SHELL_MAJOR", shellMajor);
+    if (hbc) set("dev.shipvo.HERMES_BYTECODE_VERSIONS", hbc);
     return cfg;
   });
 };

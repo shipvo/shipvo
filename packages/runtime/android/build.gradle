@@ -21,4 +21,5 @@ dependencies {
   implementation 'net.i2p.crypto:eddsa:0.3.0'
   // bzip2 for standard BSDIFF40 patches. 1.21 has no transitive dependencies; R8 keeps only the bzip2 reader.
   implementation 'org.apache.commons:commons-compress:1.21'
+  testImplementation 'junit:junit:4.13.2'
 }
