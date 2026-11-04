@@ -1,6 +1,6 @@
 # Make your first app, change it and get it ready to ship
 
-You will make a phone app, see it run on your computer, change its words, and prepare a signed release. You need no phone and no coding. Most of the time goes to installing Node and waiting for downloads. The commands themselves took about 1 minute 10 seconds in total on our test machine (times are given at each step).
+You will make a phone app, see it run on your computer, change its words, and prepare a signed release. You need no phone and no coding. Most of the time goes to installing Node and waiting for downloads.
 
 You will use a **terminal**: a window where you type commands. Words in **bold** are explained once and listed in the [glossary](../glossary.md).
 
@@ -42,7 +42,7 @@ Pick a short name with no spaces for the folder (`mybakery`), and the real name 
 npx -y @shipvo/cli init mybakery --name "Mama Ngozi Bakery"
 ```
 
-You should see `Created Mama Ngozi Bakery in mybakery` and a long note. It ends with a line starting `Public key pinned in the shell`. This took under a second on our test machine, after the first download.
+You should see `Created Mama Ngozi Bakery in mybakery` and a long note. It ends with a line starting `Public key pinned in the shell`.
 
 The command also made a **signing seed**: a secret file at `mybakery/.shipvo/seed.txt`. Phones only accept releases signed with it. Copy that one file to a USB stick or a password manager now. If you lose it, phones that already have your app will never accept an update. Never email it or post it.
 
@@ -58,7 +58,7 @@ npm install
 npx playwright install chromium
 ```
 
-`npm install` downloads the app's parts. It took about 30 seconds on our test machine, and may take a few minutes on slow internet. It ends with a few lines about "vulnerabilities" or "audit". You can ignore those. The second command downloads a hidden web browser that draws the simulated phone. It took about 8 seconds for us.
+`npm install` downloads the app's parts. On slow internet it may take a few minutes. It ends with a few lines about "vulnerabilities" or "audit". You can ignore those. The second command downloads a hidden web browser that draws the simulated phone.
 
 > **If something goes wrong:** red lines starting with `npm error` and the word `EACCES` mean you lack permission to write in that folder. Make the app in your own Documents folder, not inside a system folder. If `npm install` stops with a network error, run it again.
 
@@ -68,7 +68,7 @@ npx playwright install chromium
 npm run sim
 ```
 
-Wait about 10 seconds. You should see this, and the terminal will stay busy. That is correct:
+Wait until the simulator prints the lines below. The terminal will stay busy. That is correct:
 
 ```text
 Simulator on http://localhost:4545  (open_app("mybakery") from @shipvo/mcp; Ctrl-C to stop)
@@ -90,7 +90,7 @@ Nothing here is a real camera or a real notification. The simulator says so in i
 
 Leave this terminal window open. Open a **second** terminal window for the next steps and go to your app again: `cd mybakery` (you may need the full path, such as `cd Documents/mybakery`).
 
-> **If something goes wrong:** "Port 4545 is in use" means a simulator is already running, perhaps in another window. Close that window, or press Ctrl + C in it, and try again. If the page does not load, wait 10 more seconds and refresh. Do not run `npm run sim` twice on the same port: the second run can leave you looking at an older build.
+> **If something goes wrong:** "Port 4545 is in use" means a simulator is already running, perhaps in another window. Close that window, or press Ctrl + C in it, and try again. If the page does not load, wait a little and refresh. Do not run `npm run sim` twice on the same port: the second run can leave you looking at an older build.
 
 ## 5. Let an assistant use your app (optional)
 
@@ -119,7 +119,7 @@ In your second terminal, open the file `src/release.ts` in any plain text editor
 export const RELEASE = { headline: "Fresh bread every morning from 6am.", note: "Order by 10pm for next-day pickup." };
 ```
 
-Save the file. Then go to the first terminal (the one running the simulator), press Ctrl + C to stop it, and start it again with `npm run sim`. Wait about 10 seconds and refresh the browser page. The simulator does not refresh by itself yet, so you must restart it after each change (watch mode is tracked in issue #27).
+Save the file. Then go to the first terminal (the one running the simulator), press Ctrl + C to stop it, and start it again with `npm run sim`. Wait until the simulator prints its ready line again, then refresh the browser page. The simulator does not refresh by itself yet, so you must restart it after each change (watch mode is tracked in issue #27).
 
 ![The app after the change: the banner now reads "Fresh bread every morning from 6am." with the note "Order by 10pm for next-day pickup."](/tutorials/first-app/04-edited-text.png)
 
@@ -133,7 +133,7 @@ A **dry run** builds and signs your release into a folder on your computer and s
 npx shipvo publish --dry-run --skip-web true --platform android
 ```
 
-(`--skip-web true` skips the browser copy so it runs faster. `--platform android` builds the Android release only.) It took about 12 seconds for us. You should see lines about "Bundled" and "Exported: dist-ota", and then one line of text in curly brackets ending in `"dry_run":true`, with the size in bytes. A size of about 1.75 million bytes (1.7 MB) is normal for the first release.
+(`--skip-web true` skips the browser copy so it runs faster. `--platform android` builds the Android release only.) You should see lines about "Bundled" and "Exported: dist-ota", and then one line of text in curly brackets ending in `"dry_run":true`, with the size in bytes.
 
 Now look at what it made:
 
