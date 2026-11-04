@@ -169,6 +169,20 @@ jobs:
           if [ "$N" -gt 0 ]; then START=$(( SEED % N )); TRIES=$(( N < 5 ? N : 5 )); for t in $(seq 0 $(( TRIES - 1 ))); do ORDER+=("$(( (START + t) % N ))"); done; fi
           [ "$PROVIDER" = "mistral" ] || ORDER+=("anon")   # anonymous mode exists only on the Kilo gateway
           echo "provider: $PROVIDER; keys available: $N; will try ${#ORDER[@]} credential(s)"
+          # Aider gets one turn here, so give it the files the task names up front instead of letting it ask.
+          mapfile -t FILES < <(python3 - <<'PY'
+          import os, re, glob
+          txt = open("/tmp/agent/prompt.md").read()
+          out = []
+          for m in re.findall(r"(?:packages|services|scripts|apps|docs|blog)/[\w./*{}-]+", txt):
+              m = m.rstrip(".,)`*/") or m
+              hits = [m] if os.path.isfile(m) else sorted(f for f in glob.glob(m.rstrip("/") + "/**/*", recursive=True) if os.path.isfile(f) and os.path.getsize(f) < 60000 and not re.search(r"node_modules|dist/|migrations/|\.(png|jpg|mp4|lock)$", f))[:6] if os.path.isdir(m.rstrip("/")) and m.rstrip("/").count("/") >= 2 else []
+              for h in hits:
+                  if h not in out: out.append(h)
+          for f in out[:14]: print("--file\n" + f)
+          PY
+          )
+          echo "files given to Aider: $(printf '%s ' "${FILES[@]}" | sed 's/--file //g')"
           for i in "${ORDER[@]}"; do
             if [ "$i" = "anon" ]; then export OPENAI_API_KEY="anonymous"; WHO="anonymous mode"; else export OPENAI_API_KEY="${K[$i]}"; WHO="key $(( i + 1 )) of $N"; fi
             # Mistral reasoning models return answers in parts; litellm's native mistral/ provider reads them, openai/ does not.
@@ -179,7 +193,7 @@ jobs:
             set +e
             aider --model "$LLM" --weak-model "$LLM" --model-settings-file /tmp/agent/aider-models.yml --timeout 900 --message-file /tmp/agent/prompt.md --read CLAUDE.md \
               --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
-              --edit-format diff --no-detect-urls --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
+              --edit-format diff --no-detect-urls --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 "${FILES[@]}" > /tmp/agent/aider.log 2>&1
             set -e
             tail -n 300 /tmp/agent/aider.log
             if grep -qiE "AuthenticationError|authentication token is invalid|invalid api key|401 Unauthorized" /tmp/agent/aider.log; then
