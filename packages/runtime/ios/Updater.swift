@@ -3,7 +3,7 @@ import Foundation
 struct UpdateError: Error { let message: String; init(_ m: String) { message = m } }
 
 /// Fetch, verify and stage the newest signed release for this device's band. Mirrors Android `check()`.
-/// iOS downloads full bundles only for now; a pointer's `patches` are ignored (an Android-only optimisation).
+/// Uses a bsdiff patch when the pointer lists one from the bundle this device runs; any patch problem falls back to the full bundle.
 enum Updater {
   private static func require(_ cond: Bool, _ msg: @autoclosure () -> String) throws { if !cond { throw UpdateError(msg()) } }
 
@@ -41,15 +41,26 @@ enum Updater {
     let tmp = s.dir.appendingPathComponent("dl-\(release).tmp")
     try? FileManager.default.removeItem(at: tmp)
 
+    var via = "full", downloadedBytes = 0
     let d0 = Store.now()
-    let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
-    let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
-    try require(dcode == 200, "bundle HTTP \(dcode)")
-    try FileManager.default.moveItem(at: fileURL, to: tmp)
-    let downloadMs = (Store.now() - d0) * 1000
+    var ready = false
+    if let patch = try? await patched(s, core: core, wantSha: wantSha, wantSize: wantSize, to: tmp) {
+      ready = true; via = "patch"; downloadedBytes = patch
+    }
+    var downloadMs = (Store.now() - d0) * 1000
+    if !ready {
+      let f0 = Store.now()
+      let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
+      let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
+      try require(dcode == 200, "bundle HTTP \(dcode)")
+      try? FileManager.default.removeItem(at: tmp)
+      try FileManager.default.moveItem(at: fileURL, to: tmp)
+      downloadMs += (Store.now() - f0) * 1000
+    }
 
     let v0 = Store.now()
     let size = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? -1
+    if via == "full" { downloadedBytes = size }
     let ok = try (size == wantSize && Verify.sha256Hex(file: tmp) == wantSha)
     if !ok { try? FileManager.default.removeItem(at: tmp); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
     let verifyMs = (Store.now() - v0) * 1000 + verifyPointerMs
@@ -58,8 +69,30 @@ enum Updater {
     try? FileManager.default.removeItem(at: dest)
     try FileManager.default.moveItem(at: tmp, to: dest)
     stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String)
-    return ["status": "staged", "release": release, "bytes": size, "via": "full", "bundleBytes": size,
+    return ["status": "staged", "release": release, "bytes": downloadedBytes, "via": via, "bundleBytes": size,
             "downloadMs": Int(downloadMs), "verifyMs": Int(verifyMs), "issuedAt": body["issued_at"] as? String ?? ""]
+  }
+
+  /// Try the patch from the bundle this device runs. Writes the rebuilt bundle to `tmp` and returns the patch size,
+  /// or throws (nothing left behind) so the caller can fetch the full bundle. The caller still checks the signed hash.
+  private static func patched(_ s: Store, core: [String: Any], wantSha: String, wantSize: Int, to tmp: URL) async throws -> Int {
+    guard let base = s.currentPath, s.currentSha != nil, FileManager.default.fileExists(atPath: base),
+          let list = core["patches"] as? [[String: Any]],
+          let entry = list.first(where: { $0["from_sha256"] as? String == s.currentSha }),
+          let purl = entry["url"] as? String, let psha = entry["sha256"] as? String, let psize = (entry["size"] as? NSNumber)?.intValue,
+          psize > 0, psize < wantSize else { throw UpdateError("no usable patch") }
+    do {
+      let (data, resp) = try await URLSession.shared.data(for: request(resolve(s, purl), etag: nil))
+      try require((resp as? HTTPURLResponse)?.statusCode == 200 && data.count == psize && Verify.sha256Hex(data) == psha, "patch download invalid")
+      let old = try Data(contentsOf: URL(fileURLWithPath: base))
+      try require(Verify.sha256Hex(old) == s.currentSha, "current bundle changed on disk")
+      let new = try Patch.apply(old: old, patch: data)
+      try require(new.count == wantSize && Verify.sha256Hex(new) == wantSha, "patched bundle does not match")
+      try new.write(to: tmp)
+      return psize
+    } catch {
+      try? FileManager.default.removeItem(at: tmp); s.addEvent("patch_failed"); throw error
+    }
   }
 
   /// Synchronous so the lock is never held across a suspension point.
