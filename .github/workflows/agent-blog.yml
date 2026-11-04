@@ -1,0 +1,18 @@
+# Content Lead: publishes one evidence-backed, SEO-minded article to shipvo.dev (blog + sitemap rebuild on merge).
+name: agent-blog
+on:
+  schedule: [{ cron: "17 6 * * 2,4,6" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: agent-blog }
+jobs:
+  run:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: blog
+      mode: branch
+      branch: agent/blog/${{ github.run_number }}
+      pr_labels: agent:claude,content
+      max_turns: 150
+      timeout: 90

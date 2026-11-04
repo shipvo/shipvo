@@ -75,6 +75,23 @@ for (const pr of prs) {
   }
 
   if (L.includes("needs-human")) continue;
+
+  // Nudge stuck PRs: events can be lost (GitHub hiccups, bot-made changes that do not trigger workflows).
+  const quietMin = (Date.now() - new Date(pr.updated_at)) / 6e4;
+  if (quietMin > 60 && L.includes("agent:changes-requested")) {
+    act(`re-request fix on #${n}`, () => {
+      gh("api", "-X", "DELETE", `repos/${REPO}/issues/${n}/labels/agent:changes-requested`);
+      gh("api", "-X", "POST", `repos/${REPO}/issues/${n}/labels`, "-f", "labels[]=agent:changes-requested");
+    });
+    continue;
+  }
+  if (quietMin > 60 && !L.some((l) => ["agent:approved", "agent:changes-requested", "agent:contract-check", "contract:drift"].includes(l))) {
+    act(`re-request review on #${n} (close and reopen)`, () => {
+      gh("api", "-X", "PATCH", `repos/${REPO}/pulls/${n}`, "-f", "state=closed");
+      gh("api", "-X", "PATCH", `repos/${REPO}/pulls/${n}`, "-f", "state=open");
+    });
+    continue;
+  }
   const files = apiAll(`repos/${REPO}/pulls/${n}/files?per_page=100`).map((f) => f.filename);
   const locked = files.filter((f) => LOCKED.some((re) => re.test(f)));
   if (locked.length) {

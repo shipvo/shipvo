@@ -53,11 +53,11 @@ New `@shipvo/*` packages come only from an issue labelled `new-package` (see `do
 - has a README with install, a runnable example and the API, and tests run by `pnpm -r test`;
 - depends on other `@shipvo/*` packages with `workspace:^`, and adds no other dependency without saying why;
 - is listed in the README's package table and gets a docs entry.
-The release train publishes every non-private package automatically.
+The release train publishes every non-private package automatically. Keep packages lean: ship only built code in `files`, no tests, fixtures, media or source maps unless needed; CI fails any package over 10 MB unpacked. Large media (videos, recordings) goes to Cloudflare R2, never into git or npm.
 
 ## Branches, commits and PRs
 
-- Aider branches: `agent/aider/issue-<n>`. Mistral branches: `agent/mistral/issue-<n>`. Claude branches: `agent/claude/issue-<n>`, `agent/pm/<n>`, `agent/design/<n>`, `agent/dogfood/<n>`, `agent/device-lab/<n>`, `agent/qa/<date>`, `agent/security/<date>`, `agent/docs/<date>`. Copilot branches: `copilot/*`.
+- Aider branches: `agent/aider/issue-<n>`. Mistral branches: `agent/mistral/issue-<n>`. Claude branches: `agent/claude/issue-<n>`, `agent/pm/<n>`, `agent/design/<n>`, `agent/dogfood/<n>`, `agent/device-lab/<n>`, `agent/qa/<date>`, `agent/security/<date>`, `agent/docs/<n>`, `agent/blog/<n>`, `agent/tutorial/<n>`, `agent/video/<n>`. Copilot branches: `copilot/*`.
 - Commit messages: `<area>: <what changed>` (for example `sim: keep refs stable across scroll`).
 - PR body: what changed, why, how it was tested, and `Fixes #<n>`.
 
