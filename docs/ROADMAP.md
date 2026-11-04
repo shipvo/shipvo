@@ -12,7 +12,7 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 
 ### 1. Update safety and reach
 - Shells declare the Hermes bytecode version they run, and mismatched releases are refused (epic #14).
-- bsdiff patches on iOS (issue #2); measure OTA apply time on a physical iPhone (issue #1).
+- bsdiff patches on iOS (issue #2); measure OTA apply time on the iOS Simulator in CI (issue #1).
 - Stronger rollback: rollback by cohort, automatic rollback on crash-rate thresholds from telemetry.
 - Docker self-hosting target for the control plane.
 - Resumable and delta downloads on slow networks; measure on low-end Android.
@@ -49,7 +49,7 @@ Bet 1, a bundle never reaches a shell that cannot run it (epic #14):
 
 Bet 2, iOS reaches Android update quality (epic #15):
 - [ ] #2 bsdiff patches on iOS
-- [ ] #1 Measure OTA apply time on a physical iPhone (needs a human with a phone)
+- [ ] #1 Measure OTA apply time on the iOS Simulator in CI
 
 Bet 3, first run in under 10 minutes, and measured (epic #16):
 - [ ] #19 `shipvo doctor`

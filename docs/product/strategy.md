@@ -19,8 +19,8 @@ Jobs:
 Why they would still choose something else today:
 
 - **Expo EAS Update** is the default for Expo apps. It has per-update rollout percentages, rollback commands, end-to-end code signing (paid plans only, per DeepWiki on `expo/expo`) and bsdiff patch support. Shipvo has no polished dashboard and a much smaller community.
-- **No track record.** We have one sample app and one physical device in the evidence. No outside team has told us they ship with Shipvo (all 8 issues to date were opened by one account).
-- **iOS is new.** The iOS runtime shipped on 2026-10-31. There are no bsdiff patches on iOS (#2) and no measurement on a physical iPhone (#1).
+- **No track record.** We have one sample app in the evidence. No outside team has told us they ship with Shipvo (all 8 issues to date were opened by one account).
+- **iOS is new.** The iOS runtime shipped on 2026-10-31. There are no bsdiff patches on iOS yet (#2), and iOS apply time is not yet published (#1).
 - **Bytecode safety is half done.** Publish now records the Hermes bytecode version (#10, #12), but shells do not check it yet.
 - **Maestro and mobile-mcp** already have users for agent-driven testing on real devices and emulators. Our simulator only covers what the app exposes in React Native Web.
 
@@ -64,7 +64,7 @@ Our honest edge: **update safety that we measured, plus an agent-testable simula
 **Bet 2: iOS reaches Android's update quality.**
 
 - Outcome: iOS apply time and patch size are measured, and patches are small.
-- How we will know: bsdiff patch on iOS verified in CI (#2); apply time on a physical iPhone published in `docs/spike-results.md` (#1, needs a human with a phone).
+- How we will know: bsdiff patch on iOS verified in CI (#2); iOS apply time measured on the iOS Simulator in CI and published in `docs/spike-results.md` (#1).
 - First slice: bsdiff patch apply in the Swift runtime with full-bundle fallback (#2). Epic #15.
 
 **Bet 3: First run in under 10 minutes, and we can see it.**
