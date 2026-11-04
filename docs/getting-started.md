@@ -114,7 +114,7 @@ Then edit `src/release.ts` and run `shipvo publish`. (In a GitHub repo, the work
 3. builds the web artifact of the same commit for the simulator (`/w/<app>/r<N>/`),
 4. signs the release pointer (Ed25519) and writes it for each cohort band (`b0` 1 %, `b1` 10 %, `b2` everyone).
 
-To check a release before you have a control plane or token, run `shipvo publish --dry-run [--out dir]`. It builds, signs and writes everything to `dir` (default `.shipvo/dry-run`) and sends nothing. Layout: `b/<app>/r<N>.hbc` (bundle), `p/<app>/<major>/<band>` (signed pointers; iOS under `p/<app>/<major>/ios/`), `h/<app>/r<N>` (release record), `w/<app>/r<N>/` (web export; add `--skip-web true` to skip it and run faster). The release is 1 unless you pass `--release N`, and no patches are built offline. Old files in `dir` are not cleared. `rollback` has no dry run yet.
+To check a release before you have a control plane or token, run `shipvo publish --dry-run [--out dir]`. It builds, signs and writes everything to `dir` (default `.shipvo/dry-run`), sends nothing, and prints a short summary (release, size in KB below 1 MB and MB above, folder). Layout: `b/<app>/r<N>.hbc` (bundle), `p/<app>/<major>/<band>` (signed pointers; iOS under `p/<app>/<major>/ios/`), `h/<app>/r<N>` (release record), `w/<app>/r<N>/` (web export; add `--skip-web true` to skip it and run faster). The release is 1 unless you pass `--release N`, and no patches are built offline. Old files in `dir` are not cleared. `rollback` has no dry run yet.
 
 If your first publish fails, run `shipvo doctor` first. It checks your Node version, `shipvo.json`, signing key match, control plane reachability, and `hermesBytecodeVersion` when present.
 

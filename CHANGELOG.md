@@ -4,6 +4,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **`shipvo publish --dry-run` prints a plain summary; `shipvo publish --help` lists the flags.** The dry run now ends with the release number, size (KB below 1 MB, otherwise MB), the output folder and "Nothing was sent", instead of one line of JSON. The bsdiff4 (pip) hint shows only when older releases exist to patch from. Migration: a script that parsed the JSON from `--dry-run` should read the files in the `--out` directory instead. A real publish still prints JSON.
 - **bsdiff patches on iOS.** The iOS runtime now applies BSDIFF40 patches listed in the signed pointer when the patch starts from the bundle the device is running. It checks the patch hash, then the rebuilt bundle's signed hash and size, and falls back to the full bundle on any problem. `shipvo publish --platform ios` now publishes patches from earlier iOS releases (stored as `b/<app>/ios-d-*.bsdiff`). Migration: nothing is required. Pointers without `patches` still work. There is no patch from the app's embedded bundle on iOS yet, so the first update after install is a full download.
 
 - **`shipvo verify <pointer> [public-key]`.** Checks the signature of a release pointer (`{body, signature}`, such as the files `publish --dry-run` writes) and prints `valid` or `INVALID`. The key defaults to the one from your signing seed. `verify-json` is unchanged and still checks `signDoc` documents only. Migration: none needed.
