@@ -42,8 +42,7 @@ jobs:
       pr_number: ${{ steps.post.outputs.pr_number }}
       report: ${{ steps.post.outputs.report }}
     env:
-      AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
-      REPO: ${{ github.repository }}
+      REPO: ${{ github.repository }}   # AGENT_TOKEN is passed only to the steps that need it, never to the agent
     steps:
       - name: Check secrets
         id: chk
@@ -52,6 +51,7 @@ jobs:
           O: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           K: ${{ secrets.OPENAI_COMPAT_API_KEY }}
           ENGINE: ${{ inputs.engine }}
+          AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
         run: |
           KEY="$A$O"; [ "$ENGINE" = "aider" ] && KEY="${K:-anonymous}"   # Kilo serves free models without a key
           if [ -z "$AGENT_TOKEN" ] || [ -z "$KEY" ]; then
@@ -157,7 +157,7 @@ jobs:
             --max-turns ${{ inputs.max_turns }}
             --model ${{ inputs.model || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
             --mcp-config '{"mcpServers":{"deepwiki":{"type":"http","url":"https://mcp.deepwiki.com/mcp"}}}'
-            --allowedTools "mcp__deepwiki__read_wiki_structure,mcp__deepwiki__read_wiki_contents,mcp__deepwiki__ask_wiki_question,Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*),Bash(adb:*),Bash(bash:*),Bash(sh:*),Bash(curl:*),Bash(sleep:*),Bash(timeout:*),Bash(date:*),Bash(java:*),Bash(./gradlew:*),Bash(tar:*),Bash(unzip:*),Bash(pip:*),Bash(echo:*),Bash(cd:*),Bash(kill:*),Bash(pkill:*),Bash(ps:*)"
+            --allowedTools "${{ inputs.mode != 'read' && 'Bash,' || '' }}mcp__deepwiki__read_wiki_structure,mcp__deepwiki__read_wiki_contents,mcp__deepwiki__ask_wiki_question,Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*),Bash(adb:*),Bash(bash:*),Bash(sh:*),Bash(curl:*),Bash(sleep:*),Bash(timeout:*),Bash(date:*),Bash(java:*),Bash(./gradlew:*),Bash(tar:*),Bash(unzip:*),Bash(pip:*),Bash(echo:*),Bash(cd:*),Bash(kill:*),Bash(pkill:*),Bash(ps:*)"
             --disallowedTools "Bash(git push:*),Bash(gh pr merge:*),Bash(gh api:*),Bash(gh release:*),Bash(gh secret:*),Bash(gh workflow:*),Bash(npm publish:*),Bash(pnpm publish:*)"
 
       - name: Set up Python for Aider
@@ -271,6 +271,12 @@ jobs:
           [ "$ISSUE" != "0" ] && ! grep -qi "#$ISSUE" /tmp/agent/pr_body.md && printf '\nFixes #%s\n' "$ISSUE" >> /tmp/agent/pr_body.md
           printf '\n\n---\nOpened by the Shipvo agent team ([run](%s)).\n' "$RUN_URL" >> /tmp/agent/pr_body.md
           ARGS=(--label agent-pr); IFS=',' read -ra L <<< "$PR_LABELS"; for l in "${L[@]}"; do [ -n "$l" ] && ARGS+=(--label "$l"); done
-          URL=$(gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md "${ARGS[@]}")
+          URL=""
+          for a in 1 2 3 4; do
+            URL=$(gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md "${ARGS[@]}" 2>/dev/null) && break
+            URL=$(gh api "repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&state=open" --jq '.[0].html_url // empty')   # created despite an error?
+            [ -n "$URL" ] && break; echo "PR create failed, retrying"; sleep $(( a * 15 ))
+          done
+          [ -n "$URL" ] || { echo "::error::could not open the PR"; exit 1; }
           echo "pr_number=${URL##*/}" >> "$GITHUB_OUTPUT"
           [ "$ISSUE" != "0" ] && gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress --add-label agent:pr-open || true

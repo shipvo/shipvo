@@ -118,8 +118,16 @@ for (const pr of prs) {
   }
   if (budget <= 0) { log(`daily merge cap reached; #${n} waits`); continue; }
 
-  act(`merge #${n} ${pr.title}`, () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/merge`,
-    "-f", "merge_method=squash", "-f", `commit_title=${pr.title} (#${n})`, "-f", `sha=${full.head.sha}`));
+  // GitHub sometimes answers 5xx even when the merge went through; retry, then check before deleting anything.
+  let merged = false;
+  for (let attempt = 1; attempt <= 3 && !merged; attempt++) {
+    act(`merge #${n} ${pr.title} (attempt ${attempt})`, () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/merge`,
+      "-f", "merge_method=squash", "-f", `commit_title=${pr.title} (#${n})`, "-f", `sha=${full.head.sha}`));
+    if (DRY) break;
+    try { merged = api(`repos/${REPO}/pulls/${n}`).merged === true; } catch { merged = false; }
+    if (!merged && attempt < 3) execFileSync("sleep", [String(attempt * 10)]);
+  }
+  if (!merged) { log(`#${n}: merge did not go through; will retry on the next pass`); continue; }
   act(`delete branch ${pr.head.ref}`, () => gh("api", "-X", "DELETE", `repos/${REPO}/git/refs/heads/${pr.head.ref}`));
   budget--;
 }
