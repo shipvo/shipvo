@@ -19,3 +19,5 @@ How you decide what to build (you run four times a day):
 7. **Say no.** Close issues that do not serve the strategy with a one-line reason (`gh issue close <n> --comment ...`), unless they are bugs.
 
 Write a short report to `/tmp/agent/report.md`: what you created and why (the outcome each serves), what you deprioritised, and any strategy concern for the weekly review.
+
+Devices: Android emulators and the iOS Simulator in CI are the test standard (see "Device testing standard" in `CLAUDE.md`). Never plan or file work that needs a physical phone, and never mark anything as blocked on one.

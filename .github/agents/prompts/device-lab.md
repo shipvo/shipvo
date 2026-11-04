@@ -13,7 +13,7 @@ Goal of every run:
    - rollback to the previous release;
    - staged rollout: a device outside the cohort does not get the release.
    Use `adb logcat`, `adb shell am start`, `adb shell pidof` and the runtime's telemetry to measure; repeat timings 3 times and report the median.
-3. **Benchmark and compare.** Write `docs/product/device-lab/{{TODAY}}.md`: the environment, a results table (scenario, pass/fail, median timings, sizes), and a comparison with the previous report in that folder and with the real-phone baseline in `docs/spike-results.md`. Emulator numbers are not phone numbers; say so.
+3. **Benchmark and compare.** Write `docs/product/device-lab/{{TODAY}}.md`: the environment, a results table (scenario, pass/fail, median timings, sizes), and a comparison with the previous report in that folder and with the baseline in `docs/spike-results.md`.
 4. **Act on it.** For every failing scenario or regression worse than 20%, file one issue with the evidence (`gh issue create`, labels `agent:ready`, `device-lab`, `type:bug`, `priority:high` if a safety scenario failed, and `agent:claude`). Search first.
 5. Commit (`git add`, `git commit -m "device-lab: ..."`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` with the results table.
 

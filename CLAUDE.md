@@ -32,6 +32,10 @@ Node 22, pnpm 10. CI (`.github/workflows/ci.yml`, job `test`) must pass before a
 - **Match the code around you.** TypeScript strict, ES modules, no new dependencies unless the issue needs one (say why in the PR).
 - **Write plain English** in docs, comments and PR text: short sentences, no hype words.
 
+## Device testing standard
+
+Android emulators and the iOS Simulator in CI are our device test standard. Prove features there and ship on that evidence. Never block work, mark an issue `needs-human`, or file an issue because something has not been tried on a physical phone, and do not add "not tested on a real device" notes to docs, the site, the README or release notes. Report what CI measured, on what, as it is.
+
 ## Never do these
 
 - Never edit files under `.github/`, this `CLAUDE.md`, or `scripts/agents/`. The team's own rules and workflows change only through a human.

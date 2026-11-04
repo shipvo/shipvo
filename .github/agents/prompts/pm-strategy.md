@@ -26,3 +26,5 @@ For each bet, make sure the backlog has an `epic` issue and its first 2–3 slic
 Rules: only real, linked evidence; never invent users, numbers or quotes; do not copy competitors' text or code. No changes outside `docs/product/` and `docs/ROADMAP.md`; `docs/product/platform.md` keeps its mission section exactly as the owner wrote it.
 
 Commit (`git add`, `git commit -m "product: weekly strategy review"`). Do not push. Write `/tmp/agent/pr_title.txt` ("product: strategy review <date>") and `/tmp/agent/pr_body.md` (the 5-line summary: what we learned, what changed, the bets).
+
+Devices: Android emulators and the iOS Simulator in CI are the test standard (see "Device testing standard" in `CLAUDE.md`). Never plan or file work that needs a physical phone, and never mark anything as blocked on one.
