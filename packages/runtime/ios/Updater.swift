@@ -19,7 +19,7 @@ enum Updater {
   static func check(_ s: Store) async throws -> [String: Any] {
     try require(!s.baseUrl.isEmpty && !s.publicKey.isEmpty && !s.appId.isEmpty, "runtime not configured")
     let known = max(s.currentRelease, s.pendingRelease, s.blockedRelease)
-    let (data, resp) = try await URLSession.shared.data(for: request("\(s.baseUrl)/p/\(s.appId)/\(s.shellMajor)/ios/\(s.band).json", etag: known > 0 ? "\"\(known)\"" : nil))
+    let (data, resp) = try await URLSession.shared.data(for: try request("\(s.baseUrl)/p/\(s.appId)/\(s.shellMajor)/ios/\(s.band).json", etag: known > 0 ? "\"\(known)\"" : nil))
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
     if code == 304 || code == 404 { return ["status": "none"] }
     try require(code == 200, "pointer HTTP \(code)")
