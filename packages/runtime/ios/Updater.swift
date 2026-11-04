@@ -61,13 +61,11 @@ enum Updater {
         try? FileManager.default.removeItem(at: tmp)
         try FileManager.default.moveItem(at: fileURL, to: tmp)
       } else if dcode == 206 {
+        // Append downloaded bytes to partial file
+        if let data = try? Data(contentsOf: fileURL) {
+          try data.write(to: partial)
+        }
         try? FileManager.default.removeItem(at: tmp)
-        try FileManager.default.moveItem(at: fileURL, to: partial)
-        let (fileURL2, dresp2) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
-        let dcode2 = (dresp2 as? HTTPURLResponse)?.statusCode ?? 0
-        try require(dcode2 == 200, "bundle HTTP \(dcode2)")
-        try? FileManager.default.removeItem(at: tmp)
-        try FileManager.default.moveItem(at: fileURL2, to: tmp)
         downloadMs += (Store.now() - f0) * 1000
       } else {
         try require(false, "bundle HTTP \(dcode)")

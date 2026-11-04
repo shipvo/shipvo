@@ -196,16 +196,3 @@ private extension Data {
     self = d
   }
 }
-
-private extension FileManager {
-  func exists(atPath path: String) -> Bool { self.fileExists(atPath: path) }
-}
-
-private extension Data {
-  func append(to url: URL) throws {
-    if let data = try? Data(contentsOf: url) {
-      self = data + self
-    }
-    try write(to: url)
-  }
-}
