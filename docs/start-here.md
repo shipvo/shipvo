@@ -55,7 +55,7 @@ Follow [Test with an assistant](test-with-an-assistant.md). It takes you through
 npx shipvo publish --dry-run
 ```
 
-This builds and signs an update on your computer and sends it nowhere. It is safe to run any time. It writes its files to `.shipvo/dry-run`. A good result ends with a line that says `dry run: nothing is sent anywhere`.
+This builds and signs an update on your computer and sends it nowhere. It is safe to run any time. It writes its files to `.shipvo/dry-run`. The first line it prints is `dry run: nothing is sent anywhere; files go to .shipvo/dry-run`. It runs `expo export`, so it can take a few minutes. It ends without an error.
 
 ## Next steps
 

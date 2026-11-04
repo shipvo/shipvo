@@ -6,7 +6,7 @@ Every Shipvo word in plain English, in alphabetical order. If a page uses a word
 
 **Agent.** An AI assistant, such as Claude or ChatGPT, that can use tools. In Shipvo an agent uses your app through the simulator.
 
-**Band.** A slice of your users. A release goes to band `b0` (1 %) first, then `b1` (10 %), then `b2` (everyone). A phone is placed in a band by the control plane.
+**Band.** A slice of your users. A release goes to band `b0` (1 %) first, then `b1` (10 %), then `b2` (everyone).
 
 **bsdiff patch.** A small file that describes only what changed between two bundles. Phones download the patch instead of the whole bundle, so most updates are small.
 

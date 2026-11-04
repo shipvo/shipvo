@@ -42,7 +42,7 @@ Unknown flags are errors. Write a value after a space (`--out dir`), not `--out=
 | `--max-bases N` | How many earlier releases to build patches against. Default 6. |
 | `--skip-export` | Reuse the bundle already exported instead of running `expo export`. |
 | `--skip-web true` | Skip the web build for the simulator. |
-| `--dry-run` | Build and sign, write to a local folder, send nothing. No login or token needed, only the signing seed. |
+| `--dry-run` | Runs `expo export` (this can take a while), builds and signs, write to a local folder, send nothing. No login or token needed, only the signing seed. |
 | `--out <dir>` | Folder for `--dry-run` output. Default `.shipvo/dry-run`. Errors without `--dry-run`. |
 
 `rollback` has no dry run yet.
