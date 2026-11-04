@@ -7,10 +7,11 @@ struct UpdateError: Error { let message: String; init(_ m: String) { message = m
 enum Updater {
   private static func require(_ cond: Bool, _ msg: @autoclosure () -> String) throws { if !cond { throw UpdateError(msg()) } }
 
-  private static func request(_ url: String, etag: String?) throws -> URLRequest {
+  private static func request(_ url: String, etag: String?, range: String? = nil) throws -> URLRequest {
     guard let u = URL(string: url) else { throw UpdateError("bad url \(url)") }
     var r = URLRequest(url: u, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
     if let etag { r.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+    if let range { r.setValue(range, forHTTPHeaderField: "Range") }
     return r
   }
 
@@ -38,8 +39,9 @@ enum Updater {
 
     guard let core = body["core"] as? [String: Any], let wantSha = core["sha256"] as? String,
           let wantSize = (core["size"] as? NSNumber)?.intValue, let url = core["url"] as? String else { throw UpdateError("pointer core incomplete") }
-    let tmp = s.dir.appendingPathComponent("dl-\(release).tmp")
-    try? FileManager.default.removeItem(at: tmp)
+    let tmp = s.dir.appendingPathComponent("dl-\(wantSha).tmp")
+    let partial = s.partialPath(for: wantSha)
+    try? FileManager.default.removeItem(at: partial)
 
     var via = "full", downloadedBytes = 0
     let d0 = Store.now()
@@ -50,12 +52,24 @@ enum Updater {
     var downloadMs = (Store.now() - d0) * 1000
     if !ready {
       let f0 = Store.now()
-      let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
+      let resumeData = partial.exists() ? try Data(contentsOf: partial) : nil
+      let rangeHeader = resumeData.map { "bytes=\(resumeData.count)-" } ?? "bytes=0-"
+      let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil, range: rangeHeader))
       let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
-      try require(dcode == 200, "bundle HTTP \(dcode)")
-      try? FileManager.default.removeItem(at: tmp)
-      try FileManager.default.moveItem(at: fileURL, to: tmp)
-      downloadMs += (Store.now() - f0) * 1000
+      if dcode == 200 {
+        try? FileManager.default.removeItem(at: partial)
+        try? FileManager.default.removeItem(at: tmp)
+        let (fileURL2, dresp2) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
+        let dcode2 = (dresp2 as? HTTPURLResponse)?.statusCode ?? 0
+        try require(dcode2 == 200, "bundle HTTP \(dcode2)")
+        try? FileManager.default.removeItem(at: tmp)
+        try FileManager.default.moveItem(at: fileURL2, to: tmp)
+      } else {
+        try require(dcode == 206, "bundle HTTP \(dcode)")
+        if let resumeData { try resumeData.append(to: tmp) }
+        try? FileManager.default.removeItem(at: fileURL)
+        downloadMs += (Store.now() - f0) * 1000
+      }
     }
 
     let v0 = Store.now()

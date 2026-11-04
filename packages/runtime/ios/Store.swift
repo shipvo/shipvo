@@ -87,6 +87,10 @@ final class Store {
   var appId: String { o?.appId ?? plist("ShipvoAppId") ?? "" }
   var shellMajor: Int { if let o { return o.shellMajor }; return Int(plist("ShipvoShellMajor") ?? "1") ?? 1 }
 
+  // MARK: partial downloads
+  /// Path to a partial download for the given release sha256.
+  func partialPath(for sha256: String) -> URL { return dir.appendingPathComponent("dl-\(sha256).tmp") }
+
   // MARK: per-process state
   /// Which release the JS running right now came from (set when the bundle is selected).
   static var runningRelease = 0

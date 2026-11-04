@@ -144,6 +144,39 @@ final class RuntimeTests: XCTestCase {
     XCTAssertFalse(FileManager.default.fileExists(atPath: first))
   }
 
+  func testResumesDownloadFromPartialFile() async throws {
+    let s = store("good")
+    let partial = s.partialPath(for: bundleSha)
+    try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!).write(to: partial)
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["via"] as? String, "full")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: s.pendingPath!))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))
+  }
+
+  func testRestartsDownloadWhenServerReturns200ForRangeRequest() async throws {
+    let s = store("good")
+    let partial = s.partialPath(for: bundleSha)
+    try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!).write(to: partial)
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["via"] as? String, "full")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: s.pendingPath!))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))
+  }
+
+  func testDeletesCorruptedPartialFileAndSucceeds() async throws {
+    let s = store("good")
+    let partial = s.partialPath(for: bundleSha)
+    try Data([0xDE, 0xAD]).write(to: partial)
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["via"] as? String, "full")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: s.pendingPath!))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))
+  }
+
   func testSemver() {
     XCTAssertTrue(Verify.semverLess("1.0.2", "1.1.0")); XCTAssertFalse(Verify.semverLess("1.1.0", "1.1.0")); XCTAssertFalse(Verify.semverLess("2.0.0", "1.9.9"))
     XCTAssertTrue(Verify.semverLess("1.0", "1.0.1"))
@@ -163,5 +196,18 @@ private extension Data {
     var d = Data(); var i = hex.startIndex
     while i < hex.endIndex { let j = hex.index(i, offsetBy: 2); d.append(UInt8(hex[i..<j], radix: 16)!); i = j }
     self = d
+  }
+}
+
+private extension FileManager {
+  func exists(atPath path: String) -> Bool { self.fileExists(atPath: path) }
+}
+
+private extension Data {
+  func append(to url: URL) throws {
+    if let data = try? Data(contentsOf: url) {
+      self = data + self
+    }
+    try write(to: url)
   }
 }
