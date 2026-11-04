@@ -1,0 +1,54 @@
+# Release train (no AI): once a day, if main is green, publishes a patch release of every
+# @shipvo package whose code changed, with a CHANGELOG entry and a tag. Pushing main to the
+# `release` branch runs publish-npm. Set the repo variable AGENT_RELEASES=false to stop releases.
+name: agent-release
+on:
+  schedule: [{ cron: "41 18 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency: { group: agent-release }
+jobs:
+  release:
+    if: vars.AGENTS_PAUSED != 'true' && vars.AGENT_RELEASES != 'false'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      R: ${{ github.repository }}
+    steps:
+      - name: Only release a green main
+        id: gate
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::warning::Add the AGENT_TOKEN secret"; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          SHA=$(gh api repos/$R/commits/main --jq .sha)
+          CI=$(gh api "repos/$R/commits/$SHA/check-runs?check_name=test" --jq '[.check_runs[]|.conclusion][0] // "none"')
+          RED=$(gh issue list -R $R --label ci-main --state open --json number --jq length)
+          echo "main $SHA ci=$CI open-ci-issues=$RED"
+          if [ "$CI" = "success" ] && [ "$RED" = "0" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; echo "sha=$SHA" >> "$GITHUB_OUTPUT"; else echo "go=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+        with: { ref: "${{ steps.gate.outputs.sha }}", fetch-depth: 0, persist-credentials: false }
+      - name: Bump changed packages
+        if: steps.gate.outputs.go == 'true'
+        run: node scripts/agents/release.mjs
+      - name: Changelog, commit, tag, push to release
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          N=$(node -e "console.log(require('/tmp/release.json').length)")
+          [ "$N" != "0" ] || { echo "nothing to release"; exit 0; }
+          DATE=$(date -u +%Y-%m-%d); TAG="release-$(date -u +%Y%m%d)"
+          node - <<'JS'
+          const fs = require("fs"); const r = require("/tmp/release.json");
+          const date = new Date().toISOString().slice(0, 10);
+          let entry = `## ${date} (release)\n\n` + r.map((p) => `- **${p.name} ${p.to}**: ${p.changes.slice(0, 5).map((c) => c.replace(/ \(#\d+\)$/, "")).join("; ")}`).join("\n") + "\n\n";
+          const c = fs.readFileSync("CHANGELOG.md", "utf8"); const i = c.indexOf("\n## ");
+          fs.writeFileSync("CHANGELOG.md", i < 0 ? c + "\n" + entry : c.slice(0, i + 1) + entry + c.slice(i + 1));
+          JS
+          git config user.name "Shipvo Release Bot"; git config user.email "agents@shipvo.dev"
+          git add -A packages CHANGELOG.md
+          git commit -qm "release: $(node -e "console.log(require('/tmp/release.json').map(p=>p.name+' '+p.to).join(', '))")"
+          git tag -a "$TAG" -m "Release $DATE"
+          U="https://x-access-token:${GH_TOKEN}@github.com/${R}.git"
+          for a in 1 2 3; do git push "$U" HEAD:refs/heads/main && break; sleep $((a*15)); done
+          git push "$U" "$TAG"
+          git push --force "$U" HEAD:refs/heads/release
+          echo "released: $(cat /tmp/release.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).map(p=>p.name+" "+p.to).join(", ")))')" >> "$GITHUB_STEP_SUMMARY"

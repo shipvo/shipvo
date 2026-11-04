@@ -1,0 +1,19 @@
+# Research lead: every 6 hours, searches the web (competitors, platform changes, developer pain,
+# agents and MCP) and turns evidence into issues for the engineers.
+name: agent-research
+on:
+  schedule: [{ cron: "37 */6 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: read, actions: read, id-token: write }
+concurrency: { group: agent-research }
+jobs:
+  research:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: research
+      mode: read
+      model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
+      max_turns: 90
+      timeout: 45
+      vars: '{"MAX_NEW": "${{ vars.AGENT_MAX_RESEARCH_ISSUES || 3 }}"}'

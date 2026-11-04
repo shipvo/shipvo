@@ -101,6 +101,7 @@ jobs:
           v.setdefault("BRANCH", os.environ["BRANCH"])
           v.setdefault("TODAY", datetime.date.today().isoformat())
           v.setdefault("SINCE", (datetime.date.today() - datetime.timedelta(days=7)).isoformat())
+          v["HOUR"] = str(datetime.datetime.utcnow().hour)
           v.setdefault("YESTERDAY", (datetime.date.today() - datetime.timedelta(days=1)).isoformat())
           t = open(f".github/agents/prompts/{os.environ['ROLE']}.md").read()
           for k, val in v.items():

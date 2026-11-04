@@ -11,7 +11,7 @@
 import { execFileSync } from "node:child_process";
 
 const REPO = process.env.GITHUB_REPOSITORY;
-const MAX_MERGES = Number(process.env.AGENT_MAX_MERGES_PER_DAY || 20);
+const MAX_MERGES = Number(process.env.AGENT_MAX_MERGES_PER_DAY || 40);
 const STALE_DAYS = Number(process.env.AGENT_STALE_DAYS || 4);
 const DRY = process.env.DRY_RUN === "true";
 

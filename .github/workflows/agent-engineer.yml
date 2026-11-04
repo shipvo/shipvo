@@ -3,7 +3,7 @@
 name: agent-engineer
 on:
   issues: { types: [labeled] }
-  schedule: [{ cron: "23 */2 * * *" }]
+  schedule: [{ cron: "23 * * * *" }]
   workflow_dispatch:
     inputs:
       issue: { description: "Issue number (optional)", type: number, required: false }
@@ -20,7 +20,7 @@ jobs:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
       REPO: ${{ github.repository }}
       WANT: ${{ github.event.issue.number || inputs.issue || '' }}
-      MAX_ACTIVE: ${{ vars.AGENT_CLAUDE_MAX_ACTIVE || 3 }}
+      MAX_ACTIVE: ${{ vars.AGENT_CLAUDE_MAX_ACTIVE || 4 }}
     steps:
       - id: pick
         run: |

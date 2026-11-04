@@ -2,7 +2,7 @@
 # for the Claude and Copilot engineers. Writes no code.
 name: agent-planner
 on:
-  schedule: [{ cron: "17 5 * * *" }]
+  schedule: [{ cron: "17 5,11,17,23 * * *" }]
   workflow_dispatch:
 permissions: { contents: read, issues: write, pull-requests: read, actions: read, id-token: write }
 concurrency: { group: agent-planner }
@@ -16,4 +16,4 @@ jobs:
       model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
       max_turns: 80
       timeout: 40
-      vars: '{"MAX_BACKLOG": "${{ vars.AGENT_MAX_BACKLOG || 12 }}", "MAX_NEW": "${{ vars.AGENT_MAX_NEW_ISSUES || 5 }}"}'
+      vars: '{"MAX_BACKLOG": "${{ vars.AGENT_MAX_BACKLOG || 20 }}", "MAX_NEW": "${{ vars.AGENT_MAX_NEW_ISSUES || 4 }}"}'
