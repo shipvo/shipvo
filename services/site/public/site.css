@@ -248,6 +248,8 @@ footer.old{display:none}
 .foot-grid{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:28px}
 .foot-grid>div{display:flex;flex-direction:column;gap:9px}
 .foot-grid a:hover{color:var(--paper)}
+.listing-badge{display:inline-block;margin-top:6px;line-height:0}
+.listing-badge img{width:200px;height:50px}
 .foot-title{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
 .foot-brand p{margin:0;max-width:30ch}
 .foot .small{font-size:12.5px;color:var(--dim)}
