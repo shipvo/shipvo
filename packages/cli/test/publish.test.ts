@@ -2,17 +2,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 
 const exec = vi.hoisted(() => ({ fn: (_cmd: string) => {} }));
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string) => exec.fn(c) }));
 
 const puts: string[] = [];
 const values = new Map<string, string>();
+const blobs = new Map<string, Uint8Array>();
 const stub = {
   get: async (k: string) => values.get(k) ?? null,
-  getBytes: async () => null,
-  keys: async () => [] as string[],
-  put: async (k: string, body: unknown) => { puts.push(k); values.set(k, typeof body === "string" ? body : ""); },
+  getBytes: async (k: string) => blobs.get(k) ?? null,
+  keys: async (prefix: string) => [...values.keys(), ...blobs.keys()].filter((k) => k.startsWith(prefix)),
+  put: async (k: string, body: unknown) => { puts.push(k); values.set(k, typeof body === "string" ? body : ""); if (typeof body !== "string") blobs.set(k, body as Uint8Array); },
 };
 vi.mock("../src/config.js", async (orig) => ({
   ...(await orig<typeof import("../src/config.js")>()),
@@ -31,7 +33,7 @@ const fakeHbc = (version: number) => {
 
 let cwd: string, prev: string;
 beforeEach(() => {
-  puts.length = 0; values.clear(); exec.fn = () => {};
+  puts.length = 0; values.clear(); blobs.clear(); exec.fn = () => {};
   prev = process.cwd(); cwd = mkdtempSync(join(tmpdir(), "shipvo-pub-"));
   writeFileSync(join(cwd, "app.json"), JSON.stringify({ expo: { version: "1.0.0" } }));
   mkdirSync(join(cwd, "dist-ota/_expo/static/js/android"), { recursive: true });
@@ -146,5 +148,27 @@ describe("publish and the Hermes bytecode check", () => {
     writeFileSync(join(cwd, ".shipvo/dry-run/h/demo/r7"), JSON.stringify({ release: 7, sha256: "x" }));
     await publish([...flags, "--dry-run"]);
     expect(JSON.parse(String((console.log as any).mock.calls[0][0]))).toMatchObject({ release: 1 });
+  });
+
+  it("iOS patches start only from earlier iOS releases, Android only from Android", async () => {
+    // Stand-in for bsdiff4: the import check passes and the diff command writes a small patch file.
+    exec.fn = (c) => { const m = c.match(/'([^']*p\.bsdiff)'/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
+    const make = (tag: number) => { const b = fakeHbc(96); b[20] = tag; return b; }; // the tag makes each bundle's hash different
+    const bundle = (pf: string, tag: number) => {
+      mkdirSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}`), { recursive: true });
+      writeFileSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}/index.hbc`), make(tag));
+    };
+    const sha = (tag: number) => createHash("sha256").update(make(tag)).digest("hex");
+    const run = (release: number) => publish(["--skip-export", "true", "--skip-web", "true", "--bands", "b0", "--platform", "all", "--release", String(release)]);
+    bundle("android", 1); bundle("ios", 2); await run(1);
+    bundle("android", 3); bundle("ios", 4); await run(2);
+
+    const core = (key: string) => JSON.parse(JSON.parse(values.get(key)!).body).core;
+    const ios = core("p/demo/1/ios/b0"), android = core("p/demo/1/b0");
+    expect(ios.patches.map((p: any) => p.from_sha256)).toEqual([sha(2)]);
+    expect(ios.patches[0].url).toBe(`b/demo/ios-d-${sha(2).slice(0, 16)}-r2.bsdiff`);
+    expect(android.patches.map((p: any) => p.from_sha256)).toEqual([sha(1)]);
+    expect(android.patches[0].url).toBe(`b/demo/d-${sha(1).slice(0, 16)}-r2.bsdiff`);
+    expect(puts).toContain(ios.patches[0].url);
   });
 });
