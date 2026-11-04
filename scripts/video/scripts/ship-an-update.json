@@ -1,0 +1,67 @@
+{
+  "slug": "ship-an-update",
+  "title": "Ship an update to phones in minutes",
+  "tutorial": "docs/getting-started.md#5-publish-over-the-air",
+  "voice": "af_heart",
+  "scenes": [
+    {
+      "id": "hook",
+      "visual": "hook",
+      "min": 6,
+      "narration": "You found a bug. Your app is already on people's phones. Do you wait days to fix it? With Shipvo, you fix it in minutes."
+    },
+    {
+      "id": "idea",
+      "visual": "idea",
+      "min": 6,
+      "narration": "This is called an O T A update. O T A means over the air. The phone gets the new version straight from you, like a web page.",
+      "caption": "This is called an OTA update. OTA means over the air. The phone gets the new version straight from you, like a web page."
+    },
+    {
+      "id": "edit",
+      "visual": "edit",
+      "min": 6,
+      "narration": "Step one. Edit your app. In a Shipvo app, the first file to change is source, release, dot T S.",
+      "caption": "Step one. Edit your app. In a Shipvo app, the first file to change is src/release.ts."
+    },
+    {
+      "id": "publish",
+      "visual": "publish",
+      "min": 6,
+      "narration": "Step two. Run one command. Shipvo publish.",
+      "caption": "Step two. Run one command. shipvo publish."
+    },
+    {
+      "id": "build",
+      "visual": "build",
+      "min": 8,
+      "narration": "Shipvo builds your new bundle and takes its fingerprint. Then it builds small patches, so phones download only what changed."
+    },
+    {
+      "id": "sign",
+      "visual": "sign",
+      "min": 9,
+      "narration": "Then it signs the release with your private key. That key stays on your machine. Phones check the signature before they apply anything. So a stolen publish token cannot ship code to your users."
+    },
+    {
+      "id": "rollout",
+      "visual": "rollout",
+      "min": 8,
+      "narration": "Releases go out in three groups. One percent of users. Then ten percent. Then everyone."
+    },
+    {
+      "id": "safety",
+      "visual": "safety",
+      "min": 9,
+      "narration": "If a release fails to start three times on a phone, that phone throws it away. And if you need to go back, one command, shipvo rollback, sends an older release to everyone.",
+      "caption": "If a release fails to start three times on a phone, that phone throws it away. And if you need to go back, one command, shipvo rollback, sends an older release to everyone."
+    },
+    {
+      "id": "cta",
+      "visual": "cta",
+      "min": 8,
+      "narration": "Back up your signing seed first. Then try it yourself. The full guide is at shipvo dot dev, slash docs, slash getting started.",
+      "caption": "Back up your signing seed first. Then try it yourself. The full guide is at shipvo.dev/docs/getting-started."
+    }
+  ]
+}

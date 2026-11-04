@@ -6,14 +6,21 @@ name: agent-fixer
 on:
   workflow_run: { workflows: [ci], types: [completed] }
   pull_request: { types: [labeled] }
+  # GitHub sends no pull_request events for a PR with merge conflicts, so the merge bot calls this directly.
+  workflow_dispatch:
+    inputs:
+      pr: { description: "PR number", required: true }
+      branch: { description: "PR head branch", required: true }
+      label: { description: "Why: agent:conflict or agent:changes-requested", required: false, default: "agent:changes-requested" }
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
 jobs:
   route:
-    concurrency: { group: "agent-fix-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}" }
+    concurrency: { group: "agent-fix-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref || inputs.branch }}" }
     if: >-
       vars.AGENTS_PAUSED != 'true' && (
         (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure') ||
-        (github.event_name == 'pull_request' && contains(fromJSON('["agent:changes-requested","agent:conflict"]'), github.event.label.name)))
+        (github.event_name == 'pull_request' && contains(fromJSON('["agent:changes-requested","agent:conflict"]'), github.event.label.name)) ||
+        github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     outputs:
       pr: ${{ steps.r.outputs.pr }}
@@ -24,9 +31,9 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
       R: ${{ github.repository }}
-      BRANCH: ${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
+      BRANCH: ${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref || inputs.branch }}
       EVENT: ${{ github.event_name }}
-      LABEL: ${{ github.event.label.name }}
+      LABEL: ${{ github.event.label.name || inputs.label }}
       RUN_ID: ${{ github.event.workflow_run.id }}
       RUN_URL: ${{ github.event.workflow_run.html_url }}
       MAX_ROUNDS: ${{ vars.AGENT_MAX_FIX_ROUNDS || 3 }}
@@ -75,7 +82,9 @@ jobs:
           if E["EVENT"] == "workflow_run":
               reason = f"CI failed: {E['RUN_URL']} (run id {E['RUN_ID']})."
           elif E["LABEL"] == "agent:conflict":
-              reason = "The branch has merge conflicts with main."
+              reason = "The branch has merge conflicts with main. Resolve them, keeping the intent of both sides."
+              if "contract:drift" in names: reason += " Then fix every item in the latest 'Contract: DRIFT' comment."
+              elif "agent:changes-requested" in names: reason += " Then make the changes the reviewer requested in the latest review comment."
           else:
               reason = ("The merge contract check found drift; fix every item in the latest 'Contract: DRIFT' comment."
                         if "contract:drift" in names else "The reviewer requested changes; see the latest review comment on the PR.")

@@ -1,6 +1,6 @@
 export const COMMANDS = [
   "init", "sim", "publish", "rollback", "app", "login", "keys", "mcp",
-  "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json",
+  "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
 export const help = `shipvo <command>
@@ -26,6 +26,8 @@ Advanced
   hash <file>                 Print the SHA-256 and size of a file
   sign-file <file>            Print the Ed25519 signature (base64) of a file
   sign-json <file.json>       Sign a JSON document and write the signature into it
+  verify <pointer> [public-key-b64]
+                              Check a release pointer (such as one from publish --dry-run)
   verify-json <file.json> <public-key-b64>
                               Check the signature of a JSON document
 `;
