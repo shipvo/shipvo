@@ -16,7 +16,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 - **Site:** the home page hero is rewritten in plain language with a first step for people who do not use a terminal, and light-mode small text now meets WCAG AA contrast.
 - **Docs:** French translation of Getting started.
 - **Device lab:** an Android emulator harness for OTA behaviour (`scripts/android-e2e/`) and its first report, `docs/product/device-lab/2026-11-04.md`.
-- The Hermes bytecode and `shipvo publish --dry-run` changes are listed under Unreleased below.
+- The Hermes bytecode and `shipvo publish --dry-run` changes are listed under Unreleased above.
 
 ## 2026-10-31
 
