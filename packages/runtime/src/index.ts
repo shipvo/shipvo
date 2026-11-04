@@ -7,7 +7,9 @@ export type RuntimeState = {
   baseUrl: string; appId: string; shellMajor: number;
 };
 export type CheckResult = {
-  status: "none" | "staged" | "error"; release?: number; bytes?: number; downloadMs?: number; verifyMs?: number;
+  status: "none" | "staged" | "error"; release?: number;
+  /** Bytes fetched in this call (a resumed download counts only the resumed part). `bundleBytes` is the full size. */
+  bytes?: number; downloadMs?: number; verifyMs?: number;
   /** Shell 1.0.2+ (Android): "patch" when a bsdiff patch was applied, "full" otherwise. iOS always downloads "full". */
   via?: "patch" | "full"; bundleBytes?: number; patchError?: string | null;
   issuedAt?: string; error?: string;

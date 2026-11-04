@@ -36,7 +36,7 @@ enum Updater {
     if offset > wantSize { try? fm.removeItem(at: file); offset = 0 }
     if offset == wantSize && offset > 0 { return 0 }
     var req = try request(url, etag: nil)
-    if offset > 0 { req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range") }
+    if offset > 0 { req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range"); req.setValue("identity", forHTTPHeaderField: "Accept-Encoding") }
     let (bytes, resp) = try await URLSession.shared.bytes(for: req)
     let http = resp as? HTTPURLResponse
     let code = http?.statusCode ?? 0

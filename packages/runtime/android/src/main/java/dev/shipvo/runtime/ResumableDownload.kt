@@ -28,7 +28,7 @@ object ResumableDownload {
     if (offset == wantSize && offset > 0) return 0
     val conn = open(url)
     try {
-      if (offset > 0) conn.setRequestProperty("Range", "bytes=$offset-")
+      if (offset > 0) { conn.setRequestProperty("Range", "bytes=$offset-"); conn.setRequestProperty("Accept-Encoding", "identity") }
       val code = conn.responseCode
       when {
         code == 206 && offset > 0 && contentRangeStart(conn.getHeaderField("Content-Range")) == offset -> {}
