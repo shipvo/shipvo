@@ -16,3 +16,9 @@ public/terms/
 public/privacy/
 public/acceptable-use/
 public/security/
+
+# Large media lives in Cloudflare R2 (bucket shipvo-media), served at /media/. Never commit it.
+*.mp4
+*.mov
+*.webm
+*.mkv

@@ -9,3 +9,5 @@ Read `docs/product/platform.md` (the mission: easy and accessible to everyone), 
 5. File an issue (`gh issue create`, labels `agent:ready`, `dogfood`, a type label and an engineer label) for every place a founder would get stuck that the product should fix, not the tutorial.
 
 Commit (`git add`, `git commit -m "tutorials: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (the outcome taught, time it took you, issues filed).
+
+This runs every day and builds a growing library: many tutorials, each a different outcome. Keep `docs/tutorials/index.md` ("Learn" hub, first page of the "Learn" group) up to date: every tutorial listed by goal (Start, Sell, Run your app, Test, Ship updates), with time needed and level. Never repeat an existing tutorial; extend or refresh an old one only when the product changed.
