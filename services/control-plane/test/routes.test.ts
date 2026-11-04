@@ -25,6 +25,30 @@ describe("GET /band/:cohort", () => {
   });
 });
 
+describe("GET /b/:app/:file ranges", () => {
+  const env = { POINTERS: kv({ "b/tide/r3.hbc": "0123456789" }) };
+  const get = (range?: string) => app.request("/b/tide/r3.hbc", range ? { headers: { range } } : {}, env);
+  it("serves the rest of the file from an offset", async () => {
+    const r = await get("bytes=4-");
+    expect(r.status).toBe(206);
+    expect(r.headers.get("content-range")).toBe("bytes 4-9/10");
+    expect(await r.text()).toBe("456789");
+  });
+  it("serves a bounded range and advertises ranges", async () => {
+    const r = await get("bytes=2-3");
+    expect(await r.text()).toBe("23");
+    expect((await get()).headers.get("accept-ranges")).toBe("bytes");
+  });
+  it("answers 416 past the end and ignores ranges it does not understand", async () => {
+    const r = await get("bytes=10-");
+    expect(r.status).toBe(416);
+    expect(r.headers.get("content-range")).toBe("bytes */10");
+    const all = await get("bytes=0-1,4-5");
+    expect(all.status).toBe(200);
+    expect(await all.text()).toBe("0123456789");
+  });
+});
+
 describe("POST /t telemetry", () => {
   const ev = { schema_version: "1.0", app_id: "tide", release: 3, event: "applied" };
   it("stores a valid event and trims extras", async () => {

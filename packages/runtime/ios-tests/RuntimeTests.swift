@@ -1,6 +1,27 @@
 import XCTest
 @testable import ShipvoCore
 
+/// Serves the fixture's release 5 bundle with or without `Range` support and records the Range header of each request.
+final class BundleStub: URLProtocol {
+  static var body = Data(), honourRange = true, ranges: [String?] = []
+  override class func canInit(with request: URLRequest) -> Bool { request.url?.path.hasSuffix("/b/good/ios-r5.hbc") == true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func startLoading() {
+    let range = request.value(forHTTPHeaderField: "Range"); BundleStub.ranges.append(range)
+    let url = request.url!
+    if BundleStub.honourRange, let range, let start = Int(range.dropFirst("bytes=".count).dropLast()) {
+      let part = BundleStub.body.suffix(from: start), total = BundleStub.body.count
+      let resp = HTTPURLResponse(url: url, statusCode: 206, httpVersion: nil, headerFields: ["Content-Range": "bytes \(start)-\(total - 1)/\(total)"])!
+      client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed); client?.urlProtocol(self, didLoad: Data(part))
+    } else {
+      let resp = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+      client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed); client?.urlProtocol(self, didLoad: BundleStub.body)
+    }
+    client?.urlProtocolDidFinishLoading(self)
+  }
+  override func stopLoading() {}
+}
+
 /// Runs against the static fake control plane written by scripts/ios-fixture.mjs and served on SHIPVO_FIXTURE_BASE.
 final class RuntimeTests: XCTestCase {
   private var base = "", pub = "", bundleSha = "", tmp: URL!, meta: [String: Any] = [:]
@@ -70,6 +91,63 @@ final class RuntimeTests: XCTestCase {
   func testUsesTheFullBundleWhenNothingIsRunningYet() async throws {
     let r = try await Updater.check(store("patch"))
     XCTAssertEqual(r["via"] as? String, "full")
+  }
+
+  // MARK: resumable downloads
+
+  private func stubbedBundle(honourRange: Bool) throws {
+    BundleStub.body = try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!)
+    BundleStub.honourRange = honourRange; BundleStub.ranges = []
+    URLProtocol.registerClass(BundleStub.self)
+  }
+  private func partial(_ s: Store, bytes: Data) throws -> URL {
+    try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let f = Updater.partialFile(s, sha: bundleSha)
+    try bytes.write(to: f)
+    return f
+  }
+
+  func testResumesAnInterruptedDownloadFromThePartialSize() async throws {
+    try stubbedBundle(honourRange: true); defer { URLProtocol.unregisterClass(BundleStub.self) }
+    let s = store("good")
+    _ = try partial(s, bytes: BundleStub.body.prefix(150_000))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(BundleStub.ranges, ["bytes=150000-"])
+    XCTAssertEqual(r["bytes"] as? Int, BundleStub.body.count - 150_000, "only the missing bytes were fetched")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: Updater.partialFile(s, sha: bundleSha).path))
+  }
+
+  func testRestartsWhenTheServerIgnoresRange() async throws {
+    try stubbedBundle(honourRange: false); defer { URLProtocol.unregisterClass(BundleStub.self) }
+    let s = store("good")
+    _ = try partial(s, bytes: BundleStub.body.prefix(150_000))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(BundleStub.ranges, ["bytes=150000-"])
+    XCTAssertEqual(r["bytes"] as? Int, BundleStub.body.count)
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+  }
+
+  func testDeletesACorruptPartialThenDownloadsFresh() async throws {
+    try stubbedBundle(honourRange: true); defer { URLProtocol.unregisterClass(BundleStub.self) }
+    let s = store("good")
+    let f = try partial(s, bytes: Data(repeating: 9, count: 150_000))
+    do { _ = try await Updater.check(s); XCTFail("corrupt partial must fail verification") }
+    catch let e as UpdateError { XCTAssertTrue(e.message.contains("hash")) }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: f.path))
+    XCTAssertNil(s.pendingPath)
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(BundleStub.ranges, ["bytes=150000-", nil])
+  }
+
+  func testDropsThePartialOfAnotherRelease() async throws {
+    let s = store("good")
+    try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let old = tmp.appendingPathComponent("dl-\(String(repeating: "a", count: 64)).part")
+    try Data([1, 2, 3]).write(to: old)
+    _ = try await Updater.check(s)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: old.path))
   }
 
   func testRefusesWhatItCannotTrust() async throws {

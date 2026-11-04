@@ -87,6 +87,34 @@ class ShipvoRuntimeModule : Module() {
       etag?.let { setRequestProperty("If-None-Match", it) }
     }
 
+  /**
+   * Download the full bundle into [file], resuming with `Range` when a partial file exists. Returns the bytes fetched by this call.
+   * An interrupted download keeps its partial file. A 200 answer to a Range request means the server ignored it: start over.
+   * The caller verifies size, sha256 and signature of the finished file as for any other download.
+   */
+  internal fun downloadFull(url: String, file: File, size: Long): Long {
+    var have = if (file.exists()) file.length() else 0L
+    if (have > size) { file.delete(); have = 0 }
+    if (have == size) return 0
+    val dl = http(url, null)
+    try {
+      dl.setRequestProperty("Accept-Encoding", "identity")
+      if (have > 0) dl.setRequestProperty("Range", "bytes=$have-")
+      val code = dl.responseCode
+      if (code == 416) { file.delete(); error("bundle HTTP 416") }
+      require(code == 200 || (code == 206 && have > 0)) { "bundle HTTP $code" }
+      if (code == 206) {
+        if (dl.getHeaderField("Content-Range")?.startsWith("bytes $have-") != true) { file.delete(); error("bundle range mismatch") }
+      } else { file.delete(); have = 0 }
+      var got = 0L
+      dl.inputStream.use { ins -> java.io.FileOutputStream(file, have > 0).use { out ->
+        val buf = ByteArray(64 * 1024)
+        while (true) { val n = ins.read(buf); if (n < 0) break; out.write(buf, 0, n); got += n }
+      } }
+      return got
+    } finally { dl.disconnect() }
+  }
+
   private fun resolve(s: Store, url: String) = if (url.startsWith("http")) url else "${s.baseUrl}/${url.trimStart('/')}"
 
   private fun check(): Map<String, Any?> {
@@ -114,6 +142,9 @@ class ShipvoRuntimeModule : Module() {
     val core = body.getJSONObject("core")
     val wantSha = core.getString("sha256"); val wantSize = core.getLong("size")
     val tmp = File(s.dir, "dl-$release.tmp")
+    // A partial full-bundle download is named by the release sha256. Any other release's partial file is useless now.
+    val part = File(s.dir, "dl-$wantSha.part")
+    s.dir.listFiles()?.forEach { if (it.name.startsWith("dl-") && it.name.endsWith(".part") && it.name != part.name) it.delete() }
     val d0 = SystemClock.elapsedRealtime()
     var via = "full"; var bytesDownloaded = 0L; var patchError: String? = null
 
@@ -141,22 +172,20 @@ class ShipvoRuntimeModule : Module() {
     }
 
     // 2. Fall back to the full bundle.
+    var built = tmp
     if (via == "full") {
-      val dl = http(resolve(s, core.getString("url")), null)
-      require(dl.responseCode == 200) { "bundle HTTP ${dl.responseCode}" }
-      dl.inputStream.use { ins -> tmp.outputStream().use { ins.copyTo(it, 64 * 1024) } }
-      dl.disconnect()
-      bytesDownloaded = tmp.length()
+      built = part
+      bytesDownloaded = downloadFull(resolve(s, core.getString("url")), part, wantSize)
     }
     val downloadMs = SystemClock.elapsedRealtime() - d0
 
     val v0 = SystemClock.elapsedRealtime()
-    val ok = tmp.length() == wantSize && Verify.sha256Hex(tmp) == wantSha
-    if (!ok) { tmp.delete(); s.addEvent("verify_failed:$release"); throw IllegalStateException("bundle hash/size mismatch") }
+    val ok = built.length() == wantSize && Verify.sha256Hex(built) == wantSha
+    if (!ok) { built.delete(); s.addEvent("verify_failed:$release"); throw IllegalStateException("bundle hash/size mismatch") }
     val verifyMs = SystemClock.elapsedRealtime() - v0 + verifyPointerMs
 
     val dest = File(s.dir, "r$release.hbc")
-    require(tmp.renameTo(dest)) { "could not stage bundle" }
+    require(built.renameTo(dest)) { "could not stage bundle" }
     synchronized(ShipvoHostHandler.LOCK) {
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha

@@ -5,7 +5,7 @@ struct UpdateError: Error { let message: String; init(_ m: String) { message = m
 /// Fetch, verify and stage the newest signed release for this device's band. Mirrors Android `check()`.
 /// Uses a bsdiff patch when the pointer lists one from the bundle this device runs; any patch problem falls back to the full bundle.
 enum Updater {
-  private static func require(_ cond: Bool, _ msg: @autoclosure () -> String) throws { if !cond { throw UpdateError(msg()) } }
+  static func require(_ cond: Bool, _ msg: @autoclosure () -> String) throws { if !cond { throw UpdateError(msg()) } }
 
   private static func request(_ url: String, etag: String?) throws -> URLRequest {
     guard let u = URL(string: url) else { throw UpdateError("bad url \(url)") }
@@ -40,6 +40,7 @@ enum Updater {
           let wantSize = (core["size"] as? NSNumber)?.intValue, let url = core["url"] as? String else { throw UpdateError("pointer core incomplete") }
     let tmp = s.dir.appendingPathComponent("dl-\(release).tmp")
     try? FileManager.default.removeItem(at: tmp)
+    removeStalePartials(s, keep: wantSha)
 
     var via = "full", downloadedBytes = 0
     let d0 = Store.now()
@@ -48,29 +49,77 @@ enum Updater {
       ready = true; via = "patch"; downloadedBytes = patch
     }
     var downloadMs = (Store.now() - d0) * 1000
+    var built = tmp
     if !ready {
       let f0 = Store.now()
-      let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
-      let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
-      try require(dcode == 200, "bundle HTTP \(dcode)")
-      try? FileManager.default.removeItem(at: tmp)
-      try FileManager.default.moveItem(at: fileURL, to: tmp)
+      built = partialFile(s, sha: wantSha)
+      downloadedBytes = try await downloadFull(request(resolve(s, url), etag: nil), to: built, size: wantSize)
       downloadMs += (Store.now() - f0) * 1000
     }
 
     let v0 = Store.now()
-    let size = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? -1
-    if via == "full" { downloadedBytes = size }
-    let ok = try (size == wantSize && Verify.sha256Hex(file: tmp) == wantSha)
-    if !ok { try? FileManager.default.removeItem(at: tmp); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
+    let size = (try? FileManager.default.attributesOfItem(atPath: built.path)[.size] as? Int) ?? -1
+    let ok = try (size == wantSize && Verify.sha256Hex(file: built) == wantSha)
+    if !ok { try? FileManager.default.removeItem(at: built); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
     let verifyMs = (Store.now() - v0) * 1000 + verifyPointerMs
 
     let dest = s.dir.appendingPathComponent("r\(release).hbc")
     try? FileManager.default.removeItem(at: dest)
-    try FileManager.default.moveItem(at: tmp, to: dest)
+    try FileManager.default.moveItem(at: built, to: dest)
     stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String)
     return ["status": "staged", "release": release, "bytes": downloadedBytes, "via": via, "bundleBytes": size,
             "downloadMs": Int(downloadMs), "verifyMs": Int(verifyMs), "issuedAt": body["issued_at"] as? String ?? ""]
+  }
+
+  /// The partial full-bundle download, named by the release sha256 so a different release never reuses it.
+  static func partialFile(_ s: Store, sha: String) -> URL { s.dir.appendingPathComponent("dl-\(sha).part") }
+
+  /// A partial file for any other release is useless now.
+  static func removeStalePartials(_ s: Store, keep sha: String) {
+    let keepName = partialFile(s, sha: sha).lastPathComponent
+    for f in (try? FileManager.default.contentsOfDirectory(atPath: s.dir.path)) ?? [] where f.hasPrefix("dl-") && f.hasSuffix(".part") && f != keepName {
+      try? FileManager.default.removeItem(at: s.dir.appendingPathComponent(f))
+    }
+  }
+
+  /// Download the full bundle into `file`, resuming with `Range` when a partial file exists. Returns the bytes fetched by this call.
+  /// An interrupted download keeps its partial file. A 200 answer to a Range request means the server ignored it: start over.
+  /// The caller verifies size, sha256 and signature of the finished file as for any other download.
+  static func downloadFull(_ base: URLRequest, to file: URL, size: Int) async throws -> Int {
+    let fm = FileManager.default
+    try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    var have = (try? fm.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0
+    if have > size { try? fm.removeItem(at: file); have = 0 }
+    if have == size { return 0 }
+    var r = base
+    r.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+    if have > 0 { r.setValue("bytes=\(have)-", forHTTPHeaderField: "Range") }
+    let (stream, resp) = try await URLSession.shared.bytes(for: r)
+    let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+    if code == 416 { try? fm.removeItem(at: file); throw UpdateError("bundle HTTP 416") }
+    try require(code == 200 || (code == 206 && have > 0), "bundle HTTP \(code)")
+    if code == 206 {
+      let range = (resp as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Range") ?? ""
+      if !range.hasPrefix("bytes \(have)-") { try? fm.removeItem(at: file); throw UpdateError("bundle range mismatch") }
+    } else {
+      try? fm.removeItem(at: file); have = 0
+    }
+    if !fm.fileExists(atPath: file.path) { fm.createFile(atPath: file.path, contents: nil) }
+    let h = try FileHandle(forWritingTo: file)
+    defer { try? h.close() }
+    try h.seekToEnd()
+    var buf = Data(), got = 0
+    do {
+      for try await b in stream {
+        buf.append(b)
+        if buf.count >= 64 * 1024 { try h.write(contentsOf: buf); got += buf.count; buf.removeAll(keepingCapacity: true) }
+      }
+    } catch {
+      if !buf.isEmpty { try? h.write(contentsOf: buf) }
+      throw error
+    }
+    if !buf.isEmpty { try h.write(contentsOf: buf); got += buf.count }
+    return got
   }
 
   /// Try the patch from the bundle this device runs. Writes the rebuilt bundle to `tmp` and returns the patch size,
