@@ -20,6 +20,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @shipvo/schema build
       - run: pnpm -r test
+      - name: npm package size budget (each @shipvo package under 10 MB unpacked)
+        run: |
+          pnpm -r --filter "./packages/**" build > /dev/null
+          for d in packages/*/; do
+            (cd "$d" && npm pack --dry-run --json 2>/dev/null) | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s)[0];const kb=Math.round(j.unpackedSize/1024);console.log(j.name+': '+Math.round(j.size/1024)+' KB packed, '+kb+' KB unpacked, '+j.entryCount+' files');if(kb>10240){console.log('::error::'+j.name+' is over the 10 MB budget');process.exit(1)}})" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
       - name: Device end-to-end through MCP (simulator, no phone)
         working-directory: apps/tide-and-tackle
         run: |
