@@ -1,0 +1,60 @@
+// Times a new developer's first run offline: `shipvo init`, then `shipvo publish --dry-run`.
+// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json]
+// The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets, no network.
+// The bundle export (`expo export`) needs an install and network, so it is not timed: a small
+// plain-JS bundle is staged where the export would write it, and publish runs with --skip-export.
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+export function runStep(name, cli, args, cwd) {
+  const t0 = performance.now();
+  const r = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: cleanEnv() });
+  const ms = Math.round(performance.now() - t0);
+  const exit = r.status ?? (r.error ? 127 : 1);
+  return { step: name, ms, exit, stderr: r.stderr || (r.error ? String(r.error) : "") };
+}
+
+// No secrets in, nothing to log in to: the seed comes from the .shipvo/seed.txt that init writes.
+function cleanEnv() {
+  const e = { ...process.env };
+  for (const k of Object.keys(e)) if (/SIGNING_SEED|TOKEN|SHIPVO_API|CLOUDFLARE/i.test(k)) delete e[k];
+  return e;
+}
+
+export function table(results) {
+  return ["| step | ms | exit |", "| --- | ---: | ---: |", ...results.map((r) => `| ${r.step} | ${r.ms} | ${r.exit} |`)].join("\n");
+}
+
+export function measure(cli) {
+  const root = mkdtempSync(join(tmpdir(), "shipvo-first-run-"));
+  const app = join(root, "app");
+  const results = [];
+  try {
+    results.push(runStep("init", cli, ["init", app], root));
+    if (results[0].exit === 0) {
+      const js = join(app, "dist-ota/_expo/static/js/android");
+      mkdirSync(js, { recursive: true });
+      writeFileSync(join(js, "index.js"), "console.log('first run');\n");
+      results.push(runStep("publish --dry-run", cli, ["publish", "--dry-run", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app));
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+  return results;
+}
+
+export function main(argv) {
+  const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
+  const here = dirname(fileURLToPath(import.meta.url));
+  const cli = resolve(opt("--cli", join(here, "../../packages/cli/dist/cli.js")));
+  const out = resolve(opt("--out", "first-run.json"));
+  const results = measure(cli);
+  writeFileSync(out, JSON.stringify(results.map(({ step, ms, exit }) => ({ step, ms, exit })), null, 2) + "\n");
+  console.log(table(results));
+  const bad = results.filter((r) => r.exit !== 0);
+  for (const r of bad) console.error(`\nstep "${r.step}" failed with exit ${r.exit}:\n${r.stderr}`);
+  return bad.length ? 1 : 0;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(main(process.argv.slice(2)));

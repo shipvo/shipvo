@@ -46,7 +46,7 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 The planner keeps this list to the 5–10 most valuable items in flight. Each line links its issue.
 
 Bet 1, a bundle never reaches a shell that cannot run it (epic #14):
-- [ ] #17 Shells declare their Hermes bytecode version; control plane skips mismatched releases
+- [x] #17 Shells declare their Hermes bytecode version; control plane skips mismatched releases (merged)
 - [ ] #18 Runtime refuses a mismatched release (after #17)
 
 Bet 2, iOS reaches Android update quality (epic #15):
@@ -56,6 +56,7 @@ Bet 2, iOS reaches Android update quality (epic #15):
 Bet 3, first run in under 10 minutes, and measured (epic #16):
 - [ ] #19 `shipvo doctor`
 - [ ] #20 Script counting weekly healthy releases per app
+- [ ] #26 `shipvo publish --dry-run` (first slice merged in #36; offline `rollback --dry-run` remains)
 
 Other:
 - [ ] #3 More typed-test examples for `@shipvo/test`
