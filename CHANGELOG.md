@@ -2,6 +2,15 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## 2026-11-04 (release)
+
+- **@shipvo/cli 0.1.3**: cli: readable publish --dry-run summary and working publish --help; runtime: bsdiff patches on iOS; cli: add `shipvo doctor` pre-publish setup checks; cli: starter app says 'local build' instead of 'release 0'; cli: add 'shipvo verify' to check a release pointer signature
+- **@shipvo/mcp 0.0.7**: sim: stale element refs return a typed stale_ref error; docs: changelog for 2026-11-04, local MCP app note, roadmap Now list; mcp, cli: open_app works for the scaffolded app; shipvo mcp works signed out; Add Dockerfile and glama.json for Glama listing; server.json: shorten description to registry limit (100)
+- **@shipvo/runtime 0.1.3**: runtime: bsdiff patches on iOS
+- **@shipvo/schema 0.0.3**: schema, control-plane: shells declare Hermes bytecode versions; mismatched releases are not offered; publish: record and check the Hermes bytecode version in releases
+- **@shipvo/sim 0.1.3**: sim: stale element refs return a typed stale_ref error; sim: permission dialogs use the app name when /app/ is opened in a browser; mcp, cli: open_app works for the scaffolded app; shipvo mcp works signed out
+- **@shipvo/test 0.1.1**: test: add failure-path example flows to @shipvo/test; docs: fix links to doc pages that resolved to 404 GitHub URLs
+
 ## Unreleased
 
 - **Stale element refs are an error, never a wrong tap.** `/act` in `@shipvo/sim` now checks a ref before `tap`, `type` and `scroll`. If the element was re-rendered with new content, is gone, or the ref came from an earlier page load, the answer is `{ ok: false, code: "stale_ref", error: "stale ref e5: the screen changed. Take a new snapshot (action \"screen\") and use a ref from it." }`. Before, a re-rendered element waited 3 seconds and failed with a Playwright timeout, and a ref from before a page load could hit a different element. `@shipvo/mcp` shows it as `Error [stale_ref]: ...` followed by the new screen. Refs after a full page load now look like `p1e5` (they were `e5`); refs on the first page and in single-page navigation are unchanged. Treat refs as opaque strings. Migration: on `stale_ref`, read the screen in the same reply and use a ref from it. Tool names and inputs are unchanged.
