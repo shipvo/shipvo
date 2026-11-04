@@ -147,6 +147,9 @@ class ShipvoRuntimeModule : Module() {
     val core = body.getJSONObject("core")
     val wantSha = core.getString("sha256"); val wantSize = core.getLong("size")
     val tmp = File(s.dir, "dl-$release.tmp")
+    val part = ResumableDownload.partialFile(s.dir, wantSha)
+    // The release changed: partial files for other hashes can never complete.
+    s.dir.listFiles()?.forEach { if (it.extension == "part" && it.name != part.name) it.delete() }
     val d0 = SystemClock.elapsedRealtime()
     var via = "full"; var bytesDownloaded = 0L; var patchError: String? = null
 
@@ -175,17 +178,16 @@ class ShipvoRuntimeModule : Module() {
 
     // 2. Fall back to the full bundle.
     if (via == "full") {
-      val dl = http(resolve(s, core.getString("url")), null)
-      require(dl.responseCode == 200) { "bundle HTTP ${dl.responseCode}" }
-      dl.inputStream.use { ins -> tmp.outputStream().use { ins.copyTo(it, 64 * 1024) } }
-      dl.disconnect()
-      bytesDownloaded = tmp.length()
+      val resumedFrom = ResumableDownload.fetch(resolve(s, core.getString("url")), part, wantSize)
+      tmp.delete()
+      require(part.renameTo(tmp)) { "could not move downloaded bundle" }
+      bytesDownloaded = tmp.length() - resumedFrom
     }
     val downloadMs = SystemClock.elapsedRealtime() - d0
 
     val v0 = SystemClock.elapsedRealtime()
     val ok = tmp.length() == wantSize && Verify.sha256Hex(tmp) == wantSha
-    if (!ok) { tmp.delete(); s.addEvent("verify_failed:$release"); throw IllegalStateException("bundle hash/size mismatch") }
+    if (!ok) { tmp.delete(); part.delete(); s.addEvent("verify_failed:$release"); throw IllegalStateException("bundle hash/size mismatch") }
     val verifyMs = SystemClock.elapsedRealtime() - v0 + verifyPointerMs
 
     val dest = File(s.dir, "r$release.hbc")

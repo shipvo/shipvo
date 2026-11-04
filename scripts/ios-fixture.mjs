@@ -44,6 +44,7 @@ patchPointer("patch", goodPatch);                              // release 6, pat
 patchPointer("bad-patch", Buffer.concat([goodPatch.subarray(0, 40), Buffer.alloc(30, 1)])); // valid hash, broken contents: must fall back to the full bundle
 put("b/good/ios-r5.hbc", bundle);
 pointer("good");                                   // release 5, valid
+pointer("no-range");                               // same as good, but its server ignores Range
 pointer("good-next", { release: 6 });              // a newer one for the same app id family
 pointer("bad-sig", { sig: otherSeed });            // signed by someone else
 pointer("bad-hash", { sha: "0".repeat(64) });      // body says another hash than the bytes

@@ -67,6 +67,55 @@ final class RuntimeTests: XCTestCase {
     XCTAssertTrue(s.consumeEvents().contains("patch_failed"))
   }
 
+  // MARK: resumed downloads
+
+  private func bundleBytes() throws -> Data { try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!) }
+  private func writePartial(_ s: Store, _ data: Data) throws -> URL {
+    let part = Updater.partialURL(s, sha: bundleSha)
+    try data.write(to: part)
+    return part
+  }
+
+  func testResumesAnInterruptedDownloadFromThePartialSize() async throws {
+    let s = store("good")
+    let all = try bundleBytes(), cut = 120_000
+    _ = try writePartial(s, all.prefix(cut))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["bytes"] as? Int, all.count - cut, "only the missing tail is sent")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+  }
+
+  func testRestartsWhenTheServerIgnoresRange() async throws {
+    let s = store("no-range")
+    let all = try bundleBytes()
+    _ = try writePartial(s, all.prefix(120_000))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["bytes"] as? Int, all.count, "a 200 answer means the whole file came again")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+  }
+
+  func testCorruptPartialFailsVerificationIsDeletedAndTheNextTryWorks() async throws {
+    let s = store("good")
+    let all = try bundleBytes()
+    let part = try writePartial(s, Data(repeating: 0xAB, count: 120_000))
+    do { _ = try await Updater.check(s); XCTFail("corrupt partial must not verify") } catch let e as UpdateError { XCTAssertTrue(e.message.contains("mismatch")) }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: part.path))
+    XCTAssertNil(s.pendingPath)
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["bytes"] as? Int, all.count)
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+  }
+
+  func testPartialForAnotherReleaseIsDeleted() async throws {
+    let s = store("good")
+    let other = s.dir.appendingPathComponent("dl-\(String(repeating: "1", count: 64)).part")
+    try Data(repeating: 1, count: 10).write(to: other)
+    _ = try await Updater.check(s)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: other.path))
+  }
+
   func testUsesTheFullBundleWhenNothingIsRunningYet() async throws {
     let r = try await Updater.check(store("patch"))
     XCTAssertEqual(r["via"] as? String, "full")

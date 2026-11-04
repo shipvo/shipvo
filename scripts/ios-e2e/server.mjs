@@ -28,7 +28,8 @@ createServer((req, res) => {
   if (!f) { log(`GET ${url.pathname} 404`); return res.writeHead(404, { "content-type": "application/json" }).end('{"error":"not_found"}'); }
   const data = readFileSync(f), type = f.endsWith(".json") ? "application/json" : "application/octet-stream";
   // Range support (bytes=<n>-), like the real control plane, so resumed downloads can be tested.
-  const m = /^bytes=(\d+)-$/.exec(req.headers.range || "");
+  // Paths under /b/no-range/ ignore Range and answer 200, like a server without range support.
+  const m = url.pathname.startsWith("/b/no-range/") ? null : /^bytes=(\d+)-$/.exec(req.headers.range || "");
   if (m) {
     const start = Number(m[1]);
     if (start >= data.length) { log(`GET ${url.pathname} 416`); return res.writeHead(416, { "content-range": `bytes */${data.length}` }).end(); }
