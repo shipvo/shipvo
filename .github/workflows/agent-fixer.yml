@@ -36,6 +36,7 @@ jobs:
       LABEL: ${{ github.event.label.name || inputs.label }}
       RUN_ID: ${{ github.event.workflow_run.id }}
       RUN_URL: ${{ github.event.workflow_run.html_url }}
+      RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
       MAX_ROUNDS: ${{ vars.AGENT_MAX_FIX_ROUNDS || 3 }}
     steps:
       - id: r
@@ -46,6 +47,18 @@ jobs:
           E = os.environ; R = E["R"]; B = E["BRANCH"]
           def gh(*a): return subprocess.run(["gh", *a], text=True, capture_output=True).stdout
           out = open(E["GITHUB_OUTPUT"], "a")
+          if E["EVENT"] == "workflow_run":
+              # A job GitHub never started (no runner free, e.g. macOS capacity) is not a code failure:
+              # run it again later instead of asking an engineer to fix code.
+              jobs = json.loads(gh("api", f"repos/{R}/actions/runs/{E['RUN_ID']}/jobs", "--jq", ".jobs") or "[]")
+              bad = [j for j in jobs if j["conclusion"] in ("failure", "cancelled", "timed_out")]
+              if bad and all(not j.get("steps") for j in bad):
+                  if int(E.get("RUN_ATTEMPT") or 1) < 4:
+                      subprocess.run(["bash", "-c", f"sleep 600; gh api -X POST repos/{R}/actions/runs/{E['RUN_ID']}/rerun-failed-jobs"])
+                      print("jobs never got a runner; re-ran them")
+                  else:
+                      print("jobs never got a runner after several attempts; leaving it for the next push")
+                  raise SystemExit
           if B == "main":
               if E["EVENT"] != "workflow_run": raise SystemExit
               if json.loads(gh("issue", "list", "-R", R, "--label", "ci-main", "--state", "open", "--json", "number") or "[]"):
