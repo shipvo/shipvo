@@ -1,0 +1,113 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:01.498
+You found a bug.
+
+2
+00:00:01.498 --> 00:00:03.932
+Your app is already on people's phones.
+
+3
+00:00:03.932 --> 00:00:05.616
+Do you wait days to fix it?
+
+4
+00:00:05.616 --> 00:00:07.800
+With Shipvo, you fix it in minutes.
+
+5
+00:00:09.400 --> 00:00:11.604
+This is called an OTA update.
+
+6
+00:00:11.604 --> 00:00:13.382
+OTA means over the air.
+
+7
+00:00:13.382 --> 00:00:18.075
+The phone gets the new version straight from you, like a web page.
+
+8
+00:00:19.675 --> 00:00:20.277
+Step one.
+
+9
+00:00:20.277 --> 00:00:21.215
+Edit your app.
+
+10
+00:00:21.215 --> 00:00:25.900
+In a Shipvo app, the first file to change is src/release.ts.
+
+11
+00:00:27.500 --> 00:00:28.316
+Step two.
+
+12
+00:00:28.316 --> 00:00:29.766
+Run one command.
+
+13
+00:00:29.766 --> 00:00:31.125
+shipvo publish.
+
+14
+00:00:33.500 --> 00:00:36.994
+Shipvo builds your new bundle and takes its fingerprint.
+
+15
+00:00:36.994 --> 00:00:41.175
+Then it builds small patches, so phones download only what changed.
+
+16
+00:00:42.775 --> 00:00:45.826
+Then it signs the release with your private key.
+
+17
+00:00:45.826 --> 00:00:47.796
+That key stays on your machine.
+
+18
+00:00:47.796 --> 00:00:51.227
+Phones check the signature before they apply anything.
+
+19
+00:00:51.227 --> 00:00:54.850
+So a stolen publish token cannot ship code to your users.
+
+20
+00:00:56.450 --> 00:00:58.850
+Releases go out in three groups.
+
+21
+00:00:58.850 --> 00:01:00.425
+One percent of users.
+
+22
+00:01:00.425 --> 00:01:01.700
+Then ten percent.
+
+23
+00:01:01.700 --> 00:01:02.750
+Then everyone.
+
+24
+00:01:04.450 --> 00:01:09.479
+If a release fails to start three times on a phone, that phone throws it away.
+
+25
+00:01:09.479 --> 00:01:15.475
+And if you need to go back, one command, shipvo rollback, sends an older release to everyone.
+
+26
+00:01:17.075 --> 00:01:19.262
+Back up your signing seed first.
+
+27
+00:01:19.262 --> 00:01:20.697
+Then try it yourself.
+
+28
+00:01:20.697 --> 00:01:25.550
+The full guide is at shipvo.dev/docs/getting-started.
