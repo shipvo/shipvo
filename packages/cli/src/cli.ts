@@ -9,6 +9,7 @@ import { sim } from "./sim.js";
 import { keys, login, mcp } from "./login.js";
 import { signingKey } from "./signing.js";
 import { appCmd } from "./app.js";
+import { doctor } from "./doctor.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
 const help = `shipvo <command>
@@ -19,6 +20,7 @@ const help = `shipvo <command>
   rollback --to <release>     Republish an earlier release's code as a new release
   app create | list | delete  Register this app with the hosted control plane (publish token), list yours, or remove one
   login                       Sign in with GitHub and get a key for the hosted simulator
+  doctor                      Check setup before first publish
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print (or save) this app's release signing seed, to back it up or move machines
   keys import [seed|--file f] Restore the signing seed on a new machine (checked against shipvo.json)
@@ -38,6 +40,7 @@ switch (cmd) {
   case "publish": await publish(rest); break;
   case "rollback": await rollback(rest); break;
   case "login": await login(rest); break;
+  case "doctor": await doctor(rest); break;
   case "app": await appCmd(rest); break;
   case "keys": if (rest[0] === "export" || rest[0] === "import") await signingKey(rest); else await keys(); break;
   case "mcp": mcp(); break;

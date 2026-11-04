@@ -110,6 +110,8 @@ Then edit `src/release.ts` and run `shipvo publish`. (In a GitHub repo, the work
 3. builds the web artifact of the same commit for the simulator (`/w/<app>/r<N>/`),
 4. signs the release pointer (Ed25519) and writes it for each cohort band (`b0` 1 %, `b1` 10 %, `b2` everyone).
 
+If your first publish fails, run `shipvo doctor` first. It checks your Node version, `shipvo.json`, signing key match, control plane reachability, and `hermesBytecodeVersion` when present.
+
 Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
 
 Agents open the exact release phones run with `open_app("myshop@r8")` or `open_app("myshop@latest")`.

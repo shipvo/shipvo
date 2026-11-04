@@ -4,6 +4,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **CLI:** new `shipvo doctor` command to check setup before first publish. It verifies Node version, `shipvo.json` parsing, signing key/public key match, control plane reachability, and validates `hermesBytecodeVersion` when present. It prints one pass/fail line per check with a fix and exits non-zero on any failure.
 - **Publish records the Hermes bytecode version.** `shipvo publish` reads the version from the `.hbc` header and adds an optional `hermes_bytecode_version` to the signed release. Set `hermesBytecodeVersion` (a number or list) in `shipvo.json`, or pass `--hermes-bytecode-version`, to make publish fail when the bundle is plain JavaScript or built with a different Hermes. Migration: nothing is required. Releases without the field still parse and apply as before. Shells do not check the field yet; that is a follow-up.
 
 ## 2026-10-31
