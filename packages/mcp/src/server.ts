@@ -33,7 +33,7 @@ async function localApps(): Promise<AppInfo> {
   return TIDE;
 }
 
-type Act = { ok: boolean; screen?: string | null; error?: string; path?: string };
+type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string };
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
   const r = await fetch(SIM + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}. Is it running at ${SIM}?`);
@@ -41,7 +41,7 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
 }
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
-const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}`); };
+const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}`); };
 // Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
 const need = (_sid: string) => {};
