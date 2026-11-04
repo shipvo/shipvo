@@ -45,7 +45,7 @@ Repository secrets (Settings > Secrets and variables > Actions):
 | Secret | What |
 | --- | --- |
 | `CLAUDE_CODE_OAUTH_TOKEN` | From `claude setup-token` (uses your Claude subscription). Or set `ANTHROPIC_API_KEY` instead to pay per use. |
-| `OPENAI_COMPAT_API_KEY` | Your Kilo AI Gateway key (or any OpenAI-compatible provider key) for the Aider engineer. |
+| `OPENAI_COMPAT_API_KEY` | Your Kilo AI Gateway keys for the Aider engineer, comma-separated (one is fine). Each run starts on a different key and moves to the next one on a rate limit or quota error (up to 5 per run). Every key is masked in logs. |
 | `AGENT_TOKEN` | Fine-grained personal access token for `shipvo/shipvo` with: Contents, Issues, Pull requests, Actions: read and write; Metadata: read; Repository security advisories: read and write. No Workflows permission, so agents can never change workflows. Your account needs a Copilot plan for the Copilot engineer. |
 
 Settings to turn on:
@@ -64,7 +64,7 @@ Settings to turn on:
 | `AGENT_COPILOT_MAX_ACTIVE` | 3 | Copilot tasks in flight. |
 | `AGENT_AIDER_MAX_ACTIVE` | 2 | Aider tasks in flight. |
 | `OPENAI_COMPAT_BASE_URL` | `https://ai-gateway.kilo.ai/api/v1` | OpenAI-compatible endpoint for Aider. |
-| `AIDER_MODEL` | `anthropic/claude-sonnet-4.5` | Model id on that endpoint (any id the gateway lists at `/models`). |
+| `AIDER_MODEL` | `kilo-auto/free` | Model id on that endpoint (any id the gateway lists at `/models`). |
 | `AGENT_MAX_BACKLOG` | 12 | Planner stops filing issues above this many `agent:ready` issues. |
 | `AGENT_MAX_NEW_ISSUES` | 5 | Most issues the planner files per day. |
 | `AGENT_MAX_MERGES_PER_DAY` | 20 | Merge bot cap. |

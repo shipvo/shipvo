@@ -138,15 +138,34 @@ jobs:
       - name: Run Aider (${{ inputs.role }}) via OpenAI-compatible gateway
         if: steps.chk.outputs.ok == 'true' && inputs.engine == 'aider'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_COMPAT_API_KEY }}
+          KEYS: ${{ secrets.OPENAI_COMPAT_API_KEY }}   # one key, or many separated by commas; rotated per run and on rate limits
           OPENAI_API_BASE: ${{ vars.OPENAI_COMPAT_BASE_URL || 'https://ai-gateway.kilo.ai/api/v1' }}
-          MODEL: ${{ inputs.model || vars.AIDER_MODEL || 'anthropic/claude-sonnet-4.5' }}
+          MODEL: ${{ inputs.model || vars.AIDER_MODEL || 'kilo-auto/free' }}
+          SEED: ${{ github.run_id }}
         run: |
           pipx install aider-chat > /dev/null 2>&1 || python3 -m pip install --user aider-chat > /dev/null
           export PATH="$HOME/.local/bin:$PATH"
-          aider --model "openai/$MODEL" --message-file /tmp/agent/prompt.md --read CLAUDE.md \
-            --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
-            --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 2>&1 | tail -n 400
+          # Split the key list and mask every key on its own: GitHub only masks the secret as a whole string.
+          mapfile -t K < <(printf '%s' "$KEYS" | tr ',\n' '\n\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
+          for k in "${K[@]}"; do echo "::add-mask::$k"; done
+          N=${#K[@]}; [ "$N" -gt 0 ] || { echo "::error::OPENAI_COMPAT_API_KEY is empty"; exit 1; }
+          START=$(( SEED % N )); TRIES=$(( N < 5 ? N : 5 ))
+          echo "keys available: $N; starting at key $(( START + 1 )); up to $TRIES keys this run"
+          for t in $(seq 0 $(( TRIES - 1 ))); do
+            i=$(( (START + t) % N ))
+            export OPENAI_API_KEY="${K[$i]}"
+            set +e
+            aider --model "openai/$MODEL" --message-file /tmp/agent/prompt.md --read CLAUDE.md \
+              --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
+              --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
+            rc=$?; set -e
+            tail -n 300 /tmp/agent/aider.log
+            if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror" /tmp/agent/aider.log; then
+              echo "::warning::key $(( i + 1 )) of $N hit a rate limit or quota; rotating"; continue
+            fi
+            break
+          done
+          unset OPENAI_API_KEY
           # Aider cannot write outside the repo; keep its scratch notes out of commits.
           for f in pr_title.txt pr_body.md blocked.md fix_note.md; do [ -f ".agent/$f" ] && mv ".agent/$f" /tmp/agent/; done
           if [ -d .agent ]; then git rm -rq --cached .agent 2>/dev/null; rm -rf .agent; git diff --cached --quiet || git commit -qm "chore: drop agent notes"; fi
