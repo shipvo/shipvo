@@ -1,5 +1,7 @@
 # Build your first Shipvo app
 
+Also in: [Français](fr/getting-started.md)
+
 Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
 
 ## 0. What you need
