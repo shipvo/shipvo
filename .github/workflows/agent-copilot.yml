@@ -3,6 +3,8 @@
 name: agent-copilot
 on:
   issues: { types: [labeled] }
+  # Heartbeat: GitHub delays scheduled runs by hours on this repo, so also look for work whenever CI or the merge bot finishes.
+  workflow_run: { workflows: [ci, agent-merger], types: [completed] }
   schedule: [{ cron: "7 * * * *" }]
   workflow_dispatch:
 permissions: { contents: read }
