@@ -22,6 +22,7 @@ beforeAll(async () => {
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, app: "menu", release: "local", screen: "heading Table Menu" }));
+    if (req.url === "/act" && JSON.parse(raw).ref === "e5") return res.end(JSON.stringify({ ok: false, code: "stale_ref", error: 'stale ref e5: the screen changed. Take a new snapshot (action "screen") and use a ref from it.', screen: "- button \"Item 9\" [ref=e7]" }));
     res.end(JSON.stringify({ ok: true }));
   });
   await new Promise<void>((r) => fake.listen(0, r));
@@ -52,6 +53,13 @@ describe("local mcp", () => {
     const r: any = await c.callTool({ name: "open_app", arguments: { app: "nope" } });
     expect(r.isError).toBe(true);
     expect(textOf(r)).toContain("Apps: menu");
+    await c.close();
+  });
+  it("shows a stale ref as an error with its code, the fix and the new screen", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "s", ref: "e5" } });
+    expect(textOf(r)).toMatch(/^Error \[stale_ref\]: stale ref e5.*new snapshot/);
+    expect(textOf(r)).toContain('Screen now:\n- button "Item 9" [ref=e7]');
     await c.close();
   });
 });

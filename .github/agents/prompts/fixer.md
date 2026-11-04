@@ -10,6 +10,7 @@ Steps:
 5. Run the relevant tests until they pass.
 6. Commit (`git add`, `git commit -m "fix: ..."`). Do not push; the workflow pushes.
 7. Write a short note of what you changed, point by point, to `/tmp/agent/fix_note.md`.
+8. If the review or the contract check says the PR description is wrong (claims, numbers, test counts), write the full corrected description to `/tmp/agent/pr_body.md`, starting from `gh pr view {{PR}} --json body --jq .body`. Re-run anything you quote so every number is true at the new head. The workflow updates the PR; you cannot edit it yourself.
 
 If the PR cannot be fixed without breaking `CLAUDE.md`, make no commits and write why to `/tmp/agent/blocked.md`.
 

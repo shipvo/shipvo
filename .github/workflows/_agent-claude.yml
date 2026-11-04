@@ -246,7 +246,20 @@ jobs:
             fi
           fi
           [ "$MODE" = "read" ] && exit 0
+          # A fixer may correct the PR description (reviews and the contract check it against the code).
+          BODY_FIXED=no
+          if [ "$MODE" = "pr-branch" ] && [ -s /tmp/agent/pr_body.md ]; then
+            gh pr edit "$PR" -R "$REPO" --body-file /tmp/agent/pr_body.md && BODY_FIXED=yes || true
+          fi
           AHEAD=$(git rev-list --count "$(cat /tmp/agent/start_sha)..HEAD")
+          if [ "$AHEAD" = "0" ] && [ "$BODY_FIXED" = "yes" ]; then
+            # No new commit, so nothing re-triggers review: clear the old verdicts and reopen the PR to ask for a fresh one.
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            [ -f /tmp/agent/fix_note.md ] && gh pr comment "$PR" -R "$REPO" --body-file /tmp/agent/fix_note.md || true
+            gh pr edit "$PR" -R "$REPO" --remove-label contract:drift --remove-label agent:changes-requested || true
+            gh pr close "$PR" -R "$REPO" && gh pr reopen "$PR" -R "$REPO" || true
+            exit 0
+          fi
           if [ "$AHEAD" = "0" ]; then
             echo "pushed=false" >> "$GITHUB_OUTPUT"
             if [ "$ISSUE" != "0" ] && [ ! -f /tmp/agent/blocked.md ]; then
