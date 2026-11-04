@@ -32,6 +32,7 @@ export async function publish(argv: string[]) {
   const a = parse(argv), cfg = loadConfig(), SEED = seed(), kv = kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor;
   const MIN_SHELL = a["min-shell"] || JSON.parse(readFileSync("app.json", "utf8")).expo.version; // a bundle needs the shell it was built against
+  if (a["hermes-bytecode-version"] === "true") throw new Error("--hermes-bytecode-version needs a value: pass a value like 96 (or 96,98)");
   const declaredHermes = parseDeclared(a["hermes-bytecode-version"] ?? cfg.hermesBytecodeVersion);
   const bands = (a.bands || "b0,b1,b2").split(",");
   const platforms = platformsOf(a);
@@ -93,7 +94,7 @@ export async function publish(argv: string[]) {
         addons: [], screens: [], min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(web ? { web } : {}) });
       await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
-    await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, web }), "application/json");
+    await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), web }), "application/json");
     summary[pf] = { bytes: bytes.length, ...(pf === "android" ? { patches: patches.map((p) => ({ from: p.from_sha256.slice(0, 12), kb: +(p.size / 1024).toFixed(1) })) } : {}) };
     if (web) summary.web = web;
   }

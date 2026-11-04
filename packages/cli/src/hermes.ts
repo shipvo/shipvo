@@ -1,6 +1,8 @@
 // Read the Hermes bytecode version from a bundle header, and check it against what the app's shells declare.
 // A Hermes bytecode file starts with an 8-byte magic number (little-endian 0x1F1903C103BC1FC6),
 // followed by the bytecode format version as a 32-bit little-endian integer.
+// Layout source: the BytecodeFileHeader struct in facebook/hermes, include/hermes/BCGen/HBC/BytecodeFileFormat.h
+// (fields MAGIC, then VERSION).
 const MAGIC = [0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f];
 
 /** True if the bytes start with the Hermes bytecode magic number. */
