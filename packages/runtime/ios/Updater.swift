@@ -36,7 +36,16 @@ enum Updater {
     if offset > wantSize { try? fm.removeItem(at: file); offset = 0 }
     if offset == wantSize && offset > 0 { return 0 }
     var req = try request(url, etag: nil)
-    if offset > 0 { req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range"); req.setValue("identity", forHTTPHeaderField: "Accept-Encoding") }
+    if offset == 0 {
+      // Fresh download: keep the fast file download. The streaming path below is only for resuming.
+      let (tmpUrl, resp) = try await URLSession.shared.download(for: req)
+      let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+      guard code == 200 else { try? fm.removeItem(at: tmpUrl); throw UpdateError("bundle HTTP \(code)") }
+      try? fm.removeItem(at: file)
+      try fm.moveItem(at: tmpUrl, to: file)
+      return max(sizeOf(file), 0)
+    }
+    req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range"); req.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
     let (bytes, resp) = try await URLSession.shared.bytes(for: req)
     let http = resp as? HTTPURLResponse
     let code = http?.statusCode ?? 0
@@ -107,7 +116,7 @@ enum Updater {
       let f0 = Store.now()
       file = partFile(s, wantSha)
       let target = resolve(s, url)
-      let resumed = ((try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0) > 0
+      let resumed = sizeOf(file) > 0
       downloadedBytes = try await fetch(target, into: file, wantSize: wantSize)
       let resumedOk = try resumed ? (sizeOf(file) == wantSize && Verify.sha256Hex(file: file) == wantSha) : true
       if !resumedOk {
