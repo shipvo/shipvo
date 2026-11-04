@@ -45,7 +45,7 @@ The matching code phones use to check your signature. It is safe to share. Shipv
 The server that stores your releases and tells phones which one to use. Shipvo hosts one for you, or you can [host your own](self-hosting.md).
 
 ## Cohort band
-A slice of your users who get a release first. Shipvo writes three: `b0` (1 % of users), `b1` (10 %) and `b2` (everyone). Releasing to a small slice first limits the damage if something is wrong.
+A slice of your users who get a release first. Shipvo writes three: `b0` (1 % of users), `b1` (10 %) and `b2` (everyone). Releasing to a small slice first limits the damage if something is wrong. See [Publish over the air](getting-started.md#5-publish-over-the-air).
 
 ## Rollback
 Going back to an earlier release. `shipvo rollback --to 7` republishes release 7's code as a new release.

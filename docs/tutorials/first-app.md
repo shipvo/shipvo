@@ -1,6 +1,6 @@
 # Make your first app, change it and get it ready to ship
 
-You will make a phone app, see it run on your computer, change its words, and prepare a signed release. You need no phone and no coding. Plan for about 30 minutes. Most of that is installing Node and waiting for downloads: the commands themselves took under two minutes on our test machine.
+You will make a phone app, see it run on your computer, change its words, and prepare a signed release. You need no phone and no coding. Most of the time goes to installing Node and waiting for downloads. The commands themselves took about 1 minute 10 seconds in total on our test machine (times are given at each step).
 
 You will use a **terminal**: a window where you type commands. Words in **bold** are explained once and listed in the [glossary](../glossary.md).
 
@@ -17,7 +17,6 @@ The starter app is not a shop yet. It is one screen with a headline and four but
 
 - A computer (Windows, Mac or Linux) with an internet connection.
 - **Node** version 22. Go to [nodejs.org](https://nodejs.org), download the LTS or "Current" installer for version 22 or later, and click through it.
-- About 1 GB of free disk space.
 - Optional: Claude Desktop, Claude Code, Cursor or ChatGPT, for step 5.
 
 ## 1. Open a terminal and check Node
@@ -59,7 +58,7 @@ npm install
 npx playwright install chromium
 ```
 
-`npm install` downloads the app's parts. It took about 30 seconds on our test machine, and may take a few minutes on slow internet. It ends with a few lines about "vulnerabilities" or "audit". You can ignore those. The second command downloads a hidden web browser (about 120 MB) that draws the simulated phone. It took about 8 seconds for us.
+`npm install` downloads the app's parts. It took about 30 seconds on our test machine, and may take a few minutes on slow internet. It ends with a few lines about "vulnerabilities" or "audit". You can ignore those. The second command downloads a hidden web browser that draws the simulated phone. It took about 8 seconds for us.
 
 > **If something goes wrong:** red lines starting with `npm error` and the word `EACCES` mean you lack permission to write in that folder. Make the app in your own Documents folder, not inside a system folder. If `npm install` stops with a network error, run it again.
 
@@ -120,7 +119,7 @@ In your second terminal, open the file `src/release.ts` in any plain text editor
 export const RELEASE = { headline: "Fresh bread every morning from 6am.", note: "Order by 10pm for next-day pickup." };
 ```
 
-Save the file. Then go to the first terminal (the one running the simulator), press Ctrl + C to stop it, and start it again with `npm run sim`. Wait about 10 seconds and refresh the browser page. The simulator does not refresh by itself yet, so you must restart it after each change.
+Save the file. Then go to the first terminal (the one running the simulator), press Ctrl + C to stop it, and start it again with `npm run sim`. Wait about 10 seconds and refresh the browser page. The simulator does not refresh by itself yet, so you must restart it after each change (watch mode is tracked in issue #27).
 
 ![The app after the change: the banner now reads "Fresh bread every morning from 6am." with the note "Order by 10pm for next-day pickup."](/tutorials/first-app/04-edited-text.png)
 

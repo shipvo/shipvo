@@ -25,7 +25,7 @@ const NAV = [
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
   { group: "Learn", pages: [
-    { slug: "first-app", src: "docs/tutorials/first-app.md", title: "Make your first app", desc: "No coding needed. Make a phone app, see it in a simulator, let an AI assistant tap it, change its words and prepare a signed release in about 30 minutes." },
+    { slug: "first-app", src: "docs/tutorials/first-app.md", title: "Make your first app", desc: "No coding needed. Make a phone app, see it in a simulator, let an AI assistant tap it, change its words and prepare a signed release." },
     { slug: "glossary", src: "docs/glossary.md", title: "Glossary", desc: "Plain-English meanings for the words in the Shipvo docs: simulator, release, dry run, signing seed, cohort band and more." },
   ]},
   { group: "Test", pages: [
