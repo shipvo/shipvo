@@ -8,7 +8,7 @@ import java.io.File
 import kotlin.random.Random
 
 /** Persistent runtime state. All bundle decisions go through here so the host handler and module agree. */
-internal class Store(private val ctx: Context) {
+internal class Store(private val ctx: Context) : BootCounts {
   private val p: SharedPreferences = ctx.getSharedPreferences("shipvo.runtime", Context.MODE_PRIVATE)
   val dir: File get() = File(ctx.filesDir, "shipvo").apply { mkdirs() }
 
@@ -63,8 +63,8 @@ internal class Store(private val ctx: Context) {
   }
 
   var trialBoots: Int get() = p.getInt("trial_boots", 0); set(v) { p.edit().putInt("trial_boots", v).commit() }
-  var unhealthyBoots: Int get() = p.getInt("unhealthy_boots", 0); set(v) { p.edit().putInt("unhealthy_boots", v).commit() }
-  var firstUnhealthyAt: Long get() = p.getLong("first_unhealthy_at", 0); set(v) { p.edit().putLong("first_unhealthy_at", v).commit() }
+  override var unhealthyBoots: Int get() = p.getInt("unhealthy_boots", 0); set(v) { p.edit().putInt("unhealthy_boots", v).commit() }
+  override var firstUnhealthyAt: Long get() = p.getLong("first_unhealthy_at", 0); set(v) { p.edit().putLong("first_unhealthy_at", v).commit() }
 
   fun addEvent(e: String) {
     val list = p.getString("events", "")!!.split('\n').filter { it.isNotBlank() }.takeLast(49) + e

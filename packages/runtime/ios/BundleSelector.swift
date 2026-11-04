@@ -42,6 +42,22 @@ enum ShipvoBundleSelector {
     s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
   }
 
+  /// The load that last reported healthy. `markStableIfHealthy` only acts for that load.
+  private static var healthyLoad = 0
+
+  /// Called from `markHealthy`: the current load reached its first screen.
+  static func noteHealthy() { Store.lock.lock(); healthyLoad = Store.loadsInProcess; Store.lock.unlock() }
+
+  /// Clears the count only if the current load reported healthy. After a reload, the new load has not, so a crash
+  /// before its `markHealthy` still counts. Returns whether the count was cleared.
+  @discardableResult
+  static func markStableIfHealthy(_ s: Store) -> Bool {
+    Store.lock.lock(); defer { Store.lock.unlock() }
+    guard healthyLoad != 0, healthyLoad == Store.loadsInProcess else { return false }
+    s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
+    return true
+  }
+
   /// Called before a reload so the next ask is a fresh load.
   static func invalidate() { Store.lock.lock(); Store.selection = (nil, false); Store.lock.unlock() }
 

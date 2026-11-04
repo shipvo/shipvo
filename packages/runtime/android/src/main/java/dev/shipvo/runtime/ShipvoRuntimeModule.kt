@@ -15,11 +15,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class ShipvoRuntimeModule : Module() {
-  companion object {
-    /** The process stayed alive long enough: the current boot was not a crash. */
-    internal fun markStable(s: Store) { s.unhealthyBoots = 0; s.firstUnhealthyAt = 0 }
-  }
-
   private val ctx: Context get() = appContext.reactContext?.applicationContext ?: throw Exceptions.ReactContextLost()
 
   override fun definition() = ModuleDefinition {
@@ -56,11 +51,12 @@ class ShipvoRuntimeModule : Module() {
           s.pendingRelease = 0; s.pendingPath = null; s.trialBoots = 0
           s.addEvent("applied:${s.currentRelease}")
           // The promoting boot was a trial boot and was not counted. Count it now, until the stability window ends.
-          s.unhealthyBoots = 1; s.firstUnhealthyAt = s.now()
+          BootRules.countPromotedBoot(s, s.now())
           promoted = true
         }
         // The boot counter is not cleared here: markStable does that after the stability window.
       }
+      BootRules.noteHealthy(Store.loadsInProcess)
       scheduleStable()
       val kind = if (Store.loadsInProcess <= 1) "cold" else "reload"
       mapOf("release" to Store.runningRelease, "coldStartMs" to coldStart, "sinceLoadMs" to sinceLoad, "promoted" to promoted, "kind" to kind)
@@ -85,26 +81,27 @@ class ShipvoRuntimeModule : Module() {
     Function("reload") { reloadHost() }
   }
 
-  /** Clears the unhealthy-boot count once the app stayed up for the stability window. A reload since then cancels it. */
+  /** Clears the unhealthy-boot count once the app stayed up for the stability window.
+   *  The task is dropped after it runs and on reload, and `markStableIfHealthy` checks the load number. */
   private fun scheduleStable() {
     val app = ctx
     synchronized(ShipvoHostHandler.LOCK) {
       stableTask?.let { handler.removeCallbacks(it) }
       val load = Store.loadsInProcess
       val task = Runnable {
-        synchronized(ShipvoHostHandler.LOCK) { if (Store.loadsInProcess == load) markStable(Store(app)) }
+        synchronized(ShipvoHostHandler.LOCK) { BootRules.markStableIfHealthy(Store(app), load); stableTask = null }
       }
       stableTask = task
       handler.postDelayed(task, ShipvoHostHandler.STABILITY_MS)
     }
   }
 
-  /** Going to background cleanly counts as stable, but only after the app reported healthy for this load. */
+  /** Going to background cleanly counts as stable, but only if this load reported healthy (see BootRules). */
   private fun stableNow() {
     synchronized(ShipvoHostHandler.LOCK) {
-      val task = stableTask ?: return
-      handler.removeCallbacks(task); stableTask = null
-      markStable(Store(ctx))
+      if (BootRules.markStableIfHealthy(Store(ctx), Store.loadsInProcess)) {
+        stableTask?.let { handler.removeCallbacks(it) }; stableTask = null
+      }
     }
   }
 
@@ -112,6 +109,7 @@ class ShipvoRuntimeModule : Module() {
   private var stableTask: Runnable? = null
 
   private fun reloadHost() {
+    synchronized(ShipvoHostHandler.LOCK) { stableTask?.let { handler.removeCallbacks(it) }; stableTask = null }
     Handler(Looper.getMainLooper()).post {
       (ctx as? ReactApplication)?.reactHost?.reload("shipvo-update")
     }

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Exports Hermes bundles of the sample app for the device lab. Run after the APK is built (the APK embeds the
-# unmodified source). Writes <outDir>/v1.hbc .. v<N>.hbc (headline changed each time) crash.hbc (throws at start) and late-crash.hbc (throws 5 s after start, after markHealthy).
+# unmodified source). Writes <outDir>/v1.hbc .. v<N>.hbc (headline changed each time), crash.hbc (throws at start)
+# and late-crash.hbc (throws 5 s after start, after markHealthy).
 #   make-bundles.sh <outDir> [count]
 set -euo pipefail
 OUT="$(mkdir -p "$1" && cd "$1" && pwd)"; N="${2:-4}"

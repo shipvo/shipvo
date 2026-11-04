@@ -40,10 +40,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
       val current = s.currentPath
       if (current != null && File(current).exists()) {
-        val now = s.now()
-        if (now - s.firstUnhealthyAt > WINDOW_MS) { s.firstUnhealthyAt = now; s.unhealthyBoots = 0 }
-        s.unhealthyBoots = s.unhealthyBoots + 1
-        if (s.unhealthyBoots > MAX_BOOTS) {
+        if (BootRules.countBoot(s, s.now(), MAX_BOOTS, WINDOW_MS)) {
           s.addEvent("crash_loop_revert:${s.currentRelease}")
           s.block(s.currentRelease)
           revertToPrevious(s)
@@ -73,7 +70,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
       s.currentPath?.let { if (it != s.previousPath) File(it).delete() }
       s.currentPath = s.previousPath; s.currentRelease = s.previousRelease; s.currentSha = null
       s.previousPath = null; s.previousRelease = 0
-      s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
+      BootRules.clear(s)
     }
   }
 }

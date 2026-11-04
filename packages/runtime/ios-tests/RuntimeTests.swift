@@ -136,13 +136,26 @@ final class RuntimeTests: XCTestCase {
     let s = store("good"); try await promoted(s)
     s.previousPath = "/nonexistent/prev.hbc"; s.previousRelease = 3
     // Each boot reports healthy, then the process dies before the stability window ends (markStable is never reached).
-    for _ in 0..<3 {
+    // The promoting boot counted as 1, so launches 2 and 3 run the release and launch 4 reverts. That is 3 runs of the bad release.
+    for _ in 0..<2 {
       XCTAssertEqual(load(s)?.path, s.currentPath)
-      _ = ShipvoBundleSelector.promoteIfRunning(s)
+      ShipvoBundleSelector.noteHealthy()
     }
-    XCTAssertNil(load(s), "fourth launch reverts to the previous release (missing file, so the embedded bundle)")
+    XCTAssertNil(load(s), "the next launch reverts to the previous release (missing file, so the embedded bundle)")
     XCTAssertEqual(s.currentRelease, 3); XCTAssertEqual(s.blockedRelease, 5)
     XCTAssertTrue(s.consumeEvents().contains("crash_loop_revert:5"))
+  }
+
+  func testReloadBeforeMarkHealthyKeepsTheCount() async throws {
+    let s = store("good"); try await promoted(s)
+    XCTAssertEqual(s.unhealthyBoots, 1)
+    _ = load(s); ShipvoBundleSelector.noteHealthy()       // load A reports healthy
+    _ = load(s)                                           // reload: load B has not reported healthy
+    XCTAssertFalse(ShipvoBundleSelector.markStableIfHealthy(s), "background before markHealthy must not clear the count")
+    XCTAssertGreaterThan(s.unhealthyBoots, 0)
+    ShipvoBundleSelector.noteHealthy()
+    XCTAssertTrue(ShipvoBundleSelector.markStableIfHealthy(s))
+    XCTAssertEqual(s.unhealthyBoots, 0)
   }
 
   func testReleaseThatSurvivesTheStabilityWindowIsKept() async throws {
@@ -150,7 +163,7 @@ final class RuntimeTests: XCTestCase {
     for _ in 0..<6 {
       XCTAssertEqual(load(s)?.path, s.currentPath)
       _ = ShipvoBundleSelector.promoteIfRunning(s)
-      ShipvoBundleSelector.markStable(s)
+      ShipvoBundleSelector.noteHealthy(); ShipvoBundleSelector.markStableIfHealthy(s)
     }
     XCTAssertEqual(s.currentRelease, 5); XCTAssertEqual(s.blockedRelease, 0)
     XCTAssertFalse(s.consumeEvents().contains("crash_loop_revert:5"))
