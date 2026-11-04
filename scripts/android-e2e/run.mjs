@@ -138,7 +138,7 @@ await scenario("rollback to the previous release", async () => {
 });
 
 for (const [kind, file, title, maxBoots] of [
-  ["start", "crash", "crash-loop: a release that crashes on start is discarded", 10],
+  ["start", "crash", "crash-loop: a release that crashes on start is discarded", 4],
   // Reports healthy, is promoted, then dies 5 s later. The stability window must keep counting these boots: the bad release runs 3 times (the promoting boot counts as the first), and the 4th launch is the revert. That is the same rule as crash-on-start.
   ["late", "late-crash", "crash-loop: a release that crashes 5 s after markHealthy is reverted", 4],
 ]) await scenario(title, async () => {

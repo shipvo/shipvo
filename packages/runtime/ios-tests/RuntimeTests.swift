@@ -135,7 +135,7 @@ final class RuntimeTests: XCTestCase {
   func testReleaseThatDiesAfterMarkHealthyIsReverted() async throws {
     let s = store("good"); try await promoted(s)
     s.previousPath = "/nonexistent/prev.hbc"; s.previousRelease = 3
-    // Each boot reports healthy, then the process dies before the stability window ends (markStable is never reached).
+    // Each boot reports healthy, then the process dies before the stability window ends (markStableIfHealthy is never reached).
     // The promoting boot counted as 1, so launches 2 and 3 run the release and launch 4 reverts. That is 3 runs of the bad release.
     for _ in 0..<2 {
       XCTAssertEqual(load(s)?.path, s.currentPath)

@@ -31,15 +31,8 @@ enum ShipvoBundleSelector {
       s.unhealthyBoots = 1; s.firstUnhealthyAt = Store.now()
       promoted = true
     }
-    // The boot counter is not cleared here: `markStable` does that after the stability window.
+    // The boot counter is not cleared here: `markStableIfHealthy` does that after the stability window.
     return promoted
-  }
-
-  /// The process stayed alive for the stability window (or went to background cleanly): the current boot was not a crash.
-  /// Until this runs, the boot counted in `choose` stays on the books, so a crash after `markHealthy` still adds up.
-  static func markStable(_ s: Store) {
-    Store.lock.lock(); defer { Store.lock.unlock() }
-    s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
   }
 
   /// The load that last reported healthy. `markStableIfHealthy` only acts for that load.

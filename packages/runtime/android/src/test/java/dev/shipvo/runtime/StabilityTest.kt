@@ -16,12 +16,12 @@ class StabilityTest {
   /** One launch of a promoted release: count it, then report healthy. Returns true if the launch reverts. */
   private fun launch(c: Counts, now: Long, load: Int): Boolean {
     if (BootRules.countBoot(c, now, max, win)) return true
-    BootRules.noteHealthy(load); return false
+    BootRules.onHealthy(c, load, now, promoted = false); return false
   }
 
   @Test fun releaseThatDiesAfterMarkHealthyIsReverted() {
     val c = Counts()
-    BootRules.countPromotedBoot(c, 0)          // boot 1: promoted, counted as 1
+    BootRules.onHealthy(c, 1, 0, promoted = true)  // boot 1: promoted, counted as 1
     assertFalse(launch(c, 5_000, 2))           // boot 2
     assertFalse(launch(c, 10_000, 3))          // boot 3
     assertTrue("fourth launch reverts", launch(c, 15_000, 4))
@@ -29,7 +29,7 @@ class StabilityTest {
 
   @Test fun releaseThatReachesStabilityIsKept() {
     val c = Counts()
-    BootRules.countPromotedBoot(c, 0)
+    BootRules.onHealthy(c, 1, 0, promoted = true)
     for (i in 2..20) {
       assertFalse(launch(c, i * 5_000L, i))
       assertTrue(BootRules.markStableIfHealthy(c, i))
@@ -38,8 +38,7 @@ class StabilityTest {
 
   @Test fun backgroundBeforeMarkHealthyDoesNotClearTheCount() {
     val c = Counts()
-    BootRules.countPromotedBoot(c, 0)
-    BootRules.noteHealthy(1)                   // load 1 reported healthy, then the app reloaded
+    BootRules.onHealthy(c, 1, 0, promoted = true)  // load 1 reported healthy, then the app reloaded
     BootRules.countBoot(c, 1_000, max, win)    // load 2 starts
     assertFalse(BootRules.markStableIfHealthy(c, 2))
     assertEquals(2, c.unhealthyBoots)
@@ -47,7 +46,7 @@ class StabilityTest {
 
   @Test fun countsExpireOutsideTheWindow() {
     val c = Counts()
-    BootRules.countPromotedBoot(c, 0)
+    BootRules.onHealthy(c, 1, 0, promoted = true)
     assertFalse(BootRules.countBoot(c, win + 1, max, win))
     assertEquals(1, c.unhealthyBoots)
   }

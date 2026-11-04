@@ -25,6 +25,13 @@ internal object BootRules {
 
   fun noteHealthy(load: Int) { healthyLoad = load }
 
+  /** What `markHealthy` does to the counts: the promoting boot (if any) is counted, and `load` is recorded as healthy.
+   *  The module and the tests both call this, so they cannot drift apart. */
+  fun onHealthy(c: BootCounts, load: Int, now: Long, promoted: Boolean) {
+    if (promoted) countPromotedBoot(c, now)
+    noteHealthy(load)
+  }
+
   /** Clears the counts only if `load` is the one that reported healthy. A reloaded load that has not called
    *  markHealthy yet keeps its count, so a crash before markHealthy still adds up. Returns whether it cleared. */
   fun markStableIfHealthy(c: BootCounts, load: Int): Boolean {

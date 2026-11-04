@@ -50,13 +50,12 @@ class ShipvoRuntimeModule : Module() {
           s.currentRelease = s.pendingRelease; s.currentPath = s.pendingPath; s.currentSha = s.pendingSha
           s.pendingRelease = 0; s.pendingPath = null; s.trialBoots = 0
           s.addEvent("applied:${s.currentRelease}")
-          // The promoting boot was a trial boot and was not counted. Count it now, until the stability window ends.
-          BootRules.countPromotedBoot(s, s.now())
           promoted = true
         }
-        // The boot counter is not cleared here: markStable does that after the stability window.
+        // The promoting boot was a trial boot and was not counted, so onHealthy counts it until the stability window ends.
+        // The counter is not cleared here: markStableIfHealthy does that after the window.
+        BootRules.onHealthy(s, Store.loadsInProcess, s.now(), promoted)
       }
-      BootRules.noteHealthy(Store.loadsInProcess)
       scheduleStable()
       val kind = if (Store.loadsInProcess <= 1) "cold" else "reload"
       mapOf("release" to Store.runningRelease, "coldStartMs" to coldStart, "sinceLoadMs" to sinceLoad, "promoted" to promoted, "kind" to kind)
