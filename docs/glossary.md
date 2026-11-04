@@ -6,11 +6,11 @@ Every Shipvo word in plain English, in alphabetical order. If a page uses a word
 
 **Agent.** An AI assistant, such as Claude or ChatGPT, that can use tools. In Shipvo an agent uses your app through the simulator.
 
-**Band.** A slice of your users. A release goes to band `b0` (1 %) first, then `b1` (10 %), then `b2` (everyone). Each phone is placed in one band for good.
-
-**Bundle.** The JavaScript file that holds your app's screens and logic. An over-the-air update replaces the bundle.
+**Band.** A slice of your users. A release goes to band `b0` (1 %) first, then `b1` (10 %), then `b2` (everyone). A phone is placed in a band by the control plane.
 
 **bsdiff patch.** A small file that describes only what changed between two bundles. Phones download the patch instead of the whole bundle, so most updates are small.
+
+**Bundle.** The JavaScript file that holds your app's screens and logic. An over-the-air update replaces the bundle.
 
 **Control plane.** The server that stores your releases and tells phones which one to run. You can use the hosted one (`api.shipvo.dev`) or [run your own](self-hosting.md).
 
@@ -24,7 +24,7 @@ Every Shipvo word in plain English, in alphabetical order. If a page uses a word
 
 **Hermes bytecode version.** A number that says which Hermes build made a bundle. A phone can only run bundles with a matching number. Shipvo records it so a bundle is not sent to a phone that cannot run it.
 
-**MCP (Model Context Protocol).** A standard way for an AI assistant to use outside tools. `@shipvo/mcp` is the tool that lets an assistant open and tap through your app. See [@shipvo/mcp](mcp.md).
+**MCP (Model Context Protocol).** A standard way for an AI assistant to use outside tools. `@shipvo/mcp` is the tool that lets an assistant open and tap through your app. See [@shipvo/mcp](/docs/mcp/).
 
 **OTA (over-the-air) update.** A new version of your app that reaches phones without an app store release. Only JavaScript and assets change. Native code does not.
 
@@ -44,6 +44,6 @@ Every Shipvo word in plain English, in alphabetical order. If a page uses a word
 
 **Signature.** A check value made with your seed. A phone uses your public key to confirm a release came from you and was not changed.
 
-**Simulator.** A pretend phone that runs on a computer with no phone attached. Shipvo's simulator runs your app in a headless browser (one with no window) and shows it to agents as an accessibility tree. See [@shipvo/sim](sim.md).
+**Simulator.** A pretend phone that runs on a computer with no phone attached. Shipvo's simulator runs your app in a headless browser (one with no window) and shows it to agents as an accessibility tree. See [@shipvo/sim](/docs/sim/).
 
 **Staged release.** Sending a release to a few users first, then more. Shipvo does this with bands.

@@ -21,7 +21,7 @@ const NAV = [
   { group: "Get started", pages: [
     { slug: "start-here", src: "docs/start-here.md", title: "Start here", desc: "A plain-words first step for founders and makers: what Shipvo does, what you need, and what you will see when it works. No coding background assumed." },
     { slug: "overview", src: "README.md", title: "What Shipvo is", desc: "Shipvo is an open-source React Native framework: signed over-the-air updates for phones and a simulator AI agents operate over MCP." },
-    { slug: "getting-started", src: "docs/getting-started.md", title: "Build your first app", desc: "Twenty minutes from nothing to a React Native app that AI agents can open in a simulator and phones update over the air." },
+    { slug: "getting-started", src: "docs/getting-started.md", title: "Build your first app", desc: "Go from nothing to a React Native app that AI agents can open in a simulator and phones update over the air." },
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},

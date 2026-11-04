@@ -132,18 +132,16 @@ These come from closed issues and our dogfood reports.
 
 | You see | Why | What to do |
 | --- | --- | --- |
-| `Port 4545 is in use. Stop the other `shipvo sim` or pass --port <n>.` | Another simulator is running. `sim-dist/` is left as it was. | Stop the other one, or run `npm run sim -- --port 4546`. |
-| `unknown app "myshop"` from `open_app` with the local MCP | Older `@shipvo/mcp` only knew the sample app. | Update `@shipvo/mcp`, and run `shipvo sim` first. The local server asks the simulator which app it serves. `PN_APPS` still overrides. |
-| `Not signed in. Run `shipvo login`.` from `shipvo mcp` | You are signed out. | Current versions print the local config when signed out. Run `shipvo login` only for the hosted simulator. |
+| ``Port 4545 is in use. Stop the other `shipvo sim` or pass --port N.`` | Another simulator is running. `sim-dist/` is left as it was. | Stop the other one, or run `npm run sim -- --port 4546`. |
+| ``unknown app "myshop". Apps: ...`` from `open_app` with the local MCP | The id is not one of the apps the local server knows. The message lists the ones it does. | Run `shipvo sim` first, then use an id from the list. `PN_APPS` overrides the list. |
 | `Unknown flag --dryrun. Known flags: ...` | `publish` and `rollback` reject flags they do not know, so a typo cannot cause a real publish. | Use the flag as listed. Write `--out dir`, not `--out=dir`. |
 | `--out only works with --dry-run` | `--out` sets the dry-run folder. | Add `--dry-run`, or drop `--out`. |
 | `Nothing to publish with.` | No token or Cloudflare variables are set. | Run `shipvo login` then `shipvo app create`, or set the self-hosted variables in step 5. To only check a release, use `--dry-run`. |
-| After a scan the agent still sees the camera view | The scan result arrives a moment after the tap. | Read the screen again. |
 | A bundle is refused for a Hermes bytecode mismatch | The publish check, or the control plane, found the bundle was built with a different Hermes than the shell. | See [Hermes bytecode version](self-hosting.md#hermes-bytecode-version). |
 
 ## Next steps
 
 - Write tests for your flows: [Test your app in CI](testing.md).
 - Have an assistant try your app: [Test with an assistant](test-with-an-assistant.md).
-- Every command and flag: [@shipvo/cli](../packages/cli/README.md).
+- Every command and flag: [@shipvo/cli](/docs/cli/).
 - Back up your signing key: [Moving to a new machine](new-machine.md).

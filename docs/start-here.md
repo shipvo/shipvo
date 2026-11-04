@@ -6,7 +6,7 @@ New words are explained in the [glossary](glossary.md).
 
 ## What Shipvo does for you
 
-1. **It fixes your phone app without an app store wait.** When you change your app, you run one command. People who already installed the app get the change the next time they open it.
+1. **It fixes your phone app without an app store wait.** When you change your app, you run one command. People who already installed the app can get the change without a new store release.
 2. **It keeps updates safe.** Every update is signed with a secret only you hold. A phone refuses an update that is not signed by you. If an update breaks the app, the phone goes back to the last good version on its own.
 3. **It lets an AI assistant try your app.** Shipvo runs your app on a pretend phone on a computer. Claude or ChatGPT can tap through it like a customer and tell you where it breaks.
 
@@ -55,7 +55,7 @@ Follow [Test with an assistant](test-with-an-assistant.md). It takes you through
 npx shipvo publish --dry-run
 ```
 
-This builds and signs an update on your computer and sends it nowhere. It is safe to run any time. It writes its files to `.shipvo/dry-run`.
+This builds and signs an update on your computer and sends it nowhere. It is safe to run any time. It writes its files to `.shipvo/dry-run`. A good result ends with a line that says `dry run: nothing is sent anywhere`.
 
 ## Next steps
 
