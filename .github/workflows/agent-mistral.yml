@@ -13,7 +13,8 @@ on:
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
 jobs:
   pick:
-    concurrency: { group: "agent-mistral-${{ github.event.issue.number || inputs.issue || 'sweep' }}" }
+    # One picker at a time per engineer, so two runs never take the same issue.
+    concurrency: { group: "agent-mistral-pick" }
     if: vars.AGENTS_PAUSED != 'true' && (github.event_name != 'issues' || github.event.label.name == 'agent:mistral')
     runs-on: ubuntu-latest
     outputs:
