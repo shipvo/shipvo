@@ -9,7 +9,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import http from "node:http";
-import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
@@ -156,27 +155,28 @@ if (argi < 0) {
 } else {
   const port = Number(process.argv[argi + 1] || 8787);
   const keys = new Set((process.env.PN_API_KEYS ?? "").split(",").map((k) => k.trim()).filter(Boolean));
-  const transports = new Map<string, StreamableHTTPServerTransport>();
+  // Stateless (MCP 2026-07-28, and fine for 2025-era clients): no protocol session. Every request gets its own
+  // McpServer and transport, built from that request's x-shipvo-* headers, so scope never outlives the request.
+  // Simulator sessions are separate: they live in the simulator and travel as the `session` tool argument.
   const httpServer = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
-    if (url.pathname === "/health") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: true, sessions: transports.size })); }
+    if (url.pathname === "/health") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: true })); }
     if (url.pathname !== "/mcp") { res.writeHead(404); return res.end(); }
     // Keys: Bearer <key>. With no keys configured, the server is open (local use behind a tunnel you control).
     if (keys.size) { const k = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""); if (!keys.has(k)) { res.writeHead(401, { "content-type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_api_key" })); } }
-    const sid = req.headers["mcp-session-id"] as string | undefined;
-    let transport = sid ? transports.get(sid) : undefined;
-    if (!transport) {
-      if (req.method !== "POST") { res.writeHead(400); return res.end("missing session"); }
-      transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID(), onsessioninitialized: (id) => { transports.set(id, transport!); } });
-      transport.onclose = () => { for (const [id, t] of transports) if (t === transport) transports.delete(id); };
-      // One McpServer per client connection. Behind sim.shipvo.dev the Worker has checked the key and says which
-      // app and scope it grants; locally there are no such headers and every app is allowed.
-      const scope = req.headers["x-shipvo-scope"] as Ctx["scope"] | undefined;
-      await makeServer({ app: (req.headers["x-shipvo-app"] as string) || undefined, publicApps: (req.headers["x-shipvo-public"] as string) || undefined, scope, ownerToken: (req.headers["x-shipvo-owner-token"] as string) || undefined }).connect(transport);
-    }
-    let body: unknown = undefined;
-    if (req.method === "POST") { let raw = ""; for await (const ch of req) raw += ch; body = raw ? JSON.parse(raw) : undefined; }
-    await transport.handleRequest(req, res, body);
+    // No server-initiated streams and nothing to close without sessions.
+    if (req.method !== "POST") { res.writeHead(405, { allow: "POST", "content-type": "application/json" }); return res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed: this server is stateless, use POST" }, id: null })); }
+    let body: unknown;
+    try { let raw = ""; for await (const ch of req) raw += ch; body = raw ? JSON.parse(raw) : undefined; }
+    catch { res.writeHead(400, { "content-type": "application/json" }); return res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null })); }
+    // Behind sim.shipvo.dev the Worker has checked the key and says which app and scope it grants; locally
+    // there are no such headers and every app is allowed. A client's mcp-session-id header is ignored.
+    const h = (n: string) => (req.headers[n] as string) || undefined;
+    const server = makeServer({ app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    res.on("close", () => { void transport.close(); void server.close(); });
+    try { await server.connect(transport); await transport.handleRequest(req, res, body); }
+    catch (e) { if (!res.headersSent) { res.writeHead(500, { "content-type": "application/json" }); res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32603, message: "Internal error" }, id: null })); } }
   });
   httpServer.listen(port, () => console.error(`Shipvo MCP over HTTP on http://localhost:${port}/mcp (${keys.size ? keys.size + " key(s)" : "no auth"})`));
 }
