@@ -4,6 +4,9 @@
   "type": "module",
   "license": "Apache-2.0",
   "description": "The Shipvo simulator: runs a Shipvo app's web build in a phone-sized headless browser and exposes it to agents (accessibility tree, tap/type/scroll, simulated device, mock backend). Used by @shipvo/mcp and `shipvo sim`.",
+  "scripts": {
+    "test": "node --test"
+  },
   "bin": {
     "shipvo-sim": "server.mjs"
   },
@@ -13,6 +16,7 @@
   },
   "files": [
     "server.mjs",
+    "app-name.mjs",
     "README.md"
   ],
   "peerDependencies": {
