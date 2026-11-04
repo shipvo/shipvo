@@ -8,9 +8,9 @@ on:
     inputs:
       issue: { description: "Issue number (optional)", type: number, required: false }
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
-concurrency: { group: "agent-engineer-${{ github.event.issue.number || inputs.issue || 'sweep' }}" }
 jobs:
   pick:
+    concurrency: { group: "agent-engineer-${{ github.event.issue.number || inputs.issue || 'sweep' }}" }
     if: vars.AGENTS_PAUSED != 'true' && (github.event_name != 'issues' || github.event.label.name == 'agent:claude')
     runs-on: ubuntu-latest
     outputs:

@@ -13,15 +13,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Skip team members
+        id: who
+        env: { GH_TOKEN: "${{ github.token }}", U: "${{ github.event.issue.user.login }}", R: "${{ github.repository }}" }
+        run: |
+          # author_association hides private org membership, so ask for the real permission.
+          P=$(gh api "repos/$R/collaborators/$U/permission" --jq .permission 2>/dev/null || echo none)
+          case "$P" in admin|maintain|write) echo "team=true" >> "$GITHUB_OUTPUT"; echo "$U is on the team ($P); no triage";; *) echo "team=false" >> "$GITHUB_OUTPUT";; esac
       - uses: actions/checkout@v4
+        if: steps.who.outputs.team != 'true'
         with: { persist-credentials: false, sparse-checkout: .github/agents }
       - name: Build prompt
+        if: steps.who.outputs.team != 'true'
         env: { ISSUE: "${{ github.event.issue.number }}", AUTHOR: "${{ github.event.issue.user.login }}" }
         run: |
           sed -e "s/{{ISSUE}}/$ISSUE/g" -e "s/{{AUTHOR}}/$AUTHOR/g" \
             .github/agents/prompts/triage.md > /tmp/prompt.md
           { echo 'PROMPT<<__P__'; cat /tmp/prompt.md; echo; echo '__P__'; } >> "$GITHUB_ENV"
       - uses: anthropics/claude-code-action@v1
+        if: steps.who.outputs.team != 'true'
         env: { GH_TOKEN: "${{ github.token }}" }
         with:
           prompt: ${{ env.PROMPT }}

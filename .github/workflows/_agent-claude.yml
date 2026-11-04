@@ -135,6 +135,11 @@ jobs:
             --allowedTools "Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*)"
             --disallowedTools "Bash(git push:*),Bash(gh pr merge:*),Bash(gh api:*),Bash(gh release:*),Bash(gh secret:*),Bash(gh workflow:*),Bash(npm publish:*),Bash(pnpm publish:*)"
 
+      - name: Set up Python for Aider
+        if: steps.chk.outputs.ok == 'true' && inputs.engine == 'aider'
+        uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
       - name: Run Aider (${{ inputs.role }}) via OpenAI-compatible gateway
         if: steps.chk.outputs.ok == 'true' && inputs.engine == 'aider'
         env:
@@ -143,8 +148,7 @@ jobs:
           MODEL: ${{ inputs.model || vars.AIDER_MODEL || 'kilo-auto/free' }}
           SEED: ${{ github.run_id }}
         run: |
-          pipx install aider-chat > /dev/null 2>&1 || python3 -m pip install --user aider-chat > /dev/null
-          export PATH="$HOME/.local/bin:$PATH"
+          python -m pip install --quiet --disable-pip-version-check aider-chat
           # Split the key list and mask every key on its own: GitHub only masks the secret as a whole string.
           mapfile -t K < <(printf '%s' "$KEYS" | tr ',\n' '\n\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
           for k in "${K[@]}"; do echo "::add-mask::$k"; done
