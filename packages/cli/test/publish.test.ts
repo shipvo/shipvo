@@ -119,6 +119,36 @@ describe("publish and the Hermes bytecode check", () => {
     expect(puts).toEqual([]);
   });
 
+  describe("rollback --dry-run", () => {
+    const seedRelease = () => { blobs.set("b/demo/r1.hbc", fakeHbc(96)); values.set("h/demo/r1", JSON.stringify({ min_shell_version: "1.2.0" })); };
+    it("makes no put calls and prints the summary", async () => {
+      seedRelease();
+      await rollback(["--to", "1", "--bands", "b0,b1", "--dry-run"]);
+      expect(puts).toEqual([]);
+      const text = String((console.log as any).mock.calls[0][0]);
+      expect(text).toContain("demo");
+      expect(text).toContain("code of release 1");
+      expect(text).toContain("New release number: ");
+      expect(text).toContain("Platforms: android");
+      expect(text).toContain("Bands: b0, b1");
+      expect(text).toContain("Min shell version: 1.2.0");
+      expect(text).toContain("Dry run: nothing was written.");
+    });
+    it("still exits 1 when the bundle is missing", async () => {
+      const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+      await expect(rollback(["--to", "9", "--dry-run"])).rejects.toThrow("exit");
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(console.error).toHaveBeenCalledWith("Release 9 android bundle not found");
+      expect(puts).toEqual([]);
+    });
+    it("without the flag, pointers are written and the output is JSON", async () => {
+      seedRelease();
+      await rollback(["--to", "1", "--bands", "b0,b1"]);
+      expect(puts.length).toBe(2);
+      expect(JSON.parse(String((console.log as any).mock.calls[0][0])).rolled_back_to_code_of).toBe(1);
+    });
+  });
+
   it("--out followed by a --flag counts as no value", async () => {
     withBundle(96);
     await expect(publish([...flags, "--dry-run", "--out", "--bands", "b0"])).rejects.toThrow(/--out needs a directory/);
