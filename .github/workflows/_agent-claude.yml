@@ -174,8 +174,8 @@ jobs:
             if grep -qiE "AuthenticationError|authentication token is invalid|invalid api key|401 Unauthorized" /tmp/agent/aider.log; then
               echo "::warning::$WHO was rejected (invalid or expired) and is discarded for this run. Replace it in OPENAI_COMPAT_API_KEY."; git checkout -q -- . 2>/dev/null || true; continue
             fi
-            if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror" /tmp/agent/aider.log; then
-              echo "::warning::$WHO hit a rate limit or quota; trying the next credential"; git checkout -q -- . 2>/dev/null || true; continue
+            if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror|Empty response received|ServiceUnavailable|APIConnectionError|InternalServerError|Timeout" /tmp/agent/aider.log; then
+              echo "::warning::$WHO hit a rate limit, quota or empty/failed response; trying the next credential"; git checkout -q -- . 2>/dev/null || true; continue
             fi
             break
           done
