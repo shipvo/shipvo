@@ -4,6 +4,9 @@
 name: agent-release
 on:
   schedule: [{ cron: "41 18 * * *" }]
+  # GitHub often drops or delays the schedule on this repo, so also try after each merge-bot pass;
+  # the gate below only goes ahead after 18:41 UTC and once per day.
+  workflow_run: { workflows: [agent-merger], types: [completed] }
   workflow_dispatch:
 permissions: { contents: read }
 concurrency: { group: agent-release }
@@ -19,6 +22,10 @@ jobs:
         id: gate
         run: |
           [ -n "$GH_TOKEN" ] || { echo "::warning::Add the AGENT_TOKEN secret"; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            [ "$(date -u +%H%M)" -ge 1841 ] || { echo "before 18:41 UTC"; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0; }
+            if gh api "repos/$R/git/ref/tags/release-$(date -u +%Y%m%d)" >/dev/null 2>&1; then echo "already released today"; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          fi
           SHA=$(gh api repos/$R/commits/main --jq .sha)
           CI=$(gh api "repos/$R/commits/$SHA/check-runs?check_name=test" --jq '[.check_runs[]|.conclusion][0] // "none"')
           RED=$(gh issue list -R $R --label ci-main --state open --json number --jq length)
@@ -48,7 +55,8 @@ jobs:
           git commit -qm "release: $(node -e "console.log(require('/tmp/release.json').map(p=>p.name+' '+p.to).join(', '))")"
           git tag -a "$TAG" -m "Release $DATE"
           U="https://x-access-token:${GH_TOKEN}@github.com/${R}.git"
-          for a in 1 2 3; do git push "$U" HEAD:refs/heads/main && break; sleep $((a*15)); done
+          # If main moved since the gate, do not tag or publish this commit; the next pass starts from the new main.
+          git push "$U" HEAD:refs/heads/main || { echo "main moved; trying again on the next pass"; exit 0; }
           git push "$U" "$TAG"
           git push --force "$U" HEAD:refs/heads/release
           echo "released: $(cat /tmp/release.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).map(p=>p.name+" "+p.to).join(", ")))')" >> "$GITHUB_STEP_SUMMARY"
