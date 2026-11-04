@@ -1,7 +1,7 @@
 ---
 title: How to roll back a bad React Native over-the-air update
 date: 2026-11-04
-order: 30
+order: 23
 author: Shipvo team
 tags: Guides, OTA
 seo_title: Roll back a bad React Native OTA update
@@ -40,11 +40,11 @@ This is the layer that matters when the bundle crashes before the app can reach 
 
 The Shipvo runtime counts failed boots. A release is marked healthy once the first screen renders. If a release fails to boot three times, the phone discards it, blocks that release number, and goes back to the last good release. It does not download the blocked release again.
 
-We tested this on a real phone. Release 4 of the sample app threw an error at startup on purpose. After three failed boots the phone reverted to release 3 by itself, and the cold start after the revert was 847 ms. The device was a 2 GB Xiaomi Redmi 9A. The timeline and the raw numbers are in the [spike results](/docs/spike-results/).
+In the spike, release 4 of the sample app threw an error at startup on purpose. After three failed boots the phone reverted to release 3 by itself. Cold start after the revert was 847 ms on a Xiaomi Redmi 9A (Android). The timeline and the raw numbers are in the [spike results](/docs/spike-results/).
 
 Two limits to be honest about:
 
-- This was measured on Android. Do not assume the same numbers on iOS. iOS apply time is not published yet.
+- The numbers above are from Android.
 - The phone only reverts crashes it can see at boot. A release that runs but does the wrong thing, such as a button that does nothing, is not a crash. For that you need layer 3.
 
 ## Layer 3: republish the last good release for everyone
@@ -61,11 +61,11 @@ Say release 8 is bad and release 7 was fine. The command takes release 7's bundl
 {"app":"myshop","rolled_back_to_code_of":7,"new_release":9,"min_shell_version":"1.0.0","issued_at":"..."}
 ```
 
-Why a new number instead of pointing back to 7? Phones that already applied 8 compare release numbers. A pointer that goes backwards looks like old news. A new release with the old code moves forward for every phone.
+`rollback` publishes the old code under the next release number.
 
 The command signs the new pointer with your signing seed, like a normal publish. Phones check the signature and the SHA-256 of the bundle before they apply it. A rollback is not a shortcut around verification. See [who signs your updates](/blog/who-signs-your-updates/) for why that matters.
 
-Useful flags:
+Useful flags. `--bands b0,b1` changes only the pointers for `b0` and `b1`; `b2` keeps its current pointer.
 
 ```bash
 shipvo rollback --to 7 --bands b0,b1     # leave b2 alone
@@ -77,7 +77,7 @@ shipvo rollback --to 7 --platform android
 ## A short incident checklist
 
 1. **Stop the spread.** If the bad release is only in `b0`, do not publish to `b1` or `b2`.
-2. **Pick the last good release number.** Check your release history. Do not guess.
+2. **Pick the last good release number.** Use the release number you recorded when you published it. Do not guess.
 3. **Run `shipvo rollback --to <n>`.** Add `--bands` if only some bands got the bad release.
 4. **Open the app on a test phone or in the [simulator](/docs/getting-started/).** `open_app("myshop@latest")` opens the exact release phones run, so you can confirm that the old behaviour is back.
 5. **Fix forward.** Write a test that fails on the bad change, fix it, and publish as a normal release. A rollback buys time. It does not fix the bug.
@@ -90,9 +90,9 @@ Whatever you use, ask these before you need them:
 - Does it remember the bad release so it is not downloaded again?
 - Can you limit a release to a small share of users?
 - Is a rollback signed and verified like any release?
-- Has the vendor shown the revert working on a real device?
+- Has the vendor published a measured revert, with the device and the numbers?
 
-The last one is where most pages stop at a claim. Ours is a test on one phone, which is a small sample, and we say so. If you are leaving CodePush, see [a CodePush alternative after App Center](/blog/a-codepush-alternative-after-app-center/) for the full checklist. For how OTA fits store policy, read [OTA updates and the app store rules](/blog/ota-updates-and-the-app-store-rules/).
+The last one is where most pages stop at a claim. Ours is the crash-loop revert row in the [spike results](/docs/spike-results/), with the device and timings. If you are leaving CodePush, see [a CodePush alternative after App Center](/blog/a-codepush-alternative-after-app-center/) for the full checklist. For how OTA fits store policy, read [OTA updates and the app store rules](/blog/ota-updates-and-the-app-store-rules/).
 
 ## Next step
 
