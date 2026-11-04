@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+// Prints the results table (markdown) from android-e2e-report.json.   node summary.mjs <report.json>
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const kb = (n) => (n == null ? "-" : `${(n / 1024).toFixed(1)} KB`);
+const ms = (n) => (n == null ? "-" : `${n} ms`);
+export function rows(report) {
+  return report.scenarios.map((s) => {
+    const m = s.median ?? {};
+    const t = [m.pointerToHealthyMs != null && `pointer to healthy ${ms(m.pointerToHealthyMs)}`, m.downloadMs != null && `download ${ms(m.downloadMs)}`, m.applyMs != null && `apply ${ms(m.applyMs)}`,
+      m.totalMs != null && `am start -W ${ms(m.totalMs)}`, m.reportedColdStartMs != null && `reported cold start ${ms(m.reportedColdStartMs)}`, m.restoredMs != null && `restored ${ms(m.restoredMs)} after publish`, m.boots != null && `${m.boots} launches`,
+      s.pointerToHealthyMs != null && `pointer to healthy ${ms(s.pointerToHealthyMs)}`, s.joinedAfterWideningMs != null && `joined ${ms(s.joinedAfterWideningMs)} after widening`].filter(Boolean).join("; ") || "-";
+    const size = m.downloadBytes != null ? kb(m.downloadBytes) : s.downloadBytes != null ? kb(s.downloadBytes) : "-";
+    return `| ${s.name} | ${s.pass ? "pass" : "FAIL"} | ${t} | ${size} |`;
+  });
+}
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const r = JSON.parse(readFileSync(process.argv[2], "utf8"));
+  console.log(["| Scenario | Result | Median timings (3 trials) | Download |", "| --- | --- | --- | --- |", ...rows(r)].join("\n"));
+}
