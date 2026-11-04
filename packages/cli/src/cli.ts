@@ -36,7 +36,9 @@ switch (cmd) {
   case "verify": {
     if (!rest[0]) { console.error("Usage: shipvo verify <pointer file> [public-key-b64]"); process.exit(2); }
     const key = rest[1] ?? b64(keyFromSeed(seed()).publicKey);
-    const ok = verifyPointer(readFileSync(rest[0], "utf8"), key); console.log(ok ? "valid" : "INVALID"); process.exit(ok ? 0 : 1);
+    let text: string;
+    try { text = readFileSync(rest[0], "utf8"); } catch { console.error(`Cannot read ${rest[0]}`); process.exit(2); }
+    const ok = verifyPointer(text, key); console.log(ok ? "valid" : "INVALID"); process.exit(ok ? 0 : 1);
   }
   case undefined: case "--help": case "-h": case "help": console.log(help); break;
   default: console.error(unknownCommand(cmd)); process.exit(1);

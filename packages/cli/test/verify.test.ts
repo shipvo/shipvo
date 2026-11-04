@@ -6,6 +6,7 @@ import { verifyPointer } from "../src/verify";
 const seed = b64(randomBytes(32));
 const pub = b64(keyFromSeed(seed).publicKey);
 const body = JSON.stringify({ schema_version: "1.0", app_id: "demo", release: 1 });
+// Signs the original `body` but stores `b`, so passing a changed `b` makes a tampered pointer.
 const pointer = (b: string) => JSON.stringify({ body: b, signature: signBytes(new TextEncoder().encode(body), seed) });
 
 describe("verifyPointer", () => {
