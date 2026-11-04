@@ -217,10 +217,11 @@ async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof l
 
 export async function rollback(argv: string[]) {
   checkFlags(argv, ["to", "bands", "platform", "dry-run"]);
-  const a = parse(argv), cfg = loadConfig(), SEED = seed(), kv = kvFor(cfg);
+  const a = parse(argv), cfg = loadConfig(), kv = kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor, to = Number(a.to);
-  if (!to) { console.error("Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all]"); process.exit(2); }
+  if (!to) { console.error("Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all] [--dry-run]"); process.exit(2); }
   const dry = a["dry-run"] !== undefined;
+  const SEED = dry ? "" : seed();
   const release = (await currentRelease(kv, APP, MAJOR)) + 1, issued_at = new Date().toISOString();
   const bands = (a.bands || "b0,b1,b2").split(",");
   const platforms = platformsOf(a);
