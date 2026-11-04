@@ -13,7 +13,7 @@ Ship
   publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release
   publish --dry-run [--out d] Check a release offline: build and sign, write nothing remote
   rollback --to <release>     Republish an earlier release as a new release
-  rollback --to <release> --dry-run  Preview a rollback without writing pointers
+  rollback --to <n> --dry-run Preview a rollback, write nothing
   app create | list | delete  Register, list or remove apps on the hosted control plane
   login                       Sign in with GitHub and get a key for the hosted simulator
   doctor                      Check setup before first publish

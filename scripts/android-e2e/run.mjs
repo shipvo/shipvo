@@ -137,10 +137,14 @@ await scenario("rollback to the previous release", async () => {
   return { pass: trials.every((t) => t.ok && t.deviceBundleMatches), trials, median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "applyMs"]) };
 });
 
-await scenario("crash-loop: a release that crashes on start is discarded", async () => {
+for (const [kind, file, title, maxBadRuns] of [
+  ["start", "crash", "crash-loop: a release that crashes on start is discarded", 3],
+  // Reports healthy, is promoted, then dies 5 s later. The stability window must keep counting these boots: the bad release runs 3 times (the promoting boot counts as the first), and the 4th launch is the revert. That is the same rule as crash-on-start. `maxBadRuns` is how many times the bad release may run (the issue's "within 3 launches"); the last launch is the revert to the previous release, so `badRuns = boots - 1`.
+  ["late", "late-crash", "crash-loop: a release that crashes 5 s after markHealthy is reverted", 3],
+]) await scenario(title, async () => {
   const trials = [];
   for (let i = 0; i < TRIALS; i++) {
-    const prev = good().rel, crashBytes = bundle("crash");
+    const prev = good().rel, crashBytes = bundle(file);
     const p = await publish(crashBytes, { bases: [] });
     const staged = await waitFor(() => prefs().pending_release === p.release, 60_000);
     let boots = 0, restored = null;
@@ -152,10 +156,11 @@ await scenario("crash-loop: a release that crashes on start is discarded", async
     }
     const pr = prefs(), after = entries().filter((e) => e.t >= (restored?.at ?? Infinity) && e.path.includes(`r${p.release}.hbc`)).length;
     const revertEvent = tele().some((e) => e.event === "crash_loop_revert" && e.at >= p.at);
-    trials.push({ release: p.release, staged: !!staged, boots, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
-      revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 });
+    const badRuns = boots - 1;
+    trials.push({ release: p.release, staged: !!staged, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
+      revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 && badRuns <= maxBadRuns });
   }
-  return { pass: trials.every((t) => t.pass), trials, median: summarize(trials, ["restoredMs", "boots"]) };
+  return { pass: trials.every((t) => t.pass), kind, maxBadRuns, trials, median: summarize(trials, ["restoredMs", "boots", "badRuns"]) };
 });
 
 await scenario("staged rollout: a device outside the cohort does not get the release", async () => {

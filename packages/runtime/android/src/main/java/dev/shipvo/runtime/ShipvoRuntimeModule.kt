@@ -52,11 +52,16 @@ class ShipvoRuntimeModule : Module() {
           s.addEvent("applied:${s.currentRelease}")
           promoted = true
         }
-        s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
+        // The promoting boot was a trial boot and was not counted, so onHealthy counts it until the stability window ends.
+        // The counter is not cleared here: markStableIfHealthy does that after the window.
+        BootRules.onHealthy(s, Store.loadsInProcess, s.now(), promoted)
       }
+      scheduleStable()
       val kind = if (Store.loadsInProcess <= 1) "cold" else "reload"
       mapOf("release" to Store.runningRelease, "coldStartMs" to coldStart, "sinceLoadMs" to sinceLoad, "promoted" to promoted, "kind" to kind)
     }
+
+    OnActivityEntersBackground { stableNow() }
 
     Function("consumeEvents") { Store(ctx).consumeEvents() }
 
@@ -75,7 +80,35 @@ class ShipvoRuntimeModule : Module() {
     Function("reload") { reloadHost() }
   }
 
+  /** Clears the unhealthy-boot count once the app stayed up for the stability window.
+   *  The task is dropped after it runs and on reload, and `markStableIfHealthy` checks the load number. */
+  private fun scheduleStable() {
+    val app = ctx
+    synchronized(ShipvoHostHandler.LOCK) {
+      stableTask?.let { handler.removeCallbacks(it) }
+      val load = Store.loadsInProcess
+      val task = Runnable {
+        synchronized(ShipvoHostHandler.LOCK) { BootRules.markStableIfHealthy(Store(app), load); stableTask = null }
+      }
+      stableTask = task
+      handler.postDelayed(task, ShipvoHostHandler.STABILITY_MS)
+    }
+  }
+
+  /** Going to background cleanly counts as stable, but only if this load reported healthy (see BootRules). */
+  private fun stableNow() {
+    synchronized(ShipvoHostHandler.LOCK) {
+      if (BootRules.markStableIfHealthy(Store(ctx), Store.loadsInProcess)) {
+        stableTask?.let { handler.removeCallbacks(it) }; stableTask = null
+      }
+    }
+  }
+
+  private val handler = Handler(Looper.getMainLooper())
+  private var stableTask: Runnable? = null
+
   private fun reloadHost() {
+    synchronized(ShipvoHostHandler.LOCK) { stableTask?.let { handler.removeCallbacks(it) }; stableTask = null }
     Handler(Looper.getMainLooper()).post {
       (ctx as? ReactApplication)?.reactHost?.reload("shipvo-update")
     }
