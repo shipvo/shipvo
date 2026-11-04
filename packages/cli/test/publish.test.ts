@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -59,5 +59,29 @@ describe("publish and the Hermes bytecode check", () => {
     withBundle(96);
     await expect(publish([...flags, "--hermes-bytecode-version"])).rejects.toThrow(/pass a value like 96/);
     expect(puts).toEqual([]);
+  });
+
+  it("rejects unknown flags before doing anything", async () => {
+    withBundle(96);
+    await expect(publish([...flags, "--dryrun"])).rejects.toThrow(/Unknown flag --dryrun/);
+    expect(puts).toEqual([]);
+  });
+
+  it("--dry-run signs and writes a release locally without touching the control plane", async () => {
+    withBundle(96);
+    await publish([...flags, "--dry-run"]);
+    expect(puts).toEqual([]); // the remote store is never used
+    const out = join(cwd, ".shipvo/dry-run");
+    const ptr = JSON.parse(readFileSync(join(out, "p/demo/1/b0"), "utf8"));
+    expect(typeof ptr.signature).toBe("string");
+    expect(JSON.parse(ptr.body).release).toBe(1);
+    expect(existsSync(join(out, "b/demo/r1.hbc"))).toBe(true);
+    expect(JSON.parse(String((console.log as any).mock.calls[0][0]))).toMatchObject({ dry_run: true, release: 1, bytes: 64 });
+  });
+
+  it("--out picks the directory", async () => {
+    withBundle(96);
+    await publish([...flags, "--dry-run", "--out", "out-x"]);
+    expect(existsSync(join(cwd, "out-x/h/demo/r1"))).toBe(true);
   });
 });

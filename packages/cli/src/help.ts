@@ -11,6 +11,7 @@ Start
 
 Ship
   publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release
+  publish --dry-run [--out d] Build and sign offline, write to a local directory (default .shipvo/dry-run)
   rollback --to <release>     Republish an earlier release as a new release
   app create | list | delete  Register, list or remove apps on the hosted control plane
   login                       Sign in with GitHub and get a key for the hosted simulator

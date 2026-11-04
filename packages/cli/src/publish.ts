@@ -1,9 +1,9 @@
 // `shipvo publish`: build the Hermes bundle, sign a release pointer, publish bundle + patches + the agent-facing web
 // artifact to the control plane. `shipvo rollback --to N`: republish an earlier bundle as a new release.
 import { execSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
 import { checkBundle, parseDeclared } from "./hermes.js";
 import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
@@ -28,8 +28,36 @@ const platformsOf = (a: Record<string, string | undefined>): Platform[] => {
   throw new Error(`--platform must be android, ios or all (got "${a.platform}")`);
 };
 
+/** Unknown flags are errors: a typo like --dryrun must not fall through to a real publish. */
+function checkFlags(argv: string[], known: string[]) {
+  const bad = argv.filter((x) => x.startsWith("--") && !known.includes(x.slice(2)));
+  if (bad.length) throw new Error(`Unknown flag ${bad.join(", ")}. Known flags: ${known.map((k) => "--" + k).join(" ")}`);
+}
+
+/** A store that only writes files under `dir` (key `p/app/1/b0` becomes `dir/p/app/1/b0`). It reads nothing, so a dry run never needs a control plane. */
+function localKv(dir: string) {
+  const root = resolve(dir);
+  return {
+    async get(_k: string): Promise<string | null> { return null; },
+    async getBytes(_k: string): Promise<Uint8Array<ArrayBuffer> | null> { return null; },
+    async keys(_prefix: string): Promise<string[]> { return []; },
+    async put(k: string, body: BodyInit, _type: string) {
+      const f = resolve(root, k);
+      if (!f.startsWith(root + "/")) throw new Error(`refusing to write outside ${dir}: ${k}`);
+      mkdirSync(dirname(f), { recursive: true });
+      writeFileSync(f, typeof body === "string" ? body : (body as Uint8Array));
+    },
+  };
+}
+
+const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-bytecode-version", "max-bases", "skip-export", "skip-web", "dry-run", "out"];
+
 export async function publish(argv: string[]) {
-  const a = parse(argv), cfg = loadConfig(), SEED = seed(), kv = kvFor(cfg);
+  checkFlags(argv, PUBLISH_FLAGS);
+  const a = parse(argv), cfg = loadConfig(), SEED = seed();
+  const dry = a["dry-run"] !== undefined && a["dry-run"] !== "false";
+  const outDir = a.out && a.out !== "true" ? a.out : ".shipvo/dry-run";
+  const kv = dry ? localKv(outDir) : kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor;
   const MIN_SHELL = a["min-shell"] || JSON.parse(readFileSync("app.json", "utf8")).expo.version; // a bundle needs the shell it was built against
   if (a["hermes-bytecode-version"] === "true") throw new Error("--hermes-bytecode-version needs a value: pass a value like 96 (or 96,98)");
@@ -37,7 +65,8 @@ export async function publish(argv: string[]) {
   const bands = (a.bands || "b0,b1,b2").split(",");
   const platforms = platformsOf(a);
   const release = Number(a.release || 0) || (await currentRelease(kv, APP, MAJOR)) + 1;
-  const summary: Record<string, unknown> = { app: APP, release, bands, min_shell_version: MIN_SHELL };
+  const summary: Record<string, unknown> = { app: APP, release, bands, min_shell_version: MIN_SHELL, ...(dry ? { dry_run: true, out: outDir } : {}) };
+  if (dry) console.error(`dry run: nothing is sent anywhere; files go to ${outDir}. Release is ${release}${a.release ? "" : " (pass --release N to match the control plane)"}.`);
 
   for (const pf of platforms) {
     // Android published alone keeps the original dist-ota/ layout, so existing CI keeps working.
@@ -131,6 +160,7 @@ async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof l
 }
 
 export async function rollback(argv: string[]) {
+  checkFlags(argv, ["to", "bands", "platform"]);
   const a = parse(argv), cfg = loadConfig(), SEED = seed(), kv = kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor, to = Number(a.to);
   if (!to) { console.error("Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all]"); process.exit(2); }
