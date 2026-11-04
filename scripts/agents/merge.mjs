@@ -76,13 +76,22 @@ for (const pr of prs) {
 
   if (L.includes("needs-human")) continue;
 
-  // Nudge stuck PRs: events can be lost (GitHub hiccups, bot-made changes that do not trigger workflows).
+  // Ask the fixer directly: label events can be lost, and GitHub sends no pull_request events at all
+  // for a PR with merge conflicts, so a label alone would never start it.
+  const fixNow = (label, why) => act(`dispatch fixer for #${n} (${why})`, () => gh("workflow", "run", "agent-fixer.yml", "-R", REPO,
+    "--ref", "main", "-f", `pr=${n}`, "-f", `branch=${pr.head.ref}`, "-f", `label=${label}`));
   const quietMin = (Date.now() - new Date(pr.updated_at)) / 6e4;
+  const full = api(`repos/${REPO}/pulls/${n}`);
+  if (full.mergeable === false && full.mergeable_state === "dirty") {
+    if (!L.includes("agent:conflict")) {
+      addLabel(n, "agent:conflict");
+      comment(n, "This branch has merge conflicts with main. The fixer agent has been asked to resolve them.");
+      fixNow("agent:conflict", "merge conflict");
+    } else if (quietMin > 60) fixNow("agent:conflict", "still conflicting");
+    continue;
+  }
   if (quietMin > 60 && L.includes("agent:changes-requested")) {
-    act(`re-request fix on #${n}`, () => {
-      gh("api", "-X", "DELETE", `repos/${REPO}/issues/${n}/labels/agent:changes-requested`);
-      gh("api", "-X", "POST", `repos/${REPO}/issues/${n}/labels`, "-f", "labels[]=agent:changes-requested");
-    });
+    fixNow("agent:changes-requested", "changes requested, quiet for an hour");
     continue;
   }
   if (quietMin > 60 && !L.some((l) => ["agent:approved", "agent:changes-requested", "agent:contract-check", "contract:drift"].includes(l))) {
@@ -101,18 +110,8 @@ for (const pr of prs) {
   }
   const guarded = files.some((f) => GUARDED.some((re) => re.test(f)));
   if (!L.includes("agent:approved")) { log(`#${n}: waiting for review approval`); continue; }
-  const full = api(`repos/${REPO}/pulls/${n}`);
   if (full.mergeable_state === "behind") {
     act(`update branch #${n}`, () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/update-branch`));
-    continue;
-  }
-  if (full.mergeable === false || full.mergeable_state === "dirty") {
-    if (!L.includes("agent:conflict")) {
-      addLabel(n, "agent:conflict");
-      comment(n, isCopilot(pr)
-        ? "@copilot this branch has merge conflicts with main. Please merge main into it and resolve them."
-        : "This branch has merge conflicts with main. The fixer agent will be asked to resolve them.");
-    }
     continue;
   }
 
