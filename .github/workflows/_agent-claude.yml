@@ -43,30 +43,35 @@ jobs:
       REPO: ${{ github.repository }}
     steps:
       - name: Check secrets
+        id: chk
         env:
           A: ${{ secrets.ANTHROPIC_API_KEY }}
           O: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          [ -n "$AGENT_TOKEN" ] || { echo "::error::Add the AGENT_TOKEN repo secret (see .github/agents/README.md)"; exit 1; }
-          [ -n "$A$O" ] || { echo "::error::Add CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY (see .github/agents/README.md)"; exit 1; }
+          if [ -z "$AGENT_TOKEN" ] || [ -z "$A$O" ]; then
+            echo "::warning::Agent team not set up yet: add AGENT_TOKEN and CLAUDE_CODE_OAUTH_TOKEN (or ANTHROPIC_API_KEY). See .github/agents/README.md"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
 
       - uses: actions/checkout@v4
+        if: steps.chk.outputs.ok == 'true'
         with:
           ref: ${{ inputs.mode == 'pr-branch' && inputs.branch || '' }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node and pnpm
-        if: inputs.mode != 'read' || inputs.role == 'reviewer'
+        if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
         uses: pnpm/action-setup@v4
         with: { version: 10.28.0 }
-      - if: inputs.mode != 'read' || inputs.role == 'reviewer'
+      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
         uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
-      - if: inputs.mode != 'read' || inputs.role == 'reviewer'
+      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
         run: pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
 
       - name: Prepare branch
+        if: steps.chk.outputs.ok == 'true'
         run: |
           git config user.name "Shipvo Agent (Claude)"
           git config user.email "agents@shipvo.dev"
@@ -79,6 +84,7 @@ jobs:
           fi
 
       - name: Build prompt
+        if: steps.chk.outputs.ok == 'true'
         env:
           VARS: ${{ inputs.vars }}
           ROLE: ${{ inputs.role }}
@@ -107,6 +113,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Run Claude (${{ inputs.role }})
+        if: steps.chk.outputs.ok == 'true'
         uses: anthropics/claude-code-action@v1
         env:
           # read roles use gh with the agent token; code roles only get read access through GITHUB_TOKEN
@@ -125,7 +132,7 @@ jobs:
 
       - name: Push, open PR, post notes
         id: post
-        if: always()
+        if: always() && steps.chk.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
           MODE: ${{ inputs.mode }}

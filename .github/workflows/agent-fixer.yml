@@ -31,6 +31,7 @@ jobs:
     steps:
       - id: r
         run: |
+          [ -n "$GH_TOKEN" ] || { echo "::warning::Add the AGENT_TOKEN secret (see .github/agents/README.md)"; exit 0; }
           python3 - <<'EOF'
           import json, os, re, subprocess
           E = os.environ; R = E["R"]; B = E["BRANCH"]

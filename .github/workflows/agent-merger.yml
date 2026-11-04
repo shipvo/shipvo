@@ -19,7 +19,9 @@ jobs:
         with: { sparse-checkout: scripts/agents, persist-credentials: false }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: node scripts/agents/merge.mjs
+      - run: |
+          [ -n "$GH_TOKEN" ] || { echo "::warning::Add the AGENT_TOKEN secret (see .github/agents/README.md)"; exit 0; }
+          node scripts/agents/merge.mjs
         env:
           GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}

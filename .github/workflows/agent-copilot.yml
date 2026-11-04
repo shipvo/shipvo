@@ -17,6 +17,7 @@ jobs:
       MAX_ACTIVE: ${{ vars.AGENT_COPILOT_MAX_ACTIVE || 3 }}
     steps:
       - run: |
+          [ -n "$GH_TOKEN" ] || { echo "::warning::Add the AGENT_TOKEN secret (see .github/agents/README.md)"; exit 0; }
           python3 - <<'EOF'
           import json, os, subprocess
           R = os.environ["REPO"]
