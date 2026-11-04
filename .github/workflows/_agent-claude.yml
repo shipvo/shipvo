@@ -161,7 +161,7 @@ jobs:
             set +e
             aider --model "openai/$MODEL" --message-file /tmp/agent/prompt.md --read CLAUDE.md \
               --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
-              --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
+              --edit-format diff --no-detect-urls --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
             rc=$?; set -e
             tail -n 300 /tmp/agent/aider.log
             if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror" /tmp/agent/aider.log; then
