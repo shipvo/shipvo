@@ -174,10 +174,11 @@ describe("publish and the Hermes bytecode check", () => {
   it("shows the pip hint when older bundles exist but bsdiff4 is missing", async () => {
     withBundle(96);
     values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: "abc" }));
+    const realKeys = stub.keys;
     stub.keys = async (p: string) => (p === "h/demo/r" ? ["h/demo/r1"] : []);
     exec.fn = (c) => { if (c.includes("import bsdiff4")) throw new Error("no module"); };
     await publish([...flags, "--release", "2"]);
-    stub.keys = async () => [] as string[];
+    stub.keys = realKeys; // put the shared stub back so later tests see real keys
     const err = (console.error as any).mock.calls.join("\n");
     expect(err).toMatch(/pip install bsdiff4/);
     expect(err).toMatch(/Updates still work/);
