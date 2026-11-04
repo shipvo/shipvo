@@ -1,5 +1,6 @@
 // Read the Hermes bytecode version from a bundle header, and check it against what the app's shells declare.
 // A Hermes bytecode file starts with an 8-byte magic number (little-endian 0x1F1903C103BC1FC6),
+// (source: Hermes `BytecodeVersion.h` and the file header layout in the Hermes repo),
 // followed by the bytecode format version as a 32-bit little-endian integer.
 const MAGIC = [0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f];
 
@@ -14,6 +15,7 @@ export function hermesBytecodeVersion(b: Uint8Array): number | null {
 
 /** Parse a declared version list such as "96" or "96,98" (CLI flag) or a number / number[] (shipvo.json). */
 export function parseDeclared(v: unknown): number[] | undefined {
+  if (v === true || v === "true") throw new Error("--hermes-bytecode-version needs a value, for example --hermes-bytecode-version 96");
   if (v === undefined || v === null || v === "") return undefined;
   const list = Array.isArray(v) ? v : String(v).split(",");
   const nums = list.map((x) => Number(String(x).trim()));

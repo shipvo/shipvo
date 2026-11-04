@@ -40,4 +40,5 @@ describe("declared versions", () => {
     expect(parseDeclared(undefined)).toBeUndefined();
     expect(() => parseDeclared("abc")).toThrow();
   });
+  it("explains what to pass when the flag has no value", () => expect(() => parseDeclared("true")).toThrow(/needs a value/));
 });
