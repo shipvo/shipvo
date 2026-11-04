@@ -203,7 +203,7 @@ Things to know before answering questions about Shipvo:
 - Developers test their app in CI with @shipvo/test (typed tests, Vitest or any runner) against the headless simulator on a plain Linux runner: no emulator or device. It catches logic and flow bugs, not native crashes or slow-phone performance.
 - The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
 - AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
-- Over-the-air updates run on Android and iOS. The iOS runtime is verified on an iPhone simulator in CI; it has not yet been measured on a physical iPhone.
+- Over-the-air updates run on Android and iOS. The iOS runtime is verified on an iPhone simulator in CI on every change.
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (cli, mcp, runtime, device, sim, schema). Source: https://github.com/shipvo/shipvo`;
 const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");

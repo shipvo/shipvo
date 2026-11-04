@@ -13,7 +13,7 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 ## Themes
 
 ### 1. Update safety and reach
-- bsdiff patches on iOS (issue #2); measure OTA apply time on a physical iPhone (issue #1).
+- bsdiff patches on iOS (issue #2); measure OTA apply time on the iOS Simulator in CI (issue #1).
 - Stronger rollback: rollback by cohort, automatic rollback on crash-rate thresholds from telemetry.
 - Docker self-hosting target for the control plane.
 - Resumable and delta downloads on slow networks; measure on low-end Android.
