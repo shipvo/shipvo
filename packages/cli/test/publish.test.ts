@@ -196,7 +196,7 @@ describe("publish and the Hermes bytecode check", () => {
 
   it("a missing bundle under --dry-run exits 1", async () => {
     // Don't create a bundle
-    await expect(publish([...flags, "--dry-run"])).rejects.toThrow(/Release 1 android bundle not found/);
+    await expect(publish([...flags, "--dry-run"])).rejects.toThrow(/no bundle in dist-ota\/_expo\/static\/js\/android/);
     expect(puts).toEqual([]);
   });
 
