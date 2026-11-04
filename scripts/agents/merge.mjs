@@ -81,7 +81,9 @@ for (const pr of prs) {
   const fixNow = (label, why) => act(`dispatch fixer for #${n} (${why})`, () => gh("workflow", "run", "agent-fixer.yml", "-R", REPO,
     "--ref", "main", "-f", `pr=${n}`, "-f", `branch=${pr.head.ref}`, "-f", `label=${label}`));
   const quietMin = (Date.now() - new Date(pr.updated_at)) / 6e4;
-  const full = api(`repos/${REPO}/pulls/${n}`);
+  // GitHub answers mergeable: null while it is still computing; ask again before deciding.
+  let full = api(`repos/${REPO}/pulls/${n}`);
+  for (let i = 0; i < 3 && full.mergeable === null; i++) { execFileSync("sleep", ["4"]); full = api(`repos/${REPO}/pulls/${n}`); }
   if (full.mergeable === false && full.mergeable_state === "dirty") {
     if (!L.includes("agent:conflict")) {
       addLabel(n, "agent:conflict");
