@@ -1,0 +1,9 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { rows } from "./summary.mjs";
+
+test("rows show pass or FAIL, medians and sizes", () => {
+  const r = rows({ scenarios: [{ name: "a", pass: true, median: { pointerToHealthyMs: 900, downloadBytes: 2048 } }, { name: "b", pass: false }] });
+  assert.equal(r[0], "| a | pass | pointer to healthy 900 ms | 2.0 KB |");
+  assert.equal(r[1], "| b | FAIL | - | - |");
+});
