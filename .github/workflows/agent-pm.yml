@@ -1,0 +1,20 @@
+# Head of Product: weekly strategy review (Mondays). Measures adoption, studies competitors,
+# updates docs/product/strategy.md and the roadmap, and seeds epics for the next 4 weeks.
+name: agent-pm
+on:
+  schedule: [{ cron: "29 6 * * 1" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: agent-pm }
+jobs:
+  strategy:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: pm-strategy
+      mode: branch
+      branch: agent/pm/${{ github.run_number }}
+      pr_labels: agent:claude,type:docs
+      model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
+      max_turns: 150
+      timeout: 90

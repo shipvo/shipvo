@@ -7,7 +7,7 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Role | Who | When | Workflow |
 | --- | --- | --- | --- |
 | Research lead | Claude with web search | every 6 h | `agent-research.yml` |
-| Product lead | Claude | 4 times a day | `agent-planner.yml` |
+| Head of Product (senior PM) | Claude | daily planning 4 times a day; strategy review Mondays | `agent-planner.yml`, `agent-pm.yml` |
 | Engineer | Claude | on `agent:claude` label, sweep hourly | `agent-engineer.yml` |
 | Engineer | Copilot | on `agent:copilot` label, sweep hourly | `agent-copilot.yml` |
 | Engineer | Aider (open source) via Kilo AI Gateway | on `agent:aider` label, sweep hourly | `agent-aider.yml` |
@@ -25,7 +25,8 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 ## How work flows
 
 1. The **research lead** searches the web every 6 hours (competitors, React Native/Expo/OS changes, developer complaints, MCP and agent news) and files evidence-backed issues labelled `research`.
-1. The **product lead** reads `docs/ROADMAP.md`, open issues, CI and recent merges, and files small, self-contained issues with acceptance criteria, labelled `agent:ready` and `agent:claude`, `agent:copilot` or `agent:aider`.
+1. Every Monday the **Head of Product** measures adoption (npm downloads, stars, outside issues), studies competitors, and updates `docs/product/strategy.md` (beachhead user, north-star metric, 3 bets for the next 4 weeks) and the roadmap, seeding an epic and first slices for each bet.
+1. The **Head of Product** plans four times a day: it ties every issue to a user outcome, prioritises with RICE, slices big bets small, and says no to work that doesn't serve the strategy. It reads `docs/ROADMAP.md`, open issues, CI and recent merges, and files small, self-contained issues with acceptance criteria, labelled `agent:ready` and `agent:claude`, `agent:copilot` or `agent:aider`.
 2. The **engineers** pick them up (a few at a time each), work on a branch and open a PR that says `Fixes #n`.
 3. The **reviewer** (Claude) reviews every PR, including Copilot's, and labels it `agent:approved` or `agent:changes-requested`.
 4. If CI fails or changes are requested, the **fix engineer** works on it. After 3 failed rounds the PR is closed and the issue goes to the next engineer (Claude, then Copilot, then Aider).

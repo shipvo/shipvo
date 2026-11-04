@@ -1,6 +1,6 @@
 # Shipvo roadmap
 
-This is the working direction for the project. The planner agent reads it every day to choose what to build next and keeps the "Now" list current through normal pull requests. A human sets the goals and themes.
+This is the working direction for the project. It is owned by the Head of Product agent, which reviews it every Monday against evidence (adoption, research, competitors) and plans from it four times a day; the strategy behind it is in `docs/product/strategy.md`. Changes go through normal pull requests, and the owner can override anything here.
 
 ## Goal
 
