@@ -26,7 +26,7 @@ npx -y @shipvo/cli sim                  # serve the app in the simulator for age
 | `mcp` | Print the MCP config agents need |
 | `keygen [--out seed.txt]` | Create an Ed25519 release signing key |
 | `pubkey` | Print the public key for the current seed |
-| `hash <file>`, `sign-file <file>`, `sign-json <file>`, `verify-json <file> <key>` | Low-level signing helpers |
+| `hash <file>`, `sign-file <file>`, `sign-json <file>`, `verify-json <file> <key>`, `verify <pointer> [key]` (release pointers) | Low-level signing helpers |
 
 Changing computers? See [Moving to a new machine](new-machine.md).
 
