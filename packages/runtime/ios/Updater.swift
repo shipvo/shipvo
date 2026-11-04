@@ -56,7 +56,7 @@ enum Updater {
     if !ready {
       let f0 = Store.now()
       let offset = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? 0
-      var req = request(resolve(s, url), etag: nil)
+      var req = try request(resolve(s, url), etag: nil)
       if offset > 0 { req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range") }
       let (fileURL, dresp) = try await URLSession.shared.download(for: req)
       let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
