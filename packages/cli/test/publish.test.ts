@@ -79,7 +79,13 @@ describe("publish and the Hermes bytecode check", () => {
     expect(typeof ptr.signature).toBe("string");
     expect(JSON.parse(ptr.body).release).toBe(1);
     expect(existsSync(join(out, "b/demo/r1.hbc"))).toBe(true);
-    expect(JSON.parse(String((console.log as any).mock.calls[0][0]))).toMatchObject({ dry_run: true, release: 1, bytes: 64 });
+    const text = String((console.log as any).mock.calls[0][0]);
+    expect(text).toContain("Nothing was sent");
+    expect(text).toContain("Release:  1");
+    expect(text).toContain("0.00 MB");
+    expect(text).toContain(".shipvo/dry-run");
+    expect(text).toContain("Full bundles are fine for a first release");
+    expect(text).not.toMatch(/^\{/);
   });
 
   it("--out picks the directory", async () => {
@@ -123,7 +129,7 @@ describe("publish and the Hermes bytecode check", () => {
     const out = join(cwd, ".shipvo/dry-run");
     expect(readFileSync(join(out, "w/demo/r1/index.html"), "utf8")).toContain('src="/w/demo/r1/a.js"');
     expect(existsSync(join(out, "w/demo/r1/a.js"))).toBe(true);
-    expect(JSON.parse(String((console.log as any).mock.calls[0][0])).web).toMatchObject({ base: "/w/demo/r1/", files: 2 });
+    expect(JSON.parse(JSON.parse(readFileSync(join(out, "p/demo/1/b0"), "utf8")).body).web).toMatchObject({ base: "/w/demo/r1/", files: 2 });
   });
 
   it("--platform all: the iOS pointer carries the same web as the Android one", async () => {
@@ -145,6 +151,32 @@ describe("publish and the Hermes bytecode check", () => {
     mkdirSync(join(cwd, ".shipvo/dry-run/h/demo"), { recursive: true });
     writeFileSync(join(cwd, ".shipvo/dry-run/h/demo/r7"), JSON.stringify({ release: 7, sha256: "x" }));
     await publish([...flags, "--dry-run"]);
-    expect(JSON.parse(String((console.log as any).mock.calls[0][0]))).toMatchObject({ release: 1 });
+    expect(String((console.log as any).mock.calls[0][0])).toContain("Release:  1");
+  });
+
+  it("--help prints the flags and does nothing else", async () => {
+    await publish(["--help"]);
+    const text = String((console.log as any).mock.calls[0][0]);
+    for (const f of ["--bands", "--platform", "--release", "--dry-run", "--out", "--skip-web"]) expect(text).toContain(f);
+    expect(puts).toEqual([]);
+  });
+
+  it("a first-release dry run never mentions pip", async () => {
+    withBundle(96);
+    await publish([...flags, "--dry-run"]);
+    const all = [...(console.error as any).mock.calls, ...(console.log as any).mock.calls].join("\n");
+    expect(all).not.toMatch(/pip/);
+  });
+
+  it("shows the pip hint when older bundles exist but bsdiff4 is missing", async () => {
+    withBundle(96);
+    values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: "abc" }));
+    stub.keys = async (p: string) => (p === "h/demo/r" ? ["h/demo/r1"] : []);
+    exec.fn = (c) => { if (c.includes("import bsdiff4")) throw new Error("no module"); };
+    await publish([...flags, "--release", "2"]);
+    stub.keys = async () => [] as string[];
+    const err = (console.error as any).mock.calls.join("\n");
+    expect(err).toMatch(/pip install bsdiff4/);
+    expect(err).toMatch(/Updates still work/);
   });
 });
