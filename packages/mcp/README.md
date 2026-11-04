@@ -30,4 +30,12 @@ Clients connect with a URL instead of a command:
 { "mcpServers": { "shipvo": { "url": "https://sim.shipvo.dev/mcp", "headers": { "Authorization": "Bearer key-for-claude" } } } }
 ```
 
-Each client connection gets its own MCP session; each `open_app` gets its own phone. Requests without a valid key are refused. The hosted version at `sim.shipvo.dev` will issue keys per account with scopes (test, owner, read).
+The HTTP endpoint is stateless. There is no protocol session: each POST is handled on its own, and the `x-shipvo-*` scope headers are read per request, so a scope never carries over to another request. `GET` and `DELETE` on `/mcp` answer 405. Phones are separate: each `open_app` gets its own phone, and you pass its `session` as a tool argument.
+
+### Protocol versions
+
+- **2025-era clients** (`initialize`, then calls, with or without `Mcp-Session-Id`): work. `initialize` is answered, no session id is issued, and any `Mcp-Session-Id` a client sends is ignored.
+- **2026-07-28 clients**: `tools/list` and `tools/call` work with no session and no `initialize`. Not done yet: `server/discover`, the `Mcp-Method`/`Mcp-Name` headers, `ttlMs`/`cacheScope` on list results. `tools/list` order is fixed (registration order).
+- This package uses `@modelcontextprotocol/sdk` 1.x. Stdio is unchanged.
+
+ Requests without a valid key are refused. The hosted version at `sim.shipvo.dev` will issue keys per account with scopes (test, owner, read).
