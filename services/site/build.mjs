@@ -19,6 +19,7 @@ const REPO = "https://github.com/shipvo/shipvo/blob/main/";
 const lastmod = (src) => { try { const d = execFileSync("git", ["log", "-1", "--format=%cs", "--", src], { cwd: ROOT, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); if (d) return d; } catch {} return new Date().toISOString().slice(0, 10); };
 const NAV = [
   { group: "Get started", pages: [
+    { slug: "start-here", src: "docs/start-here.md", title: "Start here", desc: "A plain-words first step for founders and makers: what Shipvo does, what you need, and what you will see when it works. No coding background assumed." },
     { slug: "overview", src: "README.md", title: "What Shipvo is", desc: "Shipvo is an open-source React Native framework: signed over-the-air updates for phones and a simulator AI agents operate over MCP." },
     { slug: "getting-started", src: "docs/getting-started.md", title: "Build your first app", desc: "Twenty minutes from nothing to a React Native app that AI agents can open in a simulator and phones update over the air." },
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
@@ -40,6 +41,9 @@ const NAV = [
     { slug: "test", src: "packages/test/README.md", title: "@shipvo/test", desc: "@shipvo/test: typed end-to-end tests for React Native apps in Vitest or any runner, running against the headless Shipvo simulator in CI." },
     { slug: "sim", src: "packages/sim/README.md", title: "@shipvo/sim", desc: "@shipvo/sim: the headless simulator that runs your app in Playwright and exposes accessibility trees and a simulated phone to agents and tests." },
     { slug: "schema", src: "packages/schema/README.md", title: "@shipvo/schema", desc: "@shipvo/schema: zod schemas for Shipvo release pointers, signed envelopes, shell manifests, gate reports and telemetry." },
+  ]},
+  { group: "Help", pages: [
+    { slug: "glossary", src: "docs/glossary.md", title: "Glossary", desc: "Every Shipvo term in plain English: bands, bundles, control plane, OTA update, seed, shell, simulator and more." },
   ]},
   { group: "Measured results", pages: [
     { slug: "parity-results", src: "docs/parity-results.md", title: "Simulator vs device parity", desc: "Simulator vs device parity: every screen of three purchase flows compared on Android and iOS, with every known gap listed, not hidden." },

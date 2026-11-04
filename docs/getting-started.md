@@ -2,7 +2,9 @@
 
 Also in: [Français](fr/getting-started.md)
 
-Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
+For developers. By the end you have an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`. Not a developer? Start with [Start here](start-here.md). Unfamiliar word? See the [glossary](glossary.md).
+
+Timing: in our [2026-11-04 dogfood run](product/dogfood/2026-11-04-menu.md), steps 1 and 2 (create, install, start the simulator) took about 45 seconds on a fast connection once the packages were built. Building and installing on a phone (step 4) depends on your Android setup and was not timed there.
 
 ## 0. What you need
 
@@ -123,3 +125,25 @@ The simulator also runs hosted: one Worker spins up a sandbox per API key and ex
 ## Where things are measured
 
 Everything above is claimed from measurements on real hardware, published in this repo: OTA sizes and timings on a 2 GB Redmi 9A ([spike-results.md](spike-results.md)), and simulator-vs-device parity on an Android emulator and an iPhone simulator, including what the score does not cover ([parity-results.md](parity-results.md)).
+
+## Troubleshooting
+
+These come from closed issues and our dogfood reports.
+
+| You see | Why | What to do |
+| --- | --- | --- |
+| `Port 4545 is in use. Stop the other `shipvo sim` or pass --port <n>.` | Another simulator is running. `sim-dist/` is left as it was. | Stop the other one, or run `npm run sim -- --port 4546`. |
+| `unknown app "myshop"` from `open_app` with the local MCP | Older `@shipvo/mcp` only knew the sample app. | Update `@shipvo/mcp`, and run `shipvo sim` first. The local server asks the simulator which app it serves. `PN_APPS` still overrides. |
+| `Not signed in. Run `shipvo login`.` from `shipvo mcp` | You are signed out. | Current versions print the local config when signed out. Run `shipvo login` only for the hosted simulator. |
+| `Unknown flag --dryrun. Known flags: ...` | `publish` and `rollback` reject flags they do not know, so a typo cannot cause a real publish. | Use the flag as listed. Write `--out dir`, not `--out=dir`. |
+| `--out only works with --dry-run` | `--out` sets the dry-run folder. | Add `--dry-run`, or drop `--out`. |
+| `Nothing to publish with.` | No token or Cloudflare variables are set. | Run `shipvo login` then `shipvo app create`, or set the self-hosted variables in step 5. To only check a release, use `--dry-run`. |
+| After a scan the agent still sees the camera view | The scan result arrives a moment after the tap. | Read the screen again. |
+| A bundle is refused for a Hermes bytecode mismatch | The publish check, or the control plane, found the bundle was built with a different Hermes than the shell. | See [Hermes bytecode version](self-hosting.md#hermes-bytecode-version). |
+
+## Next steps
+
+- Write tests for your flows: [Test your app in CI](testing.md).
+- Have an assistant try your app: [Test with an assistant](test-with-an-assistant.md).
+- Every command and flag: [@shipvo/cli](../packages/cli/README.md).
+- Back up your signing key: [Moving to a new machine](new-machine.md).

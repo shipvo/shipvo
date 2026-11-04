@@ -14,7 +14,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 - **Local MCP opens your own app.** The local `@shipvo/mcp` server now asks the simulator which app it serves, so `open_app("<your app>")` works after `shipvo sim`. `PN_APPS` still overrides it. If the simulator cannot be reached it falls back to the sample app. `shipvo mcp` prints the local config when you are not signed in.
 - **Clearer CLI help.** A mistyped command now says so and suggests the closest one (`shipvo: 'publsh' is not a command. Did you mean 'publish'?`), on stderr with exit 1. Help is grouped into Start, Ship and Advanced.
 - **Site:** the home page hero is rewritten in plain language with a first step for people who do not use a terminal, and light-mode small text now meets WCAG AA contrast.
-- **Docs:** French translation of Getting started.
+- **Docs:** French translation of Getting started. New pages: [Start here](/docs/start-here/), a plain-words first step for non-developers, and a [Glossary](/docs/glossary/). Getting started and the CLI page now have troubleshooting and next steps, and the CLI page lists every `publish` flag.
 - **Device lab:** an Android emulator harness for OTA behaviour (`scripts/android-e2e/`) and its first report, `docs/product/device-lab/2026-11-04.md`.
 - The Hermes bytecode and `shipvo publish --dry-run` changes are listed under Unreleased above.
 

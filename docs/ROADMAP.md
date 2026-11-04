@@ -60,6 +60,7 @@ Bet 3, first run in under 10 minutes, and measured (epic #16):
 
 Other:
 - [ ] #3 More typed-test examples for `@shipvo/test`
+- [x] Docs: Start here page for non-developers, glossary, troubleshooting on Getting started and the CLI page (this branch)
 
 Review of 2026-11-04: priority order is unchanged (update safety first). Bets 1 and 2 are update safety. Bet 3 is developer experience, chosen because we cannot yet measure activation. See `docs/product/strategy.md`.
 
