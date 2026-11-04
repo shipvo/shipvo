@@ -4,6 +4,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **Shells declare their Hermes bytecode versions.** `ShellManifest` has an optional `hermes_bytecode_versions` (a non-empty list of positive integers). The control plane pointer route takes an optional `?hbc=96,98` query. If the release sets `hermes_bytecode_version` and it is not in the list, the route answers 404 `hermes_bytecode_mismatch` and the release is not offered. Releases or shells without the field behave as before. Migration: none needed. To opt in, add the field to your shell manifest; the runtime does not send `?hbc=` yet (next slice).
 - **Publish records the Hermes bytecode version.** `shipvo publish` reads the version from the `.hbc` header and adds an optional `hermes_bytecode_version` to the signed release. Set `hermesBytecodeVersion` (a number or list) in `shipvo.json`, or pass `--hermes-bytecode-version`, to make publish fail when the bundle is plain JavaScript or built with a different Hermes. Migration: nothing is required. Releases without the field still parse and apply as before. Shells do not check the field yet; that is a follow-up.
 
 ## 2026-10-31

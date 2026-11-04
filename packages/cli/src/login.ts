@@ -42,9 +42,13 @@ export async function keys() {
 }
 
 export function mcp() {
-  const c = savedCreds(); if (!c) { console.error("Not signed in. Run `shipvo login`."); process.exit(1); }
+  const c = savedCreds();
+  if (!c) { printLocalMcp(); console.log("\nTo let agents open your published app from anywhere, run `shipvo login` for a hosted config."); return; }
   printMcp(c.mcp_url, c.key);
 }
+
+const LOCAL_MCP = `Local simulator (no login needed). Run \`npm run sim\` first:\n${JSON.stringify({ mcpServers: { shipvo: { command: "npx", args: ["-y", "@shipvo/mcp"] } } }, null, 2)}`;
+function printLocalMcp() { console.log(LOCAL_MCP); }
 
 function printMcp(url: string, key: string) {
   console.log(`Claude Desktop / Cursor / Claude Code (remote):\n${JSON.stringify({ mcpServers: { shipvo: { url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)}\n`);
