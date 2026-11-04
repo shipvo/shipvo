@@ -34,7 +34,7 @@ Input metrics:
 | --- | --- | --- |
 | npm downloads, last week (2026-10-28 to 2026-11-03) | `@shipvo/mcp` 1,299; `@shipvo/cli` 830; `@shipvo/sim` 602; `@shipvo/device` 592; `@shipvo/runtime` 582; `@shipvo/schema` 474; `@shipvo/test` 238 | `https://api.npmjs.org/downloads/point/last-week/@shipvo/<pkg>`, read 2026-11-04. These include CI installs and mirrors; they are not unique users. |
 | Time from first `shipvo init` to first applied OTA | Not measured yet | Add a timed first-run job in CI on a clean machine (bet 3). |
-| Update safety on device | Publish to applied 16–36 s; patch 64 KB vs 1.57 MB full; crash-loop revert after 3 failed boots; cold start 847–931 ms on a Redmi 9A (Android only) | [spike results](../spike-results.md), 2026-10-30 |
+| Update safety on device (Android) | Publish to applied 16–36 s; patch 64 KB vs 1.57 MB full; crash-loop revert after 3 failed boots; cold start 847–931 ms on a Redmi 9A (Android only) | [spike results](../spike-results.md), 2026-10-30 |
 | Simulator-vs-device parity | 100% actionable on 13 screens (Flows A and B) on Android and iOS; text 98.6% Android, 96.2% iOS | [parity results](../parity-results.md) |
 | Agent task success without screenshots | 5/5 Haiku, after 4/5 Sonnet on round 1 | [agent gate results](../agent-gate-results.md) |
 | GitHub stars and forks | Not read this week (the GitHub call was blocked in this run) | `gh api repos/shipvo/shipvo --jq '.stargazers_count,.forks_count'`; record next week |
@@ -58,7 +58,7 @@ Our honest edge: **update safety that we measured, plus an agent-testable simula
 **Bet 1: A bundle can never reach a shell it cannot run.** (Update safety.)
 
 - Outcome: shells declare their Hermes bytecode version; the control plane and runtime refuse a mismatched release before launch.
-- How we will know: a test shows a mismatched release is not offered and not applied, with a typed reason in telemetry; zero bytecode-mismatch crash-loops in the Redmi 9A run.
+- How we will know: a test shows a mismatched release is not offered and not applied, with a typed reason in telemetry; zero bytecode-mismatch crash-loops in the Android emulator and iOS Simulator CI runs.
 - First slice: schema field for the shell's declared bytecode version, plus control-plane check (follow-up of #10). Epic #14, slices #17 and #18.
 
 **Bet 2: iOS reaches Android's update quality.**
