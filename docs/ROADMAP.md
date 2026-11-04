@@ -56,7 +56,7 @@ Bet 2, iOS reaches Android update quality (epic #15):
 Bet 3, first run in under 10 minutes, and measured (epic #16):
 - [ ] #19 `shipvo doctor`
 - [ ] #20 Script counting weekly healthy releases per app
-- [ ] #26 `shipvo publish --dry-run` (first slice merged in #36; offline `rollback --dry-run` remains)
+- [ ] #26 `shipvo publish --dry-run` (first slice merged in #36; `rollback --dry-run` is done; it reads the bundle, so it is not offline)
 
 Other:
 - [ ] #3 More typed-test examples for `@shipvo/test`
