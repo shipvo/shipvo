@@ -27,11 +27,12 @@ const parseMajor = (v: string) => Number(v.split(".")[0] || 0);
 const pub = (s: string) => b64(keyFromSeed(s).publicKey);
 
 function resolveSeed(env: NodeJS.ProcessEnv, cwd: string, readText: (path: string) => string): string | null {
-  const s = env.SHIPVO_SIGNING_SEED || env.PURENATIVE_SIGNING_SEED
-    || ((env.SHIPVO_SIGNING_SEED_FILE || env.PURENATIVE_SIGNING_SEED_FILE)
-      ? readText(env.SHIPVO_SIGNING_SEED_FILE || env.PURENATIVE_SIGNING_SEED_FILE || "").trim()
-      : "");
-  if (s) return s;
+  const direct = env.SHIPVO_SIGNING_SEED || env.PURENATIVE_SIGNING_SEED;
+  if (direct) return direct;
+  const file = env.SHIPVO_SIGNING_SEED_FILE || env.PURENATIVE_SIGNING_SEED_FILE;
+  if (file) {
+    try { return readText(file).trim() || null; } catch { return null; }
+  }
   try { return readText(join(cwd, ".shipvo", "seed.txt")).trim() || null; } catch { return null; }
 }
 
@@ -68,22 +69,24 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
     if (!s) return false;
     try { return pub(s) === cfg.publicKey; } catch { return false; }
   })();
-  results.push({ name: "signing key matches shipvo.json publicKey", ok: signingOk, fix: "restore the right seed with `shipvo keys import` (or set SHIPVO_SIGNING_SEED)" });
+  const needCfg = "fix shipvo.json first";
+  results.push({ name: "signing key matches shipvo.json publicKey", ok: signingOk, fix: !cfg ? needCfg : "restore the right seed with `shipvo keys import` (or set SHIPVO_SIGNING_SEED)" });
 
   let controlPlaneOk = false;
+  let cpFix = "check shipvo.json controlPlane and your network access (5 second timeout)";
   if (cfg?.controlPlane && typeof cfg.controlPlane === "string") {
     try {
-      await deps.fetchFn(cfg.controlPlane.replace(/\/$/, ""));
-      controlPlaneOk = true;
+      const res = await deps.fetchFn(cfg.controlPlane.replace(/\/$/, ""), { signal: AbortSignal.timeout(5000) });
+      if (res.status >= 500) cpFix = `the control plane answered HTTP ${res.status}; check its deploy and logs`;
+      else controlPlaneOk = true;
     } catch {}
   }
-  results.push({ name: "control plane reachable", ok: controlPlaneOk, fix: "check shipvo.json controlPlane and your network access" });
+  results.push({ name: "control plane reachable", ok: controlPlaneOk, fix: !cfg ? needCfg : cpFix });
 
   let hermesOk = true;
   if (cfg && Object.prototype.hasOwnProperty.call(cfg, "hermesBytecodeVersion")) {
     try {
-      const parsed = parseDeclared(cfg.hermesBytecodeVersion);
-      hermesOk = !!parsed;
+      parseDeclared(cfg.hermesBytecodeVersion); // undefined means "not declared", which passes
     } catch {
       hermesOk = false;
     }
@@ -96,6 +99,6 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
 export async function doctor(argv: string[]) {
   if (argv.length) { console.error("Usage: shipvo doctor"); process.exit(2); }
   const results = await runDoctorChecks();
-  for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"} ${r.name} — fix: ${r.ok ? "none" : r.fix}`);
+  for (const r of results) console.log(`${r.ok ? `PASS ${r.name}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
   if (results.some((r) => !r.ok)) process.exit(1);
 }

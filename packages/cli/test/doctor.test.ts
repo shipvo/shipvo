@@ -86,4 +86,74 @@ describe("shipvo doctor checks", () => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
+
+  it("fails the signing check, without crashing, when the seed file is missing", async () => {
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(makeSeed()) }));
+    const r = await runDoctorChecks({ cwd, env: { SHIPVO_SIGNING_SEED_FILE: "/nope" }, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch });
+    expect(r).toHaveLength(5);
+    expect(nameOf(r, "signing key matches shipvo.json publicKey").ok).toBe(false);
+    expect(nameOf(r, "control plane reachable").ok).toBe(true);
+  });
+
+  it("passes a timeout signal to fetch and fails when it aborts", async () => {
+    const seed = makeSeed();
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
+    const fetchFn = vi.fn(async (_u: unknown, init?: RequestInit) => {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      throw new DOMException("timed out", "TimeoutError");
+    });
+    const r = await runDoctorChecks({ cwd, fetchFn: fetchFn as unknown as typeof fetch });
+    expect(fetchFn).toHaveBeenCalled();
+    expect(nameOf(r, "control plane reachable").ok).toBe(false);
+  });
+
+  it("fails control plane check on HTTP 503 and says so", async () => {
+    const seed = makeSeed();
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
+    const r = await runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response("down", { status: 503 })) as typeof fetch });
+    const c = nameOf(r, "control plane reachable");
+    expect(c.ok).toBe(false);
+    expect(c.fix).toContain("503");
+  });
+
+  it("treats empty or null hermesBytecodeVersion as not declared", async () => {
+    const seed = makeSeed();
+    for (const v of ["", null]) {
+      const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed), hermesBytecodeVersion: v }), seed);
+      const r = await runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch });
+      expect(nameOf(r, "hermesBytecodeVersion (if present) is set").ok).toBe(true);
+    }
+  });
+
+  it("points at shipvo.json when it is missing", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "shipvo-doctor-"));
+    const r = await runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch });
+    expect(nameOf(r, "signing key matches shipvo.json publicKey").fix).toContain("shipvo.json first");
+    expect(nameOf(r, "control plane reachable").fix).toContain("shipvo.json first");
+  });
+
+  it("prints PASS lines without a fix and does not print the seed on an all-pass run", async () => {
+    const seed = makeSeed();
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(process, "cwd").mockReturnValue(cwd);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("ok"));
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await doctor([]);
+    expect(exit).not.toHaveBeenCalled();
+    const out = logs.join("\n");
+    expect(out).toContain("PASS control plane reachable");
+    expect(out).not.toContain("fix: none");
+    expect(out).not.toContain(seed);
+    vi.restoreAllMocks();
+  });
+
+  it("exits 2 on extra arguments", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await expect(doctor(["extra"])).rejects.toThrow("exit");
+    expect(exit).toHaveBeenCalledWith(2);
+    vi.restoreAllMocks();
+  });
 });
