@@ -164,6 +164,22 @@ describe("publish and the Hermes bytecode check", () => {
     expect(puts).toEqual([]);
   });
 
+  it("a missing bundle under --dry-run exits 1", async () => {
+    // Don't create a bundle
+    await expect(publish([...flags, "--dry-run"])).rejects.toThrow(/Release 1 android bundle not found/);
+    expect(puts).toEqual([]);
+  });
+
+  it("without --dry-run, pointers are written and JSON is printed", async () => {
+    withBundle(96);
+    await publish([...flags]);
+    // Check that puts contains the pointer keys
+    expect(puts).toContain("p/demo/1/b0");
+    // Check that console.log was called with JSON
+    const text = String((console.log as any).mock.calls[0][0]);
+    expect(text).toMatch(/^{/);
+  });
+
   it("a first-release dry run never mentions pip", async () => {
     withBundle(96);
     await publish([...flags, "--dry-run"]);

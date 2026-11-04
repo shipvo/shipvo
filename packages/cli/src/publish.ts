@@ -73,7 +73,7 @@ Flags (write a value after a space, not =):
   --max-bases N                How many older releases to build patches from (default 6)
   --skip-export true           Reuse the last build in dist-ota/
   --skip-web true              Do not publish the web copy for the simulator
-  --dry-run                    Build and sign, write files locally, send nothing
+  --dry-run                    Build and sign, write files locally, send nothing (also emits JSON with dry_run: true)
   --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)
   --help                       Show this help
 `;
@@ -226,7 +226,7 @@ export async function rollback(argv: string[]) {
     const bytes = await kv.getBytes(`b/${APP}/${bundleName(to, pf)}`); if (!bytes) { console.error(`Release ${to} ${pf} bundle not found`); process.exit(1); }
     let web: unknown = undefined;
     try { const h = JSON.parse((await kv.get(pf === "ios" ? `h/${APP}/ios-r${to}` : `h/${APP}/r${to}`))!); minShell = h.min_shell_version || minShell; web = h.web ?? undefined; } catch {}
-    if (a["dry-run"] !== undefined) {
+    if (dry) {
       console.error(`rollback --dry-run: would republish release ${to} as release ${release} for ${platformsOf(a).join(", ")} (bands: ${(a.bands || "b0,b1,b2")})`);
       console.error(`min shell version: ${minShell}`);
       console.error(`Dry run: nothing was written.`);
@@ -238,7 +238,5 @@ export async function rollback(argv: string[]) {
       }
     }
   }
-  if (a["dry-run"] === undefined) {
-    console.log(JSON.stringify({ app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at }));
-  }
+  console.log(JSON.stringify({ app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at, ...(dry ? { dry_run: true } : {}) }));
 }
