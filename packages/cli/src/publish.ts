@@ -38,18 +38,22 @@ function checkFlags(argv: string[], known: string[]) {
   }
 }
 
-/** A store that only writes files under `dir` (key `p/app/1/b0` becomes `dir/p/app/1/b0`). It reads nothing, so a dry run never needs a control plane. */
+/** A store that only writes files under `dir` (key `p/app/1/b0` becomes `dir/p/app/1/b0`). It reads back only what this run wrote (kept in memory), never old files, so the iOS pass can find the web artifact and a dry run never needs a control plane. */
 function localKv(dir: string) {
   const root = resolve(dir);
+  const mem = new Map<string, Uint8Array<ArrayBuffer>>();
+  const enc = new TextEncoder();
   return {
-    async get(_k: string): Promise<string | null> { return null; },
-    async getBytes(_k: string): Promise<Uint8Array<ArrayBuffer> | null> { return null; },
-    async keys(_prefix: string): Promise<string[]> { return []; },
+    async get(k: string): Promise<string | null> { const v = mem.get(k); return v ? new TextDecoder().decode(v) : null; },
+    async getBytes(k: string): Promise<Uint8Array<ArrayBuffer> | null> { return mem.get(k) ?? null; },
+    async keys(prefix: string): Promise<string[]> { return [...mem.keys()].filter((k) => k.startsWith(prefix)); },
     async put(k: string, body: BodyInit, _type: string) {
       const f = resolve(root, k);
       if (!f.startsWith(root + "/")) throw new Error(`refusing to write outside ${dir}: ${k}`);
+      const bytes = typeof body === "string" ? enc.encode(body) : new Uint8Array(body as Uint8Array);
       mkdirSync(dirname(f), { recursive: true });
-      writeFileSync(f, typeof body === "string" ? body : (body as Uint8Array));
+      writeFileSync(f, bytes);
+      mem.set(k, bytes);
     },
   };
 }
@@ -72,7 +76,7 @@ export async function publish(argv: string[]) {
   const platforms = platformsOf(a);
   const release = Number(a.release || 0) || (await currentRelease(kv, APP, MAJOR)) + 1;
   const summary: Record<string, unknown> = { app: APP, release, bands, min_shell_version: MIN_SHELL, ...(dry ? { dry_run: true, out: outDir } : {}) };
-  if (dry) console.error(`dry run: nothing is sent anywhere; files go to ${outDir}. Release is ${release}${a.release ? "" : " (pass --release N to match the control plane)"}.`);
+  if (dry) console.error(`dry run: nothing is sent anywhere; files go to ${outDir}. No patches are built offline. Release is ${release}${a.release ? "" : " (pass --release N to match the control plane)"}.`);
 
   for (const pf of platforms) {
     // Android published alone keeps the original dist-ota/ layout, so existing CI keeps working.

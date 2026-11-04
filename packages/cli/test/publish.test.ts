@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+const exec = vi.hoisted(() => ({ fn: (_cmd: string) => {} }));
+vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string) => exec.fn(c) }));
+
 const puts: string[] = [];
 const values = new Map<string, string>();
 const stub = {
@@ -28,7 +31,7 @@ const fakeHbc = (version: number) => {
 
 let cwd: string, prev: string;
 beforeEach(() => {
-  puts.length = 0; values.clear();
+  puts.length = 0; values.clear(); exec.fn = () => {};
   prev = process.cwd(); cwd = mkdtempSync(join(tmpdir(), "shipvo-pub-"));
   writeFileSync(join(cwd, "app.json"), JSON.stringify({ expo: { version: "1.0.0" } }));
   mkdirSync(join(cwd, "dist-ota/_expo/static/js/android"), { recursive: true });
@@ -105,5 +108,43 @@ describe("publish and the Hermes bytecode check", () => {
   it("rollback rejects unknown flags before any put", async () => {
     await expect(rollback(["--to", "1", "--bogus"])).rejects.toThrow(/Unknown flag/);
     expect(puts).toEqual([]);
+  });
+
+  it("--out followed by a --flag counts as no value", async () => {
+    withBundle(96);
+    await expect(publish([...flags, "--dry-run", "--out", "--bands", "b0"])).rejects.toThrow(/--out needs a directory/);
+  });
+
+  it("dry run writes the web export under w/<app>/r1/ with no remote puts", async () => {
+    withBundle(96);
+    exec.fn = (c) => { if (c.includes("--platform web")) { mkdirSync(join(cwd, "dist-web"), { recursive: true }); writeFileSync(join(cwd, "dist-web/index.html"), '<script src="/a.js"></script>'); writeFileSync(join(cwd, "dist-web/a.js"), "1"); } };
+    await publish(["--skip-export", "true", "--bands", "b0", "--dry-run"]);
+    expect(puts).toEqual([]);
+    const out = join(cwd, ".shipvo/dry-run");
+    expect(readFileSync(join(out, "w/demo/r1/index.html"), "utf8")).toContain('src="/w/demo/r1/a.js"');
+    expect(existsSync(join(out, "w/demo/r1/a.js"))).toBe(true);
+    expect(JSON.parse(String((console.log as any).mock.calls[0][0])).web).toMatchObject({ base: "/w/demo/r1/", files: 2 });
+  });
+
+  it("--platform all: the iOS pointer carries the same web as the Android one", async () => {
+    for (const pf of ["android", "ios"]) {
+      mkdirSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}`), { recursive: true });
+      writeFileSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}/index.hbc`), fakeHbc(96));
+    }
+    exec.fn = (c) => { if (c.includes("--platform web")) { mkdirSync(join(cwd, "dist-web"), { recursive: true }); writeFileSync(join(cwd, "dist-web/index.html"), "<p>hi</p>"); } };
+    await publish(["--skip-export", "true", "--bands", "b0", "--platform", "all", "--dry-run"]);
+    const out = join(cwd, ".shipvo/dry-run");
+    const web = (f: string) => JSON.parse(JSON.parse(readFileSync(join(out, f), "utf8")).body).web;
+    const android = web("p/demo/1/b0"), ios = web("p/demo/1/ios/b0");
+    expect(android).toBeTruthy();
+    expect(ios).toEqual(android);
+  });
+
+  it("a dry run does not read files left by an earlier run", async () => {
+    withBundle(96);
+    mkdirSync(join(cwd, ".shipvo/dry-run/h/demo"), { recursive: true });
+    writeFileSync(join(cwd, ".shipvo/dry-run/h/demo/r7"), JSON.stringify({ release: 7, sha256: "x" }));
+    await publish([...flags, "--dry-run"]);
+    expect(JSON.parse(String((console.log as any).mock.calls[0][0]))).toMatchObject({ release: 1 });
   });
 });
