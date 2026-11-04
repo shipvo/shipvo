@@ -22,11 +22,13 @@ npx vitest run
 
 ## Failure-path examples
 
-Runnable versions are in [`examples/flows.ts`](examples/flows.ts). They use the Tide & Tackle labels. Change them to match your app.
+Runnable versions are in [`examples/flows.ts`](examples/flows.ts). They use the Tide & Tackle labels. Change them to match your app. The checkout flows need a cart, so open the phone with one: `openApp({ seedCart: [{ product_id: "rod-surf-36", quantity: 1 }] })`. The full purchase is in [`checkout.test.ts`](../../apps/tide-and-tackle/tests/checkout.test.ts).
 
 **Permission denied**
 
 ```ts
+await phone.tap(/^Open cart/);
+await phone.tap("Choose delivery and pay");
 await phone.tap("Use my location");
 await phone.tap("Deny");
 await phone.waitFor("Location permission was not granted.");
@@ -42,11 +44,19 @@ await phone.waitFor("You're offline");
 **Payment decline**
 
 ```ts
-await phone.device.set({ payment: { nextResult: "decline" } });
-await phone.tap("Pay and place order");
+await phone.device.set({ payment: { nextResult: "decline", pin: "1234" }, biometrics: { enrolled: true, nextResult: "success" } });
+await phone.tap(/^Open cart/);
+await phone.tap("Choose delivery and pay");
+await phone.tap(/^Any day Shop pickup/);
+await phone.tap("Mobile money");
+await phone.type("Mobile money number", "677000111");
+await phone.tap("Place order");
+await phone.tap("Use fingerprint");
 await phone.type("Mobile money PIN", "1234");
 await phone.tap("Confirm payment");
 await phone.waitFor("Payment declined");
 ```
+
+The tests for these flows run against a small fake simulator, not the real app. The fake follows the real screen order and button names.
 
 Works with any runner through `openApp` from `@shipvo/test`. Full guide, CI workflow and API: [Test your app in CI](https://shipvo.dev/docs/testing/).
