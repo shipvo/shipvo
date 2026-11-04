@@ -22,6 +22,7 @@ on:
       pr_labels: { type: string, default: "" }        # extra labels for a PR opened in branch mode
       issue: { type: number, default: 0 }             # issue this run works on (blocked notes go here)
       pr: { type: number, default: 0 }                # PR this run works on
+      android_emulator: { type: boolean, default: false }  # boot an Android 11 emulator before the agent runs
     outputs:
       verdict: { value: "${{ jobs.run.outputs.verdict }}" }
       pushed: { value: "${{ jobs.run.outputs.pushed }}" }
@@ -74,6 +75,28 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
         run: pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
+
+      - name: Android toolchain and emulator
+        if: steps.chk.outputs.ok == 'true' && inputs.android_emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          SM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"; AM="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          yes | "$SM" --licenses > /dev/null || true
+          "$SM" "emulator" "platform-tools" "system-images;android-30;google_apis;x86_64" > /dev/null
+          echo no | "$AM" create avd -n lab -k "system-images;android-30;google_apis;x86_64" -d pixel_5 --force
+          mkdir -p /tmp/agent
+          nohup "$ANDROID_HOME/emulator/emulator" -avd lab -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot > /tmp/agent/emulator.log 2>&1 &
+          "$ANDROID_HOME/platform-tools/adb" wait-for-device
+          for i in $(seq 1 90); do [ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" = "1" ] && break; sleep 5; done
+          "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
+          "$ANDROID_HOME/platform-tools/adb" shell settings put global animator_duration_scale 0
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"; echo "emulator booted"
+      - uses: actions/setup-java@v4
+        if: steps.chk.outputs.ok == 'true' && inputs.android_emulator
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.chk.outputs.ok == 'true' && inputs.android_emulator
 
       - name: Prepare branch
         if: steps.chk.outputs.ok == 'true'
@@ -134,7 +157,7 @@ jobs:
             --max-turns ${{ inputs.max_turns }}
             --model ${{ inputs.model || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
             --mcp-config '{"mcpServers":{"deepwiki":{"type":"http","url":"https://mcp.deepwiki.com/mcp"}}}'
-            --allowedTools "mcp__deepwiki__read_wiki_structure,mcp__deepwiki__read_wiki_contents,mcp__deepwiki__ask_wiki_question,Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*)"
+            --allowedTools "mcp__deepwiki__read_wiki_structure,mcp__deepwiki__read_wiki_contents,mcp__deepwiki__ask_wiki_question,Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*),Bash(adb:*),Bash(bash:*),Bash(sh:*),Bash(curl:*),Bash(sleep:*),Bash(timeout:*),Bash(date:*),Bash(java:*),Bash(./gradlew:*),Bash(tar:*),Bash(unzip:*),Bash(pip:*),Bash(echo:*),Bash(cd:*),Bash(kill:*),Bash(pkill:*),Bash(ps:*)"
             --disallowedTools "Bash(git push:*),Bash(gh pr merge:*),Bash(gh api:*),Bash(gh release:*),Bash(gh secret:*),Bash(gh workflow:*),Bash(npm publish:*),Bash(pnpm publish:*)"
 
       - name: Set up Python for Aider
