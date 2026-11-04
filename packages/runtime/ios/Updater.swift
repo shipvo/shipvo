@@ -109,7 +109,8 @@ enum Updater {
       let target = resolve(s, url)
       let resumed = ((try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0) > 0
       downloadedBytes = try await fetch(target, into: file, wantSize: wantSize)
-      if resumed && !(sizeOf(file) == wantSize && (try Verify.sha256Hex(file: file)) == wantSha) {
+      let resumedOk = try resumed ? (sizeOf(file) == wantSize && Verify.sha256Hex(file: file) == wantSha) : true
+      if !resumedOk {
         // A bad resumed file is deleted, then one fresh download is tried before giving up.
         try? FileManager.default.removeItem(at: file); s.addEvent("verify_failed:\(release)")
         downloadedBytes = try await fetch(target, into: file, wantSize: wantSize)
