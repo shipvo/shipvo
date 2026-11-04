@@ -15,6 +15,6 @@ jobs:
       mode: branch
       branch: agent/security/${{ github.run_number }}
       pr_labels: agent:claude,security
-      model: ${{ vars.AGENT_MODEL_LEAD || 'claude-opus-5-5' }}
+      model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
       max_turns: 120
       timeout: 90

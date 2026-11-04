@@ -25,7 +25,7 @@ jobs:
       role: reviewer
       mode: read
       pr: ${{ github.event.pull_request.number }}
-      model: ${{ vars.AGENT_MODEL_LEAD || 'claude-opus-5-5' }}
+      model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
       max_turns: 60
       timeout: 40
       allowed_bots: copilot-swe-agent,Copilot

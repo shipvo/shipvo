@@ -58,8 +58,8 @@ Settings to turn on:
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `AGENTS_PAUSED` | unset | `true` stops every agent at once. |
-| `AGENT_MODEL` | action default | Model for engineers, QA, docs, triage, digest. |
-| `AGENT_MODEL_LEAD` | `claude-opus-5-5` | Model for the planner, reviewer and security roles. |
+| `AGENT_MODEL` | `claude-sonnet-5-5` | Model for every Claude role. |
+| `AGENT_MODEL_LEAD` | same as `AGENT_MODEL` | Optional override for the planner, reviewer and security roles (for example `claude-opus-5-5`). |
 | `AGENT_CLAUDE_MAX_ACTIVE` | 3 | Claude engineer tasks in flight. |
 | `AGENT_COPILOT_MAX_ACTIVE` | 3 | Copilot tasks in flight. |
 | `AGENT_AIDER_MAX_ACTIVE` | 2 | Aider tasks in flight. |
