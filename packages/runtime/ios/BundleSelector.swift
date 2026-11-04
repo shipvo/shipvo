@@ -4,6 +4,8 @@ import Foundation
 enum ShipvoBundleSelector {
   static let maxBoots = 3
   static let windowSeconds: TimeInterval = 60
+  /// A release is stable once its process has stayed in the foreground this long after `markHealthy`. Android uses the same value.
+  static let stabilitySeconds: TimeInterval = 30
 
   /// Idempotent per load: React Native asks for the URL more than once, and only the first ask counts as a boot.
   static func select(_ s: Store) -> URL? {
@@ -25,10 +27,28 @@ enum ShipvoBundleSelector {
       s.currentRelease = s.pendingRelease; s.currentPath = s.pendingPath; s.currentSha = s.pendingSha
       s.pendingRelease = 0; s.pendingPath = nil; s.trialBoots = 0
       s.addEvent("applied:\(s.currentRelease)")
+      // The promoting boot was a trial boot and was not counted. Count it now, until the stability window ends.
+      s.unhealthyBoots = 1; s.firstUnhealthyAt = Store.now()
       promoted = true
     }
-    s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
+    // The boot counter is not cleared here: `markStableIfHealthy` does that after the stability window.
     return promoted
+  }
+
+  /// The load that last reported healthy. `markStableIfHealthy` only acts for that load.
+  private static var healthyLoad = 0
+
+  /// Called from `markHealthy`: the current load reached its first screen.
+  static func noteHealthy() { Store.lock.lock(); healthyLoad = Store.loadsInProcess; Store.lock.unlock() }
+
+  /// Clears the count only if the current load reported healthy. After a reload, the new load has not, so a crash
+  /// before its `markHealthy` still counts. Returns whether the count was cleared.
+  @discardableResult
+  static func markStableIfHealthy(_ s: Store) -> Bool {
+    Store.lock.lock(); defer { Store.lock.unlock() }
+    guard healthyLoad != 0, healthyLoad == Store.loadsInProcess else { return false }
+    s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
+    return true
   }
 
   /// Called before a reload so the next ask is a fresh load.

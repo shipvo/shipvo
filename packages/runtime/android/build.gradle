@@ -16,6 +16,7 @@ android {
 }
 
 dependencies {
+  testImplementation 'junit:junit:4.13.2'
   implementation 'com.facebook.react:react-android'
   // Ed25519 verification on Android 7+ (no platform Ed25519 before API 33). Pure Java, ~60 KB.
   implementation 'net.i2p.crypto:eddsa:0.3.0'

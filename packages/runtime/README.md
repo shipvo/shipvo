@@ -19,3 +19,11 @@ Runtime.markHealthy();                   // call once the first screen rendered
 ```
 
 `shipvo init` wires all of this for you.
+
+## Crash after `markHealthy`
+
+`markHealthy` means the first screen rendered. It promotes a staged release, but it does not clear the unhealthy-boot count. The count is cleared when the app has stayed in the foreground for 30 seconds, or when it goes to background. If the process dies before that, the next launch counts as an unhealthy boot for that release. After 3 unhealthy boots inside 60 seconds the runtime blocks the release, goes back to the previous one and records `crash_loop_revert`.
+
+A good release that you open and kill in the foreground within 30 seconds, 4 times in 60 seconds, is reverted too. This is rare.
+
+Reverting does not undo changes the bad release made to app storage (files, databases, keychain, preferences). Write migrations so an older release can read newer data.
