@@ -22,4 +22,19 @@ class HermesCheckTest {
     assertEquals(emptyList<Int>(), HermesCheck.parse(null))
     assertEquals(listOf(96), HermesCheck.parse("96,x,-1,0"))
   }
+  @Test fun refuseOnMismatchRecordsEventBlocksAndReturnsResult() {
+    val events = mutableListOf<String>(); val blocked = mutableListOf<Int>()
+    val r = HermesCheck.refuse(listOf(96), 98, 7, { events.add(it) }, { blocked.add(it) })!!
+    assertEquals(listOf("hermes_bytecode_mismatch:7"), events)
+    assertEquals(listOf(7), blocked)
+    assertEquals("none", r["status"]); assertEquals("hermes_bytecode_mismatch", r["reason"])
+    assertEquals(7, r["release"]); assertEquals(98, r["releaseHermesBytecodeVersion"]); assertEquals(listOf(96), r["shellHermesBytecodeVersions"])
+  }
+  @Test fun refuseOnMatchOrMissingFieldDoesNothing() {
+    val events = mutableListOf<String>(); val blocked = mutableListOf<Int>()
+    assertEquals(null, HermesCheck.refuse(listOf(96, 98), 98, 7, { events.add(it) }, { blocked.add(it) }))
+    assertEquals(null, HermesCheck.refuse(listOf(96), null, 7, { events.add(it) }, { blocked.add(it) }))
+    assertEquals(null, HermesCheck.refuse(emptyList(), 98, 7, { events.add(it) }, { blocked.add(it) }))
+    assertTrue(events.isEmpty() && blocked.isEmpty())
+  }
 }
