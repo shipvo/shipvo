@@ -65,7 +65,7 @@ module.exports = withShipvoSim(getDefaultConfig(__dirname));
   w("index.ts", `import { registerRootComponent } from "expo";\nimport App from "./App";\nregisterRootComponent(App);\n`);
   w(".gitignore", `node_modules/\n.expo/\ndist/\ndist-ota/\ndist-web/\nsim-dist/\nweb-build/\n/ios\n/android\n.kotlin/\n*.jks\n*.p8\n*.p12\n*.key\n*.mobileprovision\n*.tsbuildinfo\n.env*.local\n.DS_Store\n# never commit the release signing seed\n.shipvo/\n`);
   w("src/release.ts", `// Edit and push: the publish workflow signs and ships this to every installed phone and to the simulator.
-export const RELEASE = { headline: "Release 1: hello from ${name}.", note: "Edit src/release.ts and run \`shipvo publish\`." };
+export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/release.ts and run \`shipvo publish\`." };
 `);
   w("App.tsx", APP_TSX(name, appId));
   w(".github/workflows/publish.yml", WORKFLOW);
@@ -110,7 +110,7 @@ export default function App() {
 
   // Over-the-air updates: tell the runtime the first screen rendered (so this release is kept), then poll while open.
   useEffect(() => {
-    try { const h = Runtime.markHealthy(); add(\`Running release \${h.release}\`); } catch {}
+    try { const h = Runtime.markHealthy(); add(h.release ? \`Running release \${h.release}\` : "Running local build"); } catch {}
     const check = async () => {
       if (busy.current || !state?.baseUrl) return; busy.current = true;
       try { const r = await Runtime.checkForUpdate(true); if (r.status === "staged") add(\`Applied release \${r.release} (\${r.via ?? "full"})\`); }
@@ -139,7 +139,7 @@ export default function App() {
         <Btn label="Send a notification" onPress={notify} />
         <Text style={s.h2} accessibilityRole="header">Log</Text>
         {log.length === 0 ? <Text style={s.muted}>Nothing yet.</Text> : log.map((l, i) => <Text key={i} style={s.line}>{l}</Text>)}
-        <Text style={s.muted}>App id ${appId} · shell {state?.shellVersion ?? "none"} · release {state?.runningRelease ?? 0}</Text>
+        <Text style={s.muted}>App id ${appId} · shell {state?.shellVersion ?? "none"} · {state?.runningRelease ? \`release \${state.runningRelease}\` : "local build"}</Text>
       </ScrollView>
       <ScanHost accent="#1F4E5F" />
     </View>
@@ -195,8 +195,8 @@ const TEST_APP = (name: string) => `// Tests that run your app in the Shipvo sim
 // Run them with "npm test" (start the simulator first: npm run sim) and in CI (.github/workflows/test.yml).
 import { test, expect } from "@shipvo/test/vitest";
 
-test("the app opens and shows its release", async ({ phone }) => {
-  expect(phone).toSee(/Release \\d+/);
+test("the app opens and shows its headline", async ({ phone }) => {
+  expect(phone).toSee("Hello from ${name}.");
   expect(phone.screen).not.toMatch(/something went wrong|unhandled|exception/i);
 });
 
