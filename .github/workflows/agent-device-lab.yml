@@ -1,22 +1,86 @@
 # Device Lab: nightly on an Android emulator, builds the sample shell, publishes real OTA releases to a
 # local release server and tests apply, patches, tampering, crash-loop, rollback and cohorts; benchmarks
-# against the last run and the real-phone baseline, and files issues for failures and regressions.
+# against the last run and the baseline, and files issues for failures and regressions.
+# The agent runs inside the emulator runner (the same setup as parity.yml), so the device stays up.
 name: agent-device-lab
 on:
   schedule: [{ cron: "19 23 * * *" }]
   workflow_dispatch:
-permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+permissions: { contents: read, issues: write, pull-requests: write, actions: read }
 concurrency: { group: agent-device-lab }
 jobs:
   lab:
-    uses: ./.github/workflows/_agent-claude.yml
-    secrets: inherit
-    with:
-      role: device-lab
-      mode: branch
-      branch: agent/device-lab/${{ github.run_number }}
-      pr_labels: agent:claude,device-lab
-      android_emulator: true
-      model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
-      max_turns: 250
-      timeout: 180
+    if: vars.AGENTS_PAUSED != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      REPO: ${{ github.repository }}
+      BRANCH: agent/device-lab/${{ github.run_number }}
+    steps:
+      - name: Check secrets
+        id: chk
+        env: { A: "${{ secrets.ANTHROPIC_API_KEY }}", O: "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}", T: "${{ secrets.AGENT_TOKEN }}" }
+        run: |
+          if [ -n "$T" ] && [ -n "$A$O" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "::warning::Agent team not set up yet"; echo "ok=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.chk.outputs.ok == 'true'
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: Enable KVM
+        if: steps.chk.outputs.ok == 'true'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: pnpm/action-setup@v4
+        if: steps.chk.outputs.ok == 'true'
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        if: steps.chk.outputs.ok == 'true'
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-java@v4
+        if: steps.chk.outputs.ok == 'true'
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.chk.outputs.ok == 'true'
+      - name: Install, prompt, branch, Claude Code
+        if: steps.chk.outputs.ok == 'true'
+        run: |
+          pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
+          git config user.name "Shipvo Agent (Claude)"; git config user.email "agents@shipvo.dev"
+          git checkout -b "$BRANCH"; mkdir -p /tmp/agent; git rev-parse HEAD > /tmp/agent/start_sha
+          T=$(date -u +%Y-%m-%d)
+          sed -e "s#{{BRANCH}}#$BRANCH#g" -e "s#{{TODAY}}#$T#g" .github/agents/prompts/device-lab.md > /tmp/agent/prompt.md
+          printf '\n\nScratch files go in /tmp/agent/. Today is %s.\n' "$T" >> /tmp/agent/prompt.md
+          for a in 1 2 3; do curl -fsSL https://claude.ai/install.sh | bash -s -- 2.1.318 && break; sleep 10; done
+      - name: Run the Device Lab agent on the emulator
+        if: steps.chk.outputs.ok == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          AGENT_MODEL: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: timeout 12600 bash .github/agents/run-device-lab.sh
+      - name: Push and open the PR
+        if: always() && steps.chk.outputs.ok == 'true'
+        env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" }
+        run: |
+          AHEAD=$(git rev-list --count "$(cat /tmp/agent/start_sha)..HEAD")
+          [ "$AHEAD" != "0" ] || { echo "no changes"; exit 0; }
+          for a in 1 2 3 4; do git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}" && break; sleep $((a*15)); done
+          TITLE=$(head -n1 /tmp/agent/pr_title.txt 2>/dev/null || git log --reverse --format=%s "$(cat /tmp/agent/start_sha)..HEAD" | head -n1)
+          [ -f /tmp/agent/pr_body.md ] || git log --format='- %s' "$(cat /tmp/agent/start_sha)..HEAD" > /tmp/agent/pr_body.md
+          printf '\n\n---\nOpened by the Shipvo agent team ([run](%s)).\n' "$RUN_URL" >> /tmp/agent/pr_body.md
+          for a in 1 2 3 4; do
+            gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md --label agent-pr --label agent:claude --label device-lab && break
+            [ -n "$(gh api "repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&state=open" --jq '.[0].number // empty')" ] && break; sleep $((a*15))
+          done
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.chk.outputs.ok == 'true'
+        with: { name: device-lab, path: /tmp/agent/claude.log, if-no-files-found: ignore, retention-days: 14 }
