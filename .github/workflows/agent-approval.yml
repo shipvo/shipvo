@@ -1,0 +1,37 @@
+# Approve GitHub Copilot's own PR runs without approving untrusted fork workflows.
+# Only same-repository copilot/* branches and Copilot-labelled runs qualify.
+name: agent-approval
+on:
+  schedule: [{ cron: "*/5 * * * *" }]
+  workflow_dispatch:
+permissions: {}
+concurrency: { group: agent-approval }
+jobs:
+  approve:
+    if: vars.AGENTS_PAUSED != 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Approve trusted Copilot runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "::warning::Add the AGENT_TOKEN secret (see .github/agents/README.md)"; exit 0; }
+          gh api "repos/$REPO/actions/runs?status=action_required&per_page=100" --jq '.workflow_runs[] | @base64' |
+          while IFS= read -r encoded; do
+            [ -n "$encoded" ] || continue
+            run=$(printf '%s' "$encoded" | base64 -d)
+            id=$(jq -r '.id' <<<"$run")
+            name=$(jq -r '.name' <<<"$run")
+            branch=$(jq -r '.head_branch // ""' <<<"$run")
+            head_repo=$(jq -r '.head_repository.full_name // ""' <<<"$run")
+            event=$(jq -r '.event // ""' <<<"$run")
+            if [[ "$head_repo" == "$REPO" && "$branch" == copilot/* && "$event" == pull_request && "${name,,}" == *copilot* ]]; then
+              echo "Approving Copilot run $id ($name on $branch)"
+              gh api -X POST "repos/$REPO/actions/runs/$id/approve" >/dev/null
+            else
+              echo "Leaving run $id unapproved ($name, $event, $head_repo, $branch)"
+            fi
+          done
