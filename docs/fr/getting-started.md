@@ -1,15 +1,17 @@
-# Build your first Shipvo app
+# Créez votre première application Shipvo
+
+Aussi disponible en : [English](../getting-started.md)
 
 Vingt minutes pour passer de rien à une application que des agents IA peuvent ouvrir dans un simulateur, qui s'installe sur un téléphone Android, et que vous mettez à jour over the air avec une seule commande, `shipvo publish`.
 
-## 0. What you need
+## 0. Ce qu'il vous faut
 
 - Node 22 et npm (ou pnpm / bun).
 - Pour le simulateur : Chromium via Playwright (une commande ci-dessous). Pas d'Android Studio, pas de Xcode, pas de téléphone.
 - Pour les téléphones : Android Studio une fois (`npx expo run:android`), ou EAS Build.
-- Pour publier : un control plane. Utilisez celui hébergé (`shipvo login`, puis `shipvo app create`, tous deux ci-dessous) ou auto-hébergez le vôtre sur Cloudflare en dix minutes ([self-hosting.md](self-hosting.md)).
+- Pour publier : un control plane. Utilisez celui hébergé (`shipvo login`, puis `shipvo app create`, tous deux ci-dessous) ou auto-hébergez le vôtre sur Cloudflare en dix minutes ([self-hosting.md](../self-hosting.md)).
 
-## 1. Create the app
+## 1. Créer l'application
 
 ```bash
 npx -y @shipvo/cli init myshop --name "My Shop"
@@ -20,7 +22,7 @@ npx playwright install chromium
 
 `init` écrit une application Expo complète :
 
-| File | What it is |
+| Fichier | Description |
 | --- | --- |
 | `shipvo.json` | Identifiant de l'application, nom, URL du control plane, clé publique épinglée dans le shell. Chaque commande `shipvo` le lit. |
 | `app.json` | Configuration Expo avec le plugin `@shipvo/runtime` (la racine de confiance + le control plane vont dans le shell natif) et les chaînes de permissions Expo. |
@@ -28,9 +30,9 @@ npx playwright install chromium
 | `src/release.ts` | Le premier fichier que vous modifiez : poussez un changement et chaque téléphone et simulateur le reçoit. |
 | `metro.config.js` | `withShipvoSim` : les builds simulateur remplacent les modules natifs d'Expo par le device simulé. |
 | `.github/workflows/publish.yml` | Exécute `shipvo publish` pour vous à chaque push vers `main` (optionnel ; vous pouvez toujours l'exécuter vous-même). |
-| `.shipvo/seed.txt` | Votre seed de signature de release Ed25519, ignorée par git. **Sauvegardez-la hors ligne.** Si vous la perdez, les shells installés n'accepteront plus jamais de mise à jour. Exécutez `shipvo keys export` et gardez une copie ([changer de machine](new-machine.md)). |
+| `.shipvo/seed.txt` | Votre seed de signature de release Ed25519, ignorée par git. **Sauvegardez-la hors ligne.** Si vous la perdez, les shells installés n'accepteront plus jamais de mise à jour. Exécutez `shipvo keys export` et gardez une copie ([changer de machine](../new-machine.md)). |
 
-## 2. Run it in the simulator
+## 2. Lancer l'application dans le simulateur
 
 ```bash
 npm run sim
@@ -57,7 +59,7 @@ curl -s -X POST localhost:4545/session -H 'content-type: application/json' -d '{
 curl -s -X POST localhost:4545/act -H 'content-type: application/json' -d '{"session":"s1","action":"tap","ref":"e11"}'
 ```
 
-## 3. Use the device API in your own screens
+## 3. Utiliser l'API device dans vos propres écrans
 
 ```tsx
 import { device } from "@shipvo/device";
@@ -71,9 +73,9 @@ await device.notifications.show({ title: "Order confirmed", body: "MS-1 is being
 device.notifications.onOpen((n) => openOrder(n.data?.order));
 ```
 
-La référence complète est dans [device-api.md](device-api.md). Les écrans construits dessus fonctionnent sans changement sur téléphone et dans le simulateur ; les dialogues système sont formulés comme Android ou iOS les formulent selon la plateforme du device simulé.
+La référence complète est dans [device-api.md](../device-api.md). Les écrans construits dessus fonctionnent sans changement sur téléphone et dans le simulateur ; les dialogues système sont formulés comme Android ou iOS les formulent selon la plateforme du device simulé.
 
-## 4. Put it on a phone
+## 4. Installer sur un téléphone
 
 ```bash
 npx expo run:android          # or: npx eas build -p android
@@ -81,9 +83,9 @@ npx expo run:android          # or: npx eas build -p android
 
 Le shell contient votre clé publique et l'URL du control plane comme méta-données du manifeste ; rien de livré over the air ne peut les modifier. Le bundle embarqué est la première release ; toutes les suivantes sont des téléchargements signés. Sur iOS, le même runtime vérifie et applique les releases publiées avec `shipvo publish --platform ios` (ou `all`) ; iOS télécharge pour l'instant des bundles complets, pas des patchs.
 
-## 5. Publish over the air
+## 5. Publier over the air
 
-**Hosted control plane (the default).** Connectez-vous une fois et enregistrez l'application :
+**Control plane hébergé (par défaut).** Connectez-vous une fois et enregistrez l'application :
 
 ```bash
 npx -y @shipvo/cli login          # GitHub sign-in; saves your key
@@ -92,14 +94,14 @@ npx -y @shipvo/cli app create     # registers the app id + your public key, save
 
 Pour la CI, ajoutez deux secrets du dépôt (Settings → Secrets → Actions) :
 
-| Secret | Value |
+| Secret | Valeur |
 | --- | --- |
 | `SHIPVO_SIGNING_SEED` | le contenu de `.shipvo/seed.txt` |
 | `SHIPVO_PUBLISH_TOKEN` | le contenu de `.shipvo/publish-token` (valide 90 jours ; exécutez `shipvo app create` à nouveau pour en générer un nouveau) |
 
 Le publish token ne peut écrire que les propres fichiers de votre application, et chaque pointeur de release doit être vérifié par rapport à la clé publique que vous avez enregistrée, donc un token divulgué ne peut pas livrer du code à vos utilisateurs sans votre seed de signature. La seed ne quitte jamais votre machine ou la CI.
 
-**Self-hosted control plane.** Au lieu du token, définissez `CLOUDFLARE_API_TOKEN` (Workers KV Storage: Edit), `CLOUDFLARE_ACCOUNT_ID` et `SHIPVO_KV_ID` (voir [self-hosting.md](self-hosting.md)) et pointez `controlPlane` dans `shipvo.json` vers votre Worker.
+**Control plane auto-hébergé.** Au lieu du token, définissez `CLOUDFLARE_API_TOKEN` (Workers KV Storage: Edit), `CLOUDFLARE_ACCOUNT_ID` et `SHIPVO_KV_ID` (voir [self-hosting.md](../self-hosting.md)) et pointez `controlPlane` dans `shipvo.json` vers votre Worker.
 
 Puis modifiez `src/release.ts` et exécutez `shipvo publish`. (Dans un dépôt GitHub, le workflow fait la même chose à chaque push vers `main`.) Cela :
 
@@ -112,10 +114,10 @@ Les téléphones vérifient quand ils sont ouverts, vérifient signature, hachag
 
 Les agents ouvrent la release exacte exécutée par les téléphones avec `open_app("myshop@r8")` ou `open_app("myshop@latest")`.
 
-## 6. Give agents a key, not a laptop
+## 6. Donnez aux agents une clé, pas un laptop
 
-Le simulateur fonctionne aussi en mode hébergé : un Worker lance un sandbox par clé API et expose les mêmes outils MCP via HTTPS, afin que ChatGPT ou tout agent distant puisse ouvrir une application avec une URL et sans rien installer. `npx -y @shipvo/cli login` vous connecte avec GitHub et vous donne une clé ; `shipvo mcp` affiche la configuration. Votre clé ouvre l'application d'exemple et chaque application que vous avez enregistrée avec `shipvo app create` : après une publication, `open_app("myshop@latest")` ouvre exactement la release exécutée par les téléphones. La bêta autorise 3 applications par compte et 500 MB chacune ; l'auto-hébergement est toujours ouvert. Voir [agents.md](agents.md).
+Le simulateur fonctionne aussi en mode hébergé : un Worker lance un sandbox par clé API et expose les mêmes outils MCP via HTTPS, afin que ChatGPT ou tout agent distant puisse ouvrir une application avec une URL et sans rien installer. `npx -y @shipvo/cli login` vous connecte avec GitHub et vous donne une clé ; `shipvo mcp` affiche la configuration. Votre clé ouvre l'application d'exemple et chaque application que vous avez enregistrée avec `shipvo app create` : après une publication, `open_app("myshop@latest")` ouvre exactement la release exécutée par les téléphones. La bêta autorise 3 applications par compte et 500 MB chacune ; l'auto-hébergement est toujours ouvert. Voir [agents.md](../agents.md).
 
-## Where things are measured
+## Où les éléments sont mesurés
 
-Tout ce qui est affirmé ci-dessus vient de mesures sur du matériel réel, publiées dans ce dépôt : tailles et temps OTA sur un Redmi 9A 2 GB ([spike-results.md](spike-results.md)), et parité simulateur-appareil sur un émulateur Android et un simulateur iPhone, y compris ce que le score ne couvre pas ([parity-results.md](parity-results.md)).
+Tout ce qui est affirmé ci-dessus vient de mesures sur du matériel réel, publiées dans ce dépôt : tailles et temps OTA sur un Redmi 9A 2 GB ([spike-results.md](../spike-results.md)), et parité simulateur-appareil sur un émulateur Android et un simulateur iPhone, y compris ce que le score ne couvre pas ([parity-results.md](../parity-results.md)).
