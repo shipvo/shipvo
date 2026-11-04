@@ -57,8 +57,20 @@ async function newSession(id, opts = {}) {
   sessions.set(id, { ctx, page, app: target.app, release: target.release, startedAt: new Date().toISOString() });
 }
 
+// Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
+// old "e5" would point at a different element. Each document gets an epoch; refs after the first load are "p<epoch>e5".
+const DOCS = new WeakMap();
+async function epochOf(page) {
+  const id = await page.evaluate(() => (globalThis.__pnDoc ??= Math.random().toString(36).slice(2)));
+  const d = DOCS.get(page);
+  if (!d) DOCS.set(page, { id, epoch: 0 }); else if (d.id !== id) { d.id = id; d.epoch++; }
+  return DOCS.get(page).epoch;
+}
+class SimError extends Error { constructor(code, message) { super(message); this.code = code; } }
+
 async function screen(page) {
   await page.waitForTimeout(150);
+  const epoch = await epochOf(page);
   // Phones only expose the items of a horizontal list that are on screen; hide the rest, as a phone would,
   // so an agent learns to swipe the rail ("scroll right <ref>") exactly as it must on a device.
   await page.evaluate(() => {
@@ -95,20 +107,34 @@ async function screen(page) {
     out.push(l);
     if (/^\s*- (button|radio|link|checkbox|switch|tab) "[^"]+"/.test(l) && /:\s*$/.test(l)) hideBelow = indent;
   }
-  return out.join("\n");
+  const text = out.join("\n");
+  return epoch ? text.replace(/\[ref=(e\d+)\]/g, `[ref=p${epoch}$1]`) : text;
 }
 
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
 
 async function act(id, body) {
   const s = sessions.get(id); if (!s) throw new Error(`no session '${id}': call /session first`);
-  const { page } = s; const loc = (ref) => page.locator(`aria-ref=${ref}`);
+  const { page } = s;
+  // A ref is valid only for the page it came from and while its element is unchanged. Re-snapshot first, so a node that
+  // was re-rendered with new content has lost its old ref, then fail with a typed error instead of acting on anything else.
+  const loc = (ref) => page.locator(`aria-ref=${ref}`);
+  const resolve = async (ref) => {
+    const m = /^(?:p(\d+))?(e\d+)$/.exec(String(ref));
+    const stale = () => new SimError("stale_ref", `stale ref ${ref}: the screen changed. Take a new snapshot (action "screen") and use a ref from it.`);
+    if (!m) return loc(ref);
+    await screen(page);
+    if (Number(m[1] ?? 0) !== DOCS.get(page).epoch) throw stale();
+    const l = loc(m[2]);
+    if ((await l.count()) !== 1) throw stale();
+    return l;
+  };
   switch (body.action) {
     case "screen": break;
-    case "tap": await loc(body.ref).click({ timeout: 3000 }); break;
+    case "tap": await (await resolve(body.ref)).click({ timeout: 3000 }); break;
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
-      let t = loc(body.ref);
+      let t = await resolve(body.ref);
       const kind = await t.evaluate((el) => (/^(INPUT|TEXTAREA)$/.test(el.tagName) || el.isContentEditable) ? "field" : el.querySelector("input, textarea") ? "wrapper" : (el.getAttribute("aria-label") || el.textContent || "").trim(), { timeout: 3000 });
       if (kind === "wrapper") t = t.locator("input, textarea").first();
       else if (kind !== "field") {
@@ -120,7 +146,7 @@ async function act(id, body) {
       await t.fill(String(body.text ?? ""), { timeout: 3000 }); if (body.enter) await t.press("Enter"); break;
     }
     case "scroll": {
-      const target = body.ref ? loc(body.ref) : page.locator("body");
+      const target = body.ref ? await resolve(body.ref) : page.locator("body");
       const box = await target.boundingBox().catch(() => null);
       if (box) await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 400));
       await page.mouse.wheel(body.direction === "right" ? 300 : body.direction === "left" ? -300 : 0, body.direction === "up" ? -600 : body.direction === "down" ? 600 : 0);
@@ -198,7 +224,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
-      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], screen: s ? await screen(s.page) : null }); }
+      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), screen: s ? await screen(s.page) : null }); }
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }

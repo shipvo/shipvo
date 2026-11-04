@@ -11,6 +11,7 @@ Twenty minutes from nothing to an app that AI agents can open in a simulator, th
 ## 0. What you need
 
 - Node 22 and npm (or pnpm / bun).
+  Check with `node --version`. It must print `v22` or higher. If not, run `nvm use 22` or install Node 22 from nodejs.org.
 - For the simulator: Chromium via Playwright (one command below). No Android Studio, no Xcode, no phone.
 - For phones: Android Studio once (`npx expo run:android`), or EAS Build.
 - For publishing: a control plane. Use the hosted one (`shipvo login`, then `shipvo app create`, both below) or self-host yours on Cloudflare in ten minutes ([self-hosting.md](self-hosting.md)).
@@ -23,6 +24,8 @@ cd myshop
 npm install
 npx playwright install chromium
 ```
+
+If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with PASS or FAIL, and a FAIL line ends with the exact fix. It checks your Node version, `shipvo.json`, the signing key, control plane reachability and `hermesBytecodeVersion`. It does not check ports or Chromium yet.
 
 `init` writes a complete Expo app:
 
