@@ -35,9 +35,13 @@ public final class ShipvoRuntimeModule: Module {
       let coldStart = max(0, (Date().timeIntervalSince1970 - Self.processStart()) * 1000)
       let sinceLoad = Store.bundleSelectedAt > 0 ? (now - Store.bundleSelectedAt) * 1000 : -1
       let promoted = ShipvoBundleSelector.promoteIfRunning(s)
+      ShipvoBundleSelector.noteHealthy()
+      Self.scheduleStable()
       return ["release": Store.runningRelease, "coldStartMs": Int(coldStart), "sinceLoadMs": Int(sinceLoad), "promoted": promoted,
               "kind": Store.loadsInProcess <= 1 ? "cold" : "reload"]
     }
+
+    OnAppEntersBackground { Self.stableNow() }
 
     Function("consumeEvents") { () -> [String] in Store().consumeEvents() }
 
@@ -56,7 +60,30 @@ public final class ShipvoRuntimeModule: Module {
     Function("reload") { () in Self.reloadHost() }
   }
 
+  private static var stableTimer: DispatchWorkItem?
+
+  /// Clears the unhealthy-boot count once the app has stayed up for the stability window.
+  /// The timer is dropped after it fires and on reload, and `markStableIfHealthy` checks the load number.
+  static func scheduleStable() {
+    Store.lock.lock(); defer { Store.lock.unlock() }
+    stableTimer?.cancel()
+    let item = DispatchWorkItem {
+      ShipvoBundleSelector.markStableIfHealthy(Store())
+      Store.lock.lock(); stableTimer = nil; Store.lock.unlock()
+    }
+    stableTimer = item
+    DispatchQueue.main.asyncAfter(deadline: .now() + ShipvoBundleSelector.stabilitySeconds, execute: item)
+  }
+
+  /// Going to background cleanly counts as stable, but only if this load reported healthy.
+  static func stableNow() {
+    if ShipvoBundleSelector.markStableIfHealthy(Store()) {
+      Store.lock.lock(); stableTimer?.cancel(); stableTimer = nil; Store.lock.unlock()
+    }
+  }
+
   static func reloadHost() {
+    Store.lock.lock(); stableTimer?.cancel(); stableTimer = nil; Store.lock.unlock()
     ShipvoBundleSelector.invalidate()
     DispatchQueue.main.async { RCTTriggerReloadCommandListeners("shipvo-update") }
   }
