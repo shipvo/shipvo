@@ -19,7 +19,7 @@ const stub = {
 vi.mock("../src/config.js", async (orig) => ({
   ...(await orig<typeof import("../src/config.js")>()),
   loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k" }),
-  seed: () => Buffer.alloc(32, 7).toString("base64"),
+  seed: vi.fn(() => Buffer.alloc(32, 7).toString("base64")),
   kv: () => stub,
 }));
 import { publish, rollback, dryRunSummary } from "../src/publish";
@@ -211,42 +211,6 @@ describe("publish and the Hermes bytecode check", () => {
     expect(dryRunSummary(1, 2 * 1048576, "out")).toContain("2.00 MB");
     expect(dryRunSummary(1, 64 * 1024, "out")).toContain("64.0 KB");
   });
-});
-
-describe("rollback dry run", () => {
-  it("writes nothing and prints the summary with no signing seed", async () => {
-    blobs.set("b/demo/r1.hbc", fakeHbc(96));
-    vi.mocked(seed).mockImplementation(() => { throw new Error("no signing seed"); });
-    await rollback(["--to", "1", "--dry-run"]);
-    expect(puts).toEqual([]);
-    const text = String((console.log as any).mock.calls.at(-1)?.[0]);
-    expect(text).toContain("app: demo");
-    expect(text).toContain("rolling back to the code of release 1");
-    expect(text).toContain("new release: 1");
-    expect(text).toContain("platforms: android");
-    expect(text).toContain("bands: b0");
-    expect(text).toContain("min shell version: 1.0.0");
-    expect(text).toContain("Dry run: nothing was written.");
-    vi.mocked(seed).mockImplementation(() => Buffer.alloc(32, 7).toString("base64"));
-  });
-
-  it("exits 1 when the target bundle is missing", async () => {
-    const exit = vi.spyOn(process, "exit").mockImplementation((code?: number) => { throw new Error(`exit ${code}`); });
-    await expect(rollback(["--to", "1", "--dry-run"])).rejects.toThrow(/exit 1/);
-    expect((console.error as any).mock.calls.join("\n")).toContain("Release 1 android bundle not found");
-    expect(puts).toEqual([]);
-    exit.mockRestore();
-  });
-
-  it("writes pointers without --dry-run", async () => {
-    blobs.set("b/demo/r1.hbc", fakeHbc(96));
-    await rollback(["--to", "1", "--bands", "b0"]);
-    expect(puts).toEqual(["p/demo/1/b0"]);
-    const text = String((console.log as any).mock.calls.at(-1)?.[0]);
-    expect(text).toMatch(/^\{.*\}$/);
-    expect(text).toContain('"rolled_back_to_code_of":1');
-    expect(text).toContain('"new_release":1');
-  });
 
   it("iOS patches start only from earlier iOS releases, Android only from Android", async () => {
     // Stand-in for bsdiff4: the import check passes and the diff command writes a small patch file.
@@ -269,4 +233,44 @@ describe("rollback dry run", () => {
     expect(android.patches[0].url).toBe(`b/demo/d-${sha(1).slice(0, 16)}-r2.bsdiff`);
     expect(puts).toContain(ios.patches[0].url);
   });
+});
+
+describe("rollback dry run", () => {
+  it("writes nothing and prints the summary with no signing seed", async () => {
+    blobs.set("b/demo/r1.hbc", fakeHbc(96));
+    vi.mocked(seed).mockImplementation(() => { throw new Error("no signing seed"); });
+    try {
+      await rollback(["--to", "1", "--dry-run"]);
+      expect(puts).toEqual([]);
+      const text = String((console.log as any).mock.calls.at(-1)?.[0]);
+      expect(text).toContain("app: demo");
+      expect(text).toContain("rolling back to the code of release 1");
+      expect(text).toContain("new release: 1");
+      expect(text).toContain("platforms: android");
+      expect(text).toContain("bands: b0");
+      expect(text).toContain("min shell version: 1.0.0");
+      expect(text).toContain("Dry run: nothing was written.");
+    } finally {
+      vi.mocked(seed).mockImplementation(() => Buffer.alloc(32, 7).toString("base64"));
+    }
+  });
+
+  it("exits 1 when the target bundle is missing", async () => {
+    const exit = vi.spyOn(process, "exit").mockImplementation((code?: number) => { throw new Error(`exit ${code}`); });
+    await expect(rollback(["--to", "1", "--dry-run"])).rejects.toThrow(/exit 1/);
+    expect((console.error as any).mock.calls.join("\n")).toContain("Release 1 android bundle not found");
+    expect(puts).toEqual([]);
+    exit.mockRestore();
+  });
+
+  it("writes pointers without --dry-run", async () => {
+    blobs.set("b/demo/r1.hbc", fakeHbc(96));
+    await rollback(["--to", "1", "--bands", "b0"]);
+    expect(puts).toEqual(["p/demo/1/b0"]);
+    const text = String((console.log as any).mock.calls.at(-1)?.[0]);
+    expect(text).toMatch(/^\{.*\}$/);
+    expect(text).toContain('"rolled_back_to_code_of":1');
+    expect(text).toContain('"new_release":1');
+  });
+
 });
