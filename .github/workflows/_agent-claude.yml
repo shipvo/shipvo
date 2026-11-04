@@ -159,7 +159,7 @@ jobs:
             i=$(( (START + t) % N ))
             export OPENAI_API_KEY="${K[$i]}"
             set +e
-            aider --model "openai/$MODEL" --message-file /tmp/agent/prompt.md --read CLAUDE.md \
+            aider --model "openai/$MODEL" --weak-model "openai/$MODEL" --message-file /tmp/agent/prompt.md --read CLAUDE.md \
               --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
               --edit-format diff --no-detect-urls --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
             rc=$?; set -e
@@ -232,6 +232,9 @@ jobs:
             exit 0
           fi
           TITLE=$(head -n1 /tmp/agent/pr_title.txt 2>/dev/null || true); [ -n "$TITLE" ] || TITLE="$(git log --reverse --format=%s "$(cat /tmp/agent/start_sha)..HEAD" | head -n1)"
+          if [ -z "$TITLE" ] || echo "$TITLE" | grep -qi "no commit message"; then
+            TITLE=$( [ "$ISSUE" != "0" ] && gh issue view "$ISSUE" -R "$REPO" --json title --jq .title || echo "agent: update $BRANCH" )
+          fi
           if [ ! -f /tmp/agent/pr_body.md ]; then
             { echo "Changes:"; git log --reverse --format='- %s' "$(cat /tmp/agent/start_sha)..HEAD"; echo; echo "Tested with \`pnpm -r test\` by the agent before committing."; [ "$ISSUE" != "0" ] && printf '\nFixes #%s\n' "$ISSUE"; } > /tmp/agent/pr_body.md
           fi
