@@ -169,13 +169,11 @@ final class RuntimeTests: XCTestCase {
   func testDeletesCorruptedPartialFileAndSucceeds() async throws {
     let s = store("good")
     let partial = s.partialPath(for: bundleSha)
-    try Data([0xDE, 0xAD]).write(to: partial)
-    let r = try await Updater.check(s)
-    XCTAssertEqual(r["status"] as? String, "staged")
-    XCTAssertEqual(r["via"] as? String, "full")
-    XCTAssertTrue(FileManager.default.fileExists(atPath: s.pendingPath!))
-    XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))
-  }
+    try Data([0xDE, 0xAD]).write(to: partial)\n    let r = try await Updater.check(s)\n    XCTAssertEqual(r["status"] as? String, "staged")\n    XCTAssertEqual(r["via"] as? String, "full")\n    XCTAssertTrue(FileManager.default.fileExists(atPath: s.pendingPath!))\n    XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))\n  }
+
+  func testResumesDownloadFromPartialFile() async throws {\n    let s = store("good")\n    let partial = s.partialPath(for: bundleSha)\n    // Write only half the bundle to simulate interrupted download\n    let bundleData = try Data(contentsOf: URL(string: \"\(base)/b/good/ios-r5.hbc\")!)\n    try bundleData.prefix(bundleData.count / 2).write(to: partial)\n    let r = try await Updater.check(s)\n    XCTAssertEqual(r["status"] as? String, "staged")\n    XCTAssertEqual(r["via"] as? String, "full")\n    XCTAssertTrue(FileManager.default.fileExists(atPath: s.pendingPath!))\n    XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))\n    XCTAssertEqual(r["bytes"] as? Int, bundleData.count / 2, "only the remaining bytes should be downloaded")\n  }
+
+  func testServerReturns206ForRangeRequest() async throws {\n    let s = store("good")\n    let partial = s.partialPath(for: bundleSha)\n    // Write partial data\n    let bundleData = try Data(contentsOf: URL(string: \"\(base)/b/good/ios-r5.hbc\")!)\n    try bundleData.prefix(bundleData.count / 2).write(to: partial)\n    let r = try await Updater.check(s)\n    XCTAssertEqual(r["status"] as? String, "staged")\n    XCTAssertEqual(r["via"] as? String, "full")\n    XCTAssertTrue(FileManager.default.fileExists(atPath: s.pendingPath!))\n    XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))\n  }
 
   func testSemver() {
     XCTAssertTrue(Verify.semverLess("1.0.2", "1.1.0")); XCTAssertFalse(Verify.semverLess("1.1.0", "1.1.0")); XCTAssertFalse(Verify.semverLess("2.0.0", "1.9.9"))

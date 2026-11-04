@@ -41,7 +41,6 @@ enum Updater {
           let wantSize = (core["size"] as? NSNumber)?.intValue, let url = core["url"] as? String else { throw UpdateError("pointer core incomplete") }
     let tmp = s.dir.appendingPathComponent("dl-\(wantSha).tmp")
     let partial = s.partialPath(for: wantSha)
-    try? FileManager.default.removeItem(at: partial)
 
     var via = "full", downloadedBytes = 0
     let d0 = Store.now()
@@ -52,31 +51,46 @@ enum Updater {
     var downloadMs = (Store.now() - d0) * 1000
     if !ready {
       let f0 = Store.now()
-      let resumeData = partial.exists() ? try Data(contentsOf: partial) : nil
-      let rangeHeader = resumeData.map { "bytes=\(resumeData.count)-" } ?? "bytes=0-"
+      let partialExists = FileManager.default.fileExists(atPath: partial.path)
+      let partialSize = partialExists ? (try? FileManager.default.attributesOfItem(atPath: partial.path)[.size] as? Int) ?? 0 : 0
+      let rangeHeader = partialExists && partialSize > 0 ? "bytes=\(partialSize)-" : "bytes=0-"
       let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil, range: rangeHeader))
       let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
       if dcode == 200 {
         try? FileManager.default.removeItem(at: partial)
         try? FileManager.default.removeItem(at: tmp)
+        try FileManager.default.moveItem(at: fileURL, to: tmp)
+      } else if dcode == 206 {
+        try? FileManager.default.removeItem(at: tmp)
+        try FileManager.default.moveItem(at: fileURL, to: partial)
         let (fileURL2, dresp2) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
         let dcode2 = (dresp2 as? HTTPURLResponse)?.statusCode ?? 0
         try require(dcode2 == 200, "bundle HTTP \(dcode2)")
         try? FileManager.default.removeItem(at: tmp)
         try FileManager.default.moveItem(at: fileURL2, to: tmp)
-      } else {
-        try require(dcode == 206, "bundle HTTP \(dcode)")
-        if let resumeData { try resumeData.append(to: tmp) }
-        try? FileManager.default.removeItem(at: fileURL)
         downloadMs += (Store.now() - f0) * 1000
+      } else {
+        try require(false, "bundle HTTP \(dcode)")
       }
     }
 
     let v0 = Store.now()
     let size = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? -1
     if via == "full" { downloadedBytes = size }
-    let ok = try (size == wantSize && Verify.sha256Hex(file: tmp) == wantSha)
-    if !ok { try? FileManager.default.removeItem(at: tmp); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
+    let ok = try (size == wantSize && Verify.sha256Hex(file: tmp) == wantSha)\n    if !ok {\n      try? FileManager.default.removeItem(at: tmp)\n      try? FileManager.default.removeItem(at: partial)\n      s.addEvent(\"verify_failed:\(release)\")\n      throw UpdateError(\"bundle hash/size mismatch\")\n    }\n>>>>>>> REPLACE
+````
+
+packages/runtime/ios-tests/RuntimeTests.swift
+````swift
+<<<<<<< SEARCH
+private extension FileManager {
+  func exists(atPath path: String) -> Bool { self.fileExists(atPath: path) }
+}
+
+private extension Data {
+  func append(to url: URL) throws {
+    if let data = try? Data(contentsOf: url) {\n      self = data + self\n    }\n    try write(to: url)\n  }
+}
     let verifyMs = (Store.now() - v0) * 1000 + verifyPointerMs
 
     let dest = s.dir.appendingPathComponent("r\(release).hbc")
