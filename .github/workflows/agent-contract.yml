@@ -1,0 +1,75 @@
+# Merge contract: before an approved, green PR that touches guarded code is merged, check it
+# against .github/agents/contract.md on the exact commit. PASS lets the merge bot merge it.
+# DRIFT sends it back to its engineer to fix; after AGENT_MAX_FIX_ROUNDS it waits for the owner.
+name: agent-contract
+on:
+  pull_request: { types: [labeled] }
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+jobs:
+  machine:
+    if: vars.AGENTS_PAUSED != 'true' && github.event.label.name == 'agent:contract-check'
+    concurrency: { group: "agent-contract-${{ github.event.pull_request.number }}", cancel-in-progress: true }
+    runs-on: ubuntu-latest
+    outputs:
+      vars: ${{ steps.m.outputs.vars }}
+      locked: ${{ steps.m.outputs.locked }}
+    env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", N: "${{ github.event.pull_request.number }}" }
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: scripts/agents, persist-credentials: false }
+      - id: m
+        run: |
+          node scripts/agents/contract.mjs "$N" > /tmp/findings.json
+          cat /tmp/findings.json
+          python3 - <<'PY'
+          import json, os
+          f = json.load(open("/tmp/findings.json"))
+          o = open(os.environ["GITHUB_OUTPUT"], "a")
+          o.write(f"locked={'true' if f['locked'] else 'false'}\n")
+          v = json.dumps({"PR": os.environ["N"], "FINDINGS": json.dumps({k: f[k] for k in ("sha", "guarded", "drift", "attention")}, indent=1)})
+          o.write(f"vars<<__V__\n{v}\n__V__\n")
+          PY
+  check:
+    needs: machine
+    if: needs.machine.outputs.locked != 'true'
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: contract
+      mode: read
+      pr: ${{ github.event.pull_request.number }}
+      model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
+      max_turns: 70
+      timeout: 45
+      allowed_bots: copilot-swe-agent,Copilot
+      vars: ${{ needs.machine.outputs.vars }}
+  result:
+    needs: [machine, check]
+    if: always() && needs.machine.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      R: ${{ github.repository }}
+      N: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+      V: ${{ needs.check.outputs.verdict }}
+      LOCKED: ${{ needs.machine.outputs.locked }}
+    steps:
+      - run: |
+          gh pr edit $N -R $R --remove-label agent:contract-check || true
+          if [ "$LOCKED" = "true" ]; then
+            gh pr edit $N -R $R --add-label needs-human
+            gh pr comment $N -R $R --body "Held for the owner: this PR changes locked paths (the agents' own rules, workflows, licence or legal), which never merge automatically. See .github/agents/contract.md."
+            exit 0
+          fi
+          NOW=$(gh api repos/$R/pulls/$N --jq .head.sha)
+          if [ "$NOW" != "$SHA" ]; then echo "PR moved on; a new check will run after review"; exit 0; fi
+          case "$V" in
+            APPROVE)
+              gh pr edit $N -R $R --add-label contract:ok --remove-label contract:drift
+              gh pr comment $N -R $R --body "<!-- contract-ok:$SHA -->Contract check passed for \`${SHA:0:7}\`. The merge bot will merge it once checks are green." ;;
+            CHANGES)
+              gh pr edit $N -R $R --add-label contract:drift --remove-label agent:approved
+              gh pr edit $N -R $R --add-label agent:changes-requested ;;
+            *) echo "::warning::contract checker gave no verdict; will retry on the next merge-bot pass" ;;
+          esac

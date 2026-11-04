@@ -13,6 +13,7 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Engineer | Aider (open source) via Kilo AI Gateway | on `agent:aider` label, sweep hourly | `agent-aider.yml` |
 | Code reviewer | Claude | every agent PR, on open and on each push | `agent-reviewer.yml` |
 | Fix engineer | each engineer fixes its own PRs (Copilot via `@copilot`) | CI red, changes requested, merge conflict | `agent-fixer.yml` |
+| Contract checker | rules + Claude | before merging any PR that touches guarded code | `agent-contract.yml` |
 | Merge bot | rules, no AI | every 30 min and after CI | `agent-merger.yml` |
 | QA engineer | Claude | nightly 01:41 UTC | `agent-qa.yml` |
 | Security engineer | Claude | Mondays 03:11 UTC | `agent-security.yml` |
@@ -33,14 +34,18 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 7. The **release train** publishes a patch release of every package whose code changed that day, with a CHANGELOG entry and a `release-YYYYMMDD` tag, by pushing main to `release` (which runs `publish-npm`).
 8. The **team lead** posts a daily report on the pinned "Agent team log" issue.
 
-## What still needs a human
+## Guarded code and the merge contract
 
-By design, agents never:
-- merge changes to `.github/**`, `CLAUDE.md`, `scripts/agents/**`, update signing and verification, auth, database migrations, the sample app's OTA-shipped source, `LICENSE`, `SECURITY.md` or `legal/**` (those PRs get `needs-human`);
-- trigger OTA releases to phones (npm releases go out only through the release train, never from an agent);
-- describe a serious security finding in public (it becomes a draft security advisory).
+PRs that touch guarded code (signing, verification, publishing, auth, migrations, and the sample app code that ships over the air to phones) merge automatically only after they pass the **merge contract** in [`contract.md`](contract.md), checked on the exact commit that will be merged:
 
-The daily report lists anything labelled `needs-human`. Everything else runs on its own.
+1. Code review approves and CI is green.
+2. The merge bot asks for a contract check. A script checks the hard rules (size, tests changed, no deleted or skipped tests, no destructive migrations, no bypass flags in signing or auth), then Claude checks every contract clause, including that the PR body's claims are true of the code.
+3. **Pass:** the PR is merged. **Drift:** it goes back to its engineer with the list, is fixed, reviewed and checked again. After 3 drifting rounds it is labelled `needs-human` and waits for you.
+4. Any new push clears the pass, so what merges is always what was checked.
+
+**Locked paths** never merge automatically: workflows and prompts (`.github/**`), `CLAUDE.md`, `scripts/agents/**`, `LICENSE`, `SECURITY.md`, `legal/**`. These define what the agents may do, so the agents cannot change them on their own. Agents also never trigger OTA releases to phones, and serious security findings become a private draft advisory.
+
+The daily report lists anything labelled `needs-human`.
 
 ## Tools the agents have
 

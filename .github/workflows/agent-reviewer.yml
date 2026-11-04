@@ -15,7 +15,7 @@ jobs:
     env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", N: "${{ github.event.pull_request.number }}", R: "${{ github.repository }}", HEAD: "${{ github.event.pull_request.head.ref }}" }
     steps:
       - run: |
-          gh pr edit $N -R $R --add-label agent-pr --remove-label agent:approved --remove-label agent:changes-requested --remove-label agent:conflict || true
+          gh pr edit $N -R $R --add-label agent-pr --remove-label agent:approved --remove-label agent:changes-requested --remove-label agent:conflict --remove-label contract:ok --remove-label contract:drift --remove-label agent:contract-check || true
           case "$HEAD" in copilot/*) gh pr edit $N -R $R --add-label agent:copilot || true;; esac
   review:
     needs: gate

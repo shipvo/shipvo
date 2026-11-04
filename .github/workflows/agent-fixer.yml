@@ -51,6 +51,10 @@ jobs:
           pr = prs[0]; n = pr["number"]; names = [l["name"] for l in pr["labels"]]
           if "agent-pr" not in names or "needs-human" in names: raise SystemExit
           rounds = max([int(x.split(":")[1]) for x in names if re.fullmatch(r"fix:\d+", x)] or [0])
+          if rounds >= int(E["MAX_ROUNDS"]) and "contract:drift" in names:
+              gh("pr", "edit", str(n), "-R", R, "--add-label", "needs-human", "--remove-label", "agent:changes-requested")
+              gh("pr", "comment", str(n), "-R", R, "--body", f"Still drifting from the merge contract after {rounds} fix rounds. Waiting for the owner.")
+              raise SystemExit
           if rounds >= int(E["MAX_ROUNDS"]):
               gh("pr", "comment", str(n), "-R", R, "--body", f"Closing after {rounds} fix rounds without success. The issue goes back to the backlog for the other engineer.")
               gh("pr", "close", str(n), "-R", R, "--delete-branch")
@@ -71,7 +75,8 @@ jobs:
           elif E["LABEL"] == "agent:conflict":
               reason = "The branch has merge conflicts with main."
           else:
-              reason = "The reviewer requested changes; see the latest review comment on the PR."
+              reason = ("The merge contract check found drift; fix every item in the latest 'Contract: DRIFT' comment."
+                        if "contract:drift" in names else "The reviewer requested changes; see the latest review comment on the PR.")
           if B.startswith("copilot/"):
               gh("pr", "comment", str(n), "-R", R, "--body", f"@copilot {reason} Please fix it: address every required point in the latest review comment, keep the change focused, and make sure `pnpm -r test` passes. Do not skip or delete tests.")
               print(f"asked Copilot to fix #{n}"); raise SystemExit

@@ -66,13 +66,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node and pnpm
-        if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
+        if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
         uses: pnpm/action-setup@v4
         with: { version: 10.28.0 }
-      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
+      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
         uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
-      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
+      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
         run: pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
 
       - name: Prepare branch
