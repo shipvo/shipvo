@@ -36,6 +36,7 @@ jobs:
       LABEL: ${{ github.event.label.name || inputs.label }}
       RUN_ID: ${{ github.event.workflow_run.id }}
       RUN_URL: ${{ github.event.workflow_run.html_url }}
+      RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
       MAX_ROUNDS: ${{ vars.AGENT_MAX_FIX_ROUNDS || 3 }}
     steps:
       - id: r
@@ -46,6 +47,18 @@ jobs:
           E = os.environ; R = E["R"]; B = E["BRANCH"]
           def gh(*a): return subprocess.run(["gh", *a], text=True, capture_output=True).stdout
           out = open(E["GITHUB_OUTPUT"], "a")
+          if E["EVENT"] == "workflow_run":
+              # A job GitHub never started (no runner free, e.g. macOS capacity) is not a code failure:
+              # run it again later instead of asking an engineer to fix code.
+              jobs = json.loads(gh("api", f"repos/{R}/actions/runs/{E['RUN_ID']}/jobs", "--jq", ".jobs") or "[]")
+              bad = [j for j in jobs if j["conclusion"] in ("failure", "cancelled", "timed_out")]
+              if bad and all(not j.get("steps") for j in bad):
+                  if int(E.get("RUN_ATTEMPT") or 1) < 4:
+                      subprocess.run(["bash", "-c", f"sleep 600; gh api -X POST repos/{R}/actions/runs/{E['RUN_ID']}/rerun-failed-jobs"])
+                      print("jobs never got a runner; re-ran them")
+                  else:
+                      print("jobs never got a runner after several attempts; leaving it for the next push")
+                  raise SystemExit
           if B == "main":
               if E["EVENT"] != "workflow_run": raise SystemExit
               if json.loads(gh("issue", "list", "-R", R, "--label", "ci-main", "--state", "open", "--json", "number") or "[]"):
@@ -59,11 +72,16 @@ jobs:
           pr = prs[0]; n = pr["number"]; names = [l["name"] for l in pr["labels"]]
           if "agent-pr" not in names or "needs-human" in names: raise SystemExit
           rounds = max([int(x.split(":")[1]) for x in names if re.fullmatch(r"fix:\d+", x)] or [0])
-          if rounds >= int(E["MAX_ROUNDS"]) and "contract:drift" in names:
+          # A conflict caused by other PRs landing on main is not the engineer's failure: resolving it
+          # never uses up a fix round, so an approved PR is never closed just because main moved.
+          free = E["EVENT"] != "workflow_run" and E["LABEL"] == "agent:conflict" and not ({"agent:changes-requested", "contract:drift"} & set(names))
+          if free: rounds_cap = False
+          else: rounds_cap = rounds >= int(E["MAX_ROUNDS"])
+          if rounds_cap and "contract:drift" in names:
               gh("pr", "edit", str(n), "-R", R, "--add-label", "needs-human", "--remove-label", "agent:changes-requested")
               gh("pr", "comment", str(n), "-R", R, "--body", f"Still drifting from the merge contract after {rounds} fix rounds. Waiting for the owner.")
               raise SystemExit
-          if rounds >= int(E["MAX_ROUNDS"]):
+          if rounds_cap:
               gh("pr", "comment", str(n), "-R", R, "--body", f"Closing after {rounds} fix rounds without success. The issue goes back to the backlog for the other engineer.")
               gh("pr", "close", str(n), "-R", R, "--delete-branch")
               for m in re.finditer(r"(?:fixes|closes|resolves)\s+#(\d+)", pr["body"] or "", re.I):
@@ -76,9 +94,10 @@ jobs:
                      "--remove-label", "agent:in-progress", "--remove-label", "agent:pr-open", "--remove-assignee", "Copilot")
                   gh("issue", "comment", i, "-R", R, "--body", f"PR #{n} failed {rounds} fix rounds; handed to the next engineer ({nxt}).")
               raise SystemExit
-          if rounds: gh("pr", "edit", str(n), "-R", R, "--remove-label", f"fix:{rounds}")
-          gh("label", "create", f"fix:{rounds+1}", "-R", R, "--color", "fbca04", "--force")
-          gh("pr", "edit", str(n), "-R", R, "--add-label", f"fix:{rounds+1}", "--remove-label", "agent:changes-requested")
+          if not free:
+              if rounds: gh("pr", "edit", str(n), "-R", R, "--remove-label", f"fix:{rounds}")
+              gh("label", "create", f"fix:{rounds+1}", "-R", R, "--color", "fbca04", "--force")
+              gh("pr", "edit", str(n), "-R", R, "--add-label", f"fix:{rounds+1}", "--remove-label", "agent:changes-requested")
           if E["EVENT"] == "workflow_run":
               reason = f"CI failed: {E['RUN_URL']} (run id {E['RUN_ID']})."
           elif E["LABEL"] == "agent:conflict":
