@@ -9,6 +9,8 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Role | Who | When | Workflow |
 | --- | --- | --- | --- |
 | Research lead | Claude with web search | every 6 h | `agent-research.yml` |
+| App Builders (dogfooding) | Claude, a different persona each day | daily | `agent-dogfood.yml` |
+| Device Lab (OTA on Android emulator) | Claude + emulator | nightly | `agent-device-lab.yml` |
 | Design Lead (senior UI/UX) | Claude with screenshots | Wed and Sat | `agent-design.yml` |
 | Head of Product (senior PM) | Claude | daily planning 4 times a day; strategy review Mondays | `agent-planner.yml`, `agent-pm.yml` |
 | Engineer | Claude | on `agent:claude` label, sweep hourly | `agent-engineer.yml` |
@@ -28,6 +30,8 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 ## How work flows
 
 1. The **Design Lead** screenshots the site and product on desktop and phone, light and dark, ships the single highest-impact design fix, and files design specs. The reviewer holds every user-facing change to the same bar.
+1. **App Builders** build a real app with Shipvo every day from the docs alone, as a different persona (including a non-technical founder working only through an agent), using the packages on `main`. They record time to a first running app and first passing test in `docs/product/dogfood/`, fix small doc issues and file every bug they hit.
+1. The **Device Lab** boots an Android emulator nightly, builds the sample shell, publishes real OTA releases to a local release server and tests apply, patch updates, tampered bundles, crash-loop recovery, rollback and cohorts. It benchmarks against the last run and the real-phone baseline in `docs/product/device-lab/` and files issues for failures and regressions.
 1. The **research lead** searches the web every 6 hours (competitors, React Native/Expo/OS changes, developer complaints, MCP and agent news) and files evidence-backed issues labelled `research`.
 1. Every Monday the **Head of Product** measures adoption (npm downloads, stars, outside issues), studies competitors, and updates `docs/product/strategy.md` (beachhead user, north-star metric, 3 bets for the next 4 weeks) and the roadmap, seeding an epic and first slices for each bet.
 1. The **Head of Product** plans four times a day: it ties every issue to a user outcome, prioritises with RICE, slices big bets small, and says no to work that doesn't serve the strategy. It reads `docs/ROADMAP.md`, open issues, CI and recent merges, and files small, self-contained issues with acceptance criteria, labelled `agent:ready` and `agent:claude`, `agent:copilot` or `agent:aider`.

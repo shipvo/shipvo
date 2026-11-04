@@ -1,0 +1,22 @@
+# Device Lab: nightly on an Android emulator, builds the sample shell, publishes real OTA releases to a
+# local release server and tests apply, patches, tampering, crash-loop, rollback and cohorts; benchmarks
+# against the last run and the real-phone baseline, and files issues for failures and regressions.
+name: agent-device-lab
+on:
+  schedule: [{ cron: "19 23 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: agent-device-lab }
+jobs:
+  lab:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: device-lab
+      mode: branch
+      branch: agent/device-lab/${{ github.run_number }}
+      pr_labels: agent:claude,device-lab
+      android_emulator: true
+      model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
+      max_turns: 250
+      timeout: 180
