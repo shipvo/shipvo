@@ -216,21 +216,36 @@ async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof l
 }
 
 export async function rollback(argv: string[]) {
-  checkFlags(argv, ["to", "bands", "platform"]);
+  checkFlags(argv, ["to", "bands", "platform", "dry-run"]);
   const a = parse(argv), cfg = loadConfig(), SEED = seed(), kv = kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor, to = Number(a.to);
   if (!to) { console.error("Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all]"); process.exit(2); }
+  const dry = a["dry-run"] !== undefined;
   const release = (await currentRelease(kv, APP, MAJOR)) + 1, issued_at = new Date().toISOString();
+  const bands = (a.bands || "b0,b1,b2").split(",");
+  const platforms = platformsOf(a);
   let minShell = "1.0.0";
-  for (const pf of platformsOf(a)) {
+  for (const pf of platforms) {
     const bytes = await kv.getBytes(`b/${APP}/${bundleName(to, pf)}`); if (!bytes) { console.error(`Release ${to} ${pf} bundle not found`); process.exit(1); }
     let web: unknown = undefined;
     try { const h = JSON.parse((await kv.get(pf === "ios" ? `h/${APP}/ios-r${to}` : `h/${APP}/r${to}`))!); minShell = h.min_shell_version || minShell; web = h.web ?? undefined; } catch {}
-    for (const band of (a.bands || "b0,b1,b2").split(",")) {
-      const body = JSON.stringify({ schema_version: "1.0", app_id: APP, shell_major: MAJOR, band, ...(pf === "ios" ? { platform: "ios" } : {}), release, issued_at,
-        core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${APP}/${bundleName(to, pf)}` }, addons: [], screens: [], min_shell_version: minShell, ...(web ? { web } : {}) });
-      await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
+    if (!dry) {
+      for (const band of bands) {
+        const body = JSON.stringify({ schema_version: "1.0", app_id: APP, shell_major: MAJOR, band, ...(pf === "ios" ? { platform: "ios" } : {}), release, issued_at,
+          core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${APP}/${bundleName(to, pf)}` }, addons: [], screens: [], min_shell_version: minShell, ...(web ? { web } : {}) });
+        await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
+      }
     }
   }
-  console.log(JSON.stringify({ app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at }));
+  if (dry) {
+    console.log(`app: ${APP}`);
+    console.log(`rolling back to the code of release ${to}`);
+    console.log(`new release: ${release}`);
+    console.log(`platforms: ${platforms.join(", ")}`);
+    console.log(`bands: ${bands.join(", ")}`);
+    console.log(`min shell version: ${minShell}`);
+    console.log("Dry run: nothing was written.");
+  } else {
+    console.log(JSON.stringify({ app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at }));
+  }
 }
