@@ -9,5 +9,6 @@
     { "pattern": "www.shipvo.dev", "custom_domain": true }
   ],
   "vars": { "API": "https://api.shipvo.dev" },
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "shipvo-media" }],
   "observability": { "enabled": true }
 }

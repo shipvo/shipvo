@@ -14,5 +14,6 @@ jobs:
       mode: branch
       branch: agent/video/${{ github.run_number }}
       pr_labels: agent:claude,video
+      upload_media: true
       max_turns: 250
       timeout: 180
