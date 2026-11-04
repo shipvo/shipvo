@@ -45,10 +45,10 @@ Input metrics:
 Facts about competitors come from DeepWiki and web searches on 2026-11-04. Vendor claims are marked as such.
 
 - **Expo EAS Update.** Ahead of us on rollouts, dashboards and ecosystem. We are ahead on: signing is on for everyone, not a paid tier; self-hosting on Cloudflare; no per-update fee model. Behind on: iOS patches, polish, trust.
-- **react-native-code-push.** A guide we read says App Center was retired in March 2025 and that CodePush still works with a self-hosted server ([AppsOnAir](https://www.appsonair.com/blogs/app-center-is-gone-why-react-native-teams-still-need-a-codepush-strategy-in-2026)). Teams that lost their host are looking. We win if migration is easy. We have no CodePush migration guide yet.
-- **hot-updater (`gronxb`).** It is the closest peer: self-hostable, with signing (0.23.0), staged rollout 1–100% (0.29.0) and rollback recovery (0.28.0), per DeepWiki. We are ahead on: a measured on-device crash-loop revert, bsdiff patches on Android, signed pointers with platform binding, and the agent half. Behind on: percentage rollouts (we have cohort bands only) and community size.
+- **react-native-code-push.** A guide we read says App Center was retired in March 2025 and that CodePush still works with a self-hosted server ([AppsOnAir](https://www.appsonair.com/blogs/app-center-is-gone-why-react-native-teams-still-need-a-codepush-strategy-in-2026)). Teams that lost their host are looking. We win if migration is easy. We have one blog post with a three-step migration section ([a CodePush alternative after App Center](../../blog/a-codepush-alternative-after-app-center.md)), but no full step-by-step migration guide in `docs/`.
+- **hot-updater (`gronxb`).** It is the closest peer: self-hostable, with signing (0.23.0), staged rollout 1–100% (0.29.0) and rollback recovery (0.28.0), per DeepWiki (version numbers unverified). We are ahead on: a measured on-device crash-loop revert, bsdiff patches on Android, signed pointers with platform binding, and the agent half. Behind on: percentage rollouts (we have cohort bands only) and community size.
 - **Capgo (`capacitor-updater`).** It targets Capacitor, not React Native, and its vendor docs claim delta updates and encryption. Different audience. We do not compete head on.
-- **Maestro.** It ships an MCP server inside its CLI (blog post dated 2026-04-14) and a viewer that embeds devices in coding agents (CLI 2.6.0, per a secondary summary). It tests real devices and emulators. We are ahead on: no device or emulator needed, a typed test API for CI, and one app artifact shared with OTA. Behind on: real-device coverage and users.
+- **Maestro.** It ships an MCP server inside its CLI (blog post dated 2026-04-14) and a viewer that embeds devices in coding agents (CLI 2.6.0, unverified: from a secondary summary). It tests real devices and emulators. We are ahead on: no device or emulator needed, a typed test API for CI, and one app artifact shared with OTA. Behind on: real-device coverage and users.
 - **mobile-mcp.** An Apache-2.0 MCP server that drives simulators, emulators and real devices and needs Xcode and Android platform tools. Star counts in the sources disagree, so we record none. We are ahead on: headless, no SDK install, hosted remote MCP. Behind on: works with any app, with no integration.
 
 Our honest edge: **update safety that we measured, plus an agent-testable simulator that shares the same release.** We lose on anything that needs scale, a dashboard or a community.
@@ -79,7 +79,7 @@ Our honest edge: **update safety that we measured, plus an agent-testable simula
 - **Automatic rollback on crash-rate telemetry.** Needs fleet data we do not have yet. Crash-loop revert on the device already works.
 - **Real-device farm for agents.** Maestro and mobile-mcp cover it. Our edge is headless.
 - **Shipping native code over the air.** Unchanged from the roadmap.
-- **New marketing pages or blog posts.** The site has 15 articles and no outside user yet. Evidence first.
+- **New marketing pages or blog posts.** The site has 18 blog posts (`blog/`) and no outside user yet. Evidence first.
 - **Capacitor support.** Different audience.
 
 ## 7. Changelog of this document
