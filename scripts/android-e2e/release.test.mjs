@@ -25,7 +25,7 @@ test("only the listed bands get a pointer", () => {
   publishRelease({ root, app: "tide", seed, release: 3, bytes: next, bands: ["b1"] });
   assert.ok(existsSync(join(root, "p/tide/1/b1.json"))); assert.ok(!existsSync(join(root, "p/tide/1/b0.json")));
 });
-test("a patch is offered for a similar base and names the base hash", { skip: !hasBsdiff && "bsdiff4 not installed" }, () => {
+test("a patch is offered for a similar base and names the base hash", { skip: !hasBsdiff && !process.env.CI && "bsdiff4 not installed" }, () => {
   const root = mkdtempSync(join(tmpdir(), "rel-"));
   const { patches } = publishRelease({ root, app: "tide", seed, release: 4, bytes: next, bases: [old] });
   assert.equal(patches.length, 1); assert.equal(patches[0].from_sha256, sha256(old)); assert.ok(patches[0].size < next.length * 0.6);

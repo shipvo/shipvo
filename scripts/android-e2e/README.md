@@ -19,6 +19,8 @@ scripts/android-e2e/make-bundles.sh bundles 8
 node scripts/android-e2e/run.mjs --apk shell.apk --bundles bundles --key key.json
 ```
 
-Tests for the helpers: `node --test scripts/android-e2e/*.test.mjs`.
+Tests for the helpers: `node --test scripts/android-e2e/*.test.mjs`. Build `@shipvo/schema` and `@shipvo/cli` first, because the tests import `packages/cli/dist`. `pnpm -r test` does not run these tests, and no workflow does yet (`.github/` is locked, so a human has to wire them in). The bsdiff patch test is skipped when `bsdiff4` is missing, unless the `CI` env var is set; then it fails.
+
+Build note: `build-apk.sh` passes `-x lintVitalRelease`. Lint rejects the hardcoded `debuggable` flag that the harness needs for `run-as`.
 
 How times are taken: the server and the runner share one clock. "Pointer published" is the time the pointer file became visible. "Healthy" is the time the server received the app's `applied` telemetry for the new release (sent after `markHealthy`). The app polls every 10 s while open, so pointer-to-healthy includes up to one poll interval.
