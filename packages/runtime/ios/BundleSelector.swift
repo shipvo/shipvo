@@ -4,6 +4,8 @@ import Foundation
 enum ShipvoBundleSelector {
   static let maxBoots = 3
   static let windowSeconds: TimeInterval = 60
+  /// A release is stable once its process has stayed in the foreground this long after `markHealthy`. Android uses the same value.
+  static let stabilitySeconds: TimeInterval = 30
 
   /// Idempotent per load: React Native asks for the URL more than once, and only the first ask counts as a boot.
   static func select(_ s: Store) -> URL? {
@@ -25,10 +27,19 @@ enum ShipvoBundleSelector {
       s.currentRelease = s.pendingRelease; s.currentPath = s.pendingPath; s.currentSha = s.pendingSha
       s.pendingRelease = 0; s.pendingPath = nil; s.trialBoots = 0
       s.addEvent("applied:\(s.currentRelease)")
+      // The promoting boot was a trial boot and was not counted. Count it now, until the stability window ends.
+      s.unhealthyBoots = 1; s.firstUnhealthyAt = Store.now()
       promoted = true
     }
-    s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
+    // The boot counter is not cleared here: `markStable` does that after the stability window.
     return promoted
+  }
+
+  /// The process stayed alive for the stability window (or went to background cleanly): the current boot was not a crash.
+  /// Until this runs, the boot counted in `choose` stays on the books, so a crash after `markHealthy` still adds up.
+  static func markStable(_ s: Store) {
+    Store.lock.lock(); defer { Store.lock.unlock() }
+    s.unhealthyBoots = 0; s.firstUnhealthyAt = 0
   }
 
   /// Called before a reload so the next ask is a fresh load.

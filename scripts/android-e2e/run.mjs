@@ -137,10 +137,14 @@ await scenario("rollback to the previous release", async () => {
   return { pass: trials.every((t) => t.ok && t.deviceBundleMatches), trials, median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "applyMs"]) };
 });
 
-await scenario("crash-loop: a release that crashes on start is discarded", async () => {
+for (const [kind, file, title, maxBoots] of [
+  ["start", "crash", "crash-loop: a release that crashes on start is discarded", 10],
+  // Reports healthy, is promoted, then dies 5 s later. The stability window must keep counting these boots: 3 counted launches, then the revert on the 4th.
+  ["late", "late-crash", "crash-loop: a release that crashes 5 s after markHealthy is reverted", 4],
+]) await scenario(title, async () => {
   const trials = [];
   for (let i = 0; i < TRIALS; i++) {
-    const prev = good().rel, crashBytes = bundle("crash");
+    const prev = good().rel, crashBytes = bundle(file);
     const p = await publish(crashBytes, { bases: [] });
     const staged = await waitFor(() => prefs().pending_release === p.release, 60_000);
     let boots = 0, restored = null;
@@ -153,9 +157,9 @@ await scenario("crash-loop: a release that crashes on start is discarded", async
     const pr = prefs(), after = entries().filter((e) => e.t >= (restored?.at ?? Infinity) && e.path.includes(`r${p.release}.hbc`)).length;
     const revertEvent = tele().some((e) => e.event === "crash_loop_revert" && e.at >= p.at);
     trials.push({ release: p.release, staged: !!staged, boots, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
-      revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 });
+      revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 && boots <= maxBoots });
   }
-  return { pass: trials.every((t) => t.pass), trials, median: summarize(trials, ["restoredMs", "boots"]) };
+  return { pass: trials.every((t) => t.pass), kind, maxBoots, trials, median: summarize(trials, ["restoredMs", "boots"]) };
 });
 
 await scenario("staged rollout: a device outside the cohort does not get the release", async () => {

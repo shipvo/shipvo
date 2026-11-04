@@ -92,6 +92,37 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(again["status"] as? String, "none", "a release this device refused is not fetched again")
   }
 
+  /// Promote release 5, then run it as the current release.
+  private func promoted(_ s: Store) async throws {
+    _ = try await Updater.check(s); _ = load(s)
+    XCTAssertTrue(ShipvoBundleSelector.promoteIfRunning(s))
+    _ = s.consumeEvents()
+  }
+
+  func testReleaseThatDiesAfterMarkHealthyIsReverted() async throws {
+    let s = store("good"); try await promoted(s)
+    s.previousPath = "/nonexistent/prev.hbc"; s.previousRelease = 3
+    // Each boot reports healthy, then the process dies before the stability window ends (markStable is never reached).
+    for _ in 0..<3 {
+      XCTAssertEqual(load(s)?.path, s.currentPath)
+      _ = ShipvoBundleSelector.promoteIfRunning(s)
+    }
+    XCTAssertNil(load(s), "fourth launch reverts to the previous release (missing file, so the embedded bundle)")
+    XCTAssertEqual(s.currentRelease, 3); XCTAssertEqual(s.blockedRelease, 5)
+    XCTAssertTrue(s.consumeEvents().contains("crash_loop_revert:5"))
+  }
+
+  func testReleaseThatSurvivesTheStabilityWindowIsKept() async throws {
+    let s = store("good"); try await promoted(s)
+    for _ in 0..<6 {
+      XCTAssertEqual(load(s)?.path, s.currentPath)
+      _ = ShipvoBundleSelector.promoteIfRunning(s)
+      ShipvoBundleSelector.markStable(s)
+    }
+    XCTAssertEqual(s.currentRelease, 5); XCTAssertEqual(s.blockedRelease, 0)
+    XCTAssertFalse(s.consumeEvents().contains("crash_loop_revert:5"))
+  }
+
   func testNewAppBinaryDiscardsOldBundles() async throws {
     let s = store("good"); _ = try await Updater.check(s)
     let path = s.pendingPath!

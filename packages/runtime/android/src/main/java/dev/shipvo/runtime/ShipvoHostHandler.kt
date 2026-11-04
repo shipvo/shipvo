@@ -65,6 +65,8 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
   companion object {
     const val MAX_BOOTS = 3
     const val WINDOW_MS = 60_000L
+    /** A release is stable once its process stayed in the foreground this long after markHealthy. iOS uses the same value. */
+    const val STABILITY_MS = 30_000L
     val LOCK = Any()
 
     internal fun revertToPrevious(s: Store) {

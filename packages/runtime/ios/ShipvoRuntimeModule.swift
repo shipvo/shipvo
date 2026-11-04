@@ -35,9 +35,12 @@ public final class ShipvoRuntimeModule: Module {
       let coldStart = max(0, (Date().timeIntervalSince1970 - Self.processStart()) * 1000)
       let sinceLoad = Store.bundleSelectedAt > 0 ? (now - Store.bundleSelectedAt) * 1000 : -1
       let promoted = ShipvoBundleSelector.promoteIfRunning(s)
+      Self.scheduleStable()
       return ["release": Store.runningRelease, "coldStartMs": Int(coldStart), "sinceLoadMs": Int(sinceLoad), "promoted": promoted,
               "kind": Store.loadsInProcess <= 1 ? "cold" : "reload"]
     }
+
+    OnAppEntersBackground { Self.stableNow() }
 
     Function("consumeEvents") { () -> [String] in Store().consumeEvents() }
 
@@ -54,6 +57,29 @@ public final class ShipvoRuntimeModule: Module {
     }
 
     Function("reload") { () in Self.reloadHost() }
+  }
+
+  private static var stableTimer: DispatchWorkItem?
+
+  /// Clears the unhealthy-boot count once the app has stayed up for the stability window. A reload since then cancels it.
+  static func scheduleStable() {
+    Store.lock.lock(); defer { Store.lock.unlock() }
+    stableTimer?.cancel()
+    let load = Store.loadsInProcess
+    let item = DispatchWorkItem {
+      Store.lock.lock(); defer { Store.lock.unlock() }
+      if Store.loadsInProcess == load { ShipvoBundleSelector.markStable(Store()) }
+    }
+    stableTimer = item
+    DispatchQueue.main.asyncAfter(deadline: .now() + ShipvoBundleSelector.stabilitySeconds, execute: item)
+  }
+
+  /// Going to background cleanly counts as stable, but only after the app reported healthy for this load.
+  static func stableNow() {
+    Store.lock.lock(); defer { Store.lock.unlock() }
+    guard let t = stableTimer, !t.isCancelled else { return }
+    t.cancel(); stableTimer = nil
+    ShipvoBundleSelector.markStable(Store())
   }
 
   static func reloadHost() {
