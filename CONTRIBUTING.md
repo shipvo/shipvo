@@ -18,6 +18,7 @@ Node 22 and pnpm are required. Packages live in `packages/`, hosted services in 
 - Tests for `@shipvo/test` flows in `packages/test`.
 - Measuring OTA on more real phones; add your numbers to `docs/spike-results.md` with the device model.
 - Anything labelled [good first issue](https://github.com/shipvo/shipvo/labels/good%20first%20issue).
+- Anything on the [roadmap](docs/ROADMAP.md) "Now" list.
 
 ## Pull requests
 
