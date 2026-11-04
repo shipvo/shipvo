@@ -8,6 +8,7 @@ Check, in order:
 3. **Tests:** new behaviour has tests that would fail without the change. No tests skipped or deleted to get green.
 4. **Scope:** no unrelated changes, no new dependency without reason, no invented numbers in docs.
 5. **Rules:** it follows `CLAUDE.md`.
+6. **Experience:** if it changes anything a person sees (site, docs, CLI output, errors, simulator, `/admin`, the sample app), hold it to a senior designer's bar: clear copy, consistent with the brand, accessible (contrast, focus, alt text), works on phone width and in dark mode, and understandable by a non-technical founder.
 
 Run the tests for the touched packages if it helps you decide.
 

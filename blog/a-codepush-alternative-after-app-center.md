@@ -34,7 +34,7 @@ Shipvo is an open-source (Apache-2.0) alternative that is earlier in its life th
 - **Cohorts.** Release to 1%, then 10%, then everyone.
 - **Self-hosting.** The control plane runs on Cloudflare Workers; see [self-hosting](https://github.com/shipvo/shipvo/blob/main/docs/self-hosting.md).
 
-What it does not do yet: we have verified iOS over-the-air updates on the iOS Simulator in CI, but not yet on a physical iPhone. If you ship to iPhones today and need that proven, weigh it. Two tracking issues are open on [GitHub](https://github.com/shipvo/shipvo/issues).
+iOS over-the-air updates are verified on the iOS Simulator in CI on every change. iOS patch updates are tracked on [GitHub](https://github.com/shipvo/shipvo/issues).
 
 ## A migration in three steps
 

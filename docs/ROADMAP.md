@@ -4,7 +4,9 @@ This is the working direction for the project. It is owned by the Head of Produc
 
 ## Goal
 
-Make Shipvo the most dependable way to ship React Native updates without the store, and the best way for AI agents to use and test a mobile app without a phone.
+Make building, testing and maintaining mobile apps easy and accessible to everyone, including non-technical founders working with an AI agent. Shipvo is infrastructure: a small, safe core (signed updates, schema, control plane, simulator) with products and packages built on it. See `docs/product/platform.md`.
+
+First, make Shipvo the most dependable way to ship React Native updates without the store, and the best way for AI agents to use and test a mobile app without a phone.
 
 Order of priority when choosing work: **correctness and safety of updates > reliability of the simulator > developer experience > new features > docs and polish.**
 
