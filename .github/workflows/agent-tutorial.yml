@@ -1,0 +1,18 @@
+# Founder Academy: one complete, tested tutorial for non-technical founders, with screenshots, on shipvo.dev.
+name: agent-tutorial
+on:
+  schedule: [{ cron: "43 7 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: agent-tutorial }
+jobs:
+  run:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: tutorial
+      mode: branch
+      branch: agent/tutorial/${{ github.run_number }}
+      pr_labels: agent:claude,tutorial
+      max_turns: 200
+      timeout: 120

@@ -1,7 +1,8 @@
-# Docs and DevRel: twice a week, keeps CHANGELOG, docs and the roadmap's "Now" list true to the code.
+# Docs Lead: three times a week, documents every new feature, matures the docs for developers and
+# non-technical founders, and keeps CHANGELOG and the roadmap's "Now" list current.
 name: agent-docs
 on:
-  schedule: [{ cron: "29 4 * * 2,5" }]
+  schedule: [{ cron: "29 4 * * 1,3,5" }]
   workflow_dispatch:
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
 concurrency: { group: agent-docs }
@@ -14,5 +15,5 @@ jobs:
       mode: branch
       branch: agent/docs/${{ github.run_number }}
       pr_labels: agent:claude,type:docs
-      max_turns: 100
-      timeout: 60
+      max_turns: 150
+      timeout: 90

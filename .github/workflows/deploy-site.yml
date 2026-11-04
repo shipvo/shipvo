@@ -15,6 +15,20 @@ jobs:
         with: { node-version: 22 }
       - name: Build docs from the repo Markdown
         run: npm i --no-audit --no-fund --no-save marked@14 && node services/site/build.mjs
+      - name: Media bucket (R2)
+        working-directory: services/site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # Videos live in R2, not git. Create the bucket once; if the token cannot use R2, deploy without the
+          # binding so the site never goes down over it (the /media/ route then returns 404).
+          if npx wrangler@4 r2 bucket list 2>/dev/null | grep -q "shipvo-media" || npx wrangler@4 r2 bucket create shipvo-media; then
+            echo "media bucket ready"
+          else
+            echo "::warning::Could not reach R2 with CLOUDFLARE_API_TOKEN (needs Workers R2 Storage: Edit). Deploying without /media."
+            node -e "const f='wrangler.jsonc';const fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace(/\n\s*\"r2_buckets\".*\n/,'\n'))"
+          fi
       - name: Deploy
         working-directory: services/site
         env:

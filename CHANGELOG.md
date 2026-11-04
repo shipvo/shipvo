@@ -9,6 +9,16 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 - **Shells declare their Hermes bytecode versions.** `ShellManifest` has an optional `hermes_bytecode_versions` (a non-empty list of positive integers). The control plane pointer route takes an optional `?hbc=96,98` query. If the release sets `hermes_bytecode_version` and it is not in the list, the route answers 404 `hermes_bytecode_mismatch` and the release is not offered. Releases or shells without the field behave as before. Migration: none needed. To opt in, add the field to your shell manifest; the runtime does not send `?hbc=` yet (next slice).
 - **Publish records the Hermes bytecode version.** `shipvo publish` reads the version from the `.hbc` header and adds an optional `hermes_bytecode_version` to the signed release. Set `hermesBytecodeVersion` (a number or list) in `shipvo.json`, or pass `--hermes-bytecode-version`, to make publish fail when the bundle is plain JavaScript or built with a different Hermes. Migration: nothing is required. Releases without the field still parse and apply as before. Shells do not check the field yet; that is a follow-up.
 
+## 2026-11-04
+
+- **`shipvo sim` fails cleanly when the port is taken.** It checks the port before building. If it is in use, it prints `Port <n> is in use. Stop the other `shipvo sim` or pass --port <n>.`, exits 1 and leaves `sim-dist/` alone. `Simulator on ...` is printed only once the server accepts connections.
+- **Local MCP opens your own app.** The local `@shipvo/mcp` server now asks the simulator which app it serves, so `open_app("<your app>")` works after `shipvo sim`. `PN_APPS` still overrides it. If the simulator cannot be reached it falls back to the sample app. `shipvo mcp` prints the local config when you are not signed in.
+- **Clearer CLI help.** A mistyped command now says so and suggests the closest one (`shipvo: 'publsh' is not a command. Did you mean 'publish'?`), on stderr with exit 1. Help is grouped into Start, Ship and Advanced.
+- **Site:** the home page hero is rewritten in plain language with a first step for people who do not use a terminal, and light-mode small text now meets WCAG AA contrast.
+- **Docs:** French translation of Getting started.
+- **Device lab:** an Android emulator harness for OTA behaviour (`scripts/android-e2e/`) and its first report, `docs/product/device-lab/2026-11-04.md`.
+- The Hermes bytecode and `shipvo publish --dry-run` changes are listed under Unreleased above.
+
 ## 2026-10-31
 
 - **Site:** a [blog](/blog/) with 15 articles and an RSS feed, a [Shipvo vs Expo](/compare/) side-by-side, and [pricing](/pricing/) with worked examples against Expo's plans. New docs page [Test with an assistant](/docs/test-with-an-assistant/) covers the hosted remote MCP path step by step. The light theme was fixed sitewide for contrast and visibility.
