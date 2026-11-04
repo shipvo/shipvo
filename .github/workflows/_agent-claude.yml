@@ -271,6 +271,12 @@ jobs:
           [ "$ISSUE" != "0" ] && ! grep -qi "#$ISSUE" /tmp/agent/pr_body.md && printf '\nFixes #%s\n' "$ISSUE" >> /tmp/agent/pr_body.md
           printf '\n\n---\nOpened by the Shipvo agent team ([run](%s)).\n' "$RUN_URL" >> /tmp/agent/pr_body.md
           ARGS=(--label agent-pr); IFS=',' read -ra L <<< "$PR_LABELS"; for l in "${L[@]}"; do [ -n "$l" ] && ARGS+=(--label "$l"); done
-          URL=$(gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md "${ARGS[@]}")
+          URL=""
+          for a in 1 2 3 4; do
+            URL=$(gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md "${ARGS[@]}" 2>/dev/null) && break
+            URL=$(gh api "repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&state=open" --jq '.[0].html_url // empty')   # created despite an error?
+            [ -n "$URL" ] && break; echo "PR create failed, retrying"; sleep $(( a * 15 ))
+          done
+          [ -n "$URL" ] || { echo "::error::could not open the PR"; exit 1; }
           echo "pr_number=${URL##*/}" >> "$GITHUB_OUTPUT"
           [ "$ISSUE" != "0" ] && gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress --add-label agent:pr-open || true
