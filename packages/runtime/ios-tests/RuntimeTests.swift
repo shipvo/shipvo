@@ -29,6 +29,32 @@ final class RuntimeTests: XCTestCase {
     return url
   }
 
+  /// The fixture server (python http.server) ignores Range and answers 200, so a leftover partial file must be discarded.
+  func testServerAnswering200ToARangeRestartsCleanly() async throws {
+    let s = store("good")
+    try FileManager.default.createDirectory(at: s.dir, withIntermediateDirectories: true)
+    let part = s.dir.appendingPathComponent("dl-\(bundleSha).part")
+    try Data(repeating: 7, count: 5_000).write(to: part)
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: part.path))
+  }
+
+  func testPartialFileOfAnotherReleaseIsDeleted() async throws {
+    let s = store("good")
+    try FileManager.default.createDirectory(at: s.dir, withIntermediateDirectories: true)
+    let other = s.dir.appendingPathComponent("dl-\(String(repeating: "f", count: 64)).part")
+    try Data(repeating: 1, count: 10).write(to: other)
+    _ = try await Updater.check(s)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: other.path))
+  }
+
+  func testContentRangeStart() {
+    XCTAssertEqual(Updater.contentRangeStart("bytes 6-9/10"), 6)
+    XCTAssertEqual(Updater.contentRangeStart(nil), -1)
+  }
+
   func testStagesAVerifiedRelease() async throws {
     let s = store("good")
     let r = try await Updater.check(s)

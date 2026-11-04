@@ -139,3 +139,24 @@ describe("owner auth", () => {
     expect(r.status).toBe(401);
   });
 });
+
+describe("GET /b/:app/:file ranges", () => {
+  const env = { POINTERS: kv({ "b/tide/r3.hbc": "0123456789" }) } as any;
+  const get = (range?: string) => app.request("/b/tide/r3.hbc", range ? { headers: { range } } : {}, env);
+  it("serves the rest of the file from an offset", async () => {
+    const r = await get("bytes=6-");
+    expect(r.status).toBe(206);
+    expect(r.headers.get("content-range")).toBe("bytes 6-9/10");
+    expect(await r.text()).toBe("6789");
+  });
+  it("serves a closed range and clamps the end", async () => {
+    expect(await (await get("bytes=2-4")).text()).toBe("234");
+    expect(await (await get("bytes=8-99")).text()).toBe("89");
+  });
+  it("answers 416 past the end and 200 for the whole file", async () => {
+    expect((await get("bytes=10-")).status).toBe(416);
+    const r = await get();
+    expect(r.status).toBe(200); expect(r.headers.get("accept-ranges")).toBe("bytes");
+    expect(await r.text()).toBe("0123456789");
+  });
+});

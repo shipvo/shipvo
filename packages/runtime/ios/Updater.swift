@@ -16,6 +16,58 @@ enum Updater {
 
   private static func resolve(_ s: Store, _ url: String) -> String { url.hasPrefix("http") ? url : "\(s.baseUrl)/\(url.drop(while: { $0 == "/" }))" }
 
+  private static func partFile(_ s: Store, _ sha: String) -> URL { s.dir.appendingPathComponent("dl-\(sha).part") }
+  private static func sizeOf(_ u: URL) -> Int { (try? FileManager.default.attributesOfItem(atPath: u.path)[.size] as? Int) ?? -1 }
+
+  /// Remove partial files that belong to another release.
+  private static func pruneParts(_ s: Store, keep sha: String) {
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: s.dir.path)) ?? []
+    for n in names where n.hasPrefix("dl-") && n.hasSuffix(".part") && n != partFile(s, sha).lastPathComponent {
+      try? FileManager.default.removeItem(at: s.dir.appendingPathComponent(n))
+    }
+  }
+
+  /// Download `url` into `file`, appending after a `Range` request when `file` already holds bytes.
+  /// A 200 answer means the server ignored the range, so the file is rewritten. On a network error the partial file stays.
+  /// Returns the bytes fetched in this call. Size and hash are checked by the caller.
+  static func fetch(_ url: String, into file: URL, wantSize: Int) async throws -> Int {
+    let fm = FileManager.default
+    var offset = max(sizeOf(file), 0)
+    if offset > wantSize { try? fm.removeItem(at: file); offset = 0 }
+    if offset == wantSize && offset > 0 { return 0 }
+    var req = try request(url, etag: nil)
+    if offset > 0 { req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range") }
+    let (bytes, resp) = try await URLSession.shared.bytes(for: req)
+    let http = resp as? HTTPURLResponse
+    let code = http?.statusCode ?? 0
+    if code == 206, offset > 0, contentRangeStart(http?.value(forHTTPHeaderField: "Content-Range")) == offset {
+      // continue
+    } else if code == 200 {
+      offset = 0
+    } else {
+      if code == 416 { try? fm.removeItem(at: file) }
+      throw UpdateError("bundle HTTP \(code)")
+    }
+    if offset == 0 { fm.createFile(atPath: file.path, contents: nil) }
+    let h = try FileHandle(forWritingTo: file)
+    defer { try? h.close() }
+    try h.seekToEnd()
+    var buf = Data(), total = 0
+    buf.reserveCapacity(64 * 1024)
+    for try await b in bytes {
+      buf.append(b)
+      if buf.count >= 64 * 1024 { try h.write(contentsOf: buf); total += buf.count; buf.removeAll(keepingCapacity: true) }
+    }
+    if !buf.isEmpty { try h.write(contentsOf: buf); total += buf.count }
+    return total
+  }
+
+  /// Start byte of a "bytes <start>-<end>/<total>" header, or -1.
+  static func contentRangeStart(_ h: String?) -> Int {
+    guard let h, h.hasPrefix("bytes ") else { return -1 }
+    return Int(h.dropFirst(6).prefix(while: { $0.isNumber })) ?? -1
+  }
+
   static func check(_ s: Store) async throws -> [String: Any] {
     try require(!s.baseUrl.isEmpty && !s.publicKey.isEmpty && !s.appId.isEmpty, "runtime not configured")
     let known = max(s.currentRelease, s.pendingRelease, s.blockedRelease)
@@ -40,6 +92,7 @@ enum Updater {
           let wantSize = (core["size"] as? NSNumber)?.intValue, let url = core["url"] as? String else { throw UpdateError("pointer core incomplete") }
     let tmp = s.dir.appendingPathComponent("dl-\(release).tmp")
     try? FileManager.default.removeItem(at: tmp)
+    pruneParts(s, keep: wantSha)
 
     var via = "full", downloadedBytes = 0
     let d0 = Store.now()
@@ -48,26 +101,31 @@ enum Updater {
       ready = true; via = "patch"; downloadedBytes = patch
     }
     var downloadMs = (Store.now() - d0) * 1000
+    var file = tmp
     if !ready {
+      // The partial file is named by the signed sha256, so a retry continues where the last attempt stopped.
       let f0 = Store.now()
-      let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
-      let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
-      try require(dcode == 200, "bundle HTTP \(dcode)")
-      try? FileManager.default.removeItem(at: tmp)
-      try FileManager.default.moveItem(at: fileURL, to: tmp)
+      file = partFile(s, wantSha)
+      let target = resolve(s, url)
+      let resumed = ((try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0) > 0
+      downloadedBytes = try await fetch(target, into: file, wantSize: wantSize)
+      if resumed && !(sizeOf(file) == wantSize && (try Verify.sha256Hex(file: file)) == wantSha) {
+        // A bad resumed file is deleted, then one fresh download is tried before giving up.
+        try? FileManager.default.removeItem(at: file); s.addEvent("verify_failed:\(release)")
+        downloadedBytes = try await fetch(target, into: file, wantSize: wantSize)
+      }
       downloadMs += (Store.now() - f0) * 1000
     }
 
     let v0 = Store.now()
-    let size = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? -1
-    if via == "full" { downloadedBytes = size }
-    let ok = try (size == wantSize && Verify.sha256Hex(file: tmp) == wantSha)
-    if !ok { try? FileManager.default.removeItem(at: tmp); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
+    let size = sizeOf(file)
+    let ok = try (size == wantSize && Verify.sha256Hex(file: file) == wantSha)
+    if !ok { try? FileManager.default.removeItem(at: file); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
     let verifyMs = (Store.now() - v0) * 1000 + verifyPointerMs
 
     let dest = s.dir.appendingPathComponent("r\(release).hbc")
     try? FileManager.default.removeItem(at: dest)
-    try FileManager.default.moveItem(at: tmp, to: dest)
+    try FileManager.default.moveItem(at: file, to: dest)
     stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String)
     return ["status": "staged", "release": release, "bytes": downloadedBytes, "via": via, "bundleBytes": size,
             "downloadMs": Int(downloadMs), "verifyMs": Int(verifyMs), "issuedAt": body["issued_at"] as? String ?? ""]

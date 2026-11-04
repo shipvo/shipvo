@@ -88,7 +88,15 @@ app.get("/b/:app/:file", async (c) => {
   if (!ID.test(appId) || !/^[a-z0-9._-]{1,128}$/i.test(file)) return c.json({ error: "bad_request" }, 400);
   const buf = await c.env.POINTERS.get(`b/${appId}/${file}`, "arrayBuffer");
   if (!buf) return c.json({ error: "not_found" }, 404);
-  return new Response(buf, { headers: { "content-type": "application/octet-stream", "cache-control": "public, max-age=31536000, immutable" } });
+  const headers: Record<string, string> = { "content-type": "application/octet-stream", "cache-control": "public, max-age=31536000, immutable", "accept-ranges": "bytes" };
+  // Resumable downloads: honour a single "bytes=<start>-[end]" range. Anything else gets the whole file.
+  const m = /^bytes=(\d+)-(\d*)$/.exec(c.req.header("range") ?? "");
+  if (m) {
+    const start = Number(m[1]), end = m[2] === "" ? buf.byteLength - 1 : Math.min(Number(m[2]), buf.byteLength - 1);
+    if (start >= buf.byteLength || end < start) return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${buf.byteLength}` } });
+    return new Response(buf.slice(start, end + 1), { status: 206, headers: { ...headers, "content-range": `bytes ${start}-${end}/${buf.byteLength}` } });
+  }
+  return new Response(buf, { headers });
 });
 
 /** Device telemetry for the spike: applied / reverted / timings. */

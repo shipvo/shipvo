@@ -173,23 +173,30 @@ class ShipvoRuntimeModule : Module() {
       } catch (e: Exception) { patchError = e.message; tmp.delete() }
     }
 
-    // 2. Fall back to the full bundle.
+    // 2. Fall back to the full bundle. A partial file named by the sha256 lets a retry continue where the last one stopped.
+    var file = tmp
     if (via == "full") {
-      val dl = http(resolve(s, core.getString("url")), null)
-      require(dl.responseCode == 200) { "bundle HTTP ${dl.responseCode}" }
-      dl.inputStream.use { ins -> tmp.outputStream().use { ins.copyTo(it, 64 * 1024) } }
-      dl.disconnect()
-      bytesDownloaded = tmp.length()
+      file = ResumableDownload.partFile(s.dir, wantSha)
+      ResumableDownload.prune(s.dir, wantSha)
+      val url = resolve(s, core.getString("url"))
+      val open = { u: String -> http(u, null) }
+      val resumed = file.exists() && file.length() > 0
+      bytesDownloaded = ResumableDownload.fetch(url, file, wantSize, open)
+      if (resumed && !(file.length() == wantSize && Verify.sha256Hex(file) == wantSha)) {
+        // A bad resumed file is deleted, then one fresh download is tried before giving up.
+        file.delete(); s.addEvent("verify_failed:$release")
+        bytesDownloaded = ResumableDownload.fetch(url, file, wantSize, open)
+      }
     }
     val downloadMs = SystemClock.elapsedRealtime() - d0
 
     val v0 = SystemClock.elapsedRealtime()
-    val ok = tmp.length() == wantSize && Verify.sha256Hex(tmp) == wantSha
-    if (!ok) { tmp.delete(); s.addEvent("verify_failed:$release"); throw IllegalStateException("bundle hash/size mismatch") }
+    val ok = file.length() == wantSize && Verify.sha256Hex(file) == wantSha
+    if (!ok) { file.delete(); s.addEvent("verify_failed:$release"); throw IllegalStateException("bundle hash/size mismatch") }
     val verifyMs = SystemClock.elapsedRealtime() - v0 + verifyPointerMs
 
     val dest = File(s.dir, "r$release.hbc")
-    require(tmp.renameTo(dest)) { "could not stage bundle" }
+    require(file.renameTo(dest)) { "could not stage bundle" }
     synchronized(ShipvoHostHandler.LOCK) {
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
