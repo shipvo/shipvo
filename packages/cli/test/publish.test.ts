@@ -242,7 +242,7 @@ describe("rollback dry run", () => {
     try {
       await rollback(["--to", "1", "--dry-run"]);
       expect(puts).toEqual([]);
-      const text = String((console.log as any).mock.calls.at(-1)?.[0]);
+      const text = (console.log as any).mock.calls.map((c: any[]) => String(c[0])).join("\n");
       expect(text).toContain("app: demo");
       expect(text).toContain("rolling back to the code of release 1");
       expect(text).toContain("new release: 1");
