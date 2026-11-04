@@ -20,4 +20,33 @@ npx shipvo sim          # the simulator, http://localhost:4545
 npx vitest run
 ```
 
+## Failure-path examples
+
+Runnable versions are in [`examples/flows.ts`](examples/flows.ts). They use the Tide & Tackle labels. Change them to match your app.
+
+**Permission denied**
+
+```ts
+await phone.tap("Use my location");
+await phone.tap("Deny");
+await phone.waitFor("Location permission was not granted.");
+```
+
+**Offline**
+
+```ts
+await phone.device.set({ online: false });
+await phone.waitFor("You're offline");
+```
+
+**Payment decline**
+
+```ts
+await phone.device.set({ payment: { nextResult: "decline" } });
+await phone.tap("Pay and place order");
+await phone.type("Mobile money PIN", "1234");
+await phone.tap("Confirm payment");
+await phone.waitFor("Payment declined");
+```
+
 Works with any runner through `openApp` from `@shipvo/test`. Full guide, CI workflow and API: [Test your app in CI](https://shipvo.dev/docs/testing/).
