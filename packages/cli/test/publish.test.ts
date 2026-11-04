@@ -220,6 +220,12 @@ describe("rollback dry run", () => {
     await rollback(["--to", "1", "--dry-run"]);
     expect(puts).toEqual([]);
     const text = String((console.log as any).mock.calls.at(-1)?.[0]);
+    expect(text).toContain("app: demo");
+    expect(text).toContain("rolling back to the code of release 1");
+    expect(text).toContain("new release: 1");
+    expect(text).toContain("platforms: android");
+    expect(text).toContain("bands: b0");
+    expect(text).toContain("min shell version: 1.0.0");
     expect(text).toContain("Dry run: nothing was written.");
     vi.mocked(seed).mockImplementation(() => Buffer.alloc(32, 7).toString("base64"));
   });
