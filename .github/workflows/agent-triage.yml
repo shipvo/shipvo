@@ -1,0 +1,34 @@
+# Triage: labels and answers new issues from people outside the team. It can only touch issues;
+# it never hands work to the engineers (the planner decides that).
+name: agent-triage
+on:
+  issues: { types: [opened] }
+permissions: { issues: write, contents: read }
+concurrency: { group: "agent-triage-${{ github.event.issue.number }}" }
+jobs:
+  triage:
+    if: >-
+      vars.AGENTS_PAUSED != 'true' && github.event.issue.user.type != 'Bot' &&
+      !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false, sparse-checkout: .github/agents }
+      - name: Build prompt
+        env: { ISSUE: "${{ github.event.issue.number }}", AUTHOR: "${{ github.event.issue.user.login }}" }
+        run: |
+          sed -e "s/{{ISSUE}}/$ISSUE/g" -e "s/{{AUTHOR}}/$AUTHOR/g" \
+            .github/agents/prompts/triage.md > /tmp/prompt.md
+          { echo 'PROMPT<<__P__'; cat /tmp/prompt.md; echo; echo '__P__'; } >> "$GITHUB_ENV"
+      - uses: anthropics/claude-code-action@v1
+        env: { GH_TOKEN: "${{ github.token }}" }
+        with:
+          prompt: ${{ env.PROMPT }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          allowed_non_write_users: "*"
+          claude_args: >-
+            --max-turns 15 --model ${{ vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
+            --allowedTools "Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh search issues:*)"

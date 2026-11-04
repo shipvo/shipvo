@@ -1,0 +1,44 @@
+# Code reviewer: Claude reviews every agent PR (Claude's and Copilot's) when it is opened or updated,
+# then labels it agent:approved or agent:changes-requested.
+name: agent-reviewer
+on:
+  pull_request: { types: [opened, synchronize, ready_for_review, reopened] }
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: "agent-review-${{ github.event.pull_request.number }}", cancel-in-progress: true }
+jobs:
+  gate:
+    if: >-
+      vars.AGENTS_PAUSED != 'true' && !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (startsWith(github.event.pull_request.head.ref, 'agent/') || startsWith(github.event.pull_request.head.ref, 'copilot/'))
+    runs-on: ubuntu-latest
+    env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", N: "${{ github.event.pull_request.number }}", R: "${{ github.repository }}", HEAD: "${{ github.event.pull_request.head.ref }}" }
+    steps:
+      - run: |
+          gh pr edit $N -R $R --add-label agent-pr --remove-label agent:approved --remove-label agent:changes-requested --remove-label agent:conflict || true
+          case "$HEAD" in copilot/*) gh pr edit $N -R $R --add-label agent:copilot || true;; esac
+  review:
+    needs: gate
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: reviewer
+      mode: read
+      pr: ${{ github.event.pull_request.number }}
+      model: ${{ vars.AGENT_MODEL_LEAD || 'claude-opus-5-5' }}
+      max_turns: 60
+      timeout: 40
+      allowed_bots: copilot-swe-agent,Copilot
+      vars: '{"PR": "${{ github.event.pull_request.number }}", "AUTHOR": "${{ github.event.pull_request.user.login }}"}'
+  verdict:
+    needs: review
+    if: always() && needs.review.result == 'success'
+    runs-on: ubuntu-latest
+    env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", N: "${{ github.event.pull_request.number }}", R: "${{ github.repository }}", V: "${{ needs.review.outputs.verdict }}" }
+    steps:
+      - run: |
+          case "$V" in
+            APPROVE) gh pr edit $N -R $R --add-label agent:approved ;;
+            CHANGES) gh pr edit $N -R $R --add-label agent:changes-requested ;;
+            *) echo "::warning::reviewer gave no verdict"; exit 0 ;;
+          esac

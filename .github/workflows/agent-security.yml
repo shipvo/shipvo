@@ -1,0 +1,20 @@
+# Security engineer: weekly review of dependencies and recent code; fixes low-risk problems,
+# reports serious ones only as a private draft security advisory.
+name: agent-security
+on:
+  schedule: [{ cron: "11 3 * * 1" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: agent-security }
+jobs:
+  audit:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: security
+      mode: branch
+      branch: agent/security/${{ github.run_number }}
+      pr_labels: agent:claude,security
+      model: ${{ vars.AGENT_MODEL_LEAD || 'claude-opus-5-5' }}
+      max_turns: 120
+      timeout: 90

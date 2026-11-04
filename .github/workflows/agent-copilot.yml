@@ -1,0 +1,52 @@
+# Copilot engineer: assigns issues labelled agent:copilot to GitHub Copilot's coding agent,
+# keeping at most AGENT_COPILOT_MAX_ACTIVE tasks in flight. Copilot then opens the PR itself.
+name: agent-copilot
+on:
+  issues: { types: [labeled] }
+  schedule: [{ cron: "7 * * * *" }]
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency: { group: agent-copilot }
+jobs:
+  assign:
+    if: vars.AGENTS_PAUSED != 'true' && (github.event_name != 'issues' || github.event.label.name == 'agent:copilot')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      REPO: ${{ github.repository }}
+      MAX_ACTIVE: ${{ vars.AGENT_COPILOT_MAX_ACTIVE || 3 }}
+    steps:
+      - run: |
+          python3 - <<'EOF'
+          import json, os, subprocess
+          R = os.environ["REPO"]
+          def gh(*a, inp=None): return subprocess.run(["gh", *a], text=True, capture_output=True, input=inp)
+          def j(*a): return json.loads(gh(*a).stdout or "[]")
+          prs = [p for p in j("pr", "list", "-R", R, "--state", "open", "--json", "number,headRefName", "--limit", "100") if p["headRefName"].startswith("copilot/")]
+          busy = j("issue", "list", "-R", R, "--label", "agent:copilot", "--label", "agent:in-progress", "--json", "number")
+          slots = int(os.environ["MAX_ACTIVE"]) - max(len(prs), len(busy))
+          print(f"copilot: {len(prs)} PRs, {len(busy)} in progress, {slots} free slots")
+          if slots <= 0: raise SystemExit
+          skip = {"agent:in-progress", "agent:pr-open", "agent:blocked", "needs-human"}
+          todo = [i for i in j("issue", "list", "-R", R, "--label", "agent:ready", "--label", "agent:copilot", "--state", "open",
+                               "--json", "number,labels,assignees,author", "--limit", "50")
+                  if not i["assignees"] and not ({l["name"] for l in i["labels"]} & skip)]
+          todo.sort(key=lambda i: (not any(l["name"].startswith("priority:") for l in i["labels"]), i["number"]))
+          for i in todo[:slots]:
+              n = i["number"]
+              perm = json.loads(gh("api", f"repos/{R}/collaborators/{i['author']['login']}/permission").stdout or "{}").get("permission")
+              if perm not in ("admin", "maintain", "write") and not i["author"].get("is_bot"):
+                  print(f"#{n}: author not on the team; skipping"); continue
+              body = json.dumps({"assignees": ["copilot-swe-agent[bot]"], "agent_assignment": {
+                  "target_repo": R, "base_branch": "main", "custom_agent": "", "model": "",
+                  "custom_instructions": f"Follow CLAUDE.md and .github/copilot-instructions.md. Keep the PR small, add tests, and put 'Fixes #{n}' in the PR body."}})
+              r = gh("api", "-X", "POST", f"repos/{R}/issues/{n}/assignees", "--input", "-", inp=body)
+              assigned = r.returncode == 0 and "copilot" in r.stdout.lower()
+              print(f"#{n}: {'assigned to Copilot' if assigned else 'assignment failed: ' + (r.stderr or r.stdout)[:300]}")
+              if assigned:
+                  gh("issue", "edit", str(n), "-R", R, "--add-label", "agent:in-progress")
+              else:
+                  # Copilot not available (plan or settings): hand the issue to Claude instead.
+                  gh("issue", "edit", str(n), "-R", R, "--remove-label", "agent:copilot", "--add-label", "agent:claude")
+                  gh("issue", "comment", str(n), "-R", R, "--body", "Copilot could not take this task (check the Copilot plan and cloud agent settings). Handing it to the Claude engineer.")
+          EOF

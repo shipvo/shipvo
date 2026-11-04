@@ -1,0 +1,92 @@
+# Fix engineer: when CI fails on an agent PR, the reviewer asks for changes, or the branch conflicts,
+# Claude fixes its own PRs and Copilot is asked (with @copilot) to fix its PRs.
+# After AGENT_MAX_FIX_ROUNDS attempts the PR is closed and the issue goes to the other engineer.
+# A red CI on main becomes an urgent issue for the Claude engineer.
+name: agent-fixer
+on:
+  workflow_run: { workflows: [ci], types: [completed] }
+  pull_request: { types: [labeled] }
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: "agent-fix-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}" }
+jobs:
+  route:
+    if: >-
+      vars.AGENTS_PAUSED != 'true' && (
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure') ||
+        (github.event_name == 'pull_request' && contains(fromJSON('["agent:changes-requested","agent:conflict"]'), github.event.label.name)))
+    runs-on: ubuntu-latest
+    outputs:
+      pr: ${{ steps.r.outputs.pr }}
+      branch: ${{ steps.r.outputs.branch }}
+      vars: ${{ steps.r.outputs.vars }}
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      R: ${{ github.repository }}
+      BRANCH: ${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
+      EVENT: ${{ github.event_name }}
+      LABEL: ${{ github.event.label.name }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      MAX_ROUNDS: ${{ vars.AGENT_MAX_FIX_ROUNDS || 3 }}
+    steps:
+      - id: r
+        run: |
+          python3 - <<'EOF'
+          import json, os, re, subprocess
+          E = os.environ; R = E["R"]; B = E["BRANCH"]
+          def gh(*a): return subprocess.run(["gh", *a], text=True, capture_output=True).stdout
+          out = open(E["GITHUB_OUTPUT"], "a")
+          if B == "main":
+              if E["EVENT"] != "workflow_run": raise SystemExit
+              if json.loads(gh("issue", "list", "-R", R, "--label", "ci-main", "--state", "open", "--json", "number") or "[]"):
+                  print("main CI issue already open"); raise SystemExit
+              gh("issue", "create", "-R", R, "--title", "CI is failing on main",
+                 "--label", "agent:ready", "--label", "agent:claude", "--label", "priority:urgent", "--label", "type:bug", "--label", "ci-main",
+                 "--body", f"**Problem**\nThe `ci` workflow failed on `main`: {E['RUN_URL']}\n\n**What to do**\nRead the failing log (`gh run view {E['RUN_ID']} --log-failed`), find the cause and fix it.\n\n**Acceptance criteria**\n- [ ] `ci` is green on the fix PR\n- [ ] The cause is explained in the PR body\n- [ ] No test is skipped or deleted to get green")
+              print("opened main CI issue"); raise SystemExit
+          prs = json.loads(gh("pr", "list", "-R", R, "--head", B, "--state", "open", "--json", "number,labels,body,headRefName") or "[]")
+          if not prs: raise SystemExit
+          pr = prs[0]; n = pr["number"]; names = [l["name"] for l in pr["labels"]]
+          if "agent-pr" not in names or "needs-human" in names: raise SystemExit
+          rounds = max([int(x.split(":")[1]) for x in names if re.fullmatch(r"fix:\d+", x)] or [0])
+          if rounds >= int(E["MAX_ROUNDS"]):
+              gh("pr", "comment", str(n), "-R", R, "--body", f"Closing after {rounds} fix rounds without success. The issue goes back to the backlog for the other engineer.")
+              gh("pr", "close", str(n), "-R", R, "--delete-branch")
+              for m in re.finditer(r"(?:fixes|closes|resolves)\s+#(\d+)", pr["body"] or "", re.I):
+                  i = m.group(1); il = gh("issue", "view", i, "-R", R, "--json", "labels")
+                  was_claude = "agent:claude" in il
+                  gh("issue", "edit", i, "-R", R, "--add-label", "agent:ready", "--add-label", "agent:copilot" if was_claude else "agent:claude",
+                     "--remove-label", "agent:claude" if was_claude else "agent:copilot",
+                     "--remove-label", "agent:in-progress", "--remove-label", "agent:pr-open", "--remove-assignee", "Copilot")
+                  gh("issue", "comment", i, "-R", R, "--body", f"PR #{n} failed {rounds} fix rounds; reassigned to the {'Copilot' if was_claude else 'Claude'} engineer.")
+              raise SystemExit
+          if rounds: gh("pr", "edit", str(n), "-R", R, "--remove-label", f"fix:{rounds}")
+          gh("label", "create", f"fix:{rounds+1}", "-R", R, "--color", "fbca04", "--force")
+          gh("pr", "edit", str(n), "-R", R, "--add-label", f"fix:{rounds+1}", "--remove-label", "agent:changes-requested")
+          if E["EVENT"] == "workflow_run":
+              reason = f"CI failed: {E['RUN_URL']} (run id {E['RUN_ID']})."
+          elif E["LABEL"] == "agent:conflict":
+              reason = "The branch has merge conflicts with main."
+          else:
+              reason = "The reviewer requested changes; see the latest review comment on the PR."
+          if B.startswith("copilot/"):
+              gh("pr", "comment", str(n), "-R", R, "--body", f"@copilot {reason} Please fix it: address every required point in the latest review comment, keep the change focused, and make sure `pnpm -r test` passes. Do not skip or delete tests.")
+              print(f"asked Copilot to fix #{n}"); raise SystemExit
+          if not B.startswith("agent/"): raise SystemExit
+          v = json.dumps({"PR": n, "BRANCH": B, "REASON": reason, "RUN_ID": E.get("RUN_ID") or ""})
+          out.write(f"pr={n}\nbranch={B}\nvars<<__V__\n{v}\n__V__\n")
+          print(f"Claude will fix #{n} ({reason})")
+          EOF
+  fix:
+    needs: route
+    if: needs.route.outputs.pr != ''
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: fixer
+      mode: pr-branch
+      branch: ${{ needs.route.outputs.branch }}
+      pr: ${{ fromJSON(needs.route.outputs.pr) }}
+      vars: ${{ needs.route.outputs.vars }}
+      max_turns: 120
+      timeout: 90

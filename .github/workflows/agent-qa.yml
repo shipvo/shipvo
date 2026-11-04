@@ -1,0 +1,18 @@
+# QA engineer: nightly, adds tests where coverage is weak and files bugs it finds.
+name: agent-qa
+on:
+  schedule: [{ cron: "41 1 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: agent-qa }
+jobs:
+  qa:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: qa
+      mode: branch
+      branch: agent/qa/${{ github.run_number }}
+      pr_labels: agent:claude,type:test
+      max_turns: 120
+      timeout: 90

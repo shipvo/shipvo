@@ -1,0 +1,183 @@
+# Runs one Claude agent role. Called by the agent-*.yml workflows; not run on its own.
+# Modes:
+#   read       - no code changes (planner, reviewer, triage, digest). gh uses AGENT_TOKEN.
+#   branch     - new branch from main; if Claude commits, the workflow pushes and opens a PR.
+#   pr-branch  - existing PR branch; if Claude commits, the workflow pushes to it.
+# Claude never pushes, merges or publishes. Pushing happens in a later step with AGENT_TOKEN,
+# so CI runs on agent PRs (pushes made with GITHUB_TOKEN do not trigger workflows).
+name: _agent-claude
+on:
+  workflow_call:
+    inputs:
+      role: { type: string, required: true }          # prompt file in .github/agents/prompts/<role>.md
+      vars: { type: string, default: "{}" }           # JSON of {{KEY}} substitutions for the prompt
+      mode: { type: string, default: read }
+      branch: { type: string, default: "" }
+      model: { type: string, default: "" }
+      max_turns: { type: number, default: 60 }
+      timeout: { type: number, default: 60 }
+      allowed_bots: { type: string, default: "" }
+      pr_labels: { type: string, default: "" }        # extra labels for a PR opened in branch mode
+      issue: { type: number, default: 0 }             # issue this run works on (blocked notes go here)
+      pr: { type: number, default: 0 }                # PR this run works on
+    outputs:
+      verdict: { value: "${{ jobs.run.outputs.verdict }}" }
+      pushed: { value: "${{ jobs.run.outputs.pushed }}" }
+      blocked: { value: "${{ jobs.run.outputs.blocked }}" }
+      pr_number: { value: "${{ jobs.run.outputs.pr_number }}" }
+      report: { value: "${{ jobs.run.outputs.report }}" }
+
+jobs:
+  run:
+    if: vars.AGENTS_PAUSED != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout }}
+    outputs:
+      verdict: ${{ steps.post.outputs.verdict }}
+      pushed: ${{ steps.post.outputs.pushed }}
+      blocked: ${{ steps.post.outputs.blocked }}
+      pr_number: ${{ steps.post.outputs.pr_number }}
+      report: ${{ steps.post.outputs.report }}
+    env:
+      AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Check secrets
+        env:
+          A: ${{ secrets.ANTHROPIC_API_KEY }}
+          O: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          [ -n "$AGENT_TOKEN" ] || { echo "::error::Add the AGENT_TOKEN repo secret (see .github/agents/README.md)"; exit 1; }
+          [ -n "$A$O" ] || { echo "::error::Add CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY (see .github/agents/README.md)"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.mode == 'pr-branch' && inputs.branch || '' }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node and pnpm
+        if: inputs.mode != 'read' || inputs.role == 'reviewer'
+        uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - if: inputs.mode != 'read' || inputs.role == 'reviewer'
+        uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - if: inputs.mode != 'read' || inputs.role == 'reviewer'
+        run: pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
+
+      - name: Prepare branch
+        run: |
+          git config user.name "Shipvo Agent (Claude)"
+          git config user.email "agents@shipvo.dev"
+          mkdir -p /tmp/agent
+          if [ "${{ inputs.mode }}" = "branch" ]; then git checkout -b "${{ inputs.branch }}"; fi
+          git rev-parse HEAD > /tmp/agent/start_sha
+          if [ "${{ inputs.mode }}" = "pr-branch" ]; then
+            # Bring in main first; if that conflicts, the markers stay for Claude to resolve and commit.
+            git merge --no-edit origin/main > /tmp/agent/merge.txt 2>&1 || echo "MERGE_CONFLICT=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build prompt
+        env:
+          VARS: ${{ inputs.vars }}
+          ROLE: ${{ inputs.role }}
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, datetime
+          v = json.loads(os.environ.get("VARS") or "{}")
+          v.setdefault("BRANCH", os.environ["BRANCH"])
+          v.setdefault("TODAY", datetime.date.today().isoformat())
+          v.setdefault("SINCE", (datetime.date.today() - datetime.timedelta(days=7)).isoformat())
+          v.setdefault("YESTERDAY", (datetime.date.today() - datetime.timedelta(days=1)).isoformat())
+          t = open(f".github/agents/prompts/{os.environ['ROLE']}.md").read()
+          for k, val in v.items():
+              t = t.replace("{{" + k + "}}", str(val))
+          if os.environ.get("MERGE_CONFLICT"):
+              t += "\n\nmain was merged into this branch and has conflicts (see `git status`). Resolve every conflict marker correctly, then `git add` and `git commit --no-edit` before anything else."
+          t += "\n\nScratch files go in /tmp/agent/. Today is " + v["TODAY"] + "."
+          open("/tmp/agent/prompt.md", "w").write(t)
+          EOF
+          {
+            echo 'PROMPT<<__AGENT_PROMPT__'
+            cat /tmp/agent/prompt.md
+            echo
+            echo '__AGENT_PROMPT__'
+          } >> "$GITHUB_ENV"
+
+      - name: Run Claude (${{ inputs.role }})
+        uses: anthropics/claude-code-action@v1
+        env:
+          # read roles use gh with the agent token; code roles only get read access through GITHUB_TOKEN
+          GH_TOKEN: ${{ inputs.mode == 'read' && secrets.AGENT_TOKEN || github.token }}
+        with:
+          prompt: ${{ env.PROMPT }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ inputs.mode == 'read' && secrets.AGENT_TOKEN || github.token }}
+          allowed_bots: ${{ inputs.allowed_bots }}
+          claude_args: >-
+            --max-turns ${{ inputs.max_turns }}
+            ${{ (inputs.model || vars.AGENT_MODEL) && format('--model {0}', inputs.model || vars.AGENT_MODEL) || '' }}
+            --allowedTools "Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*)"
+            --disallowedTools "Bash(git push:*),Bash(gh pr merge:*),Bash(gh api:*),Bash(gh release:*),Bash(gh secret:*),Bash(gh workflow:*),Bash(npm publish:*),Bash(pnpm publish:*)"
+
+      - name: Push, open PR, post notes
+        id: post
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+          MODE: ${{ inputs.mode }}
+          BRANCH: ${{ inputs.branch }}
+          ISSUE: ${{ inputs.issue }}
+          PR: ${{ inputs.pr }}
+          PR_LABELS: ${{ inputs.pr_labels }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -u
+          V=$(tr -d '[:space:]' < /tmp/agent/verdict.txt 2>/dev/null || true); echo "verdict=$V" >> "$GITHUB_OUTPUT"
+          if [ -f /tmp/agent/report.md ]; then
+            cat /tmp/agent/report.md >> "$GITHUB_STEP_SUMMARY"
+            { echo 'report<<__R__'; head -c 60000 /tmp/agent/report.md; echo; echo '__R__'; } >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f /tmp/agent/private_finding.md ]; then
+            # Details go only into a draft security advisory (visible to repo admins), never into public issues or logs.
+            python3 -c "import json;d=open('/tmp/agent/private_finding.md').read();print(json.dumps({'summary':'Private finding from the security agent','description':d,'severity':'high','vulnerabilities':[{'package':{'ecosystem':'npm','name':'@shipvo/cli'}}]}))" > /tmp/agent/adv.json
+            gh api -X POST "repos/$REPO/security-advisories" --input /tmp/agent/adv.json > /dev/null 2>&1 && ADV=yes || ADV=no
+            gh issue create -R "$REPO" --title "Security: private finding needs review" --label needs-human --label security \
+              --body "The security agent found something that should not be described in public. Draft advisory created: $ADV (Security tab > Advisories). Run: $RUN_URL" || true
+            rm -f /tmp/agent/private_finding.md /tmp/agent/adv.json
+          fi
+          if [ -f /tmp/agent/blocked.md ]; then
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+            T="$ISSUE"; [ "$PR" != "0" ] && T="$PR"
+            if [ "$T" != "0" ]; then
+              { echo "**Agent could not finish this.**"; echo; cat /tmp/agent/blocked.md; echo; echo "Run: $RUN_URL"; } > /tmp/agent/b.md
+              gh issue comment "$T" -R "$REPO" --body-file /tmp/agent/b.md || true
+              gh issue edit "$T" -R "$REPO" --remove-label agent:in-progress --add-label agent:blocked || true
+            fi
+          fi
+          [ "$MODE" = "read" ] && exit 0
+          AHEAD=$(git rev-list --count "$(cat /tmp/agent/start_sha)..HEAD")
+          if [ "$AHEAD" = "0" ]; then
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            if [ "$ISSUE" != "0" ] && [ ! -f /tmp/agent/blocked.md ]; then
+              gh issue comment "$ISSUE" -R "$REPO" --body "Agent run ended without changes. Run: $RUN_URL" || true
+              gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress || true
+            fi
+            exit 0
+          fi
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+          if [ "$MODE" = "pr-branch" ]; then
+            [ -f /tmp/agent/fix_note.md ] && gh pr comment "$PR" -R "$REPO" --body-file /tmp/agent/fix_note.md || true
+            exit 0
+          fi
+          TITLE=$(head -n1 /tmp/agent/pr_title.txt 2>/dev/null || true); [ -n "$TITLE" ] || TITLE="$(git log -1 --format=%s)"
+          [ -f /tmp/agent/pr_body.md ] || git log --format='- %s' "$(cat /tmp/agent/start_sha)..HEAD" > /tmp/agent/pr_body.md
+          printf '\n\n---\nOpened by the Shipvo agent team ([run](%s)).\n' "$RUN_URL" >> /tmp/agent/pr_body.md
+          ARGS=(--label agent-pr); IFS=',' read -ra L <<< "$PR_LABELS"; for l in "${L[@]}"; do [ -n "$l" ] && ARGS+=(--label "$l"); done
+          URL=$(gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md "${ARGS[@]}")
+          echo "pr_number=${URL##*/}" >> "$GITHUB_OUTPUT"
+          [ "$ISSUE" != "0" ] && gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress --add-label agent:pr-open || true

@@ -1,0 +1,32 @@
+# Team lead: daily report of what shipped, what is in flight and what (if anything) needs the owner.
+# Posted as a comment on the pinned "Agent team log" issue.
+name: agent-digest
+on:
+  schedule: [{ cron: "53 20 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: read, actions: read, id-token: write }
+concurrency: { group: agent-digest }
+jobs:
+  write:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: digest
+      mode: read
+      max_turns: 40
+      timeout: 25
+  post:
+    needs: write
+    if: needs.write.outputs.report != ''
+    runs-on: ubuntu-latest
+    env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", R: "${{ github.repository }}", REPORT: "${{ needs.write.outputs.report }}" }
+    steps:
+      - run: |
+          N=$(gh issue list -R $R --label agent:log --state open --json number --jq '.[0].number')
+          if [ -z "$N" ]; then
+            URL=$(gh issue create -R $R --title "Agent team log" --label agent:log \
+              --body "Daily reports from the Shipvo agent team. Roster and controls: .github/agents/README.md")
+            N=${URL##*/}; gh issue pin $N -R $R || true
+          fi
+          printf '%s\n' "$REPORT" > /tmp/r.md
+          gh issue comment $N -R $R --body-file /tmp/r.md

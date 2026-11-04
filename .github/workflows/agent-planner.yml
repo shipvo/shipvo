@@ -1,0 +1,19 @@
+# Product Lead: every morning, turns the roadmap and the state of the repo into well-scoped issues
+# for the Claude and Copilot engineers. Writes no code.
+name: agent-planner
+on:
+  schedule: [{ cron: "17 5 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: read, actions: read, id-token: write }
+concurrency: { group: agent-planner }
+jobs:
+  plan:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: planner
+      mode: read
+      model: ${{ vars.AGENT_MODEL_LEAD || 'claude-opus-5-5' }}
+      max_turns: 80
+      timeout: 40
+      vars: '{"MAX_BACKLOG": "${{ vars.AGENT_MAX_BACKLOG || 12 }}", "MAX_NEW": "${{ vars.AGENT_MAX_NEW_ISSUES || 5 }}"}'

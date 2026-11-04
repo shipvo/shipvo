@@ -1,0 +1,71 @@
+# Claude engineer: implements issues labelled agent:claude and opens a PR.
+# Starts when the label is added, and every 2 hours picks up the oldest waiting issue.
+name: agent-engineer
+on:
+  issues: { types: [labeled] }
+  schedule: [{ cron: "23 */2 * * *" }]
+  workflow_dispatch:
+    inputs:
+      issue: { description: "Issue number (optional)", type: number, required: false }
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: "agent-engineer-${{ github.event.issue.number || inputs.issue || 'sweep' }}" }
+jobs:
+  pick:
+    if: vars.AGENTS_PAUSED != 'true' && (github.event_name != 'issues' || github.event.label.name == 'agent:claude')
+    runs-on: ubuntu-latest
+    outputs:
+      issue: ${{ steps.pick.outputs.issue }}
+      vars: ${{ steps.pick.outputs.vars }}
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      REPO: ${{ github.repository }}
+      WANT: ${{ github.event.issue.number || inputs.issue || '' }}
+      MAX_ACTIVE: ${{ vars.AGENT_CLAUDE_MAX_ACTIVE || 3 }}
+    steps:
+      - id: pick
+        run: |
+          python3 - <<'EOF'
+          import json, os, subprocess
+          R = os.environ["REPO"]
+          def gh(*a): return subprocess.check_output(["gh", *a], text=True)
+          out = open(os.environ["GITHUB_OUTPUT"], "a")
+          active = json.loads(gh("pr", "list", "-R", R, "--label", "agent:claude", "--state", "open", "--json", "number"))
+          busy = json.loads(gh("issue", "list", "-R", R, "--label", "agent:in-progress", "--label", "agent:claude", "--json", "number"))
+          if len(active) + len(busy) >= int(os.environ["MAX_ACTIVE"]):
+              print(f"at capacity ({len(active)} PRs, {len(busy)} in progress)"); raise SystemExit
+          want = os.environ.get("WANT")
+          if want:
+              cands = [json.loads(gh("issue", "view", want, "-R", R, "--json", "number,title,body,labels,state,author"))]
+          else:
+              cands = json.loads(gh("issue", "list", "-R", R, "--label", "agent:ready", "--label", "agent:claude", "--state", "open",
+                                    "--json", "number,title,body,labels,state,author", "--limit", "50"))
+              cands.sort(key=lambda i: (not any(l["name"] in ("priority:urgent", "priority:high") for l in i["labels"]), i["number"]))
+          skip = {"agent:in-progress", "agent:pr-open", "agent:blocked", "needs-human"}
+          for i in cands:
+              names = {l["name"] for l in i["labels"]}
+              if i["state"] != "OPEN" or "agent:claude" not in names or names & skip: continue
+              perm = json.loads(gh("api", f"repos/{R}/collaborators/{i['author']['login']}/permission"))["permission"] if not i["author"].get("is_bot") else "bot"
+              if perm not in ("admin", "maintain", "write", "bot"):
+                  print(f"#{i['number']}: author {i['author']['login']} is not on the team; skipping"); continue
+              n = i["number"]
+              gh("issue", "edit", str(n), "-R", R, "--add-label", "agent:in-progress")
+              v = json.dumps({"ISSUE": n, "ISSUE_TEXT": f"# {i['title']}\n\n{i['body'] or ''}"})
+              out.write(f"issue={n}\nvars<<__V__\n{v}\n__V__\n")
+              print(f"picked #{n}"); break
+          else:
+              print("nothing to do")
+          EOF
+  build:
+    needs: pick
+    if: needs.pick.outputs.issue != ''
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: engineer
+      mode: branch
+      branch: agent/claude/issue-${{ needs.pick.outputs.issue }}-${{ github.run_number }}
+      issue: ${{ fromJSON(needs.pick.outputs.issue) }}
+      pr_labels: agent:claude
+      vars: ${{ needs.pick.outputs.vars }}
+      max_turns: 150
+      timeout: 100

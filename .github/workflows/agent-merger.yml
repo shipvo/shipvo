@@ -1,0 +1,27 @@
+# Merge bot (no AI): merges approved, green agent PRs, holds protected paths for a human,
+# updates branches that fell behind, readies finished Copilot drafts and closes idle PRs.
+name: agent-merger
+on:
+  schedule: [{ cron: "*/30 * * * *" }]
+  workflow_run: { workflows: [ci], types: [completed] }
+  pull_request: { types: [labeled] }
+  workflow_dispatch:
+    inputs:
+      dry_run: { type: boolean, default: false }
+permissions: { contents: read }
+concurrency: { group: agent-merger }
+jobs:
+  merge:
+    if: vars.AGENTS_PAUSED != 'true' && (github.event_name != 'pull_request' || github.event.label.name == 'agent:approved')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: scripts/agents, persist-credentials: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node scripts/agents/merge.mjs
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          AGENT_MAX_MERGES_PER_DAY: ${{ vars.AGENT_MAX_MERGES_PER_DAY || 20 }}
+          AGENT_STALE_DAYS: ${{ vars.AGENT_STALE_DAYS || 4 }}
