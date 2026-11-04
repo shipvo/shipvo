@@ -88,7 +88,7 @@ enum Updater {
           let (b2, resp2) = try await URLSession.shared.bytes(for: r2)
           let c2 = (resp2 as? HTTPURLResponse)?.statusCode ?? 0
           try require(c2 == 200, "bundle HTTP \(c2)")
-          try streamBytes(b2, to: tmp, append: false)
+          try await streamBytes(b2, to: tmp, append: false)
         } else {
           try require(code == 206, "bundle HTTP \(code)")
           // validate Content-Range
@@ -107,11 +107,11 @@ enum Updater {
               }
             }
           }
-          try streamBytes(bytes, to: tmp, append: true)
+          try await streamBytes(bytes, to: tmp, append: true)
         }
       } else {
         try require(code == 200, "bundle HTTP \(code)")
-        try streamBytes(bytes, to: tmp, append: false)
+        try await streamBytes(bytes, to: tmp, append: false)
       }
       downloadMs += (Store.now() - f0) * 1000
     }
