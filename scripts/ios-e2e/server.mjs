@@ -26,6 +26,16 @@ createServer((req, res) => {
   const p = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, "");
   const f = [join(root, p), join(root, p + ".json")].find((x) => existsSync(x) && statSync(x).isFile());
   if (!f) { log(`GET ${url.pathname} 404`); return res.writeHead(404, { "content-type": "application/json" }).end('{"error":"not_found"}'); }
+  const data = readFileSync(f), type = f.endsWith(".json") ? "application/json" : "application/octet-stream";
+  // Range support (bytes=<n>-), like the real control plane, so resumed downloads can be tested.
+  const m = /^bytes=(\d+)-$/.exec(req.headers.range || "");
+  if (m) {
+    const start = Number(m[1]);
+    if (start >= data.length) { log(`GET ${url.pathname} 416`); return res.writeHead(416, { "content-range": `bytes */${data.length}` }).end(); }
+    log(`GET ${url.pathname} 206 from ${start}`);
+    return res.writeHead(206, { "content-type": type, "accept-ranges": "bytes", "content-length": data.length - start,
+      "content-range": `bytes ${start}-${data.length - 1}/${data.length}` }).end(data.subarray(start));
+  }
   log(`GET ${url.pathname} 200`);
-  res.writeHead(200, { "content-type": f.endsWith(".json") ? "application/json" : "application/octet-stream" }).end(readFileSync(f));
+  res.writeHead(200, { "content-type": type, "accept-ranges": "bytes", "content-length": data.length }).end(data);
 }).listen(port, () => console.log(`e2e control plane on :${port}`));

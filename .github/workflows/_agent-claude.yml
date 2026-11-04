@@ -302,6 +302,8 @@ jobs:
             URL=$(gh api "repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&state=open" --jq '.[0].html_url // empty')   # created despite an error?
             [ -n "$URL" ] && break; echo "PR create failed, retrying"; sleep $(( a * 15 ))
           done
+          # Copilot gets auto-assigned to new PRs on this account; our own fixer handles these PRs, so take it off.
+          if [ -n "$URL" ]; then sleep 10; gh api -X DELETE "repos/$REPO/issues/${URL##*/}/assignees" -f 'assignees[]=Copilot' > /dev/null 2>&1 || true; fi
           [ -n "$URL" ] || { echo "::error::could not open the PR"; exit 1; }
           echo "pr_number=${URL##*/}" >> "$GITHUB_OUTPUT"
           [ "$ISSUE" != "0" ] && gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress --add-label agent:pr-open || true
