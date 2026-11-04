@@ -116,6 +116,8 @@ Then edit `src/release.ts` and run `shipvo publish`. (In a GitHub repo, the work
 
 To check a release before you have a control plane or token, run `shipvo publish --dry-run [--out dir]`. It builds, signs and writes everything to `dir` (default `.shipvo/dry-run`) and sends nothing. Layout: `b/<app>/r<N>.hbc` (bundle), `p/<app>/<major>/<band>` (signed pointers; iOS under `p/<app>/<major>/ios/`), `h/<app>/r<N>` (release record), `w/<app>/r<N>/` (web export; add `--skip-web true` to skip it and run faster). The release is 1 unless you pass `--release N`, and no patches are built offline. Old files in `dir` are not cleared. `rollback` has no dry run yet.
 
+If your first publish fails, run `shipvo doctor` first. It checks your Node version, `shipvo.json`, signing key match, control plane reachability, and `hermesBytecodeVersion` when present.
+
 Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
 
 Agents open the exact release phones run with `open_app("myshop@r8")` or `open_app("myshop@latest")`.
