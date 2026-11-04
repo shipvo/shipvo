@@ -11,6 +11,7 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 ## Themes
 
 ### 1. Update safety and reach
+- Shells declare the Hermes bytecode version they run, and mismatched releases are refused (epics #14).
 - bsdiff patches on iOS (issue #2); measure OTA apply time on a physical iPhone (issue #1).
 - Stronger rollback: rollback by cohort, automatic rollback on crash-rate thresholds from telemetry.
 - Docker self-hosting target for the control plane.
@@ -42,8 +43,22 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 
 The planner keeps this list to the 5–10 most valuable items in flight. Each line links its issue.
 
+Bet 1, a bundle never reaches a shell that cannot run it (epic #14):
+- [ ] #17 Shells declare their Hermes bytecode version; control plane skips mismatched releases
+- [ ] #18 Runtime refuses a mismatched release (after #17)
+
+Bet 2, iOS reaches Android update quality (epic #15):
 - [ ] #2 bsdiff patches on iOS
+- [ ] #1 Measure OTA apply time on a physical iPhone (needs a human with a phone)
+
+Bet 3, first run in under 10 minutes, and measured (epic #16):
+- [ ] #19 `shipvo doctor`
+- [ ] #20 Script counting weekly healthy releases per app
+
+Other:
 - [ ] #3 More typed-test examples for `@shipvo/test`
+
+Review of 2026-11-04: priority order is unchanged (update safety first). Bets 1 and 2 are update safety. Bet 3 is developer experience, chosen because we cannot yet measure activation. See `docs/product/strategy.md`.
 
 ## Not doing (for now)
 
