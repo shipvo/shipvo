@@ -1,17 +1,20 @@
 # Shipvo roadmap
 
-This is the working direction for the project. The planner agent reads it every day to choose what to build next and keeps the "Now" list current through normal pull requests. A human sets the goals and themes.
+This is the working direction for the project. It is owned by the Head of Product agent, which reviews it every Monday against evidence (adoption, research, competitors) and plans from it four times a day; the strategy behind it is in `docs/product/strategy.md`. Changes go through normal pull requests, and the owner can override anything here.
 
 ## Goal
 
-Make Shipvo the most dependable way to ship React Native updates without the store, and the best way for AI agents to use and test a mobile app without a phone.
+Make building, testing and maintaining mobile apps easy and accessible to everyone, including non-technical founders working with an AI agent. Shipvo is infrastructure: a small, safe core (signed updates, schema, control plane, simulator) with products and packages built on it. See `docs/product/platform.md`.
+
+First, make Shipvo the most dependable way to ship React Native updates without the store, and the best way for AI agents to use and test a mobile app without a phone.
 
 Order of priority when choosing work: **correctness and safety of updates > reliability of the simulator > developer experience > new features > docs and polish.**
 
 ## Themes
 
 ### 1. Update safety and reach
-- bsdiff patches on iOS (issue #2); measure OTA apply time on a physical iPhone (issue #1).
+- Shells declare the Hermes bytecode version they run, and mismatched releases are refused (epic #14).
+- bsdiff patches on iOS (issue #2); measure OTA apply time on the iOS Simulator in CI (issue #1).
 - Stronger rollback: rollback by cohort, automatic rollback on crash-rate thresholds from telemetry.
 - Docker self-hosting target for the control plane.
 - Resumable and delta downloads on slow networks; measure on low-end Android.
@@ -42,8 +45,23 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 
 The planner keeps this list to the 5–10 most valuable items in flight. Each line links its issue.
 
+Bet 1, a bundle never reaches a shell that cannot run it (epic #14):
+- [x] #17 Shells declare their Hermes bytecode version; control plane skips mismatched releases (merged)
+- [ ] #18 Runtime refuses a mismatched release (after #17)
+
+Bet 2, iOS reaches Android update quality (epic #15):
 - [ ] #2 bsdiff patches on iOS
+- [ ] #1 Measure OTA apply time on the iOS Simulator in CI
+
+Bet 3, first run in under 10 minutes, and measured (epic #16):
+- [ ] #19 `shipvo doctor`
+- [ ] #20 Script counting weekly healthy releases per app
+- [ ] #26 `shipvo publish --dry-run` (first slice merged in #36; offline `rollback --dry-run` remains)
+
+Other:
 - [ ] #3 More typed-test examples for `@shipvo/test`
+
+Review of 2026-11-04: priority order is unchanged (update safety first). Bets 1 and 2 are update safety. Bet 3 is developer experience, chosen because we cannot yet measure activation. See `docs/product/strategy.md`.
 
 ## Not doing (for now)
 

@@ -11,6 +11,7 @@ on:
   workflow_call:
     inputs:
       engine: { type: string, default: claude }       # claude | aider
+      provider: { type: string, default: kilo }       # for aider: kilo (OpenAI-compatible gateway) | mistral
       role: { type: string, required: true }          # prompt file in .github/agents/prompts/<role>.md
       vars: { type: string, default: "{}" }           # JSON of {{KEY}} substitutions for the prompt
       mode: { type: string, default: read }
@@ -41,8 +42,7 @@ jobs:
       pr_number: ${{ steps.post.outputs.pr_number }}
       report: ${{ steps.post.outputs.report }}
     env:
-      AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
-      REPO: ${{ github.repository }}
+      REPO: ${{ github.repository }}   # AGENT_TOKEN is passed only to the steps that need it, never to the agent
     steps:
       - name: Check secrets
         id: chk
@@ -50,9 +50,13 @@ jobs:
           A: ${{ secrets.ANTHROPIC_API_KEY }}
           O: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           K: ${{ secrets.OPENAI_COMPAT_API_KEY }}
+          M: ${{ secrets.MISTRAL_API_KEY }}
+          PROVIDER: ${{ inputs.provider }}
           ENGINE: ${{ inputs.engine }}
+          AGENT_TOKEN: ${{ secrets.AGENT_TOKEN }}
         run: |
-          KEY="$A$O"; [ "$ENGINE" = "aider" ] && KEY="$K"
+          KEY="$A$O"; [ "$ENGINE" = "aider" ] && KEY="${K:-anonymous}"   # Kilo serves free models without a key
+          [ "$ENGINE" = "aider" ] && [ "$PROVIDER" = "mistral" ] && KEY="$M"
           if [ -z "$AGENT_TOKEN" ] || [ -z "$KEY" ]; then
             echo "::warning::Agent team not set up yet: add AGENT_TOKEN and the model key for the $ENGINE engine. See .github/agents/README.md"
             echo "ok=false" >> "$GITHUB_OUTPUT"
@@ -66,13 +70,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node and pnpm
-        if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
+        if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
         uses: pnpm/action-setup@v4
         with: { version: 10.28.0 }
-      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
+      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
         uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
-      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || inputs.role == 'reviewer')
+      - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
         run: pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
 
       - name: Prepare branch
@@ -101,6 +105,7 @@ jobs:
           v.setdefault("BRANCH", os.environ["BRANCH"])
           v.setdefault("TODAY", datetime.date.today().isoformat())
           v.setdefault("SINCE", (datetime.date.today() - datetime.timedelta(days=7)).isoformat())
+          v["HOUR"] = str(datetime.datetime.utcnow().hour)
           v.setdefault("YESTERDAY", (datetime.date.today() - datetime.timedelta(days=1)).isoformat())
           t = open(f".github/agents/prompts/{os.environ['ROLE']}.md").read()
           for k, val in v.items():
@@ -132,7 +137,8 @@ jobs:
           claude_args: >-
             --max-turns ${{ inputs.max_turns }}
             --model ${{ inputs.model || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
-            --allowedTools "Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*)"
+            --mcp-config '{"mcpServers":{"deepwiki":{"type":"http","url":"https://mcp.deepwiki.com/mcp"}}}'
+            --allowedTools "${{ inputs.mode != 'read' && 'Bash,' || '' }}mcp__deepwiki__read_wiki_structure,mcp__deepwiki__read_wiki_contents,mcp__deepwiki__ask_wiki_question,Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*),Bash(adb:*),Bash(bash:*),Bash(sh:*),Bash(curl:*),Bash(sleep:*),Bash(timeout:*),Bash(date:*),Bash(java:*),Bash(./gradlew:*),Bash(tar:*),Bash(unzip:*),Bash(pip:*),Bash(echo:*),Bash(cd:*),Bash(kill:*),Bash(pkill:*),Bash(ps:*)"
             --disallowedTools "Bash(git push:*),Bash(gh pr merge:*),Bash(gh api:*),Bash(gh release:*),Bash(gh secret:*),Bash(gh workflow:*),Bash(npm publish:*),Bash(pnpm publish:*)"
 
       - name: Set up Python for Aider
@@ -143,33 +149,47 @@ jobs:
       - name: Run Aider (${{ inputs.role }}) via OpenAI-compatible gateway
         if: steps.chk.outputs.ok == 'true' && inputs.engine == 'aider'
         env:
-          KEYS: ${{ secrets.OPENAI_COMPAT_API_KEY }}   # one key, or many separated by commas; rotated per run and on rate limits
-          OPENAI_API_BASE: ${{ vars.OPENAI_COMPAT_BASE_URL || 'https://ai-gateway.kilo.ai/api/v1' }}
-          MODEL: ${{ inputs.model || vars.AIDER_MODEL || 'kilo-auto/free' }}
+          # Kilo: one key or many, comma-separated, rotated, with anonymous fallback. Mistral: MISTRAL_API_KEY (one or many).
+          KEYS: ${{ inputs.provider == 'mistral' && secrets.MISTRAL_API_KEY || secrets.OPENAI_COMPAT_API_KEY }}
+          OPENAI_API_BASE: ${{ inputs.provider == 'mistral' && 'https://api.mistral.ai/v1' || (vars.OPENAI_COMPAT_BASE_URL || 'https://ai-gateway.kilo.ai/api/v1') }}
+          MODEL: ${{ inputs.model || (inputs.provider == 'mistral' && (vars.MISTRAL_MODEL || 'labs-leanstral-1-5') || (vars.AIDER_MODEL || 'kilo-auto/free')) }}
+          PROVIDER: ${{ inputs.provider }}
           SEED: ${{ github.run_id }}
         run: |
           python -m pip install --quiet --disable-pip-version-check aider-chat
           # Split the key list and mask every key on its own: GitHub only masks the secret as a whole string.
           mapfile -t K < <(printf '%s' "$KEYS" | tr ',\n' '\n\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
           for k in "${K[@]}"; do echo "::add-mask::$k"; done
-          N=${#K[@]}; [ "$N" -gt 0 ] || { echo "::error::OPENAI_COMPAT_API_KEY is empty"; exit 1; }
-          START=$(( SEED % N )); TRIES=$(( N < 5 ? N : 5 ))
-          echo "keys available: $N; starting at key $(( START + 1 )); up to $TRIES keys this run"
-          for t in $(seq 0 $(( TRIES - 1 ))); do
-            i=$(( (START + t) % N ))
-            export OPENAI_API_KEY="${K[$i]}"
+          N=${#K[@]}
+          # Try up to 5 keys starting at a different one each run. A rate-limited key is skipped for this run;
+          # a rejected (invalid or expired) key is discarded. If no key works, run anonymously: the gateway
+          # serves free models without a key, so a bad key never stops or fails the run.
+          ORDER=()
+          if [ "$N" -gt 0 ]; then START=$(( SEED % N )); TRIES=$(( N < 5 ? N : 5 )); for t in $(seq 0 $(( TRIES - 1 ))); do ORDER+=("$(( (START + t) % N ))"); done; fi
+          [ "$PROVIDER" = "mistral" ] || ORDER+=("anon")   # anonymous mode exists only on the Kilo gateway
+          echo "provider: $PROVIDER; keys available: $N; will try ${#ORDER[@]} credential(s)"
+          for i in "${ORDER[@]}"; do
+            if [ "$i" = "anon" ]; then export OPENAI_API_KEY="anonymous"; WHO="anonymous mode"; else export OPENAI_API_KEY="${K[$i]}"; WHO="key $(( i + 1 )) of $N"; fi
+            # Mistral reasoning models return answers in parts; litellm's native mistral/ provider reads them, openai/ does not.
+            if [ "$PROVIDER" = "mistral" ]; then export MISTRAL_API_KEY="$OPENAI_API_KEY"; LLM="mistral/$MODEL"; else LLM="openai/$MODEL"; fi
+            # Mistral rejects greedy sampling unless top_p is 1, and reasoning models need room to think.
+            printf -- '- name: %s\n  edit_format: diff\n  use_temperature: 0.2\n  extra_params:\n    top_p: 1\n    max_tokens: 32000\n' "$LLM" > /tmp/agent/aider-models.yml
+            echo "running Aider with $WHO"
             set +e
-            aider --model "openai/$MODEL" --message-file /tmp/agent/prompt.md --read CLAUDE.md \
+            aider --model "$LLM" --weak-model "$LLM" --model-settings-file /tmp/agent/aider-models.yml --timeout 900 --message-file /tmp/agent/prompt.md --read CLAUDE.md \
               --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
-              --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
-            rc=$?; set -e
+              --edit-format diff --no-detect-urls --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 > /tmp/agent/aider.log 2>&1
+            set -e
             tail -n 300 /tmp/agent/aider.log
-            if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror" /tmp/agent/aider.log; then
-              echo "::warning::key $(( i + 1 )) of $N hit a rate limit or quota; rotating"; continue
+            if grep -qiE "AuthenticationError|authentication token is invalid|invalid api key|401 Unauthorized" /tmp/agent/aider.log; then
+              echo "::warning::$WHO was rejected (invalid or expired) and is discarded for this run. Replace it in OPENAI_COMPAT_API_KEY."; git checkout -q -- . 2>/dev/null || true; continue
+            fi
+            if grep -qiE "rate.?limit|429|too many requests|quota|insufficient.?credit|ratelimiterror|Empty response received|ServiceUnavailable|APIConnectionError|InternalServerError|Timeout" /tmp/agent/aider.log; then
+              echo "::warning::$WHO hit a rate limit, quota or empty/failed response; trying the next credential"; git checkout -q -- . 2>/dev/null || true; continue
             fi
             break
           done
-          unset OPENAI_API_KEY
+          unset OPENAI_API_KEY MISTRAL_API_KEY
           # Aider cannot write outside the repo; keep its scratch notes out of commits.
           for f in pr_title.txt pr_body.md blocked.md fix_note.md; do [ -f ".agent/$f" ] && mv ".agent/$f" /tmp/agent/; done
           if [ -d .agent ]; then git rm -rq --cached .agent 2>/dev/null; rm -rf .agent; git diff --cached --quiet || git commit -qm "chore: drop agent notes"; fi
@@ -187,7 +207,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -u
-          V=$(tr -d '[:space:]' < /tmp/agent/verdict.txt 2>/dev/null || true); echo "verdict=$V" >> "$GITHUB_OUTPUT"
+          V=$(cat /tmp/agent/verdict.txt 2>/dev/null | tr -d '[:space:]' || true); echo "verdict=$V" >> "$GITHUB_OUTPUT"
           if [ -f /tmp/agent/report.md ]; then
             cat /tmp/agent/report.md >> "$GITHUB_STEP_SUMMARY"
             { echo 'report<<__R__'; head -c 60000 /tmp/agent/report.md; echo; echo '__R__'; } >> "$GITHUB_OUTPUT"
@@ -219,19 +239,31 @@ jobs:
             fi
             exit 0
           fi
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
+          for a in 1 2 3 4; do
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}" && break
+            [ $a = 4 ] && exit 1; echo "push failed, retrying in $(( a * 15 ))s"; sleep $(( a * 15 ))
+          done
           echo "pushed=true" >> "$GITHUB_OUTPUT"
           if [ "$MODE" = "pr-branch" ]; then
             [ -f /tmp/agent/fix_note.md ] && gh pr comment "$PR" -R "$REPO" --body-file /tmp/agent/fix_note.md || true
             exit 0
           fi
           TITLE=$(head -n1 /tmp/agent/pr_title.txt 2>/dev/null || true); [ -n "$TITLE" ] || TITLE="$(git log --reverse --format=%s "$(cat /tmp/agent/start_sha)..HEAD" | head -n1)"
+          if [ -z "$TITLE" ] || echo "$TITLE" | grep -qi "no commit message"; then
+            TITLE=$( [ "$ISSUE" != "0" ] && gh issue view "$ISSUE" -R "$REPO" --json title --jq .title || echo "agent: update $BRANCH" )
+          fi
           if [ ! -f /tmp/agent/pr_body.md ]; then
             { echo "Changes:"; git log --reverse --format='- %s' "$(cat /tmp/agent/start_sha)..HEAD"; echo; echo "Tested with \`pnpm -r test\` by the agent before committing."; [ "$ISSUE" != "0" ] && printf '\nFixes #%s\n' "$ISSUE"; } > /tmp/agent/pr_body.md
           fi
           [ "$ISSUE" != "0" ] && ! grep -qi "#$ISSUE" /tmp/agent/pr_body.md && printf '\nFixes #%s\n' "$ISSUE" >> /tmp/agent/pr_body.md
           printf '\n\n---\nOpened by the Shipvo agent team ([run](%s)).\n' "$RUN_URL" >> /tmp/agent/pr_body.md
           ARGS=(--label agent-pr); IFS=',' read -ra L <<< "$PR_LABELS"; for l in "${L[@]}"; do [ -n "$l" ] && ARGS+=(--label "$l"); done
-          URL=$(gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md "${ARGS[@]}")
+          URL=""
+          for a in 1 2 3 4; do
+            URL=$(gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" --body-file /tmp/agent/pr_body.md "${ARGS[@]}" 2>/dev/null) && break
+            URL=$(gh api "repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&state=open" --jq '.[0].html_url // empty')   # created despite an error?
+            [ -n "$URL" ] && break; echo "PR create failed, retrying"; sleep $(( a * 15 ))
+          done
+          [ -n "$URL" ] || { echo "::error::could not open the PR"; exit 1; }
           echo "pr_number=${URL##*/}" >> "$GITHUB_OUTPUT"
           [ "$ISSUE" != "0" ] && gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress --add-label agent:pr-open || true

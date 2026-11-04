@@ -1,5 +1,5 @@
 # Fix engineer: when CI fails on an agent PR, the reviewer asks for changes, or the branch conflicts,
-# Claude and Aider fix their own PRs and Copilot is asked (with @copilot) to fix its PRs.
+# Claude, Mistral and Aider fix their own PRs; Claude also fixes any leftover Copilot PRs.
 # After AGENT_MAX_FIX_ROUNDS attempts the PR is closed and the issue goes to the next engineer.
 # A red CI on main becomes an urgent issue for the Claude engineer.
 name: agent-fixer
@@ -19,6 +19,7 @@ jobs:
       pr: ${{ steps.r.outputs.pr }}
       branch: ${{ steps.r.outputs.branch }}
       engine: ${{ steps.r.outputs.engine }}
+      provider: ${{ steps.r.outputs.provider }}
       vars: ${{ steps.r.outputs.vars }}
     env:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
@@ -51,13 +52,18 @@ jobs:
           pr = prs[0]; n = pr["number"]; names = [l["name"] for l in pr["labels"]]
           if "agent-pr" not in names or "needs-human" in names: raise SystemExit
           rounds = max([int(x.split(":")[1]) for x in names if re.fullmatch(r"fix:\d+", x)] or [0])
+          if rounds >= int(E["MAX_ROUNDS"]) and "contract:drift" in names:
+              gh("pr", "edit", str(n), "-R", R, "--add-label", "needs-human", "--remove-label", "agent:changes-requested")
+              gh("pr", "comment", str(n), "-R", R, "--body", f"Still drifting from the merge contract after {rounds} fix rounds. Waiting for the owner.")
+              raise SystemExit
           if rounds >= int(E["MAX_ROUNDS"]):
               gh("pr", "comment", str(n), "-R", R, "--body", f"Closing after {rounds} fix rounds without success. The issue goes back to the backlog for the other engineer.")
               gh("pr", "close", str(n), "-R", R, "--delete-branch")
               for m in re.finditer(r"(?:fixes|closes|resolves)\s+#(\d+)", pr["body"] or "", re.I):
                   i = m.group(1); il = gh("issue", "view", i, "-R", R, "--json", "labels")
-                  order = ["agent:claude", "agent:copilot", "agent:aider"]
+                  order = ["agent:claude", "agent:mistral", "agent:aider"]
                   cur = next((x for x in order if x in il), "agent:aider")
+                  if "agent:copilot" in il: gh("issue", "edit", i, "-R", R, "--remove-label", "agent:copilot")
                   nxt = order[(order.index(cur) + 1) % len(order)]
                   gh("issue", "edit", i, "-R", R, "--add-label", "agent:ready", "--add-label", nxt, "--remove-label", cur,
                      "--remove-label", "agent:in-progress", "--remove-label", "agent:pr-open", "--remove-assignee", "Copilot")
@@ -71,12 +77,12 @@ jobs:
           elif E["LABEL"] == "agent:conflict":
               reason = "The branch has merge conflicts with main."
           else:
-              reason = "The reviewer requested changes; see the latest review comment on the PR."
-          if B.startswith("copilot/"):
-              gh("pr", "comment", str(n), "-R", R, "--body", f"@copilot {reason} Please fix it: address every required point in the latest review comment, keep the change focused, and make sure `pnpm -r test` passes. Do not skip or delete tests.")
-              print(f"asked Copilot to fix #{n}"); raise SystemExit
-          if not B.startswith("agent/"): raise SystemExit
-          engine = "aider" if B.startswith("agent/aider/") else "claude"
+              reason = ("The merge contract check found drift; fix every item in the latest 'Contract: DRIFT' comment."
+                        if "contract:drift" in names else "The reviewer requested changes; see the latest review comment on the PR.")
+          if not (B.startswith("agent/") or B.startswith("copilot/")): raise SystemExit
+          # Copilot PRs left over from before are fixed by Claude.
+          engine = "aider" if B.startswith(("agent/aider/", "agent/mistral/")) else "claude"
+          provider = "mistral" if B.startswith("agent/mistral/") else "kilo"
           details = ""
           if engine == "aider":
               # Aider has no GitHub tools, so hand it the failing log and the latest review comment.
@@ -85,7 +91,7 @@ jobs:
               cm = json.loads(gh("pr", "view", str(n), "-R", R, "--json", "comments") or "{}").get("comments", [])
               if cm: details += "\n\nLatest review comment:\n" + cm[-1]["body"][:6000]
           v = json.dumps({"PR": n, "BRANCH": B, "REASON": reason, "RUN_ID": E.get("RUN_ID") or "", "DETAILS": details})
-          out.write(f"pr={n}\nbranch={B}\nengine={engine}\nvars<<__V__\n{v}\n__V__\n")
+          out.write(f"pr={n}\nbranch={B}\nengine={engine}\nprovider={provider}\nvars<<__V__\n{v}\n__V__\n")
           print(f"Claude will fix #{n} ({reason})")
           EOF
   fix:
@@ -95,6 +101,7 @@ jobs:
     secrets: inherit
     with:
       engine: ${{ needs.route.outputs.engine }}
+      provider: ${{ needs.route.outputs.provider || 'kilo' }}
       role: ${{ needs.route.outputs.engine == 'aider' && 'fixer-aider' || 'fixer' }}
       mode: pr-branch
       branch: ${{ needs.route.outputs.branch }}

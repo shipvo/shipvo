@@ -99,7 +99,7 @@
         <tr><th>Trust model</th><td>Managed by Expo; code signing is available.</td><td>Your Ed25519 key is pinned in the app's native shell. Phones verify the signature, hash and size of every release; nothing delivered over the air can change the key.</td></tr>
         <tr><th>Update size</th><td>Full bundle or assets that changed.</td><td>bsdiff patches from the version a phone already has; typically tens of KB.</td></tr>
         <tr><th>Rollout and rollback</th><td>Channels and staged rollouts.</td><td>Cohorts at 1 %, 10 %, then everyone; <code>shipvo rollback --to 7</code>; phones discard a release that fails to boot.</td></tr>
-        <tr><th>Platforms</th><td class="win">Android and iOS, in production use at scale.</td><td>Android measured on a 2 GB phone. iOS verified on an iPhone simulator in CI, not yet measured on a physical iPhone.</td></tr>
+        <tr><th>Platforms</th><td class="win">Android and iOS, in production use at scale.</td><td>Android measured on a 2 GB phone. iOS verified on an iPhone simulator in CI on every change.</td></tr>
         <tr><th>Maturity</th><td class="win">Years in production, large user base, paid support on higher plans.</td><td>Beta. Small and young; the numbers we have are published, including the gaps.</td></tr>
         <tr><th>Cost model</th><td>Plan fee plus per monthly active user above the included amount. See <a href="/pricing/">pricing</a>.</td><td class="win">No per-user fee in the software. Hosted is free in the beta; self-hosted costs whatever Cloudflare charges you.</td></tr>
       </tbody>

@@ -4,7 +4,9 @@
 name: agent-aider
 on:
   issues: { types: [labeled] }
-  schedule: [{ cron: "53 1-23/2 * * *" }]
+  # Heartbeat: GitHub delays scheduled runs by hours on this repo, so also look for work whenever CI or the merge bot finishes.
+  workflow_run: { workflows: [ci, agent-merger], types: [completed] }
+  schedule: [{ cron: "53 * * * *" }]
   workflow_dispatch:
     inputs:
       issue: { description: "Issue number (optional)", type: number, required: false }
@@ -21,7 +23,7 @@ jobs:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
       REPO: ${{ github.repository }}
       WANT: ${{ github.event.issue.number || inputs.issue || '' }}
-      MAX_ACTIVE: ${{ vars.AGENT_AIDER_MAX_ACTIVE || 2 }}
+      MAX_ACTIVE: ${{ vars.AGENT_AIDER_MAX_ACTIVE || 3 }}
     steps:
       - id: pick
         run: |

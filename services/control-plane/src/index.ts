@@ -40,7 +40,15 @@ async function servePointer(c: any, platform: "android" | "ios") {
   let release: number;
   try {
     const env = SignedEnvelope.parse(JSON.parse(raw));
-    release = ReleasePointerBody.parse(JSON.parse(env.body)).release;
+    const body = ReleasePointerBody.parse(JSON.parse(env.body));
+    release = body.release;
+    // A shell may say which Hermes bytecode versions it runs: ?hbc=96,98. Without it, every release is offered.
+    const hbc = c.req.query("hbc");
+    if (hbc !== undefined && body.hermes_bytecode_version !== undefined) {
+      const ok = hbc.split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      if (ok.length === 0) return c.json({ error: "bad_request" }, 400);
+      if (!ok.includes(body.hermes_bytecode_version)) return c.json({ error: "hermes_bytecode_mismatch" }, 404, { "cache-control": "public, max-age=5" });
+    }
   } catch { return c.json({ error: "corrupt_pointer" }, 500); }
   const etag = `"${release}"`;
   if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag } });

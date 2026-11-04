@@ -1,0 +1,42 @@
+# App Builders: every day an agent builds a real app with Shipvo from the docs alone, as a different
+# persona, using the packages on main. Records times and friction, fixes small doc issues, files bugs.
+name: agent-dogfood
+on:
+  schedule: [{ cron: "7 9 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: agent-dogfood }
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    outputs: { vars: "${{ steps.p.outputs.vars }}" }
+    steps:
+      - id: p
+        run: |
+          python3 - <<'PY'
+          import datetime, json, os
+          d = datetime.date.today().toordinal()
+          personas = ["an experienced React Native developer", "a web developer new to mobile",
+                      "a non-technical founder working only through an AI agent", "a solo indie hacker in a hurry"]
+          apps = [("a small shop with cart, mobile money payment and order tracking", "shop"),
+                  ("a booking app for a barber with time slots and reminders", "booking"),
+                  ("a field-survey app that scans codes, records location and works offline", "survey"),
+                  ("a community events app with sign-up and push notifications", "events"),
+                  ("a restaurant menu and table ordering app", "menu"),
+                  ("a habit tracker with biometrics lock", "habits")]
+          p = personas[d % len(personas)]; a, slug = apps[d % len(apps)]
+          v = json.dumps({"PERSONA": p, "APP": a, "SLUG": slug})
+          open(os.environ["GITHUB_OUTPUT"], "a").write(f"vars<<__V__\n{v}\n__V__\n")
+          PY
+  build:
+    needs: pick
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      role: dogfood
+      mode: branch
+      branch: agent/dogfood/${{ github.run_number }}
+      pr_labels: agent:claude,dogfood
+      vars: ${{ needs.pick.outputs.vars }}
+      max_turns: 200
+      timeout: 120

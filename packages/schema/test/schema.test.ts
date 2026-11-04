@@ -10,6 +10,13 @@ const manifest = {
   public_key: sig, owner_root_public_key: sig, signature: sig,
 };
 describe("manifest", () => {
+  it("parses a manifest with and without hermes_bytecode_versions", () => {
+    const old = ShellManifest.safeParse(manifest);
+    expect(old.success && old.data.hermes_bytecode_versions).toBeUndefined();
+    const v = ShellManifest.safeParse({ ...manifest, hermes_bytecode_versions: [96, 98] });
+    expect(v.success && v.data.hermes_bytecode_versions).toEqual([96, 98]);
+    expect(ShellManifest.safeParse({ ...manifest, hermes_bytecode_versions: [] }).success).toBe(false);
+  });
   it("accepts a valid manifest", () => expect(ShellManifest.safeParse(manifest).success).toBe(true));
   it("rejects vague purpose strings", () =>
     expect(ShellManifest.safeParse({ ...manifest, permissions: [{ name: "camera", tier: "elevated", purpose: "stuff" }] }).success).toBe(false));
@@ -30,6 +37,16 @@ describe("release pointer", () => {
     const ok = ReleasePointer.safeParse({ schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 1,
       issued_at: "2026-10-29T21:00:00Z", core: { version: "1.0.0", sha256: h, size: 10, url: "c" }, min_shell_version: "1.0.0", signature: sig });
     expect(ok.success).toBe(true);
+  });
+  it("parses with and without hermes_bytecode_version", () => {
+    const h = "a".repeat(64);
+    const base = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 1,
+      issued_at: "2026-10-29T21:00:00Z", core: { version: "1.0.0", sha256: h, size: 10, url: "c" }, min_shell_version: "1.0.0", signature: sig };
+    const old = ReleasePointer.safeParse(base);
+    expect(old.success && old.data.hermes_bytecode_version).toBeUndefined();
+    const withV = ReleasePointer.safeParse({ ...base, hermes_bytecode_version: 96 });
+    expect(withV.success && withV.data.hermes_bytecode_version).toBe(96);
+    expect(ReleasePointer.safeParse({ ...base, hermes_bytecode_version: 1.5 }).success).toBe(false);
   });
 });
 describe("gate report", () => {

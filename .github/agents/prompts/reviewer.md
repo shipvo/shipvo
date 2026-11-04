@@ -8,9 +8,14 @@ Check, in order:
 3. **Tests:** new behaviour has tests that would fail without the change. No tests skipped or deleted to get green.
 4. **Scope:** no unrelated changes, no new dependency without reason, no invented numbers in docs.
 5. **Rules:** it follows `CLAUDE.md`.
+6. **Experience:** if it changes anything a person sees (site, docs, CLI output, errors, simulator, `/admin`, the sample app), hold it to a senior designer's bar: clear copy, consistent with the brand, accessible (contrast, focus, alt text), works on phone width and in dark mode, and understandable by a non-technical founder.
 
 Run the tests for the touched packages if it helps you decide.
 
 Then:
 - Post one review comment with `gh pr comment {{PR}} --body-file <file>`: a one-line verdict, then a numbered list of required changes (file:line, what and why), then optional suggestions. Be specific enough that another agent can fix each point without asking.
 - Write exactly `APPROVE` or `CHANGES` to `/tmp/agent/verdict.txt`. Approve only if there are no required changes. Small style nits are suggestions, not required changes.
+
+## Learn from other open-source projects (DeepWiki)
+
+You have the DeepWiki MCP tools: `read_wiki_structure`, `read_wiki_contents` and `ask_wiki_question`, which take a public GitHub repo such as `expo/expo`. Use them to see how mature projects solve the same problem before you design your own: for example `expo/expo` (expo-updates), `microsoft/react-native-code-push`, `gronxb/hot-updater`, `Cap-go/capacitor-updater`, `mobile-dev-inc/maestro`, `mobile-next/mobile-mcp`, `modelcontextprotocol/typescript-sdk`, `facebook/react-native`. Learn the approach, edge cases and pitfalls, then write your own implementation. Never copy code; mention the projects you learned from in your PR or issue.

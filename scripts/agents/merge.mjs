@@ -4,25 +4,19 @@
 //   - label `agent-pr` and `agent:approved`, no `needs-human`, not draft, base `main`
 //   - every check run on the head commit finished green, and the CI `test` check is among them
 //   - GitHub reports it mergeable and up to date with main (otherwise we update the branch and wait)
-//   - it touches no protected path (those get `needs-human` instead)
+//   - it touches no locked path (those wait for the owner), and if it touches guarded code it has
+//     passed the merge contract (.github/agents/contract.md) on its exact head commit
 //   - today's merge count is under AGENT_MAX_MERGES_PER_DAY
 // It also marks finished Copilot drafts ready for review, approves pending workflow runs on
 // Copilot branches, and closes agent PRs that have been idle for too long.
 import { execFileSync } from "node:child_process";
 
 const REPO = process.env.GITHUB_REPOSITORY;
-const MAX_MERGES = Number(process.env.AGENT_MAX_MERGES_PER_DAY || 20);
+const MAX_MERGES = Number(process.env.AGENT_MAX_MERGES_PER_DAY || 40);
 const STALE_DAYS = Number(process.env.AGENT_STALE_DAYS || 4);
 const DRY = process.env.DRY_RUN === "true";
 
-const PROTECTED = [
-  /^\.github\//, /^CLAUDE\.md$/, /^scripts\/agents\//,
-  /^packages\/cli\/src\/signing\.ts$/, /^packages\/cli\/src\/publish\.ts$/,
-  /^packages\/runtime\/.*Verify\.(kt|swift)$/,
-  /^services\/control-plane\/src\/auth\.ts$/, /^services\/control-plane\/migrations\//,
-  /^apps\/tide-and-tackle\/src\//, /^apps\/tide-and-tackle\/App\.tsx$/,
-  /^LICENSE$/, /^SECURITY\.md$/, /^legal\//,
-];
+import { LOCKED, GUARDED } from "./contract.mjs";
 const GREEN = new Set(["success", "skipped", "neutral"]);
 
 const gh = (...args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
@@ -81,15 +75,32 @@ for (const pr of prs) {
   }
 
   if (L.includes("needs-human")) continue;
-  const files = apiAll(`repos/${REPO}/pulls/${n}/files?per_page=100`).map((f) => f.filename);
-  const hit = files.filter((f) => PROTECTED.some((re) => re.test(f)));
-  if (hit.length) {
-    addLabel(n, "needs-human");
-    comment(n, `Held for a human: this PR changes protected paths (see CLAUDE.md):\n${hit.map((f) => `- \`${f}\``).join("\n")}`);
+
+  // Nudge stuck PRs: events can be lost (GitHub hiccups, bot-made changes that do not trigger workflows).
+  const quietMin = (Date.now() - new Date(pr.updated_at)) / 6e4;
+  if (quietMin > 60 && L.includes("agent:changes-requested")) {
+    act(`re-request fix on #${n}`, () => {
+      gh("api", "-X", "DELETE", `repos/${REPO}/issues/${n}/labels/agent:changes-requested`);
+      gh("api", "-X", "POST", `repos/${REPO}/issues/${n}/labels`, "-f", "labels[]=agent:changes-requested");
+    });
     continue;
   }
+  if (quietMin > 60 && !L.some((l) => ["agent:approved", "agent:changes-requested", "agent:contract-check", "contract:drift"].includes(l))) {
+    act(`re-request review on #${n} (close and reopen)`, () => {
+      gh("api", "-X", "PATCH", `repos/${REPO}/pulls/${n}`, "-f", "state=closed");
+      gh("api", "-X", "PATCH", `repos/${REPO}/pulls/${n}`, "-f", "state=open");
+    });
+    continue;
+  }
+  const files = apiAll(`repos/${REPO}/pulls/${n}/files?per_page=100`).map((f) => f.filename);
+  const locked = files.filter((f) => LOCKED.some((re) => re.test(f)));
+  if (locked.length) {
+    addLabel(n, "needs-human");
+    comment(n, `Held for the owner: this PR changes locked paths that never merge automatically (see .github/agents/contract.md):\n${locked.map((f) => `- \`${f}\``).join("\n")}`);
+    continue;
+  }
+  const guarded = files.some((f) => GUARDED.some((re) => re.test(f)));
   if (!L.includes("agent:approved")) { log(`#${n}: waiting for review approval`); continue; }
-
   const full = api(`repos/${REPO}/pulls/${n}`);
   if (full.mergeable_state === "behind") {
     act(`update branch #${n}`, () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/update-branch`));
@@ -113,10 +124,27 @@ for (const pr of prs) {
     log(`#${n}: checks not green (pending ${pending.length}, failed ${failed.length}, ci ${hasCI})`);
     continue;
   }
+  if (guarded) {
+    const ok = L.includes("contract:ok") && apiAll(`repos/${REPO}/issues/${n}/comments?per_page=100`)
+      .some((c) => c.body.includes(`<!-- contract-ok:${full.head.sha} -->`));
+    if (!ok) {
+      if (!L.includes("agent:contract-check") && !L.includes("contract:drift")) addLabel(n, "agent:contract-check");
+      log(`#${n}: guarded change; waiting for the contract check on ${full.head.sha.slice(0, 7)}`);
+      continue;
+    }
+  }
   if (budget <= 0) { log(`daily merge cap reached; #${n} waits`); continue; }
 
-  act(`merge #${n} ${pr.title}`, () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/merge`,
-    "-f", "merge_method=squash", "-f", `commit_title=${pr.title} (#${n})`, "-f", `sha=${full.head.sha}`));
+  // GitHub sometimes answers 5xx even when the merge went through; retry, then check before deleting anything.
+  let merged = false;
+  for (let attempt = 1; attempt <= 3 && !merged; attempt++) {
+    act(`merge #${n} ${pr.title} (attempt ${attempt})`, () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/merge`,
+      "-f", "merge_method=squash", "-f", `commit_title=${pr.title} (#${n})`, "-f", `sha=${full.head.sha}`));
+    if (DRY) break;
+    try { merged = api(`repos/${REPO}/pulls/${n}`).merged === true; } catch { merged = false; }
+    if (!merged && attempt < 3) execFileSync("sleep", [String(attempt * 10)]);
+  }
+  if (!merged) { log(`#${n}: merge did not go through; will retry on the next pass`); continue; }
   act(`delete branch ${pr.head.ref}`, () => gh("api", "-X", "DELETE", `repos/${REPO}/git/refs/heads/${pr.head.ref}`));
   budget--;
 }

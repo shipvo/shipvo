@@ -1,5 +1,7 @@
 # Build your first Shipvo app
 
+Also in: [Français](fr/getting-started.md)
+
 Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
 
 ## 0. What you need
@@ -108,13 +110,15 @@ Then edit `src/release.ts` and run `shipvo publish`. (In a GitHub repo, the work
 3. builds the web artifact of the same commit for the simulator (`/w/<app>/r<N>/`),
 4. signs the release pointer (Ed25519) and writes it for each cohort band (`b0` 1 %, `b1` 10 %, `b2` everyone).
 
+To check a release before you have a control plane or token, run `shipvo publish --dry-run [--out dir]`. It builds, signs and writes everything to `dir` (default `.shipvo/dry-run`) and sends nothing. Layout: `b/<app>/r<N>.hbc` (bundle), `p/<app>/<major>/<band>` (signed pointers; iOS under `p/<app>/<major>/ios/`), `h/<app>/r<N>` (release record), `w/<app>/r<N>/` (web export; add `--skip-web true` to skip it and run faster). The release is 1 unless you pass `--release N`, and no patches are built offline. Old files in `dir` are not cleared. `rollback` has no dry run yet.
+
 Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
 
 Agents open the exact release phones run with `open_app("myshop@r8")` or `open_app("myshop@latest")`.
 
 ## 6. Give agents a key, not a laptop
 
-The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config. Your key opens the sample app and every app you registered with `shipvo app create`: after a publish, `open_app("myshop@latest")` opens the exact release phones run. The beta allows 3 apps per account and 500 MB each; self-hosting is always open. See [agents.md](agents.md).
+The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config (signed out, it prints the local config for `shipvo sim`). Your key opens the sample app and every app you registered with `shipvo app create`: after a publish, `open_app("myshop@latest")` opens the exact release phones run. The beta allows 3 apps per account and 500 MB each; self-hosting is always open. See [agents.md](agents.md).
 
 ## Where things are measured
 

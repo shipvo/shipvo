@@ -12,14 +12,14 @@ Three pillars:
 2. **Simulate.** `@shipvo/mcp` opens any Shipvo app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@shipvo/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
 3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result: 100% actionable parity on Android and iOS across the 13-screen purchase flows; on the native-feature flow, 18 of 21 screens match at 100% on Android (the three gaps are listed) and 100% on iOS, with the orders themselves compared (`docs/parity-results.md`, which also says exactly what the score does and does not measure).
 
-[Website](https://shipvo.dev) · [Docs](https://shipvo.dev/docs/getting-started/) · [Blog](https://shipvo.dev/blog/) · [Shipvo vs Expo](https://shipvo.dev/compare/) · [Pricing](https://shipvo.dev/pricing/)
+[Website](https://shipvo.dev) · [Docs](https://shipvo.dev/docs/getting-started/) · [Blog](https://shipvo.dev/blog/) · [Shipvo vs Expo](https://shipvo.dev/compare/) · [Pricing](https://shipvo.dev/pricing/) · [Roadmap](docs/ROADMAP.md)
 
 [![CI](https://github.com/shipvo/shipvo/actions/workflows/ci.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/ci.yml)
 [![Deploy](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Status: pre-launch](https://img.shields.io/badge/status-pre--launch-orange)
 
-> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on Android; iOS is next. The iOS OTA runtime is verified on the iOS Simulator in CI (fetch, verify, stage, reload, cold start); physical iPhones are not yet measured.
+> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on Android; iOS is next. The iOS OTA runtime is verified on the iOS Simulator in CI on every change (fetch, verify, stage, reload, cold start).
 
 ## Why Shipvo
 

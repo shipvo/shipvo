@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm, registry-url: "https://registry.npmjs.org" }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build && pnpm --filter @shipvo/mcp build && pnpm --filter @shipvo/test build
+      - run: pnpm --filter @shipvo/schema build && pnpm -r --filter "./packages/**" build
       - run: pnpm -r test
       - name: Publish @shipvo packages
         env:
@@ -30,9 +30,7 @@ jobs:
             return $code
           }
           pub @shipvo/schema
-          pub @shipvo/cli
-          pub @shipvo/mcp
-          pub @shipvo/device
-          pub @shipvo/runtime
-          pub @shipvo/sim
-          pub @shipvo/test
+          for pj in packages/*/package.json; do
+            name=$(node -p "const p=require('./$pj'); p.private ? '' : p.name")
+            [ -n "$name" ] && [ "$name" != "@shipvo/schema" ] && pub "$name"
+          done

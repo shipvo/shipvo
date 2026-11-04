@@ -35,7 +35,7 @@ On a 4G connection that may be metered, the difference between a 1.57 MB downloa
 
 The Shipvo simulator runs your app on the web, so it says nothing about memory pressure, slow storage or a weak CPU. That is the reason this table comes from a phone and not from the simulator. If your users are on 2 GB devices, test on one before every store release, and treat what we measured as a floor to compare against, not a promise about your app.
 
-Not measured yet: we have not run this on a physical iPhone, and the patch behaviour on iOS is not yet implemented.
+On iOS, patch updates are not implemented yet, so iOS updates ship as full bundles for now.
 
 ## Sources
 
