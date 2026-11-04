@@ -11,7 +11,7 @@ on:
     branches: [main]
     paths: ["packages/runtime/**", "scripts/ios-fixture.mjs", "scripts/ios-e2e/**", "packages/cli/src/publish.ts", ".github/workflows/ios-runtime.yml"]
   pull_request:
-    paths: ["packages/runtime/**", "scripts/ios-fixture.mjs", ".github/workflows/ios-runtime.yml"]
+    paths: ["packages/runtime/**", "scripts/ios-fixture.mjs", "scripts/ios-e2e/**", ".github/workflows/ios-runtime.yml"]
 
 jobs:
   swift-tests:
@@ -28,7 +28,8 @@ jobs:
       - name: Fake control plane (signed iOS pointers, good and bad)
         run: |
           node scripts/ios-fixture.mjs "$RUNNER_TEMP/fx"
-          cd "$RUNNER_TEMP/fx" && (python3 -m http.server 8099 --bind 127.0.0.1 >/dev/null 2>&1 &) && sleep 1
+          # Same fixture server as the simulator e2e; it answers Range requests like the real control plane.
+          (node scripts/ios-e2e/server.mjs "$RUNNER_TEMP/fx" 8099 "$RUNNER_TEMP/fx-server.log" > /dev/null 2>&1 &) && sleep 1
           curl -sf http://127.0.0.1:8099/meta.json
       - name: swift test
         working-directory: packages/runtime
