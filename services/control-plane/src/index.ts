@@ -124,6 +124,43 @@ app.get("/t/:app", async (c) => {
   return c.json(results);
 });
 
+/** Per-release telemetry summary: counts of each event, median apply_ms and cold_start_ms. */
+app.get("/t/:app/summary", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const { results } = await c.env.DB.prepare(`
+    SELECT t.release,
+           COUNT(*) as total,
+           SUM(CASE WHEN t.event = 'applied' THEN 1 ELSE 0 END) as applied,
+           SUM(CASE WHEN t.event = 'reverted' THEN 1 ELSE 0 END) as reverted,
+           SUM(CASE WHEN t.event = 'healthy' THEN 1 ELSE 0 END) as healthy,
+           SUM(CASE WHEN t.event = 'unhealthy_boot' THEN 1 ELSE 0 END) as unhealthy_boot,
+           SUM(CASE WHEN t.event = 'timed_out' THEN 1 ELSE 0 END) as timed_out,
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.apply_ms) as apply_ms_median,
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.cold_start_ms) as cold_start_ms_median
+    FROM telemetry t
+    WHERE t.app_id = ?
+    GROUP BY t.release
+    ORDER BY MAX(t.published_at) DESC
+    LIMIT 20
+  `).bind(appId).all();
+
+  const releases = results.map((r: any) => ({
+    release: r.release,
+    events: {
+      applied: r.applied ?? 0,
+      reverted: r.reverted ?? 0,
+      healthy: r.healthy ?? 0,
+      unhealthy_boot: r.unhealthy_boot ?? 0,
+      timed_out: r.timed_out ?? 0,
+    },
+    apply_ms_median: r.apply_ms_median ?? null,
+    cold_start_ms_median: r.cold_start_ms_median ?? null,
+  }));
+
+  return c.json({ releases });
+});
+
 app.get("/band/:cohort", (c) => {
   try { return c.json({ band: bandForCohort(Number(c.req.param("cohort"))) }); }
   catch { return c.json({ error: "cohort must be 0-999" }, 400); }
