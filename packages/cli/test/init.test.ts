@@ -28,16 +28,17 @@ it("the starter does not claim a release before one exists", () => {
 
 it("prints next steps in order", () => {
   const dir = join(tmp, "my-shop");
-  const lines = (console.log as any).mock.calls.map((c: any[]) => String(c[0]));
-  const iNext = lines.findIndex((l) => l.includes("Next steps:"));
-  const iCd = lines.findIndex((l) => l.includes(`1. cd ${dir}`));
-  const iDoctor = lines.findIndex((l) => l.includes("2. npx shipvo doctor"));
-  const iSim = lines.findIndex((l) => l.includes("3. npm run sim"));
-  const iPublish = lines.findIndex((l) => l.includes("4. npx shipvo publish --dry-run"));
+  const output = (console.log as any).mock.calls.map((c: any[]) => String(c[0])).join("\n");
+  const iNext = output.indexOf("Next steps:");
+  const iCd = output.indexOf(`\n1. cd ${dir}\n`);
+  const iDoctor = output.indexOf("\n2. npx shipvo doctor\n");
+  const iSim = output.indexOf("\n3. npm run sim\n");
+  const iPublish = output.indexOf("\n4. npx shipvo publish --dry-run\n");
 
   expect(iNext).toBeGreaterThanOrEqual(0);
   expect(iNext).toBeLessThan(iCd);
   expect(iCd).toBeLessThan(iDoctor);
   expect(iDoctor).toBeLessThan(iSim);
   expect(iSim).toBeLessThan(iPublish);
+  expect(output.trimEnd()).toMatch(/4\. npx shipvo publish --dry-run$/);
 });
