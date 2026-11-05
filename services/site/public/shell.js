@@ -25,7 +25,7 @@
   var burger=document.querySelector('.burger'),mm=document.querySelector('.mobile-menu');
   if(burger&&mm){
     var items=function(){return Array.prototype.slice.call(mm.querySelectorAll('a[href],button')).filter(function(e){return e.offsetParent})};
-    var setOpen=function(o){mm.hidden=!o;burger.setAttribute('aria-expanded',o);burger.classList.toggle('x',o);burger.setAttribute('aria-label',o?'Close menu':'Menu');if(o){var f=items()[0];f&&f.focus()}};
+    var setOpen=function(o){mm.hidden=!o;burger.setAttribute('aria-expanded',o);burger.classList.toggle('x',o);if(o){var f=items()[0];f&&f.focus()}};
     burger.addEventListener('click',function(){setOpen(mm.hidden)});
     document.addEventListener('keydown',function(e){
       if(mm.hidden)return;

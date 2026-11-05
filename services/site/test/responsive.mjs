@@ -108,7 +108,7 @@ const sizes = [[360, 780], [390, 844], [768, 1024], [1440, 900]];
 let failures = 0, checked = 0;
 if (shotsDir) mkdirSync(shotsDir, { recursive: true });
 for (const [w, h] of sizes) {
-  if (!shotsDir && w > 390) continue;
+  if (!shotsDir && w > 768) continue;
   for (const scheme of ['light', 'dark']) {
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, deviceScaleFactor: 1, hasTouch: w < 768, reducedMotion: 'reduce' });
     // keep the check offline: external requests (GitHub stars, status, badges, phone embeds) are aborted
@@ -118,6 +118,7 @@ for (const [w, h] of sizes) {
       try { await page.goto(base + p, { waitUntil: 'load', timeout: 20000 }); } catch (e) { console.log(`FAIL ${p} @${w} ${scheme}: ${e.message.split('\n')[0]}`); failures++; continue; }
       await page.waitForTimeout(150);
       if (shotsDir) await page.screenshot({ path: join(shotsDir, `${p.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'home'}-${w}-${scheme}.png`), fullPage: true });
+      if (w === 768) { const sw = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]); checked++; if (sw[0] > sw[1]) { console.log(`FAIL ${p} @${w} ${scheme}: horizontal scroll: scrollWidth ${sw[0]} > ${sw[1]}`); failures++; } continue; }
       if (w > 390) continue;
       const problems = await page.evaluate(probe);
       if (scheme === 'light') problems.push(...(await menuProbe(page)));
