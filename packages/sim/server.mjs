@@ -140,9 +140,26 @@ async function act(id, body) {
     if ((await l.count()) !== 1) throw stale();
     return l;
   };
+  // Before acting on an element, say why it cannot receive the action. Nothing has reached the app when this throws.
+  const NOT_DELIVERED = { not_visible: "is not visible", disabled: "is disabled", covered: "is covered by another element" };
+  const ready = async (l) => {
+    const fail = (reason, what) => new SimError(reason, `${what} ${NOT_DELIVERED[reason]}, so nothing was sent to the app.`);
+    if (!(await l.isVisible())) throw fail("not_visible", String(body.ref));
+    // Still off the screen after scrolling it into view (for example a fixed element parked outside the window).
+    await l.scrollIntoViewIfNeeded({ timeout: 1000 }).catch(() => {});
+    const box = await l.boundingBox(); const vp = page.viewportSize();
+    if (!box || (vp && (box.x + box.width <= 0 || box.y + box.height <= 0 || box.x >= vp.width || box.y >= vp.height))) throw fail("not_visible", String(body.ref));
+    if (await l.isDisabled()) throw fail("disabled", String(body.ref));
+    const covered = await l.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!top && top !== el && !el.contains(top) && !top.contains(el);
+    });
+    if (covered) throw fail("covered", String(body.ref));
+  };
   switch (body.action) {
     case "screen": break;
-    case "tap": await (await resolve(body.ref)).click({ timeout: 3000 }); break;
+    case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
       let t = await resolve(body.ref);
@@ -154,7 +171,9 @@ async function act(id, body) {
         if ((await named.count()) !== 1) throw new Error(`${body.ref} is not a text field. Type into a "textbox" ref.`);
         t = named;
       }
-      await t.fill(String(body.text ?? ""), { timeout: 3000 }); if (body.enter) await t.press("Enter"); break;
+      await ready(t);
+      await t.fill(String(body.text ?? ""), { timeout: 3000 }); if (body.enter) await t.press("Enter");
+      return { delivery: "delivered", value: await t.inputValue().catch(() => null), screen: await screen(page) };
     }
     case "scroll": {
       const target = body.ref ? await resolve(body.ref) : page.locator("body");
@@ -203,13 +222,15 @@ async function act(id, body) {
       return { diag: r, screen: await screen(page) };
     }
     case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
-    case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) await b.first().click(); else throw new Error("no Back button on this screen"); break; }
+    case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) { await ready(b.first()); await b.first().click(); } else throw new Error("no Back button on this screen"); break; }
     case "screenshot": { const p = join(DIR, `${id}-${Date.now()}.png`); await page.screenshot({ path: p }); return { path: p, screen: await screen(page) }; }
     default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, device_log, device_reset, set_network_mocks`);
   }
-  return { screen: await screen(page) };
+  return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
 
+const DELIVERY = new Set(["tap", "type", "scroll", "back"]);
+const REASONS = new Set(["stale_ref", "not_visible", "disabled", "covered"]);
 const WCACHE = new Map();
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
@@ -261,7 +282,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
-      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), screen: s ? await screen(s.page) : null }); }
+      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }
