@@ -3,18 +3,17 @@ import { Platform, Share, Linking } from "react-native";
 import type { Device, PermissionStatus, Notification, Contact, CalendarEvent, PickedFile } from "./types";
 export * from "./types";
 
-// Metro needs static requires; each module is optional so an app only pays for what it installs.
-const tryReq = (f: () => any) => { try { return f(); } catch { return null; } };
-const MODS: Record<string, any> = {
-  "expo-camera": tryReq(() => require("expo-camera")),
-  "expo-location": tryReq(() => require("expo-location")),
-  "expo-local-authentication": tryReq(() => require("expo-local-authentication")),
-  "expo-notifications": tryReq(() => require("expo-notifications")),
-  "expo-clipboard": tryReq(() => require("expo-clipboard")),
-  "expo-contacts": tryReq(() => require("expo-contacts")),
-  "expo-calendar": tryReq(() => require("expo-calendar")),
-  "expo-document-picker": tryReq(() => require("expo-document-picker")),
-};
+// Metro resolves require() statically and only treats it as optional when it sits directly inside a try block
+// (not inside a function). So each module gets its own try/catch: a missing module resolves to null, and the bundle still builds.
+const MODS: Record<string, any> = {};
+try { MODS["expo-camera"] = require("expo-camera"); } catch { MODS["expo-camera"] = null; }
+try { MODS["expo-location"] = require("expo-location"); } catch { MODS["expo-location"] = null; }
+try { MODS["expo-local-authentication"] = require("expo-local-authentication"); } catch { MODS["expo-local-authentication"] = null; }
+try { MODS["expo-notifications"] = require("expo-notifications"); } catch { MODS["expo-notifications"] = null; }
+try { MODS["expo-clipboard"] = require("expo-clipboard"); } catch { MODS["expo-clipboard"] = null; }
+try { MODS["expo-contacts"] = require("expo-contacts"); } catch { MODS["expo-contacts"] = null; }
+try { MODS["expo-calendar"] = require("expo-calendar"); } catch { MODS["expo-calendar"] = null; }
+try { MODS["expo-document-picker"] = require("expo-document-picker"); } catch { MODS["expo-document-picker"] = null; }
 function opt<T>(name: string): T | null { return (MODS[name] as T) ?? null; }
 const map = (s: string): PermissionStatus => (s === "granted" ? "granted" : s === "denied" ? "denied" : "undetermined");
 let online = true; const netSubs = new Set<(o: boolean) => void>();

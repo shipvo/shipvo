@@ -137,6 +137,7 @@ async function stub({ putStatus = 200, badSig = false } = {}) {
     let b = ""; req.on("data", (d) => (b += d)); req.on("end", () => {
       log.push(`${req.method} ${req.url}`);
       const send = (c, o) => { res.writeHead(c, { "content-type": "application/json" }); res.end(typeof o === "string" ? o : JSON.stringify(o)); };
+      if (req.method === "POST" && req.url === "/apps") { try { log.push("APPID " + JSON.parse(b).app_id); } catch {} }
       if (req.method === "POST" && req.url === "/apps") return req.headers.authorization === "Bearer sv_test_localdev" ? send(201, { publish_token: "tok123" }) : send(401, { error: "bad dev key" });
       if (req.method === "PUT" && req.url.startsWith("/apps/")) {
         if (req.headers.authorization !== "Bearer tok123") return send(401, { error: "no" });
@@ -161,11 +162,11 @@ if (a[2]==="publish" && process.env.ARGS_LOG) appendFileSync(process.env.ARGS_LO
 if (a[2]==="init") { mkdirSync(a[3],{recursive:true}); writeFileSync(a[3]+"/shipvo.json", JSON.stringify({appId:"demo", controlPlane:"https://x.invalid", publicKey:${JSON.stringify(pubB64)}})); }
 if (a[2]==="publish" && !a.includes("--dry-run")) {
   const cfg = JSON.parse(readFileSync("shipvo.json","utf8"));
-  const body = JSON.stringify({app_id:"demo", release:1});
+  const body = JSON.stringify({app_id:cfg.appId, release:1});
   const key = createPrivateKey(${JSON.stringify(privateKey.export({ format: "pem", type: "pkcs8" }))});
-  const r = await fetch(cfg.controlPlane+"/apps/demo/kv/p/demo/1/b0", {method:"PUT", headers:{authorization:"Bearer "+process.env.SHIPVO_PUBLISH_TOKEN}, body: JSON.stringify({body, signature: sign(null, Buffer.from(body), key).toString("base64")})});
-  if (!r.ok) { console.error("publish p/demo/1/b0: "+r.status+" "+(await r.json()).message); process.exit(1); }
-  console.log(JSON.stringify({app:"demo", release:1}));
+  const r = await fetch(cfg.controlPlane+"/apps/"+cfg.appId+"/kv/p/"+cfg.appId+"/1/b0", {method:"PUT", headers:{authorization:"Bearer "+process.env.SHIPVO_PUBLISH_TOKEN}, body: JSON.stringify({body, signature: sign(null, Buffer.from(body), key).toString("base64")})});
+  if (!r.ok) { console.error("publish p/"+cfg.appId+"/1/b0: "+r.status+" "+(await r.json()).message); process.exit(1); }
+  console.log(JSON.stringify({app:cfg.appId, release:1}));
 }`);
 const runAsync = ({ cli, out }, extra, env = {}) => new Promise((done) => {
   const c = spawn(process.execPath, [script, "--cli", cli, "--out", out, ...extra], { env: { ...process.env, SHIPVO_LOCAL_DEV_KEY: "sv_test_localdev", ...env } });
@@ -183,7 +184,9 @@ test("--control-url runs a real publish and checks the signed pointer", async ()
     assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 0], ["publish --dry-run", 0], ["publish", 0], ["pointer", 0], ["total", 0]]);
     assert.ok(j.every((x) => Number.isInteger(x.ms)));
     assert.match(r.stdout, /\| publish \| \d+\.\d\d \|/);
-    assert.ok(s.log.includes("DELETE /apps/demo"));
+    const id = s.log.find((l) => l.startsWith("APPID ")).slice(6);
+    assert.match(id, /^first-run-[a-z0-9]{6}$/);
+    assert.ok(s.log.includes(`DELETE /apps/${id}`));
   } finally { s.close(); }
 });
 
@@ -237,4 +240,15 @@ test("without --with-export, the real publish still passes --skip-export true", 
     const calls = publishCalls(log);
     assert.ok(calls.some((c) => !c.includes("--dry-run") && c.join(" ").includes("--skip-export true")));
   } finally { s.close(); }
+});
+
+test("pickAppId is not reserved by the control plane", async () => {
+  const { pickAppId } = await import("./measure.mjs");
+  const src = readFileSync(fileURLToPath(new URL("../../services/control-plane/src/apps.ts", import.meta.url)), "utf8");
+  const reserved = [...src.match(/const RESERVED = new Set\(\[(.*?)\]\)/)[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(reserved.includes("app"));
+  const a = pickAppId();
+  assert.match(a, /^first-run-[a-z0-9]{6}$/);
+  assert.ok(!reserved.includes(a));
+  assert.notEqual(a, pickAppId());
 });
