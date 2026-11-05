@@ -5,9 +5,12 @@ import { writeParquet } from "./parquet";
 export const EXPORT_BATCH = 5000;
 const COLS = "id, received_at, app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via";
 
-/** Object key: Hive-style partitions (`app=`, `day=`) that DuckDB and Spark read directly. The id range makes a re-run write the same key. */
-export const exportKey = (app: string, day: string, firstId: number, lastId: number) =>
-  `telemetry/v${TELEMETRY_EXPORT_VERSION}/app=${app}/day=${day}/part-${String(firstId).padStart(12, "0")}-${String(lastId).padStart(12, "0")}.parquet`;
+/** Object key: Hive-style partitions (`app=`, `day=`) that DuckDB and Spark read directly. Named by the first id only: a retry starts after the same mark, so it writes the same key and overwrites, even if more rows arrived. */
+export const exportKey = (app: string, day: string, firstId: number) =>
+  `telemetry/v${TELEMETRY_EXPORT_VERSION}/app=${app}/day=${day}/part-${String(firstId).padStart(12, "0")}.parquet`;
+
+/** Batches per app per run, so one busy app cannot hold the run forever. */
+export const MAX_BATCHES_PER_RUN = 10;
 
 /** Writes new telemetry rows to the bucket as Parquet, one file per app and day. Does nothing without a bucket. Returns the number of rows written. */
 export async function exportTelemetry(env: { DB: D1Database; EXPORT_BUCKET?: R2Bucket }): Promise<number> {
@@ -17,17 +20,26 @@ export async function exportTelemetry(env: { DB: D1Database; EXPORT_BUCKET?: R2B
   ).all<{ app_id: string; last_id: number }>();
   let total = 0;
   for (const a of appRows ?? []) {
-    const { results } = await env.DB.prepare(`SELECT ${COLS} FROM telemetry WHERE app_id = ? AND id > ? ORDER BY id LIMIT ?`).bind(a.app_id, a.last_id, EXPORT_BATCH).all<Record<string, unknown>>();
-    const rows = results ?? []; if (!rows.length) continue;
-    const days = new Map<string, Record<string, unknown>[]>();
-    for (const r of rows) { const d = String(r.received_at).slice(0, 10); (days.get(d) ?? days.set(d, []).get(d)!).push(r); }
-    for (const [day, part] of days) {
-      await bucket.put(exportKey(a.app_id, day, part[0].id as number, part[part.length - 1].id as number), writeParquet(part), { httpMetadata: { contentType: "application/vnd.apache.parquet" } });
+    try {
+      let last = a.last_id;
+      for (let i = 0; i < MAX_BATCHES_PER_RUN; i++) {
+        const { results } = await env.DB.prepare(`SELECT ${COLS} FROM telemetry WHERE app_id = ? AND id > ? ORDER BY id LIMIT ?`).bind(a.app_id, last, EXPORT_BATCH).all<Record<string, unknown>>();
+        const rows = results ?? []; if (!rows.length) break;
+        const days = new Map<string, Record<string, unknown>[]>();
+        for (const r of rows) { const d = String(r.received_at).slice(0, 10); (days.get(d) ?? days.set(d, []).get(d)!).push(r); }
+        for (const [day, part] of days) {
+          await bucket.put(exportKey(a.app_id, day, part[0].id as number), writeParquet(part), { httpMetadata: { contentType: "application/vnd.apache.parquet" } });
+        }
+        // Move the mark only after every file is written; a retry rewrites the same keys.
+        last = rows[rows.length - 1].id as number;
+        await env.DB.prepare("INSERT INTO telemetry_export (app_id, last_id, exported_at) VALUES (?, ?, ?) ON CONFLICT(app_id) DO UPDATE SET last_id = excluded.last_id, exported_at = excluded.exported_at")
+          .bind(a.app_id, last, new Date().toISOString()).run();
+        total += rows.length;
+        if (rows.length < EXPORT_BATCH) break;
+      }
+    } catch (e) {
+      console.error(`telemetry export failed for app ${a.app_id}: ${e instanceof Error ? e.message : String(e)}`);
     }
-    // Move the mark only after every file is written; a crash in between just rewrites the same keys.
-    await env.DB.prepare("INSERT INTO telemetry_export (app_id, last_id, exported_at) VALUES (?, ?, ?) ON CONFLICT(app_id) DO UPDATE SET last_id = excluded.last_id, exported_at = excluded.exported_at")
-      .bind(a.app_id, rows[rows.length - 1].id, new Date().toISOString()).run();
-    total += rows.length;
   }
   return total;
 }

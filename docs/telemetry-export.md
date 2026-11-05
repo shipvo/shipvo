@@ -17,11 +17,12 @@ Uncomment the `[[r2_buckets]]` block at the end of `wrangler.toml` and run `npx 
 ## What is written
 
 ```
-telemetry/v1/app=<app_id>/day=<YYYY-MM-DD>/part-<first id>-<last id>.parquet
+telemetry/v1/app=<app_id>/day=<YYYY-MM-DD>/part-<first id>.parquet
 ```
 
-- One file per app, per day, per run. Up to 5000 rows per app per run; a backlog drains over several runs.
-- A re-run after a failure writes the same keys, so it never duplicates rows.
+- One file per app, per day, per batch. A run writes up to 10 batches of 5000 rows per app; a larger backlog drains over the next runs.
+- The file is named by its first row id. A retry after a failure starts after the same mark, so it writes the same key and overwrites the file. It never duplicates rows.
+- If one app fails (for example an R2 error), the error is logged with the app id and the other apps still export.
 - `app` and `day` are partitions in the path. DuckDB reads them as columns with `hive_partitioning`.
 - The columns are defined in `@shipvo/schema` (`TELEMETRY_EXPORT_COLUMNS`, version `TELEMETRY_EXPORT_VERSION`). The version is also in the path (`v1`) and in each file's metadata. A rename, removal or type change bumps the version; a new nullable column at the end does not.
 
@@ -44,6 +45,8 @@ telemetry/v1/app=<app_id>/day=<YYYY-MM-DD>/part-<first id>-<last id>.parquet
 **No personal data.** The control plane stores no device id, user id or IP address with telemetry, so the export has none. Cohort bands are not stored with events yet, so `device_class` is the only grouping of devices today.
 
 ## Query with DuckDB
+
+The three queries below were run with DuckDB 2.0.0 against a local directory laid out like the export keys, with the files written by the export code. The `CREATE SECRET` and `r2://` part has **not yet been run against a bucket**.
 
 Create an R2 API token (S3 compatible) and read through the S3 endpoint:
 
@@ -94,7 +97,7 @@ Give the agent the DuckDB CLI (or any DuckDB MCP server) with the view above and
 Any Parquet reader opens a file you downloaded:
 
 ```bash
-python3 -c "import pyarrow.parquet as pq; print(pq.read_table('part-000000000001-000000000020.parquet').to_pandas())"
+python3 -c "import pyarrow.parquet as pq; print(pq.read_table('part-000000000001.parquet').to_pandas())"
 ```
 
 ## Not yet
