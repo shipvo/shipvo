@@ -39,6 +39,27 @@ describe("shipvo status", () => {
     expect(f).toHaveBeenCalledWith("https://cp.test/t/other/summary");
     expect(JSON.parse(String(log.mock.calls[0][0]))).toEqual(payload);
   });
+  it("prints one halt line above the table when halted is set", async () => {
+    inApp();
+    const halted = { release: 8, halted_at: "2026-11-05T00:00:00.000Z", reports: 40, failed: 12, threshold: 0.2 };
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    expect(await status([], (async () => resp({ ...payload, halted })) as any)).toBe(0);
+    expect(log.mock.calls[0][0]).toBe("Release 8 is halted: 12 of 40 devices failed (limit 20%). Publish a new release or run shipvo rollback to clear.");
+    expect(String(log.mock.calls[1][0])).toContain("applied");
+  });
+  it("prints no halt line when halted is null or missing; --json passes it through", async () => {
+    inApp();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await status([], (async () => resp({ ...payload, halted: null })) as any);
+    await status([], (async () => resp(payload)) as any);
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(String(log.mock.calls[0][0])).not.toContain("halted");
+    expect(String(log.mock.calls[1][0])).not.toContain("halted");
+    log.mockClear();
+    const halted = { release: 8, reports: 40, failed: 12, threshold: 0.2 };
+    await status(["--json"], (async () => resp({ ...payload, halted })) as any);
+    expect(JSON.parse(String(log.mock.calls[0][0])).halted).toEqual(halted);
+  });
   it("says no telemetry yet and exits 0 when empty", async () => {
     inApp();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
