@@ -1,7 +1,7 @@
 # Content Lead: publishes one evidence-backed, SEO-minded article to shipvo.dev (blog + sitemap rebuild on merge).
 name: agent-blog
 on:
-  schedule: [{ cron: "17 6 * * 2,4,6" }]
+  schedule: [{ cron: "17 6 * * *" }]
   workflow_dispatch:
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
 concurrency: { group: agent-blog }

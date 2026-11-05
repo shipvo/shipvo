@@ -14,4 +14,4 @@ House style (from the owner): visuals are **handcrafted from scratch in code**, 
 
 Commit (`git add`, `git commit -m "video: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (topic, length, size, how you checked it).
 
-This runs four times a week and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
+This runs every day and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
