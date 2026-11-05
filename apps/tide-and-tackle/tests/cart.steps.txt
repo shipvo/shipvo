@@ -1,0 +1,7 @@
+# The cart flow in plain language. Run by cart-plain.test.ts.
+tap "Open cart"
+see "Choose delivery and pay"
+do not see "Order placed"
+tap "Choose delivery and pay"
+wait for "Mobile money"
+go back
