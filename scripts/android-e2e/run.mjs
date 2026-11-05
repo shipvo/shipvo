@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { startServer } from "./server.mjs";
 import { publishRelease } from "./release.mjs";
-import { median, parseLog, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
+import { hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const APK = resolve(arg("apk", "shell.apk")), BUNDLES = resolve(arg("bundles", "bundles")), KEY = JSON.parse(readFileSync(arg("key", "key.json"), "utf8"));
@@ -130,6 +130,26 @@ for (const mode of ["signature", "hash", "size"]) {
       release: p.release, runningBefore: cur, currentAfter: after.current_release, pendingAfter: after.pending_release ?? 0, devicePolledPointer: sawPointer, deviceDownloadedBundle: sawBundle, appStayedAlive: alive, restartedOnRelease: again?.release ?? null };
   });
 }
+await scenario("hermes bytecode mismatch: a release for another bytecode version is refused", async () => {
+  const shellVersion = hermesVersionOf(embedded);
+  if (shellVersion == null) throw new Error("the shell's embedded bundle is not Hermes bytecode, so there is nothing to mismatch");
+  if (!pid()) launch(); // the app only polls while it is open
+  const cur = good().rel, releaseVersion = otherHermesVersion(shellVersion), before = prefs();
+  const p = await publish(withHermesVersion(bundle("v" + AFTER_PATCH), releaseVersion), { bases: [], hermesBytecodeVersion: releaseVersion });
+  const reason = await waitFor(() => refusalReason(tele(), p.release, p.at), 60_000);
+  await sleep(15_000); // more poll cycles: the release must stay refused
+  const e = entries().filter((x) => x.t >= p.at), after = prefs();
+  const sawPointer = e.some((x) => x.path === `/p/${APP}/1/${BAND}.json` && x.status === 200);
+  const downloaded = e.some((x) => x.path.startsWith("/b/") && x.path.includes(`r${p.release}.`));
+  const ranIt = !!tele().find((x) => x.event === "applied" && x.release === p.release && x.at >= p.at);
+  const alive = !!pid();
+  stop(); await sleep(800); const t1 = Date.now(); launch();
+  const again = await waitFor(() => healthy(cur, t1), 30_000);
+  return { pass: reason === "hermes_bytecode_mismatch" && sawPointer && !downloaded && !ranIt && alive && after.current_release === cur && !after.pending_release && !!again && !fatal(),
+    refusalReason: reason, release: p.release, shellBytecodeVersion: shellVersion, releaseBytecodeVersion: releaseVersion, runningBefore: cur, currentAfter: after.current_release, pendingAfter: after.pending_release ?? 0,
+    blockedAfter: after.blocked_release ?? 0, devicePolledPointer: sawPointer, deviceDownloadedBundle: downloaded, appStayedAlive: alive, restartedOnRelease: again?.release ?? null };
+});
+
 await scenario("device recovers: valid release after tampered ones", async () => { const t = await updateTrial(bundle("v" + AFTER_PATCH), []); return { pass: t.ok, ...t }; });
 
 await scenario("rollback to the previous release", async () => {
