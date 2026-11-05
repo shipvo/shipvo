@@ -127,6 +127,8 @@ If your first publish fails, run `shipvo doctor` first. It checks your Node vers
 
 Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
 
+To see whether the release reached phones, run `shipvo status [--app <id>] [--json]`. It reads the control plane's `/t/<app>/summary` and prints one row per recent release: counts for each telemetry event, and the median apply and cold start times in milliseconds. It prints "No telemetry yet" when phones have not reported. `--json` prints the endpoint's payload unchanged.
+
 Agents open the exact release phones run with `open_app("myshop@r8")` or `open_app("myshop@latest")`.
 
 ## Already have a bare React Native app?
