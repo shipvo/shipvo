@@ -210,7 +210,7 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
 
 server.tool("export_test", "Turn this session's steps into a TypeScript @shipvo/test script (vitest) that replays them in CI with no agent. Targets are the visible text, never refs. Text that matches several elements becomes a '// TODO: ambiguous' comment. Values typed into password-like fields become process.env placeholders. Call before end_session.", { session: sid }, RO, async ({ session }) => {
   const log = logs.get(session);
-  if (!log) return { ...text(`Error [unknown_session]: this server has no steps for session "${session}". Call open_app first; steps are kept until end_session.`), isError: true as const, structuredContent: { ok: false, code: "unknown_session", error: `no steps for session "${session}"` } };
+  if (!log) return { ...text(`Error [no_session]: no session '${session}': call open_app first`), isError: true as const, structuredContent: { ok: false, code: "no_session", error: `no session '${session}': call open_app first` } };
   return text(exportTest(log.open, log.steps));
 });
 

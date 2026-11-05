@@ -58,7 +58,24 @@ describe("export_test", () => {
     const c = await connect();
     const r: any = await c.callTool({ name: "export_test", arguments: { session: "nope" } });
     expect(r.isError).toBe(true);
-    expect(r.structuredContent.code).toBe("unknown_session");
+    expect(r.structuredContent.code).toBe("no_session");
+    await c.close();
+  });
+  it("opening the same session id again resets its steps", async () => {
+    const c = await connect();
+    await c.callTool({ name: "open_app", arguments: { app: "shop", session: "s2" } });
+    await c.callTool({ name: "back", arguments: { session: "s2" } });
+    await c.callTool({ name: "open_app", arguments: { app: "shop", session: "s2" } });
+    const script = textOf(await c.callTool({ name: "export_test", arguments: { session: "s2" } }));
+    expect(script).not.toContain("phone.back()");
+    await c.close();
+  });
+  it("keeps at most 500 steps per session", async () => {
+    const c = await connect();
+    await c.callTool({ name: "open_app", arguments: { app: "shop", session: "s3" } });
+    for (let i = 0; i < 502; i++) await c.callTool({ name: "back", arguments: { session: "s3" } });
+    const script = textOf(await c.callTool({ name: "export_test", arguments: { session: "s3" } }));
+    expect(script.split("phone.back()").length - 1).toBe(500);
     await c.close();
   });
   it("exports open, tap, type, back with text targets, a TODO for an ambiguous one and an env placeholder for a password", async () => {

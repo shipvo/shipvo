@@ -68,7 +68,7 @@ Rules:
 - Text typed into a field whose name looks like a password, PIN, token, secret, OTP, verification code, card number, security code or CVV is not written. The script reads `process.env.SHIPVO_TEST_<FIELD NAME>` instead, and a `payment.pin` in `set_device` becomes `process.env.SHIPVO_TEST_PAYMENT_PIN`.
 - `open_notification`, `push_notification` and `device_reset` change the phone but have no script form. They become a `// TODO: not exported: ... (replay by hand)` line.
 - The `app` in the script is the value you gave `open_app` (for example `tide@r13`), so it pins that release. Use the plain app id to follow the latest.
-- Steps are kept in memory until `end_session`, up to 500 per session. An unknown session returns the error code `unknown_session`, which includes a reconnect to a different server process.
+- Steps are kept in memory until `end_session`, up to 500 per session. The secret check looks at the field label only, so review the script before you commit it. An unknown session returns `no_session`. Steps live in the memory of the server process that opened the session, so after a reconnect to a different process there is nothing to export.
 - Not yet: assertions from the `end_session` orders, and a CLI command.
 
 ## What the tree shows (and hides), on purpose
