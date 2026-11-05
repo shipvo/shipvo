@@ -16,6 +16,8 @@
 // A failed step prints its output and exits 1. Nothing is recorded as 0 s for a step that did not run.
 // Full path on a clean Linux runner (no secrets), after `pnpm --filter @shipvo/cli build`:
 //   node scripts/first-run/measure.mjs --with-install --with-export --control-url http://localhost:8787
+// --control-log <file>: the file the local control plane writes its log to. If the real publish fails, the last 20 lines
+// of that file are added to the failure output, so a failed run shows what the server saw (or that it saw nothing).
 // --with-export (needs --with-install and --control-url) runs the real bundle export (`expo export`) inside the
 // real `shipvo publish`, so "publish" includes the export. Without it, a small plain-JS bundle is staged where
 // the export would write it, and publish runs with --skip-export.
@@ -57,8 +59,16 @@ export function pickAppId() {
   return `first-run-${id}`;
 }
 
+/** The last `n` lines of the control plane log, ready to append to a failure message. */
+export function logTail(file, n = 20) {
+  let text;
+  try { text = readFileSync(file, "utf8"); } catch (e) { return `\n(control plane log ${file} could not be read: ${e.code ?? e.message})`; }
+  const lines = text.split("\n"); if (lines[lines.length - 1] === "") lines.pop();
+  return `\n--- last ${Math.min(n, lines.length)} lines of the control plane log (${file}) ---\n${lines.slice(-n).join("\n")}`;
+}
+
 /** Real publish against a control plane, then check the pointer it serves. Returns the steps to record. */
-async function realPublish(cli, app, controlUrl, withExport) {
+async function realPublish(cli, app, controlUrl, withExport, controlLog) {
   const base = controlUrl.replace(/\/$/, "");
   const cfgPath = join(app, "shipvo.json");
   const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
@@ -77,7 +87,7 @@ async function realPublish(cli, app, controlUrl, withExport) {
   try {
     writeFileSync(cfgPath, JSON.stringify({ ...cfg, controlPlane: base }, null, 2) + "\n");
     const pub = await runStepAsync(withExport ? "publish (includes export)" : "publish", cli, ["publish", ...(withExport ? [] : ["--skip-export", "true"]), "--skip-web", "true", "--platform", "android", "--bands", "b0"], app, { SHIPVO_PUBLISH_TOKEN: token });
-    if (pub.exit !== 0) return [pub];
+    if (pub.exit !== 0) return [controlLog ? { ...pub, stderr: pub.stderr + logTail(controlLog) } : pub];
     const t0 = performance.now();
     const pointer = (exit, msg) => ({ step: "pointer", ms: Math.round(performance.now() - t0), exit, stderr: msg });
     let released;
@@ -196,7 +206,7 @@ export function table(results, totalMs = results.reduce((n, r) => n + r.ms, 0)) 
 }
 
 // withExport: run the real bundle export inside `shipvo publish` (needs install and network).
-export async function measure(cli, withInstall = false, controlUrl, withExport = false, withSession = false) {
+export async function measure(cli, withInstall = false, controlUrl, withExport = false, withSession = false, controlLog) {
   if (withSession && !withInstall) throw new Error("--with-session needs --with-install");
   if (withExport && !(withInstall && controlUrl)) throw new Error("--with-export needs --with-install and --control-url");
   const start = performance.now();
@@ -229,7 +239,7 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
       results.push(sess);
       ok = sess.exit === 0;
     }
-    if (ok && controlUrl) results.push(...(await realPublish(cli, app, controlUrl, withExport)));
+    if (ok && controlUrl) results.push(...(await realPublish(cli, app, controlUrl, withExport, controlLog)));
   } finally { rmSync(root, { recursive: true, force: true }); }
   results.totalMs = Math.round(performance.now() - start);
   return results;
@@ -243,7 +253,7 @@ export async function main(argv) {
   const withInstall = argv.includes("--with-install");
   const controlUrl = opt("--control-url", undefined);
   let results;
-  try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export"), argv.includes("--with-session")); }
+  try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export"), argv.includes("--with-session"), opt("--control-log", undefined)); }
   catch (e) { console.error(e.message); return 1; }
   writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }], null, 2) + "\n");
   console.log(table(results, results.totalMs));

@@ -302,3 +302,28 @@ test("pickAppId is not reserved by the control plane", async () => {
   assert.ok(!reserved.includes(a));
   assert.notEqual(a, pickAppId());
 });
+
+test("--control-log: a failed publish prints the last 20 lines of the control plane log", async () => {
+  const s = await stub({ putStatus: 429 }); const f = fakeCp();
+  const logFile = join(mkdtempSync(join(tmpdir(), "cp-log-")), "control-plane.log");
+  writeFileSync(logFile, Array.from({ length: 30 }, (_, i) => `server line ${i + 1}`).join("\n") + "\n");
+  try {
+    const r = await runAsync(f, ["--control-url", s.url, "--control-log", logFile]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /quota exceeded on purpose/);
+    assert.match(r.stderr, /server line 30/);
+    assert.match(r.stderr, /server line 11\b/);
+    assert.doesNotMatch(r.stderr, /server line 10\b/);
+  } finally { s.close(); }
+});
+
+test("--control-log: a successful publish does not print the log", async () => {
+  const s = await stub(); const f = fakeCp();
+  const logFile = join(mkdtempSync(join(tmpdir(), "cp-log-")), "control-plane.log");
+  writeFileSync(logFile, "server line 1\n");
+  try {
+    const r = await runAsync(f, ["--control-url", s.url, "--control-log", logFile]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.doesNotMatch(r.stderr, /server line/);
+  } finally { s.close(); }
+});
