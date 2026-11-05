@@ -86,20 +86,55 @@ body.dark{background:#15171a;color:#eee}
 .bar{display:flex;gap:8px;justify-content:center;align-items:center;padding:10px;flex-wrap:wrap}
 .bar button{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
 .bar button[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}
-.stage{display:flex;justify-content:center;padding:0 10px 20px}
+.stage{display:flex;justify-content:center;align-items:flex-start;gap:16px;padding:0 10px 20px;flex-wrap:wrap}
+.panel{width:280px;max-width:100%;box-sizing:border-box;display:grid;gap:10px;padding:12px;border:1px solid #8886;border-radius:12px}
+.panel h2{font-size:15px;margin:0}.panel fieldset{border:0;margin:0;padding:0;display:grid;gap:6px}.panel legend{font-weight:600;padding:0 0 4px}
+.panel .row{display:flex;gap:6px;flex-wrap:wrap}.panel input,.panel select,.panel button{font:inherit;padding:5px 8px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;min-width:0}
+.panel input{flex:1 1 80px}.panel button{cursor:pointer}.panel .sim{opacity:.7;font-size:12px;margin:0}
 iframe{border:0;background:#fff;border-radius:28px;box-shadow:0 8px 30px #0005;width:360px;height:760px;max-width:100%}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
-@media (max-width:500px){.bar,.note{display:none}.stage{padding:0}iframe{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0;box-shadow:none}}
+@media (max-width:500px){.bar,.note{display:none}.stage{padding:0;display:block}.panel{width:auto;margin:10px;max-width:none}iframe{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0;box-shadow:none}}
 </style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-device="phone" aria-pressed="true">Phone</button><button data-device="iphone" aria-pressed="false">iPhone</button><button data-device="tablet" aria-pressed="false">Tablet</button>
 <button id="theme" aria-pressed="false">Dark</button></div>
-<div class="stage"><iframe id="app" src="app.html" title="${title}"></iframe></div>
+<div class="stage"><iframe id="app" src="app.html" title="${title}"></iframe>
+<aside class="panel" id="device-panel" aria-label="Device controls"><h2>Device</h2>
+<fieldset><legend>Location</legend><div class="row"><select data-control="location-list" aria-label="Place"><option value="4.0511,9.7679">Douala</option><option value="48.8566,2.3522">Paris</option><option value="40.7128,-74.006">New York</option><option value="-1.2921,36.8219">Nairobi</option></select><button data-control="location-set">Set</button></div>
+<div class="row"><input data-control="lat" placeholder="Latitude" inputmode="decimal" aria-label="Latitude"><input data-control="lng" placeholder="Longitude" inputmode="decimal" aria-label="Longitude"><button data-control="coords-set">Go</button></div></fieldset>
+<fieldset><legend>Camera</legend><div class="row"><select data-control="camera-list" aria-label="Barcode"><option value="ean13|6181234567890">EAN-13 6181234567890</option><option value="qr|https://example.com">QR https://example.com</option><option value="none|">Nothing in view</option></select><button data-control="camera-set">Show</button></div></fieldset>
+<fieldset><legend>Fingerprint / Face ID</legend><div class="row"><button data-control="bio-success">Match</button><button data-control="bio-fail">No match</button></div></fieldset>
+<fieldset><legend>Payment</legend><div class="row"><button data-control="pay-approve">Approve</button><button data-control="pay-decline">Decline</button></div></fieldset>
+<fieldset><legend>Network</legend><div class="row"><button data-control="net-online">Online</button><button data-control="net-slow">Slow</button><button data-control="net-offline">Offline</button></div></fieldset>
+<fieldset><legend>Push notification</legend><input data-control="push-title" placeholder="Title" aria-label="Title"><input data-control="push-body" placeholder="Body" aria-label="Body"><button data-control="push-send">Send</button></fieldset>
+<p class="sim" id="panel-status" role="status">All device events here are simulated.</p></aside>
+</div>
 <p class="note">${title}: simulated device, public preview. System sheets such as permissions and payments are simulated.</p>
 <script>
 var S={phone:[360,760],iphone:[390,844],tablet:[820,1180]},f=document.getElementById("app");
 document.querySelectorAll("[data-device]").forEach(function(b){b.onclick=function(){var s=S[b.dataset.device];f.style.width=s[0]+"px";f.style.height=s[1]+"px";document.querySelectorAll("[data-device]").forEach(function(o){o.setAttribute("aria-pressed",o===b)})}});
 var t=document.getElementById("theme");t.onclick=function(){var d=!document.body.classList.contains("dark");document.body.classList.toggle("dark",d);t.setAttribute("aria-pressed",d);t.textContent=d?"Light":"Dark";f.style.colorScheme=d?"dark":"light"};
+var P=document.getElementById("panel-status");
+function pnSay(m){P.textContent=m+" (simulated)"}
+function pnDev(){var d=f.contentWindow&&f.contentWindow.__pnDevice;if(!d){pnSay("The app is still loading");return null}return d}
+function pnVal(c){return document.querySelector('[data-control="'+c+'"]').value}
+function pnSet(patch,msg){var d=pnDev();if(d){d.set(patch);pnSay(msg)}}
+var pnDelay=0;
+function pnSlow(){var w=f.contentWindow;if(!w||w.__pnSlow||!w.fetch)return;w.__pnSlow=1;var o=w.fetch.bind(w);w.fetch=function(){var a=arguments;return new Promise(function(r){setTimeout(r,pnDelay)}).then(function(){return o.apply(null,a)})}}
+var A={
+"location-set":function(){var v=pnVal("location-list").split(",");pnSet({location:{latitude:+v[0],longitude:+v[1],accuracy:20}},"Location set")},
+"coords-set":function(){var a=parseFloat(pnVal("lat")),o=parseFloat(pnVal("lng"));if(!(a>=-90&&a<=90&&o>=-180&&o<=180)){pnSay("Enter latitude -90 to 90 and longitude -180 to 180");return}pnSet({location:{latitude:a,longitude:o,accuracy:20}},"Location set")},
+"camera-set":function(){var v=pnVal("camera-list").split("|");pnSet({camera:{barcode:v[0]==="none"?null:{type:v[0],data:v.slice(1).join("|")}}},"Camera shows "+(v[0]==="none"?"nothing":v[0]))},
+"bio-success":function(){pnSet({biometrics:{nextResult:"success"}},"Next fingerprint or Face ID matches")},
+"bio-fail":function(){pnSet({biometrics:{nextResult:"fail"}},"Next fingerprint or Face ID does not match")},
+"pay-approve":function(){pnSet({payment:{nextResult:"approve"}},"Next payment is approved")},
+"pay-decline":function(){pnSet({payment:{nextResult:"decline"}},"Next payment is declined")},
+"net-online":function(){pnDelay=0;pnSet({online:true},"Network online")},
+"net-slow":function(){pnDelay=1500;pnSlow();pnSet({online:true},"Network slow (requests wait 1.5 s)")},
+"net-offline":function(){pnDelay=0;pnSet({online:false},"Network offline")},
+"push-send":function(){var d=pnDev();if(!d)return;var t=pnVal("push-title")||"Notification",b=pnVal("push-body");pnSay(d.push({title:t,body:b})===null?"Not delivered: notification permission is not granted":"Push sent")}
+};
+document.querySelectorAll("[data-control]").forEach(function(e){var c=e.dataset.control;if(A[c])e.onclick=A[c]});
 </script></body></html>
 `;
 }

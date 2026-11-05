@@ -70,6 +70,17 @@ Safety rules:
 - It never uploads `.shipvo/`, `.env*`, key files (`.pem`, `.key`, `.p8`, `.p12`, `.jks`, `.mobileprovision`), `seed.txt`, `publish-token` or source maps.
 - It refuses to publish if a text file in the build holds a private key, your signing seed or publish token, or another known secret pattern. The message names the file, never the value.
 
+### Device panel
+
+The preview page has a **Device** panel beside the phone (under it at phone width). It sets the same simulated device state as the MCP `set_device` and `push_notification` tools. Every event is simulated.
+
+- **Location**: pick a place, or type latitude and longitude.
+- **Camera**: put an EAN-13 or QR code in front of the camera, or nothing.
+- **Fingerprint / Face ID**: the next check matches or does not match.
+- **Payment**: the next payment is approved or declined.
+- **Network**: online, slow (the app's `fetch` calls wait 1.5 s) or offline.
+- **Push notification**: send a title and body; it shows as a banner. Nothing is delivered if the app has not been granted notification permission, and the panel says so.
+
 Options: `--skip-build` publishes the last build in `.shipvo/preview-build`.
 
 `shipvo.json` has a `preview` setting: `"here.now"` (default). `"control-plane"` (permanent hosting at `/w/{app}/r{release}/`) is reserved and not built yet; setting it stops with a message.
