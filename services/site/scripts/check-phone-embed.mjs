@@ -52,7 +52,9 @@ const done = (code) => { chrome.kill(); server.close(); process.exit(code); };
 try {
   let targets;
   for (let i = 0; i < 100 && !targets?.some((t) => t.type === 'page'); i++) { try { targets = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json(); } catch {} await new Promise((r) => setTimeout(r, 200)); }
-  const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
+  const page = targets?.find((t) => t.type === 'page');
+  if (!page) throw new Error('Chromium did not expose a page target');
+  const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((r) => (ws.onopen = r));
   let id = 0; const pending = new Map();
   ws.onmessage = (m) => { const d = JSON.parse(m.data); pending.get(d.id)?.(d); };

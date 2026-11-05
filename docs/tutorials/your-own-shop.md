@@ -51,7 +51,9 @@ http://localhost:4545/app/
 
 You should see "Sandbar Shop" with five products and a **Cart** link.
 
-<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: open a product and add it to the cart" data-fallback="/tutorials/your-own-shop/01-starter-list.png"></div>
+The phone below is the finished Tide & Tackle sample shop, not your Sandbar Shop. Try it to see how a shop app works: open a product and add it to the cart.
+
+<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: the Tide & Tackle sample shop (not your Sandbar Shop)" data-fallback="/tutorials/your-own-shop/01-starter-list.png"></div>
 
 ![The shop template on a 390 by 844 phone screen. The heading says Sandbar Shop. Below it are five products with prices: Canvas tote $18.00, Enamel mug $12.00, Pocket notebook $6.50, Wool beanie $24.00 and Steel bottle $29.00.](/tutorials/your-own-shop/01-starter-list.png)
 
@@ -144,7 +146,9 @@ Then change a price: find `"price": 650` and make it `"price": 700`. Save, wait 
 
 Open the app again. Click **Fresh tilapia**, **Add to cart**, **Back**, **River shrimp**, **Add to cart**, then **Cart**. The cart lists both, and the total adds up.
 
-<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: add two products, then open the cart" data-fallback="/tutorials/your-own-shop/06-edited-cart.png"></div>
+The phone below is still the Tide & Tackle sample shop. It does not have your Fresh tilapia or River shrimp. Try adding any two of its products, then open the cart.
+
+<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: add two sample products, then open the cart" data-fallback="/tutorials/your-own-shop/06-edited-cart.png"></div>
 
 ![The cart on the phone screen. It lists Fresh tilapia x 1 and River shrimp x 1, each with a Remove link. The total reads $15.50.](/tutorials/your-own-shop/06-edited-cart.png)
 
