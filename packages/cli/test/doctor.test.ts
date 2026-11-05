@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { b64, keyFromSeed } from "../src/index";
@@ -90,7 +90,7 @@ describe("shipvo doctor checks", () => {
   it("fails the signing check, without crashing, when the seed file is missing", async () => {
     const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(makeSeed()) }));
     const r = await runDoctorChecks({ cwd, env: { SHIPVO_SIGNING_SEED_FILE: "/nope" }, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch });
-    expect(r).toHaveLength(5);
+    expect(r).toHaveLength(7);
     expect(nameOf(r, "signing key matches shipvo.json publicKey").ok).toBe(false);
     expect(nameOf(r, "control plane reachable").ok).toBe(true);
   });
@@ -138,8 +138,9 @@ describe("shipvo doctor checks", () => {
     const logs: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
     vi.spyOn(process, "cwd").mockReturnValue(cwd);
-    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("ok"));
+    chmodSync(join(cwd, ".shipvo", "seed.txt"), 0o600);
     const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u) => String(u).endsWith("/health") ? Response.json({ ok: true }) : new Response("ok"));
     await doctor([]);
     expect(exit).not.toHaveBeenCalled();
     const out = logs.join("\n");
@@ -155,6 +156,58 @@ describe("shipvo doctor checks", () => {
     await expect(doctor(["extra"])).rejects.toThrow("exit");
     expect(exit).toHaveBeenCalledWith(2);
     vi.restoreAllMocks();
+  });
+
+  describe("key file permissions", () => {
+    const keyCheck = (cwd: string, extra = {}) => runDoctorChecks({ cwd, env: {}, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch, ...extra }).then((r) => nameOf(r, "signing key file is private"));
+    const setup = (mode: number) => {
+      const seed = makeSeed();
+      const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
+      chmodSync(join(cwd, ".shipvo", "seed.txt"), mode);
+      return cwd;
+    };
+    it.skipIf(process.platform === "win32")("passes 0600", async () => {
+      expect((await keyCheck(setup(0o600))).ok).toBe(true);
+    });
+    it.skipIf(process.platform === "win32")("fails 0644 with a chmod hint and no key contents", async () => {
+      const c = await keyCheck(setup(0o644));
+      expect(c.ok).toBe(false);
+      expect(c.fix).toContain("chmod 600");
+      expect(c.fix).not.toContain(makeSeed());
+    });
+    it("skips on Windows with a note", async () => {
+      const c = await keyCheck(setup(0o644), { platform: "win32" });
+      expect(c.ok).toBe(true);
+      expect(c.note).toContain("Windows");
+    });
+  });
+
+  describe("control plane health", () => {
+    const run = (fetchFn: unknown) => {
+      const seed = makeSeed();
+      const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com/", publicKey: makePub(seed) }), seed);
+      return runDoctorChecks({ cwd, fetchFn: fetchFn as typeof fetch }).then((r) => nameOf(r, "control plane /health returns JSON"));
+    };
+    it("passes on 200 JSON and requests /health", async () => {
+      const f = vi.fn(async () => Response.json({ ok: true }));
+      expect((await run(f)).ok).toBe(true);
+      expect(f.mock.calls.some((c) => (c as unknown[])[0] === "https://example.com/health")).toBe(true);
+    });
+    it("fails on non-200", async () => {
+      const c = await run(async () => new Response("{}", { status: 404 }));
+      expect(c.ok).toBe(false);
+      expect(c.fix).toContain("404");
+    });
+    it("fails on timeout", async () => {
+      const c = await run(async () => { throw new DOMException("t", "TimeoutError"); });
+      expect(c.ok).toBe(false);
+      expect(c.fix).toContain("5 seconds");
+    });
+    it("fails on non-JSON", async () => {
+      const c = await run(async () => new Response("<html>"));
+      expect(c.ok).toBe(false);
+      expect(c.fix).toContain("not JSON");
+    });
   });
 });
 
