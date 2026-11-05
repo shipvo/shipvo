@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo sim --watch` prints one plain line for a broken JSON file, and hides the build stack unless you pass `--verbose`.
-- Migration: none. Scripts that parse the old "build failed: ..." text should use `--verbose`.

@@ -1,14 +1,16 @@
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort, checkNativeModules } from "@shipvo/schema";
+import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
+import { exportTelemetry } from "./export";
+import { decideOffer, type OfferResult } from "./offer";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
+type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket };
 const app = new Hono<{ Bindings: Env }>();
 
 /* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
@@ -39,34 +41,24 @@ async function servePointer(c: any, platform: "android" | "ios") {
   if (!["b0", "b1", "b2"].includes(band)) return c.json({ error: "bad_band" }, 400);
   const raw = await c.env.POINTERS.get(platform === "ios" ? `p/${appId}/${major}/ios/${band}` : `p/${appId}/${major}/${band}`);
   if (!raw) return c.json({ error: "no_release" }, 404);
-  let release: number;
+  let body: ReturnType<typeof ReleasePointerBody.parse>;
   try {
     const env = SignedEnvelope.parse(JSON.parse(raw));
-    const body = ReleasePointerBody.parse(JSON.parse(env.body));
-    release = body.release;
-    // A shell may say which Hermes bytecode versions it runs: ?hbc=96,98. Without it, every release is offered.
-    const hbc = c.req.query("hbc");
-    if (hbc !== undefined && body.hermes_bytecode_version !== undefined) {
-      const ok = hbc.split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0);
-      if (ok.length === 0) return c.json({ error: "bad_request" }, 400);
-      if (!ok.includes(body.hermes_bytecode_version)) return c.json({ error: "hermes_bytecode_mismatch" }, 404, { "cache-control": "public, max-age=5" });
-    }
-    // A shell may list its native modules: ?nm=@scope/pkg@1.2.3,other@2.0.0. Without it, or without required_native_modules, every release is offered.
-    const nm = c.req.query("nm");
-    if (nm !== undefined && body.required_native_modules !== undefined) {
-      const shell: Record<string, string> = {};
-      for (const item of nm.split(",").filter(Boolean)) { const i = item.lastIndexOf("@"); if (i <= 0) return c.json({ error: "bad_request" }, 400); shell[item.slice(0, i)] = item.slice(i + 1); }
-      const bad = checkNativeModules(body.required_native_modules, shell);
-      if (bad) return c.json({ error: bad.reason, module: bad.module, required: bad.required, ...(bad.have ? { have: bad.have } : {}) }, 404, { "cache-control": "public, max-age=5" });
-    }
+    body = ReleasePointerBody.parse(JSON.parse(env.body));
   } catch { return c.json({ error: "corrupt_pointer" }, 500); }
-  // A halted release is not offered. A halt for another release, or a corrupt value, is ignored.
-  const halted = await c.env.POINTERS.get(`halt/${appId}`);
-  if (halted) {
-    let haltedRelease: unknown;
-    try { haltedRelease = JSON.parse(halted)?.release; } catch { /* corrupt: ignore */ }
-    if (haltedRelease === release) return c.json({ error: "release_halted", release }, 404, { "cache-control": "public, max-age=5" });
+  // The halt key is read only when the earlier rules pass, as before.
+  const query = { hbc: c.req.query("hbc"), nm: c.req.query("nm") };
+  const decide = (haltedRelease?: string | null): OfferResult | null => {
+    try { return decideOffer({ body, ...query, haltedRelease }); } catch { return null; }
+  };
+  let offer = decide();
+  if (offer?.ok) offer = decide(await c.env.POINTERS.get(`halt/${appId}`));
+  if (!offer) return c.json({ error: "corrupt_pointer" }, 500);
+  if (!offer.ok) {
+    const { ok: _ok, status, ...json } = offer;
+    return c.json(json, status, status === 404 ? { "cache-control": "public, max-age=5" } : undefined);
   }
+  const release = offer.release;
   const etag = `"${release}"`;
   if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
   return new Response(raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
@@ -310,7 +302,28 @@ app.delete("/app/:id/api/halt-config", async (c) => {
   return c.json({ enabled: false });
 });
 
+/** Audit rows for one app, newest first. ?limit= (default 50, max 200), ?before=<id>. Owner or the app's publish token. */
+app.get("/audit/:app", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const lq = c.req.query("limit"), bq = c.req.query("before");
+  const limit = lq === undefined ? 50 : Number(lq);
+  if (!Number.isInteger(limit) || limit < 1) return c.json({ error: "bad_request", message: "limit must be a positive integer" }, 400);
+  if (bq !== undefined && !/^\d+$/.test(bq)) return c.json({ error: "bad_request", message: "before must be a row id" }, 400);
+  const n = Math.min(limit, 200);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, app_id, at, actor, actor_kind, action, release, release_id, before, after FROM audit_log WHERE app_id = ?${bq !== undefined ? " AND id < ?" : ""} ORDER BY id DESC LIMIT ?`,
+  ).bind(...(bq !== undefined ? [appId, Number(bq), n] : [appId, n])).all();
+  return c.json({ app: appId, rows: results ?? [] }, 200, { "cache-control": "no-store" });
+});
+
 app.route("/auth", auth);
 app.route("/apps", apps);
 
-export default app;
+/** Hourly cron: copy new telemetry to the owner's R2 bucket as Parquet (only when the EXPORT_BUCKET binding is set). */
+export default Object.assign(app, {
+  scheduled(_e: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(exportTelemetry(env).catch((e) => console.error("telemetry export failed", e)));
+  },
+});

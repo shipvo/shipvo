@@ -46,11 +46,21 @@ function runStepAsync(name, cli, args, cwd, extraEnv) {
 
 const devKey = () => process.env.SHIPVO_LOCAL_DEV_KEY ?? "sv_test_localdev";
 
+/** A fresh app id for the measured app. The scaffold's own id ("app") is reserved by the control plane. */
+export function pickAppId() {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "";
+  for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return `first-run-${id}`;
+}
+
 /** Real publish against a control plane, then check the pointer it serves. Returns the steps to record. */
 async function realPublish(cli, app, controlUrl, withExport) {
   const base = controlUrl.replace(/\/$/, "");
   const cfgPath = join(app, "shipvo.json");
   const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
+  cfg.appId = pickAppId();
+  writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + "\n");
   const fail = (step, ms, stderr) => ({ step, ms, exit: 1, stderr });
   let token;
   try {
