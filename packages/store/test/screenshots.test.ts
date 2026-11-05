@@ -118,3 +118,10 @@ describe("jpeg parsing", () => {
     expect(checkScreenshot(f("a.jpg", j), "iphone").problems[0]).toContain("1080x1920");
   });
 });
+
+import { checkScreenshot as checkFormat } from "../src/screenshots.js";
+it("reports the detected format", () => {
+  const j = Uint8Array.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 8, 0x0a, 0xf8, 0x05, 0x0a, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xff, 0xd9]);
+  expect(checkFormat({ name: "a", bytes: j }, "iphone").format).toBe("jpeg");
+  expect(checkFormat({ name: "a", bytes: Uint8Array.from([1]) }, "iphone").format).toBeUndefined();
+});

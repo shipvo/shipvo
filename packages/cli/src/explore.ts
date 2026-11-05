@@ -178,11 +178,8 @@ export function simDriver(base: string, app: string, session = `explore-${Date.n
   };
 }
 
-/** Returns the exit code. */
-export async function explore(argv: string[]): Promise<number> {
-  const a = parse(argv); const cfg = loadConfig();
-  const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
-  const maxDepth = num("max-depth", 3), maxSteps = num("max-steps", 100);
+/** Use the simulator at `--sim <url>`, or build the app and start one on `--port` (default 4546). `stop` kills the one we started. */
+export async function startSim(a: Record<string, string | undefined>, cfg: { name: string; appId: string; controlPlane: string }): Promise<{ base: string; stop: () => void }> {
   let base = a.sim; let child: ReturnType<typeof spawn> | undefined;
   if (!base) {
     const port = a.port || "4546";
@@ -200,6 +197,15 @@ export async function explore(argv: string[]): Promise<number> {
     if (!(await waitListening(Number(port), () => exited))) throw new Error("the simulator exited before it was ready");
     base = `http://localhost:${port}`;
   }
+  return { base, stop: () => { child?.kill(); } };
+}
+
+/** Returns the exit code. */
+export async function explore(argv: string[]): Promise<number> {
+  const a = parse(argv); const cfg = loadConfig();
+  const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
+  const maxDepth = num("max-depth", 3), maxSteps = num("max-steps", 100);
+  const sim = await startSim(a, cfg); const base = sim.base;
   try {
     const report = await walk(simDriver(base, cfg.appId), { routes: cfg.routes, maxDepth, maxSteps, app: cfg.appId });
     const out = a.out ?? "explore-report";
@@ -207,5 +213,5 @@ export async function explore(argv: string[]): Promise<number> {
     console.log(`${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`);
     if (report.error) { console.error(report.error); return 1; }
     return report.findings.length && a["fail-on-findings"] === "true" ? 1 : 0;
-  } finally { child?.kill(); }
+  } finally { sim.stop(); }
 }

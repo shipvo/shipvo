@@ -116,3 +116,37 @@ it("store status prints a next action per store and --mark moves it on", async (
     expect(o).toContain("shipvo store status --mark play-closed-test");
   });
 });
+
+const jpeg = (w: number, h: number) => Uint8Array.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 8, h >> 8, h & 255, w >> 8, w & 255, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xff, 0xd9]);
+
+it("store screenshots (fast mode) writes a passing file per route in every set", async () => {
+  const { renderScreenshots, RENDER_SETS } = await import("../src/store");
+  const log = vi.spyOn(console, "log"); log.mockClear();
+  const seen: (string | undefined)[] = [];
+  const code = await renderScreenshots(["tide://cart", "tide://tides"], async (s, route) => { seen.push(route); return jpeg(s.width, s.height); }, "raw");
+  expect(code).toBe(0);
+  for (const { set } of RENDER_SETS) {
+    expect(existsSync(join(app, "raw", set, "01-start.jpg"))).toBe(true);
+    expect(existsSync(join(app, "raw", set, "02-cart.jpg"))).toBe(true);
+    expect(existsSync(join(app, "raw", set, "03-tides.jpg"))).toBe(true);
+  }
+  expect(seen).toHaveLength(RENDER_SETS.length * 3);
+  const printed = log.mock.calls.map((c) => c.join(" ")).join("\n");
+  expect(printed).toContain("fast mode: simulator render, not the native UI");
+  expect(printed).toContain("raw/iphone/01-start.jpg: ok");
+});
+
+it("store screenshots reports a wrong size and exits non-zero", async () => {
+  const { renderScreenshots } = await import("../src/store");
+  const log = vi.spyOn(console, "log"); log.mockClear();
+  const code = await renderScreenshots(undefined, async () => jpeg(100, 100), "raw-bad");
+  expect(code).toBe(1);
+  expect(log.mock.calls.map((c) => c.join(" ")).join("\n")).toContain("FAILED");
+});
+
+it("store screenshots names a non-image file .bin, not by its first byte", async () => {
+  const { renderScreenshots } = await import("../src/store");
+  const code = await renderScreenshots(undefined, async () => Uint8Array.from([1, 2, 3]), "raw-junk");
+  expect(code).toBe(1);
+  expect(existsSync(join(app, "raw-junk/iphone/01-start.bin"))).toBe(true);
+});
