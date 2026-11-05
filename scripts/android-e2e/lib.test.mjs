@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { createPublicKey, verify } from "node:crypto";
 import { b64, keyFromSeed } from "../../packages/cli/dist/index.js";
-import { buildPointer, median, parseLog, telemetry, pctChange, sha256, firstRunFrom, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion } from "./lib.mjs";
+import { buildPointer, median, parseLog, telemetry, pctChange, sha256, FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion } from "./lib.mjs";
 
 const seed = b64(randomBytes(32)), pub = b64(keyFromSeed(seed).publicKey);
 const bytes = new Uint8Array(randomBytes(500));
@@ -44,7 +44,7 @@ test("steadyTrials drops poll misses and the trial after one", () => {
 });
 
 test("firstRunFrom takes the full-bundle scenario median, and is null when it failed or has no timing", () => {
-  const name = "update: full bundle (no patches offered)";
+  const name = FULL_BUNDLE_SCENARIO;
   assert.deepEqual(firstRunFrom([{ name, pass: true, median: { pointerToHealthyMs: 4000, downloadMs: 900, applyMs: 100 } }]), { source: name, publishToHealthyMs: 4000, downloadMs: 900, applyMs: 100 });
   assert.equal(firstRunFrom([{ name, pass: false, median: { pointerToHealthyMs: 4000 } }]), null);
   assert.equal(firstRunFrom([{ name, pass: true, median: { pointerToHealthyMs: null } }]), null);

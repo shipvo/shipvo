@@ -355,7 +355,7 @@ test("--control-log: a successful publish does not print the log", async () => {
 });
 
 test("applyRow maps the emulator figure and drops missing values", () => {
-  assert.deepEqual(applyRow({ firstRun: { publishToHealthyMs: 4200.4, downloadMs: 800 } }), { step: "publish to healthy (emulator)", ms: 4200, exit: 0, downloadMs: 800 });
+  assert.deepEqual(applyRow({ firstRun: { publishToHealthyMs: 4200.4, downloadMs: 800 } }), { step: "publish to healthy (full-bundle update scenario, emulator)", ms: 4200, exit: 0, downloadMs: 800 });
   assert.equal(applyRow({ firstRun: { publishToHealthyMs: 0 } }), null);
   assert.equal(applyRow({}), null);
 });
@@ -369,10 +369,10 @@ test("--apply-report appends the emulator row after total, outside the total", (
   const { f, r } = withReport(rep);
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.slice(-2).map((x) => x.step), ["total", "publish to healthy (emulator)"]);
-  assert.deepEqual(j.at(-1), { step: "publish to healthy (emulator)", ms: 4200, exit: 0, downloadMs: 800, applyMs: 150 });
+  assert.deepEqual(j.slice(-2).map((x) => x.step), ["total", "publish to healthy (full-bundle update scenario, emulator)"]);
+  assert.deepEqual(j.at(-1), { step: "publish to healthy (full-bundle update scenario, emulator)", ms: 4200, exit: 0, downloadMs: 800, applyMs: 150 });
   assert.ok(j.find((x) => x.step === "total").ms < 4200);
-  assert.match(r.stdout, /publish to healthy \(emulator\): 4\.20 s/);
+  assert.match(r.stdout, /publish to healthy \(full-bundle update scenario, emulator\): 4\.20 s/);
 });
 
 test("--apply-report with a missing or invalid file says why on stderr and prints not measured", () => {
@@ -383,7 +383,7 @@ test("--apply-report with a missing or invalid file says why on stderr and print
     assert.equal(r.status, 0);
     assert.match(r.stderr, new RegExp("--apply-report .*" + path.split("/").pop()));
     assert.match(r.stderr, why);
-    assert.match(r.stdout, /publish to healthy \(emulator\): not measured/);
+    assert.match(r.stdout, /publish to healthy \(full-bundle update scenario, emulator\): not measured/);
     assert.equal(JSON.parse(readFileSync(f.out, "utf8")).at(-1).step, "total");
   }
 });
@@ -414,4 +414,13 @@ test("bundleStep: same size but a different hash fails on sha256", async () => {
     assert.equal(r.exit, 1);
     assert.match(r.stderr, /has sha256 .*, the signed pointer says/);
   } finally { srv.close(); }
+});
+
+test("--apply-report with a valid report but no firstRun timing says why on stderr", () => {
+  const rep = join(mkdtempSync(join(tmpdir(), "rep-")), "report.json");
+  writeFileSync(rep, JSON.stringify({ firstRun: null }));
+  const { r } = withReport(rep);
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /no firstRun timing/);
+  assert.match(r.stdout, /not measured/);
 });

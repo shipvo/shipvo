@@ -287,9 +287,9 @@ export function applyRow(report) {
   if (typeof ms !== "number" || !Number.isFinite(ms) || ms <= 0) return null;
   const { downloadMs, applyMs } = report.firstRun;
   const ok = (n) => (typeof n === "number" && Number.isFinite(n) && n > 0 ? n : undefined);
-  const row = { step: "publish to healthy (emulator)", ms: Math.round(ms), exit: 0 };
-  if (ok(downloadMs)) row.downloadMs = ok(downloadMs);
-  if (ok(applyMs)) row.applyMs = ok(applyMs);
+  const row = { step: "publish to healthy (full-bundle update scenario, emulator)", ms: Math.round(ms), exit: 0 };
+  if (ok(downloadMs)) row.downloadMs = Math.round(ok(downloadMs));
+  if (ok(applyMs)) row.applyMs = Math.round(ok(applyMs));
   return row;
 }
 
@@ -304,11 +304,12 @@ export async function main(argv) {
   try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export"), argv.includes("--with-session"), opt("--control-log", undefined)); }
   catch (e) { console.error(e.message); return 1; }
   const applyPath = opt("--apply-report", undefined);
-  let apply = null;
-  if (applyPath) { try { apply = applyRow(JSON.parse(readFileSync(applyPath, "utf8"))); } catch (e) { console.error(`--apply-report ${applyPath}: ${e.code === "ENOENT" ? "file not found" : e.message}`); } }
+  let apply = null, applyErr = false;
+  if (applyPath) { try { apply = applyRow(JSON.parse(readFileSync(applyPath, "utf8"))); } catch (e) { applyErr = true; console.error(`--apply-report ${applyPath}: ${e.code === "ENOENT" ? "file not found" : e.message}`); }
+    if (!apply && !applyErr) console.error(`--apply-report ${applyPath}: report has no firstRun timing (the full-bundle update scenario failed or was not run)`); }
   writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }, ...(apply ? [apply] : [])], null, 2) + "\n");
   console.log(table(results, results.totalMs));
-  if (applyPath) console.log(apply ? `\npublish to healthy (emulator): ${secs(apply.ms)} s (not part of the total above)` : "\npublish to healthy (emulator): not measured");
+  if (applyPath) console.log(apply ? `\npublish to healthy (full-bundle update scenario, emulator): ${secs(apply.ms)} s (not part of the total above)` : "\npublish to healthy (full-bundle update scenario, emulator): not measured");
   if (withInstall) {
     const inst = results.find((r) => r.step === "install");
     const pm = inst?.pm;
