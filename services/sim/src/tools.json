@@ -620,6 +620,69 @@
   }
  },
  {
+  "name": "lock",
+  "description": "Press the phone's power button: show the lock screen. Taps do nothing until unlock. Logged in device_log as simulated.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "unlock",
+  "description": "Swipe up on the lock screen: the phone is usable again. Logged in device_log as simulated.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "restart",
+  "description": "Restart the simulated phone: the app cold-starts, storage is kept, in-memory device state starts fresh. Logged in device_log as simulated.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
   "name": "device_reset",
   "description": "Put the simulated phone back to a known state (permissions undetermined, default location, nothing in front of the camera, log cleared), optionally with a new profile.",
   "inputSchema": {

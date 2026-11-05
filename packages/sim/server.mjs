@@ -10,6 +10,7 @@ import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
+import { lifecycle, lockedError } from "./lifecycle.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -164,7 +165,8 @@ async function act(id, body) {
   };
   switch (body.action) {
     case "screen": break;
-    case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
+    case "lock": case "unlock": case "restart": { const r = await lifecycle(page, body.action); return { ...r, screen: await screen(page) }; }
+    case "tap": { if (await page.evaluate(() => globalThis.__pnDevice?.locked?.())) throw lockedError(); const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
       let t = await resolve(body.ref);
@@ -236,7 +238,7 @@ async function act(id, body) {
       const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

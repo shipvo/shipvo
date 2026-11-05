@@ -123,7 +123,7 @@ describe("local mcp", () => {
     for (const t of tools) expect(t.annotations, t.name).toBeDefined();
     for (const n of ["list_apps", "list_sessions", "screen", "screenshot", "notifications", "device_log", "owner_describe"]) expect(by[n]?.readOnlyHint, n).toBe(true);
     for (const n of ["owner_command", "end_session"]) expect(by[n]?.destructiveHint, n).toBe(true);
-    for (const n of ["open_app", "tap", "type", "scroll", "back", "set_device", "push_notification", "open_notification", "open_url", "device_reset"]) expect(by[n]?.readOnlyHint, n).toBe(false);
+    for (const n of ["open_app", "tap", "type", "scroll", "back", "set_device", "push_notification", "open_notification", "open_url", "device_reset", "lock", "unlock", "restart"]) expect(by[n]?.readOnlyHint, n).toBe(false);
     await c.close();
   });
 });

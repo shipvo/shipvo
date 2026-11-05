@@ -84,6 +84,14 @@ describe("secrets and private files", () => {
 });
 
 describe("frame page", () => {
+  it("uses the shared Shipvo Phone frame: side buttons, lock screen, power menu, live status script", () => {
+    const h = framePage("Shop");
+    for (const id of ["power", "volup", "voldn", "lock", "pmenu", "boot", "status"]) expect(h).toContain(`id="${id}"`);
+    expect(h).toContain("--w:412px;--h:915px");
+    expect(h).toContain("<script data-frame>");
+    expect(h).toContain("function statusModel(");
+    expect(h).toContain("Simulated Android style");
+  });
   it("has a phone-width layout, device switcher, themes and loads app.html", () => {
     const h = framePage("Shop");
     expect(h).toContain('name="viewport"');
@@ -106,7 +114,7 @@ describe("frame page", () => {
     const h = framePage("Shop");
     expect(h).not.toMatch(/location\.(reload|href)/);
     const script = h.match(/<script>([\s\S]*)<\/script>/)![1];
-    const mk = (extra: object = {}) => ({ style: {} as Record<string, string>, addEventListener() {}, dataset: {} as Record<string, string>, setAttribute(k: string, v: unknown) { (this as any).attrs[k] = v; }, attrs: {} as Record<string, unknown>, classList: { contains: () => false, toggle() {} }, ...extra });
+    const mk = (extra: object = {}) => ({ style: { setProperty(k: string, v: string) { (this as any)[k] = v; } } as Record<string, any>, addEventListener() {}, dataset: {} as Record<string, string>, setAttribute(k: string, v: unknown) { (this as any).attrs[k] = v; }, attrs: {} as Record<string, unknown>, classList: { contains: () => false, toggle() {} }, ...extra });
     const nodes: Record<string, any> = {};
     const clicked: string[] = [];
     const backBtn = { getAttribute: () => "Back", textContent: "", click: () => clicked.push("btn") };
@@ -115,14 +123,14 @@ describe("frame page", () => {
     const chips = [["skin", "iphone"], ["size", "tablet"]].map(([k, v]) => mk({ dataset: { [k]: v } }));
     const doc = { getElementById: (id: string) => nodes[id], querySelectorAll: (s: string) => (s === "[data-skin]" ? [chips[0]] : s === "[data-size]" ? [chips[1]] : []), body: mk() };
     new Function("document", script)(doc);
-    expect(nodes.device.style.width).toBe("360px");
-    (chips[0] as any).onclick(); expect(nodes.device.dataset.skin).toBe("iphone"); expect(nodes.device.style.width).toBe("390px");
+    expect(nodes.device.style["--w"]).toBe("412px");
+    (chips[0] as any).onclick(); expect(nodes.device.dataset.skin).toBe("iphone"); expect(nodes.device.style["--w"]).toBe("393px");
     expect(chips[0].attrs["aria-pressed"]).toBe(true); expect(chips[1].attrs["aria-pressed"]).toBe(false);
-    (chips[1] as any).onclick(); expect(nodes.device.style.width).toBe("820px");
+    (chips[1] as any).onclick(); expect(nodes.device.style["--w"]).toBe("820px");
     expect(chips[1].attrs["aria-pressed"]).toBe(true);
-    (chips[1] as any).dataset.size = "large"; (chips[1] as any).onclick(); expect(nodes.device.style.width).toBe("430px");
+    (chips[1] as any).dataset.size = "large"; (chips[1] as any).onclick(); expect(nodes.device.style["--w"]).toBe("412px");
     expect(chips[1].attrs["aria-pressed"]).toBe(true);
-    (chips[0] as any).dataset.skin = "android"; (chips[0] as any).onclick(); expect(nodes.device.style.width).toBe("412px");
+    (chips[0] as any).dataset.skin = "android"; (chips[0] as any).onclick(); expect(nodes.device.style["--w"]).toBe("412px");
     expect(chips[0].attrs["aria-pressed"]).toBe(true);
     (chips[0] as any).dataset.skin = "iphone"; (chips[0] as any).onclick(); (chips[1] as any).dataset.size = "tablet"; (chips[1] as any).onclick();
     nodes.back.onclick(); expect(clicked).toEqual(["btn"]);
@@ -265,7 +273,7 @@ function runPanel(control: string, inputs: Record<string, string> = {}, device: 
   const fetchCalls: number[] = [];
   const win: any = { __pnDevice: dev, fetch: async () => { fetchCalls.push(1); return "ok"; } };
   const doc: any = {
-    getElementById: (id: string) => (id === "app" ? { contentWindow: win, style: {}, addEventListener() {} } : id === "panel-status" ? status : (els[id] ??= { onclick: null, setAttribute() {}, addEventListener() {}, style: {}, dataset: {}, textContent: "" })),
+    getElementById: (id: string) => (id === "app" ? { contentWindow: win, style: { setProperty(k: string, v: string) { (this as any)[k] = v; } }, addEventListener() {} } : id === "panel-status" ? status : (els[id] ??= { onclick: null, setAttribute() {}, addEventListener() {}, style: { setProperty(k: string, v: string) { (this as any)[k] = v; } }, dataset: {}, textContent: "" })),
     querySelectorAll: (sel: string) => (sel === "[data-control]" ? html.match(/data-control="[^"]+"/g)!.map((m) => ({ dataset: { control: m.slice(14, -1) }, set onclick(f: () => void) { handlers[this.dataset.control] = f; } })) : []),
     querySelector: (sel: string) => ctl(sel.match(/"(.+)"/)![1]), body: { classList: { contains: () => false, toggle() {} } },
   };

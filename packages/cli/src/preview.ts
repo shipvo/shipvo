@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { join, relative, sep, extname } from "node:path";
 import { args as parse, loadConfig } from "./config.js";
 import { RECORDER_JS } from "./preview-recorder.js";
+import { FRAME_CSS, frameMarkup, frameScript, SKINS } from "@shipvo/sim/frame.mjs";
 
 const API = "https://here.now/api/v1";
 const CLIENT = "shipvo/cli";
@@ -88,23 +89,9 @@ body.dark{background:#15171a;color:#eee}
 .bar button,.back{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
 .bar button[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}
 .stage{display:flex;justify-content:center;align-items:flex-start;gap:16px;padding:0 10px 20px;flex-wrap:wrap}
-.device{display:flex;flex-direction:column;background:#000;color:#fff;border-radius:28px;box-shadow:0 8px 30px #0005;overflow:hidden;width:360px;max-width:100%;box-sizing:border-box;padding:0 6px}
-.device[data-skin=iphone]{border-radius:44px;padding:0 10px}
-.status{display:flex;justify-content:space-between;align-items:center;height:28px;padding:0 14px;font-size:12px;flex:none}
-.device[data-skin=iphone] .status{height:44px;padding:0 24px}
-.device[data-skin=android] .status .notch{display:none}
-.device[data-skin=iphone] .status .icons{letter-spacing:2px}
-.notch{width:90px;height:24px;background:#000;border-radius:14px;position:absolute}
-.device[data-skin=iphone] .status{position:relative}
-.device[data-skin=iphone] .status .notch{left:50%;margin-left:-45px;top:8px;background:#111}
-iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
-.nav{flex:none;display:flex;justify-content:center;align-items:center;height:44px}
-.device[data-skin=iphone] .nav{height:44px}
+${FRAME_CSS}
 .back{color:#fff;border-color:#888;padding:4px 14px}
-.device[data-skin=iphone] .back{display:block;position:relative;width:134px;height:44px;padding:0;border:0;background:transparent;font-size:0}
-.device[data-skin=iphone] .back::after{content:"";position:absolute;left:0;right:0;top:50%;height:5px;margin-top:-2px;border-radius:3px;background:#fff}
 .back:focus-visible{outline:2px solid #fff;outline-offset:2px}
-.device[data-skin=android] .back{border:0}
 .side{max-width:360px;margin:0 auto 20px;padding:0 10px;box-sizing:border-box}
 .side h2{font-size:14px;margin:0 0 6px}.side ol{padding-left:20px;margin:6px 0}.side li{margin-bottom:6px}.side small{opacity:.7}
 .side button,.side input{font:inherit}
@@ -114,7 +101,6 @@ body.dark .side input{background:#15171a;color:#eee}body.dark .side small{opacit
 .fab[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}
 .fab:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
 body.dark .fab{background:#2a2d31;color:#eee}body.dark .fab[aria-pressed=true]{background:#2563eb;color:#fff}
-.device{position:relative}
 #pin{position:absolute;inset:0;display:none;cursor:crosshair;background:#2563eb22;z-index:5}
 #pin.on{display:block}
 #pin .hint{position:absolute;left:8px;right:8px;top:8px;padding:6px 8px;border-radius:6px;background:#111;color:#fff;font-size:13px;text-align:center}
@@ -125,18 +111,14 @@ body.dark .fab{background:#2a2d31;color:#eee}body.dark .fab[aria-pressed=true]{b
 .panel h2{font-size:15px;margin:0}.panel fieldset{border:0;margin:0;padding:0;display:grid;gap:6px}.panel legend{font-weight:600;padding:0 0 4px}
 .panel .row{display:flex;gap:6px;flex-wrap:wrap}.panel input,.panel select,.panel button{font:inherit;padding:5px 8px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;min-width:0}
 body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.panel button[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}.panel input{flex:1 1 80px}.panel button{cursor:pointer}.panel .sim{opacity:.7;font-size:12px;margin:0}
-@media (max-width:500px){.bar,.note{display:none}.stage{padding:0;display:block}.panel{width:auto;margin:10px;max-width:none}.device{padding:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}}
+@media (max-width:500px){.bar,.note{display:none}.stage{padding:0;display:block}.panel{width:auto;margin:10px;max-width:none}.fit{transform:none!important;width:auto!important;height:auto!important}.device{padding:0!important;margin:0;width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}.screen{width:100%!important;height:100%!important;border-radius:0!important}.side-btn,.simlabel{display:none}}
 </style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-skin="android" aria-pressed="true">Android</button><button data-skin="iphone" aria-pressed="false">iPhone</button>
 <button data-size="phone" aria-pressed="true">Phone</button><button data-size="large" aria-pressed="false">Large phone</button><button data-size="tablet" aria-pressed="false">Tablet</button>
 <button id="theme" aria-pressed="false">Dark</button></div>
 <button id="comment" class="fab" aria-pressed="false">Comment</button>
-<div class="stage"><div class="device" id="device" data-skin="android" style="width:360px;height:760px">
-<div class="status" id="status"><span id="clock">9:41</span><span class="notch"></span><span class="icons" id="icons">&#9679;&#9679; 5G 100%</span></div>
-<iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" role="button" tabindex="0" aria-label="Tap where the problem is, or press Enter to mark the centre of the device"><span class="hint">Tap where the problem is. Press Escape to cancel.</span></div>
-<div class="nav"><button class="back" id="back" aria-label="Back" title="Back">&#9664; Back</button></div>
-</div>
+<div class="stage">${frameMarkup({ skin: "android", title, src: "app.html" })}
 <aside class="panel" id="device-panel" aria-label="Device controls"><h2>Device</h2>
 <fieldset><legend>Location</legend><div class="row"><select data-control="location-list" aria-label="Place"><option value="4.0511,9.7679">Douala</option><option value="48.8566,2.3522">Paris</option><option value="40.7128,-74.006">New York</option><option value="-1.2921,36.8219">Nairobi</option></select><button data-control="location-set">Set</button></div>
 <div class="row"><input data-control="lat" placeholder="Latitude" inputmode="decimal" aria-label="Latitude"><input data-control="lng" placeholder="Longitude" inputmode="decimal" aria-label="Longitude"><button data-control="coords-set">Go</button></div></fieldset>
@@ -185,6 +167,7 @@ render();
 </script>
 <section class="recp" aria-label="Recorder"><p id="honesty">This is the app's web build on Shipvo's simulated device, measured against Android and iOS in <a href="https://github.com/shipvo/shipvo/blob/main/docs/parity-results.md">docs/parity-results.md</a>. Native-only UI can differ.</p>
 <button id="rec" aria-pressed="false">Record</button> <button id="dl" disabled>Download test</button> <span id="stepcount" aria-live="polite">0 steps</span></section>
+<script data-frame>${frameScript()}</script>
 <script>${RECORDER_JS}
 var APP=${JSON.stringify(appId).replace(/</g, "\\u003c")},TITLE=${JSON.stringify(title).replace(/</g, "\\u003c")},recording=false;
 function step(s){if(recording){shipvoSteps.push(s);document.getElementById("stepcount").textContent=shipvoSteps.length+(shipvoSteps.length===1?" step":" steps");document.getElementById("dl").disabled=false}}
@@ -192,10 +175,10 @@ document.getElementById("app").addEventListener("load",function(){shipvoAttach(t
 (function(a){if(a.contentDocument&&a.contentDocument.readyState==="complete")shipvoAttach(a,step)})(document.getElementById("app"));
 document.getElementById("rec").onclick=function(){recording=!recording;if(recording){shipvoSteps.length=0;document.getElementById("stepcount").textContent="0 steps";document.getElementById("dl").disabled=true}this.setAttribute("aria-pressed",recording)};
 document.getElementById("dl").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([shipvoExport(APP,shipvoSteps,TITLE)],{type:"text/typescript"}));a.download="recorded-session.test.ts";a.click()};
-var SIZES={phone:[360,760],large:[412,892],tablet:[820,1180]},IPHONE={phone:[390,844],large:[430,932],tablet:[820,1180]};
+var SKINS=${JSON.stringify(SKINS)},EXTRA={large:[412,892],tablet:[820,1180]};
 var skin="android",size="phone",d=document.getElementById("device"),f=document.getElementById("app"),bk=document.getElementById("back");
 function pressed(sel,val,key){document.querySelectorAll(sel).forEach(function(o){o.setAttribute("aria-pressed",o.dataset[key]===val)})}
-function apply(){var s=(skin==="iphone"?IPHONE:SIZES)[size];d.dataset.skin=skin;d.style.width=s[0]+"px";d.style.height=s[1]+"px";bk.innerHTML=skin==="iphone"?"Back":"&#9664; Back";bk.setAttribute("aria-label","Back");document.getElementById("icons").innerHTML=skin==="iphone"?"5G &#9646; 100%":"&#9679;&#9679; 5G 100%";pressed("[data-skin]",skin,"skin");pressed("[data-size]",size,"size")}
+function apply(){var s=size==="phone"?[SKINS[skin].width,SKINS[skin].height]:EXTRA[size];d.dataset.skin=skin;d.style.setProperty("--w",s[0]+"px");d.style.setProperty("--h",s[1]+"px");bk.innerHTML=skin==="iphone"?"Back":"&#9664; Back";bk.setAttribute("aria-label","Back");var sl=document.getElementById("simlabel");if(sl)sl.textContent="Simulated "+SKINS[skin].label;pressed("[data-skin]",skin,"skin");pressed("[data-size]",size,"size");if(typeof shipvoFit==="function")shipvoFit()}
 document.querySelectorAll("[data-skin]").forEach(function(b){b.onclick=function(){step({action:"note",text:"panel: skin set to "+b.dataset.skin});skin=b.dataset.skin;apply()}});
 document.querySelectorAll("[data-size]").forEach(function(b){b.onclick=function(){step({action:"note",text:"panel: size set to "+b.dataset.size});size=b.dataset.size;apply()}});
 // Back does what the simulator's back action does: press the screen's Back button, else go back in history.

@@ -12,10 +12,17 @@
   },
   "exports": {
     "./server.mjs": "./server.mjs",
+    "./frame.mjs": {
+      "types": "./frame.d.mts",
+      "default": "./frame.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "server.mjs",
+    "frame.mjs",
+    "frame.d.mts",
+    "lifecycle.mjs",
     "chromium-hint.mjs",
     "app-name.mjs",
     "mock-rules.mjs",

@@ -1,0 +1,4 @@
+- sim: new shared Shipvo Phone frame (`@shipvo/sim/frame.mjs`) with Android style (412x915) and iPhone style (393x852) skins, live status bar, power and volume buttons, lock screen, power menu and restart. `shipvo preview` uses it.
+- sim, mcp: new `lock`, `unlock` and `restart` actions and MCP tools. Taps are refused while the phone is locked. Restart reloads the app and keeps storage.
+- device: the simulated device gains `airplane`, `battery` and `locked` state and `lock()`, `unlock()`, `frameEvent()` on `__pnDevice`. All are logged in `device_log` as simulated. Existing apps need no change.
+- cli: `@shipvo/cli` now depends on `@shipvo/sim`. The preview page's phone/large/tablet size buttons now set the screen size; "Phone" is the skin's real size.

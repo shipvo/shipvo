@@ -21,6 +21,12 @@ export type DeviceState = {
   biometrics: { enrolled: boolean; nextResult: "success" | "fail" | "cancel" };
   payment: { nextResult: "approve" | "decline" | "timeout" | "insufficient_funds"; pin?: string };
   online: boolean;
+  /** Airplane mode: no signal, no wifi. The Shipvo Phone status bar shows it. */
+  airplane?: boolean;
+  /** Battery shown in the Shipvo Phone status bar. */
+  battery?: { level: number; charging: boolean };
+  /** True while the simulated phone shows its lock screen. */
+  locked?: boolean;
   clipboard: string;
   log: { at: number; kind: string; detail?: unknown }[];
 };
@@ -38,7 +44,7 @@ const state: DeviceState = {
   camera: { barcode: null, delayMs: 800 },
   biometrics: { enrolled: true, nextResult: "success" },
   payment: { nextResult: "approve", pin: "1234" },
-  online: true, clipboard: "", log: [],
+  online: true, airplane: false, battery: { level: 100, charging: false }, locked: false, clipboard: "", log: [],
   ...(cfg.device ?? {}),
 };
 // Every entry is marked simulated: a simulated fingerprint or payment is for testing and is never a real verification or money movement.
@@ -222,10 +228,16 @@ g.__pnDevice = {
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
   openUrl: (url: string) => deliverUrl(url),
   capabilities: () => device.capabilities(),
+  /** Lock and unlock the phone (power button, lock screen). Both are logged as simulated. */
+  lock() { if (!state.locked) { state.locked = true; log("lock"); } return true; },
+  unlock() { if (state.locked) { state.locked = false; log("unlock"); } return true; },
+  locked: () => !!state.locked,
+  /** Record a frame event (volume, power menu, restart, power off). Always marked simulated. */
+  frameEvent(kind: string, detail?: unknown) { log(kind, detail); },
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
     Object.assign(state, { permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
-      location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
+      location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, airplane: false, battery: { level: 100, charging: false }, locked: false, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
     recent.length = 0; seq = 0;
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
