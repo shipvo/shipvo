@@ -1,4 +1,5 @@
 import { PhoneError } from "./phone.js";
+import { redact, resolveSecrets } from "./secrets.js";
 import type { Phone } from "./phone.js";
 
 /** One parsed line. `target` is the quoted text: an accessibility name or visible text, as in the typed API. `role` is optional and narrows which elements a repair may pick. `line` is the 1-based line number in the source text. */
@@ -43,16 +44,17 @@ export async function runSteps(phone: Phone, steps: Step[]): Promise<void> {
     try {
       switch (s.kind) {
         case "tap": await phone.tap(s.target); break;
-        case "type": await phone.type(s.target, s.text, s.enter ? { enter: true } : {}); break;
+        case "type": await phone.type(s.target, resolveSecrets(s.text), s.enter ? { enter: true } : {}); break;
         case "scroll": await phone.scroll(s.direction); break;
         case "back": await phone.back(); break;
         case "wait_for": await phone.waitFor(s.text); break;
+        // see and not_see put the screen in the message: the catch below redacts it. Keep that.
         case "see": if (!phone.sees(s.text)) throw new Error(`expected to see "${s.text}"\n\nScreen now:\n${phone.screen}`); break;
         case "not_see": if (phone.sees(s.text)) throw new Error(`expected not to see "${s.text}"\n\nScreen now:\n${phone.screen}`); break;
       }
     } catch (e) {
       const err = e as Error;
-      throw new PhoneError(`step on line ${s.line} failed: ${err.message}`, (err as PhoneError).code ?? "step_failed");
+      throw new PhoneError(`step on line ${s.line} failed: ${redact(err.message)}`, (err as PhoneError).code ?? "step_failed");
     }
   }
 }

@@ -14,6 +14,7 @@ export type TestKit = {
   openApp(): Promise<PhoneLike>;
   parseSteps(text: string): StepLike[];
   runSteps(phone: PhoneLike, steps: StepLike[]): Promise<void>;
+  redact?(text: string): string;
   proposeRepair(step: StepLike, tree: string): { kind: "repaired"; step: StepLike; reason: string } | { kind: "unresolved"; candidates: Node[] };
 };
 
@@ -81,7 +82,7 @@ function flagValue(argv: string[], name: string): string | undefined {
 }
 
 /** Runs the suite. Returns the exit code: 0 when every step passed (or every failure was repaired and written), 1 otherwise. */
-export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) => void = console.log): Promise<number> {
+export async function testCmd(argv: string[], kit?: TestKit, rawLog: (s: string) => void = console.log): Promise<number> {
   const repair = argv.includes("--repair");
   const write = argv.includes("--write");
   if (write && !repair) { console.error("--write only works with --repair"); return 2; }
@@ -96,6 +97,9 @@ export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) =>
   const files = given.length ? given : findStepFiles("tests");
   if (!files.length) { console.error("No tests found. Put plain-language steps in tests/*.steps, or pass file names."); return 2; }
   const k = kit ?? (await loadKit());
+  const scrub = (t: string) => k.redact?.(t) ?? t;
+  // Every line goes through scrub: screen text and errors can echo a secret.
+  const log = (s: string) => rawLog(scrub(s));
   let failed = 0, repaired = 0, unresolved = 0;
   for (const file of files) {
     const text = readFileSync(file, "utf8");
@@ -108,8 +112,8 @@ export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) =>
       try { await k.runSteps(phone, [step]); continue; }
       catch (e) {
         failed++;
-        if (!flow.failedStep) { flow.status = "failed"; flow.failedStep = step; flow.message = (e as Error).message.split("\n")[0]!; }
-        log(`FAIL ${file}:${step.line}: ${(e as Error).message.split("\n")[0]}`);
+        if (!flow.failedStep) { flow.status = "failed"; flow.failedStep = step; flow.message = scrub((e as Error).message.split("\n")[0]!); }
+        log(`FAIL ${file}:${step.line}: ${scrub((e as Error).message.split("\n")[0]!)}`);
         if (!repair) break;
         const r = k.proposeRepair(step, phone.screen);
         if (r.kind === "unresolved") {

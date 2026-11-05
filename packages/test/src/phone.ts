@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { find, parseScreen, type Node, type Target } from "./tree.js";
+import { redact } from "./secrets.js";
 
 /** One address-book entry. */
 export type Contact = { id: string; name: string; phoneNumbers?: string[]; emails?: string[] };
@@ -39,7 +40,7 @@ export type OpenOptions = {
 };
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 /** An action the simulator refused. `code` is set for typed failures such as `no_url_listener` or `stale_ref`. */
-export class PhoneError extends Error { constructor(message: string, readonly code?: string) { super(message); this.name = "PhoneError"; } }
+export class PhoneError extends Error { constructor(message: string, readonly code?: string) { super(redact(message)); this.name = "PhoneError"; } }
 /** What a mocked request answers with. An object `body` is sent as JSON. */
 export type MockResponse = { status: number; body?: string | Record<string, unknown> | unknown[] | null; headers?: Record<string, string>; delayMs?: number };
 /** A string `url` must equal the full request URL. A RegExp is tested against it. Without `method`, any method matches. The first matching rule wins. */
@@ -88,7 +89,7 @@ export class Phone {
   }
   /** Find one element without acting on it. Throws if none or several match. */
   locate(target: Target): Node {
-    try { return find(this.nodes(), target); } catch (e) { throw new Error(`${(e as Error).message}\n\nScreen now:\n${this.screen}`); }
+    try { return find(this.nodes(), target); } catch (e) { throw new Error(redact(`${(e as Error).message}\n\nScreen now:\n${this.screen}`)); }
   }
 
   async tap(target: Target): Promise<this> { await this.act("tap", { ref: this.locate(target).ref }); return this; }
@@ -108,7 +109,7 @@ export class Phone {
     for (;;) {
       await this.refresh();
       if (this.sees(text)) return this;
-      if (Date.now() > end) throw new Error(`timed out waiting for ${text instanceof RegExp ? text : `"${text}"`}\n\nScreen now:\n${this.screen}`);
+      if (Date.now() > end) throw new Error(redact(`timed out waiting for ${text instanceof RegExp ? text : `"${text}"`}\n\nScreen now:\n${this.screen}`));
       await new Promise((r) => setTimeout(r, opts.interval ?? 250));
     }
   }
@@ -118,7 +119,7 @@ export class Phone {
     for (;;) {
       await this.refresh();
       if (!this.sees(text)) return this;
-      if (Date.now() > end) throw new Error(`"${text}" is still on screen after ${opts.timeout ?? 5000} ms\n\nScreen now:\n${this.screen}`);
+      if (Date.now() > end) throw new Error(redact(`"${text}" is still on screen after ${opts.timeout ?? 5000} ms\n\nScreen now:\n${this.screen}`));
       await new Promise((r) => setTimeout(r, opts.interval ?? 250));
     }
   }
