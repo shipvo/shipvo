@@ -2,7 +2,7 @@
 # non-technical founders, and keeps CHANGELOG and the roadmap's "Now" list current.
 name: agent-docs
 on:
-  schedule: [{ cron: "29 4 * * 1,3,5" }]
+  schedule: [{ cron: "29 4,16 * * *" }]
   workflow_dispatch:
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
 concurrency: { group: agent-docs }

@@ -14,4 +14,17 @@ House style (from the owner): visuals are **handcrafted from scratch in code**, 
 
 Commit (`git add`, `git commit -m "video: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (topic, length, size, how you checked it).
 
-This runs every day and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
+This runs three times a day and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
+
+## Content follows code (shared with docs, blog, tutorials and videos)
+
+`docs/content-coverage.md` is the team's content ledger: one row per user-visible feature or advantage (from `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs), with columns **Docs**, **Tutorial**, **Video**, **Blog**, each a link or empty. Before picking a topic, read it and pick the biggest gap in your column, newest and most important features first (what makes Shipvo stronger than the alternatives: signed OTA with rollback, the agent simulator over MCP, measured parity, the store path, `shipvo run`, framework adapters, self-hosting). After your work, add your link to the ledger in the same commit, and add any feature you found missing from it. Create the file if it does not exist, backfilled from everything shipped so far.
+
+## Background music (every video)
+
+Every video gets a quiet music bed that ducks under the narration, mixed with `scripts/video/bgmusic.py` (loudness-matched, sidechain-ducked by the voice, fades in and out; the picture is untouched):
+1. Pick the mood from the video (explainer or tech: `--want tech,documentary,ambient --avoid upbeat`; calm tutorial: `ambient,acoustic`; launch teaser: `upbeat,cinematic`).
+2. **Licence first.** Use only tracks whose own licence tag allows commercial use with changes: CC BY, CC BY-SA or CC0. Most Jamendo tracks are CC BY-NC or CC BY-NC-ND and must not be used. Start from `scripts/video/music.json` (checked tracks); for a new track run `python3 scripts/video/bgmusic.py license --ids <ids>` and add the ones that pass to `music.json`. `auto` filters by licence for you.
+3. `python3 scripts/video/bgmusic.py analyze --ids ...` and pick the flattest (lowest LRA, 3 to 7 LU), then `mix --video ... --narration <full-length narration wav> --music music/<id>.mp3 --out ...`. Default `--bed 0.5`; 0.35 for dense narration.
+4. Credit the track under the video in `docs/videos.md` and in the transcript page: "Music: <title> by <artist> (Jamendo, <licence>, link)". CC BY-SA also needs the licence link. Never commit MP3 files; record the track id in the video's script JSON so the mix can be rebuilt.
+5. Backfill: when a published video has no music, remix and republish it with a bed (new R2 key, update `docs/videos.md`).

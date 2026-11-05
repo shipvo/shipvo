@@ -21,7 +21,7 @@ const put = (file, data) => { mkdirSync(dirname(file), { recursive: true }); con
  * not under 60% of it, same rule as `shipvo publish`). Returns { at, patches } where `at` is the ms time the last
  * pointer became visible.
  */
-export function publishRelease({ root, app, seed, release, bytes, bands = ["b0", "b1", "b2"], bases = [], tamper, minShell = "1.0.0" }) {
+export function publishRelease({ root, app, seed, release, bytes, bands = ["b0", "b1", "b2"], bases = [], tamper, minShell = "1.0.0", hermesBytecodeVersion }) {
   const url = `b/${app}/r${release}.hbc`;
   put(join(root, url), bytes);
   const patches = [];
@@ -34,7 +34,7 @@ export function publishRelease({ root, app, seed, release, bytes, bands = ["b0",
     patches.push({ from_sha256: sha256(base), url: purl, size: p.length, sha256: sha256(p) });
   }
   const issuedAt = new Date().toISOString();
-  for (const band of bands) put(join(root, "p", app, "1", `${band}.json`), JSON.stringify(buildPointer({ app, seed, release, band, bytes, url, patches, minShell, tamper, issuedAt })));
+  for (const band of bands) put(join(root, "p", app, "1", `${band}.json`), JSON.stringify(buildPointer({ app, seed, release, band, bytes, url, patches, minShell, tamper, hermesBytecodeVersion, issuedAt })));
   return { at: Date.now(), patches };
 }
 

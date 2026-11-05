@@ -71,6 +71,19 @@ describe("wait_for and settle", () => {
     expect(r.structuredContent.waited.matched).toBe(true); expect(txt(r)).toContain('text "Paid"'); expect(reads).toBeGreaterThanOrEqual(3);
     await c.close();
   });
+  it("wait_for catches a result that arrives after a pause", async () => {
+    flips = [[50, C], [1000, B]]; const c = await opened();
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "w", ref: "e1", wait_for: { text: "Paid" }, timeout_ms: 3000 } });
+    expect(r.structuredContent.waited.matched).toBe(true); expect(txt(r)).toContain('text "Paid"'); expect(txt(r)).not.toContain("Loading");
+    await c.close();
+  });
+  it("tap and wait fields tell assistants to wait for work", async () => {
+    const c = await connect(); const { tools } = await c.listTools();
+    const tap: any = tools.find((t) => t.name === "tap");
+    expect(tap.description).toMatch(/wait_for/); expect(tap.description).toMatch(/settle/);
+    expect(tap.inputSchema.properties.settle.description).toMatch(/after any action that starts work/);
+    await c.close();
+  });
   it("adds nothing without the fields", async () => {
     flips = []; const c = await opened();
     const r: any = await c.callTool({ name: "tap", arguments: { session: "w", ref: "e1" } });

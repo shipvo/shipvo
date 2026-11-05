@@ -57,3 +57,11 @@ This section is set by the owner. The Head of Product plans from it and does not
 **Frameworks.** The core (signing, pointers, cohorts, rollback, health, agents, store setup) does not depend on a framework. Each framework gets an adapter with three parts: a runtime (verify, stage, apply, roll back), a build path (EAS Build for React Native and Expo; the team's own CI for others, with a Shipvo template), and submission through EAS Submit. Order: React Native and Expo (done), then Capacitor and Cordova (their updates are web bundles, and their apps already run in our simulator almost as on a phone), then others when users ask. Apps are never converted from one framework to another: Shipvo meets teams where they are.
 
 **Risks to watch:** Apple and Google rules on updates (stay on interpreted code and declared capabilities, and document compliance publicly); trust in AI-written code (the merge contract and test evidence are the answer, never hidden); and adoption (only real users prove anything).
+
+### Win the lane, and keep the gap growing (5 Nov 2026)
+
+Shipvo aims to be the clear best in its lane, so far ahead that a copy cannot catch up, because we ship, refine and measure every day. In practice:
+- **Shipvo Phone** (epic #466): a native-feeling simulated phone in two skins, Android style and iPhone style (our own artwork and names, never Apple or Google assets or "Shipvo iOS/Android"), with real gestures, shade and Control Center, Settings, restart, an app store inside the phone, multi-app flows, real browser camera/mic/location with simulated fallback, live OTA updates on the phone, and agent control of everything over MCP.
+- **`shipvo run android|ios`** (epic #442): the app on that phone in the person's own browser in seconds, no Playwright needed; the coding agent in the repo drives the same live phone while the person watches (#448).
+- **Content follows code:** every feature gets docs, an interactive tutorial, a video and a blog post (`docs/content-coverage.md`), in the top-level Learn section.
+- **Proof, not claims:** every feature has a parity check against the Android emulator and iOS Simulator, published.

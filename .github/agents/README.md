@@ -11,7 +11,7 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Research lead | Claude with web search | every 6 h | `agent-research.yml` |
 | App Builders (dogfooding) | Claude, a different persona each day | daily | `agent-dogfood.yml` |
 | Device Lab (OTA on Android emulator) | Claude + emulator | nightly | `agent-device-lab.yml` |
-| Design Lead (senior UI/UX) | Claude with screenshots | Wed and Sat | `agent-design.yml` |
+| Design Lead (senior UI/UX) | Claude with screenshots | daily | `agent-design.yml` |
 | Head of Product (senior PM) | Claude | daily planning 4 times a day; strategy review Mondays | `agent-planner.yml`, `agent-pm.yml` |
 | Engineer | Claude | on `agent:claude` label, sweep hourly | `agent-engineer.yml` |
 | Engineer (docs and tests only, one task at a time) | Mistral `labs-leanstral-1-5` via Aider (`MISTRAL_API_KEY`; free daily use through Mistral Labs) | on `agent:mistral` label, on every CI/merge, hourly | `agent-mistral.yml` |
@@ -22,10 +22,10 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Merge bot | rules, no AI | every 30 min and after CI | `agent-merger.yml` |
 | QA engineer | Claude | nightly 01:41 UTC | `agent-qa.yml` |
 | Security engineer | Claude | Mondays 03:11 UTC | `agent-security.yml` |
-| Docs Lead | Claude | Mon, Wed, Fri | `agent-docs.yml` |
-| Content Lead (blog and SEO) | Claude with web search | daily, one new post each run | `agent-blog.yml` |
-| Founder Academy (tutorials) | Claude, runs every step for real | daily, one new tutorial each run | `agent-tutorial.yml` |
-| Video Studio (education videos) | Claude, code-built scenes + simulator recordings + open-source narration | daily, one new video each run | `agent-video.yml` |
+| Docs Lead | Claude | twice a day | `agent-docs.yml` |
+| Content Lead (blog and SEO) | Claude with web search | twice a day, one new post each run | `agent-blog.yml` |
+| Founder Academy (tutorials) | Claude, runs every step for real | twice a day, one new tutorial each run | `agent-tutorial.yml` |
+| Video Studio (education videos) | Claude, code-built scenes + simulator recordings + open-source narration | three times a day, one new video each run | `agent-video.yml` |
 | Triage | Claude (issues only) | new issues from outside the team | `agent-triage.yml` |
 | Team lead (report) | Claude | daily 20:53 UTC | `agent-digest.yml` |
 | Release train | rules, no AI | daily 18:41 UTC, only if main is green | `agent-release.yml` |
@@ -39,8 +39,8 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 1. **App Builders** build a real app with Shipvo every day from the docs alone, as a different persona (including a non-technical founder working only through an agent), using the packages on `main`. They record time to a first running app and first passing test in `docs/product/dogfood/`, fix small doc issues and file every bug they hit.
 1. The **Device Lab** boots an Android emulator nightly, builds the sample shell, publishes real OTA releases to a local release server and tests apply, patch updates, tampered bundles, crash-loop recovery, rollback and cohorts. It benchmarks against the last run and the real-phone baseline in `docs/product/device-lab/` and files issues for failures and regressions.
 1. The **Docs Lead** documents every new feature and matures the docs on two paths: plain-English "Start here" for non-technical founders and precise reference for developers, with verified commands, troubleshooting and a glossary.
-1. The **Content Lead** publishes an evidence-backed article three times a week, aimed at what developers and founders search for; merged posts go live with the sitemap, RSS and `llms.txt` rebuilt automatically.
-1. The **Founder Academy** publishes a tested, interactive tutorial every day for non-technical founders, and files issues wherever the product, not the tutorial, should change.
+1. The **Content Lead** publishes an evidence-backed article twice a day, aimed at what developers and founders search for; merged posts go live with the sitemap, RSS and `llms.txt` rebuilt automatically.
+1. The **Founder Academy** publishes a tested, interactive tutorial twice a day for non-technical founders, and files issues wherever the product, not the tutorial, should change.
 1. The **Video Studio** turns tutorials into short educational videos built from scratch in code (brand scenes and real simulator recordings, open-source narration, captions) and publishes them on the site's Videos page.
 1. The **research lead** searches the web every 6 hours (competitors, React Native/Expo/OS changes, developer complaints, MCP and agent news) and files evidence-backed issues labelled `research`.
 1. Every Monday the **Head of Product** measures adoption (npm downloads, stars, outside issues), studies competitors, and updates `docs/product/strategy.md` (beachhead user, north-star metric, 3 bets for the next 4 weeks) and the roadmap, seeding an epic and first slices for each bet.
