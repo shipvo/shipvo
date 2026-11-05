@@ -24,8 +24,8 @@ function shipvoLine(s){
   }
   return [];
 }
-function shipvoExport(app,steps){
-  var out=['import { test } from "@shipvo/test/vitest";','import { openApp } from "@shipvo/test";','','test('+shipvoQ("recorded session for "+app)+', async () => {','  const phone = await openApp({ app: '+shipvoQ(app)+' });'];
+function shipvoExport(app,steps,title){
+  var out=['import { test } from "@shipvo/test/vitest";','import { openApp } from "@shipvo/test";','','test('+shipvoQ("recorded session for "+(title||app))+', async () => {','  const phone = await openApp({ app: '+shipvoQ(app)+' });'];
   steps.forEach(function(s){
     var lines=shipvoLine(s);
     lines.forEach(function(l){out.push("  "+l)});
@@ -48,7 +48,7 @@ function shipvoAttach(frame,onStep){
   doc.addEventListener("click",function(e){
     var el=e.target&&e.target.closest&&e.target.closest(sel);
     if(!el||el.matches("input,textarea"))return;
-    var text=shipvoLabel(el);if(!text)return;
+    var text=shipvoLabel(el);if(!text){onStep({action:"note",text:"TODO: tap without a label"});return}
     onStep({action:"tap",target:{text:text,role:el.getAttribute("role")||el.tagName.toLowerCase(),matches:shipvoCount(doc,text)},changed:true});
   },true);
   doc.addEventListener("change",function(e){

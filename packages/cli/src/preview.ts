@@ -75,7 +75,7 @@ export function collectFiles(dir: string): PreviewFile[] {
 }
 
 /** The page people open: the app in a phone-sized frame with a device and theme switcher. */
-export function framePage(name: string): string {
+export function framePage(name: string, appId: string = name): string {
   const title = name.replace(/[<>&"']/g, "");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -90,8 +90,9 @@ body.dark{background:#15171a;color:#eee}
 .stage{display:flex;justify-content:center;padding:0 10px 20px}
 iframe{border:0;background:#fff;border-radius:28px;box-shadow:0 8px 30px #0005;width:360px;height:760px;max-width:100%}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
+.panel a{color:inherit;text-decoration:underline}body.dark .panel a{color:#93c5fd}.panel button:focus-visible,.bar button:focus-visible,.panel a:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
 .panel{max-width:520px;margin:0 auto;padding:0 12px 24px;text-align:center}.panel p{opacity:.8}.panel button{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
-@media (max-width:500px){.bar,.note,.panel{display:none}.stage{padding:0}iframe{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0;box-shadow:none}}
+@media (max-width:500px){.bar,.note{display:none}.stage{padding:0}iframe{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0;box-shadow:none}}
 </style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-device="phone" aria-pressed="true">Phone</button><button data-device="iphone" aria-pressed="false">iPhone</button><button data-device="tablet" aria-pressed="false">Tablet</button>
@@ -101,11 +102,11 @@ iframe{border:0;background:#fff;border-radius:28px;box-shadow:0 8px 30px #0005;w
 <section class="panel" aria-label="Recorder"><p id="honesty">This is the app's web build on Shipvo's simulated device, measured against Android and iOS in <a href="https://github.com/shipvo/shipvo/blob/main/docs/parity-results.md">docs/parity-results.md</a>. Native-only UI can differ.</p>
 <button id="rec" aria-pressed="false">Record</button> <button id="dl" disabled>Download test</button> <span id="count" aria-live="polite">0 steps</span></section>
 <script>${RECORDER_JS}
-var APP=${JSON.stringify(title)},recording=false;
-function step(s){if(recording){shipvoSteps.push(s);document.getElementById("count").textContent=shipvoSteps.length+" steps";document.getElementById("dl").disabled=false}}
+var APP=${JSON.stringify(appId).replace(/</g, "\\u003c")},TITLE=${JSON.stringify(title).replace(/</g, "\\u003c")},recording=false;
+function step(s){if(recording){shipvoSteps.push(s);document.getElementById("count").textContent=shipvoSteps.length+(shipvoSteps.length===1?" step":" steps");document.getElementById("dl").disabled=false}}
 document.getElementById("app").addEventListener("load",function(){shipvoAttach(this,step)});
-document.getElementById("rec").onclick=function(){recording=!recording;this.setAttribute("aria-pressed",recording);this.textContent=recording?"Stop":"Record"};
-document.getElementById("dl").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([shipvoExport(APP,shipvoSteps)],{type:"text/typescript"}));a.download="recorded-session.test.ts";a.click()};
+document.getElementById("rec").onclick=function(){recording=!recording;if(recording){shipvoSteps.length=0;document.getElementById("count").textContent="0 steps";document.getElementById("dl").disabled=true}this.setAttribute("aria-pressed",recording)};
+document.getElementById("dl").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([shipvoExport(APP,shipvoSteps,TITLE)],{type:"text/typescript"}));a.download="recorded-session.test.ts";a.click()};
 var S={phone:[360,760],iphone:[390,844],tablet:[820,1180]},f=document.getElementById("app");
 document.querySelectorAll("[data-device]").forEach(function(b){b.onclick=function(){var s=S[b.dataset.device];step({action:"note",text:"panel: device set to "+b.dataset.device});f.style.width=s[0]+"px";f.style.height=s[1]+"px";document.querySelectorAll("[data-device]").forEach(function(o){o.setAttribute("aria-pressed",o===b)})}});
 var t=document.getElementById("theme");t.onclick=function(){step({action:"note",text:"panel: theme toggled"});var d=!document.body.classList.contains("dark");document.body.classList.toggle("dark",d);t.setAttribute("aria-pressed",d);t.textContent=d?"Light":"Dark";f.style.colorScheme=d?"dark":"light"};
@@ -114,12 +115,12 @@ var t=document.getElementById("theme");t.onclick=function(){step({action:"note",
 }
 
 /** Puts the frame page at index.html and the app's own entry at app.html (its asset paths are absolute, so it stays at the site root). */
-export function wrapBuild(buildDir: string, name: string): PreviewFile[] {
+export function wrapBuild(buildDir: string, name: string, appId: string = name): PreviewFile[] {
   const files = collectFiles(buildDir).filter((f) => f.path !== "index.html");
   const entry = join(buildDir, "index.html");
   if (!existsSync(entry)) throw new Error("The web build has no index.html. Run `npx expo export --platform web` and check it works.");
   files.push({ path: "app.html", bytes: new Uint8Array(readFileSync(entry)), contentType: typeOf("x.html") });
-  files.push({ path: "index.html", bytes: new TextEncoder().encode(framePage(name)), contentType: typeOf("x.html") });
+  files.push({ path: "index.html", bytes: new TextEncoder().encode(framePage(name, appId)), contentType: typeOf("x.html") });
   return files;
 }
 
@@ -197,7 +198,7 @@ export async function runPreview(root: string, o: PreviewOpts & { skipBuild?: bo
   if (provider !== "here.now") throw new Error(`shipvo.json: "preview" must be "here.now" or "control-plane", not "${provider}".`);
   const dir = o.buildDir ?? join(root, ".shipvo", "preview-build");
   if (!o.skipBuild) await build(root, dir);
-  return publishToHereNow(wrapBuild(dir, cfg.name), o);
+  return publishToHereNow(wrapBuild(dir, cfg.name, cfg.appId), o);
 }
 
 export async function preview(argv: string[]) {

@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { RECORDER_JS } from "../src/preview-recorder";
-import { framePage } from "../src/preview";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { framePage, wrapBuild } from "../src/preview";
 import { exportTest, type Step } from "../../mcp/src/export";
 
-const page = new Function(`${RECORDER_JS}; return { exp: shipvoExport, steps: shipvoSteps };`)() as { exp: (app: string, s: unknown[]) => string; steps: unknown[] };
+const page = new Function(`${RECORDER_JS}; return { exp: shipvoExport, steps: shipvoSteps };`)() as { exp: (app: string, s: unknown[], title?: string) => string; steps: unknown[] };
 const t = (text: string, matches = 1) => ({ text, role: "button", matches });
 
 const session: Step[] = [
@@ -24,18 +27,56 @@ describe("preview recorder", () => {
     expect(out).not.toContain("hunter2");
     expect(out).toContain("process.env.SHIPVO_TEST_PASSWORD");
   });
-  it("replays green against a phone that has the recorded screen", async () => {
-    const script = page.exp("shop", session.filter((s) => !(s.action === "tap" && s.target!.matches > 1)));
-    const body = script.split("\n").filter((l) => l.startsWith("  await phone.") || l.startsWith("  const phone")).join("\n").replace("const phone = await openApp({ app: \"shop\" });", "");
-    const seen: string[] = [];
+  it("runs the generated module against a mocked openApp and phone", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "rec-"));
+    const calls: string[] = [];
+    (globalThis as any).__rec = { calls, env: { SHIPVO_TEST_PASSWORD: "x" } };
     const phone = {
-      async tap(x: string) { if (x !== "Add to cart") throw new Error("no " + x); seen.push("tap " + x); },
-      async type(l: string, v: string) { if (!["Email", "Password"].includes(l)) throw new Error("no " + l); seen.push(`type ${l}`); void v; },
-      async scroll() { seen.push("scroll"); }, async back() { seen.push("back"); }, async waitFor() { seen.push("wait"); },
+      async tap(x: string) { calls.push("tap " + x); }, async type(l: string) { calls.push("type " + l); },
+      async scroll(d: string) { calls.push("scroll " + d); }, async back() { calls.push("back"); }, async waitFor() { calls.push("wait"); },
     };
-    const process = { env: { SHIPVO_TEST_PASSWORD: "x" } };
-    await new Function("phone", "process", `return (async () => {\n${body.replace(/!\)/g, ")")}\n})()`)(phone, process);
-    expect(seen).toEqual(["tap Add to cart", "wait", "type Email", "type Password", "scroll", "back"]);
+    (globalThis as any).__rec.phone = phone;
+    (globalThis as any).__rec.opened = [];
+    // The only change: the two imports point at mocks. The body of the script is run as generated.
+    const script = page.exp("shop", session)
+      .replace('import { test } from "@shipvo/test/vitest";', "const test = (_n, f) => (globalThis.__rec.run = f);")
+      .replace('import { openApp } from "@shipvo/test";', "const openApp = async (o) => { globalThis.__rec.opened.push(o.app); return globalThis.__rec.phone; };");
+    const file = join(dir, "rec.mts");
+    writeFileSync(file, script);
+    await import(/* @vite-ignore */ file);
+    await (globalThis as any).__rec.run();
+    expect((globalThis as any).__rec.opened).toEqual(["shop"]);
+    expect(calls).toEqual(["tap Add to cart", "wait", "type Email", "type Password", "scroll up", "back"]);
+  });
+  it("opens the app id, not the display name", () => {
+    const h = framePage("Tide & Tackle", "com.example.tide");
+    expect(h).toContain('var APP="com.example.tide"');
+    expect(h).toContain('TITLE="Tide  Tackle"');
+    const out = page.exp("com.example.tide", [], "Tide  Tackle");
+    expect(out).toContain('openApp({ app: "com.example.tide" })');
+    expect(out).toContain('recorded session for Tide  Tackle');
+    expect(out).not.toMatch(/openApp\(\{ app: "Tide/);
+  });
+  it("wrapBuild passes the app id to the page", () => {
+    const d = mkdtempSync(join(tmpdir(), "pv-"));
+    writeFileSync(join(d, "index.html"), "<app>");
+    const out = wrapBuild(d, "Tide & Tackle", "com.example.tide");
+    expect(Buffer.from(out.find((f) => f.path === "index.html")!.bytes).toString()).toContain('var APP="com.example.tide"');
+  });
+  it("keeps the honesty line and Record controls visible on phones", () => {
+    const h = framePage("Shop");
+    const m = /@media \(max-width:500px\)\{([^}]*)\}/.exec(h)![1]!;
+    expect(m).not.toContain(".panel");
+    expect(h).toContain("body.dark .panel a");
+  });
+  it("styles the link and buttons for contrast and focus", () => {
+    const h = framePage("Shop");
+    expect(h).toContain(".panel a{color:inherit;text-decoration:underline}");
+    expect(h).toContain(":focus-visible{outline");
+  });
+  it("makes unlabeled taps visible and says 1 step", () => {
+    expect(RECORDER_JS).toContain("TODO: tap without a label");
+    expect(framePage("Shop")).toContain('===1?" step":" steps"');
   });
   it("frame page has the recorder, download button and honesty line", () => {
     const h = framePage("Shop");
