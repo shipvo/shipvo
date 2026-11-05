@@ -5,7 +5,8 @@ import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
-import { apps } from "./apps";
+import { apps, publisher } from "./apps";
+import { listAudit, recordAudit } from "./audit";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
@@ -142,6 +143,7 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const cur = await env.POINTERS.get(key);
   if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
   await env.POINTERS.put(key, JSON.stringify({ release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold }));
+  await recordAudit(env.DB, { appId, actor: "halt rule", kind: "system", action: "halt", release, before: null, after: { halted: release, reports: verdict.reports, failed: counts.failed, threshold } });
 }
 
 /** Device telemetry for the spike: applied / reverted / timings. */
@@ -200,6 +202,15 @@ app.get("/t/:app/summary", async (c) => {
   const haltRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt/${appId}`) : null;
   if (haltRaw) { try { const v = JSON.parse(haltRaw); if (v && typeof v === "object") halted = v; } catch { /* corrupt: null */ } }
   return c.json({ releases, halted });
+});
+
+/** Audit log: who published, rolled back or halted. Needs the app's publish token, the owner token or an admin session. */
+app.get("/audit/:app", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await owner(c, appId)) && !(await publisher(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const { rows, next_before } = await listAudit(c.env.DB, appId, c.req.query("limit"), c.req.query("before"));
+  return c.json({ app: appId, rows, next_before }, 200, { "cache-control": "no-store" });
 });
 
 app.get("/band/:cohort", (c) => {

@@ -4,6 +4,7 @@
 // signing key never leaves the developer's machine or CI.
 import { Hono } from "hono";
 import { ReleasePointerBody } from "@shipvo/schema";
+import { recordAudit } from "./audit";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; OWNER_TOKEN?: string };
 export const apps = new Hono<{ Bindings: Env }>();
@@ -31,12 +32,16 @@ async function developer(c: any): Promise<{ account_id: number; login: string } 
 }
 
 /** The publish token of one app. */
-async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number } | null> {
+export async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number; actor: string } | null> {
   const k = bearer(c); if (!k.startsWith("sv_publish_")) return null;
   const key = await c.env.DB.prepare("SELECT id, expires_at FROM publish_tokens WHERE key_hash = ? AND app_id = ? AND revoked_at IS NULL").bind(await sha256(k), appId).first();
   if (!key || (key.expires_at && key.expires_at < now())) return null;
   c.env.DB.prepare("UPDATE publish_tokens SET last_used_at = ? WHERE id = ?").bind(now(), key.id).run().catch(() => {});
-  return (await c.env.DB.prepare("SELECT public_key, bytes_used FROM apps WHERE app_id = ?").bind(appId).first()) ?? null;
+  const app = await c.env.DB.prepare("SELECT public_key, bytes_used FROM apps WHERE app_id = ?").bind(appId).first();
+  if (!app) return null;
+  // The actor is the account login that owns the token, never the token itself.
+  const who = await c.env.DB.prepare("SELECT a.github_login FROM publish_tokens t JOIN accounts a ON a.id = t.account_id WHERE t.id = ?").bind(key.id).first().catch(() => null);
+  return { ...app, actor: who?.github_login ?? "publish token" };
 }
 
 function newPublishToken() {
@@ -199,7 +204,17 @@ apps.put("/:id/kv/*", async (c) => {
   if (buf.byteLength > MAX_VALUE) return c.json({ error: "too_large" }, 413);
   if (app.bytes_used + buf.byteLength > MAX_APP_BYTES) return c.json({ error: "app_storage_exceeded", message: `This app has used its ${MAX_APP_BYTES / 1048576} MB beta storage.` }, 413);
   if (k.startsWith(`p/${id}/`)) { const why = await pointerProblem(id, k, app.public_key, buf); if (why) return c.json({ error: "bad_pointer", message: why }, 422); }
+  // Read the old pointer first, so the audit row can show before and after. A lower release number is a rollback.
+  let prev: { release?: number } | null = null, next: any = null;
+  if (k.startsWith(`p/${id}/`)) {
+    try { prev = JSON.parse(JSON.parse((await c.env.POINTERS.get(k)) ?? "null").body); } catch { /* no earlier pointer */ }
+    try { next = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body); } catch { /* checked above */ }
+  }
   await c.env.POINTERS.put(k, buf);
+  if (next) {
+    await recordAudit(c.env.DB, { appId: id, actor: app.actor, kind: "person", action: typeof prev?.release === "number" && next.release < prev.release ? "rollback" : "publish",
+      release: next.release, before: prev ? { key: k, release: prev.release } : null, after: { key: k, release: next.release }, releaseId: next.core?.sha256 ?? null });
+  }
   await c.env.DB.prepare("UPDATE apps SET bytes_used = bytes_used + ? WHERE app_id = ?").bind(buf.byteLength, id).run();
   if (k === `w/${id}/releases`) { try { const idx = JSON.parse(new TextDecoder().decode(buf)); if (Number.isInteger(idx.latest)) await c.env.DB.prepare("UPDATE apps SET latest_release = ?, published_at = ? WHERE app_id = ?").bind(idx.latest, now(), id).run(); } catch {} }
   return c.json({ ok: true, key: k, bytes: buf.byteLength });
