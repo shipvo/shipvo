@@ -29,6 +29,8 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Triage | Claude (issues only) | new issues from outside the team | `agent-triage.yml` |
 | Team lead (report) | Claude | daily 20:53 UTC | `agent-digest.yml` |
 | Release train | rules, no AI | daily 18:41 UTC, only if main is green | `agent-release.yml` |
+| Health check | rules, no AI: clears stale labels, restarts an idle team, reports the rest on the `agent:health` issue | after every merge-bot pass | `scripts/agents/health.mjs` in `agent-merger.yml` |
+| Steward | Claude, as the owner's operator (a scheduled Claude session, outside Actions) | hourly | wakes the team, acts on `agent:health` and `agent:escalate`, fixes the team's own setup, emails the owner only when a decision is theirs |
 
 ## How work flows
 

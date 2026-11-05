@@ -1,0 +1,97 @@
+# Owner controls for the agent team, used by Shipvo HQ (shipvo.dev/hq).
+# The owner opens an issue titled "control: <command>"; this workflow checks the author is a repo admin,
+# runs the command with the team's token, reports the result on the issue and closes it.
+# Commands are reversible: pause, resume, run <role>, prioritize #n, assign #n <engineer>, unblock #n,
+# hold #n, release #n, task (title and body from the issue), report.
+# It runs even when the team is paused, so "resume" always works.
+name: agent-control
+on:
+  issues: { types: [opened] }
+permissions: { contents: read, issues: write }
+concurrency: { group: agent-control }
+jobs:
+  control:
+    # HQ opens control issues with no labels; agents always label the issues they file, so theirs never match.
+    if: startsWith(github.event.issue.title, 'control:') && toJSON(github.event.issue.labels) == '[]'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+      R: ${{ github.repository }}
+      N: ${{ github.event.issue.number }}
+      AUTHOR: ${{ github.event.issue.user.login }}
+      TITLE: ${{ github.event.issue.title }}
+      BODY: ${{ github.event.issue.body }}
+    steps:
+      - name: Run the command
+        run: |
+          python3 - <<'EOF'
+          import json, os, re, subprocess
+          E = os.environ; R = E["R"]; N = E["N"]
+          def gh(*a, check=True):
+              p = subprocess.run(["gh", *a], text=True, capture_output=True)
+              if check and p.returncode: raise RuntimeError((p.stderr or p.stdout).strip()[:400])
+              return p.stdout
+          def done(msg, ok=True):
+              gh("issue", "comment", N, "-R", R, "--body", ("Done: " if ok else "Not done: ") + msg, check=False)
+              gh("issue", "close", N, "-R", R, "--reason", "completed" if ok else "not planned", check=False)
+              print(msg); raise SystemExit
+          # Only repo admins may steer the team. Issues opened by bots or by the team's own workflows are ignored.
+          perm = json.loads(gh("api", f"repos/{R}/collaborators/{E['AUTHOR']}/permission") or "{}").get("permission")
+          if perm != "admin": done(f"only a repository admin can send controls ({E['AUTHOR']} is {perm}).", False)
+          cmd = E["TITLE"][len("control:"):].strip()
+          low = cmd.lower()
+          ROLES = {"planner", "pm", "research", "engineer", "mistral", "aider", "fixer", "reviewer", "merger", "qa", "security", "docs",
+                   "blog", "tutorial", "video", "design", "dogfood", "device-lab", "digest", "release", "triage"}
+          ENGINEERS = {"claude": "agent:claude", "mistral": "agent:mistral", "aider": "agent:aider", "device-lab": "device-lab"}
+          def var(value):
+              p = subprocess.run(["gh", "api", "-X", "PATCH", f"repos/{R}/actions/variables/AGENTS_PAUSED", "-f", "name=AGENTS_PAUSED", "-f", f"value={value}"], text=True, capture_output=True)
+              if p.returncode:
+                  p = subprocess.run(["gh", "api", "-X", "POST", f"repos/{R}/actions/variables", "-f", "name=AGENTS_PAUSED", "-f", f"value={value}"], text=True, capture_output=True)
+              if p.returncode: done("could not set AGENTS_PAUSED. The agent token needs the Variables: read and write permission. " + (p.stderr or "")[:200], False)
+          num = lambda: (re.search(r"#(\d+)", cmd) or done("name the issue or PR as #<number>.", False)).group(1)
+          try:
+              if low == "pause":
+                  var("true"); gh("api", "-X", "POST", f"repos/{R}/actions/workflows/agent-merger.yml/dispatches", "-f", "ref=main", check=False); done("the team is paused. Every agent workflow skips until you send `control: resume`.")
+              elif low == "resume":
+                  var("false")
+                  for wf in ["agent-engineer.yml", "agent-mistral.yml", "agent-aider.yml", "agent-merger.yml"]:
+                      gh("api", "-X", "POST", f"repos/{R}/actions/workflows/{wf}/dispatches", "-f", "ref=main", check=False)
+                  done("the team is running again; engineers and the merge bot were started.")
+              elif low.startswith("run "):
+                  role = low[4:].strip()
+                  if role not in ROLES: done(f"unknown role `{role}`. Roles: {', '.join(sorted(ROLES))}.", False)
+                  gh("api", "-X", "POST", f"repos/{R}/actions/workflows/agent-{role}.yml/dispatches", "-f", "ref=main")
+                  done(f"started `agent-{role}`. Watch it in Actions.")
+              elif low == "report":
+                  gh("api", "-X", "POST", f"repos/{R}/actions/workflows/agent-digest.yml/dispatches", "-f", "ref=main")
+                  done("asked the team lead for a fresh report on the Agent team log.")
+              elif low.startswith("prioritize"):
+                  n = num(); gh("issue", "edit", n, "-R", R, "--add-label", "priority:high"); done(f"#{n} is now high priority; engineers take it first.")
+              elif low.startswith("assign"):
+                  n = num(); who = next((k for k in ENGINEERS if re.search(rf"\b{k}\b", low)), None)
+                  if not who: done("say who: claude, mistral, aider or device-lab.", False)
+                  args = ["issue", "edit", n, "-R", R, "--add-label", ENGINEERS[who]]
+                  for k, l in ENGINEERS.items():
+                      if k != who: args += ["--remove-label", l]
+                  if who != "device-lab": args += ["--add-label", "agent:ready"]
+                  args += ["--remove-label", "agent:blocked", "--remove-label", "agent:in-progress"]
+                  gh(*args); done(f"#{n} is assigned to {who}.")
+              elif low.startswith("unblock"):
+                  n = num(); gh("issue", "edit", n, "-R", R, "--remove-label", "agent:blocked", "--remove-label", "needs-human", "--add-label", "agent:ready")
+                  done(f"#{n} is back in the queue.")
+              elif low.startswith("hold"):
+                  n = num(); gh("issue", "edit", n, "-R", R, "--add-label", "needs-human"); done(f"#{n} is on hold; nothing will merge or work on it until you release it.")
+              elif low.startswith("release"):
+                  n = num()
+                  for l in ["needs-human", "contract:drift", "fix:3", "fix:2", "fix:1"]: gh("issue", "edit", n, "-R", R, "--remove-label", l, check=False)
+                  done(f"#{n} is released: the hold is cleared and it gets fresh fix rounds.")
+              elif low.startswith("task"):
+                  title = cmd[4:].strip(" :") or done("give the task a title: `control: task <title>`, details in the body.", False)
+                  body = (E.get("BODY") or "").strip() + "\n\n_Filed from Shipvo HQ by the owner._"
+                  url = gh("issue", "create", "-R", R, "--title", title, "--body", body, "--label", "agent:ready", "--label", "agent:claude").strip()
+                  done(f"filed {url} for the Claude engineer.")
+              else:
+                  done("unknown command. Use: pause, resume, run <role>, report, prioritize #n, assign #n <claude|mistral|aider|device-lab>, unblock #n, hold #n, release #n, task <title>.", False)
+          except RuntimeError as e:
+              done(f"GitHub refused it: {e}", False)
+          EOF

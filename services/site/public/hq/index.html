@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Shipvo HQ</title>
+<link rel="icon" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Operations console in Shipvo's own colors: summary first, then the pipeline, the people, the progress, the paper trail. */
+:root{
+  --ink:#090D16;--ink-2:#0F1522;--ink-3:#151D2E;--line:#1F2A3F;--line-2:#2A3850;
+  --paper:#F4F2EC;--mute:#B6BDCB;--dim:#8891A3;
+  --accent:#FF9A2E;--accent-ink:#120B03;--sky:#5FB8FF;
+  --ok:#7CE3A0;--warn:#FFC857;--bad:#FF7A7A;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--ink);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--display);font-size:15px;line-height:1.45;font-weight:500;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+a{color:inherit}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--mono)}
+.dim{color:var(--dim)}.mute{color:var(--mute)}
+header.top{position:sticky;top:0;z-index:5;background:rgba(9,13,22,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;text-decoration:none;margin-right:auto}
+.brand img{width:26px;height:26px;border-radius:6px}
+.brand small{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--accent);font-weight:500;text-transform:uppercase}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;font-family:var(--mono);font-size:12px;border:1px solid var(--line-2);white-space:nowrap}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.info{color:var(--sky)}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--ink-2);color:var(--paper);font:700 14px var(--display);cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--dim)}
+.btn:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:rgba(255,122,122,.45)}
+.btn.sm{min-height:28px;padding:0 9px;font-size:12.5px;border-radius:8px}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
+nav.tabs a{padding:7px 12px;border-radius:9px;text-decoration:none;color:var(--mute);font-weight:700;font-size:14px;white-space:nowrap}
+nav.tabs a[aria-current="page"]{background:var(--ink-3);color:var(--paper);box-shadow:inset 0 -2px 0 var(--accent)}
+main{padding-block:20px 60px}
+section.view{display:grid;gap:18px}
+h2{font-size:13px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--sky);font-weight:500;margin:0 0 10px}
+h3{margin:0;font-size:16px;text-wrap:balance}
+.panel{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.grid{display:grid;gap:18px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+@media (max-width:520px){.kpis{grid-template-columns:repeat(2,1fr)}.kpis .kpi:last-child:nth-child(odd){grid-column:1/-1}}
+.kpi{background:var(--ink-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi b{display:block;font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi span{font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.04em}
+.kpi.alert{border-color:rgba(255,122,122,.5)}.kpi.alert b{color:var(--bad)}
+.strip{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:13.5px}
+.strip a{text-decoration:none}
+.list{display:grid;gap:2px}
+.row{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);min-width:0}
+.row:first-child{border-top:0}
+.row .t{flex:1;min-width:0;overflow-wrap:anywhere}
+.row .t a{text-decoration:none}.row .t a:hover{text-decoration:underline}
+.tag{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:6px;background:var(--ink-3);color:var(--mute);white-space:nowrap}
+.eng-claude{color:#FFB46B}.eng-mistral{color:#B9A6FF}.eng-aider{color:#7FD8C9}.eng-device-lab{color:var(--sky)}
+.when{font-family:var(--mono);font-size:12px;color:var(--dim);white-space:nowrap}
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px,1fr);gap:12px;overflow-x:auto;padding-bottom:8px}
+.col{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:10px;min-height:120px;display:flex;flex-direction:column;gap:8px}
+.col h3{font-size:13px;font-family:var(--mono);font-weight:500;color:var(--mute);display:flex;justify-content:space-between;padding:2px 4px 6px}
+.card{background:var(--ink-3);border:1px solid var(--line-2);border-radius:10px;padding:10px;display:grid;gap:6px}
+.card.stuck{border-color:rgba(255,200,87,.6)}
+.card a.title{text-decoration:none;font-weight:700;font-size:13.5px;overflow-wrap:anywhere}
+.card .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.card .acts{display:flex;flex-wrap:wrap;gap:6px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-family:var(--mono);font-size:11.5px;color:var(--dim);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line-2)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.num{font-variant-numeric:tabular-nums;text-align:right}
+.scroll{overflow-x:auto}
+.bar-track{height:8px;background:var(--ink-3);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;background:var(--accent);border-radius:99px}
+.md{font-size:14px;line-height:1.55;color:var(--mute);overflow-wrap:anywhere}
+.md h1,.md h2,.md h3,.md h4{color:var(--paper);font-family:var(--display);letter-spacing:0;text-transform:none;font-size:15px;margin:14px 0 6px}
+.md p{margin:6px 0}.md ul{margin:6px 0;padding-left:20px}.md code{font-family:var(--mono);font-size:.9em;color:var(--paper)}
+.md a{color:var(--sky)}
+.md table{font-size:12.5px;margin:8px 0;display:block;overflow-x:auto}
+details{border-top:1px solid var(--line);padding:8px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:700;list-style:none;display:flex;gap:10px;align-items:baseline}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";color:var(--dim);font-size:12px}
+details[open] summary::before{content:"▾"}
+label{display:grid;gap:6px;font-size:13px;color:var(--mute);font-weight:700}
+input,select,textarea{background:var(--ink-3);color:var(--paper);border:1px solid var(--line-2);border-radius:9px;padding:8px 10px;font:500 14px var(--display);width:100%}
+textarea{min-height:90px;resize:vertical}
+.form{display:grid;gap:12px}
+.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.inline>*{flex:1 1 140px}
+.note{font-size:13px;color:var(--dim)}
+.empty{color:var(--dim);font-size:14px;padding:10px 0}
+svg text{fill:var(--dim);font-family:var(--mono);font-size:10px}
+.err{background:rgba(255,122,122,.08);border:1px solid rgba(255,122,122,.4);color:var(--bad);border-radius:12px;padding:12px 14px}
+@media (prefers-reduced-motion:no-preference){.card,.btn{transition:border-color .15s}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="bar">
+    <a class="brand" href="#overview"><img src="/logo-56.png" alt="">Shipvo <small>HQ</small></a>
+    <span id="state" class="pill dim">loading</span>
+    <span id="updated" class="when"></span>
+    <button class="btn sm" id="reload" type="button">Refresh</button>
+    <a class="btn sm" id="pausebtn" target="_blank" rel="noopener" href="#">Pause team</a>
+  </div>
+  <nav class="tabs" aria-label="Views">
+    <a href="#overview">Command center</a><a href="#pipeline">Pipeline</a><a href="#team">Team</a><a href="#progress">Progress</a><a href="#reports">Reports</a><a href="#controls">Controls</a>
+  </nav>
+</div></header>
+<main class="wrap" id="app"><p class="empty">Loading the team's status…</p></main>
+
+<script>
+(() => {
+const REPO = "shipvo/shipvo", GH = `https://github.com/${REPO}`;
+let S = null, timer = null;
+const $ = (s) => document.querySelector(s);
+const esc = (x) => String(x ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ago = (iso) => { if (!iso) return "never"; const m = Math.round((Date.now() - new Date(iso)) / 6e4); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+const hrs = (h) => h < 1 ? `${Math.round(h * 60)} min` : h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} d`;
+// Controls open a pre-filled GitHub issue; agent-control.yml runs it if a repo admin submitted it.
+const ctl = (cmd, body = "") => `${GH}/issues/new?title=${encodeURIComponent("control: " + cmd)}&body=${encodeURIComponent((body ? body + "\n\n" : "") + "Sent from Shipvo HQ. Submit this issue to run the command; it closes itself when done.")}`;
+const ctlA = (cmd, label, cls = "btn sm") => `<a class="${cls}" target="_blank" rel="noopener" href="${ctl(cmd)}">${esc(label)}</a>`;
+const eng = (e) => `<span class="tag eng-${esc(e)}">${esc(e)}</span>`;
+const concl = (c, running) => running ? `<span class="pill info">running</span>` : c === "success" ? `<span class="pill ok">ok</span>` : c === "failure" ? `<span class="pill bad">failed</span>` : c === "cancelled" ? `<span class="pill warn">cancelled</span>` : c === "skipped" ? `<span class="pill dim">skipped</span>` : `<span class="pill dim">${esc(c || "none")}</span>`;
+
+// Small, safe Markdown: text is escaped first, then a few constructs are turned into tags.
+function md(src) {
+  const lines = esc(src || "").split("\n"); let out = "", list = false, table = [];
+  const inl = (t) => t.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|\s)#(\d+)\b/g, `$1<a href="${GH}/issues/$2" target="_blank" rel="noopener">#$2</a>`);
+  const flushT = () => { if (!table.length) return; out += "<table>" + table.filter((r) => !/^\|\s*-/.test(r)).map((r, i) => "<tr>" + r.replace(/^\||\|$/g, "").split("|").map((c) => (i ? "<td>" : "<th>") + inl(c.trim()) + (i ? "</td>" : "</th>")).join("") + "</tr>").join("") + "</table>"; table = []; };
+  for (const l of lines) {
+    if (/^\|/.test(l)) { if (list) { out += "</ul>"; list = false; } table.push(l); continue; } else flushT();
+    const h = l.match(/^(#{1,4})\s+(.*)/), li = l.match(/^\s*[-*]\s+(.*)/);
+    if (h) { if (list) { out += "</ul>"; list = false; } out += `<h4>${inl(h[2])}</h4>`; }
+    else if (li) { if (!list) { out += "<ul>"; list = true; } out += `<li>${inl(li[1])}</li>`; }
+    else { if (list) { out += "</ul>"; list = false; } if (l.trim()) out += `<p>${inl(l)}</p>`; }
+  }
+  flushT(); if (list) out += "</ul>"; return out;
+}
+
+function header() {
+  const st = $("#state"), pb = $("#pausebtn");
+  if (S.paused) { st.className = "pill warn"; st.textContent = "Team paused"; pb.textContent = "Resume team"; pb.href = ctl("resume"); pb.className = "btn sm primary"; }
+  else {
+    const red = S.main?.ci?.conclusion === "failure", needs = S.counts.needs_you > 0 || S.needs.length > 0;
+    st.className = "pill " + (red ? "bad" : S.health.open || needs ? "warn" : "ok");
+    st.textContent = red ? "Main CI red" : S.health.open ? "Needs attention" : needs ? "Waiting on you" : "Healthy";
+    pb.textContent = "Pause team"; pb.href = ctl("pause"); pb.className = "btn sm danger";
+  }
+  $("#updated").textContent = "updated " + ago(S.generated_at);
+}
+
+function trendChart(tr) {
+  const W = 640, Hh = 150, pad = 24, n = tr.length, max = Math.max(1, ...tr.map((t) => Math.max(t.merged, t.failed)));
+  const x = (i) => pad + (i * (W - pad * 2)) / n, bw = Math.max(6, (W - pad * 2) / n - 6), y = (v) => Hh - 22 - (v / max) * (Hh - 40);
+  const ticks = [0, Math.round(max / 2), max];
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Merged pull requests and failed runs per day, last 14 days">`;
+  for (const t of ticks) s += `<line x1="${pad}" x2="${W - pad}" y1="${y(t)}" y2="${y(t)}" stroke="#1F2A3F"/><text x="2" y="${y(t) + 3}">${t}</text>`;
+  tr.forEach((t, i) => { s += `<rect x="${x(i) + 3}" y="${y(t.merged)}" width="${bw}" height="${Hh - 22 - y(t.merged)}" rx="3" fill="#FF9A2E"><title>${t.day}: ${t.merged} merged, ${t.failed} failed runs</title></rect>`; if (i % 2 === n % 2) s += `<text x="${x(i) + 3}" y="${Hh - 6}">${t.day.slice(5)}</text>`; });
+  s += `<polyline fill="none" stroke="#FF7A7A" stroke-width="2" points="${tr.map((t, i) => `${x(i) + 3 + bw / 2},${y(t.failed)}`).join(" ")}"/>`;
+  return s + `</svg><div class="strip note"><span><span class="mono" style="color:var(--accent)">■</span> merged PRs</span><span><span class="mono bad">—</span> failed agent runs</span></div>`;
+}
+
+const views = {
+  overview() {
+    const c = S.counts, k = (v, l, alert) => `<div class="kpi${alert ? " alert" : ""}"><b>${v}</b><span>${l}</span></div>`;
+    const ci = S.main?.ci, ios = S.main?.ios;
+    return `<section class="view">
+      <div class="kpis">${k(c.merged_today, "merged today")}${k(c.merged_7d, "merged this week")}${k(c.open_prs, "open PRs")}${k(c.working, "engineers working")}${k(c.ready, "in the queue")}${k(c.failed_24h, "failed runs, 24 h", c.failed_24h >= 5)}${k(S.needs.length, "need you or the steward", S.needs.length > 0)}</div>
+      <div class="panel strip">
+        <span>Main CI ${ci ? `<a href="${esc(ci.url)}" target="_blank" rel="noopener">${concl(ci.conclusion)}</a>` : "–"}</span>
+        <span>iOS tests ${ios ? `<a href="${esc(ios.url)}" target="_blank" rel="noopener">${concl(ios.conclusion)}</a>` : "–"}</span>
+        <span>Last release ${S.release ? `<a class="mono" href="${esc(S.release.url)}" target="_blank" rel="noopener">${esc(S.release.tag)}</a>` : "none yet"}</span>
+        <span>Last wake-up ${S.steward ? `<a class="when" href="${esc(S.steward.url)}" target="_blank" rel="noopener">${ago(S.steward.at)}</a>` : "–"}</span>
+        <span class="dim">${S.paused ? "Team is paused" : "Team is running"} · ${c.runs_24h} agent runs in 24 h</span>
+      </div>
+      <div class="grid g2">
+        <div class="panel"><h2>Health check</h2>${S.health.open ? `<div class="md">${md(S.health.body)}</div><p><a class="btn sm" href="${esc(S.health.url)}" target="_blank" rel="noopener">Open #${S.health.n}</a></p>` : `<p class="ok" style="font-weight:700">All clear. The health check found nothing that needs attention.</p>`}</div>
+        <div class="panel"><h2>Needs you or the steward</h2>${S.needs.length ? `<div class="list">${S.needs.map((x) => `<div class="row"><span class="tag ${x.why === "Waiting for you" ? "warn" : ""}">${esc(x.why)}</span><span class="t"><a href="${esc(x.url)}" target="_blank" rel="noopener">#${x.n} ${esc(x.title)}</a></span>${x.why !== "Escalated to the steward" ? ctlA(`unblock #${x.n}`, "Unblock") : ""}</div>`).join("")}</div>` : `<p class="empty">Nothing is waiting on you.</p>`}</div>
+      </div>
+      <div class="grid g2">
+        <div class="panel"><h2>Last 14 days</h2>${trendChart(S.trend)}</div>
+        <div class="panel"><h2>Activity</h2><div class="list">${S.activity.slice(0, 14).map((a) => `<div class="row"><span class="tag ${a.kind === "failed" ? "bad" : a.kind === "merged" ? "ok" : ""}">${a.kind}</span><span class="t"><a href="${esc(a.url)}" target="_blank" rel="noopener">${a.n ? "#" + a.n + " " : ""}${esc(a.text)}</a></span>${a.who ? eng(a.who) : ""}<span class="when">${ago(a.at)}</span></div>`).join("")}</div></div>
+      </div></section>`;
+  },
+  pipeline() {
+    const cols = [["ready", "Queue"], ["working", "Working"], ["review", "In review"], ["fixing", "Fixing"], ["approved", "Approved, merging"], ["blocked", "Blocked or held"], ["merged", "Merged, 24 h"], ["triage", "Not routed"]];
+    const by = (s) => S.pipeline.filter((c) => c.stage === s);
+    const cardH = (c) => {
+      const stuck = c.stage !== "merged" && c.stage !== "ready" && c.stage !== "triage" && c.age_h > 2;
+      const acts = c.stage === "merged" ? "" : c.pr
+        ? [c.stage === "blocked" ? ctlA(`release #${c.n}`, "Release") : ctlA(`hold #${c.n}`, "Hold")].join("")
+        : [ctlA(`prioritize #${c.n}`, "Prioritize"), ctlA(`assign #${c.n} claude`, "→ Claude"), ctlA(`assign #${c.n} mistral`, "→ Mistral"), c.stage === "blocked" ? ctlA(`unblock #${c.n}`, "Unblock") : ""].join("");
+      return `<div class="card${stuck ? " stuck" : ""}"><a class="title" href="${esc(c.url)}" target="_blank" rel="noopener">${c.pr ? "PR " : ""}#${c.n} ${esc(c.title)}</a>
+        <div class="meta">${eng(c.engineer)}${c.fix ? `<span class="tag">fix round ${c.fix}</span>` : ""}${c.labels.includes("priority:high") ? `<span class="tag warn">high priority</span>` : ""}${c.issue ? `<span class="tag">for #${c.issue}</span>` : ""}<span class="when">${c.stage === "merged" ? hrs(c.age_h) + " ago" : "quiet " + hrs(c.age_h)}</span></div>
+        ${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
+    };
+    return `<section class="view"><p class="note">Every open issue and PR, by where it is. Amber cards have been quiet for over 2 hours. Buttons open a pre-filled control issue on GitHub; submit it and the team acts within a minute.</p>
+      <div class="board">${cols.filter(([s]) => s !== "triage" || by(s).length).map(([s, name]) => `<div class="col"><h3><span>${name}</span><span>${by(s).length}</span></h3>${by(s).map(cardH).join("") || `<p class="empty">Empty</p>`}</div>`).join("")}</div></section>`;
+  },
+  team() {
+    const sc = S.engineers.map((e) => { const tot = e.merged_7d + e.closed_unmerged_7d, rate = tot ? Math.round((e.merged_7d / tot) * 100) : null;
+      return `<div class="panel"><h3 class="eng-${e.id}" style="text-transform:capitalize">${e.id}</h3>
+      <div class="kpis" style="margin-top:10px"><div class="kpi"><b>${e.merged_7d}</b><span>merged, 7 d</span></div><div class="kpi${rate !== null && rate < 40 ? " alert" : ""}"><b>${rate === null ? "–" : rate + "%"}</b><span>of finished PRs merged</span></div></div>
+      <p class="note">${e.closed_unmerged_7d} closed without merging · ${e.open_prs} open PRs · ${e.working} working · ${e.queued} queued</p></div>`; }).join("");
+    const rows = S.roles.map((r) => `<tr><td><strong>${esc(r.name)}</strong><div class="when">${esc(r.file)}</div></td><td>${concl(r.last?.conclusion, r.running)}</td><td>${r.last ? `<a class="when" href="${esc(r.last.url)}" target="_blank" rel="noopener">${ago(r.last.at)}</a>` : `<span class="when">never</span>`}</td><td class="num">${r.runs_24h}</td><td class="num ${r.failed_24h ? "bad" : ""}">${r.failed_24h}</td><td>${r.id.startsWith("agent-") && !["agent-control", "agent-contract"].includes(r.id) ? ctlA("run " + r.id.slice(6), "Run now") : ""}</td></tr>`).join("");
+    return `<section class="view"><div><h2>Engineers, last 7 days</h2><div class="grid g3">${sc}</div></div>
+      <div class="panel"><h2>Every role</h2><div class="scroll"><table><thead><tr><th>Role</th><th>Last result</th><th>Last run</th><th style="text-align:right">Runs 24 h</th><th style="text-align:right">Failed 24 h</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div></section>`;
+  },
+  progress() {
+    const bets = S.epics.filter((e) => e.state === "open").map((e) => { const p = e.total ? Math.round((e.done / e.total) * 100) : 0;
+      return `<div class="panel"><h3><a href="${esc(e.url)}" target="_blank" rel="noopener" style="text-decoration:none">#${e.n} ${esc(e.title)}</a></h3>
+      <div style="display:flex;gap:10px;align-items:center;margin:10px 0"><div class="bar-track" style="flex:1"><div class="bar-fill" style="width:${p}%"></div></div><span class="mono">${e.done}/${e.total}</span></div>
+      ${e.open.length ? `<div class="list">${e.open.map((k) => `<div class="row"><span class="t"><a href="${esc(k.url)}" target="_blank" rel="noopener">#${k.n} ${esc(k.title)}</a></span></div>`).join("")}</div>` : `<p class="note">Every linked issue is closed.</p>`}</div>`; }).join("");
+    const done = S.epics.filter((e) => e.state === "closed");
+    return `<section class="view"><div><h2>Bets</h2><p class="note">Progress counts the issues that mention each bet: closed out of all.</p><div class="grid g3">${bets || `<p class="empty">No open bets.</p>`}</div>${done.length ? `<p class="note">Finished: ${done.map((e) => `<a href="${esc(e.url)}" target="_blank" rel="noopener">#${e.n} ${esc(e.title)}</a>`).join(", ")}</p>` : ""}</div>
+      <div class="grid g2">
+        <div class="panel"><h2>Roadmap, now</h2><div class="list">${S.roadmap_now.map((r) => `<div class="row"><span class="mono ${r.done ? "ok" : "dim"}">${r.done ? "✓" : "○"}</span><span class="t md" style="color:var(--paper)">${md(r.text).replace(/^<p>|<\/p>$/g, "")}</span></div>`).join("")}</div><p><a class="btn sm" href="${GH}/blob/main/docs/ROADMAP.md" target="_blank" rel="noopener">Full roadmap</a></p></div>
+        <div class="panel"><h2>Packages on npm</h2><div class="list">${S.packages.map((p) => `<div class="row"><span class="t"><a class="mono" href="https://www.npmjs.com/package/${esc(p.name)}" target="_blank" rel="noopener">${esc(p.name)}</a></span><span class="tag">${esc(p.version)}</span></div>`).join("")}</div>
+          <h2 style="margin-top:18px">Published content</h2><div class="strip"><span><b>${S.content.blog.length}</b> blog posts</span><span><b>${S.content.tutorials.length}</b> tutorials</span><span><b>${S.content.videos.length}</b> videos</span><a class="btn sm" href="/blog/" target="_blank" rel="noopener">Blog</a></div></div>
+      </div></section>`;
+  },
+  reports() {
+    const R = S.reports;
+    return `<section class="view"><div class="grid g2">
+      <div class="panel"><h2>Daily team log</h2>${R.log.length ? R.log.map((c, i) => `<details${i ? "" : " open"}><summary>${new Date(c.at).toUTCString().slice(0, 16)} <span class="when">${ago(c.at)}</span></summary><div class="md">${md(c.body)}</div></details>`).join("") : `<p class="empty">No report yet.</p>`}${R.log_url ? `<p>${ctlA("report", "Ask for a fresh report", "btn sm")} <a class="btn sm" href="${esc(R.log_url)}" target="_blank" rel="noopener">All reports</a></p>` : ""}</div>
+      <div class="grid" style="align-content:start">
+        <div class="panel"><h2>Device lab</h2>${R.lab.map((l) => `<details><summary>${esc(l.name.replace(".md", ""))}</summary><p class="md">${esc(l.summary)}</p><a class="btn sm" href="${esc(l.url)}" target="_blank" rel="noopener">Read the report</a></details>`).join("") || `<p class="empty">No reports yet.</p>`}</div>
+        <div class="panel"><h2>Research findings</h2><div class="list">${R.research.map((r) => `<div class="row"><span class="tag ${r.state === "open" ? "info" : ""}">${r.state}</span><span class="t"><a href="${esc(r.url)}" target="_blank" rel="noopener">#${r.n} ${esc(r.title)}</a></span><span class="when">${ago(r.at)}</span></div>`).join("")}</div></div>
+      </div></div>
+      <div class="grid g2">
+        <div class="panel"><h2>Changelog</h2>${R.changelog.map((c, i) => `<details${i ? "" : " open"}><summary>${esc(c.head)}</summary><div class="md"><ul>${c.items.map((x) => `<li>${md(x).replace(/^<p>|<\/p>$/g, "")}</li>`).join("")}</ul></div></details>`).join("")}</div>
+        <div class="panel"><h2>Product strategy</h2><details><summary>Read the current strategy</summary><div class="md">${md(R.strategy)}</div></details><p><a class="btn sm" href="${GH}/blob/main/docs/product/strategy.md" target="_blank" rel="noopener">Open on GitHub</a></p></div>
+      </div></section>`;
+  },
+  controls() {
+    const roles = ["planner", "pm", "research", "engineer", "mistral", "aider", "fixer", "reviewer", "merger", "qa", "security", "docs", "blog", "tutorial", "video", "design", "dogfood", "device-lab", "digest", "release"];
+    return `<section class="view"><p class="note">Each control opens a pre-filled issue on GitHub. Submit it, and the <code>agent-control</code> workflow checks that a repository admin sent it, does it, answers on the issue and closes it, usually within a minute. Every control can be undone.</p>
+      <div class="grid g3">
+        <div class="panel form"><h2>The whole team</h2>${S.paused ? ctlA("resume", "Resume the team", "btn primary") : ctlA("pause", "Pause the team", "btn danger")}<p class="note">Pausing stops every agent at once. HQ keeps updating.</p>${ctlA("report", "Ask for a fresh report", "btn")}</div>
+        <div class="panel form"><h2>Run a role now</h2><label>Role<select id="c-role">${roles.map((r) => `<option>${r}</option>`).join("")}</select></label><a class="btn" id="c-role-go" target="_blank" rel="noopener" href="#">Run it</a></div>
+        <div class="panel form"><h2>Steer one issue or PR</h2><label>Number<input id="c-num" inputmode="numeric" placeholder="for example 113"></label>
+          <label>Action<select id="c-act"><option value="prioritize">Make it high priority</option><option value="assign claude">Give it to Claude</option><option value="assign mistral">Give it to Mistral</option><option value="assign aider">Give it to Aider</option><option value="assign device-lab">Give it to the Device Lab</option><option value="hold">Hold it (nothing merges or works on it)</option><option value="release">Release a hold, fresh fix rounds</option><option value="unblock">Put a blocked issue back in the queue</option></select></label>
+          <a class="btn" id="c-act-go" target="_blank" rel="noopener" href="#">Send</a></div>
+      </div>
+      <div class="panel form"><h2>Give the team a task</h2><label>Title<input id="c-title" placeholder="for example: docs: add a Windows section to Getting started"></label>
+        <label>What done looks like<textarea id="c-body" placeholder="The problem, what to do, and how we will know it is done."></textarea></label>
+        <div class="inline"><a class="btn primary" id="c-task-go" target="_blank" rel="noopener" href="#">File the task</a><span class="note">It goes to the Claude engineer, ready to pick up.</span></div></div>
+      <div class="panel"><h2>Direct links</h2><div class="strip"><a class="btn sm" href="${GH}/actions" target="_blank" rel="noopener">All Actions runs</a><a class="btn sm" href="${GH}/pulls" target="_blank" rel="noopener">Pull requests</a><a class="btn sm" href="${GH}/issues" target="_blank" rel="noopener">Issues</a><a class="btn sm" href="${GH}/settings/variables/actions" target="_blank" rel="noopener">Team settings (variables)</a><a class="btn sm" href="${GH}/blob/main/.github/agents/README.md" target="_blank" rel="noopener">How the team works</a></div></div>
+    </section>`;
+  },
+};
+
+function wireControls() {
+  const role = $("#c-role"), rg = $("#c-role-go");
+  if (role) { const u = () => (rg.href = ctl("run " + role.value)); role.onchange = u; u(); }
+  const num = $("#c-num"), act = $("#c-act"), ag = $("#c-act-go");
+  if (num) { const u = () => { const n = num.value.replace(/\D/g, ""); ag.href = n ? ctl(`${act.value.split(" ")[0]} #${n}${act.value.includes(" ") ? " " + act.value.split(" ")[1] : ""}`) : "#"; ag.setAttribute("aria-disabled", n ? "false" : "true"); }; num.oninput = u; act.onchange = u; u(); ag.onclick = (e) => { if (ag.getAttribute("aria-disabled") === "true") { e.preventDefault(); num.focus(); } }; }
+  const t = $("#c-title"), b = $("#c-body"), tg = $("#c-task-go");
+  if (t) { const u = () => (tg.href = t.value.trim() ? ctl("task " + t.value.trim(), b.value.trim()) : "#"); t.oninput = u; b.oninput = u; u(); tg.onclick = (e) => { if (!t.value.trim()) { e.preventDefault(); t.focus(); } }; }
+}
+
+function render() {
+  const view = (location.hash || "#overview").slice(1);
+  const v = views[view] ? view : "overview";
+  document.querySelectorAll("nav.tabs a").forEach((a) => a.setAttribute("aria-current", a.getAttribute("href") === "#" + v ? "page" : "false"));
+  if (!S) return;
+  header();
+  const keep = v === "controls" ? { role: $("#c-role")?.value, num: $("#c-num")?.value, act: $("#c-act")?.value, title: $("#c-title")?.value, body: $("#c-body")?.value } : null;
+  $("#app").innerHTML = views[v]();
+  if (keep) { if (keep.role) $("#c-role").value = keep.role; if (keep.num) $("#c-num").value = keep.num; if (keep.act) $("#c-act").value = keep.act; if (keep.title) $("#c-title").value = keep.title; if (keep.body) $("#c-body").value = keep.body; }
+  wireControls();
+}
+
+async function load() {
+  try {
+    const r = await fetch("/hq/status.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status === 404 ? "No snapshot yet. The first one is written after the merge bot's next pass." : "HTTP " + r.status);
+    const first = !S; S = await r.json();
+    // Do not redraw the controls form under someone typing in it; the header still updates.
+    if (!first && (location.hash || "#overview") === "#controls") header(); else render();
+  } catch (e) {
+    if (!S) $("#app").innerHTML = `<div class="err">Could not load the team's status. ${esc(e.message)}</div>`;
+    else $("#updated").textContent = "update failed, showing " + ago(S.generated_at);
+  }
+}
+window.addEventListener("hashchange", render);
+$("#reload").onclick = load;
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+load(); timer = setInterval(() => { if (!document.hidden) load(); }, 60000);
+setInterval(() => { if (S) $("#updated").textContent = "updated " + ago(S.generated_at); }, 20000);
+})();
+</script>
+</body>
+</html>

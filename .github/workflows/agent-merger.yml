@@ -12,14 +12,16 @@ permissions: { contents: read }
 concurrency: { group: agent-merger }
 jobs:
   merge:
-    if: vars.AGENTS_PAUSED != 'true' && (github.event_name != 'pull_request' || github.event.label.name == 'agent:approved')
+    # The job always runs so Shipvo HQ stays current; merging and the health check skip while the team is paused.
+    if: github.event_name != 'pull_request' || github.event.label.name == 'agent:approved'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with: { sparse-checkout: scripts/agents, persist-credentials: false }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: |
+      - if: vars.AGENTS_PAUSED != 'true'
+        run: |
           [ -n "$GH_TOKEN" ] || { echo "::warning::Add the AGENT_TOKEN secret (see .github/agents/README.md)"; exit 0; }
           node scripts/agents/merge.mjs
         env:
@@ -27,3 +29,20 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
           AGENT_MAX_MERGES_PER_DAY: ${{ vars.AGENT_MAX_MERGES_PER_DAY || 40 }}
           AGENT_STALE_DAYS: ${{ vars.AGENT_STALE_DAYS || 4 }}
+      - name: Shipvo HQ snapshot (shipvo.dev/hq)
+        if: always()
+        continue-on-error: true
+        run: |
+          [ -n "$GH_TOKEN" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] || exit 0
+          node scripts/agents/hq-snapshot.mjs /tmp/hq.json
+          npx -y wrangler@4 r2 object put shipvo-media/hq/status.json --file /tmp/hq.json --content-type application/json --cache-control no-store --remote > /dev/null
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Team health check (fixes simple problems, reports the rest on the agent:health issue)
+        if: always() && vars.AGENTS_PAUSED != 'true'
+        run: '[ -z "$GH_TOKEN" ] || node scripts/agents/health.mjs'
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
