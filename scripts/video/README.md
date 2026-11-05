@@ -13,3 +13,7 @@ PW_DIR=/tmp/pw node scripts/video/render.mjs <slug> --vo vo.wav --manifest vo.js
 - `scripts/<slug>.json`: the script. Each scene has `narration` (written for the voice), optional `caption` (same sentences, written for the eye), `visual` (a key in `scenes.mjs`) and `min` seconds.
 - `plan.mjs`: scene timing and caption cues from the narration manifest. Tested: `node --test scripts/video/plan.test.mjs`.
 - `scenes.mjs` + `deck.html`: the scenes. Animations are CSS and are seeked per frame, so output is deterministic.
+
+## Runner without ffmpeg
+
+If `ffmpeg` is missing, get a static build without root: `pip download imageio-ffmpeg --no-deps -d /tmp/ff/dl`, unzip the wheel in an empty folder and copy `imageio_ffmpeg/binaries/ffmpeg-*` to `/tmp/bin/ffmpeg`. It has libx264, AAC and the filters `bgmusic.py` needs. It has no `ffprobe`: `npm i @ffprobe-installer/linux-x64` in `/tmp/pw` and copy its `ffprobe` to `/tmp/bin`. Add `/tmp/bin` to `PATH`.
