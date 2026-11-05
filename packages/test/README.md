@@ -20,6 +20,27 @@ npx shipvo sim          # the simulator, http://localhost:4545
 npx vitest run
 ```
 
+## Plain-language steps
+
+Write a test as plain lines, one step per line. Blank lines and lines starting with `#` are ignored. Quoted text is the element's accessibility name or text, as in `phone.tap("...")`.
+
+```ts
+import { openApp, parseSteps, runSteps } from "@shipvo/test";
+
+const phone = await openApp();
+await runSteps(phone, parseSteps(`
+  # find a lure and put it in the cart
+  type "popper" into "Search" and press enter
+  tap "Add 1 to cart"
+  wait for "Cart"
+  do not see "Error"
+  scroll down
+  go back
+`));
+```
+
+Lines: `tap "X"`, `type "X" into "Y"` (optional `and press enter`), `scroll down`, `go back`, `see "X"`, `do not see "X"`, `wait for "X"`. An unknown line throws a `PhoneError` with code `step_unparsed` and its line number. `runSteps` stops at the first failing step and names its line.
+
 ## Mock the network
 
 Stub what the app's `fetch` gets back, so you can test slow, empty and failing responses without a backend. Requests that match no rule go to the network as usual.

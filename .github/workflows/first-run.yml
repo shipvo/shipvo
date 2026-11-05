@@ -31,16 +31,19 @@ jobs:
           for i in $(seq 1 120); do curl -sf localhost:8787/health > /dev/null && break; sleep 2; done
           curl -sf localhost:8787/health
       - name: Install Chromium for the first agent session (shipvo sim)
-        working-directory: packages/sim
-        run: pnpm exec playwright-core install --with-deps chromium
+        run: bash scripts/agents/install-chromium.sh
       - name: Measure the first run
         run: |
           # --with-session times a first agent session in the simulator (#348); only pass it once measure.mjs has it.
+          # pipefail: without it the pipe into tee hid measure.mjs's exit 1 and failed runs showed green (#390).
+          set -o pipefail
           SESSION=""; grep -q -- "--with-session" scripts/first-run/measure.mjs && SESSION="--with-session"
+          rc=0
           node scripts/first-run/measure.mjs --with-install --with-export $SESSION --control-url http://localhost:8787 \
-            --out "$RUNNER_TEMP/first-run.json" | tee "$RUNNER_TEMP/first-run.md"
+            --out "$RUNNER_TEMP/first-run.json" | tee "$RUNNER_TEMP/first-run.md" || rc=$?
           { echo "### First run on ubuntu-latest (clean runner, no secrets)"; echo; cat "$RUNNER_TEMP/first-run.md"; echo; \
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
       - uses: actions/upload-artifact@v4
         if: always()
         with:
