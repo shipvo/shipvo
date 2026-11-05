@@ -248,4 +248,11 @@ describe("owner_command confirm", () => {
       await c.close();
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+  it("ignores confirm inside args unless the top-level confirm is true", async () => {
+    const c = await connect({ PN_CONTROL: url(), PN_OWNER_TOKEN: "t" });
+    const n = seen.length;
+    await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x", confirm: true } } });
+    expect(seen[n]!.body.args).toEqual({ note: "x" });
+    await c.close();
+  });
 });

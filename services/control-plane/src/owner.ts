@@ -14,6 +14,8 @@ export type AgentPolicy = "ask" | "deny" | "allow";
 /** agent: the caller is an AI agent holding the owner token (not the signed-in admin). `local` is a stricter policy the caller's own shipvo.json asked for. */
 export type OwnerEnv = { db: D1Database; kv: KVNamespace; appId: string; actor: string; agent?: boolean; local?: { agentPolicy?: string; agentDeny?: string[] } };
 
+/** The actor name for a caller holding the owner token (an AI agent). */
+export const AGENT_ACTOR = "agent (owner token)";
 const POLICY_KEY = (appId: string) => `c/${appId}/agent_policy`;
 export async function loadPolicy(env: { kv: KVNamespace; appId: string }): Promise<{ agentPolicy: AgentPolicy; agentDeny: string[] }> {
   try {
@@ -21,11 +23,11 @@ export async function loadPolicy(env: { kv: KVNamespace; appId: string }): Promi
     return { agentPolicy: ["ask", "deny", "allow"].includes(p.agentPolicy) ? p.agentPolicy : "ask", agentDeny: Array.isArray(p.agentDeny) ? p.agentDeny.map(String) : [] };
   } catch { return { agentPolicy: "ask", agentDeny: [] }; }
 }
-/** How many phones a publish reaches: phones that reported applying the live release, from telemetry. */
+/** What a publish reaches. Telemetry has no device id, so this counts update reports, not phones. */
 async function reach(env: OwnerEnv): Promise<string> {
   try {
     const r = await env.db.prepare("SELECT COUNT(*) AS n FROM telemetry WHERE app_id = ? AND event = 'applied'").bind(env.appId).first<{ n: number }>();
-    return r?.n ? `Reaches every installed phone (${r.n} phones have reported an update so far).` : "Reaches every installed phone (no phone has reported an update yet, so the count is unknown).";
+    return r?.n ? `Reaches every installed phone. ${r.n} update reports received so far (the number of phones is not known).` : "Reaches every installed phone. No update reports received yet (the number of phones is not known).";
   } catch { return "Reaches every installed phone (count unavailable)."; }
 }
 
@@ -235,7 +237,7 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   if (!draft) return { ok: false, error: { code: "no_content", message: "No content yet" } };
   const { confirm, ...rest } = args; args = rest;
   let res: any;
-  let gated = false;
+  let confirmed = false, denied = false, gated = false;
   try {
     if (env.agent) {
       if (cmd.adminOnly) fail("admin_only", `'${name}' needs the owner signed in to the admin; agents cannot run it.`);
@@ -244,12 +246,13 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
       const asked = env.local?.agentPolicy;
       // The caller's own shipvo.json can only make the rules stricter, never looser.
       const policy = asked && asked in rank && rank[asked]! > rank[stored.agentPolicy]! ? asked : stored.agentPolicy;
-      if ([...stored.agentDeny, ...(env.local?.agentDeny ?? [])].includes(name)) fail("denied", `'${name}' is on this app's agent deny list.`);
+      if ([...stored.agentDeny, ...(env.local?.agentDeny ?? [])].includes(name)) { denied = true; fail("denied", `'${name}' is on this app's agent deny list.`); }
       const plan = cmd.plan ? await cmd.plan(draft, args, env) : null;
       if (plan) {
         gated = true;
-        if (policy === "deny") fail("denied", `agentPolicy is "deny": agents may not run '${name}'.`);
+        if (policy === "deny") { denied = true; fail("denied", `agentPolicy is "deny": agents may not run '${name}'.`); }
         if (policy === "ask" && confirm !== true) return { ok: false, error: { code: "needs_confirm", message: `Nothing was changed. Call '${name}' again with the same arguments and confirm: true to run it.` }, code: "needs_confirm", plan };
+        if (policy === "ask") confirmed = true; // only a call that ran after an explicit confirm: true
       }
     }
     const result = await cmd.run(draft, args, env);
@@ -262,9 +265,9 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   } catch (e) {
     res = e instanceof OwnerError ? { ok: false, error: { code: e.code, message: e.message } } : { ok: false, error: { code: "internal", message: String(e) } };
   }
-  if (cmd.mutates || gated || name === "publish" || name === "restore_version" || name === "discard_draft")
+  if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy")
     await env.db.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
-      .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(gated ? { ...args, confirmed: true } : args).slice(0, 2000), res.ok ? 1 : 0).run();
+      .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(denied ? { ...args, denied: true } : confirmed ? { ...args, confirmed: true } : args).slice(0, 2000), res.ok && !denied ? 1 : 0).run();
   return res;
 }
 

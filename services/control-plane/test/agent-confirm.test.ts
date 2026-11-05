@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createRequire } from "node:module";
-import { runOwnerCommand } from "../src/owner";
+import { AGENT_ACTOR, runOwnerCommand } from "../src/owner";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 
@@ -25,7 +25,7 @@ function setup(policy?: object) {
   const m: Record<string, string> = { "c/tide/content.json": JSON.stringify(content()) };
   if (policy) m["c/tide/agent_policy"] = JSON.stringify(policy);
   const kv = { get: async (k: string) => m[k] ?? null, put: async (k: string, v: string) => { m[k] = v; } } as any;
-  const env = (agent = true, local?: any) => ({ db, kv, appId: "tide", actor: agent ? "agent (owner token)" : "owner (admin)", agent, local });
+  const env = (agent = true, local?: any) => ({ db, kv, appId: "tide", actor: agent ? AGENT_ACTOR : "owner (admin)", agent, local });
   return { sql, env };
 }
 
@@ -45,25 +45,41 @@ describe("agent confirm gate", () => {
   for (const [name, args] of CASES) {
     it(`${name}: needs_confirm, runs with confirm, refused under deny`, async () => {
       const { sql, env } = setup();
+      if (name === "revoke_api_key") sql.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label) VALUES ('tide','h','sv_test_abc1','test','')").run();
       const before = JSON.stringify(sql.prepare("SELECT * FROM content_versions").all());
       const r = await runOwnerCommand(env(), name, args);
       expect(r.ok).toBe(false); expect(r.code).toBe("needs_confirm"); expect(r.plan.length).toBeGreaterThan(0);
       expect(JSON.stringify(sql.prepare("SELECT * FROM content_versions").all())).toBe(before);
       expect(sql.prepare("SELECT COUNT(*) AS n FROM content_draft").get().n).toBe(0); // nothing written
+      expect(sql.prepare("SELECT COUNT(*) AS n FROM audit").get().n).toBe(0); // needs_confirm writes no audit row
       const ok = await runOwnerCommand(env(), name, { ...args, confirm: true });
       expect(ok.error?.code).not.toBe("needs_confirm"); expect(ok.error?.code).not.toBe("denied");
-      if (name !== "revoke_api_key") expect(ok.ok).toBe(true);
+      expect(ok.ok).toBe(true);
+      if (name === "revoke_api_key") expect(ok.result.revoked).toBe(true);
       const log = sql.prepare("SELECT actor, command, args_json FROM audit WHERE command = ?").all(name);
-      expect(log).toHaveLength(1); expect(log[0].actor).toBe("agent (owner token)"); expect(log[0].args_json).toContain('"confirmed":true');
+      expect(log).toHaveLength(1); expect(log[0].actor).toBe(AGENT_ACTOR); expect(log[0].args_json).toContain('"confirmed":true');
       const d = setup({ agentPolicy: "deny" });
       const no = await runOwnerCommand(d.env(), name, { ...args, confirm: true });
       expect(no.ok).toBe(false); expect(no.error.code).toBe("denied");
+      const row = d.sql.prepare("SELECT args_json, ok FROM audit WHERE command = ?").get(name);
+      expect(row.args_json).not.toContain("confirmed"); expect(row.args_json).toContain('"denied":true'); expect(row.ok).toBe(0);
+      const a = setup({ agentPolicy: "allow" });
+      const run = await runOwnerCommand(a.env(), name, args);
+      expect(run.ok).toBe(true);
+      expect(a.sql.prepare("SELECT args_json FROM audit WHERE command = ?").get(name).args_json).not.toContain("confirmed");
     });
   }
 
-  it("publish plan says how many phones it reaches", async () => {
+  it("set_agent_policy is audited with the admin as actor", async () => {
+    const { sql, env } = setup();
+    const r = await runOwnerCommand(env(false), "set_agent_policy", { agentPolicy: "allow" });
+    expect(r.ok).toBe(true);
+    const row = sql.prepare("SELECT actor FROM audit WHERE command = 'set_agent_policy'").get();
+    expect(row.actor).toBe("owner (admin)");
+  });
+  it("publish plan says how many update reports it has, not phones", async () => {
     const r = await runOwnerCommand(setup().env(), "publish", {});
-    expect(r.plan.join(" ")).toContain("every installed phone (3 phones");
+    expect(r.plan.join(" ")).toContain("3 update reports received so far (the number of phones is not known)");
   });
   it("discard_draft is gated when the draft has changes", async () => {
     const { env } = setup();
