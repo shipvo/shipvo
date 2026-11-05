@@ -6,7 +6,7 @@
     "build": "node build.mjs",
     "dev": "node build.mjs && wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node scripts/check-contrast.mjs && node scripts/check-hero.mjs && node scripts/check-docs-video.mjs && node scripts/check-phone-embed.mjs && node --experimental-strip-types --no-warnings scripts/check-learn.mjs",
+    "test": "node scripts/check-contrast.mjs && node scripts/check-hero.mjs && node scripts/check-docs-video.mjs && node scripts/check-phone-embed.mjs && node --experimental-strip-types --no-warnings scripts/check-learn.mjs && node scripts/check-learn-search.mjs",
     "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
