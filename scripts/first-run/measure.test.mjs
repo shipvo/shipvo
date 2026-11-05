@@ -350,3 +350,10 @@ test("--control-log: a successful publish does not print the log", async () => {
     assert.doesNotMatch(r.stderr, /server line/);
   } finally { s.close(); }
 });
+
+import { applyRow } from "./measure.mjs";
+test("applyRow maps the emulator figure and drops missing values", () => {
+  assert.deepEqual(applyRow({ firstRun: { publishToHealthyMs: 4200.4, downloadMs: 800 } }), { step: "publish to healthy (emulator)", ms: 4200, exit: 0, downloadMs: 800, applyMs: undefined });
+  assert.equal(applyRow({ firstRun: { publishToHealthyMs: 0 } }), null);
+  assert.equal(applyRow({}), null);
+});

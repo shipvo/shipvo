@@ -1,5 +1,5 @@
 // Times a new developer's first run: `shipvo init`, `shipvo doctor --offline --skip-sim`, then `shipvo publish --dry-run`.
-// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install] [--with-session] [--control-url <url>]
+// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install] [--with-session] [--control-url <url>] [--apply-report android-e2e-report.json]
 // Against a local control plane (docker compose up, or wrangler dev):
 //   node scripts/first-run/measure.mjs --control-url http://localhost:8787
 // With --control-url, after the dry run it registers the scaffolded app with the local dev key
@@ -260,6 +260,15 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
   return results;
 }
 
+/** The "publish to healthy" row from an android-e2e report's `firstRun` block, or null if it is missing or not a positive number. */
+export function applyRow(report) {
+  const ms = report?.firstRun?.publishToHealthyMs;
+  if (typeof ms !== "number" || !Number.isFinite(ms) || ms <= 0) return null;
+  const { downloadMs, applyMs } = report.firstRun;
+  const ok = (n) => (typeof n === "number" && Number.isFinite(n) && n > 0 ? n : undefined);
+  return { step: "publish to healthy (emulator)", ms: Math.round(ms), exit: 0, downloadMs: ok(downloadMs), applyMs: ok(applyMs) };
+}
+
 export async function main(argv) {
   const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
   const here = dirname(fileURLToPath(import.meta.url));
@@ -270,8 +279,12 @@ export async function main(argv) {
   let results;
   try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export"), argv.includes("--with-session"), opt("--control-log", undefined)); }
   catch (e) { console.error(e.message); return 1; }
-  writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }], null, 2) + "\n");
+  const applyPath = opt("--apply-report", undefined);
+  let apply = null;
+  if (applyPath) { try { apply = applyRow(JSON.parse(readFileSync(applyPath, "utf8"))); } catch {} }
+  writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }, ...(apply ? [{ step: apply.step, ms: apply.ms, exit: 0, downloadMs: apply.downloadMs, applyMs: apply.applyMs }] : [])], null, 2) + "\n");
   console.log(table(results, results.totalMs));
+  if (applyPath) console.log(apply ? `\npublish to healthy (emulator): ${secs(apply.ms)} s (not part of the total above)` : "\npublish to healthy (emulator): not measured");
   if (withInstall) {
     const inst = results.find((r) => r.step === "install");
     const pm = inst?.pm;

@@ -1,0 +1,2 @@
+- `scripts`: the android-e2e summary prints a publish-to-healthy line for the first-run app, and `measure.mjs --apply-report` adds it to first-run.json. A missing value shows as "not measured", never 0 s.
+- Migration: none.
