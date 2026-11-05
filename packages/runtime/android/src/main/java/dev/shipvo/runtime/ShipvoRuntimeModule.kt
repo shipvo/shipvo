@@ -125,21 +125,30 @@ class ShipvoRuntimeModule : Module() {
 
   private fun resolve(s: Store, url: String) = if (url.startsWith("http")) url else "${s.baseUrl}/${url.trimStart('/')}"
 
+  /** Build the pointer URL, appending `?hbc=` and `?nm=` when present. */
+  private fun pointerUrl(s: Store): String {
+    val base = resolve(s, "/p/${s.appId}/${s.shellMajor}/${s.band}.json")
+    val params = mutableListOf<String>()
+    s.hermesBytecodeVersions.takeIf { it.isNotEmpty() }?.let { params.add("hbc=${it.joinToString(",")}") }
+    s.nativeModules.takeIf { it.isNotEmpty() }?.let { params.add("nm=${it.entries.joinToString(",") { (k, v) -> "$k@${v}" }}") }
+    return if (params.isEmpty()) base else "$base?${params.joinToString("&")}"
+  }
+
   private fun check(): Map<String, Any?> {
     val s = Store(ctx)
     require(s.baseUrl.isNotEmpty() && s.publicKey.isNotEmpty() && s.appId.isNotEmpty()) { "runtime not configured" }
     val known = maxOf(s.currentRelease, s.pendingRelease, s.blockedRelease)
-    val conn = http("${s.baseUrl}/p/${s.appId}/${s.shellMajor}/${s.band}.json", if (known > 0) "\"$known\"" else null)
+    val conn = http(pointerUrl(s), if (known > 0) "\"$known\"" else null)
     val code = conn.responseCode
     if (code == 304) { conn.disconnect(); return mapOf("status" to "none") }
     if (code == 404) {
-      conn.disconnect()
-      val bodyStr = try { conn.inputStream.bufferedReader().use { it.readText() } } catch (_: Exception) { "" }
+      val errorBody = try { conn.errorStream.bufferedReader().use { it.readText() } } catch (_: Exception) { "" }
       conn.disconnect()
       var mismatchReason: String? = null
-      if (bodyStr.contains("hermes_bytecode_mismatch")) mismatchReason = "hermes_bytecode_mismatch"
-      else if (bodyStr.contains("native_module_missing")) mismatchReason = "native_module_missing"
-      else if (bodyStr.contains("native_module_version")) mismatchReason = "native_module_version"
+      if (errorBody.contains("hermes_bytecode_mismatch")) mismatchReason = "hermes_bytecode_mismatch"
+      else if (errorBody.contains("native_module_missing")) mismatchReason = "native_module_missing"
+      else if (errorBody.contains("native_module_version")) mismatchReason = "native_module_version"
+      s.addEvent("verify_failed:${release}:$mismatchReason")
       return mapOf("status" to "none", "mismatchReason" to mismatchReason)
     }
     require(code == 200) { "pointer HTTP $code" }
@@ -150,16 +159,12 @@ class ShipvoRuntimeModule : Module() {
     val bodyStr = envelope.getString("body")
     require(Verify.ed25519(bodyStr.toByteArray(Charsets.UTF_8), envelope.getString("signature"), s.publicKey)) { "pointer signature invalid" }
     val body = JSONObject(bodyStr)
-    if (body.getString("app_id") != s.appId || body.getInt("shell_major") != s.shellMajor) {
-      val mismatchReason = if (body.getString("app_id") != s.appId) "native_module_missing" else "hermes_bytecode_mismatch"
-      return mapOf("status" to "none", "mismatchReason" to mismatchReason)
-    }
+    require(body.getString("app_id") == s.appId) { "native_module_missing" }
+    require(body.getInt("shell_major") == s.shellMajor) { "hermes_bytecode_mismatch" }
     val release = body.getInt("release")
     if (release <= known) return mapOf("status" to "none")
     val shellVersion = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "0.0.0"
-    if (Verify.semverLess(shellVersion, body.getString("min_shell_version"))) {
-      return mapOf("status" to "none", "mismatchReason" to "shell_too_old")
-    }
+    require(!Verify.semverLess(shellVersion, body.getString("min_shell_version"))) { "shell_too_old" }
     val verifyPointerMs = SystemClock.elapsedRealtime() - t0
 
     val core = body.getJSONObject("core")
@@ -212,7 +217,6 @@ class ShipvoRuntimeModule : Module() {
     require(tmp.renameTo(dest)) { "could not stage bundle" }
     synchronized(ShipvoHostHandler.LOCK) {
       if (!BootRules.mayStage(release, s.currentRelease, s.pendingRelease, s.blockedRelease)) return mapOf("status" to "none")
-      if (mismatchReason != null) return mapOf("status" to "none", "mismatchReason" to mismatchReason)
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
       if (s.binaryVersion == null) s.binaryVersion = s.installedBinaryVersion
