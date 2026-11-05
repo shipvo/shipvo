@@ -1,4 +1,5 @@
 // A CSS-rule guard for the home hero phone mockup (issue #149), not a layout test.
+// Update the regexes below if you reformat the hero rules in site.css.
 // It reads public/site.css, rebuilds the stage width from the grid rules and checks
 // the side-by-side cards fit inside it at every viewport that is not stacked.
 // It cannot see real boxes. For that run `node scripts/measure-hero.mjs` (needs Chromium).

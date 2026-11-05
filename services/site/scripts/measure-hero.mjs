@@ -29,10 +29,12 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const url = `http://127.0.0.1:${server.address().port}/`;
 
-const chrome = spawn(process.env.CHROME || 'chromium', ['--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=9333', '--user-data-dir=/tmp/agent/chrome-prof', 'about:blank'], { stdio: 'ignore' });
+const PORT = process.env.CDP_PORT || 9333;
+const PROF = process.env.CHROME_PROFILE || `/tmp/agent/chrome-prof-${process.pid}`;
+const chrome = spawn(process.env.CHROME || 'chromium', ['--headless=new', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${PORT}`, `--user-data-dir=${PROF}`, 'about:blank'], { stdio: 'ignore' });
 let targets;
 for (let i = 0; i < 50 && !targets; i++) {
-  try { targets = await (await fetch('http://127.0.0.1:9333/json')).json(); } catch { await new Promise((r) => setTimeout(r, 200)); }
+  try { targets = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json(); } catch { await new Promise((r) => setTimeout(r, 200)); }
 }
 const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
 await new Promise((r) => (ws.onopen = r));

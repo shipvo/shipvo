@@ -102,7 +102,7 @@ section{padding:clamp(56px,8vw,112px) 0;border-top:1px solid var(--line)}
 .pillar p{margin-top:12px;color:var(--mute);font-size:16px}
 .pillar .k{margin-top:auto;padding-top:22px;font-family:var(--mono);font-size:12.5px;color:var(--dim);border-top:1px dashed var(--line-2)}
 .pillar .k b{color:var(--paper);font-weight:500}
-@media(max-width:900px){.pillars{grid-template-columns:minmax(0,1fr)}.pillar{min-height:236px}}
+@media(max-width:900px){.pillars{grid-template-columns:minmax(0,1fr)}.pillar{min-height:0}}
 
 /* steps */
 .steps{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(28px,5vw,64px);align-items:start}
@@ -290,7 +290,7 @@ footer.old{display:none}
 @media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}}
 /* bigger numbers */
 .proof .stat .v{font-size:clamp(44px,5.4vw,72px);letter-spacing:-.03em}
-.bento>.cell:last-child:nth-child(3n+1){grid-column:1/-1;min-height:236px}
+.bento>.cell:last-child:nth-child(3n+1){grid-column:1/-1;min-height:0}
 
 /* accessibility */
 :focus{outline:none}
