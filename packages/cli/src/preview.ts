@@ -98,12 +98,14 @@ body.dark{background:#15171a;color:#eee}
 .device[data-skin=iphone] .status .notch{left:50%;margin-left:-45px;top:8px;background:#111}
 iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 .nav{flex:none;display:flex;justify-content:center;align-items:center;height:44px}
-.device[data-skin=iphone] .nav{height:28px}
+.device[data-skin=iphone] .nav{height:44px}
 .back{color:#fff;border-color:#888;padding:4px 14px}
-.device[data-skin=iphone] .back{display:block;width:134px;height:5px;padding:0;border:0;border-radius:3px;background:#fff;font-size:0}
+.device[data-skin=iphone] .back{display:block;position:relative;width:134px;height:44px;padding:0;border:0;background:transparent;font-size:0}
+.device[data-skin=iphone] .back::after{content:"";position:absolute;left:0;right:0;top:50%;height:5px;margin-top:-2px;border-radius:3px;background:#fff}
+.back:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .device[data-skin=android] .back{border:0}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
-@media (max-width:500px){.bar,.note{display:none}.stage{padding:0}.device{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}}
+@media (max-width:500px){.bar,.note{display:none}.stage{padding:0}.device{padding:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}}
 </style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-skin="android" aria-pressed="true">Android</button><button data-skin="iphone" aria-pressed="false">iPhone</button>
@@ -123,7 +125,7 @@ function apply(){var s=(skin==="iphone"?IPHONE:SIZES)[size];d.dataset.skin=skin;
 document.querySelectorAll("[data-skin]").forEach(function(b){b.onclick=function(){skin=b.dataset.skin;apply()}});
 document.querySelectorAll("[data-size]").forEach(function(b){b.onclick=function(){size=b.dataset.size;apply()}});
 // Back does what the simulator's back action does: press the screen's Back button, else go back in history.
-function goBack(){var w=f.contentWindow,doc=w&&w.document;if(!doc)return;var els=doc.querySelectorAll("button,[role=button],a");for(var i=0;i<els.length;i++){var e=els[i],t=(e.getAttribute("aria-label")||e.textContent||"").trim();if(t==="Back"){e.click();return}}w.history.back()}
+function goBack(){var w=f.contentWindow;try{var doc=w&&w.document;if(!doc)return;var els=doc.querySelectorAll("button,[role=button],a");for(var i=0;i<els.length;i++){var e=els[i],t=(e.getAttribute("aria-label")||e.textContent||"").trim();if(t==="Back"){e.click();return}}w.history.back()}catch(x){}}
 bk.onclick=goBack;
 var t=document.getElementById("theme");t.onclick=function(){var k=!document.body.classList.contains("dark");document.body.classList.toggle("dark",k);t.setAttribute("aria-pressed",k);t.textContent=k?"Light":"Dark";f.style.colorScheme=k?"dark":"light"};
 apply();

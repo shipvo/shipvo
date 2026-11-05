@@ -93,11 +93,19 @@ describe("frame page", () => {
     expect(h).toContain('id="theme"');
     expect(h).toContain('src="app.html"');
   });
+  it("resets the frame padding at phone width and keeps a 44px Back hit area with a focus ring", () => {
+    const h = framePage("Shop");
+    const media = h.match(/@media \(max-width:500px\)\{[^\n]*\}/)![0];
+    expect(media).toContain(".device{padding:0!important");
+    expect(h).toMatch(/\.device\[data-skin=iphone\] \.back\{[^}]*height:44px/);
+    expect(h).toContain(".device[data-skin=iphone] .back::after");
+    expect(h).toContain(".back:focus-visible{outline:2px solid #fff;outline-offset:2px}");
+  });
   it("switches skin and size in the page without reloading, and back presses the app's Back button", async () => {
     const h = framePage("Shop");
     expect(h).not.toMatch(/location\.(reload|href)/);
     const script = h.match(/<script>([\s\S]*)<\/script>/)![1];
-    const mk = (extra: object = {}) => ({ style: {} as Record<string, string>, dataset: {} as Record<string, string>, setAttribute() {}, classList: { contains: () => false, toggle() {} }, ...extra });
+    const mk = (extra: object = {}) => ({ style: {} as Record<string, string>, dataset: {} as Record<string, string>, setAttribute(k: string, v: unknown) { (this as any).attrs[k] = v; }, attrs: {} as Record<string, unknown>, classList: { contains: () => false, toggle() {} }, ...extra });
     const nodes: Record<string, any> = {};
     const clicked: string[] = [];
     const backBtn = { getAttribute: () => "Back", textContent: "", click: () => clicked.push("btn") };
@@ -108,7 +116,14 @@ describe("frame page", () => {
     new Function("document", script)(doc);
     expect(nodes.device.style.width).toBe("360px");
     (chips[0] as any).onclick(); expect(nodes.device.dataset.skin).toBe("iphone"); expect(nodes.device.style.width).toBe("390px");
+    expect(chips[0].attrs["aria-pressed"]).toBe(true); expect(chips[1].attrs["aria-pressed"]).toBe(false);
     (chips[1] as any).onclick(); expect(nodes.device.style.width).toBe("820px");
+    expect(chips[1].attrs["aria-pressed"]).toBe(true);
+    (chips[1] as any).dataset.size = "large"; (chips[1] as any).onclick(); expect(nodes.device.style.width).toBe("430px");
+    expect(chips[1].attrs["aria-pressed"]).toBe(true);
+    (chips[0] as any).dataset.skin = "android"; (chips[0] as any).onclick(); expect(nodes.device.style.width).toBe("412px");
+    expect(chips[0].attrs["aria-pressed"]).toBe(true);
+    (chips[0] as any).dataset.skin = "iphone"; (chips[0] as any).onclick(); (chips[1] as any).dataset.size = "tablet"; (chips[1] as any).onclick();
     nodes.back.onclick(); expect(clicked).toEqual(["btn"]);
     win.document.querySelectorAll = () => []; nodes.back.onclick(); expect(clicked).toEqual(["btn", "history"]);
   });
