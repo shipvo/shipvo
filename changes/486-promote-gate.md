@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo promote` reads a test report (`--report <file>`, default `shipvo-test-report.json` if present) and refuses to widen a release whose report has failing flows. A report for another release only prints a warning. `--force` overrides.
+- Migration: none; without a report file nothing changes.

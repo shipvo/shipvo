@@ -13,6 +13,7 @@ import { parseMockRules } from "./mock-rules.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
+import { resolveBrowser } from "./browser-resolver.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -47,9 +48,11 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".json": "applica
 const LAUNCH_TIMEOUT_MS = 60_000;
 let launchBrowser;
 const browserReady = new Promise((resolve, reject) => { launchBrowser = () => {
+  // Resolve first (it may download a browser, which can take longer than the launch timeout), then time the launch only.
+  let opts;
+  try { opts = resolveBrowser({ pw, executablePath: arg("chromium", undefined) }); } catch (e) { reject(e); return; }
   const timer = setTimeout(() => reject(new Error(`Chromium did not start within ${LAUNCH_TIMEOUT_MS / 1000} s`)), LAUNCH_TIMEOUT_MS);
-  const executablePath = arg("chromium", undefined);
-  chromium.launch(executablePath ? { executablePath } : {}).then(resolve, reject).finally(() => clearTimeout(timer));
+  chromium.launch(opts).then(resolve, reject).finally(() => clearTimeout(timer));
 }; });
 browserReady.catch((e) => { console.error(`sim: ${launchErrorMessage(e.message, pwVersion)}`); process.exit(1); });
 const sessions = new Map();
