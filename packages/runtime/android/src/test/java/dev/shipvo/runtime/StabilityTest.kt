@@ -66,4 +66,11 @@ class StabilityTest {
     assertFalse(BootRules.countBoot(c, win + 1, max, win))
     assertEquals(1, c.unhealthyBoots)
   }
+
+  @Test fun aReleaseAlreadyPendingCurrentOrBlockedIsNotStagedAgain() {
+    assertTrue(BootRules.mayStage(5, 3, 4, 2))
+    assertFalse(BootRules.mayStage(5, 3, 5, 0))  // pending: staging again would reset trialBoots
+    assertFalse(BootRules.mayStage(5, 5, 0, 0))
+    assertFalse(BootRules.mayStage(5, 3, 0, 5))
+  }
 }

@@ -165,17 +165,18 @@ for (const [kind, file, title, maxBadRuns] of [
     const prev = good().rel, crashBytes = bundle(file);
     const p = await publish(crashBytes, { bases: [] });
     const staged = await waitFor(() => prefs().pending_release === p.release, 60_000);
-    let boots = 0, restored = null;
+    let boots = 0, restored = null; const timeline = []; // per launch: time since publish and the runtime's counters
+    const mark = (what) => { const q = prefs(); timeline.push({ what, ms: Date.now() - p.at, trial_boots: q.trial_boots ?? 0, unhealthy_boots: q.unhealthy_boots ?? 0, pid: pid() || null }); };
     for (let k = 0; k < 10 && !restored; k++) {
-      if (!pid()) { launch(); boots++; }
+      if (!pid()) { launch(); boots++; mark("launch"); }
       // Wait for the previous release to report healthy; stop waiting early if the process died (a crash).
       restored = await waitFor(() => healthy(prev, p.at) || (pid() ? null : "dead"), 15_000, 500);
-      if (restored === "dead") restored = null; else if (!restored && pid()) stop(); // a hung boot counts as a failed boot
+      if (restored === "dead") restored = null; else if (!restored && pid()) { mark("force-stop"); stop(); } // a hung boot counts as a failed boot
     }
     const pr = prefs(), after = entries().filter((e) => e.t >= (restored?.at ?? Infinity) && e.path.includes(`r${p.release}.hbc`)).length;
     const revertEvent = tele().some((e) => e.event === "crash_loop_revert" && e.at >= p.at);
     const badRuns = boots - 1;
-    trials.push({ release: p.release, staged: !!staged, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
+    trials.push({ release: p.release, staged: !!staged, timeline, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
       revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 && badRuns <= maxBadRuns });
   }
   return { pass: trials.every((t) => t.pass), kind, maxBadRuns, trials, median: summarize(trials, ["restoredMs", "boots", "badRuns"]) };
