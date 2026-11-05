@@ -3,7 +3,10 @@ name: ios-runtime
 # crash-loop rollback) against a fake control plane. Job 2 builds the Tide app for the iOS Simulator with the runtime
 # linked in, then proves the whole chain on a simulator: fetch the signed iOS pointer, verify, stage, reload into the
 # new bundle, report healthy.
+# PRs run only swift-tests (1-2 min). The iPhone simulator end-to-end (15-30 min) runs after merge, nightly and on
+# demand, because GitHub allows at most 5 macOS jobs at once. A red run on main calls the steward and opens an urgent issue.
 on:
+  schedule: [{ cron: "17 2 * * *" }]
   workflow_dispatch:
     inputs:
       e2e: { description: "Also run the simulator end-to-end (slow)", type: boolean, default: true }
@@ -15,8 +18,8 @@ on:
 
 # macOS runners are scarce. A new push to a PR cancels that PR's older run, so stale heads do not hold the queue.
 concurrency:
-  group: ios-runtime-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ios-runtime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true   # the newest run on a PR or on main covers everything before it
 
 jobs:
   swift-tests:
@@ -47,7 +50,7 @@ jobs:
         run: grep -E "Executed|error:|failed" "$RUNNER_TEMP/swift-test.log" | tail -20 | tee -a "$GITHUB_STEP_SUMMARY"
 
   simulator-e2e:
-    if: github.event_name != 'workflow_dispatch' || inputs.e2e
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.e2e)
     needs: swift-tests
     runs-on: macos-26
     timeout-minutes: 90
