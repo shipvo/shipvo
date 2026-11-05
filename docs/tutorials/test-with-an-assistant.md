@@ -1,6 +1,6 @@
 # Have an AI assistant test your shop before every release
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="Have an AI assistant test your shop before every release" data-length="1 min 30 s" poster="/videos/test-with-an-assistant.jpg" src="/media/videos/test-with-an-assistant-e368a4d3.mp4"><track kind="captions" src="/videos/test-with-an-assistant.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="Have an AI assistant test your shop before every release" data-length="1 min 30 s" poster="/videos/test-with-an-assistant.jpg" src="/media/videos/test-with-an-assistant-e368a4d3.mp4"><track kind="captions" src="/videos/test-with-an-assistant.vtt" srclang="en" label="English">Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
 
 Prefer to watch first? This 1 minute 30 second video covers the same steps. [Captions and transcript](../videos.md).
 
