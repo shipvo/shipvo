@@ -1,6 +1,7 @@
-// Guards the home hero phone mockup layout rules in public/site.css (issue #149).
-// It reads the CSS, rebuilds the stage width from the grid rules and checks the
-// side-by-side cards fit inside it at every viewport that is not stacked.
+// A CSS-rule guard for the home hero phone mockup (issue #149), not a layout test.
+// It reads public/site.css, rebuilds the stage width from the grid rules and checks
+// the side-by-side cards fit inside it at every viewport that is not stacked.
+// It cannot see real boxes. For that run `node scripts/measure-hero.mjs` (needs Chromium).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -8,12 +9,14 @@ const css = readFileSync(fileURLToPath(new URL('../public/site.css', import.meta
 const rule = (sel) => css.match(new RegExp('(?:^|\\n)' + sel.replace(/\./g, '\\.') + '\\{([^}]*)\\}'))?.[1] ?? '';
 const fail = [];
 
+const treeMin = Number(rule('.tree').match(/min-height:(\d+)px/)?.[1]);
+if (!(treeMin >= 200)) fail.push('.tree needs a min-height that fits the tallest step, so the card does not jump');
 if (/(^|;)\s*(height|max-height)\s*:/.test(rule('.tree'))) fail.push('.tree must size to its content (no fixed height)');
 
 const agent = rule('.agentview');
 const overlap = agent.match(/right:calc\(4% \+ 272px - (\d+)px\)/);
 const cardW = Number(agent.match(/width:(\d+)px/)?.[1]);
-if (!overlap || Number(overlap[1]) > 24) fail.push('.agentview must overlap the phone edge by at most 24px');
+if (!overlap || Number(overlap[1]) > 9) fail.push('.agentview must overlap the phone edge by at most 9px (the bezel)');
 if (!cardW) fail.push('.agentview needs a fixed px width');
 
 if (!/top:0\b/.test(rule('.bubble'))) fail.push('.bubble must sit above the phone');
