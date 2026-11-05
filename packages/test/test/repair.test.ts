@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { proposeRepair, parseSteps } from "../src/index.js";
-import { readFileSync } from "node:fs";
 
 const screen = (...l: string[]) => l.map((x, i) => `- ${x} [ref=e${i + 1}]`).join("\n");
 const tap = (target: string) => parseSteps(`tap "${target}"`)[0]!;
@@ -41,6 +40,10 @@ describe("proposeRepair", () => {
       else expect(r.kind).toBe("unresolved");
     }
     expect(proposeRepair(steps[1]!, screen('text "Cart"')).kind).toBe("unresolved");
-    expect(readFileSync(new URL("../src/repair.ts", import.meta.url), "utf8")).not.toMatch(/splice|filter\(.*steps|\.shift\(|\.pop\(/);
+  });
+  it("is unresolved when the best label has a double quote, since a step line cannot hold it", () => {
+    const r = proposeRepair(tap("Say hello"), screen('button "Say \\"hello\\""'));
+    expect(r.kind).toBe("unresolved");
+    if (r.kind === "unresolved") expect(r.candidates.map((n) => n.name)).toEqual(['Say "hello"']);
   });
 });

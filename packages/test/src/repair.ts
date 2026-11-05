@@ -33,7 +33,7 @@ const CLOSE = 0.5;
 /**
  * Propose a fix for a failed `tap` or `type` step, given the current accessibility tree (a screen string or parsed nodes).
  * Returns `repaired` when exactly one element with the right role has the closest name. Returns `unresolved`, with the
- * nearby candidates, when there is none, several are equally close, or the best match has a different role.
+ * nearby candidates, when there is none, several are equally close, the best match has a different role, or its label cannot be written in a step line (it has a double quote or a newline).
  * A repaired step is the same step with a new target: its text, enter flag and line are kept. Other step kinds are always `unresolved`.
  * This function never removes or skips a step.
  */
@@ -53,6 +53,8 @@ export function proposeRepair(step: Step, tree: string | Node[]): Repair {
   const best = top[0]!.n;
   // A closer match with another role means the role changed: do not guess.
   if (scored[0]!.s > top[0]!.s) return { kind: "unresolved", candidates: scored.map((x) => x.n) };
+  // The step grammar has no escapes, so a label with a quote or newline cannot be written back as a step line.
+  if (/["\r\n]/.test(label(best))) return { kind: "unresolved", candidates: [best] };
   if (label(best) === step.target) return { kind: "unresolved", candidates: [best] };
   return {
     kind: "repaired",

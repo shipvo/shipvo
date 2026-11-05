@@ -16,6 +16,8 @@ export type TestKit = {
 
 /** The same step as a plain-language line (only the target of a tap or type step is ever rewritten). */
 export function stepLine(s: StepLike): string {
+  const bad = (v?: string) => v !== undefined && /["\r\n]/.test(v);
+  if (bad(s.target) || bad(s.text)) throw new Error("a step line cannot hold a double quote or a newline");
   if (s.kind === "tap") return `tap "${s.target}"`;
   if (s.kind === "type") return `type "${s.text}" into "${s.target}"${s.enter ? " and press enter" : ""}`;
   throw new Error(`cannot write a ${s.kind} step`);
@@ -85,11 +87,15 @@ export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) =>
         // Prove the repaired step on the phone; it keeps its assertion, so a step that still fails stays failed.
         try { await k.runSteps(phone, [r.step]); }
         catch { unresolved++; log("  the proposed repair also fails; nothing changed"); break; }
+        let line: string;
+        try { line = stepLine(r.step); }
+        catch (err) { unresolved++; log(`  no repair: ${(err as Error).message}; nothing changed`); break; }
         repaired++;
         log(`  repair: ${r.reason}`);
-        edits.set(step.line, stepLine(r.step));
+        edits.set(step.line, line);
       }
     }
+    await (phone as { close?: () => Promise<void> }).close?.();
     const diff = unifiedDiff(file, text, edits);
     if (diff) log(diff.trimEnd());
     if (diff && write) { writeFileSync(file, applyEdits(text, edits)); log(`wrote ${file}`); }

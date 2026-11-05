@@ -2,7 +2,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { testCmd, type TestKit } from "../src/test";
+import { testCmd, stepLine, type TestKit } from "../src/test";
+import { parseSteps } from "../../test/src/steps";
 
 const cwd = process.cwd();
 afterEach(() => process.chdir(cwd));
@@ -55,5 +56,24 @@ describe("shipvo test --repair", () => {
   it("--write alone is refused", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await testCmd(["--write"], kit(), () => {})).toBe(2);
+  });
+  it("leaves the file alone when the repaired label has a double quote", async () => {
+    const f = project(); const out: string[] = [];
+    const k = kit();
+    k.proposeRepair = (s) => ({ kind: "repaired", step: { ...s, target: 'Say "hi"' }, reason: "x" });
+    k.runSteps = async () => { if (!out.length) { out.push("first"); throw new Error("fail"); } };
+    const code = await testCmd([f, "--repair", "--write"], k, (s) => out.push(s));
+    expect(readFileSync(f, "utf8")).toBe(SRC);
+    expect(out.join("\n")).toContain("nothing changed");
+    expect(code).toBe(1);
+  });
+  it("stepLine output is read back by the real parseSteps", () => {
+    const lines = ['tap "Add to basket"', 'type "popper" into "Search"', 'type "popper" into "Search" and press enter'];
+    for (const l of lines) {
+      const [step] = parseSteps(l);
+      expect(stepLine(step as never)).toBe(l);
+      expect(parseSteps(stepLine(step as never))[0]).toEqual(step);
+    }
+    expect(() => stepLine({ kind: "tap", target: 'Say "hi"', line: 1 })).toThrow();
   });
 });
