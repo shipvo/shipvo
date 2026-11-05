@@ -55,6 +55,11 @@ enum Updater {
     if release <= known { return ["status": "none"] }
     try require(!Verify.semverLess(s.shellVersion, body["min_shell_version"] as? String ?? "0.0.0"), "shell too old for release \(release)")
     let verifyPointerMs = (Store.now() - t0) * 1000
+    // Beside the signature checks, not inside them: refuse a bundle built for another Hermes bytecode version.
+    if let ev = HermesGuard.mismatchEvent(release: release, releaseVersion: HermesGuard.releaseVersionOf(body["hermes_bytecode_version"]), shellVersion: HermesGuard.shellVersion(s.appBundle)) {
+      s.addEvent(ev); s.block(release)
+      return ["status": "none", "reason": HermesGuard.reason]
+    }
 
     guard let core = body["core"] as? [String: Any], let wantSha = core["sha256"] as? String,
           let wantSize = (core["size"] as? NSNumber)?.intValue, let url = core["url"] as? String else { throw UpdateError("pointer core incomplete") }

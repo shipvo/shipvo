@@ -20,7 +20,7 @@ export type ShipvoConfig = {
 
 export function loadConfig(dir = process.cwd()): ShipvoConfig {
   const p = join(dir, "shipvo.json");
-  if (!existsSync(p)) throw new Error("No shipvo.json here. Run this inside an app created with `shipvo init`, or create one (see docs/getting-started.md).");
+  if (!existsSync(p)) throw new Error("No shipvo.json in this folder. Run this inside your app's folder. To start a new app, run `shipvo init myshop`.");
   const c = JSON.parse(readFileSync(p, "utf8"));
   for (const k of ["appId", "controlPlane", "publicKey"]) if (!c[k]) throw new Error(`shipvo.json: "${k}" is required`);
   return { shellMajor: 1, name: c.appId, ...c };

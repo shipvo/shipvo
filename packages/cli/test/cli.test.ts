@@ -29,6 +29,19 @@ describe("cli", () => {
     expect(r.stdout).toBe("");
   });
 
+  it("explains a missing shipvo.json in plain words, with no stack trace", () => {
+    const dir = mkdtempSync(join(tmpdir(), "shipvo-empty-"));
+    try {
+      const r = spawnSync(process.execPath, [join(out, "cli.js"), "publish"], { encoding: "utf8", cwd: dir });
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain("shipvo: No shipvo.json in this folder.");
+      expect(r.stderr).toContain("shipvo init myshop");
+      expect(r.stderr).not.toContain("    at ");
+      const d = spawnSync(process.execPath, [join(out, "cli.js"), "publish"], { encoding: "utf8", cwd: dir, env: { ...process.env, SHIPVO_DEBUG: "1" } });
+      expect(d.stderr).toContain("    at ");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it("prints the local MCP config when not signed in", () => {
     const home = mkdtempSync(join(tmpdir(), "shipvo-home-"));
     try {
