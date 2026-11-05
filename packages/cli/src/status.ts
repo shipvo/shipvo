@@ -2,6 +2,8 @@ import { args, loadConfig } from "./config.js";
 
 type Row = { release: number; events: Record<string, number>; apply_ms_median: number | null; cold_start_ms_median: number | null };
 
+type Halted = { release: number; reports: number; failed: number; threshold: number };
+
 const ms = (v: number | null | undefined) => (typeof v === "number" ? String(Math.round(v)) : "-");
 
 /** Plain-text table: one row per release, one column per event name, then the two medians. */
@@ -19,11 +21,11 @@ export async function status(argv: string[], fetchFn: typeof fetch = fetch): Pro
   const appId = a.app && a.app !== "true" ? a.app : cfg.appId;
   const base = cfg.controlPlane.replace(/\/$/, "");
   const url = `${base}/t/${encodeURIComponent(appId)}/summary`;
-  let data: { releases?: Row[] };
+  let data: { releases?: Row[]; halted?: Halted | null };
   try {
     const r = await fetchFn(url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    data = (await r.json()) as { releases?: Row[] };
+    data = (await r.json()) as { releases?: Row[]; halted?: Halted | null };
   } catch (e) {
     console.error(`Could not reach the control plane at ${base} (${e instanceof Error ? e.message : String(e)}).`);
     return 1;
@@ -31,6 +33,11 @@ export async function status(argv: string[], fetchFn: typeof fetch = fetch): Pro
   if (argv.includes("--json")) { console.log(JSON.stringify(data)); return 0; }
   const releases = data.releases ?? [];
   if (!releases.length) { console.log(`No telemetry yet for "${appId}".`); return 0; }
+  const h = data.halted;
+  if (h && typeof h === "object") {
+    const pct = Math.round(h.threshold * 1000) / 10;
+    console.log(`Release ${h.release} is halted: ${h.failed} of ${h.reports} devices failed (limit ${pct}%). Publish a new release or run shipvo rollback to clear.`);
+  }
   console.log(formatStatus(releases));
   return 0;
 }
