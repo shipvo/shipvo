@@ -25,7 +25,10 @@ export async function recordAudit(db: D1Database | undefined, e: AuditEntry): Pr
   }
 }
 
-/** True when the newest row for this app has the same action and release (one release uploaded to several band keys). */
+/**
+ * True when the newest row for this app has the same action and release (one release uploaded to several band keys).
+ * Read-then-insert without a lock: two concurrent band uploads could both write a row. Low risk, accepted.
+ */
 export async function isRepeatAudit(db: D1Database, appId: string, action: string, release: number): Promise<boolean> {
   try {
     const last = await db.prepare("SELECT action, release FROM audit_log WHERE app_id = ? ORDER BY id DESC LIMIT 1").bind(appId).first<{ action: string; release: number | null }>();

@@ -210,6 +210,7 @@ apps.put("/:id/kv/*", async (c) => {
   }
   await c.env.POINTERS.put(k, buf);
   if (next) {
+    // Judged per KV key against that key's previous pointer: a first upload of a band key is always a publish.
     const action = typeof prev?.release === "number" && next.release < prev.release ? "rollback" : "publish";
     // One release goes to several band keys. Write one row per publish: skip when the newest row is the same action and release.
     if (!(await isRepeatAudit(c.env.DB, id, action, next.release))) {
