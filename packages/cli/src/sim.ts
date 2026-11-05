@@ -7,7 +7,7 @@ import { createServer, connect } from "node:net";
 import { args as parse, loadConfig } from "./config.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
-function portFree(port: number): Promise<boolean> {
+export function portFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const s = createServer();
     s.once("error", () => resolve(false));
