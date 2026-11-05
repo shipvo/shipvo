@@ -39,17 +39,24 @@ it("the scaffold test reads the headline from src/release.ts, so editing it keep
   expect(test).not.toContain("My Shop");
 });
 
-it("ends with the four next steps, in order, using the directory given", async () => {
+it("ends with the five next steps, in order, using the directory given", async () => {
   const logs: string[] = [];
   vi.mocked(console.log).mockImplementation((m?: unknown) => { logs.push(String(m)); });
   const dir = join(tmp, "second-app");
   await init([dir, "--public-key", "AAAA"]);
   const out = logs.join("\n").trimEnd();
-  const steps = [`1. cd ${dir}`, "2. npx shipvo doctor", "3. npm run sim", "4. npx shipvo publish --dry-run"];
+  const steps = [`1. cd ${dir}`, "2. npx shipvo doctor", "3. npm run sim", "4. npx shipvo publish --dry-run", "5. npx shipvo preview            # get a link you can open on any phone"];
   const at = steps.map((x) => out.indexOf(x));
   expect(at.every((i) => i >= 0)).toBe(true);
   expect([...at].sort((x, y) => x - y)).toEqual(at);
-  expect(out.split("\n").pop()).toContain("4. npx shipvo publish --dry-run");
+  expect(out.split("\n").pop()).toContain("5. npx shipvo preview");
+});
+
+it.each(["blank", "content", "shop"])("the %s template prints the preview step", async (tpl) => {
+  const logs: string[] = [];
+  vi.mocked(console.log).mockImplementation((m?: unknown) => { logs.push(String(m)); });
+  await init([join(tmp, `p-${tpl}`), "--template", tpl, "--public-key", "AAAA"]);
+  expect(logs.join("\n")).toContain("5. npx shipvo preview            # get a link you can open on any phone");
 });
 
 it("with no folder, prints the short message to stderr and exits 2", async () => {

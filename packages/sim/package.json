@@ -18,6 +18,7 @@
     "server.mjs",
     "app-name.mjs",
     "mock-rules.mjs",
+    "push-notification.mjs",
     "README.md"
   ],
   "peerDependencies": {
