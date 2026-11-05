@@ -127,6 +127,7 @@ export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/releas
   } else w("App.tsx", APP_TSX(name, appId));
   w(".github/workflows/publish.yml", WORKFLOW);
   w(".github/workflows/test.yml", TEST_WORKFLOW);
+  w(".github/workflows/preview.yml", PREVIEW_WORKFLOW);
   w("tests/app.test.ts", template === "content" ? CONTENT_TEST : template === "shop" ? SHOP_TEST : TEST_APP(name));
   w("vitest.config.ts", VITEST_CONFIG);
   w("README.md", README(name, appId, controlPlane, template));
@@ -297,6 +298,34 @@ test("notifications: a push can be opened from the shade", async ({ phone }) => 
 
 const VITEST_CONFIG = `import { defineConfig } from "vitest/config";
 export default defineConfig({ test: { include: ["tests/**/*.test.ts"], testTimeout: 30_000 } });
+`;
+
+const PREVIEW_WORKFLOW = `name: preview
+# Publishes the pull request's web build to here.now (no account) and comments the link.
+# The link is public and expires in 24 hours. Pull requests from forks are skipped.
+on:
+  pull_request:
+jobs:
+  preview:
+    if: \${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - name: Publish the preview
+        id: preview
+        run: echo "json=$(npx shipvo preview --json | tail -n 1)" >> "$GITHUB_OUTPUT"
+      - name: Comment the link
+        env:
+          GH_TOKEN: \${{ github.token }}
+          PREVIEW: \${{ steps.preview.outputs.json }}
+        run: |
+          url=$(echo "$PREVIEW" | jq -r .url)
+          gh pr comment "\${{ github.event.pull_request.number }}" --body "Preview: $url (public link, expires in 24 hours)"
 `;
 
 const WORKFLOW = `name: publish

@@ -47,3 +47,33 @@ In a bare app, `shipvo init` uses the same plan, `--dry-run` and confirmation. T
 The values are the same ones the config plugin writes. Other keys keep their order, and a second run changes nothing. It does not add a config plugin, because a bare app has no prebuild. If it cannot find the manifest or the Info.plist, it stops and changes nothing. Then it prints the next steps: `cd ios && pod install`, rebuild both apps, `shipvo publish --dry-run`.
 
 Other options: `--control-plane <url>`. `--public-key <key>` must be base64 that decodes to 32 bytes, or it exits 2 before changing anything. If `shipvo.json` has a `publicKey` that does not match `.shipvo/seed.txt`, it stops and changes nothing. If `app.json` is not valid JSON, it stops with a one-line message. If a step fails, it lists the steps already applied.
+
+## `shipvo preview`
+
+Publishes a web preview of your app that anyone can open in a browser or on a phone, with no install, no account and no control plane. It uses [here.now](https://here.now).
+
+```bash
+shipvo preview          # build, publish, print the link
+shipvo preview --json   # one JSON line for agents: url, claimUrl, expiresAt, files, warnings
+```
+
+What it does:
+
+1. Builds the web app with the simulated device (`PN_SIM=1 npx expo export --platform web`) into `.shipvo/preview-build`.
+2. Wraps it in a frame page (`index.html`) with a phone, iPhone-size and tablet switcher and a light and dark switch. Your app's own page is served as `app.html` inside the frame. On a phone-width screen the app fills the screen.
+3. Publishes anonymously: create, upload, finalize. Expired upload URLs are refreshed. A 429 from here.now is retried after `retry_after` seconds. Warnings from here.now are printed.
+
+**The link is public and expires in 24 hours.** Anyone with the link can open it. To keep it, open the claim link and sign in to here.now. The claim link is shown once; copy it as printed.
+
+Safety rules:
+
+- It never uploads `.shipvo/`, `.env*`, key files (`.pem`, `.key`, `.p8`, `.p12`, `.jks`, `.mobileprovision`), `seed.txt`, `publish-token` or source maps.
+- It refuses to publish if a text file in the build holds a private key, your signing seed or publish token, or another known secret pattern. The message names the file, never the value.
+
+Options: `--skip-build` publishes the last build in `.shipvo/preview-build`.
+
+`shipvo.json` has a `preview` setting: `"here.now"` (default). `"control-plane"` (permanent hosting at `/w/{app}/r{release}/`) is reserved and not built yet; setting it stops with a message.
+
+Agents can call the MCP tool `publish_preview`; it runs `shipvo preview --json` in `PN_APP_DIR` (or the current folder) and returns `{ url, claimUrl, expiresAt }`.
+
+`shipvo init` adds `.github/workflows/preview.yml`, which publishes each pull request's web build and comments the link on the pull request. Pull requests from forks are skipped.
