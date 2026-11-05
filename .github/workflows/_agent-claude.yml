@@ -95,9 +95,11 @@ jobs:
         if: steps.chk.outputs.ok == 'true' && inputs.mode != 'read' && inputs.engine == 'claude'
         # Playwright's --with-deps runs apt-get, which fails at once if another apt process holds the lock
         # (seen on the fixer for #293). Retry instead of giving up on the first try.
+        # Use the playwright-core CLI: the `playwright` 1.63 CLI runs install-deps twice at once, and the
+        # second apt-get always loses the lock to the first, so every try failed (engineer run 42082643120).
         run: |
           for a in 1 2 3 4; do
-            pnpm --filter @shipvo/sim exec playwright install --with-deps chromium && exit 0
+            pnpm --filter @shipvo/sim exec playwright-core install --with-deps chromium && exit 0
             echo "Chromium install failed (try $a), retrying in $(( a * 15 ))s"; sleep $(( a * 15 ))
           done
           echo "::warning::Chromium install failed; simulator runs will not work in this job"
