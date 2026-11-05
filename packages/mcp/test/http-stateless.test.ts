@@ -98,4 +98,34 @@ describe("stateless HTTP", () => {
     expect((await fetch(base)).status).toBe(405);
     expect((await fetch(base, { method: "DELETE" })).status).toBe(405);
   });
+
+  it("answers server/discover with no initialize", async () => {
+    const r = await rpc("server/discover", {}, { "mcp-method": "server/discover" });
+    expect(r.status).toBe(200);
+    expect(r.body.result.supportedVersions).toContain("2026-07-28");
+    expect(r.body.result.supportedVersions).toContain("2025-06-18");
+    expect(r.body.result.capabilities.tools).toBeTruthy();
+    expect(r.body.result.serverInfo.name).toBe("shipvo");
+    expect(r.sid).toBeNull();
+  });
+
+  it("rejects Mcp-Method/Mcp-Name headers that disagree with the body", async () => {
+    const call = { name: "open_app", arguments: { app: "menu" } };
+    const ok = await rpc("tools/call", call, { "mcp-method": "tools/call", "mcp-name": "open_app" });
+    expect(ok.body.result.content[0].text).toContain("heading Table Menu");
+    const m = await rpc("tools/call", call, { "mcp-method": "tools/list" });
+    expect(m.status).toBe(400);
+    expect(m.body.error.message).toContain("Mcp-Method");
+    expect(m.body.result).toBeUndefined();
+    const n = await rpc("tools/call", call, { "mcp-method": "tools/call", "mcp-name": "tap" });
+    expect(n.status).toBe(400);
+    expect(n.body.error.message).toContain("Mcp-Name");
+    expect((await rpc("tools/call", call, { "mcp-method": "tools/call" })).status).toBe(400);
+  });
+
+  it("requires the headers when the body names a 2026 protocol version", async () => {
+    const meta = { "io.modelcontextprotocol/protocolVersion": "2026-07-28" };
+    expect((await rpc("tools/list", { _meta: meta })).status).toBe(400);
+    expect((await rpc("tools/list", { _meta: meta }, { "mcp-method": "tools/list" })).status).toBe(200);
+  });
 });
