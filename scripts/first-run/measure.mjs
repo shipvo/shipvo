@@ -109,6 +109,16 @@ async function realPublish(cli, app, controlUrl, withExport, controlLog) {
   }
 }
 
+const STEP_BROWSER = "browser install";
+
+/** Installs the Chromium that the scaffold's own playwright wants, so the session step finds the matching revision. */
+export function installBrowser(app, spawnFn = spawnSync) {
+  const t0 = performance.now();
+  const r = spawnFn("npx", ["playwright", "install", "chromium"], { cwd: app, encoding: "utf8", env: cleanEnv() });
+  const exit = r.status ?? (r.error ? 127 : 1);
+  return { step: STEP_BROWSER, ms: Math.round(performance.now() - t0), exit, stderr: [r.stdout, r.stderr, r.error ? String(r.error) : ""].filter(Boolean).join("\n") };
+}
+
 const STEP_SESSION = "first agent session";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -233,6 +243,11 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
       const dry = runStep("publish --dry-run", cli, ["publish", "--dry-run", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app);
       results.push(dry);
       ok = dry.exit === 0;
+    }
+    if (ok && withSession) {
+      const br = installBrowser(app);
+      results.push(br);
+      ok = br.exit === 0;
     }
     if (ok && withSession) {
       const sess = await firstAgentSession(cli, app);

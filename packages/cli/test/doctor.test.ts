@@ -247,9 +247,11 @@ describe("shipvo doctor sim checks", () => {
     const bin = join(cwd, "chrome");
     writeFileSync(bin, "");
     expect(nameOf(await run(cwd, { chromiumPath: () => bin }), "Playwright Chromium installed").ok).toBe(true);
-    const missing = nameOf(await run(cwd, { chromiumPath: () => join(cwd, "nope") }), "Playwright Chromium installed");
+    const missing = nameOf(await run(cwd, { chromiumPath: () => join(cwd, "nope"), playwrightVersion: () => "1.63.0" }), "Playwright Chromium installed");
     expect(missing.ok).toBe(false);
-    expect(missing.fix.endsWith("npx playwright install chromium")).toBe(true);
+    expect(missing.fix).toContain("`npx playwright install chromium` in the app folder");
+    expect(missing.fix).toContain("playwright 1.63.0");
+    expect(missing.fix).toContain("Linux");
     expect(nameOf(await run(cwd, { chromiumPath: () => null }), "Playwright Chromium installed").ok).toBe(false);
   });
 
