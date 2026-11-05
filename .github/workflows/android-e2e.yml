@@ -1,0 +1,68 @@
+name: android-e2e
+# Runs the Android device-lab harness (scripts/android-e2e) on an emulator with no agent in the loop:
+# builds the sample shell APK, exports bundles, publishes real signed releases to a local server and runs
+# every scenario. Uploads android-e2e-report.json (artifact "android-e2e-report") so first-run.yml can
+# read the first-run publish-to-healthy figure with --apply-report (escalation #446).
+# Runs weekly before first-run.yml, and on demand.
+on:
+  workflow_dispatch:
+  schedule: [{ cron: "17 2 * * 1" }]
+permissions:
+  contents: read
+concurrency: { group: android-e2e, cancel-in-progress: false }
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install and build the CLI
+        run: |
+          pip install bsdiff4
+          pnpm install --frozen-lockfile
+          pnpm --filter "@shipvo/cli..." build
+      - name: Test the harness helpers
+        env: { CI: "1" }
+        run: node --test scripts/android-e2e/*.test.mjs
+      - name: Key, APK and bundles
+        run: |
+          W="$RUNNER_TEMP/e2e"; mkdir -p "$W"
+          node scripts/ios-e2e/keygen.mjs > "$W/key.json"
+          scripts/android-e2e/build-apk.sh "$(node -p "require('$W/key.json').publicKey")" 8110 "$W/shell.apk"
+          scripts/android-e2e/make-bundles.sh "$W/bundles" 10
+      - name: Run the scenarios on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: node scripts/android-e2e/run.mjs --apk "$RUNNER_TEMP/e2e/shell.apk" --bundles "$RUNNER_TEMP/e2e/bundles" --key "$RUNNER_TEMP/e2e/key.json" --out "$RUNNER_TEMP/e2e/android-e2e-report.json"
+      - name: Summary
+        if: always()
+        run: |
+          R="$RUNNER_TEMP/e2e/android-e2e-report.json"
+          [ -f "$R" ] || { echo "No report was written." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          { echo "### Android e2e on the emulator (API 30, x86_64, pixel_5)"; echo; node scripts/android-e2e/summary.mjs "$R"; echo; \
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
+          node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).allPassed ? 0 : 1)' "$R"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-e2e-report
+          path: ${{ runner.temp }}/e2e/android-e2e-report.json
+          if-no-files-found: ignore
+          retention-days: 30

@@ -167,6 +167,18 @@ it("--template shop shows prices in the currency set in src/data/shop.json", asy
     expect(readFileSync(join(dir, `src/screens/${f}.tsx`), "utf8")).toContain("formatPrice(");
 });
 
+it("--template shop sends the payment to the shop name given with --name", async () => {
+  const dir = join(tmp, "named-shop");
+  await init([dir, "--template", "shop", "--name", "Sandbar Shop", "--public-key", "AAAA"]);
+  rmSync(join(dir, "tsconfig.json"));
+  expect(JSON.parse(readFileSync(join(dir, "src/data/shop.json"), "utf8")).name).toBe("Sandbar Shop");
+  const cart = readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8");
+  expect(cart).toContain("to: shopName");
+  expect(cart).not.toContain('to: "My Shop"');
+  const { shopName } = await import(join(dir, "src/money.ts"));
+  expect(shopName).toBe("Sandbar Shop");
+});
+
 it("the default and --template blank write the same files as before", async () => {
   const a = join(tmp, "plain-a"), b = join(tmp, "plain-b");
   await init([a, "--name", "Same", "--public-key", "AAAA"]);
