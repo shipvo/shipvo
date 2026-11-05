@@ -34,5 +34,15 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Terminal.** A window where you type commands instead of clicking. On a Mac it is called Terminal. On Windows use "Windows Terminal" or "PowerShell". On Linux it is also called Terminal.
 
+**Audit log.** A list of what happened to your app's releases: who published, who rolled back, and when a release was stopped. You can export it with `shipvo audit`.
+
+**Cohort band.** A group of people who get a release first (`b0`), then more (`b1`, `b2`). Starting small limits the damage if something is wrong.
+
+**Policy.** Rules you write in `shipvo.json` about releases, such as no publishing on Fridays (`blockedWeekdays`) or after 3pm (`blockedAfterHour`). `shipvo publish --dry-run` checks them, and the control plane enforces them on every real publish.
+
+**Rollback.** Sending people back to the last good release.
+
+**Parquet.** A file format for tables of data. Tools such as DuckDB read it, so you can ask questions about your releases with SQL.
+
 **Test.** A small file that repeats the steps a customer takes and fails if the result changes. It runs on your computer in seconds.
 

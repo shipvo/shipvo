@@ -12,6 +12,10 @@
   },
   "exports": {
     "./server.mjs": "./server.mjs",
+    "./frame.mjs": {
+      "types": "./frame.d.mts",
+      "default": "./frame.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -20,6 +24,8 @@
     "browser-resolver.mjs",
     "app-name.mjs",
     "phone-browser.mjs",
+    "frame.mjs",
+    "frame.d.mts",
     "mock-rules.mjs",
     "screen-rules.mjs",
     "push-notification.mjs",
