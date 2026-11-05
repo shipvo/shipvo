@@ -1,0 +1,23 @@
+{
+  "name": "capacitor-sample",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Minimal Capacitor 8 app used to test Shipvo's Capacitor adapter work.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "serve": "pnpm build && node scripts/serve.mjs",
+    "sync": "pnpm build && cap sync",
+    "test": "pnpm build && vitest run"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}
