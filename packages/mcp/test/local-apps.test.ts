@@ -62,6 +62,31 @@ describe("local mcp", () => {
     expect(textOf(r)).toContain('Screen now:\n- button "Item 9" [ref=e7]');
     await c.close();
   });
+  it("marks a failed call isError and puts the code in structuredContent", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "s", ref: "e5" } });
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent).toMatchObject({ ok: false, code: "stale_ref" });
+    expect(r.structuredContent.error).toContain("stale ref e5");
+    await c.close();
+  });
+  it("leaves a successful call without isError", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "screen", arguments: { session: "s" } });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent).toBeUndefined();
+    await c.close();
+  });
+  it("declares annotations on every tool", async () => {
+    const c = await connect();
+    const tools = (await c.listTools()).tools;
+    const by = Object.fromEntries(tools.map((t) => [t.name, t.annotations]));
+    for (const t of tools) expect(t.annotations, t.name).toBeDefined();
+    for (const n of ["list_apps", "list_sessions", "screen", "screenshot", "notifications", "device_log", "owner_describe"]) expect(by[n]?.readOnlyHint, n).toBe(true);
+    for (const n of ["owner_command", "end_session"]) expect(by[n]?.destructiveHint, n).toBe(true);
+    for (const n of ["open_app", "tap", "type", "scroll", "back", "set_device", "push_notification", "open_notification", "open_url", "device_reset"]) expect(by[n]?.readOnlyHint, n).toBe(false);
+    await c.close();
+  });
 });
 
 describe("change line", () => {
