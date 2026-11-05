@@ -13,6 +13,27 @@ internal object HermesGuard {
     return if (v in 1..Int.MAX_VALUE) v.toInt() else null
   }
 
+  /** The first 12 bytes of a bundle stream, read until full or EOF. Null when the stream is missing or unreadable
+   *  ("unknown", so the release is applied as before). A short stream gives a short array, which `versionOf` maps to null. */
+  fun readHeader(open: () -> java.io.InputStream?): ByteArray? = try {
+    open()?.use { ins ->
+      val h = ByteArray(12); var n = 0
+      while (n < h.size) { val r = ins.read(h, n, h.size - n); if (r < 0) break; n += r }
+      h.copyOf(n)
+    }
+  } catch (_: java.io.IOException) { null }
+
+  /** The version field of a pointer body. Only a positive whole number counts; anything else is unknown. */
+  fun releaseVersionOf(raw: Any?): Int? = when (raw) {
+    is Int -> raw.takeIf { it > 0 }
+    is Long -> raw.takeIf { it in 1..Int.MAX_VALUE }?.toInt()
+    else -> null
+  }
+
+  /** The whole decision `check()` makes: the event to log when the release must be refused, or null to go on. */
+  fun decide(release: Int, rawReleaseVersion: Any?, openShellBundle: () -> java.io.InputStream?): String? =
+    mismatchEvent(release, releaseVersionOf(rawReleaseVersion), readHeader(openShellBundle)?.let { versionOf(it) })
+
   /** The event to log when the release must be refused, or null when it may be staged.
    *  A missing field on either side means "unknown", so the release is applied as before. */
   fun mismatchEvent(release: Int, releaseVersion: Int?, shellVersion: Int?): String? =
