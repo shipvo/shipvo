@@ -5,7 +5,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join, extname, normalize, resolve, sep } from "node:path";
 import { loadConfig } from "./config.js";
-import { portFree } from "./sim.js";
+import { portFree, rebuildInto } from "./sim.js";
 
 export type Platform = "android" | "ios";
 export type RunOptions = { platform: Platform; open: boolean; port?: number; native: boolean };
@@ -84,7 +84,10 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
   const root = resolve(opts.dir);
   const page = runFramePage(opts.platform, opts.name);
   const server = createServer((req, res) => {
-    const path = decodeURIComponent((req.url ?? "/").split("?")[0]);
+    let path: string;
+    try { path = decodeURIComponent((req.url ?? "/").split("?")[0]); }
+    catch { res.writeHead(400); return void res.end("Bad request"); }
+    if (path === "/app") { res.writeHead(302, { location: "/app/" }); return void res.end(); }
     if (path === "/" || path === "/index.html") { res.writeHead(200, { "content-type": TYPES[".html"] }); return void res.end(page); }
     let rel = path.startsWith("/app/") ? path.slice(4) : path;
     if (rel.endsWith("/")) rel += "index.html";
@@ -114,14 +117,10 @@ export function describeWebBuildFailure(output: string): string {
   return `The app cannot build for web${f ? ` (in ${f[1]})` : ""}: ${last || "see the build output above"}. Use \`shipvo run <platform> --native\` to run it natively.`;
 }
 
-function buildWeb(root: string, out: string): Promise<void> {
-  return new Promise((ok, fail) => {
-    const p = spawn("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out], { cwd: root, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "inherit", "pipe"] });
-    let tail = "";
-    p.stderr!.on("data", (d) => { process.stderr.write(d); tail = (tail + d).slice(-4000); });
-    p.on("error", (e) => fail(new Error(`Could not start the web build: ${e.message}`)));
-    p.on("exit", (c) => (c === 0 ? ok() : fail(new Error(describeWebBuildFailure(tail)))));
-  });
+/** Builds the web export with `rebuildInto` from sim.ts (the same build as `shipvo sim`) into `<root>/sim-dist`. */
+export async function buildWeb(root: string, command?: string): Promise<void> {
+  try { await rebuildInto({ root, command, echo: true }); }
+  catch (e) { throw new Error(describeWebBuildFailure((e as { output?: string }).output ?? (e as Error).message)); }
 }
 
 function openBrowser(url: string) {
@@ -143,9 +142,9 @@ export async function run(argv: string[]): Promise<number> {
   let name: string;
   try { name = loadConfig().name; } catch (e) { console.error((e as Error).message); return 1; }
   if (o.port !== undefined && o.port !== 0 && !(await portFree(o.port))) { console.error(`Port ${o.port} is in use. Pass another --port <n>.`); return 1; }
-  const out = join(process.cwd(), ".shipvo", "run-build");
+  const out = join(process.cwd(), "sim-dist");
   console.error(`Building ${name} for web with the simulated device…`);
-  try { await buildWeb(process.cwd(), out); } catch (e) { console.error((e as Error).message); return 1; }
+  try { await buildWeb(process.cwd()); } catch (e) { console.error((e as Error).message); return 1; }
   const s = await startRunServer({ dir: out, platform: o.platform, name, port: o.port });
   const url = `http://127.0.0.1:${s.port}/`;
   console.error(`Simulated ${FRAMES[o.platform].label} phone at ${url}  (Ctrl+C to stop)`);
