@@ -139,6 +139,8 @@ section{padding:clamp(56px,8vw,112px) 0;border-top:1px solid var(--line)}
 .market-head{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:28px}
 .search{flex:1 1 300px;display:flex;align-items:center;gap:10px;background:var(--ink-2);border:1px solid var(--line);border-radius:12px;padding:0 14px;min-height:48px}
 .search input{flex:1;background:transparent;border:0;color:var(--paper);font:inherit;font-size:16px;outline:none;min-width:0}
+.search input::placeholder{color:var(--dim);opacity:1}
+.search-hint{margin:8px 0 0;font-size:13.5px;color:var(--dim)}
 .search svg{width:18px;height:18px;color:var(--dim)}
 .cats{display:flex;flex-wrap:wrap;gap:8px}
 .cats button{border:1px solid var(--line-2);background:transparent;color:var(--mute);border-radius:999px;padding:8px 14px;font:inherit;font-size:13.5px;cursor:pointer;min-height:36px}
