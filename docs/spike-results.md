@@ -79,6 +79,18 @@ How to read these numbers:
 - The first run is the slowest (8.1 s): it is the first launch of a freshly booted simulator.
 - Every run of the workflow repeats this and prints the table in its job summary, so these numbers are re-measured on each iOS runtime change.
 
+### iOS patch size and patch apply time
+
+Measured on 5 Nov 2026 by the `ios-runtime` workflow, [run 42087991990](https://github.com/shipvo/shipvo/actions/runs/42087991990) (job `simulator-e2e`): `macos-26-arm64` runner image, Xcode 26.6, iPhone simulator, Release build, local control plane. The app is freshly installed, so its first update is a bsdiff patch against its embedded bundle. This is the "iOS patch from the embedded bundle" table from the job summary, as printed:
+
+| Patch runs | Median patch bytes | Median full-bundle bytes | Median patch apply time, last byte to healthy (ms) |
+| --- | --- | --- | --- |
+| 3 | 83999 | 1996082 | 573 |
+
+Patch apply time (last byte to healthy) is measured by `scripts/ios-e2e/analyze.mjs` from the last `/b/` request to the app reporting healthy. It includes the reload, so it is larger than the runtime's own `apply_ms` telemetry in the same log (51 to 64 ms).
+
+The run's log also prints: "patch 83999 bytes, full bundle 1996082 bytes, embedded bundle 1996119 bytes". The patch is the first-download size from the embedded bundle, not a steady-state patch from the previous release. The full-bundle table above comes from an earlier run, so the two tables are from different runs.
+
 ## Gaps found and next actions
 
 1. ~~Update size.~~ Shell 1.0.2 ships BSDIFF40 patches against the last good bundle or the APK's embedded bundle, verified against the signed sha256, with full download as fallback. Measured on device: 64 KB steady state. Next: build the embedded bundle the same way as OTA bundles so the first patch after install shrinks from 291 KB, and send content edits (copy, prices, images) as CMS data rather than code, which takes them to a few KB.

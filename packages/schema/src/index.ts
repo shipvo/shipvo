@@ -265,10 +265,19 @@ export const ShipvoPolicy = z.object({
   blockedWeekdays: z.array(PolicyWeekday).min(1).optional(),
   /** Local hour 0-23. From this hour on, publishes on `blockedWeekdays` are refused. */
   blockedAfterHour: z.number().int().min(0).max(23).optional(),
+  /** Widest cohort a publish run by an agent may reach: a band name or a percent of devices (1-100). */
+  maxCohortForAgents: z.union([Band, z.number().gt(0).max(100)]).optional(),
+  /** A release must sit at `percent` of devices for at least `minHours` before it goes to everyone. */
+  requireStageBeforeFull: z.object({
+    percent: z.number().gt(0).lt(100),
+    minHours: z.number().positive(),
+  }).strict().optional(),
 }).strict().superRefine((p, ctx) => {
   if (p.blockedAfterHour !== undefined && !p.blockedWeekdays) ctx.addIssue({ code: "custom", path: ["blockedAfterHour"], message: "blockedAfterHour needs blockedWeekdays" });
 });
 export type ShipvoPolicy = z.infer<typeof ShipvoPolicy>;
+/** Same type as `ShipvoPolicy`. */
+export type Policy = ShipvoPolicy;
 
 /** Validates the `policy` value from shipvo.json. Throws an Error whose message names each bad field (`policy.maxBand: ...`). */
 export function parsePolicy(value: unknown): ShipvoPolicy {

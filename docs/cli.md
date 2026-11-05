@@ -112,6 +112,12 @@ shipvo publish --dry-run --bands b0,b1,b2
 # Refused by policy rule maxBand: this publish reaches b2, but policy.maxBand is b1
 ```
 
+To check the policy without building anything, use `--dry-run-policy`. It reads `shipvo.json`, checks the bands in `--bands` (default all three), prints the result and publishes nothing. It exits 0 when the policy allows the publish or there is no policy, and 1 when a rule refuses.
+
+```bash
+shipvo publish --dry-run-policy --bands b0,b1,b2
+```
+
 | Field | Meaning |
 | --- | --- |
 | `maxBand` | Widest band any publish may reach: `b0`, `b1` or `b2`. The widest band in `--bands` counts. |
@@ -136,3 +142,18 @@ shipvo auto-halt --threshold 0.2 --dry-run         # print the change, write not
 - It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create` (`SHIPVO_PUBLISH_TOKEN` or `.shipvo/publish-token`). A publish token can turn auto-halt off, so a leaked CI publish token can disable it.
 - `shipvo status` shows the setting: `auto-halt: off` or `auto-halt: on at 20% after 20 reports`.
 - The route behind it is `GET`, `PUT` and `DELETE` on `/app/<app>/api/halt-config`. A bad value is a 400 with `error: "bad_halt_config"`.
+
+## `shipvo audit`
+
+Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.
+
+```bash
+shipvo audit shop > audit.json                 # JSON (default)
+shipvo audit shop --format csv > audit.csv     # CSV
+shipvo audit shop --limit 100                  # only the newest 100 entries
+```
+
+- It pages through `GET /audit/<app>` with `?before=<id>`, 200 rows at a time. `--limit` caps the total (default: all).
+- CSV has a header row, every field in double quotes, and columns in this order: `id`, `app_id`, `at`, `actor`, `actor_kind`, `action`, `release`, `release_id`, `before`, `after`. Objects are written as JSON text.
+- A value that starts with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet does not run it as a formula.
+- It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. A non-2xx answer prints the status and exits 1. The token is never printed.

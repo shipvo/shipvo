@@ -85,7 +85,7 @@ export async function init(argv: string[]) {
       react: SDK.react, "react-dom": SDK.react, "react-native": SDK.rn, "react-native-web": SDK.rnw,
       "@shipvo/device": "^0.1.0", "@shipvo/runtime": "^0.1.0",
     },
-    devDependencies: { "@shipvo/cli": "^0.1.0", "@shipvo/sim": "^0.1.0", "@shipvo/test": "^0.1.0", "@types/react": "~19.3.0", playwright: "^1.63.0", typescript: "~6.0.3", vitest: "^2.1.4" },
+    devDependencies: { "@shipvo/cli": "^0.1.0", "@shipvo/sim": "^0.1.0", "@shipvo/test": "^0.1.0", "@types/react": "~19.3.0", playwright: ">=1.63.0 <1.65.0", typescript: "~6.0.3", vitest: "^2.1.4" },
   }, null, 2) + "\n");
   w("app.json", JSON.stringify({ expo: {
     name, slug: appId, version: "1.0.0", orientation: "portrait", userInterfaceStyle: "automatic",
@@ -149,9 +149,10 @@ Install first: npm install (or pnpm / bun), then npx playwright install chromium
 Next steps:
   1. cd ${dirArg}
   2. npx shipvo doctor             # setup checks
-  3. npm run sim                   # open the app in the simulator on http://localhost:4545
-  4. npx shipvo publish --dry-run  # see what a release would contain
-  5. npx shipvo preview            # get a link you can open on any phone
+  3. npx shipvo app create ${appId}   # register the app (run shipvo login first)
+  4. npx shipvo publish            # send your first update
+  5. npx shipvo sim                # open the app in the simulator, for you or an agent
+  6. npx shipvo preview            # get a link you can open on any phone
 `);
 }
 

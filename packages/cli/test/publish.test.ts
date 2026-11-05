@@ -118,6 +118,44 @@ describe("publish and the Hermes bytecode check", () => {
     process.exitCode = undefined;
   });
 
+  describe("--dry-run-policy", () => {
+    const run = async (extra: string[]) => {
+      withBundle(96);
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      await publish([...extra, "--dry-run-policy"]);
+      const out = log.mock.calls.map((c) => String(c[0])).join("\n");
+      log.mockRestore();
+      return out;
+    };
+    afterEach(() => { process.exitCode = undefined; });
+
+    it("ok: prints that the policy allows it, exit 0, publishes nothing", async () => {
+      cfgPolicy.value = { maxBand: "b1" };
+      const out = await run(["--bands", "b0,b1"]);
+      expect(out).toMatch(/Policy allows/);
+      expect(process.exitCode).toBeUndefined();
+      expect(puts).toEqual([]);
+      expect(existsSync(join(cwd, ".shipvo/dry-run"))).toBe(false);
+    });
+
+    it("refused: prints rule and reason, exit 1, publishes nothing", async () => {
+      cfgPolicy.value = { maxBand: "b0" };
+      await run(["--bands", "b0,b1"]);
+      expect(process.exitCode).toBe(1);
+      const msg = (console.error as any).mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+      expect(msg).toMatch(/Refused by policy rule maxBand: .*b1.*b0/);
+      expect(puts).toEqual([]);
+    });
+
+    it("no policy: says so, exit 0, publishes nothing", async () => {
+      cfgPolicy.value = undefined;
+      const out = await run([]);
+      expect(out).toMatch(/No policy/);
+      expect(process.exitCode).toBeUndefined();
+      expect(puts).toEqual([]);
+    });
+  });
+
   it("--dry-run passes a policy that allows the publish", async () => {
     withBundle(96);
     cfgPolicy.value = { maxBand: "b0" };

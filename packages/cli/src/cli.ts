@@ -7,6 +7,7 @@ import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
 import { promote } from "./promote.js";
 import { autoHalt } from "./autohalt.js";
+import { explore } from "./explore.js";
 import { sim } from "./sim.js";
 import { preview } from "./preview.js";
 import { keys, login, mcp } from "./login.js";
@@ -15,6 +16,7 @@ import { signingKey } from "./signing.js";
 import { appCmd } from "./app.js";
 import { status } from "./status.js";
 import { doctor } from "./doctor.js";
+import { audit } from "./audit.js";
 import { store } from "./store.js";
 import { failure, help, unknownCommand } from "./help.js";
 
@@ -23,6 +25,7 @@ try {
 switch (cmd) {
   case "init": await init(rest); break;
   case "sim": await sim(rest); break;
+  case "explore": process.exitCode = await explore(rest); break;
   case "preview": await preview(rest); break;
   case "publish": await publish(rest); break;
   case "promote": await promote(rest); break;
@@ -31,6 +34,7 @@ switch (cmd) {
   case "login": await login(rest); break;
   case "doctor": await doctor(rest); break;
   case "status": process.exitCode = await status(rest); break;
+  case "audit": await audit(rest); break;
   case "store": await store(rest); break;
   case "app": await appCmd(rest); break;
   case "keys": if (rest[0] === "export" || rest[0] === "import") await signingKey(rest); else await keys(); break;

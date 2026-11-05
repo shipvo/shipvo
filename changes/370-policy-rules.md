@@ -1,0 +1,2 @@
+- `@shipvo/schema`: the `policy` section of `shipvo.json` takes two more rules, `maxCohortForAgents` (a band name or a percent) and `requireStageBeforeFull` (`{ percent, minHours }`). Unknown keys are still an error. New type export `Policy` (same as `ShipvoPolicy`). Schema only: nothing enforces the new rules yet.
+- Migration: none; policies without these keys parse as before.
