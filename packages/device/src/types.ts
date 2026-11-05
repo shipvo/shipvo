@@ -33,7 +33,15 @@ export interface Device {
   auth: { available(): Promise<boolean>; confirm(reason: string): Promise<AuthResult> };
   /** Charges through the configured provider. The prompt UI (amount, PIN) is the app's own sheet, identical on every platform. */
   pay: { charge(req: PaymentRequest, pin: string): Promise<PaymentResult> };
-  notifications: { show(n: Omit<Notification, "id">): Promise<string>; onOpen(cb: (n: Notification) => void): () => void };
+  notifications: {
+    show(n: Omit<Notification, "id">): Promise<string>;
+    /** Same as `onTapped`. Kept for existing code. */
+    onOpen(cb: (n: Notification) => void): () => void;
+    /** Calls `cb` with each notification that reaches the app. Nothing is delivered unless notification permission is granted. Returns an unsubscribe function. */
+    onReceived(cb: (n: Notification) => void): () => void;
+    /** Calls `cb` when the person taps a notification, with its `data`. Returns an unsubscribe function. */
+    onTapped(cb: (n: Notification) => void): () => void;
+  };
   share: { text(text: string, title?: string): Promise<boolean> };
   /** Reads the address book. Asks for permission first; throws `Contacts permission denied` when refused. Read-only. */
   contacts: { getAll(): Promise<Contact[]> };
