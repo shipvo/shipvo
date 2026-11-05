@@ -1,6 +1,7 @@
 // `shipvo sim`: build the app's web bundle with the simulated device and serve it in the simulator.
-import { execSync, spawn, exec } from "node:child_process";
-import { existsSync, renameSync, rmSync, watch } from "node:fs";
+import { execSync, spawn } from "node:child_process";
+import { existsSync, mkdirSync, renameSync, rmSync, watch } from "node:fs";
+import { join } from "node:path";
 import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
 import { args as parse, loadConfig } from "./config.js";
@@ -27,7 +28,7 @@ function waitListening(port: number, stop: () => boolean): Promise<boolean> {
   });
 }
 
-const IGNORED = new Set(["node_modules", "sim-dist", ".shipvo", ".git"]);
+const IGNORED = new Set(["node_modules", "sim-dist", ".shipvo", ".git", ".expo", "dist", "dist-ota", "web-build", "ios", "android"]);
 
 /** True if a path (relative to the project) is inside a folder that never triggers a rebuild. */
 export const ignoredPath = (rel: string) => rel.split(/[\\/]/).some((seg) => IGNORED.has(seg));
@@ -54,17 +55,43 @@ export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>;
     clearTimeout(timer);
     timer = setTimeout(() => void run(), debounceMs);
   });
-  return () => { closed = true; clearTimeout(timer); w.close(); };
+  const stop = () => { closed = true; clearTimeout(timer); w.close(); };
+  w.on("error", (e) => { log(`file watcher failed, no longer watching: ${(e as Error).message}`); stop(); });
+  return stop;
 }
 
-/** Builds into .shipvo/sim-next and swaps it into sim-dist only if the build succeeds. */
-function rebuildInto(): Promise<void> {
-  const next = ".shipvo/sim-next";
+/**
+ * Builds into `<root>/.shipvo/sim-next` and swaps it into `<root>/sim-dist` only if the build succeeds.
+ * The old build is moved aside first and moved back if the swap fails.
+ * `command` is the shell command; it gets the output dir as its last argument.
+ */
+export function rebuildInto(opts: { root?: string; command?: string } = {}): Promise<void> {
+  const root = opts.root ?? process.cwd();
+  const command = opts.command ?? "npx expo export --platform web --clear --output-dir";
+  const next = join(root, ".shipvo", "sim-next"), live = join(root, "sim-dist"), prev = join(root, ".shipvo", "sim-prev");
   return new Promise((resolve, reject) => {
-    exec(`npx expo export --platform web --output-dir ${next} --clear`, { env: { ...process.env, PN_SIM: "1" } }, (err, _out, stderr) => {
-      if (err) { rmSync(next, { recursive: true, force: true }); return reject(new Error((stderr || err.message).trim().split("\n").slice(-5).join("\n"))); }
-      rmSync("sim-dist", { recursive: true, force: true });
-      renameSync(next, "sim-dist");
+    mkdirSync(join(root, ".shipvo"), { recursive: true });
+    rmSync(next, { recursive: true, force: true });
+    const p = spawn(`${command} "${next}"`, { cwd: root, shell: true, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "pipe"] });
+    let tail = "";
+    p.stderr!.on("data", (d) => { tail = (tail + d).slice(-4000); });
+    p.on("error", (e) => { rmSync(next, { recursive: true, force: true }); reject(e); });
+    p.on("close", (code) => {
+      if (code !== 0) {
+        rmSync(next, { recursive: true, force: true });
+        return reject(new Error(tail.trim().split("\n").slice(-5).join("\n") || `build exited with code ${code}`));
+      }
+      let moved = false;
+      try {
+        rmSync(prev, { recursive: true, force: true });
+        if (existsSync(live)) { renameSync(live, prev); moved = true; }
+        renameSync(next, live);
+      } catch (e) {
+        try { if (moved && !existsSync(live)) renameSync(prev, live); } catch { /* keep the original error */ }
+        rmSync(next, { recursive: true, force: true });
+        return reject(e);
+      }
+      rmSync(prev, { recursive: true, force: true });
       resolve();
     });
   });
@@ -90,8 +117,8 @@ export async function sim(argv: string[]) {
   if (await waitListening(Number(port), () => exited)) {
     console.error(`Simulator on http://localhost:${port}  (open_app("${cfg.appId}") from @shipvo/mcp; Ctrl-C to stop)`);
     if (a.watch === "true") {
-      watchAndRebuild({ dir: process.cwd(), build: rebuildInto });
-      console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo)");
+      watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto() });
+      console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");
     }
   }
 }

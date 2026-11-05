@@ -13,7 +13,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
-- **CLI: `shipvo sim --watch`.** Rebuilds the web bundle when project files change (300 ms debounce; ignores `node_modules`, `sim-dist`, `.shipvo`) and keeps the same server and port. Prints one line per rebuild. A failed build prints the error and keeps serving the last good build. Without `--watch` nothing changes. Migration: none needed.
+- **CLI: `shipvo sim --watch`.** Rebuilds the web bundle when project files change (300 ms debounce; ignores `node_modules`, `sim-dist`, `.shipvo`, `.git`, `.expo`, `dist`, `dist-ota`, `web-build`, `ios`, `android`) and keeps the same server and port. Prints one line per rebuild. A failed build prints the error and keeps serving the last good build. Without `--watch` nothing changes. Migration: none needed.
 
 - **MCP: tool annotations and `isError`.** Every tool now declares annotations. `list_apps`, `list_sessions`, `screen`, `screenshot`, `notifications`, `device_log` and `owner_describe` set `readOnlyHint: true`; `owner_command` and `end_session` set `destructiveHint: true`; the rest are not read-only. When the simulator reports `ok: false`, the result now has `isError: true` and `structuredContent` `{ ok, code, error }`. The text (`Error [code]: ...`) is unchanged. Tool names and arguments are unchanged. Migration: none needed. Clients that branched on the text can now branch on `isError`.
 
