@@ -34,6 +34,8 @@ Ship
                               Pick the store accounts to open and write store-plan.json
   store screenshots [--out dir] [--sim url]
                               Render each route at store sizes (fast mode: simulator, not the native UI)
+  store testers [--package id] [--track alpha] [--play-key file] [--json]
+                              Steps to get your 12 testers; add the Shipvo Testers group to the closed track
   store status [--mark <step> [--as waiting|done]]
                               Show each store's steps and what to do next
   ci init --framework capacitor [--dry-run] [--force]
