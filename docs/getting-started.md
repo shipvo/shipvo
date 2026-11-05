@@ -20,6 +20,8 @@ What we measured: on 2026-11-05, on a GitHub Actions Linux runner (4 vCPU, AMD E
 
 ## 1. Create the app
 
+Already have an Expo app? Run `npx -y @shipvo/cli init` inside it instead: see [adopt mode](cli.md#adopt-mode). Then continue at step 2 or 3.
+
 ```bash
 npx -y @shipvo/cli init myshop --name "My Shop"
 cd myshop
