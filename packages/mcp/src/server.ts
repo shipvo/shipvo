@@ -10,6 +10,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import http from "node:http";
 import { readFileSync } from "node:fs";
+import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { z } from "zod";
 import { classify, compactDiff, fieldValue } from "./change.js";
@@ -182,6 +183,17 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
 });
+
+// Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.
+server.tool("publish_preview", "Build the app in PN_APP_DIR (or the current folder) with the simulated device and publish a shareable web preview to here.now, no account. The link is PUBLIC and expires in 24 hours; claimUrl keeps it. Returns { url, claimUrl, expiresAt }. Needs @shipvo/cli (npx).", {}, { title: "Publish a public preview", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  async () => {
+    if (ctx.scope && ctx.scope !== "owner" && ctx.scope !== "test") throw new Error(`this key has scope "${ctx.scope}": it cannot publish a preview`);
+    const cwd = process.env.PN_APP_DIR || process.cwd();
+    const out = await new Promise<string>((resolve, reject) => execFile("npx", ["-y", "@shipvo/cli", "preview", "--json"], { cwd, timeout: 600000, maxBuffer: 4 << 20 }, (err, so, se) => (err ? reject(new Error(String(se || err.message).trim().split("\n").slice(-3).join(" "))) : resolve(so))));
+    const r = JSON.parse(out.trim().split("\n").pop() ?? "{}");
+    const sc = { url: r.url as string, claimUrl: (r.claimUrl ?? null) as string | null, expiresAt: (r.expiresAt ?? null) as string | null };
+    return { ...text(JSON.stringify({ ...sc, note: "Public link, expires in 24 hours unless claimUrl is opened and the owner signs in to here.now. Share claimUrl byte for byte." }, null, 2)), structuredContent: sc };
+  });
 
 // Owner side: the same typed commands the admin at /app/<id>/admin uses.
 server.tool("owner_describe", "List the owner commands of an app (content, prices, offers, orders, publish). Needs PN_OWNER_TOKEN.", { app: z.string() }, RO, async ({ app }) => {
