@@ -621,7 +621,7 @@
  },
  {
   "name": "lock",
-  "description": "Press the phone's power button: show the lock screen. Taps do nothing until unlock. Logged in device_log as simulated.",
+  "description": "Press the phone's power button: show the lock screen. Taps, typing, scrolling and back do nothing until unlock. Logged in device_log as simulated.",
   "inputSchema": {
    "type": "object",
    "properties": {

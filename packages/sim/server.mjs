@@ -10,7 +10,7 @@ import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
-import { lifecycle, lockedError } from "./lifecycle.mjs";
+import { lifecycle, assertUnlocked } from "./lifecycle.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -163,10 +163,11 @@ async function act(id, body) {
     });
     if (covered) throw fail("covered", String(body.ref));
   };
+  if (["tap", "type", "scroll", "back"].includes(body.action)) await assertUnlocked(page);
   switch (body.action) {
     case "screen": break;
     case "lock": case "unlock": case "restart": { const r = await lifecycle(page, body.action); return { ...r, screen: await screen(page) }; }
-    case "tap": { if (await page.evaluate(() => globalThis.__pnDevice?.locked?.())) throw lockedError(); const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
+    case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
       let t = await resolve(body.ref);

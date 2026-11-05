@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import http from "node:http";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -24,6 +24,7 @@ beforeAll(async () => {
     if (req.url === "/act" && body.session !== "live") return res.end(JSON.stringify({ ok: false, code: "no_session", error: `no session '${body.session}': call /session first`, screen: null }));
     if (req.url === "/act" && body.ref === "e999") return res.end(JSON.stringify({ ok: false, code: "stale_ref", error: "stale ref e999: the screen changed. Take a new snapshot (action \"screen\") and use a ref from it.", screen: "heading Menu" }));
     if (req.url === "/act" && body.ref === "e998") return res.end(JSON.stringify({ ok: false, code: "disabled", delivery: "not_delivered", reason: "disabled", safe_to_retry: true, error: "e998 is disabled", screen: "heading Menu" }));
+    if (req.url === "/act" && ["lock", "unlock", "restart"].includes(body.action)) return res.end(JSON.stringify({ ok: true, locked: body.action === "lock", screen: `action ${body.action}` }));
     if (req.url === "/act" && body.action === "type") return res.end(JSON.stringify({ ok: true, delivery: "delivered", value: body.text, screen: "- textbox \"Name\" [ref=e1]: ignored" }));
     if (req.url === "/act" && body.action === "push_notification") return res.end(JSON.stringify({ ok: true, delivered: body.title !== "blocked", screen: "heading Menu" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Menu" }));
@@ -116,6 +117,26 @@ describe("push_notification", () => {
     const c = await connect();
     const r: any = await c.callTool({ name: "push_notification", arguments: { session: "live", title: "ok", body: "b" } });
     expect(r.content[0].text).toBe("heading Menu");
+    await c.close();
+  });
+});
+
+describe("lock, unlock and restart", () => {
+  it.each(["lock", "unlock", "restart"])("%s calls /act with its own action and returns the screen", async (name) => {
+    const c = await connect();
+    const r: any = await c.callTool({ name, arguments: { session: "live" } });
+    expect(r.isError).toBeFalsy();
+    expect(r.content[0].text).toBe(`action ${name}`);
+    await c.close();
+  });
+  it("tools.json in services/sim matches the MCP tool names and descriptions", async () => {
+    const c = await connect();
+    const listed: any = await c.listTools();
+    const json = JSON.parse(readFileSync(resolve(root, "../../services/sim/src/tools.json"), "utf8"));
+    const arr: any[] = Array.isArray(json) ? json : json.tools;
+    for (const n of ["lock", "unlock", "restart"]) {
+      expect(arr.find((t) => t.name === n)?.description).toBe(listed.tools.find((t: any) => t.name === n).description);
+    }
     await c.close();
   });
 });

@@ -211,7 +211,7 @@ server.tool("open_url", "Open a deep link (such as myapp://item/3) in the runnin
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Everything here is simulated: no real biometric check or money movement took place.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
-server.tool("lock", "Press the phone's power button: show the lock screen. Taps do nothing until unlock. Logged in device_log as simulated.", { session: sid }, WR,
+server.tool("lock", "Press the phone's power button: show the lock screen. Taps, typing, scrolling and back do nothing until unlock. Logged in device_log as simulated.", { session: sid }, WR,
   async ({ session }) => { need(session); return result(session, await sim("/act", { session, action: "lock" })); });
 server.tool("unlock", "Swipe up on the lock screen: the phone is usable again. Logged in device_log as simulated.", { session: sid }, WR,
   async ({ session }) => { need(session); return result(session, await sim("/act", { session, action: "unlock" })); });
