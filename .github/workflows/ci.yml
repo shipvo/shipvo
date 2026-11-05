@@ -35,7 +35,7 @@ jobs:
       - name: Device end-to-end through MCP (simulator, no phone)
         working-directory: apps/tide-and-tackle
         run: |
-          pnpm --filter @shipvo/cli build && pnpm --filter @shipvo/mcp build
+          pnpm --filter "@shipvo/cli..." build && pnpm --filter @shipvo/mcp build
           npx playwright install --with-deps chromium
           PN_SIM=1 npx expo export --platform web --output-dir sim-dist
           node sim/server.mjs --dir /tmp/pn-ui > sim.log 2>&1 &

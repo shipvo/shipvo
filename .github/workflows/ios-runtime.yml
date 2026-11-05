@@ -32,7 +32,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
+      - run: pnpm --filter "@shipvo/cli..." build
       - name: Fake control plane (signed iOS pointers, good and bad)
         run: |
           node scripts/ios-fixture.mjs "$RUNNER_TEMP/fx"
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
+      - run: pnpm --filter "@shipvo/cli..." build
 
       - name: Point the sample app at a local control plane
         working-directory: apps/tide-and-tackle
