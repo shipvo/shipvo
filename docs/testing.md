@@ -84,6 +84,7 @@ jobs:
 - **Fingerprint and Face ID.** Success, failure and cancel: `biometrics: { nextResult: "fail" }`.
 - **Offline.** `online: false`, then check queued actions and error messages.
 - **Push notifications.** `phone.notify(...)`, then `phone.openNotification()` and assert the deep link lands on the right screen.
+- **Deep links.** `await phone.openUrl("myapp://item/3")`, then assert the right screen. The app must listen with `onUrl` from `@shipvo/device`; if it does not, `openUrl` throws a `PhoneError` with code `no_url_listener`. The MCP tool is `open_url`. On a phone, `onUrl` fires only for URLs that arrive while the app runs; for a URL that launched the app, read `Linking.getInitialURL()`.
 - **Release regressions.** Keep the flows that earn money in a test file. A change that breaks them fails the pull request, not a customer.
 - **Dark mode.** `openApp({ dark: true })`.
 
@@ -122,6 +123,7 @@ For open-ended exploration, point an AI assistant at the same simulator over [MC
 | `phone.sees(text)` / `phone.screen` / `phone.nodes()` | Read what is on screen. |
 | `phone.waitFor(text, { timeout? })` / `waitForGone` | Wait for something to appear or disappear. |
 | `phone.device.set({...})` / `device.reset()` | Location, camera, permissions, biometrics, payment, network. |
+| `phone.openUrl(url)` | Open a deep link in the app. Throws `no_url_listener` if the app does not listen. |
 | `phone.notify({...})` / `notifications()` / `openNotification()` | Push notifications and the shade. |
 | `phone.deviceLog()` | What the app asked of the device. |
 | `phone.screenshot()` | A PNG of the screen (same machine as the simulator). |

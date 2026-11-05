@@ -34,6 +34,7 @@ const state: DeviceState = {
 };
 // Every entry is marked simulated: a simulated fingerprint or payment is for testing and is never a real verification or money movement.
 const log = (kind: string, detail?: unknown) => state.log.push({ at: Date.now(), kind, detail, simulated: true } as any);
+const urlSubs = new Set<(url: string) => void>();
 const netSubs = new Set<(o: boolean) => void>(); const openSubs = new Set<(n: Notification) => void>();
 
 // ---- system sheets (plain DOM so they sit above the app and read as dialogs) ----
@@ -166,6 +167,8 @@ g.__pnDevice = {
   notifications: () => recent.map((n) => ({ id: n.id, title: n.title, body: n.body })),
   /** Tap a notification from the shade: same handler as tapping its banner. */
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
+  /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
+  openUrl: (url: string) => deliverUrl(url),
   capabilities: () => device.capabilities(),
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
@@ -178,6 +181,14 @@ g.__pnDevice = {
 export const simState = state;
 export const simLog = log;
 export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });
-export const openUrl = async (url: string) => { window.dispatchEvent(new CustomEvent("pn:url", { detail: url })); };
+/** Call `cb` with each URL opened in the app (deep links). Returns an unsubscribe function. */
+export const onUrl = (cb: (url: string) => void) => { urlSubs.add(cb); return () => { urlSubs.delete(cb); }; };
+/** Deliver a URL to the app. Returns true if an `onUrl` listener received it. */
+function deliverUrl(url: string): boolean {
+  window.dispatchEvent(new CustomEvent("pn:url", { detail: url }));
+  urlSubs.forEach((f) => f(url)); log("url_opened", { url, handled: urlSubs.size > 0 });
+  return urlSubs.size > 0;
+}
+export const openUrl = async (url: string) => { deliverUrl(url); };
 // UI-owned bridges exist on native; on the simulated device the sheets are the UI, so they resolve immediately.
 export const scanBridge = { subscribe: () => () => {}, current: () => null, finish: () => {} };
