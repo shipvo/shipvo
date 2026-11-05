@@ -144,12 +144,13 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   const mode = attach ?? "auto";
   const live = mode === "never" ? undefined : findLiveRun(id);
   if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
+  let attachNote = "";
   if (live) {
     try {
       const d = await connectDriver(live);
       attached.get(sid)?.close(); attached.set(sid, d);
       const r = await act({ session: sid, action: "screen" });
-      if (!r.ok) { attached.delete(sid); d.close(); if (mode === "always") return result(sid, r); }
+      if (!r.ok) { attached.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote = ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
       else {
         sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() }); steps.set(sid, [{ action: "open" }]);
         if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
@@ -157,6 +158,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
       }
     } catch (e) {
       if (mode === "always") return result("", { ok: false, code: "attach_failed", error: (e as Error).message });
+      attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
@@ -164,7 +166,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
-  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session\n\n${r.screen ?? ""}`);
+  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
 });
 
 server.tool("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, RO, async () => {

@@ -10,6 +10,7 @@ export type ScreenMessage = { id?: number; type?: string; ok?: boolean; error?: 
 
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
 
+// Safety: run.json may come from a parent directory, but we only ever connect to 127.0.0.1 and send its token there.
 /** Finds `.shipvo/run.json` in `cwd` or a parent, stopping after the git root. Returns it only if the pid is alive and the app matches. */
 export function findLiveRun(app: string, cwd = process.cwd()): RunInfo | undefined {
   let dir = resolve(cwd);
@@ -32,6 +33,7 @@ export type Driver = { request(type: string, args?: Record<string, unknown>, ms?
 /** Connects as `driver`. Rejects if the socket cannot open within `ms`. */
 export function connectDriver(info: RunInfo, ms = 3000): Promise<Driver> {
   return new Promise((ok, fail) => {
+    if (typeof WebSocket === "undefined") return fail(new Error("attach needs Node 22+ (no global WebSocket in this Node version)"));
     const ws = new WebSocket(`ws://127.0.0.1:${info.port}/__shipvo/agent?role=driver&token=${encodeURIComponent(info.token)}`);
     const pending = new Map<number, (m: ScreenMessage) => void>();
     let next = 1, opened = false;

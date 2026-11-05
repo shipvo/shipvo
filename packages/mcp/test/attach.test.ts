@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { connectDriver } from "../src/attach.js";
 import { acceptWebSocket } from "../../cli/src/run-ws.js";
 
 const root = resolve(__dirname, "..");
@@ -41,7 +42,7 @@ beforeAll(async () => {
 });
 afterAll(() => { sim?.close(); host?.close(); if (out) rmSync(out, { recursive: true, force: true }); if (work) rmSync(work, { recursive: true, force: true }); });
 
-const runJson = (pid: number) => { mkdirSync(join(work, ".shipvo"), { recursive: true }); writeFileSync(join(work, ".shipvo", "run.json"), JSON.stringify({ port: hostPort, platform: "android", app: "menu", token: "tok", pid })); };
+const runJson = (pid: number, token = "tok") => { mkdirSync(join(work, ".shipvo"), { recursive: true }); writeFileSync(join(work, ".shipvo", "run.json"), JSON.stringify({ port: hostPort, platform: "android", app: "menu", token, pid })); };
 async function open(args: Record<string, unknown>) {
   const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${simPort}`, PN_CONTROL: "http://127.0.0.1:1" };
   delete env.PN_APPS;
@@ -76,5 +77,17 @@ describe("open_app attach", () => {
     runJson(2 ** 22 + 12345);
     const a = await open({ attach: "always" });
     expect(a.isError).toBe(true); expect(a.text).toContain("no_live_run"); await a.c.close();
+  });
+  it("says why in the headless result when attach failed", async () => {
+    runJson(process.pid, "wrong");
+    const { c, text } = await open({});
+    expect(text).toContain("mode: headless session (live run found but attach failed:");
+    await c.close();
+  });
+  it("connectDriver rejects clearly without a global WebSocket", async () => {
+    const orig = globalThis.WebSocket;
+    (globalThis as { WebSocket?: unknown }).WebSocket = undefined;
+    try { await expect(connectDriver({ port: 1, platform: "android", app: "menu", token: "t", pid: 1 })).rejects.toThrow("attach needs Node 22+"); }
+    finally { globalThis.WebSocket = orig; }
   });
 });
