@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
 /** npm, pnpm, yarn or bun, from the lockfile in `cwd`. Defaults to npm. */
+// Keep in step with packages/sim/browser.mjs (this package cannot import it).
 export function detectPackageManager(cwd: string, exists: (p: string) => boolean = existsSync): PackageManager {
   const has = (f: string) => exists(join(cwd, f));
   if (has("bun.lock") || has("bun.lockb")) return "bun";

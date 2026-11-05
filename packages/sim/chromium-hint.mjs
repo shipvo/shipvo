@@ -4,7 +4,7 @@ export const CHROMIUM_MISSING = /Executable doesn't exist/;
 /** The one-line install command for the resolved playwright version, plus the Linux hint. */
 export function chromiumInstallFix(version) {
   const v = version ? ` (playwright ${version})` : "";
-  return `run \`npx playwright install chromium\` in the app folder${v}. On Linux, if Chromium then fails to start, run \`npx playwright install --with-deps chromium\` or install the system packages it lists.`;
+  return `run \`npx playwright install chromium\` in the app folder${v}. On Linux, if Chromium then fails to start, run \`npx playwright install install-deps chromium\`.`;
 }
 
 /** The message to print for a launch error. Returns the first line, plus the fix when the browser is not installed. */

@@ -5,14 +5,14 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { spawnSync, execSync } from "node:child_process";
+import { spawn, spawnSync, execSync } from "node:child_process";
 
 export const NOT_INSTALLED = /Executable doesn't exist|is not found at|distribution '[a-z-]+' is not found/i;
 export const MISSING_LIBS = /error while loading shared libraries|Host system is missing dependencies|install-deps/i;
 
 export const autoInstallOff = (env = process.env) => /^(1|true|yes)$/i.test(String(env.SHIPVO_NO_AUTO_INSTALL || ""));
 
-/** npm, pnpm, yarn or bun, from the lockfile in `cwd`. Defaults to npm. */
+/** Keep in step with packages/cli/src/sim-install.ts (the CLI cannot import this package). npm, pnpm, yarn or bun, from the lockfile in `cwd`. Defaults to npm. */
 export function detectPackageManager(cwd, exists = existsSync) {
   const has = (f) => exists(join(cwd, f));
   if (has("bun.lock") || has("bun.lockb")) return "bun";
@@ -30,6 +30,11 @@ export function devInstallCommand(pm, pkg) {
 const defaultDeps = {
   exists: existsSync,
   run: (cmd, args, cwd) => spawnSync(cmd, args, { cwd, stdio: ["ignore", 2, 2], shell: process.platform === "win32" }).status ?? 1,
+  // Async, so the server keeps answering requests and its launch timer keeps running during the download.
+  runAsync: (cmd, args, cwd) => new Promise((resolve) => {
+    const c = spawn(cmd, args, { cwd, stdio: ["ignore", 2, 2], shell: process.platform === "win32" });
+    c.on("error", () => resolve(1)); c.on("close", (code) => resolve(code ?? 1));
+  }),
   log: (m) => console.error(m),
   platform: process.platform,
   env: process.env,
@@ -55,9 +60,9 @@ export function resolvePlaywright(cwd = process.cwd(), deps = {}) {
   const d = { ...defaultDeps, ...deps };
   const found = loadPlaywright(cwd, d);
   if (found) return found;
-  if (autoInstallOff(d.env)) throw new Error("playwright is not installed. Run: npm i -D playwright (SHIPVO_NO_AUTO_INSTALL is set, so Shipvo did not install it)");
   const pm = detectPackageManager(cwd, d.exists);
   const { cmd, args } = devInstallCommand(pm, "playwright");
+  if (autoInstallOff(d.env)) throw new Error(`playwright is not installed. Run: ${cmd} ${args.join(" ")} (SHIPVO_NO_AUTO_INSTALL is set, so Shipvo did not install it)`);
   d.log(`sim: playwright is not installed. Installing it as a dev dependency: ${cmd} ${args.join(" ")}`);
   if (d.run(cmd, args, cwd) !== 0) throw new Error(`could not install playwright. Run: ${cmd} ${args.join(" ")}`);
   const again = loadPlaywright(cwd, d);
@@ -94,7 +99,7 @@ export async function launchResolved(pw, { cwd = process.cwd(), executablePath, 
   const manual = "npx playwright install chromium";
   if (autoInstallOff(d.env)) throw new Error(`no browser found. Run: ${manual} (SHIPVO_NO_AUTO_INSTALL is set, so Shipvo did not install it)`);
   d.log(`sim: no Chrome, Edge or Playwright Chromium found. Installing Chromium once (shared by every project on this machine)${version ? ` for playwright ${version}` : ""}…`);
-  if (d.run("npx", ["playwright", "install", "chromium"], cwd) !== 0) throw new Error(`could not install Chromium. Run: ${manual}`);
+  if (await d.runAsync("npx", ["playwright", "install", "chromium"], cwd) !== 0) throw new Error(`could not install Chromium. Run: ${manual}`);
   d.log("sim: Chromium installed.");
   try { return await chromium.launch(); }
   catch (e) { libs(e); throw e; }

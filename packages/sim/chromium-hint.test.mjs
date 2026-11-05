@@ -6,7 +6,7 @@ test("a missing executable names the install command and the playwright version"
   const m = launchErrorMessage("browserType.launch: Executable doesn't exist at /x/chromium_headless_shell-1248/chrome\n╔═══╗", "1.63.0");
   assert.match(m, /npx playwright install chromium/);
   assert.match(m, /playwright 1\.63\.0/);
-  assert.match(m, /Linux/);
+  assert.match(m, /install-deps chromium/);
   assert.ok(!m.includes("╔"));
 });
 

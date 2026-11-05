@@ -188,8 +188,7 @@ export async function startSim(a: Record<string, string | undefined>, cfg: { nam
       console.error(`Building ${cfg.name} for the simulator…`);
       execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
     }
-    let server: string;
-    server = ensureSimServer();
+    const server = ensureSimServer();
     let exited = false;
     child = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId], { stdio: ["ignore", "ignore", "inherit"], env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
     child.on("exit", () => { exited = true; });

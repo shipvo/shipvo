@@ -7,7 +7,7 @@ function fakePw(plan) { // plan: array of results per launch call: "ok" or an er
   const calls = [];
   return { calls, chromium: { launch: async (o = {}) => { calls.push(o); const r = plan.shift(); if (r === "ok") return { browser: true }; throw new Error(r); } } };
 }
-const mkDeps = (over = {}) => { const ran = [], logs = []; return { ran, logs, env: {}, platform: "darwin", run: (c, a) => { ran.push([c, ...a]); return 0; }, log: (m) => logs.push(m), ...over }; };
+const mkDeps = (over = {}) => { const ran = [], logs = []; return { ran, logs, env: {}, platform: "darwin", run: (c, a) => { ran.push([c, ...a]); return 0; }, runAsync: async (c, a) => { ran.push([c, ...a]); return 0; }, log: (m) => logs.push(m), ...over }; };
 
 test("package manager comes from the lockfile", () => {
   const ex = (names) => (p) => names.some((n) => p.endsWith(n));
@@ -56,7 +56,7 @@ test("SHIPVO_NO_AUTO_INSTALL turns the install off and names the command", async
 });
 
 test("a failed install says what to run", async () => {
-  const pw = fakePw([missing, missing, missing]); const d = mkDeps({ run: () => 1 });
+  const pw = fakePw([missing, missing, missing]); const d = mkDeps({ runAsync: async () => 1 });
   await assert.rejects(launchResolved(pw, {}, d), /could not install Chromium. Run: npx playwright install chromium/);
 });
 
@@ -64,7 +64,7 @@ test("on Linux, missing system libraries print install-deps", async () => {
   const pw = fakePw(["error while loading shared libraries: libnss3.so"]); const d = mkDeps({ platform: "linux" });
   await assert.rejects(launchResolved(pw, {}, d), /npx playwright install-deps chromium/);
   const mac = fakePw(["error while loading shared libraries: libnss3.so", missing, missing, missing, missing]);
-  await assert.rejects(launchResolved(mac, {}, mkDeps({ platform: "darwin", run: () => 1 })), /could not install Chromium/);
+  await assert.rejects(launchResolved(mac, {}, mkDeps({ platform: "darwin", runAsync: async () => 1 })), /could not install Chromium/);
 });
 
 test("--chromium path wins and skips the search", async () => {
@@ -91,6 +91,14 @@ test("a missing playwright package is installed with the detected package manage
 test("a missing playwright with the opt-out fails with the command and installs nothing", () => {
   const bad = () => { throw new Error("nope"); };
   const d = mkDeps({ env: { SHIPVO_NO_AUTO_INSTALL: "1" }, requireFrom: () => bad, requireHere: bad, globalRoot: () => "/g" });
-  assert.throws(() => resolvePlaywright("/app", d), /npm i -D playwright/);
+  assert.throws(() => resolvePlaywright("/app", d), /npm install --save-dev playwright/);
   assert.equal(d.ran.length, 0);
+});
+
+test("launchResolved waits for the async Chromium install before launching again", async () => {
+  const order = [];
+  const pw = { chromium: { launch: async () => { order.push("launch"); if (order.filter((x) => x === "launch").length < 4) throw new Error(missing); return {}; } } };
+  const d = mkDeps({ runAsync: async () => { order.push("install-start"); await new Promise((r) => setTimeout(r, 20)); order.push("install-end"); return 0; } });
+  await launchResolved(pw, {}, d);
+  assert.deepEqual(order, ["launch", "launch", "launch", "install-start", "install-end", "launch"]);
 });
