@@ -60,6 +60,24 @@ describe("promote", () => {
     await promote([], { fetchFn: ok });
     expect(logs.filter((l) => l.startsWith("Wrote")).map((l) => l.slice(6, 8))).toEqual(["b2"]);
   });
+  it("never overwrites a newer release on a wider band", async () => {
+    put("p/demo/1/b0", 3); put("p/demo/1/b1", 5);
+    const rel = (k: string) => JSON.parse(JSON.parse(values.get(k)!).body).release;
+    await promote([], { fetchFn: ok });
+    expect(rel("p/demo/1/b1")).toBe(5);
+    expect(rel("p/demo/1/b2")).toBe(3);
+    expect(logs.join("\n")).toMatch(/Skipped b1 \(android\): it already has release 5, which is newer than 3/);
+    logs.length = 0;
+    await promote(["--to", "b1"], { fetchFn: ok, });
+    expect(rel("p/demo/1/b1")).toBe(5);
+    expect(logs.some((l) => l.startsWith("Wrote b1"))).toBe(false);
+    await promote(["--to", "b1", "--force"], { fetchFn: ok });
+    expect(rel("p/demo/1/b1")).toBe(5);
+  });
+  it("rejects --to with only the source band", async () => {
+    put("p/demo/1/b0", 3);
+    await expect(promote(["--to", "b0"], { fetchFn: ok })).rejects.toThrow(/b0 is the source band/);
+  });
   it("refuses a halted release, and --force overrides", async () => {
     put("p/demo/1/b0", 3);
     const halted = summary({ releases: [], halted: { release: 3 } });

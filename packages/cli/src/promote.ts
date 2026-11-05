@@ -19,6 +19,7 @@ Widen a staged release to more bands. The release number, bundle and patches sta
 
 Flags (write a value after a space, not =):
   --to b1,b2                   Bands to write (default: every band with no pointer for this release)
+                               Bands that already hold a newer release are always skipped
   --platform android|ios|all   Platform to promote (default android)
   --dry-run                    Print the plan, write nothing
   --force                      Promote even if the release is halted or has reverts
@@ -50,7 +51,7 @@ export async function promote(argv: string[], deps: { kv?: Store; fetchFn?: type
   const store = deps.kv ?? kvFor(cfg);
 
   // Read every source pointer before touching the network or writing anything.
-  const plans: { pf: Platform; release: number; from: string; body: Record<string, unknown>; targets: string[] }[] = [];
+  const plans: { pf: Platform; release: number; from: string; body: Record<string, unknown>; targets: string[]; newer: [string, number][] }[] = [];
   for (const pf of platforms) {
     let from = "", body: Record<string, unknown> | null = null;
     const have = new Map<string, number>();
@@ -60,8 +61,12 @@ export async function promote(argv: string[], deps: { kv?: Store; fetchFn?: type
     }
     if (!body) throw new Error(`No ${pf} pointer found on any band. Run shipvo publish --bands b0 first.`);
     const release = body.release as number;
-    const targets = (explicit ?? BANDS).filter((b) => b !== from && (explicit || have.get(b) !== release));
-    plans.push({ pf, release, from, body, targets });
+    if (explicit && explicit.length && explicit.every((b) => b === from)) throw new Error(`${from} is the source band (release ${release}). Pass --to with a different band.`);
+    // Never write an older release over a newer one: promote widens, it does not downgrade. --force does not change this.
+    const cand = (explicit ?? BANDS).filter((b) => b !== from && (explicit || have.get(b) !== release));
+    const newer: [string, number][] = cand.filter((b) => (have.get(b) ?? 0) > release).map((b) => [b, have.get(b) as number]);
+    const targets = cand.filter((b) => !((have.get(b) ?? 0) > release));
+    plans.push({ pf, release, from, body, targets, newer });
   }
 
   if (!force) {
@@ -82,7 +87,9 @@ export async function promote(argv: string[], deps: { kv?: Store; fetchFn?: type
     }
   }
 
-  for (const { pf, release, from, body, targets } of plans) {
+  for (const { pf, release, from, body, targets, newer } of plans) {
+    for (const [b, r] of newer) console.log(`Skipped ${b} (${pf}): it already has release ${r}, which is newer than ${release}.`);
+    if (!targets.length && newer.length) { console.log(`Nothing to promote: every other band already has a newer release than ${release} (${pf}).`); continue; }
     if (!targets.length) { console.log(`Nothing to promote: release ${release} (${pf}) already has a pointer on every band.`); continue; }
     const issued_at = new Date().toISOString();
     for (const band of targets) {
