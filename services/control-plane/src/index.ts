@@ -5,6 +5,7 @@ import { adminPage, loginPage } from "./admin";
 import { describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { apps } from "./apps";
+import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
 const app = new Hono<{ Bindings: Env }>();
@@ -107,6 +108,34 @@ app.get("/b/:app/:file", async (c) => {
   return new Response(buf, { headers });
 });
 
+/**
+ * Write KV `halt/<app>` when a release fails on too many devices. Settings live in KV `halt-config/<app>`:
+ * {"threshold": number, "min_reports": number}. No config key means halting is off.
+ */
+async function maybeHalt(env: Env, appId: string, release: number): Promise<void> {
+  if (!env.POINTERS) return;
+  const raw = await env.POINTERS.get(`halt-config/${appId}`);
+  if (!raw) return;
+  let cfg: { threshold?: unknown; min_reports?: unknown };
+  try { cfg = JSON.parse(raw); } catch { return; }
+  if (!cfg || typeof cfg !== "object") return;
+  const threshold = typeof cfg.threshold === "number" ? cfg.threshold : undefined;
+  const minReports = typeof cfg.min_reports === "number" ? cfg.min_reports : 20;
+  const { results } = await env.DB.prepare("SELECT event, COUNT(*) AS n FROM telemetry WHERE app_id = ? AND release = ? GROUP BY event").bind(appId, release).all<{ event: string; n: number }>();
+  const counts = { healthy: 0, failed: 0 };
+  for (const r of results ?? []) {
+    if (HEALTHY_EVENTS.includes(r.event)) counts.healthy += r.n;
+    else if (FAILED_EVENTS.includes(r.event)) counts.failed += r.n;
+  }
+  const verdict = shouldHalt(counts, { threshold, minReports });
+  if (!verdict.halt) return;
+  const key = `halt/${appId}`;
+  // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
+  const cur = await env.POINTERS.get(key);
+  if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
+  await env.POINTERS.put(key, JSON.stringify({ release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold }));
+}
+
 /** Device telemetry for the spike: applied / reverted / timings. */
 app.post("/t", async (c) => {
   let body: any;
@@ -121,6 +150,8 @@ app.post("/t", async (c) => {
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
     extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
+  // Halting is a best-effort side effect: the event is stored, so never fail the response.
+  if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release); } catch (e) { console.error("halt check failed", e); } }
   return c.json({ ok: true }, 202);
 });
 
