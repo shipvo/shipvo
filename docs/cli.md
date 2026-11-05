@@ -124,7 +124,8 @@ shipvo publish --dry-run-policy --bands b0,b1,b2
 | --- | --- |
 | `maxBand` | Widest band any publish may reach: `b0`, `b1` or `b2`. The widest band in `--bands` counts. |
 | `agentMaxBand` | Same, for a publish run by an agent. Set `SHIPVO_ACTOR=agent` in the agent's environment. Without it the publish counts as human. |
-| `blockedWeekdays` | Days with no publish: `mon` to `sun`, in local time. |
+| `blockedWeekdays` | Days with no publish: `mon` to `sun`, in the policy's time zone (see `timeZone`). |
+| `timeZone` | IANA name such as `Europe/Paris`. Sets the zone for `blockedWeekdays` and `blockedAfterHour`. Without it the CLI uses the machine's local time and the control plane uses UTC. |
 | `blockedAfterHour` | Hour 0-23, local time. Publishes on `blockedWeekdays` are refused from this hour on (12 means from 12:00). Without it, the whole day is blocked. Needs `blockedWeekdays`. |
 
 Without a `policy` section nothing is checked. A bad section (unknown field, wrong value) stops the dry run and names the field, for example `policy.maxBand`.

@@ -1,0 +1,2 @@
+- `scripts`: the android-e2e report has a `firstRun` block (median of the "update: full bundle (no patches offered)" scenario, labelled as such, not as the first-run app), the summary prints a publish-to-healthy line from it, and `measure.mjs --apply-report` adds it to first-run.json. A missing value shows as "not measured", never 0 s.
+- Migration: none.

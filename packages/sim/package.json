@@ -20,6 +20,7 @@
     "browser-resolver.mjs",
     "app-name.mjs",
     "mock-rules.mjs",
+    "screen-rules.mjs",
     "push-notification.mjs",
     "README.md"
   ],

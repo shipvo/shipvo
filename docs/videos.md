@@ -6,7 +6,7 @@ Short videos for people who are new to Shipvo. Each one has captions and a writt
 
 ### Have an AI assistant test your shop before every release
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="Have an AI assistant test your shop before every release" data-length="1 min 30 s" poster="/videos/test-with-an-assistant.jpg" src="/media/videos/test-with-an-assistant-e368a4d3.mp4"><track kind="captions" src="/videos/test-with-an-assistant.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="Have an AI assistant test your shop before every release" data-length="1 min 30 s" poster="/videos/test-with-an-assistant.jpg" src="/media/videos/test-with-an-assistant-e368a4d3.mp4"><track kind="captions" src="/videos/test-with-an-assistant.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
 1 minute 30 seconds. Connect an assistant such as Claude or Cursor to your shop in the simulator, ask it to shop like a customer, check what really happened with the device log, turn its run into a test and run that test before a release. It follows [Have an AI assistant test your shop](tutorials/test-with-an-assistant.md).
 
@@ -37,9 +37,9 @@ That is a safety check you can run before every release. The full guide is at sh
 
 ### Create your first app on a simulated phone
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 39 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-03fb5281.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 37 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-c7c64eb7.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
-1 minute 39 seconds. Make an app, open it on a simulated phone in your browser, tap a button, change the words on the front page and check a release with a dry run. It follows [Create your first app](tutorials/first-app.md).
+1 minute 37 seconds. Make an app, open it on a simulated phone in your browser, tap a button, change the words on the front page and check a release with a dry run. It follows [Create your first app](tutorials/first-app.md).
 
 [Captions (.vtt)](/videos/first-app.vtt)
 
@@ -68,7 +68,7 @@ That is your first app. The full guide, with every command, is at shipvo.dev/doc
 
 ### Ship an update to phones in minutes
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="Ship an update to phones in minutes" data-length="1 min 30 s" poster="/videos/ship-an-update.png" src="/media/videos/ship-an-update-988335b3.mp4"><track kind="captions" src="/videos/ship-an-update.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="Ship an update to phones in minutes" data-length="1 min 30 s" poster="/videos/ship-an-update.png" src="/media/videos/ship-an-update-988335b3.mp4"><track kind="captions" src="/videos/ship-an-update.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
 1 minute 30 seconds. What an over-the-air (OTA) update is, and what happens when you run `shipvo publish`: build, small patches, signing, three rollout groups and rollback. It follows [step 5 of Build your first app](getting-started.md).
 
