@@ -89,10 +89,15 @@ jobs:
                   order = ["agent:claude", "agent:mistral", "agent:aider"]
                   cur = next((x for x in order if x in il), "agent:aider")
                   if "agent:copilot" in il: gh("issue", "edit", i, "-R", R, "--remove-label", "agent:copilot")
-                  nxt = order[(order.index(cur) + 1) % len(order)]
-                  gh("issue", "edit", i, "-R", R, "--add-label", "agent:ready", "--add-label", nxt, "--remove-label", cur,
-                     "--remove-label", "agent:in-progress", "--remove-label", "agent:pr-open", "--remove-assignee", "Copilot")
-                  gh("issue", "comment", i, "-R", R, "--body", f"PR #{n} failed {rounds} fix rounds; handed to the next engineer ({nxt}).")
+                  # Mistral or Aider failing goes to Claude, the strongest engineer. Claude failing means the issue is
+                  # too big or unclear: block it so the Head of Product re-slices it, instead of a weaker engineer retrying.
+                  if cur != "agent:claude":
+                      gh("issue", "edit", i, "-R", R, "--add-label", "agent:ready", "--add-label", "agent:claude", "--remove-label", cur,
+                         "--remove-label", "agent:in-progress", "--remove-label", "agent:pr-open", "--remove-assignee", "Copilot")
+                      gh("issue", "comment", i, "-R", R, "--body", f"PR #{n} failed {rounds} fix rounds; handed to the Claude engineer.")
+                  else:
+                      gh("issue", "edit", i, "-R", R, "--add-label", "agent:blocked", "--remove-label", "agent:in-progress", "--remove-label", "agent:pr-open")
+                      gh("issue", "comment", i, "-R", R, "--body", f"PR #{n} failed {rounds} fix rounds with Claude. Blocked until the Head of Product re-slices it into smaller issues.")
               raise SystemExit
           if not free:
               if rounds: gh("pr", "edit", str(n), "-R", R, "--remove-label", f"fix:{rounds}")

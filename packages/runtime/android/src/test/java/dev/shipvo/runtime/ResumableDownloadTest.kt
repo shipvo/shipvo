@@ -1,10 +1,8 @@
 package dev.shipvo.runtime
 
 import java.io.File
-import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
-import java.net.Socket
 import kotlin.concurrent.thread
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -17,36 +15,38 @@ class ResumableDownloadTest {
   private val data = ByteArray(300_000) { (it * 31 % 251).toByte() }
   private val ranges = mutableListOf<String?>()
   private var honourRange = true
+  // A minimal HTTP/1.1 server on a plain socket: com.sun.net.httpserver is not on the Android unit-test classpath.
   private lateinit var server: ServerSocket
   private lateinit var dir: File
   private val url get() = "http://127.0.0.1:${server.localPort}/b"
-
-  // A tiny HTTP server on plain sockets: the Android unit-test classpath has no com.sun.net.httpserver.
-  private fun serve(sock: Socket) = sock.use {
-    val reader = it.getInputStream().bufferedReader(Charsets.ISO_8859_1)
-    var range: String? = null
-    while (true) {
-      val line = reader.readLine() ?: break
-      if (line.isEmpty()) break
-      if (line.startsWith("Range:", ignoreCase = true)) range = line.substringAfter(":").trim()
-    }
-    synchronized(ranges) { ranges.add(range) }
-    val start = if (honourRange && range != null) range.removePrefix("bytes=").removeSuffix("-").toInt() else 0
-    val body = data.copyOfRange(start, data.size)
-    val status = if (start > 0) "206 Partial Content" else "200 OK"
-    val out = it.getOutputStream()
-    out.write("HTTP/1.1 $status\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
-    out.write(body)
-    out.flush()
-  }
 
   @Before fun start() {
     dir = File.createTempFile("shipvo", "dl").apply { delete(); mkdirs() }
     server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
     thread(isDaemon = true) {
       while (!server.isClosed) {
-        val sock = try { server.accept() } catch (e: IOException) { break }
-        serve(sock)
+        val s = try { server.accept() } catch (e: Exception) { break }
+        s.use { sock ->
+          val reader = sock.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+          reader.readLine() ?: return@use
+          var range: String? = null
+          while (true) {
+            val line = reader.readLine() ?: break
+            if (line.isEmpty()) break
+            val i = line.indexOf(':')
+            if (i > 0 && line.substring(0, i).trim().equals("Range", ignoreCase = true)) range = line.substring(i + 1).trim()
+          }
+          synchronized(ranges) { ranges.add(range) }
+          val start = if (honourRange && range != null) range.removePrefix("bytes=").removeSuffix("-").toInt() else 0
+          val body = data.copyOfRange(start, data.size)
+          val head = buildString {
+            append(if (start > 0) "HTTP/1.1 206 Partial Content\r\n" else "HTTP/1.1 200 OK\r\n")
+            if (start > 0) append("Content-Range: bytes $start-${data.size - 1}/${data.size}\r\n")
+            append("Content-Length: ${body.size}\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n")
+          }
+          val out = sock.getOutputStream()
+          out.write(head.toByteArray(Charsets.ISO_8859_1)); out.write(body); out.flush()
+        }
       }
     }
   }
