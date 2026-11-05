@@ -129,6 +129,10 @@ Phones check while open, verify signature, hash and size, stage atomically, appl
 
 Agents open the exact release phones run with `open_app("myshop@r8")` or `open_app("myshop@latest")`.
 
+## Already have a bare React Native app?
+
+See [Adopt a bare React Native app](cli.md#adopt-a-bare-react-native-app). It writes the trust root into `Info.plist` and `AndroidManifest.xml` and needs Expo Modules.
+
 ## 6. Give agents a key, not a laptop
 
 The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config (signed out, it prints the local config for `shipvo sim`). Your key opens the sample app and every app you registered with `shipvo app create`: after a publish, `open_app("myshop@latest")` opens the exact release phones run. The beta allows 3 apps per account and 500 MB each; self-hosting is always open. See [agents.md](agents.md).
