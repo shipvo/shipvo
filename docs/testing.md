@@ -174,3 +174,12 @@ Writes one JSON file, whether the run passes or fails. The exit code is the same
 - Each flow is one `.steps` file. `status` is `passed` or `failed`. `failedStep` and `message` are `null` when it passed.
 - `parityLimits` is the same list the explore report prints.
 - The file holds no keys or tokens.
+
+## Markdown report for issues and PR comments
+
+```bash
+npx shipvo test --report-md shipvo-report.md --release 42
+gh issue create --title "Shipvo flows failed on release 42" --body-file shipvo-report.md
+```
+
+`--report-md` writes a Markdown file and nothing else; the CLI never calls GitHub. It can be used with `--report`. The file lists the release, the commit and the passed and failed counts. Each failing flow gets its steps, the failed step, the error and any screenshot file names, then the parity limits. A run where every flow passes gets a short "all flows passed" summary. Missing fields (no commit, no release, no screenshots) are shown as "unknown", "not set" or left out. Text is copied from the report as is, so values masked there stay masked.
