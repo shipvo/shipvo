@@ -23,7 +23,7 @@ class PointerQueryTest {
     assertNull(PointerQuery.mismatchReason(null))
   }
   @Test fun dropsInvalidItems() {
-    assertEquals("$base?hbc=96&nm=a%401", PointerQuery.url(base, "96,x,0,-1,9z", "a@1,noversion,@,@scope,a@"))
+    assertEquals("$base?hbc=96&nm=a%401", PointerQuery.url(base, "96,x,0,-1,9z", "a@1,noversion,@,@scope,a@,@scope/pkg@,a@b@"))
     assertEquals("$base?hbc=96", PointerQuery.url(base, "96,99999999999999999999", null))
     assertEquals(base, PointerQuery.url(base, "abc", "nover"))
   }
