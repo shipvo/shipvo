@@ -15,12 +15,12 @@ export type DateRange = { start: string | Date; end: string | Date };
 export type PickedFile = { name: string; mimeType: string; size: number; uri: string };
 /** Options for the file picker. `type` is a MIME filter such as `image/*` or `application/pdf` (or a list of them). Default: any file. */
 export type PickFileOptions = { type?: string | string[] };
-export type PermissionName = "camera" | "location" | "notifications" | "contacts" | "calendar";
+export type PermissionName = "camera" | "microphone" | "location" | "notifications" | "contacts" | "calendar";
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 
-export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "contacts" | "calendar" | "files";
+export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "microphone" | "contacts" | "calendar" | "files";
+export type MicrophoneSession = { source: "real" | "simulated"; stream?: unknown; /** Loudness, 0 to 1. Present for the simulated microphone, and for a real one when the browser has Web Audio. */ level?(): number; stop(): void };
 /** How a capability is provided here: by the real OS/SDK, by the simulated device, or not at all. Never a silent fallback. */
-export type MicrophoneSession = { source: "real" | "simulated"; stream?: unknown; level(): number; stop(): void };
 export type Support = "real" | "simulated" | "unavailable";
 export interface Device {
   /** Where this API is running. */

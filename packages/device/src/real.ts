@@ -51,3 +51,18 @@ export function barcodeDetector(g: any = globalThis): { detect(src: unknown): Pr
   if (typeof g.BarcodeDetector !== "function") return null;
   try { return new g.BarcodeDetector(); } catch { return null; }
 }
+
+/** Reads the loudness of a real stream, 0 to 1, with an AnalyserNode. Null when the browser has no Web Audio. */
+export function levelMeter(stream: unknown, g: any = globalThis): { level(): number; close(): void } | null {
+  const Ctx = g.AudioContext ?? g.webkitAudioContext;
+  if (typeof Ctx !== "function") return null;
+  try {
+    const ctx = new Ctx(); const analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    return {
+      level() { analyser.getByteTimeDomainData(buf); let sum = 0; for (const v of buf) { const x = (v - 128) / 128; sum += x * x; } return Math.min(1, Math.sqrt(sum / buf.length)); },
+      close() { try { void ctx.close(); } catch { /* already closed */ } },
+    };
+  } catch { return null; }
+}

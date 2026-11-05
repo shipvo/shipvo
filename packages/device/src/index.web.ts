@@ -1,7 +1,7 @@
 // Simulated device: the same API, backed by a device state the Shipvo simulator controls, with system sheets
 // (permission dialog, camera viewfinder, fingerprint prompt, payment prompt, notification banner, share sheet)
 // drawn as real dialogs so an agent sees and operates them exactly as it would a phone's.
-import { mayUseReal, openStream, stopStream, realPosition, barcodeDetector, type Source } from "./real";
+import { mayUseReal, openStream, levelMeter, stopStream, realPosition, barcodeDetector, type Source } from "./real";
 import type { Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification, Contact, CalendarEvent, PermissionName, PickedFile } from "./types";
 export * from "./types";
 
@@ -35,7 +35,7 @@ const platform: "android" | "ios" = cfg.device?.platform ?? "android"; const api
 const state: DeviceState = {
   appName: cfg.appName ?? "This app", platform, api,
   // Before Android 13 (API 33) notifications need no runtime permission.
-  permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: platform === "android" && api < 33 ? "granted" : "undetermined" },
+  permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: platform === "android" && api < 33 ? "granted" : "undetermined" },
   contacts: [],
   calendar: [],
   files: [],
@@ -81,8 +81,8 @@ async function askPermission(name: PermissionName): Promise<PermissionStatus> {
   let result: PermissionStatus = "denied";
   // The system's own dialog, worded as the platform words it.
   const title = state.platform === "ios"
-    ? (name === "camera" ? `“${state.appName}” Would Like to Access the Camera` : name === "location" ? `Allow “${state.appName}” to use your location?` : name === "contacts" ? `“${state.appName}” Would Like to Access Your Contacts` : name === "calendar" ? `“${state.appName}” Would Like to Access Your Calendar` : `“${state.appName}” Would Like to Send You Notifications`)
-    : `Allow ${state.appName} to ${name === "camera" ? "take pictures and record video" : name === "location" ? "access this device's location" : name === "contacts" ? "access your contacts" : name === "calendar" ? "access your calendar" : "send you notifications"}?`;
+    ? (name === "camera" ? `“${state.appName}” Would Like to Access the Camera` : name === "microphone" ? `“${state.appName}” Would Like to Access the Microphone` : name === "location" ? `Allow “${state.appName}” to use your location?` : name === "contacts" ? `“${state.appName}” Would Like to Access Your Contacts` : name === "calendar" ? `“${state.appName}” Would Like to Access Your Calendar` : `“${state.appName}” Would Like to Send You Notifications`)
+    : `Allow ${state.appName} to ${name === "camera" ? "take pictures and record video" : name === "microphone" ? "record audio" : name === "location" ? "access this device's location" : name === "contacts" ? "access your contacts" : name === "calendar" ? "access your calendar" : "send you notifications"}?`;
   const choices: [string, PermissionStatus][] = state.platform === "ios"
     ? (name === "location" ? [["Allow Once", "granted"], ["Allow While Using App", "granted"], ["Don’t Allow", "denied"]] : name === "camera" ? [["Allow", "granted"], ["Don’t Allow", "denied"]] : [["Allow", "granted"], ["Don’t Allow", "denied"]])
     : (name === "notifications" || name === "contacts" || name === "calendar" ? [["Allow", "granted"], name !== "notifications" ? ["Deny", "denied"] : ["Don’t allow", "denied"]] : [["While using the app", "granted"], ["Only this time", "granted"], ["Deny", "denied"]]);
@@ -97,23 +97,24 @@ async function askPermission(name: PermissionName): Promise<PermissionStatus> {
 const ALL_SIM = { camera: "simulated", location: "simulated", biometrics: "simulated", payments: "simulated", notifications: "simulated", share: "simulated", clipboard: "simulated", contacts: "simulated", calendar: "simulated", files: "simulated", network: "simulated" } as const;
 export const device: Device = {
   kind: "simulated",
-  capabilities: () => ({ ...ALL_SIM, microphone: "simulated" }),
+  // "real" when this page would try the real hardware (a person is present and the source is not forced), so the report is never a silent fallback.
+  capabilities: () => { const r = mayUseReal(state.source) ? "real" as const : "simulated" as const; return { ...ALL_SIM, camera: r, location: r, microphone: r }; },
   permissions: { async get(name) { return state.permissions[name]; }, request: askPermission },
   location: {
     async current() {
+      if ((await askPermission("location")) !== "granted") throw new Error("Location permission denied");
       if (mayUseReal(state.source)) {
-        const pos = await realPosition();
+        const pos = await realPosition(); // the browser's own prompt is a second gate
         if (pos) { log("location", pos, "real"); return pos; }
       }
-      if ((await askPermission("location")) !== "granted") throw new Error("Location permission denied");
       if (!state.online && false) throw new Error("offline");
       log("location", state.location); return { ...state.location };
     },
   },
   camera: {
     async scan(opts) {
+      if ((await askPermission("camera")) !== "granted") return null;
       const stream = mayUseReal(state.source) ? await openStream({ video: { facingMode: "environment" } }) : null;
-      if (!stream && (await askPermission("camera")) !== "granted") return null;
       let result: ScanResult | null = null; let source: Source = "simulated";
       const detector = stream ? barcodeDetector() : null;
       let timer: ReturnType<typeof setInterval> | undefined;
@@ -139,8 +140,13 @@ export const device: Device = {
   },
   microphone: {
     async open() {
+      if ((await askPermission("microphone")) !== "granted") throw new Error("Microphone permission denied");
       const stream = mayUseReal(state.source) ? await openStream({ audio: true }) : null;
-      if (stream) { log("microphone", { opened: true }, "real"); return { source: "real" as const, stream, level: () => 0, stop: () => stopStream(stream) }; }
+      if (stream) {
+        const meter = levelMeter(stream);
+        log("microphone", { opened: true }, "real");
+        return { source: "real" as const, stream, ...(meter ? { level: meter.level } : {}), stop: () => { meter?.close(); stopStream(stream); } };
+      }
       log("microphone", { opened: true, level: state.microphone.level }); return { source: "simulated" as const, level: () => state.microphone.level, stop: () => {} };
     },
   },
@@ -257,7 +263,7 @@ g.__pnDevice = {
   capabilities: () => device.capabilities(),
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
-    Object.assign(state, { permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
+    Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
       source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
     recent.length = 0; seq = 0;
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();

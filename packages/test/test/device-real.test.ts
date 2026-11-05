@@ -24,7 +24,7 @@ const person = (extra: any = {}) => setNav({ userAgent: "Chrome", geolocation: {
 const last = () => pn.log().at(-1);
 
 it("location: real reading is marked real", async () => {
-  pn.reset(); person();
+  pn.reset({ permissions: { location: "granted" } }); person();
   expect(await dev.location.current()).toEqual({ latitude: 1.5, longitude: 2.5, accuracy: 9 });
   expect(last()).toMatchObject({ kind: "location", source: "real", simulated: false });
 });
@@ -42,7 +42,7 @@ it("location: headless page falls back without a prompt", async () => {
 });
 
 it("microphone: real when granted, simulated when getUserMedia is missing or throws", async () => {
-  pn.reset(); person();
+  pn.reset({ permissions: { microphone: "granted" } }); person();
   const real = await dev.microphone.open(); expect(real.source).toBe("real"); real.stop();
   expect(last()).toMatchObject({ kind: "microphone", source: "real" });
   person({ mediaDevices: undefined });
@@ -50,6 +50,59 @@ it("microphone: real when granted, simulated when getUserMedia is missing or thr
   person({ mediaDevices: { getUserMedia: async () => { throw Object.assign(new Error("x"), { name: "NotAllowedError" }); } } });
   const sim = await dev.microphone.open(); expect(sim.source).toBe("simulated"); expect(sim.level()).toBe(0.2);
   expect(last()).toMatchObject({ source: "simulated", simulated: true });
+});
+
+it("location: denied permission never reaches real hardware", async () => {
+  pn.reset({ permissions: { location: "denied" } }); let read = false;
+  person({ geolocation: { getCurrentPosition: () => { read = true; } } });
+  await expect(dev.location.current()).rejects.toThrow(/denied/);
+  expect(read).toBe(false);
+});
+
+it("camera: denied permission returns null and never opens the camera", async () => {
+  pn.reset({ permissions: { camera: "denied" } }); let called = false;
+  person({ mediaDevices: { getUserMedia: async () => { called = true; return stream(); } } });
+  expect(await dev.camera.scan()).toBeNull(); expect(called).toBe(false);
+});
+
+it("microphone: denied permission throws and never opens the stream", async () => {
+  pn.reset({ permissions: { microphone: "denied" } }); let called = false;
+  person({ mediaDevices: { getUserMedia: async () => { called = true; return stream(); } } });
+  await expect(dev.microphone.open()).rejects.toThrow(/denied/);
+  expect(called).toBe(false); expect(await dev.permissions.get("microphone")).toBe("denied");
+});
+
+it("microphone: real level comes from an AnalyserNode", async () => {
+  pn.reset({ permissions: { microphone: "granted" } }); person();
+  g.AudioContext = class { createAnalyser() { return { fftSize: 0, getByteTimeDomainData: (b: Uint8Array) => b.fill(192) }; } createMediaStreamSource() { return { connect() {} }; } close() {} };
+  try { const m = await dev.microphone.open(); expect(m.source).toBe("real"); expect(m.level()).toBeCloseTo(0.5, 2); m.stop(); }
+  finally { delete g.AudioContext; }
+  const m2 = await dev.microphone.open(); expect(m2.source).toBe("real"); expect(m2.level).toBeUndefined(); m2.stop();
+});
+
+it("capabilities: real when a person is present, simulated when forced or headless", () => {
+  pn.reset(); person(); expect(dev.capabilities()).toMatchObject({ camera: "real", location: "real", microphone: "real" });
+  pn.set({ source: "simulated" }); expect(dev.capabilities().microphone).toBe("simulated");
+  pn.reset(); person({ webdriver: true }); expect(dev.capabilities().camera).toBe("simulated");
+});
+
+const findButton = (node: any, text: string): any => { if (node?.textContent === text && node.onclick) return node; for (const c of node?.children ?? []) { const r = findButton(c, text); if (r) return r; } return null; };
+
+it("camera: real stream with a BarcodeDetector returns a real scan", async () => {
+  pn.reset({ permissions: { camera: "granted" } });
+  g.BarcodeDetector = class { async detect() { return [{ format: "qr_code", rawValue: "REAL-1" }]; } };
+  person();
+  try { expect(await dev.camera.scan()).toEqual({ type: "qr_code", data: "REAL-1" }); } finally { delete g.BarcodeDetector; }
+  expect(last()).toMatchObject({ kind: "scan", source: "real", simulated: false });
+});
+
+it("camera: real stream, no detector and no barcode: the sheet stays until cancelled", async () => {
+  pn.reset({ permissions: { camera: "granted" } }); person(); open.length = 0;
+  const pending = dev.camera.scan();
+  await new Promise((r) => setTimeout(r, 400));
+  const host = open.at(-1); const cancel = findButton(host, "Cancel");
+  expect(cancel).toBeTruthy(); cancel.onclick();
+  expect(await pending).toBeNull();
 });
 
 it("camera: NotAllowedError falls back to the simulated camera and its barcode", async () => {
