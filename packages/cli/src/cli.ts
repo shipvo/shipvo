@@ -17,6 +17,7 @@ import { status } from "./status.js";
 import { doctor } from "./doctor.js";
 import { audit } from "./audit.js";
 import { store } from "./store.js";
+import { testCmd } from "./test.js";
 import { failure, help, unknownCommand } from "./help.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -33,6 +34,7 @@ switch (cmd) {
   case "doctor": await doctor(rest); break;
   case "status": process.exitCode = await status(rest); break;
   case "audit": await audit(rest); break;
+  case "test": process.exitCode = await testCmd(rest); break;
   case "store": await store(rest); break;
   case "app": await appCmd(rest); break;
   case "keys": if (rest[0] === "export" || rest[0] === "import") await signingKey(rest); else await keys(); break;

@@ -4,3 +4,5 @@ export { parseScreen, find } from "./tree.js";
 export type { Node, Target } from "./tree.js";
 export { parseSteps, runSteps } from "./steps.js";
 export type { Step } from "./steps.js";
+export { proposeRepair } from "./repair.js";
+export type { Repair } from "./repair.js";
