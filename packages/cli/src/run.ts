@@ -168,9 +168,12 @@ export async function run(argv: string[]): Promise<number> {
   const url = `http://127.0.0.1:${s.port}/`;
   console.error(`Simulated ${FRAMES[o.platform].label} phone at ${url}  (Ctrl+C to stop)`);
   const removeRunFile = writeRunFile(process.cwd(), { port: s.port, platform: o.platform, app: name, token: s.token, pid: process.pid });
-  if (o.open) openBrowser(url);
-  await new Promise<void>((done) => { for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, done); });
-  removeRunFile();
-  await s.close();
+  try {
+    if (o.open) openBrowser(url);
+    await new Promise<void>((done) => { for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, done); });
+  } finally {
+    removeRunFile();
+    await s.close();
+  }
   return 0;
 }

@@ -19,10 +19,10 @@ export function encodeFrame(text: string): Buffer {
 }
 
 /** Reads client frames from a socket. Text, ping and close only; fragmented or binary frames close the socket. */
-function readFrames(sock: Socket, onText: (t: string) => void) {
+function readFrames(sock: Socket, onText: (t: string) => void, head: Buffer = Buffer.alloc(0)) {
   let buf = Buffer.alloc(0);
   const close = (code: number) => { try { sock.end(Buffer.from([0x88, 2, code >> 8, code & 255])); } catch { /* already closed */ } };
-  sock.on("data", (d) => {
+  const feed = (d: Buffer) => {
     buf = Buffer.concat([buf, d]);
     for (;;) {
       if (buf.length < 2) return;
@@ -43,7 +43,9 @@ function readFrames(sock: Socket, onText: (t: string) => void) {
       if (op === 1 && fin) onText(data.toString("utf8"));
       else if (op !== 10) return close(1003);
     }
-  });
+  };
+  sock.on("data", feed);
+  if (head.length) feed(head);
 }
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -77,7 +79,7 @@ export function attachAgentSession(server: Server, getPort: () => number, token 
   let screen: Socket | undefined; let driver: Socket | undefined; let paused = false;
   const send = (s: Socket | undefined, m: unknown) => { if (s && !s.destroyed) s.write(encodeFrame(JSON.stringify(m))); };
   const state = () => ({ type: "state", screen: !!screen, paused });
-  server.on("upgrade", (req, sock: Socket) => {
+  server.on("upgrade", (req, sock: Socket, head: Buffer) => {
     const refuse = (code: string, why: string) => { sock.end(`HTTP/1.1 ${code}\r\nconnection: close\r\ncontent-length: ${why.length}\r\n\r\n${why}`); };
     if ((req.url ?? "").split("?")[0] !== AGENT_PATH) return refuse("404 Not Found", "not found");
     const c = checkUpgrade(req, token, getPort());
@@ -107,7 +109,7 @@ export function attachAgentSession(server: Server, getPort: () => number, token 
         else if (paused) send(sock, { id: m.id, ok: false, error: "the person took over", paused: true });
         else send(screen, m);
       }
-    });
+    }, head);
   });
   // Upgraded sockets are not HTTP connections, so `server.close()` would wait for them forever. Call this first.
   const closeSockets = () => { screen?.destroy(); driver?.destroy(); };
