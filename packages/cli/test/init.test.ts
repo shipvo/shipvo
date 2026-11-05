@@ -120,6 +120,13 @@ it("--template shop writes list, detail, cart, five products and a test that rea
   const cart = readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8");
   expect(cart).toContain("device.pay.charge");
   expect(cart).toContain("Order placed");
+  expect(cart).not.toContain('currency: "USD"');
+  expect(cart).toContain("chargeRequest(totalCents)");
+  expect(cart).toContain("if (busy) return;");
+  expect(cart).toContain("accessibilityState={{ disabled: busy }}");
+  expect(cart).toContain("finally { setBusy(false); }");
+  expect(readFileSync(join(dir, "src/money.ts"), "utf8")).toContain("minor / 10 ** (decimals ?? 2)");
+  expect(readFileSync(join(dir, "src/data/shop.json"), "utf8")).toContain('"code": "USD"');
   expect(cart).toContain("Payment failed: ");
   expect(test).toContain('nextResult: "decline"');
   expect(test).toContain('waitFor("Order placed")');

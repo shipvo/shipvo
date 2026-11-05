@@ -482,10 +482,10 @@ const SHOP_DATA = JSON.stringify([
   { id: "steel-bottle", name: "Steel bottle", price: 2900, description: "A one litre bottle with a screw cap." },
 ], null, 2) + "\n";
 
-const SHOP_CONFIG = JSON.stringify({ currency: "$", position: "before", decimals: 2, locale: "en-US" }, null, 2) + "\n";
+const SHOP_CONFIG = JSON.stringify({ currency: "$", code: "USD", position: "before", decimals: 2, locale: "en-US" }, null, 2) + "\n";
 
 const SHOP_MONEY = `// Prices are whole minor units (cents) in src/data/products.json. This is the one place that turns them into text.
-// To change the currency, edit src/data/shop.json. For FCFA: { "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }
+// To change the currency, edit src/data/shop.json. "code" is the ISO 4217 code sent to the payment provider ("$" is only a symbol). For FCFA: { "currency": "FCFA", "code": "XAF", "position": "after", "decimals": 0, "locale": "fr-FR" }
 import shop from "./data/shop.json";
 
 export const formatPrice = (minor: number) => {
@@ -495,6 +495,13 @@ export const formatPrice = (minor: number) => {
   // Some locales use a narrow no-break space between digit groups. Plain spaces read the same and match everywhere.
   const num = n.replace(/[\u00a0\u202f]/g, " ");
   return position === "after" ? num + " " + currency : currency + num;
+};
+
+// What device.pay.charge takes: "amount" is in whole currency units (10710 for 10710 FCFA, 12.5 for $12.50), as in the device docs.
+// Prices are minor units, so divide by 10 ** decimals. "currency" is the ISO code from shop.json.
+export const chargeRequest = (minor: number) => {
+  const { currency, code, decimals } = shop as { currency: string; code?: string; decimals?: number };
+  return { amount: minor / 10 ** (decimals ?? 2), currency: code ?? currency };
 };
 `;
 
@@ -636,19 +643,23 @@ const SHOP_CART = `import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { device } from "@shipvo/device";
 import { useCart } from "../cart";
-import { formatPrice } from "../money";
+import { chargeRequest, formatPrice } from "../money";
 import products from "../data/products.json";
 
 export function Cart({ onBack }: { onBack: () => void }) {
   const { lines, remove, clear, totalCents } = useCart();
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   // Replace "to" with your own mobile money number. The PIN here is the sandbox PIN; ask the customer for theirs in a real app.
   const pay = async () => {
+    if (busy) return;
+    setBusy(true);
     setStatus("Paying...");
     try {
-      const r = await device.pay.charge({ provider: "mobile_money", amount: totalCents, currency: "USD", to: "shop", reference: "order-" + Date.now() }, "1234");
+      const r = await device.pay.charge({ provider: "mobile_money", ...chargeRequest(totalCents), to: "My Shop", reference: "order-" + Date.now() }, "1234");
       if (r.ok) { clear(); setStatus("Order placed"); } else setStatus("Payment failed: " + r.reason);
     } catch (e: any) { setStatus("Payment failed: " + String(e?.message ?? e)); }
+    finally { setBusy(false); }
   };
   return (
     <ScrollView contentContainerStyle={s.page}>
@@ -666,7 +677,7 @@ export function Cart({ onBack }: { onBack: () => void }) {
         );
       })}
       <Text style={s.total}>{"Total: " + formatPrice(totalCents)}</Text>
-      {lines.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Pay" onPress={pay} style={s.pay}><Text style={s.payText}>Pay</Text></Pressable> : null}
+      {lines.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Pay" accessibilityState={{ disabled: busy }} onPress={pay} style={s.pay}><Text style={s.payText}>Pay</Text></Pressable> : null}
       {status ? <Text style={s.body} accessibilityRole="alert">{status}</Text> : null}
     </ScrollView>
   );
