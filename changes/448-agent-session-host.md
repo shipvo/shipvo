@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo run` now hosts an agent session: a localhost-only WebSocket at `/__shipvo/agent` (random token) and `.shipvo/run.json` (git-ignored, removed on exit). The person's tab and a driver connect to it; the host relays commands and pauses the driver when the person takes over.
+- Migration: none; `startRunServer` now also returns `token`.

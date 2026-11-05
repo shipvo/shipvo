@@ -6,6 +6,7 @@ import { createServer, type Server } from "node:http";
 import { join, extname, normalize, resolve, sep } from "node:path";
 import { loadConfig } from "./config.js";
 import { portFree, rebuildInto } from "./sim.js";
+import { attachAgentSession, writeRunFile } from "./agent-session.js";
 
 export type Platform = "android" | "ios";
 export type RunOptions = { platform: Platform; open: boolean; port?: number; native: boolean };
@@ -90,7 +91,7 @@ const TYPES: Record<string, string> = {
  * Serves the frame page at `/` and the web export at `/app/` (and its absolute asset paths at `/`).
  * Port 0 picks a free port. Resolves once listening.
  */
-export function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number }): Promise<{ server: Server; port: number; close: () => Promise<void> }> {
+export function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number }): Promise<{ server: Server; port: number; token: string; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const page = runFramePage(opts.platform, opts.name);
   const server = createServer((req, res) => {
@@ -113,11 +114,13 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
     res.writeHead(200, { "content-type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream" });
     res.end(readFileSync(target));
   });
+  let bound = 0;
+  const agent = attachAgentSession(server, () => bound);
   return new Promise((ok, fail) => {
     server.once("error", fail);
     server.listen(opts.port ?? 0, "127.0.0.1", () => {
-      const port = (server.address() as { port: number }).port;
-      ok({ server, port, close: () => new Promise<void>((r) => { server.close(() => r()); server.closeAllConnections?.(); }) });
+      const port = bound = (server.address() as { port: number }).port;
+      ok({ server, port, token: agent.token, close: () => new Promise<void>((r) => { agent.closeSockets(); server.close(() => r()); server.closeAllConnections?.(); }) });
     });
   });
 }
@@ -164,8 +167,10 @@ export async function run(argv: string[]): Promise<number> {
   const s = await startRunServer({ dir: out, platform: o.platform, name, port: o.port });
   const url = `http://127.0.0.1:${s.port}/`;
   console.error(`Simulated ${FRAMES[o.platform].label} phone at ${url}  (Ctrl+C to stop)`);
+  const removeRunFile = writeRunFile(process.cwd(), { port: s.port, platform: o.platform, app: name, token: s.token, pid: process.pid });
   if (o.open) openBrowser(url);
   await new Promise<void>((done) => { for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, done); });
+  removeRunFile();
   await s.close();
   return 0;
 }
