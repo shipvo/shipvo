@@ -39,24 +39,24 @@ it("the scaffold test reads the headline from src/release.ts, so editing it keep
   expect(test).not.toContain("My Shop");
 });
 
-it("ends with the five next steps, in order, using the directory given", async () => {
+it("ends with the six next steps, in order, using the directory given", async () => {
   const logs: string[] = [];
   vi.mocked(console.log).mockImplementation((m?: unknown) => { logs.push(String(m)); });
   const dir = join(tmp, "second-app");
   await init([dir, "--public-key", "AAAA"]);
   const out = logs.join("\n").trimEnd();
-  const steps = [`1. cd ${dir}`, "2. npx shipvo doctor", "3. npm run sim", "4. npx shipvo publish --dry-run", "5. npx shipvo preview            # get a link you can open on any phone"];
+  const steps = [`1. cd ${dir}`, "2. npx shipvo doctor", "3. npx shipvo app create second-app", "4. npx shipvo publish  ", "5. npx shipvo sim", "6. npx shipvo preview            # get a link you can open on any phone"];
   const at = steps.map((x) => out.indexOf(x));
   expect(at.every((i) => i >= 0)).toBe(true);
   expect([...at].sort((x, y) => x - y)).toEqual(at);
-  expect(out.split("\n").pop()).toContain("5. npx shipvo preview");
+  expect(out.split("\n").pop()).toContain("6. npx shipvo preview");
 });
 
 it.each(["blank", "content", "shop"])("the %s template prints the preview step", async (tpl) => {
   const logs: string[] = [];
   vi.mocked(console.log).mockImplementation((m?: unknown) => { logs.push(String(m)); });
   await init([join(tmp, `p-${tpl}`), "--template", tpl, "--public-key", "AAAA"]);
-  expect(logs.join("\n")).toContain("5. npx shipvo preview            # get a link you can open on any phone");
+  expect(logs.join("\n")).toContain("6. npx shipvo preview            # get a link you can open on any phone");
 });
 
 it("with no folder, prints the short message to stderr and exits 2", async () => {
@@ -256,4 +256,9 @@ it("writes a preview workflow that comments the link and skips forks", () => {
   expect(w).toContain("shipvo preview --json");
   expect(w).toContain("gh pr comment");
   expect(w).toContain("head.repo.full_name == github.repository");
+});
+
+it("pins playwright below 1.65.0, whose playwright-core was missing from the registry", () => {
+  const pkg = JSON.parse(readFileSync(join(tmp, "my-shop/package.json"), "utf8"));
+  expect(pkg.devDependencies.playwright).toBe(">=1.63.0 <1.65.0");
 });

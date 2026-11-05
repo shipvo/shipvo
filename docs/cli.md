@@ -114,6 +114,12 @@ shipvo publish --dry-run --bands b0,b1,b2
 # Refused by policy rule maxBand: this publish reaches b2, but policy.maxBand is b1
 ```
 
+To check the policy without building anything, use `--dry-run-policy`. It reads `shipvo.json`, checks the bands in `--bands` (default all three), prints the result and publishes nothing. It exits 0 when the policy allows the publish or there is no policy, and 1 when a rule refuses.
+
+```bash
+shipvo publish --dry-run-policy --bands b0,b1,b2
+```
+
 | Field | Meaning |
 | --- | --- |
 | `maxBand` | Widest band any publish may reach: `b0`, `b1` or `b2`. The widest band in `--bands` counts. |

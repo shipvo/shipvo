@@ -68,7 +68,7 @@ function localKv(dir: string) {
   };
 }
 
-const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-bytecode-version", "max-bases", "skip-export", "skip-web", "dry-run", "out"];
+const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-bytecode-version", "max-bases", "skip-export", "skip-web", "dry-run", "dry-run-policy", "out"];
 
 export const PUBLISH_HELP = `Usage: shipvo publish [flags]
 
@@ -84,6 +84,7 @@ Flags (write a value after a space, not =; on/off flags can be bare, or true/fal
   --skip-export               Reuse the last build in dist-ota/
   --skip-web                  Do not publish the web copy for the simulator
   --dry-run                    Build and sign, write files locally, send nothing
+  --dry-run-policy             Check the policy in shipvo.json for these --bands, print the result, publish nothing
   --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)
   --help                       Show this help
 `;
@@ -92,6 +93,12 @@ export async function publish(argv: string[]) {
   if (argv.includes("--help") || argv.includes("-h")) { console.log(PUBLISH_HELP); return; }
   checkFlags(argv, PUBLISH_FLAGS);
   const a = parse(argv), cfg = loadConfig(), SEED = seed();
+  if (switchFlag(a, "dry-run-policy")) {
+    const verdict = checkPublishPolicy(cfg.policy, (a.bands || "b0,b1,b2").split(","));
+    if (verdict.ok) console.log(cfg.policy === undefined ? "No policy in shipvo.json: nothing to check." : "Policy allows this publish.");
+    else { console.error(`Refused by policy rule ${verdict.rule}: ${verdict.reason}`); process.exitCode = 1; }
+    return;
+  }
   const dry = switchFlag(a, "dry-run"), skipExport = switchFlag(a, "skip-export"), skipWeb = switchFlag(a, "skip-web");
   if (a.out !== undefined && !dry) throw new Error("--out only works with --dry-run");
   if (a.out === "true") throw new Error("--out needs a directory: pass --out <dir>");
