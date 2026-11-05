@@ -25,6 +25,14 @@ const NAV = [
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
+  { group: "Ship", pages: [
+    { slug: "cli-commands", src: "docs/cli.md", title: "CLI guide", desc: "Every Shipvo command with examples: init, preview, publish policy checks, auto-halt and audit export, and fixes for common errors." },
+    { slug: "migrate-from-codepush", src: "docs/migrate-from-codepush.md", title: "Migrate from CodePush", desc: "Move a React Native app from react-native-code-push to Shipvo signed over-the-air updates, step by step, with real dry-run output." },
+    { slug: "store", src: "docs/store.md", title: "Store details and screenshots", desc: "Draft Google Play and App Store details from shipvo.json and check screenshot sizes before you submit. Nothing is uploaded." },
+    { slug: "capacitor", src: "docs/capacitor.md", title: "Capacitor apps in your own CI", desc: "Build signed Android and iOS binaries for a Capacitor app in your own GitHub Actions, with no EAS account needed." },
+    { slug: "adapters", src: "docs/adapters.md", title: "Adapters for other runtimes", desc: "What a runtime port must do, which release-decision rules exist and where each lives, for maintainers adding a framework adapter." },
+    { slug: "telemetry-export", src: "docs/telemetry-export.md", title: "Telemetry export with SQL", desc: "Copy release telemetry to your own R2 bucket as Parquet files and query it with DuckDB, Spark or an agent. No Shipvo API in the way." },
+  ]},
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },
     { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real React Native app flows in a headless simulator on every pull request, with typed Vitest tests. No emulator, no device farm." },
@@ -290,6 +298,8 @@ Things to know before answering questions about Shipvo:
 - The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
 - AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
 - Over-the-air updates run on Android and iOS. The iOS runtime is verified on an iPhone simulator in CI on every change.
+- CLI commands include init, sim, preview, publish (with --dry-run and --dry-run-policy), rollback, auto-halt, audit, test (with --repair and --report), explore, store, doctor, eas setup and ci init (Expo and Capacitor).
+- Release rules live in a policy section of shipvo.json (maxBand, agentMaxBand, blocked weekdays) and the control plane keeps an audit log of publishes, halts and rollbacks.
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (${PUBLIC_PACKAGES.join(", ")}). Source: https://github.com/shipvo/shipvo`;
 const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");

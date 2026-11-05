@@ -26,3 +26,8 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 | New machine and key backup | [new-machine](new-machine.md) | | | |
 | Release health dashboard and alerts | | | | |
 | Take mobile money payments | [device-api](device-api.md) | | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
+| `shipvo test --repair`, `--report`, plain steps | [testing](testing.md) | | | |
+| Release policy and `--dry-run-policy` | [CLI guide](cli.md) | | | |
+| Audit log and `shipvo audit` | [CLI guide](cli.md) | | | |
+| `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | | | |
+| MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
