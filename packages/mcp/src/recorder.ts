@@ -17,13 +17,13 @@ type Browser = { newPage(o: object): Promise<Page>; close(): Promise<void> };
 
 export class Recorder {
   private browser?: Browser; private page?: Page; private ff?: ChildProcess; private loop?: Promise<void>;
-  private t0 = 0; private running = false; private ffErr = ""; private done?: Promise<number | null>;
+  private t0 = 0; private running = false; private starting = false; private ffErr = ""; private done?: Promise<number | null>;
   private chapters: Chapter[] = []; private file = ""; private size = SIZES["9:16"]; private fps = 30;
-  get active() { return this.running; }
+  get active() { return this.running || this.starting; }
 
   async start(o: { url: string; format?: Format; fps?: 30 | 60; title?: string; dir?: string }): Promise<{ file: string; width: number; height: number }> {
-    if (this.running) throw new RecorderError("recording_active", "a recording is already running: call record_stop first");
-    this.running = true;
+    if (this.running || this.starting) throw new RecorderError("recording_active", "a recording is already running: call record_stop first");
+    this.starting = true;
     try {
       this.size = SIZES[o.format ?? "9:16"]; this.fps = o.fps ?? 30; this.chapters = []; this.ffErr = "";
       const dir = resolve(o.dir ?? join(process.cwd(), ".shipvo", "recordings")); mkdirSync(dir, { recursive: true });
@@ -31,9 +31,11 @@ export class Recorder {
       this.file = join(dir, `${slug}-${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}.mp4`);
       let pw: any;
       try { const mod = "playwright"; pw = await import(mod); } catch { throw new RecorderError("recorder_unavailable", "recording needs Playwright: run `npm i -D playwright && npx playwright install chromium`"); }
-      this.browser = await pw.chromium.launch(process.env.SHIPVO_CHROMIUM ? { executablePath: process.env.SHIPVO_CHROMIUM } : {});
+      try { this.browser = await pw.chromium.launch(process.env.SHIPVO_CHROMIUM ? { executablePath: process.env.SHIPVO_CHROMIUM } : {}); }
+      catch (e) { throw new RecorderError("recorder_unavailable", `could not launch Chromium: run \`npx playwright install chromium\` (${(e as Error).message.split("\n")[0]})`); }
       this.page = await this.browser!.newPage({ viewport: this.size });
-      await this.page.goto(o.url, { waitUntil: "load" });
+      try { await this.page.goto(o.url, { waitUntil: "load" }); }
+      catch (e) { throw new RecorderError("frame_unreachable", `could not open the phone frame page ${o.url}: ${(e as Error).message.split("\n")[0]}`); }
       this.ff = spawn("ffmpeg", ["-y", "-loglevel", "error", "-use_wallclock_as_timestamps", "1", "-f", "image2pipe", "-c:v", "mjpeg", "-i", "-",
         "-vf", `fps=${this.fps},scale=${this.size.width}:${this.size.height},format=yuv420p`, "-c:v", "libx264", "-preset", "veryfast", "-movflags", "+faststart", this.file], { stdio: ["pipe", "ignore", "pipe"] });
       this.ff.stderr!.on("data", (d) => { this.ffErr += d; });
@@ -41,6 +43,7 @@ export class Recorder {
       this.done = new Promise((r) => { this.ff!.on("error", (e) => { this.ffErr += e.message; r(-1); }); this.ff!.on("close", r); });
       this.t0 = Date.now();
       await this.grab();
+      this.running = true; this.starting = false;
       this.loop = (async () => { while (this.running) await this.grab(); })();
       return { file: this.file, ...this.size };
     } catch (e) { await this.cleanup(); throw e; }
@@ -70,7 +73,7 @@ export class Recorder {
   }
 
   private async cleanup() {
-    this.running = false; try { await this.loop; } catch {}
+    this.running = false; this.starting = false; try { await this.loop; } catch {}
     try { this.ff?.stdin?.end(); this.ff?.kill(); } catch {}
     try { await this.browser?.close(); } catch {}
     this.browser = this.page = this.ff = this.loop = undefined;

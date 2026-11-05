@@ -59,9 +59,43 @@ describe.skipIf(!ffmpegOk)("Recorder", () => {
 describe("Recorder without a recording", () => {
   it("stop and marker throw no_recording", async () => {
     const r = new Recorder();
-    await expect(r.stop()).rejects.toBeInstanceOf(RecorderError);
+    await expect(r.stop()).rejects.toMatchObject({ code: "no_recording" });
     expect(() => r.marker("x")).toThrow(/record_start/);
+    expect(() => r.marker("x")).toThrow(RecorderError);
   });
+});
+
+describe("Recorder start failures (no ffmpeg needed)", () => {
+  const withChromium = async (path: string | undefined, f: () => Promise<void>) => {
+    const old = process.env.SHIPVO_CHROMIUM;
+    if (path === undefined) delete process.env.SHIPVO_CHROMIUM; else process.env.SHIPVO_CHROMIUM = path;
+    try { await f(); } finally { if (old === undefined) delete process.env.SHIPVO_CHROMIUM; else process.env.SHIPVO_CHROMIUM = old; }
+  };
+  it("a missing Chromium gives recorder_unavailable", async () => {
+    await withChromium(join(out, "no-such-chromium"), async () => {
+      const r = new Recorder();
+      await expect(r.start({ url, dir: out })).rejects.toMatchObject({ code: "recorder_unavailable", message: expect.stringContaining("playwright install chromium") });
+      expect(r.active).toBe(false);
+    });
+  }, 60000);
+  it("an unreachable page gives frame_unreachable with the URL", async () => {
+    const chromium = process.env.SHIPVO_CHROMIUM ?? (await import("playwright")).chromium.executablePath();
+    if (!existsSync(chromium)) return; // no browser on this machine; the launch test above covers that path
+    await withChromium(chromium, async () => {
+      const r = new Recorder(); const bad = "http://127.0.0.1:1/";
+      await expect(r.start({ url: bad, dir: out })).rejects.toMatchObject({ code: "frame_unreachable", message: expect.stringContaining(bad) });
+      expect(r.active).toBe(false);
+    });
+  }, 60000);
+  it("stop and marker during start return no_recording", async () => {
+    await withChromium(join(out, "no-such-chromium"), async () => {
+      const r = new Recorder();
+      const started = r.start({ url, dir: out }).catch((e) => e);
+      expect(() => r.marker("x")).toThrow(expect.objectContaining({ code: "no_recording" }));
+      await expect(r.stop()).rejects.toMatchObject({ code: "no_recording" });
+      expect(await started).toBeInstanceOf(RecorderError);
+    });
+  }, 60000);
 });
 
 describe("MCP tools", () => {
