@@ -58,6 +58,29 @@ This section is set by the owner. The Head of Product plans from it and does not
 
 **Risks to watch:** Apple and Google rules on updates (stay on interpreted code and declared capabilities, and document compliance publicly); trust in AI-written code (the merge contract and test evidence are the answer, never hidden); and adoption (only real users prove anything).
 
+### Positioning: what Shipvo is (owner, 5 Nov 2026)
+
+Use this wording, or close to it, on the site, in docs, blog posts, tutorials and videos, so Shipvo is described the same way everywhere.
+
+**One line:** Shipvo is the mobile platform for the AI era: your agent builds the app, tests it on a phone in your browser, records the demo, and ships it to the stores and to every phone.
+
+**The loop, in one place, for people and their AI agents together:**
+1. Your agent writes code; `shipvo run` shows the app on Shipvo Phone in your browser in seconds. No emulator, no Xcode, no install.
+2. The agent tests it on that same phone while you watch: taps, gestures, notifications, offline, permissions, payments, other apps.
+3. It records a demo video of the app in the phone frame.
+4. Shipvo takes you to the stores: screenshots, store forms, testers and submission (EAS or your own CI builds the native binary).
+5. Every later change goes out as a signed over-the-air update with staged rollout and rollback.
+6. Everything is measured and published: parity of Shipvo Phone against the Android emulator and iOS Simulator, update speed on a 2 GB phone.
+
+**Against each kind of tool** (state differences as facts, never attack):
+- Expo: Shipvo adds agent-operable apps, the instant browser phone, testing and demos; it works with Expo (EAS builds and submits).
+- Agent phone tools (mobile-mcp, agent-phone, Phone Harness): they drive a device; Shipvo gives a whole phone (apps, store, hardware, lifecycle) plus updates and the store path.
+- QA agent startups: Shipvo is open source and the testing runs inside your own build loop.
+- Over-the-air update tools (CodePush successors, Capgo): Shipvo adds simulation, testing, demos and the store path.
+- Device clouds: Shipvo is instant, free and in your browser, made for agents.
+
+**Proof:** every claim about Shipvo Phone is backed by published parity results against the Android emulator and iOS Simulator (`docs/parity-results.md`). Talk about parity, with the measured numbers and links, rather than general claims.
+
 ### Win the lane, and keep the gap growing (5 Nov 2026)
 
 Shipvo aims to be the clear best in its lane, so far ahead that a copy cannot catch up, because we ship, refine and measure every day. In practice:

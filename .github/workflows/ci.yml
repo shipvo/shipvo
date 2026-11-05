@@ -24,7 +24,15 @@ jobs:
       # Package tests (e.g. @shipvo/sim) drive a headless browser, so install it before they run.
       - name: Install Chromium for browser tests
         run: bash scripts/agents/install-chromium.sh
+      # Video tests (MCP demo recording, music mix) encode MP4 with ffmpeg + libx264. SHIPVO_REQUIRE_FFMPEG
+      # tells them to fail, not skip, if it is missing.
+      - name: Install ffmpeg
+        run: |
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null; }
+          ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264 || { echo "::error::ffmpeg has no libx264"; exit 1; }
+          ffmpeg -version | head -1
       - run: pnpm -r test
+        env: { SHIPVO_REQUIRE_FFMPEG: "1" }
       - name: npm package size budget (each @shipvo package under 10 MB unpacked)
         run: |
           pnpm -r --filter "./packages/**" build > /dev/null
