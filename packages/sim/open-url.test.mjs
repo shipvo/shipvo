@@ -62,6 +62,13 @@ test("with a listener: ok, and the app saw the URL", async () => {
   assert.match(r.screen, /Opened myapp:\/\/item\/3/);
 });
 
+test("act for an unknown session: no_session", async () => {
+  const r = await act("nobody", { action: "screen" });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, "no_session");
+  assert.match(r.error, /no session 'nobody'/);
+});
+
 test("empty or missing url: bad_url", async () => {
   assert.ok((await call("/session", { session: "c" })).ok);
   for (const body of [{ action: "open_url" }, { action: "open_url", url: "" }, { action: "open_url", url: 5 }]) {
