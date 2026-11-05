@@ -35,3 +35,38 @@ export const telemetry = (entries) => entries.filter((e) => e.method === "POST" 
 
 /** Percent change from base to now; positive means slower or larger. */
 export const pctChange = (base, now) => (base ? Math.round(((now - base) / base) * 1000) / 10 : null);
+
+/**
+ * Per-phase timeline of one update trial, in ms after the pointer was published (`publishedAt`). Inputs are the parsed
+ * server log (`entries`, GET lines are written when the response ends) and the telemetry events (`tele`, with `at`).
+ * Phases: pointerSeen (first pointer GET after publish), patchReceived (last bundle or patch GET for the release),
+ * staged (telemetry with bytes_downloaded: the runtime finished download and verify), healthy (`applied` telemetry,
+ * sent after markHealthy). Gaps are null when a phase is missing. `unaccountedMs` is what the runtime's own
+ * download and apply numbers do not explain.
+ */
+export function phaseTimeline({ entries, tele, publishedAt, release, pointerPath, downloadMs, applyMs }) {
+  const rel = (t) => (t == null ? null : t - publishedAt);
+  const gets = entries.filter((e) => e.method === "GET" && e.status === 200 && e.t >= publishedAt);
+  const pointerSeen = gets.find((e) => e.path === pointerPath)?.t ?? null;
+  const blobs = gets.filter((e) => e.path.startsWith("/b/") && e.path.includes(`r${release}.`));
+  const patchReceived = blobs.length ? Math.max(...blobs.map((e) => e.t)) : null;
+  const staged = tele.find((e) => e.at >= publishedAt && e.bytes_downloaded !== undefined && e.published_at)?.at ?? null;
+  const healthy = tele.find((e) => e.event === "applied" && e.release === release && e.at >= publishedAt && e.bytes_downloaded === undefined)?.at ?? null;
+  const gap = (a, b) => (a == null || b == null ? null : b - a);
+  const total = gap(publishedAt, healthy);
+  return {
+    pointerSeenMs: rel(pointerSeen), patchReceivedMs: rel(patchReceived), stagedMs: rel(staged), healthyMs: rel(healthy),
+    gaps: { publishToPointerMs: gap(publishedAt, pointerSeen), pointerToPatchMs: gap(pointerSeen, patchReceived), patchToStagedMs: gap(patchReceived, staged), stagedToHealthyMs: gap(staged, healthy) },
+    unaccountedMs: total == null ? null : total - (downloadMs ?? 0) - (applyMs ?? 0),
+  };
+}
+
+/**
+ * Trials that are safe to put in a median. A trial is a poll miss when the device fetched the pointer later than
+ * `pollMissMs` after publish (the app polls every 10 s, so a miss costs up to 10 s). The trial right after a miss is
+ * dropped too: it starts while the poll phase is still lined up with the previous publish.
+ */
+export function steadyTrials(trials, pollMissMs = 3000) {
+  const miss = trials.map((t) => t.timeline?.pointerSeenMs == null || t.timeline.pointerSeenMs > pollMissMs);
+  return trials.filter((_, i) => !miss[i] && !(i > 0 && miss[i - 1]));
+}

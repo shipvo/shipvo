@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Android device lab: runs the over-the-air scenarios on the booted emulator and writes android-e2e-report.json.
-//   node run.mjs --apk shell.apk --bundles dir --key key.json [--port 8110] [--trials 3] [--out android-e2e-report.json]
-// bundles dir: v1.hbc .. v8.hbc and crash.hbc (make-bundles.sh). key.json: { seed, publicKey } (keygen.mjs of ios-e2e).
+//   node run.mjs --apk shell.apk --bundles dir --key key.json [--port 8110] [--trials 3] [--patch-trials 5] [--out android-e2e-report.json]
+// bundles dir: v1.hbc .. v10.hbc and crash.hbc (make-bundles.sh). key.json: { seed, publicKey } (keygen.mjs of ios-e2e).
 // The release server runs in this process, so "pointer published" and "device reported healthy" use one clock.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { startServer } from "./server.mjs";
 import { publishRelease } from "./release.mjs";
-import { median, parseLog, sha256, telemetry } from "./lib.mjs";
+import { median, parseLog, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const APK = resolve(arg("apk", "shell.apk")), BUNDLES = resolve(arg("bundles", "bundles")), KEY = JSON.parse(readFileSync(arg("key", "key.json"), "utf8"));
@@ -53,7 +53,8 @@ async function updateTrial(bytes, bases) {
   const via = gets.some((g) => g.path.includes("/d-")) ? "patch" : "full";
   if (ev) history.push({ rel: p.release, bytes });
   return { release: p.release, ok: !!ev, pointerToHealthyMs: ev ? ev.at - p.at : null, via, downloadBytes: gets.reduce((s, g) => s + g.bytes, 0) || null,
-    downloadMs: staged?.apply_ms ?? null, applyMs: ev?.apply_ms ?? null, bundleBytes: bytes.length, patchesOffered: p.patches.map((x) => x.size) };
+    downloadMs: staged?.apply_ms ?? null, applyMs: ev?.apply_ms ?? null, bundleBytes: bytes.length, patchesOffered: p.patches.map((x) => x.size),
+    timeline: phaseTimeline({ entries: entries(), tele: tele(), publishedAt: p.at, release: p.release, pointerPath: `/p/${APP}/1/${BAND}.json`, downloadMs: staged?.apply_ms, applyMs: ev?.apply_ms }) };
 }
 const summarize = (trials, keys) => Object.fromEntries(keys.map((k) => [k, median(trials.map((t) => t[k]))]));
 const results = [];
@@ -101,17 +102,22 @@ await scenario("update: full bundle (no patches offered)", async () => {
   return { pass: trials.every((t) => t.ok && t.via === "full"), trials, median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"]) };
 });
 
+const PATCH_TRIALS = Number(arg("patch-trials", 5));
+const AFTER_PATCH = 2 + TRIALS + PATCH_TRIALS; // first bundle after the patch trials (needs v1..v10 with the defaults)
 await scenario("update: bsdiff patch from the running release", async () => {
   const trials = [];
-  for (let i = 0; i < TRIALS; i++) { const n = 2 + TRIALS + i, prev = history.at(-1).bytes; trials.push(await updateTrial(bundle("v" + n), [prev])); }
-  return { pass: trials.every((t) => t.ok && t.via === "patch"), trials, median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"]) };
+  for (let i = 0; i < PATCH_TRIALS; i++) { const n = 2 + TRIALS + i, prev = history.at(-1).bytes; trials.push(await updateTrial(bundle("v" + n), [prev])); }
+  const steady = steadyTrials(trials), keys = ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"];
+  const phase = (k) => median(steady.map((t) => t.timeline.gaps[k]));
+  return { pass: trials.every((t) => t.ok && t.via === "patch"), trials, trialCount: PATCH_TRIALS, trialsInMedian: steady.length, median: summarize(steady, keys),
+    phaseMedianMs: { publishToPointerMs: phase("publishToPointerMs"), pointerToPatchMs: phase("pointerToPatchMs"), patchToStagedMs: phase("patchToStagedMs"), stagedToHealthyMs: phase("stagedToHealthyMs"), unaccountedMs: median(steady.map((t) => t.timeline.unaccountedMs)) } };
 });
 
 const good = () => history.at(-1);
 for (const mode of ["signature", "hash", "size"]) {
   await scenario(`tampered bundle rejected: bad ${mode}`, async () => {
     const before = prefs(), cur = good().rel, t0 = Date.now();
-    const p = await publish(bundle("v" + (2 + 2 * TRIALS)), { tamper: mode });
+    const p = await publish(bundle("v" + AFTER_PATCH), { tamper: mode });
     await sleep(35_000); // three or more poll cycles (the app polls every 10 s)
     const e = entries().filter((x) => x.t >= p.at), after = prefs();
     const sawPointer = e.some((x) => x.path === `/p/${APP}/1/${BAND}.json` && x.status === 200);
@@ -124,7 +130,7 @@ for (const mode of ["signature", "hash", "size"]) {
       release: p.release, runningBefore: cur, currentAfter: after.current_release, pendingAfter: after.pending_release ?? 0, devicePolledPointer: sawPointer, deviceDownloadedBundle: sawBundle, appStayedAlive: alive, restartedOnRelease: again?.release ?? null };
   });
 }
-await scenario("device recovers: valid release after tampered ones", async () => { const t = await updateTrial(bundle("v" + (2 + 2 * TRIALS)), []); return { pass: t.ok, ...t }; });
+await scenario("device recovers: valid release after tampered ones", async () => { const t = await updateTrial(bundle("v" + AFTER_PATCH), []); return { pass: t.ok, ...t }; });
 
 await scenario("rollback to the previous release", async () => {
   const trials = [];
