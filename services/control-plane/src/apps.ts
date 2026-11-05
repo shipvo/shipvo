@@ -209,13 +209,13 @@ apps.put("/:id/kv/*", async (c) => {
     try { next = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body); } catch { /* checked above */ }
   }
   await c.env.POINTERS.put(k, buf);
-  if (next) {
+  if (next && typeof next.release === "number") {
     // Judged per KV key against that key's previous pointer: a first upload of a band key is always a publish.
     const action = typeof prev?.release === "number" && next.release < prev.release ? "rollback" : "publish";
-    // One release goes to several band keys. Write one row per publish: skip when the newest row is the same action and release.
-    if (!(await isRepeatAudit(c.env.DB, id, action, next.release))) {
+    // One release goes to several band keys. Write one row per publish: skip when the newest row is the same action, release and release id, under 2 minutes old.
+    if (!(await isRepeatAudit(c.env.DB, id, action, next.release, next.core?.sha256 ?? null))) {
       // The actor is the account login that owns the token, never the token itself.
-      const who = await c.env.DB.prepare("SELECT a.github_login FROM publish_tokens t JOIN accounts a ON a.id = t.account_id WHERE t.id = ?").bind(app.token_id).first().catch(() => null);
+      const who = await c.env.DB.prepare("SELECT a.github_login FROM publish_tokens t JOIN accounts a ON a.id = t.account_id WHERE t.id = ?").bind(app.token_id).first<{ github_login: string }>().catch(() => null);
       await recordAudit(c.env.DB, { appId: id, actor: who?.github_login ?? "publish token", kind: "person", action,
         release: next.release, before: prev ? { key: k, release: prev.release } : null, after: { key: k, release: next.release }, releaseId: next.core?.sha256 ?? null });
     }

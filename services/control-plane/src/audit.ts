@@ -25,14 +25,20 @@ export async function recordAudit(db: D1Database | undefined, e: AuditEntry): Pr
   }
 }
 
+export const AUDIT_REPEAT_WINDOW_MS = 2 * 60 * 1000;
+
 /**
- * True when the newest row for this app has the same action and release (one release uploaded to several band keys).
+ * True when the newest row for this app is the same action, release and release id and under 2 minutes old
+ * (one release uploaded to several band keys back to back). A later re-upload still writes a row.
  * Read-then-insert without a lock: two concurrent band uploads could both write a row. Low risk, accepted.
+ * Interleaved uploads of two releases can also write extra rows.
  */
-export async function isRepeatAudit(db: D1Database, appId: string, action: string, release: number): Promise<boolean> {
+export async function isRepeatAudit(db: D1Database, appId: string, action: string, release: number, releaseId: string | null = null): Promise<boolean> {
   try {
-    const last = await db.prepare("SELECT action, release FROM audit_log WHERE app_id = ? ORDER BY id DESC LIMIT 1").bind(appId).first<{ action: string; release: number | null }>();
-    return !!last && last.action === action && last.release === release;
+    const last = await db.prepare("SELECT action, release, release_id, at FROM audit_log WHERE app_id = ? ORDER BY id DESC LIMIT 1").bind(appId).first<{ action: string; release: number | null; release_id: string | null; at: string }>();
+    if (!last || last.action !== action || last.release !== release || (last.release_id ?? null) !== releaseId) return false;
+    const age = Date.now() - Date.parse(last.at);
+    return Number.isFinite(age) && age < AUDIT_REPEAT_WINDOW_MS;
   } catch { return false; }
 }
 

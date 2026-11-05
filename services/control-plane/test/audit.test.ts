@@ -119,6 +119,23 @@ describe("audit log", () => {
     expect(rows.map((r) => [r.action, r.release])).toEqual([["publish", 5], ["rollback", 4]]);
   });
 
+  it("the same release published again 10 minutes later writes a second row", async () => {
+    const { db, rows } = fakeDb(); const store: Record<string, string> = {};
+    const body = JSON.stringify({ body: JSON.stringify({ schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 5, issued_at: "2026-10-30T00:00:00Z",
+      core: { version: "1.0.0", sha256: "a".repeat(64), size: 10, url: "c" }, min_shell_version: "1.0.0" }), signature: "AAAA" });
+    vi.spyOn(crypto.subtle, "verify").mockResolvedValue(true); vi.spyOn(crypto.subtle, "importKey").mockResolvedValue({} as any);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const env = { DB: db, POINTERS: kv(store) } as any;
+    const put = () => app.request("/apps/tide/kv/p/tide/1/b0", { method: "PUT", body, headers: { authorization: "Bearer sv_publish_secret123" } }, env);
+    try {
+      vi.setSystemTime(new Date("2026-11-05T10:00:00Z")); expect((await put()).status).toBe(200);
+      vi.setSystemTime(new Date("2026-11-05T10:00:30Z")); expect((await put()).status).toBe(200);
+      expect(rows).toHaveLength(1);
+      vi.setSystemTime(new Date("2026-11-05T10:10:30Z")); expect((await put()).status).toBe(200);
+      expect(rows.map((r) => [r.action, r.release])).toEqual([["publish", 5], ["publish", 5]]);
+    } finally { vi.useRealTimers(); vi.restoreAllMocks(); }
+  });
+
   it("halt writes a system row", async () => {
     const { db, rows } = fakeDb();
     const store: Record<string, string> = { "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 1 }) };
