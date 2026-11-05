@@ -59,6 +59,54 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), meta["bundle2Sha"] as? String)
   }
 
+  /// A device on its first install: no downloaded release, and `main.jsbundle` inside the app is the fixture's release 5 bundle.
+  private func storeOnEmbedded(_ app: String) throws -> Store {
+    try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let b = tmp.appendingPathComponent("Shell.bundle")
+    try FileManager.default.createDirectory(at: b, withIntermediateDirectories: true)
+    try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!).write(to: b.appendingPathComponent("main.jsbundle"))
+    let s = store(app, bundle: Bundle(path: b.path)!)
+    XCTAssertNil(s.currentPath)
+    return s
+  }
+
+  func testAppliesAPatchFromTheEmbeddedBundle() async throws {
+    let s = try storeOnEmbedded("patch")
+    XCTAssertEqual(s.embeddedSha(), bundleSha)
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["via"] as? String, "patch")
+    XCTAssertEqual(r["bytes"] as? Int, meta["patchSize"] as? Int, "only the patch was downloaded")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), meta["bundle2Sha"] as? String)
+  }
+
+  func testEmbeddedBaseFallsBackToFullOnACorruptPatch() async throws {
+    let s = try storeOnEmbedded("bad-patch")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["via"] as? String, "full")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), meta["bundle2Sha"] as? String)
+    XCTAssertTrue(s.consumeEvents().contains("patch_failed"))
+  }
+
+  func testEmbeddedBaseFallsBackToFullWhenNoPatchHasThatBase() async throws {
+    let s = try storeOnEmbedded("wrong-base")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["via"] as? String, "full")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), meta["bundle2Sha"] as? String)
+  }
+
+  func testEmbeddedBaseWithAWrongResultHashStagesNothing() async throws {
+    let s = try storeOnEmbedded("wrong-result")
+    do { _ = try await Updater.check(s); XCTFail("a bundle that is not the signed hash must not stage") } catch let e as UpdateError { XCTAssertTrue(e.message.contains("mismatch")) }
+    XCTAssertNil(s.pendingPath)
+    XCTAssertTrue(s.consumeEvents().contains("patch_failed"))
+  }
+
+  func testNoEmbeddedBundleMeansAFullDownload() async throws {
+    let r = try await Updater.check(store("patch"))
+    XCTAssertEqual(r["via"] as? String, "full")
+  }
+
   func testFallsBackToTheFullBundleWhenThePatchIsBroken() async throws {
     let s = try storeRunningRelease5("bad-patch")
     let r = try await Updater.check(s)

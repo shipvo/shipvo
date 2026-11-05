@@ -116,8 +116,8 @@ export async function publish(argv: string[]) {
     const name = bundleName(release, pf), newSha = sha256Hex(bytes);
     await kv.put(`b/${APP}/${name}`, bytes, "application/octet-stream");
 
-    // Patches: from recent releases (and, on Android, each shell's embedded bundle); devices verify the patched result against the signed sha256.
-    // iOS patches only from earlier iOS releases: the iOS runtime has no embedded-bundle baseline yet.
+    // Patches: from recent releases and each shell's embedded bundle; devices verify the patched result against the signed sha256.
+    // Releases are per platform. Embedded-bundle records are shared under base/<app>/ and tagged with a platform (no tag means Android).
     const patches: { from_sha256: string; url: string; size: number; sha256: string }[] = [];
     {
       const MAX_BASES = Number(a["max-bases"] || 6);
@@ -125,7 +125,7 @@ export async function publish(argv: string[]) {
       const hist = (await Promise.all((await kv.keys(pf === "ios" ? `h/${APP}/ios-r` : `h/${APP}/r`)).map(async (k: string) => { try { return JSON.parse((await kv.get(k))!); } catch { return null; } })))
         .filter((h) => h && h.release < release).sort((x, y) => y.release - x.release).slice(0, MAX_BASES - 2);
       for (const h of hist) bases.set(h.sha256, `b/${APP}/${bundleName(h.release, pf)}`);
-      if (pf === "android") for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); bases.set(b.sha256, b.key); } catch {} }
+      for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); if ((b.platform ?? "android") === pf) bases.set(b.sha256, b.key); } catch {} }
       // Only look for bsdiff4 when there is an older bundle to patch from; a first release needs no patches.
       let bsdiff = false;
       if (bases.size > 0) { try { execSync("python3 -c 'import bsdiff4'", { stdio: "ignore" }); bsdiff = true; } catch { console.error("Small patches are off because the Python tool bsdiff4 is not installed (pip install bsdiff4). Full bundles are published instead. Updates still work, they are just bigger."); } }

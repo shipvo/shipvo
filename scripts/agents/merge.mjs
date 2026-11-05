@@ -9,7 +9,10 @@
 //   - today's merge count is under AGENT_MAX_MERGES_PER_DAY
 // It also marks finished Copilot drafts ready for review, approves pending workflow runs on
 // Copilot branches, and closes agent PRs that have been idle for too long.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const REPO = process.env.GITHUB_REPOSITORY;
 const MAX_MERGES = Number(process.env.AGENT_MAX_MERGES_PER_DAY || 100);
@@ -30,6 +33,42 @@ const addLabel = (n, l) => act(`label #${n} +${l}`, () => gh("api", "-X", "POST"
 
 const isCopilot = (pr) => pr.head.ref.startsWith("copilot/") || /copilot/i.test(pr.user.login);
 const isAgent = (pr) => labels(pr).includes("agent-pr") || pr.head.ref.startsWith("agent/") || isCopilot(pr);
+
+// Most conflicts come from CHANGELOG.md: every PR adds a line under `## Unreleased`, so each merge
+// conflicts the rest and each one used to cost a full fixer run. When CHANGELOG.md is the only
+// conflicting file, merge main into the branch with git's union driver (keeps both sides' lines).
+// Returns true when it pushed the merge.
+let gitAuth = false;
+function mergeChangelogOnly(pr) {
+  if (pr.head.repo?.full_name !== REPO) return false;
+  const dir = mkdtempSync(join(tmpdir(), "shipvo-merge-"));
+  const git = (...a) => spawnSync("git", ["-C", dir, "-c", "user.name=shipvo-merge-bot", "-c", "user.email=merge-bot@users.noreply.github.com", ...a], { encoding: "utf8" });
+  const must = (...a) => { const r = git(...a); if (r.status !== 0) throw new Error(`git ${a[0]}: ${(r.stderr || "").trim().slice(0, 300)}`); return r.stdout; };
+  try {
+    if (!gitAuth) { gh("auth", "setup-git"); gitAuth = true; }
+    must("init", "-q");
+    must("remote", "add", "origin", `https://github.com/${REPO}.git`);
+    must("fetch", "-q", "--no-tags", "--filter=blob:none", "origin", "+refs/heads/main:refs/remotes/origin/main", `+refs/heads/${pr.head.ref}:refs/remotes/origin/pr`);
+    if (must("rev-parse", "origin/pr").trim() !== pr.head.sha) return false; // branch moved since GitHub checked
+    const mt = git("merge-tree", "--write-tree", "--name-only", "--no-messages", "origin/main", "origin/pr");
+    if (mt.status !== 1) return false; // 0: no conflict after all; >1: error
+    const conflicted = mt.stdout.trim().split("\n").slice(1).filter(Boolean);
+    if (conflicted.length !== 1 || conflicted[0] !== "CHANGELOG.md") return false;
+    writeFileSync(join(dir, ".git", "info", "attributes"), "CHANGELOG.md merge=union\n");
+    must("checkout", "-q", "-B", "pr", "origin/pr");
+    must("merge", "-q", "--no-edit", "-m", "Merge main into this branch (CHANGELOG.md: kept both sides)", "origin/main");
+    if (/^(<<<<<<<|>>>>>>>)/m.test(readFileSync(join(dir, "CHANGELOG.md"), "utf8"))) return false;
+    if (DRY) { log(`[dry] #${pr.number}: CHANGELOG.md-only conflict; would push a union merge`); return true; }
+    must("push", "-q", "origin", `HEAD:refs/heads/${pr.head.ref}`);
+    log(`#${pr.number}: CHANGELOG.md-only conflict; merged main with both sides kept`);
+    return true;
+  } catch (e) {
+    log(`#${pr.number}: CHANGELOG.md merge skipped: ${e.message}`);
+    return false;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 // 1. Approve workflow runs waiting on Copilot branches (only if the repo requires approval).
 try {
@@ -89,6 +128,7 @@ for (const pr of prs) {
   let full = api(`repos/${REPO}/pulls/${n}`);
   for (let i = 0; i < 3 && full.mergeable === null; i++) { execFileSync("sleep", ["4"]); full = api(`repos/${REPO}/pulls/${n}`); }
   if (full.mergeable === false && full.mergeable_state === "dirty") {
+    if (mergeChangelogOnly(full)) continue;
     if (!L.includes("agent:conflict")) {
       addLabel(n, "agent:conflict");
       comment(n, "This branch has merge conflicts with main. The fixer agent has been asked to resolve them.");
