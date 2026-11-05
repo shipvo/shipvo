@@ -45,7 +45,7 @@ If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with P
 npm run sim
 ```
 
-This builds the web bundle with the simulated device and serves it on `http://localhost:4545`. Now let an agent use it. In Claude Desktop, Claude Code, Cursor or PiPilot:
+This builds the web bundle with the simulated device and serves it on `http://localhost:4545`. Add `--watch` (`shipvo sim --watch`) to rebuild when you edit files: it waits 300 ms after the last change, prints `rebuilt in 5.8 s` or the build error, and keeps serving the last good build if a build fails. It ignores `node_modules`, `sim-dist` and `.shipvo`. Now let an agent use it. In Claude Desktop, Claude Code, Cursor or PiPilot:
 
 ```json
 { "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
