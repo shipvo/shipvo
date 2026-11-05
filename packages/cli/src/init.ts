@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { args as parse } from "./config.js";
-import { adopt, detectProject, isAdoptArgs, positional } from "./adopt.js";
+import { adopt, detectProject, isAdoptArgs, isBareApp, positional } from "./adopt.js";
 
 const HOSTED = "https://api.shipvo.dev";
 const SDK = { expo: "~58.0.21", camera: "~58.0.14", clipboard: "~58.0.4", localAuth: "~58.0.2", location: "~58.0.20", notifications: "~58.1.7", statusBar: "~58.0.4", constants: "~58.0.0", metroRuntime: "~58.0.15", react: "19.3.0", rn: "0.88.1", rnw: "^0.21.4" };
@@ -17,13 +17,17 @@ Try:  shipvo init myshop
 This creates ./myshop with a ready app. Other options (app id, bundle id, control plane) have defaults; see 'shipvo init --help'.`;
 
 const INIT_HELP = `Usage: shipvo init <dir> [options]
-       shipvo init [.] [--dry-run] [--yes] [--device]   (adopt mode, inside an existing Expo app)
+       shipvo init [.] [--dry-run] [--yes] [--device]   (adopt mode, inside an existing Expo or bare React Native app)
 
 Adopt mode: run it inside an Expo app (package.json with expo, plus app.json or app.config.js/ts).
 It shows a plan, then applies it after you confirm. It installs @shipvo/runtime, adds the config plugin
 and a signing key, writes shipvo.json, adds sim/publish/rollback scripts, and adds a publish workflow if
 there is none. It never overwrites a file and never touches ios/ or android/. It refuses apps that use
 expo-updates or CodePush. See docs/cli.md.
+
+In a bare React Native app (ios/ and android/ committed, no Expo config plugins) it also writes the Shipvo
+values into AndroidManifest.xml and Info.plist, and runs npx install-expo-modules@latest if Expo Modules are
+missing. Only after you confirm.
 
   --dry-run              Print the plan and change nothing.
   --yes                  Apply the plan without asking.
@@ -50,7 +54,7 @@ export async function init(argv: string[]) {
   const [dirArg] = positional(argv);
   const a = parse(argv);
   if (argv.includes("--help") || argv.includes("-h")) { console.log(INIT_HELP); return; }
-  if (isAdoptArgs(argv) && (dirArg === "." || detectProject(process.cwd()).isExpo)) { await adopt(argv); return; }
+  if (isAdoptArgs(argv) && (dirArg === "." || detectProject(process.cwd()).isExpo || isBareApp(process.cwd()))) { await adopt(argv); return; }
   if (!dirArg) { console.error(INIT_NEEDS_DIR); process.exit(2); }
   if (a.template === "true") { console.error(`shipvo: --template needs a name. Valid templates: ${TEMPLATES.join(", ")}.`); process.exit(2); }
   const template = a.template ?? "blank";
