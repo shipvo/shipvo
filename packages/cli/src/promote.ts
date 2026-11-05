@@ -1,5 +1,6 @@
 // `shipvo promote`: widen a staged release to more bands. Reads the pointer on the narrowest band that has one,
 // and writes the same release (same bundle, hashes and patches) to the other bands with a fresh issued_at and signature.
+import { existsSync, readFileSync } from "node:fs";
 import { signBytes } from "./index.js";
 import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
 
@@ -11,7 +12,7 @@ type Summary = { releases?: { release: number; events?: Record<string, number> }
 
 const pointerKey = (app: string, major: number, band: string, pf: Platform) => (pf === "ios" ? `p/${app}/${major}/ios/${band}` : `p/${app}/${major}/${band}`);
 
-export const PROMOTE_FLAGS = ["to", "platform", "dry-run", "force"];
+export const PROMOTE_FLAGS = ["to", "platform", "dry-run", "force", "report"];
 
 export const PROMOTE_HELP = `Usage: shipvo promote [flags]
 
@@ -22,7 +23,9 @@ Flags (write a value after a space, not =):
                                Bands that already hold a newer release are always skipped
   --platform android|ios|all   Platform to promote (default android)
   --dry-run                    Print the plan, write nothing
-  --force                      Promote even if the release is halted or has reverts
+  --report <file>              Test report from shipvo test --report (default shipvo-test-report.json if it exists)
+                               A report for this release with failing flows blocks promote
+  --force                      Promote even if the release is halted, has reverts or has a failing test report
   --help                       Show this help
 `;
 
@@ -47,6 +50,9 @@ export async function promote(argv: string[], deps: { kv?: Store; fetchFn?: type
   const explicit = a.to ? a.to.split(",").map((s) => s.trim()).filter(Boolean) : null;
   if (explicit) { const bad = explicit.filter((b) => !BANDS.includes(b)); if (bad.length) throw new Error(`Unknown band ${bad.join(", ")}. Bands are ${BANDS.join(", ")}.`); }
 
+  if (a.report === "true") throw new Error("--report needs a file name: pass --report <file>");
+  const reportFile = a.report ?? (existsSync("shipvo-test-report.json") ? "shipvo-test-report.json" : null);
+
   const APP = cfg.appId, MAJOR = cfg.shellMajor;
   const store = deps.kv ?? kvFor(cfg);
 
@@ -67,6 +73,21 @@ export async function promote(argv: string[], deps: { kv?: Store; fetchFn?: type
     const newer: [string, number][] = cand.filter((b) => (have.get(b) ?? 0) > release).map((b) => [b, have.get(b) as number]);
     const targets = cand.filter((b) => !((have.get(b) ?? 0) > release));
     plans.push({ pf, release, from, body, targets, newer });
+  }
+
+  if (reportFile) {
+    let rep: { release?: unknown; flows?: { name?: string; status?: string }[] };
+    try { rep = JSON.parse(readFileSync(reportFile, "utf8")); } catch (e) { throw new Error(`Could not read the test report ${reportFile} (${e instanceof Error ? e.message : String(e)}).`); }
+    const rel = rep.release == null ? null : String(rep.release);
+    const failing = (Array.isArray(rep.flows) ? rep.flows : []).filter((f) => f.status === "failed").map((f) => f.name ?? "(unnamed flow)");
+    const mine = plans.filter((x) => String(x.release) === rel);
+    if (mine.length && failing.length) {
+      const msg = `Test report ${reportFile} has ${failing.length} failing flow${failing.length === 1 ? "" : "s"} for release ${mine[0].release}: ${failing.join(", ")}.`;
+      if (!force) throw new Error(`${msg} Fix them and run shipvo test --report again, or pass --force to promote anyway.`);
+      console.log(`${msg} Overridden by --force.`);
+    } else if (!mine.length) {
+      console.log(`Warning: test report ${reportFile} is for ${rel === null ? "no release" : `release ${rel}`}, not release ${plans.map((x) => x.release).join(", ")}. It is stale and was not used.`);
+    }
   }
 
   if (!force) {
