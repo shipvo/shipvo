@@ -177,20 +177,26 @@ Writes one JSON file, whether the run passes or fails. The exit code is the same
 
 ## Gate a rollout on tests
 
-One CI job: build, test, publish to the first cohort. Each step stops the job if it fails, so a failing flow never reaches a phone.
+One CI job: build, test, publish to the first cohort, then promote only if the tests passed. Each step stops the job if it fails.
 
 ```bash
 # gate-recipe:start
+RELEASE=43   # the next release number; `shipvo status` shows the current one
 npx shipvo sim --port 4545 > sim.log 2>&1 &
-npx shipvo test --report shipvo-report.json
-npx shipvo publish --bands b0
+for i in $(seq 1 180); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
+npx shipvo test --report shipvo-report.json --release $RELEASE
+npx shipvo publish --bands b0 --release $RELEASE
+npx shipvo promote --to b1,b2 --report shipvo-report.json
 # gate-recipe:end
 ```
 
-1. `shipvo sim` builds the app and serves it in the simulator. Wait for `localhost:4545/app/` before the next line, as in the workflow above.
-2. `shipvo test --report` runs every flow and writes the results file, pass or fail. A failing flow gives a non-zero exit, so the job stops here.
-3. `shipvo publish --bands b0` builds, signs and publishes to the first cohort only.
+Install Chromium first: `npx playwright install --with-deps chromium`.
 
-Not in this recipe yet: the `promote` step that reads the report and refuses to widen when a flow failed. That needs #486. Until it lands, run `shipvo promote --to b1,b2` by hand after you check `shipvo status`.
+1. `shipvo sim` builds the app and serves it in the simulator. The loop waits for `localhost:4545/app/` before the tests start.
+2. `shipvo test --report --release $RELEASE` runs every flow and writes the results file, pass or fail. A failing flow gives a non-zero exit, so the job stops here.
+3. `shipvo publish --bands b0 --release $RELEASE` builds, signs and publishes to the first cohort only. Use the same number as in step 2.
+4. `shipvo promote --report` refuses to widen the release when the report has a failing flow for that release. The report's `release` must match the release being promoted. Otherwise promote warns that the report is stale and goes on. See [`shipvo promote`](cli.md#shipvo-promote).
 
-A drift test (`packages/cli/test/docs-gate-recipe.test.ts`) checks that every command and flag in the block above appears in `shipvo` help.
+Publish to b0 does reach the first cohort. Only `promote` is gated by the report.
+
+A drift test (`packages/cli/test/docs-gate-recipe.test.ts`) checks that every `npx shipvo` command and flag in the block above appears in `shipvo` help.
