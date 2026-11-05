@@ -8,7 +8,8 @@ const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
  */
 export function renderDataSafetyCsv(d: StoreDetails): string {
   const out: string[][] = [["Question ID", "Response ID", "Response value", "Answer requirement", "Human-friendly question label"]];
-  out.push(["PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA", "", d.rows.length > 0 ? "true" : "false", "REQUIRED", "Does your app collect or share any of the required user data types?"]);
+  // With no rows we cannot say "false": sign-in and third-party SDKs (see the questions list) may still collect data.
+  if (d.rows.length > 0) out.push(["PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA", "", "true", "REQUIRED", "Does your app collect or share any of the required user data types?"]);
   for (const r of d.rows) {
     const q = `PSL_DATA_USAGE_RESPONSES:${r.playType}`;
     if (r.shared !== "unknown") out.push([`${q}:PSL_DATA_USAGE_COLLECTION_AND_SHARING`, r.shared ? "PSL_DATA_USAGE_COLLECTED_AND_SHARED" : "PSL_DATA_USAGE_ONLY_COLLECTED", "", "REQUIRED", `${r.dataType}: collected, shared or both`]);

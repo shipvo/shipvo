@@ -21,7 +21,7 @@ Any other capability is listed as a question for you. It is never dropped.
 
 ## What it writes
 
-- `data-safety.csv`: the derived answers in the Play Data safety import layout. Check the column and response ids against the template you export from Play Console before you import.
+- `data-safety.csv`: the derived answers in the Play Data safety import layout. With no data-touching capability, the CSV leaves out the "collects data" answer: sign-in or third-party SDKs may still collect data. Check the column and response ids against the template you export from Play Console before you import.
 - `privacy-policy.md`: a draft that names only what the app declares. Review it before you publish. It is not legal advice.
 
 The command prints "Filled without you: x of y fields". That counts only the derived Data safety rows, not the questions list, so it does not mean you are done.

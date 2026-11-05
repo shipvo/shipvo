@@ -6,7 +6,7 @@ export function renderPrivacyPolicy(d: StoreDetails): string {
   L.push("> **Draft. Review before publishing.** Made by `shipvo store details` from shipvo.json. It lists what the app declares and nothing else. It is not legal advice. Fill in every item under \"Still to confirm\".", "");
   L.push(`# Privacy policy for ${d.appName}`, "");
   L.push("## What this app can access", "");
-  if (d.rows.length === 0) L.push("The app declares no access to anything on your device beyond the app itself.");
+  if (d.rows.length === 0) L.push("The app declares no access to anything on your device beyond the app itself. It does not cover data you collect through sign-in or third-party SDKs.");
   else {
     L.push("The app declares access to the following:", "");
     for (const r of d.rows) L.push(`- **${r.dataType}**: used for ${r.purpose.toLowerCase()}.`);

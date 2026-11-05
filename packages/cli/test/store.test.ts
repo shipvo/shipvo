@@ -36,3 +36,8 @@ it("without --dry-run it exits 2 and writes nothing", async () => {
   expect(existsSync(join(app, "nope"))).toBe(false);
   exit.mockRestore(); err.mockRestore();
 });
+
+it("--out with no value falls back to .shipvo/store", async () => {
+  await store(["details", "--dry-run", "--out"]);
+  expect(existsSync(join(app, ".shipvo/store/data-safety.csv"))).toBe(true);
+});

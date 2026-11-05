@@ -73,10 +73,14 @@ describe("renderPrivacyPolicy", () => {
 });
 
 describe("renderDataSafetyCsv", () => {
-  it("has the header and says no data is collected when nothing is declared", () => {
+  it("has the header and leaves the collects-data answer out when nothing is declared", () => {
     const csv = renderDataSafetyCsv(deriveStoreDetails(none)).split("\n");
     expect(csv[0]).toBe("Question ID,Response ID,Response value,Answer requirement,Human-friendly question label");
-    expect(csv[1]).toContain("PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA,,false");
+    expect(csv.join("\n")).not.toContain("PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA");
+  });
+
+  it("says data is collected when a capability touches user data", () => {
+    expect(renderDataSafetyCsv(deriveStoreDetails(three))).toContain("PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA,,true");
   });
 
   it("writes purpose rows for derived answers and leaves unknown ones out", () => {
