@@ -74,6 +74,7 @@ export default {
       if (!obj) return new Response(JSON.stringify({ error: "no snapshot yet" }), { status: 404, headers: { "content-type": "application/json" } });
       return new Response(obj.body, { headers: { "content-type": "application/json", "cache-control": "no-store", "x-robots-tag": "noindex" } });
     }
+    if (url.pathname.replace(/\/+$/, "") === "/testers") return Response.redirect("https://groups.google.com/g/shipvo-testers", 302);
     if (url.pathname === "/hq") return Response.redirect("https://shipvo.dev/hq/", 301);
     if (url.pathname === "/.well-known/security.txt") return env.ASSETS.fetch(new Request(new URL("/security.txt", url).toString(), req));
     const moved = LEARN_REDIRECTS[url.pathname.replace(/\/+$/, "")];

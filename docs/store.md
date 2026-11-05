@@ -1,5 +1,7 @@
 # Store details
 
+This page is for developers and founders getting ready to submit to Google Play and the App Store. You will draft the answers the stores ask for and check your screenshot sizes. Nothing is uploaded and no store account is touched.
+
 `shipvo store details --dry-run [--out dir]` drafts what Google Play and the App Store will ask, from `shipvo.json`. This is slice 1 of the store work (#249): it only writes files. Nothing is uploaded and no store credentials are read. Without `--dry-run` the command exits 2 with "upload is not available yet; use --dry-run".
 
 ## What it reads
@@ -52,6 +54,28 @@ The tester rule is shown only for personal Play accounts that are not exempt. Ap
 
 `status` reads `store-plan.json` and prints one timeline per store. Each step is `todo`, `waiting` or `done`, followed by what you do next. `--mark <step>` sets a step to `done`; add `--as waiting` for a wait. With no plan file it says to run `setup`.
 
+## Get your 12 testers
+
+A new personal Google Play account must have at least 12 testers opted in to a closed test for 14 days in a row before you can apply for production. Read [Google's help page](https://support.google.com/googleplay/android-developer/answer/14151465) for the current rule. Organization accounts and personal accounts made before 13 Nov 2023 skip it.
+
+`shipvo store testers [--package id] [--track alpha] [--json]` prints the steps for your app. `store setup` and `store status` show the same advice on the `play-closed-test` step.
+
+1. In Play Console, make a closed testing track and upload your first build **by hand**. Play does not let the API do the first upload of a new app.
+2. Add testers as Google Groups on the track: your own group, and `shipvo-testers@googlegroups.com` (the Shipvo Testers group).
+3. Share your opt-in link: `https://play.google.com/apps/testing/<package>`.
+4. Join Shipvo Testers at [shipvo.dev/testers](https://shipvo.dev/testers/) and test other founders' apps. The community works because everyone tests.
+5. Keep 12 or more testers opted in for 14 days in a row. If the count drops below 12 the clock resets.
+
+Anyone can join Shipvo Testers. Members cannot see each other's emails, and only managers post. We cannot say how many testers will opt in.
+
+To add the group through the API, pass your own Play service account key (it needs access to the app in Play Console):
+
+```bash
+shipvo store testers --package com.example.shop --play-key play-key.json
+```
+
+The command opens a Play edit, reads the groups already on the track, adds Shipvo Testers to them, and commits. It never removes a group. The key is read once and not stored. Without `--play-key` no network call is made.
+
 ## Screenshots (fast mode)
 
 `shipvo store screenshots` renders your app in the simulator and writes store-sized files. It prints "fast mode: simulator render, not the native UI". The simulator runs your web build in headless Chromium, so fonts, safe areas and native widgets can differ from a phone.
@@ -70,3 +94,15 @@ Store mode (native capture on an emulator or simulator) is a later slice. Nothin
 The size numbers come from the table in `@shipvo/store` and issue #249. They were not re-checked against the Apple and Play pages when this command was added. Check them before you submit.
 
 See the package: [`packages/store`](../packages/store/README.md).
+
+## Troubleshooting
+
+**`upload is not available yet; use --dry-run`** (exit 2). Upload is not built. Add `--dry-run`.
+
+**A screenshot fails the checker (exit 1).** The command lists the files that failed. Fix those files, then run it again. Check the sizes against the store pages before you submit.
+
+## Next steps
+
+- [CLI guide](cli.md)
+- [Frameworks and adapters](adapters.md)
+- [Glossary](glossary.md)

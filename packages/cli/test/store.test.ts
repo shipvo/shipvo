@@ -150,3 +150,55 @@ it("store screenshots names a non-image file .bin, not by its first byte", async
   expect(code).toBe(1);
   expect(existsSync(join(app, "raw-junk/iphone/01-start.bin"))).toBe(true);
 });
+
+it("store testers prints the steps and makes no Play call without --play-key", async () => {
+  const f = vi.spyOn(globalThis, "fetch");
+  const log = vi.spyOn(console, "log"); log.mockClear();
+  await store(["testers", "--package", "com.example.shop"]);
+  const printed = log.mock.calls.map((c) => c.join(" ")).join("\n");
+  expect(printed).toContain("https://play.google.com/apps/testing/com.example.shop");
+  expect(printed).toContain("shipvo-testers@googlegroups.com");
+  expect(printed).toContain("14 days");
+  expect(printed).toContain("first upload of a new app to be made by hand");
+  expect(f).not.toHaveBeenCalled();
+  f.mockRestore();
+});
+
+it("store testers --json is parseable", async () => {
+  const log = vi.spyOn(console, "log"); log.mockClear();
+  await store(["testers", "--package", "com.example.shop", "--json"]);
+  const j = JSON.parse(log.mock.calls.map((c) => c.join(" ")).join("\n"));
+  expect(j.optInUrl).toBe("https://play.google.com/apps/testing/com.example.shop");
+  expect(j.group).toBe("shipvo-testers@googlegroups.com");
+  expect(j.api).toBeUndefined();
+});
+
+it("addTesterGroup keeps existing groups and commits one edit", async () => {
+  const { addTesterGroup } = await import("../src/store");
+  const calls: { url: string; method: string; body?: string }[] = [];
+  const fake = (async (url: string, init: any) => {
+    calls.push({ url, method: init.method, body: init.body });
+    const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200 });
+    if (url.endsWith("/edits")) return json({ id: "E1" });
+    if (init.method === "GET") return json({ googleGroups: ["mine@googlegroups.com"] });
+    return json({});
+  }) as unknown as typeof fetch;
+  const r = await addTesterGroup({ pkg: "com.example.shop", token: "t", group: "shipvo-testers@googlegroups.com", fetch: fake });
+  expect(r.groups).toEqual(["mine@googlegroups.com", "shipvo-testers@googlegroups.com"]);
+  const put = calls.find((c) => c.method === "PUT")!;
+  expect(put.url).toContain("/applications/com.example.shop/edits/E1/testers/alpha");
+  expect(JSON.parse(put.body!)).toEqual({ googleGroups: r.groups });
+  expect(calls.at(-1)!.url).toContain("/edits/E1:commit");
+});
+
+it("addTesterGroup does not write when the group is already there", async () => {
+  const { addTesterGroup } = await import("../src/store");
+  const methods: string[] = [];
+  const fake = (async (url: string, init: any) => {
+    methods.push(init.method);
+    return new Response(JSON.stringify(url.endsWith("/edits") ? { id: "E" } : { googleGroups: ["shipvo-testers@googlegroups.com"] }), { status: 200 });
+  }) as unknown as typeof fetch;
+  const r = await addTesterGroup({ pkg: "p", token: "t", group: "shipvo-testers@googlegroups.com", fetch: fake });
+  expect(r.added).toBe(false);
+  expect(methods).not.toContain("PUT");
+});
