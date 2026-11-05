@@ -20,6 +20,8 @@ What we measured: on 2026-11-05, on a GitHub Actions Linux runner (4 vCPU, AMD E
 
 ## 1. Create the app
 
+Already have an Expo app? Run `npx -y @shipvo/cli init` inside it instead: see [adopt mode](cli.md#adopt-mode). Then continue at step 2 or 3.
+
 ```bash
 npx -y @shipvo/cli init myshop --name "My Shop"
 cd myshop
@@ -31,7 +33,7 @@ If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with P
 
 `init` also writes `tests/app.test.ts`, which tests the starter screen. When you replace `App.tsx` with your own screens, replace or delete that file too, or `npm test` fails on buttons that no longer exist.
 
-To start from a reader app instead, add `--template content`: a list screen and a detail screen that read titles and text from `src/data/articles.json`, with a matching `tests/app.test.ts`. For this template, `src/data/articles.json` is the first thing to edit. `--template blank` is the default. `shipvo init --help` lists the templates.
+To start from a reader app instead, add `--template content`: a list screen and a detail screen that read titles and text from `src/data/articles.json`, with a matching `tests/app.test.ts`. For this template, `src/data/articles.json` is the first thing to edit. For a small shop (product list, product page, cart), use `--template shop`; edit `src/data/products.json`. `--template blank` is the default. `shipvo init --help` lists the templates.
 
 `init` writes a complete Expo app:
 
