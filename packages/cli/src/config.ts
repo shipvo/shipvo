@@ -12,6 +12,10 @@ export type ShipvoConfig = {
   publicKey: string;
   /** Hermes bytecode version(s) the app's shells run. If set, `shipvo publish` refuses bundles that differ. */
   hermesBytecodeVersion?: number | number[];
+  /** What AI agents may do through `@shipvo/mcp` owner commands. "ask" (default): irreversible commands need confirm: true. "deny": they are refused. "allow": no confirm step (the owner must set it). */
+  agentPolicy?: "ask" | "deny" | "allow";
+  /** Owner commands agents may never run. */
+  agentDeny?: string[];
   /** Where `shipvo publish` writes: the control plane's Cloudflare KV namespace. */
   kv?: { namespaceId: string };
   /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */
