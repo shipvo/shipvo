@@ -169,7 +169,7 @@ for (const [kind, file, title, maxBadRuns] of [
   const p = await publish(bundle("v1"), { bases: [] });
   stop(); await sleep(800); launch();
   const ev = await waitFor(() => healthy(p.release, p.at), 120_000);
-  if (ev) history.push({ rel: p.release, bytes: bundle("v1") }); else console.log("WARN could not restore a good release before the staged rollout scenario");
+  if (ev) history.push({ rel: p.release, bytes: bundle("v1") }); else await scenario("restore a good release before the staged rollout scenario", async () => ({ pass: false, release: p.release, error: "the device did not report the restored release healthy within 120 s" }));
 }
 
 await scenario("staged rollout: a device outside the cohort does not get the release", async () => {
