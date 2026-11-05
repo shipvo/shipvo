@@ -25,3 +25,5 @@ Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (on
 A new site check is a new file `services/site/scripts/check-<name>.mjs`; `run-checks.mjs` picks it up. Do not edit the `test` script in `services/site/package.json`.
 
 The ledger must list **every** shipped user-visible feature (owner goal: each one gets a video and a tutorial). Each run, compare it with `CHANGELOG.md`, `changes/` and merged PRs and add every missing row.
+
+Every row in `docs/content-coverage.md` must have a Docs link (owner goal, 6 Nov 2026): each run, fill the empty Docs cells first, newest features first, with a real page or section (what it is, who it is for, how to use it, every option, troubleshooting). Keep `docs/ROADMAP.md` "Shipped" complete and newest first; it feeds the public roadmap page at shipvo.dev/roadmap.

@@ -22,8 +22,8 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Merge bot | rules, no AI | every 30 min and after CI | `agent-merger.yml` |
 | QA engineer | Claude | nightly 01:41 UTC | `agent-qa.yml` |
 | Security engineer | Claude | Mondays 03:11 UTC | `agent-security.yml` |
-| Docs Lead | Claude | twice a day | `agent-docs.yml` |
-| Content Lead (blog and SEO) | Claude with web search | twice a day, one new post each run | `agent-blog.yml` |
+| Docs Lead | Claude | every 6 hours | `agent-docs.yml` |
+| Content Lead (blog and SEO) | Claude with web search | every 4 hours, one new post each run (goal: one per feature) | `agent-blog.yml` |
 | Founder Academy (tutorials) | Claude, runs every step for real | every 4 hours, one new tutorial each run (goal: one per feature) | `agent-tutorial.yml` |
 | Video Studio (education videos) | Claude, code-built scenes + simulator recordings + open-source narration | every 3 hours, one new video each run (goal: one per feature) | `agent-video.yml` |
 | Triage | Claude (issues only) | new issues from outside the team | `agent-triage.yml` |
