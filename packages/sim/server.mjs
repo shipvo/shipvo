@@ -77,6 +77,45 @@ async function epochOf(page) {
 }
 class SimError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
+// Network mocks: rules are { url: string | { regex, flags }, method?, response: { status, body, headers?, delayMs? } }.
+// A string url must equal the full request URL. Unmatched requests go on to the network. The first matching rule wins.
+function parseMockRules(rules) {
+  const bad = (m) => new SimError("mock_invalid", `mockNetwork: ${m}`);
+  if (!Array.isArray(rules)) throw bad("rules must be an array");
+  return rules.map((r, i) => {
+    const at = `rule ${i}`;
+    if (!r || typeof r !== "object") throw bad(`${at} must be an object`);
+    let url = r.url;
+    if (typeof url === "string" && url) { /* exact match */ }
+    else if (url && typeof url === "object" && typeof url.regex === "string") { try { url = new RegExp(url.regex, url.flags ?? ""); } catch (e) { throw bad(`${at} has an invalid url pattern: ${e.message}`); } }
+    else throw bad(`${at} needs a url: a non-empty string or a RegExp`);
+    if (r.method !== undefined && (typeof r.method !== "string" || !/^[A-Za-z]+$/.test(r.method))) throw bad(`${at} has an invalid method`);
+    const res = r.response;
+    if (!res || typeof res !== "object") throw bad(`${at} needs a response: { status, body }`);
+    if (!Number.isInteger(res.status) || res.status < 100 || res.status > 599) throw bad(`${at} response.status must be an integer from 100 to 599`);
+    if (res.delayMs !== undefined && (typeof res.delayMs !== "number" || !(res.delayMs >= 0) || res.delayMs > 60000)) throw bad(`${at} response.delayMs must be a number from 0 to 60000`);
+    if (res.headers !== undefined && (!res.headers || typeof res.headers !== "object" || Object.values(res.headers).some((v) => typeof v !== "string"))) throw bad(`${at} response.headers must map names to strings`);
+    if (res.body !== undefined && res.body !== null && typeof res.body !== "string" && typeof res.body !== "object") throw bad(`${at} response.body must be a string or JSON value`);
+    return { url, method: r.method?.toUpperCase(), response: res };
+  });
+}
+async function setNetworkMocks(s, rules) {
+  s.mocks = rules;
+  if (s.mockRouted) return;
+  s.mockRouted = true;
+  await s.ctx.route("**/*", async (route) => {
+    const req = route.request();
+    const hit = (s.mocks ?? []).find((m) => (m.method ? m.method === req.method() : true) && (typeof m.url === "string" ? m.url === req.url() : m.url.test(req.url())));
+    if (!hit) return route.fallback();
+    const { status, body, headers, delayMs } = hit.response;
+    if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
+    const isText = typeof body === "string";
+    const h = { "access-control-allow-origin": "*", ...(isText || body == null ? {} : { "content-type": "application/json" }), ...(headers ?? {}) };
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
+    return route.fulfill({ status, headers: h, body: body == null ? "" : isText ? body : JSON.stringify(body) });
+  });
+}
+
 async function screen(page) {
   await page.waitForTimeout(150);
   const epoch = await epochOf(page);
@@ -164,6 +203,8 @@ async function act(id, body) {
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); break;
     case "push_notification": await page.evaluate((n) => globalThis.__pnDevice?.push(n), { title: body.title ?? "", body: body.body ?? "", data: body.data ?? {} }); break;
+    case "mock_network": await setNetworkMocks(s, parseMockRules(body.rules)); break;
+    case "clear_network_mocks": await setNetworkMocks(s, []); break;
     case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
     case "open_notification": { const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {
@@ -185,7 +226,7 @@ async function act(id, body) {
     case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
     case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) await b.first().click(); else throw new Error("no Back button on this screen"); break; }
     case "screenshot": { const p = join(DIR, `${id}-${Date.now()}.png`); await page.screenshot({ path: p }); return { path: p, screen: await screen(page) }; }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, device_log, device_reset`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, device_log, device_reset, mock_network, clear_network_mocks`);
   }
   return { screen: await screen(page) };
 }

@@ -41,6 +41,24 @@ await phone.device.set({ online: false });
 await phone.waitFor("You're offline");
 ```
 
+**Mock the network**
+
+`phone.mockNetwork(rules)` stubs the app's `fetch` calls. The first matching rule answers. Requests that match no rule go to the network as usual. A new call replaces the earlier rules; `phone.clearNetworkMocks()` removes them all.
+
+A rule has `url` (a string that must equal the full request URL, or a RegExp), an optional `method`, and a `response` of `{ status, body, headers?, delayMs? }`. An object `body` is sent as JSON. A bad rule throws a `PhoneError` with code `mock_invalid`. Change the URL and labels to match your app.
+
+```ts
+await phone.mockNetwork([
+  { url: /\/api\/products/, method: "GET", response: { status: 500, body: { error: "boom" } } },
+  { url: "https://api.example.com/slow", response: { status: 200, body: "ok", delayMs: 2000 } },
+]);
+await phone.tap("Shop");
+await phone.waitFor("Something went wrong");
+await phone.clearNetworkMocks();
+```
+
+Mocks cover `fetch` and other browser requests in the simulated page. WebSockets and native networking are not covered.
+
 **Payment decline**
 
 ```ts

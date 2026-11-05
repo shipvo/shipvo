@@ -28,6 +28,27 @@ export type OpenOptions = {
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 /** An action the simulator refused. `code` is set for typed failures such as `no_url_listener` or `stale_ref`. */
 export class PhoneError extends Error { constructor(message: string, readonly code?: string) { super(message); this.name = "PhoneError"; } }
+/** One network stub. A string `url` must equal the full request URL; a RegExp is tested against it. No `method` means any method. */
+export type MockRule = {
+  url: string | RegExp;
+  method?: string;
+  response: { status: number; body?: string | object | null; headers?: Record<string, string>; delayMs?: number };
+};
+/** Check rules and turn them into JSON for the simulator. Throws `PhoneError` with code `mock_invalid`. @internal */
+export function encodeMockRules(rules: MockRule[]): unknown[] {
+  const bad = (m: string) => new PhoneError(`mockNetwork: ${m}`, "mock_invalid");
+  if (!Array.isArray(rules)) throw bad("rules must be an array");
+  return rules.map((r, i) => {
+    if (!r || typeof r !== "object") throw bad(`rule ${i} must be an object`);
+    if (!((typeof r.url === "string" && r.url) || r.url instanceof RegExp)) throw bad(`rule ${i} needs a url: a non-empty string or a RegExp`);
+    if (r.method !== undefined && (typeof r.method !== "string" || !/^[A-Za-z]+$/.test(r.method))) throw bad(`rule ${i} has an invalid method`);
+    const res = r.response;
+    if (!res || typeof res !== "object") throw bad(`rule ${i} needs a response: { status, body }`);
+    if (!Number.isInteger(res.status) || res.status < 100 || res.status > 599) throw bad(`rule ${i} response.status must be an integer from 100 to 599`);
+    if (res.delayMs !== undefined && (typeof res.delayMs !== "number" || !(res.delayMs >= 0) || res.delayMs > 60000)) throw bad(`rule ${i} response.delayMs must be a number from 0 to 60000`);
+    return { ...r, url: r.url instanceof RegExp ? { regex: r.url.source, flags: r.url.flags.replace(/[gy]/g, "") } : r.url };
+  });
+}
 type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number };
 
 /** A simulated phone running your app. Every action returns once the screen has settled, and updates `screen`. */
@@ -108,6 +129,10 @@ export class Phone {
   async openNotification(id?: string): Promise<this> { await this.act("open_notification", { id }); return this; }
   /** Open a deep link in the app, as a push tap or share link would. Throws a `PhoneError` with code `no_url_listener` if the app has no `onUrl` listener. */
   async openUrl(url: string): Promise<this> { await this.act("open_url", { url }); return this; }
+  /** Stub `fetch` responses in the app. The first matching rule answers; unmatched requests go to the network. Replaces earlier rules. Throws `PhoneError` with code `mock_invalid` for a bad rule. */
+  async mockNetwork(rules: MockRule[]): Promise<this> { await this.act("mock_network", { rules: encodeMockRules(rules) }); return this; }
+  /** Remove every network stub. */
+  async clearNetworkMocks(): Promise<this> { await this.act("clear_network_mocks"); return this; }
   /** What the app did with the device: permission prompts and answers, location reads, scans, fingerprint checks, payments. */
   async deviceLog(): Promise<unknown[]> { return (await this.act("device_log")).log ?? []; }
   /** A PNG of the screen. Works when the test runs on the same machine as the simulator, as in CI. */
