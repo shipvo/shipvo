@@ -1,0 +1,420 @@
+{
+  "env": {
+    "date": "2026-11-05T04:18:55.983Z",
+    "host": {
+      "cpus": 4,
+      "cpu": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+      "node": "v22.23.4"
+    },
+    "device": {
+      "model": "sdk_gphone_x86_64",
+      "android": "11",
+      "api": 30,
+      "abi": "x86_64",
+      "emulator": true,
+      "fingerprint": "google/sdk_gphone_x86_64/generic_x86_64_arm64:11/RSR1.240422.006/12134477:userdebug/dev-keys"
+    },
+    "apk": {
+      "file": "/tmp/agent/shell.apk",
+      "bytes": 31762532
+    },
+    "publicKey": "kqTFzboY64ZwmQps20UakS2YbASQCZTk3pBt3J0DWLc=",
+    "trials": 3,
+    "bundles": {
+      "v1": 1876927,
+      "v2": 1876928,
+      "crash": 1876945
+    },
+    "shellVersion": "1.1.0",
+    "embeddedBundleBytes": 1522804
+  },
+  "scenarios": [
+    {
+      "name": "install and cold start on the bundled release",
+      "pass": true,
+      "firstLaunch": {
+        "totalMs": 964,
+        "waitMs": 965,
+        "reportedColdStartMs": 1221,
+        "alive": true,
+        "healthy": true
+      },
+      "runs": [
+        {
+          "totalMs": 964,
+          "waitMs": 965,
+          "reportedColdStartMs": 1221,
+          "alive": true,
+          "healthy": true
+        },
+        {
+          "totalMs": 880,
+          "waitMs": 883,
+          "reportedColdStartMs": 1117,
+          "alive": true,
+          "healthy": true
+        },
+        {
+          "totalMs": 924,
+          "waitMs": 943,
+          "reportedColdStartMs": 1224,
+          "alive": true,
+          "healthy": true
+        }
+      ],
+      "median": {
+        "totalMs": 924,
+        "waitMs": 943,
+        "reportedColdStartMs": 1221
+      },
+      "devicePolledPointer": false,
+      "cohort": 52,
+      "wallS": 9
+    },
+    {
+      "name": "first update after install: patch against the APK's own bundle",
+      "pass": true,
+      "release": 1,
+      "ok": true,
+      "pointerToHealthyMs": 782,
+      "via": "patch",
+      "downloadBytes": 341108,
+      "downloadMs": 237,
+      "applyMs": 238,
+      "bundleBytes": 1876927,
+      "patchesOffered": [
+        341108
+      ],
+      "fullBundleBytes": 1876927,
+      "wallS": 2
+    },
+    {
+      "name": "update: full bundle (no patches offered)",
+      "pass": true,
+      "trials": [
+        {
+          "release": 2,
+          "ok": true,
+          "pointerToHealthyMs": 773,
+          "via": "full",
+          "downloadBytes": 1876928,
+          "downloadMs": 133,
+          "applyMs": 201,
+          "bundleBytes": 1876928,
+          "patchesOffered": []
+        },
+        {
+          "release": 3,
+          "ok": true,
+          "pointerToHealthyMs": 740,
+          "via": "full",
+          "downloadBytes": 1876927,
+          "downloadMs": 133,
+          "applyMs": 213,
+          "bundleBytes": 1876927,
+          "patchesOffered": []
+        },
+        {
+          "release": 4,
+          "ok": true,
+          "pointerToHealthyMs": 992,
+          "via": "full",
+          "downloadBytes": 1876927,
+          "downloadMs": 151,
+          "applyMs": 231,
+          "bundleBytes": 1876927,
+          "patchesOffered": []
+        }
+      ],
+      "median": {
+        "pointerToHealthyMs": 773,
+        "downloadBytes": 1876927,
+        "downloadMs": 133,
+        "applyMs": 213
+      },
+      "wallS": 3
+    },
+    {
+      "name": "update: bsdiff patch from the running release",
+      "pass": true,
+      "trials": [
+        {
+          "release": 5,
+          "ok": true,
+          "pointerToHealthyMs": 443,
+          "via": "patch",
+          "downloadBytes": 296,
+          "downloadMs": 53,
+          "applyMs": 203,
+          "bundleBytes": 1876927,
+          "patchesOffered": [
+            296
+          ]
+        },
+        {
+          "release": 6,
+          "ok": true,
+          "pointerToHealthyMs": 503,
+          "via": "patch",
+          "downloadBytes": 27027,
+          "downloadMs": 54,
+          "applyMs": 189,
+          "bundleBytes": 1876927,
+          "patchesOffered": [
+            27027
+          ]
+        },
+        {
+          "release": 7,
+          "ok": true,
+          "pointerToHealthyMs": 10687,
+          "via": "patch",
+          "downloadBytes": 27220,
+          "downloadMs": 52,
+          "applyMs": 203,
+          "bundleBytes": 1876927,
+          "patchesOffered": [
+            27220
+          ]
+        }
+      ],
+      "median": {
+        "pointerToHealthyMs": 503,
+        "downloadBytes": 27027,
+        "downloadMs": 53,
+        "applyMs": 203
+      },
+      "wallS": 13
+    },
+    {
+      "name": "tampered bundle rejected: bad signature",
+      "pass": true,
+      "release": 8,
+      "runningBefore": 7,
+      "currentAfter": 7,
+      "pendingAfter": 0,
+      "devicePolledPointer": true,
+      "deviceDownloadedBundle": false,
+      "appStayedAlive": true,
+      "restartedOnRelease": 7,
+      "wallS": 38
+    },
+    {
+      "name": "tampered bundle rejected: bad hash",
+      "pass": true,
+      "release": 9,
+      "runningBefore": 7,
+      "currentAfter": 7,
+      "pendingAfter": 0,
+      "devicePolledPointer": true,
+      "deviceDownloadedBundle": true,
+      "appStayedAlive": true,
+      "restartedOnRelease": 7,
+      "wallS": 38
+    },
+    {
+      "name": "tampered bundle rejected: bad size",
+      "pass": true,
+      "release": 10,
+      "runningBefore": 7,
+      "currentAfter": 7,
+      "pendingAfter": 0,
+      "devicePolledPointer": true,
+      "deviceDownloadedBundle": true,
+      "appStayedAlive": true,
+      "restartedOnRelease": 7,
+      "wallS": 38
+    },
+    {
+      "name": "device recovers: valid release after tampered ones",
+      "pass": true,
+      "release": 11,
+      "ok": true,
+      "pointerToHealthyMs": 1326,
+      "via": "full",
+      "downloadBytes": 1876928,
+      "downloadMs": 154,
+      "applyMs": 245,
+      "bundleBytes": 1876928,
+      "patchesOffered": [],
+      "wallS": 2
+    },
+    {
+      "name": "rollback to the previous release",
+      "pass": true,
+      "trials": [
+        {
+          "release": 12,
+          "ok": true,
+          "pointerToHealthyMs": 794,
+          "via": "full",
+          "downloadBytes": 1876927,
+          "downloadMs": 144,
+          "applyMs": 196,
+          "bundleBytes": 1876927,
+          "patchesOffered": [],
+          "rolledBackToRelease": 7,
+          "deviceBundleMatches": true
+        },
+        {
+          "release": 13,
+          "ok": true,
+          "pointerToHealthyMs": 859,
+          "via": "full",
+          "downloadBytes": 1876928,
+          "downloadMs": 144,
+          "applyMs": 272,
+          "bundleBytes": 1876928,
+          "patchesOffered": [],
+          "rolledBackToRelease": 11,
+          "deviceBundleMatches": true
+        },
+        {
+          "release": 14,
+          "ok": true,
+          "pointerToHealthyMs": 871,
+          "via": "full",
+          "downloadBytes": 1876927,
+          "downloadMs": 158,
+          "applyMs": 200,
+          "bundleBytes": 1876927,
+          "patchesOffered": [],
+          "rolledBackToRelease": 12,
+          "deviceBundleMatches": true
+        }
+      ],
+      "median": {
+        "pointerToHealthyMs": 859,
+        "downloadBytes": 1876927,
+        "applyMs": 200
+      },
+      "wallS": 3
+    },
+    {
+      "name": "crash-loop: a release that crashes on start is discarded",
+      "pass": true,
+      "kind": "start",
+      "maxBadRuns": 3,
+      "trials": [
+        {
+          "release": 15,
+          "staged": true,
+          "boots": 3,
+          "badRuns": 2,
+          "restoredRelease": 14,
+          "restoredMs": 51998,
+          "blocked": 15,
+          "currentAfter": 14,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        },
+        {
+          "release": 16,
+          "staged": true,
+          "boots": 3,
+          "badRuns": 2,
+          "restoredRelease": 14,
+          "restoredMs": 52876,
+          "blocked": 16,
+          "currentAfter": 14,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        },
+        {
+          "release": 17,
+          "staged": true,
+          "boots": 3,
+          "badRuns": 2,
+          "restoredRelease": 14,
+          "restoredMs": 52596,
+          "blocked": 17,
+          "currentAfter": 14,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        }
+      ],
+      "median": {
+        "restoredMs": 52596,
+        "boots": 3,
+        "badRuns": 2
+      },
+      "wallS": 159
+    },
+    {
+      "name": "crash-loop: a release that crashes 5 s after markHealthy is reverted",
+      "pass": false,
+      "kind": "late",
+      "maxBadRuns": 3,
+      "trials": [
+        {
+          "release": 18,
+          "staged": true,
+          "boots": 9,
+          "badRuns": 8,
+          "restoredRelease": null,
+          "restoredMs": null,
+          "blocked": 17,
+          "currentAfter": 18,
+          "revertEventReported": false,
+          "redownloaded": false,
+          "pass": false
+        },
+        {
+          "release": 19,
+          "staged": false,
+          "boots": 10,
+          "badRuns": 9,
+          "restoredRelease": null,
+          "restoredMs": null,
+          "blocked": 17,
+          "currentAfter": 19,
+          "revertEventReported": false,
+          "redownloaded": false,
+          "pass": false
+        },
+        {
+          "release": 20,
+          "staged": false,
+          "boots": 10,
+          "badRuns": 9,
+          "restoredRelease": null,
+          "restoredMs": null,
+          "blocked": 17,
+          "currentAfter": 20,
+          "revertEventReported": false,
+          "redownloaded": false,
+          "pass": false
+        }
+      ],
+      "median": {
+        "restoredMs": null,
+        "boots": 10,
+        "badRuns": 9
+      },
+      "wallS": 634
+    },
+    {
+      "name": "staged rollout: a device outside the cohort does not get the release",
+      "pass": true,
+      "deviceBand": "b1",
+      "cohort": 52,
+      "publishedToBands": [
+        "b0",
+        "b2"
+      ],
+      "devicePollsWhileOutside": 4,
+      "devicePollStatuses": [
+        200
+      ],
+      "downloadsOfNewRelease": 0,
+      "currentWhileOutside": 21,
+      "joinedAfterWideningMs": 6476,
+      "wallS": 42
+    }
+  ],
+  "allPassed": false,
+  "serverLog": "/tmp/android-e2e/server.log"
+}

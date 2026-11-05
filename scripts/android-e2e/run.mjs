@@ -163,6 +163,15 @@ for (const [kind, file, title, maxBadRuns] of [
   return { pass: trials.every((t) => t.pass), kind, maxBadRuns, trials, median: summarize(trials, ["restoredMs", "boots", "badRuns"]) };
 });
 
+// The crash scenarios can leave the app dead or on a bad release (a late JS error destroys the React host but keeps the
+// process alive, see the device-lab report). Put the device back on a known good release so staged rollout is tested on its own.
+{
+  const p = await publish(bundle("v1"), { bases: [] });
+  stop(); await sleep(800); launch();
+  const ev = await waitFor(() => healthy(p.release, p.at), 120_000);
+  if (ev) history.push({ rel: p.release, bytes: bundle("v1") }); else console.log("WARN could not restore a good release before the staged rollout scenario");
+}
+
 await scenario("staged rollout: a device outside the cohort does not get the release", async () => {
   const others = ["b0", "b1", "b2"].filter((b) => b !== BAND), cur = good().rel;
   const p = await publish(bundle("v1"), { bands: others });
