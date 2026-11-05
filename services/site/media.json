@@ -1,5 +1,5 @@
 [
   {"slug":"test-with-an-assistant","file":"videos/test-with-an-assistant-e368a4d3.mp4","bytes":2485227,"sha256":"e368a4d3d359cbd97c0378f4ffdcac6f2b617ac51b4b6718bd333692f8a7cb4f","duration_s":90.2,"title":"Have an AI assistant test your shop before every release","created":"2026-11-05","credits":"/videos/test-with-an-assistant.credits.json"},
-  {"slug":"first-app","file":"videos/first-app-c7c64eb7.mp4","bytes":1417094,"sha256":"c7c64eb7ee6e095994c3f171f126dceede76d5671e2bb0133ba4626310e6066a","duration_s":97.2,"title":"Create your first app on a simulated phone","created":"2026-11-05"},
+  {"slug":"first-app","file":"videos/first-app-18b32972.mp4","bytes":2771934,"sha256":"18b32972c3d80e7f1eec619904fca7d7e8e3aeb7fdf70e67bc45b1ee5dacaee5","duration_s":99.1,"title":"Create your first app on a simulated phone","created":"2026-11-05"},
   {"slug":"ship-an-update","file":"videos/ship-an-update-988335b3.mp4","bytes":1337668,"sha256":"988335b3c6e2b8ae57befa6aa15eda3b1c2b9c1e69f040bcf6c7d14d27bcb0ce","duration_s":90.1,"title":"Ship an update to phones in minutes","created":"2026-11-04"}
 ]
