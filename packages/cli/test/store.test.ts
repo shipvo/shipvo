@@ -117,6 +117,22 @@ it("store screenshots rejects invalid routes with exit 2", async () => {
   expect(checkRoutes(["/", "/a"])).toBeUndefined();
 });
 
+it("store screenshots keeps one file per route when slugs collide, and rejects duplicate routes", async () => {
+  const { readdirSync } = await import("node:fs");
+  setRoutes(["/a/b", "/a-b", "/", "/home"]);
+  await store(["screenshots", "--out", "collide"], { render: stub });
+  process.exitCode = undefined;
+  for (const id of ["play-phone", "iphone-1206x2622"]) expect(readdirSync(join(app, "collide", id)).length, id).toBe(4);
+  const exit = vi.spyOn(process, "exit").mockImplementation(((c?: number) => { throw new Error(`exit ${c}`); }) as never);
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  setRoutes(["/", "/"]);
+  await expect(store(["screenshots"], { render: stub })).rejects.toThrow("exit 2");
+  expect(err.mock.calls.join("\n")).toContain("same path twice");
+  exit.mockRestore(); err.mockRestore();
+  setRoutes(undefined);
+  process.exitCode = undefined;
+});
+
 it("the Playwright renderer exits 2 with a message when sim-dist or playwright is missing", async () => {
   const exit = vi.spyOn(process, "exit").mockImplementation(((c?: number) => { throw new Error(`exit ${c}`); }) as never);
   const err = vi.spyOn(console, "error").mockImplementation(() => {});

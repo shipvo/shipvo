@@ -47,6 +47,7 @@ export function resolveStaticFile(dist: string, url: string): string {
 export function checkRoutes(routes: unknown): string | undefined {
   if (routes === undefined) return undefined;
   if (!Array.isArray(routes) || !routes.every((r) => typeof r === "string" && r.startsWith("/"))) return `"routes" in shipvo.json must be a list of paths that start with "/", for example ["/", "/cart"].`;
+  if (new Set(routes as string[]).size !== (routes as string[]).length) return `"routes" in shipvo.json lists the same path twice. Each screen must be a different path.`;
   return undefined;
 }
 
@@ -102,9 +103,14 @@ async function screenshots(rest: string[], deps: StoreDeps): Promise<void> {
       const list = set.id === "play-feature" ? routes.slice(0, 1) : routes;
       console.log(`\n${set.label} (${set.id}), ${set.width}x${set.height}:`);
       const ext = (b: Uint8Array) => (b[0] === 0x89 ? "png" : "jpg");
+      const used = new Set<string>();
       for (const route of list) {
         const bytes = await render(route, set);
-        const file = join(dir, `${slug(route)}.${ext(bytes)}`);
+        // Different routes can share a slug (/a/b and /a-b); add a number so no file is overwritten.
+        let name = slug(route);
+        for (let n = 2; used.has(name); n++) name = `${slug(route)}-${n}`;
+        used.add(name);
+        const file = join(dir, `${name}.${ext(bytes)}`);
         writeFileSync(file, bytes);
         const r = checkScreenshot(bytes, set.id);
         if (!r.ok) bad++;
