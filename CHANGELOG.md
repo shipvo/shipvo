@@ -2,6 +2,10 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## Unreleased
+
+- **@shipvo/runtime**: Android and iOS shells now refuse a release whose `hermes_bytecode_version` differs from the Hermes bytecode version of the shell's embedded bundle. The release is discarded and the current release keeps running. `consumeEvents()` returns `hermes_bytecode_mismatch:<release>:release=<n>:shell=<m>`, and `checkForUpdate` returns `{ status: "none", reason: "hermes_bytecode_mismatch" }`. A missing field on the release, or an embedded bundle that is not Hermes bytecode, means the release is applied as before. This runs in addition to the signature and hash checks. Migration: none; `CheckResult` gains an optional `reason`.
+
 ## 2026-11-04 (release)
 
 - **@shipvo/cli 0.1.3**: cli: readable publish --dry-run summary and working publish --help; runtime: bsdiff patches on iOS; cli: add `shipvo doctor` pre-publish setup checks; cli: starter app says 'local build' instead of 'release 0'; cli: add 'shipvo verify' to check a release pointer signature
@@ -13,7 +17,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
-- **@shipvo/runtime (Android)**: the shell now refuses a release whose `hermes_bytecode_version` differs from the Hermes bytecode version in the header of its embedded bundle. Nothing is downloaded or staged, the release is blocked so it is not fetched again, and the current release keeps running. `consumeEvents()` returns `hermes_bytecode_mismatch:<release>:release=<n>:shell=<m>` and `checkForUpdate` returns `{ status: "none", reason: "hermes_bytecode_mismatch" }`. A missing field, a value that is not a whole positive number, or an embedded bundle that is not Hermes bytecode means the release is applied as before. Signature and hash checks are unchanged. iOS is not part of this change. Migration: none; `CheckResult` gains an optional `reason`.
+- **Config plugin: declare Hermes bytecode versions and native modules.** `@shipvo/runtime/app.plugin.js` takes optional `hermesBytecodeVersions` (array of integers) and `nativeModules` (package name to version). Android gets meta-data `dev.shipvo.HERMES_BYTECODE_VERSIONS` (`96,98`) and `dev.shipvo.NATIVE_MODULES` (`name@version,...`); iOS gets `ShipvoHermesBytecodeVersions` and `ShipvoNativeModules` in Info.plist, same format. A non-integer version or an empty package name throws. Omitted props write nothing. Migration: none needed. The runtime does not read or send these yet (next slices).
 
 - **MCP: simulator calls have a time limit.** Every call from `@shipvo/mcp` to the simulator now stops after 30 s (set `SHIPVO_SIM_TIMEOUT_MS` to change it). On timeout the tool returns `isError: true` with code `sim_timeout` (same shape as other simulator errors: `structuredContent` `{ ok, code, error }`) and says the action may still have run, so the agent should call `screen`. Timed-out actions are not retried. Migration: none needed.
 
