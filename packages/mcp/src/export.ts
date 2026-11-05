@@ -5,7 +5,8 @@ export type Step =
   | { kind: "type"; label: string; text: string; enter?: boolean; secret?: boolean; problem?: string; wait?: string }
   | { kind: "scroll"; direction: string; on?: { label: string; problem?: string }; wait?: string }
   | { kind: "back"; wait?: string }
-  | { kind: "device"; settings: Record<string, unknown> };
+  | { kind: "device"; settings: Record<string, unknown> }
+  | { kind: "manual"; what: string };
 
 export type OpenInfo = { app: string; dark?: boolean; seedCart?: unknown[] };
 type Item = { role: string; label: string };
@@ -23,13 +24,13 @@ export function items(tree: string): (Item & { ref: string })[] {
     if (!ref) continue;
     let text = (m[4] ?? "").trim();
     if (/^".*"$/.test(text)) text = unq(text.slice(1, -1));
-    out.push({ role: m[1]!, label: (m[2] === undefined ? "" : unq(m[2])) || text, ref });
+    out.push({ role: m[1]!, label: (m[2] === undefined ? "" : unq(m[2])) || (FIELDS.includes(m[1]!) ? "" : text), ref });
   }
   return out;
 }
 
 const FIELDS = ["textbox", "searchbox", "spinbutton", "combobox"];
-const SECRET = /\b(password|passcode|pin|pwd|secret|token|cvv|cvc)\b/i;
+const SECRET = /\b(password|passcode|pin|pwd|secret|token|cvv|cvc|otp)\b|one-time code|verification code|card number|security code/i;
 
 // Find the element with this ref and say whether @shipvo/test would resolve its label to exactly one element
 // (an exact match wins, else a case-insensitive substring: the same rule as `find` in @shipvo/test).
@@ -84,6 +85,8 @@ export function exportTest(open: OpenInfo, steps: Step[]): string {
       L.push(`  await phone.scroll(${q(s.direction)}${s.on ? `, ${q(s.on.label)}` : ""});`); wait(s.wait);
     } else if (s.kind === "back") {
       L.push(`  await phone.back();`); wait(s.wait);
+    } else if (s.kind === "manual") {
+      L.push(todo(`not exported: ${s.what} (replay by hand)`));
     } else L.push(`  await phone.device.set(${JSON.stringify(s.settings).replace(/"__ENV_(\w+)__"/g, "process.env.$1!")});`);
   }
   L.push(`});`, ``);

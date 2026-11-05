@@ -59,6 +59,12 @@ const sessions = new Map<string, { app: string; steps: number; startedAt: number
 const trees = new Map<string, string>();
 // What export_test needs per session: how it was opened and the steps taken since (no screenshots, no owner calls).
 const logs = new Map<string, { open: OpenInfo; steps: Step[] }>();
+const MAX_STEPS = 500;
+// A tool that changes the screen or device but has no script form: keep the new tree and note a manual step.
+const manual = (sid: string, what: string, r: Act) => {
+  if (r.ok) { if (r.screen != null) trees.set(sid, r.screen); logs.get(sid)?.steps.push({ kind: "manual", what }); }
+  return result(sid, r);
+};
 // Tool annotations (MCP hints): clients use them to decide what to run without asking.
 const RO = { readOnlyHint: true, destructiveHint: false };
 const WR = { readOnlyHint: false, destructiveHint: false };
@@ -81,6 +87,7 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
 // Remember a successful step for export_test. The target is looked up in the tree the agent acted on.
 function record(sid: string, action: string, prev: string | undefined, next: string, change: string, o: { ref?: string; rec?: Rec }) {
   const log = logs.get(sid); if (!log) return;
+  if (log.steps.length >= MAX_STEPS) return; // cap memory for sessions that never end
   const wait = change === "none" ? undefined : waitText(prev, next, o.rec?.text ? [o.rec.text] : []);
   if (action === "back") log.steps.push({ kind: "back", wait });
   else if (action === "scroll") { const on = o.ref ? target(prev, o.ref) : undefined; log.steps.push({ kind: "scroll", direction: o.rec?.direction ?? "down", on: on && { label: on.label, problem: on.problem }, wait }); }
@@ -176,18 +183,18 @@ server.tool("set_device", "Change what the simulated phone has: location, the ad
   online: z.boolean().optional(),
 }, WR, async ({ session, ...device }) => { need(session); const r = await sim("/act", { session, action: "set_device", device }); if (r.ok) logs.get(session)?.steps.push({ kind: "device", settings: redactDevice(device) }); return result(session, r); });
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
-  async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
+  async ({ session, title, body, data }) => { need(session); return manual(session, "push_notification", await sim("/act", { session, action: "push_notification", title, body, data })); });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await sim("/act", { session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() }, WR,
-  async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
+  async ({ session, id }) => { need(session); return manual(session, "open_notification", await sim("/act", { session, action: "open_notification", id })); });
 server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   async ({ session, url }) => { need(session); return result(session, await sim("/act", { session, action: "open_url", url })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Everything here is simulated: no real biometric check or money movement took place.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
 server.tool("device_reset", "Put the simulated phone back to a known state (permissions undetermined, default location, nothing in front of the camera, log cleared), optionally with a new profile.", { session: sid, platform: z.enum(["android", "ios"]).optional(), api: z.number().optional() }, WR,
-  async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
+  async ({ session, ...device }) => { need(session); return manual(session, "device_reset", await sim("/act", { session, action: "device_reset", device })); });
 
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, DEST, async ({ session }) => {
   need(session);

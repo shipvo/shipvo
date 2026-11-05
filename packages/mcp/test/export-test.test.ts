@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { exportTest } from "../src/export.js";
+import { exportTest, redactDevice } from "../src/export.js";
 
 const root = resolve(__dirname, "..");
 let out = ""; let fake: http.Server; let port = 0;
@@ -26,6 +26,8 @@ beforeAll(async () => {
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "shop", name: "Shop" }] }));
     if (req.url === "/session") { screen = "home"; return res.end(JSON.stringify({ ok: true, release: "local", screen: HOME })); }
+    if (b.action === "set_device") return res.end(JSON.stringify({ ok: true, screen: HOME }));
+    if (b.action === "open_notification" || b.action === "device_reset") { screen = "login"; return res.end(JSON.stringify({ ok: true, screen: LOGIN })); }
     if (b.action === "tap" && b.ref === "e4") screen = "login";
     if (b.action === "type") screen = "typed";
     if (b.action === "back") screen = "home";
@@ -84,7 +86,47 @@ describe("export_test", () => {
   });
 });
 
+describe("export_test through the tools", () => {
+  it("redacts a payment pin sent to set_device", async () => {
+    const c = await connect();
+    await c.callTool({ name: "open_app", arguments: { app: "shop", session: "p1" } });
+    await c.callTool({ name: "set_device", arguments: { session: "p1", payment: { nextResult: "approve", pin: "4242" } } });
+    const script = textOf(await c.callTool({ name: "export_test", arguments: { session: "p1" } }));
+    expect(script).toContain("process.env.SHIPVO_TEST_PAYMENT_PIN!");
+    expect(script).not.toContain("4242");
+    await c.close();
+  });
+  it("marks open_notification and device_reset as manual and reads the next tap from the new screen", async () => {
+    for (const tool of ["open_notification", "device_reset"]) {
+      const c = await connect();
+      await c.callTool({ name: "open_app", arguments: { app: "shop", session: "n1" } });
+      await c.callTool({ name: tool, arguments: { session: "n1" } });
+      await c.callTool({ name: "tap", arguments: { session: "n1", ref: "e4" } }); // "Continue" on LOGIN, "Sign in" on HOME
+      const script = textOf(await c.callTool({ name: "export_test", arguments: { session: "n1" } }));
+      expect(script).toContain(`// TODO: not exported: ${tool} (replay by hand)`);
+      expect(script).toContain(`await phone.tap("Continue");`);
+      expect(script).not.toContain(`phone.tap("Sign in")`);
+      await c.close();
+    }
+  });
+});
+
 describe("exportTest", () => {
+  it("emits scroll, enter and dark exactly", () => {
+    const s = exportTest({ app: "tide", dark: true }, [
+      { kind: "scroll", direction: "down" },
+      { kind: "scroll", direction: "right", on: { label: "Featured" } },
+      { kind: "type", label: "Search", text: "rod", enter: true },
+    ]);
+    expect(s).toContain('openApp({ app: "tide", dark: true })');
+    expect(s).toContain('  await phone.scroll("down");');
+    expect(s).toContain('  await phone.scroll("right", "Featured");');
+    expect(s).toContain('  await phone.type("Search", "rod", { enter: true });');
+  });
+  it("redactDevice leaves a device without payment alone", () => {
+    const d = { online: false };
+    expect(redactDevice(d)).toBe(d);
+  });
   it("never writes a payment pin", () => {
     const s = exportTest({ app: "tide" }, [{ kind: "device", settings: { payment: { nextResult: "approve", pin: "__ENV_SHIPVO_TEST_PAYMENT_PIN__" } } }]);
     expect(s).toContain('"pin":process.env.SHIPVO_TEST_PAYMENT_PIN!');
