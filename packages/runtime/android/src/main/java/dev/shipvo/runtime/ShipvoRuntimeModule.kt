@@ -146,6 +146,11 @@ class ShipvoRuntimeModule : Module() {
     val shellVersion = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "0.0.0"
     require(!Verify.semverLess(shellVersion, body.getString("min_shell_version"))) { "shell too old for release $release" }
     val verifyPointerMs = SystemClock.elapsedRealtime() - t0
+    // Beside the signature checks, not inside them: refuse a bundle built for another Hermes bytecode version.
+    HermesGuard.decide(release, body.opt("hermes_bytecode_version")) { try { ctx.assets.open("index.android.bundle") } catch (_: java.io.IOException) { null } }?.let { ev ->
+      s.addEvent(ev); s.block(release)
+      return mapOf("status" to "none", "reason" to HermesGuard.REASON)
+    }
 
     val core = body.getJSONObject("core")
     val wantSha = core.getString("sha256"); val wantSize = core.getLong("size")

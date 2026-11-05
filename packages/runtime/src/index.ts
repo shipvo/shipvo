@@ -11,6 +11,8 @@ export type CheckResult = {
   /** Shell 1.0.2+ (Android): "patch" when a bsdiff patch was applied, "full" otherwise. iOS always downloads "full". */
   via?: "patch" | "full"; bundleBytes?: number; patchError?: string | null;
   issuedAt?: string; error?: string;
+  /** Set with status "none" when a release was refused. "hermes_bytecode_mismatch": built for another Hermes bytecode version than this shell runs. */
+  reason?: "hermes_bytecode_mismatch";
 };
 export type HealthyResult = {
   release: number; coldStartMs: number; sinceLoadMs: number; promoted: boolean;

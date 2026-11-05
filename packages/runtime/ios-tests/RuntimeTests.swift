@@ -16,8 +16,8 @@ final class RuntimeTests: XCTestCase {
   }
   override func tearDown() { if let tmp { try? FileManager.default.removeItem(at: tmp) } }
 
-  private func store(_ app: String, shell: String = "1.0.0", binary: String = "1.0.0/1", key: String? = nil, hbc: [Int] = [], nm: [String: String] = [:]) -> Store {
-    let s = Store(overrides: .init(suite: "shipvo.test.\(UUID().uuidString)", dir: tmp, baseUrl: base, publicKey: key ?? pub, appId: app, shellMajor: 1, shellVersion: shell, binaryVersion: binary, hermesBytecodeVersions: hbc, nativeModules: nm))
+  private func store(_ app: String, shell: String = "1.0.0", binary: String = "1.0.0/1", key: String? = nil, hbc: [Int] = [], nm: [String: String] = [:], bundle: Bundle = .main) -> Store {
+    let s = Store(bundle: bundle, overrides: .init(suite: "shipvo.test.\(UUID().uuidString)", dir: tmp, baseUrl: base, publicKey: key ?? pub, appId: app, shellMajor: 1, shellVersion: shell, binaryVersion: binary, hermesBytecodeVersions: hbc, nativeModules: nm))
     s.binaryVersion = binary
     return s
   }
@@ -190,6 +190,58 @@ final class RuntimeTests: XCTestCase {
     }
   }
 
+  // MARK: Hermes guard through Updater.check
+
+  /// A directory that acts as the app bundle: `main.jsbundle` holds `head` (or is absent).
+  private func appBundle(_ head: Data?) throws -> Bundle {
+    let dir = tmp.appendingPathComponent("app-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    if let head { try (head + Data(count: 64)).write(to: dir.appendingPathComponent("main.jsbundle")) }
+    return Bundle(path: dir.path)!
+  }
+  private func hbc(_ v: Int) -> Data {
+    Data([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f, UInt8(v & 0xff), UInt8((v >> 8) & 0xff), UInt8((v >> 16) & 0xff), UInt8((v >> 24) & 0xff)])
+  }
+
+  func testCheckRefusesAReleaseBuiltForAnotherHermesVersion() async throws {
+    let s = store("hbc-mismatch", bundle: try appBundle(hbc(96)))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "none")
+    XCTAssertEqual(r["reason"] as? String, "hermes_bytecode_mismatch")
+    XCTAssertEqual(s.pendingRelease, 0)
+    XCTAssertNil(s.pendingPath)
+    XCTAssertEqual(s.blockedRelease, 5)
+    XCTAssertEqual(s.consumeEvents(), ["hermes_bytecode_mismatch:5:release=98:shell=96"])
+  }
+
+  func testCheckStagesWhenTheHermesVersionMatches() async throws {
+    let s = store("hbc-match", bundle: try appBundle(hbc(96)))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(s.pendingRelease, 5)
+    XCTAssertEqual(s.blockedRelease, 0)
+  }
+
+  func testCheckStagesWhenTheReleaseHasNoHermesField() async throws {
+    let s = store("good", bundle: try appBundle(hbc(96)))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+  }
+
+  func testCheckStagesWhenTheShellBundleIsNotHermesOrMissing() async throws {
+    for head in [Data("var a = 1;".utf8), nil] {
+      let s = store("hbc-mismatch", bundle: try appBundle(head))
+      let r = try await Updater.check(s)
+      XCTAssertEqual(r["status"] as? String, "staged")
+    }
+  }
+
+  func testShellVersionReadsMainJsbundleHeader() throws {
+    XCTAssertEqual(HermesGuard.shellVersion(try appBundle(hbc(96))), 96)
+    XCTAssertNil(HermesGuard.shellVersion(try appBundle(nil)), "no main.jsbundle")
+    XCTAssertNil(HermesGuard.shellVersion(try appBundle(Data("var a;".utf8))))
+  }
+
   func testNeverReadsTheAndroidPointer() async throws {
     let r = try await Updater.check(store("android-ptr"))
     XCTAssertEqual(r["status"] as? String, "none")
@@ -313,6 +365,40 @@ private extension Data {
   }
 }
 
+/// Needs no fixture server: the Hermes bytecode version rule is pure.
+final class HermesGuardTests: XCTestCase {
+  private func hbc(_ v: Int) -> Data {
+    Data([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f, UInt8(v & 0xff), UInt8((v >> 8) & 0xff), UInt8((v >> 16) & 0xff), UInt8((v >> 24) & 0xff)])
+  }
+
+  func testReadsVersionFromHeader() {
+    XCTAssertEqual(HermesGuard.version(of: hbc(96)), 96)
+    XCTAssertEqual(HermesGuard.version(of: hbc(300)), 300)
+    XCTAssertNil(HermesGuard.version(of: Data("var a = 1; // js".utf8)))
+    XCTAssertNil(HermesGuard.version(of: Data(count: 4)))
+  }
+
+  func testMismatchIsRefusedWithTypedReason() {
+    XCTAssertEqual(HermesGuard.mismatchEvent(release: 7, releaseVersion: 98, shellVersion: 96), "hermes_bytecode_mismatch:7:release=98:shell=96")
+  }
+
+  func testVersionFieldMustBeAWholePositiveNumber() {
+    XCTAssertEqual(HermesGuard.releaseVersionOf(96 as NSNumber), 96)
+    XCTAssertNil(HermesGuard.releaseVersionOf(96.5 as NSNumber))
+    XCTAssertNil(HermesGuard.releaseVersionOf("96"))
+    XCTAssertNil(HermesGuard.releaseVersionOf(0 as NSNumber))
+    XCTAssertNil(HermesGuard.releaseVersionOf(-3 as NSNumber))
+    XCTAssertNil(HermesGuard.releaseVersionOf(true as NSNumber))
+    XCTAssertNil(HermesGuard.releaseVersionOf(nil))
+  }
+
+  func testMatchIsAccepted() { XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: 96, shellVersion: 96)) }
+
+  func testMissingFieldIsAccepted() {
+    XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: nil, shellVersion: 96))
+    XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: 96, shellVersion: nil))
+  }
+}
 
 /// Answers pointer requests with a fixed reply and records their URLs. Everything else goes to the real fixture server.
 final class StubPointer: URLProtocol {
