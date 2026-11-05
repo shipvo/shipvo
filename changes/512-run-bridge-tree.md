@@ -1,0 +1,3 @@
+- `@shipvo/cli`: the `shipvo run` frame page now answers `tree` requests on the agent channel with an accessibility tree, in the simulator's line shape and with stable `eN` refs. The shared screen rules are applied first. Differences from the simulator tree are in `docs/run-bridge.md`.
+- `@shipvo/cli` now depends on `@shipvo/sim`; `@shipvo/sim` exports `./screen-rules.mjs`.
+- Migration: none.

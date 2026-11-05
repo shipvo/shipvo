@@ -7,6 +7,7 @@ import { createServer, type Server } from "node:http";
 import { join, extname, normalize, resolve, sep } from "node:path";
 import { loadConfig } from "./config.js";
 import { AGENT_PATH, isAgentRole, isLoopback, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
+import { bridgeScript } from "./run-bridge.js";
 import { acceptWebSocket, type Peer } from "./run-ws.js";
 import { portFree, rebuildInto } from "./sim.js";
 
@@ -40,7 +41,7 @@ export const FRAMES = {
 } as const;
 
 /** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. */
-export function runFramePage(platform: Platform, name: string): string {
+export function runFramePage(platform: Platform, name: string, token?: string): string {
   const f = FRAMES[platform];
   const title = name.replace(/[<>&"']/g, "");
   const top = platform === "android"
@@ -80,7 +81,7 @@ sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
 function fit(){var s=Math.min(1,(innerWidth-24)/${f.width},(innerHeight-60)/${f.height});var e=document.getElementById("fit");e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${f.width}px";e.style.height="${f.height}px"}
 addEventListener("resize",fit);fit();
-</script></body></html>`;
+</script>${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
 
 const TYPES: Record<string, string> = {
@@ -105,13 +106,16 @@ export function ensureShipvoIgnored(dir: string): void {
  */
 export function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string }): Promise<{ server: Server; port: number; token: string; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
-  const page = runFramePage(opts.platform, opts.name);
+  const token = randomBytes(24).toString("hex");
+  const page = runFramePage(opts.platform, opts.name, token);
+  const bridge = bridgeScript();
   const server = createServer((req, res) => {
     let path: string;
     try { path = decodeURIComponent((req.url ?? "/").split("?")[0]); }
     catch { res.writeHead(400); return void res.end("Bad request"); }
     if (path === "/app") { res.writeHead(302, { location: "/app/" }); return void res.end(); }
     if (path === "/" || path === "/index.html") { res.writeHead(200, { "content-type": TYPES[".html"] }); return void res.end(page); }
+    if (path === "/__shipvo/bridge.js") { res.writeHead(200, { "content-type": TYPES[".js"], "cache-control": "no-store" }); return void res.end(bridge); }
     let rel = path.startsWith("/app/") ? path.slice(4) : path;
     if (rel.endsWith("/")) rel += "index.html";
     const file = normalize(join(root, rel));
@@ -126,7 +130,6 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
     res.writeHead(200, { "content-type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream" });
     res.end(readFileSync(target));
   });
-  const token = randomBytes(24).toString("hex");
   const peers: Partial<Record<AgentRole, Peer>> = {};
   server.on("upgrade", (req, socket) => {
     const refuse = (line: string) => socket.end(`HTTP/1.1 ${line}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);

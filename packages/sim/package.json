@@ -12,6 +12,7 @@
   },
   "exports": {
     "./server.mjs": "./server.mjs",
+    "./screen-rules.mjs": "./screen-rules.mjs",
     "./package.json": "./package.json"
   },
   "files": [
