@@ -1,9 +1,9 @@
 // Issue #458. Every standalone link, button and <summary> on every sitemap page is at least 44x44 px
-// at 390x844 and 768x1024, and the page does not scroll sideways. Exempt: links inside p, li, td, pre.
+// at 390x844 and 768x1024, and the page does not scroll sideways. Exempt: links inside p, td and pre, and links inside li outside nav, header and footer.
 // Uses Chromium over CDP (no extra dependency). Skipped with a note when no Chromium is found, unless CI=true.
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join, extname } from 'node:path';
@@ -29,7 +29,7 @@ const server = createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
-const PORT = 9400 + Math.floor(Math.random() * 500), PROF = `/tmp/agent/chrome-tap-${process.pid}`;
+const PORT = 9400 + Math.floor(Math.random() * 500), PROF = `${tmpdir()}/chrome-tap-${process.pid}`;
 const chrome = spawn(chromeBin, ['--headless=new', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${PORT}`, `--user-data-dir=${PROF}`, 'about:blank'], { stdio: 'ignore' });
 const done = (c) => { chrome.kill(); server.close(); process.exit(c); };
 
@@ -57,13 +57,16 @@ try {
   const ws = new WebSocket(tab.webSocketDebuggerUrl);
   await new Promise((r) => (ws.onopen = r));
   let id = 0; const pending = new Map();
-  ws.onmessage = (m) => { const d = JSON.parse(m.data); pending.get(d.id)?.(d); };
+  const loadWaiters = [];
+  ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.method === 'Page.loadEventFired') loadWaiters.splice(0).forEach((r) => r()); pending.get(d.id)?.(d); };
   const cdp = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+  await cdp('Page.enable');
   for (const [w, h] of [[390, 844], [768, 1024]]) {
     await cdp('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: true });
     for (const p of paths) {
+      const loaded = new Promise((r) => { loadWaiters.push(r); setTimeout(r, 10000); });
       await cdp('Page.navigate', { url: base + p });
-      await new Promise((r) => setTimeout(r, 350));
+      await loaded;
       const v = (await cdp('Runtime.evaluate', { expression: probe, returnByValue: true })).result.result.value;
       if (!v) { failures.push(`${w}px ${p}: probe failed`); continue; }
       const o = JSON.parse(v);

@@ -209,7 +209,7 @@ footer.old{display:none}
 .chip.ok::before,.chip.down::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:8px;background:#7CE3A0;box-shadow:0 0 0 3px rgba(124,227,160,.18)}
 .chip.down::before{background:#FF7A7A;box-shadow:0 0 0 3px rgba(255,122,122,.18)}
 .link{color:var(--sky);font-weight:700}
-div>a.link,h3>a:only-child{display:inline-flex;align-items:center;min-height:44px}
+.pick h3>a,.panel-grid>div>a.link{display:inline-flex;align-items:center;min-height:44px}
 .link:hover{text-decoration:underline;text-underline-offset:3px}
 
 /* ===== tabs ===== */
