@@ -1,0 +1,126 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`shipvo eas setup > writes pinned profiles, build YAMLs, scheme and .gitignore > android.yml 1`] = `
+"# Written by \`shipvo eas setup\`. Safe to edit; setup will not overwrite this file.
+# Docs: https://docs.expo.dev/custom-builds/get-started/
+build:
+  name: Capacitor Android release
+  steps:
+    - eas/checkout
+    - eas/install_node_modules
+    - run:
+        name: Install JDK 21
+        command: |
+          source "$HOME/.sdkman/bin/sdkman-init.sh"
+          sdk install java 21-tem < /dev/null
+          set-env JAVA_HOME "$(sdk home java 21-tem)"
+    - run:
+        name: Build the web app
+        command: npm run build
+    - run:
+        name: Sync Capacitor
+        command: npx cap sync android
+    - eas/inject_android_credentials
+    - eas/run_gradle:
+        inputs:
+          command: :app:bundleRelease
+    - eas/find_and_upload_build_artifacts
+"
+`;
+
+exports[`shipvo eas setup > writes pinned profiles, build YAMLs, scheme and .gitignore > eas.json 1`] = `
+{
+  "build": {
+    "shipvo-android": {
+      "android": {
+        "buildType": "app-bundle",
+        "config": "android.yml",
+        "image": "latest",
+      },
+      "distribution": "store",
+    },
+    "shipvo-ios": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "ios": {
+        "config": "ios.yml",
+        "image": "macos-tahoe-26.5-xcode-26.6",
+        "node": "22",
+      },
+    },
+  },
+  "cli": {
+    "appVersionSource": "remote",
+  },
+  "submit": {
+    "shipvo-android": {
+      "android": {},
+    },
+    "shipvo-ios": {
+      "ios": {},
+    },
+  },
+}
+`;
+
+exports[`shipvo eas setup > writes pinned profiles, build YAMLs, scheme and .gitignore > ios.yml 1`] = `
+"# Written by \`shipvo eas setup\`. Safe to edit; setup will not overwrite this file.
+# Docs: https://docs.expo.dev/custom-builds/get-started/
+# Before the first build, run \`shipvo eas build\`: it creates the ios/App.xcodeproj link that the EAS CLI scheme check needs on your machine before upload.
+build:
+  name: Capacitor iOS release
+  steps:
+    - eas/checkout
+    - eas/install_node_modules
+    - run:
+        name: Build the web app
+        command: npm run build
+    - run:
+        name: Sync Capacitor
+        command: npx cap sync ios
+    - run:
+        name: Install CocoaPods dependencies
+        command: cd ios/App && pod install
+    - eas/resolve_apple_team_id_from_credentials:
+        id: resolve_apple_team_id
+    - eas/prebuild_credentials_ios:
+        inputs:
+          project_dir: ios
+    - eas/configure_ios_credentials
+    - run:
+        name: Write ExportOptions.plist
+        # Nothing else creates this file. The team id comes from the EAS credentials step above;
+        # the profile name is read from the Xcode project that eas/configure_ios_credentials updated.
+        command: |
+          BUNDLE_ID="$(xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -showBuildSettings | awk -F' = ' '/ PRODUCT_BUNDLE_IDENTIFIER /{print $2; exit}')"
+          PROFILE="$(xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -showBuildSettings | awk -F' = ' '/ PROVISIONING_PROFILE_SPECIFIER /{print $2; exit}')"
+          cat > ios/App/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>\${{ steps.resolve_apple_team_id.outputs.apple_team_id }}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict><key>$BUNDLE_ID</key><string>$PROFILE</string></dict>
+          </dict>
+          </plist>
+          PLIST
+    - run:
+        name: Archive with distribution signing
+        command: |
+          xcodebuild archive \\
+            -workspace ios/App/App.xcworkspace \\
+            -scheme App \\
+            -configuration Release \\
+            -archivePath build/App.xcarchive \\
+            DEVELOPMENT_TEAM="\${{ steps.resolve_apple_team_id.outputs.apple_team_id }}" \\
+            CODE_SIGN_STYLE=Manual
+          xcodebuild -exportArchive \\
+            -archivePath build/App.xcarchive \\
+            -exportPath build/export \\
+            -exportOptionsPlist ios/App/ExportOptions.plist
+    - eas/find_and_upload_build_artifacts
+"
+`;

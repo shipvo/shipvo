@@ -1,0 +1,2 @@
+- `site`: Learn is a top-level section at `/learn/` with a hub that lists every tutorial and video, generated at build time. Tutorials are at `/learn/<slug>/`, videos at `/learn/videos/`, the glossary at `/learn/glossary/`.
+- Migration: the old `/docs/learn/`, `/docs/first-app/`, `/docs/your-own-shop/`, `/docs/videos/` and `/docs/glossary/` URLs (and their `.md` versions) redirect with a 301.
