@@ -74,7 +74,7 @@ describe("wait_for and settle", () => {
   it("adds nothing without the fields", async () => {
     flips = []; const c = await opened();
     const r: any = await c.callTool({ name: "tap", arguments: { session: "w", ref: "e1" } });
-    expect(r.structuredContent).toBeUndefined(); expect(txt(r)).not.toContain("Waited:"); expect(reads).toBe(0);
+    expect(r.structuredContent.waited).toBeUndefined(); expect(txt(r)).not.toContain("Waited:"); expect(reads).toBe(0);
     await c.close();
   });
 });
