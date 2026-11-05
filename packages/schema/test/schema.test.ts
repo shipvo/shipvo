@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ShellManifest, ReleasePointer, GateReport, bandForCohort, canonicalize } from "../src/index";
+import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, GateReport, bandForCohort, canonicalize } from "../src/index";
 
 const sig = "AAAA".repeat(16);
 const manifest = {
@@ -68,5 +68,51 @@ describe("envelope", () => {
       core: { version: "1.0.0", sha256: h, size: 10, url: "c" }, min_shell_version: "1.0.0" };
     expect(ReleasePointerBody.safeParse(body).success).toBe(true);
     expect(SignedEnvelope.safeParse({ body: JSON.stringify(body), signature: "AAAA" }).success).toBe(true);
+  });
+});
+
+describe("native modules", () => {
+  const rel = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 3, issued_at: "2026-10-30T00:00:00Z",
+    core: { version: "1.0.0", sha256: "a".repeat(64), size: 10, url: "c" }, min_shell_version: "1.0.0", signature: sig };
+  it("both fields are optional and parse when present", () => {
+    const m = ShellManifest.safeParse(manifest); expect(m.success && m.data.native_modules).toBeUndefined();
+    const m2 = ShellManifest.safeParse({ ...manifest, native_modules: { "react-native-camera-kit": "14.1.0" } });
+    expect(m2.success && m2.data.native_modules).toEqual({ "react-native-camera-kit": "14.1.0" });
+    expect(ShellManifest.safeParse({ ...manifest, native_modules: { x: "latest" } }).success).toBe(false);
+    const r = ReleasePointer.safeParse(rel); expect(r.success && r.data.required_native_modules).toBeUndefined();
+    const r2 = ReleasePointer.safeParse({ ...rel, required_native_modules: { x: "^1.0.0" } });
+    expect(r2.success && r2.data.required_native_modules).toEqual({ x: "^1.0.0" });
+  });
+  it("satisfiesRange", () => {
+    expect(satisfiesRange("1.2.3", "^1.0.0")).toBe(true);
+    expect(satisfiesRange("2.0.0", "^1.0.0")).toBe(false);
+    expect(satisfiesRange("0.2.5", "^0.2.1")).toBe(true);
+    expect(satisfiesRange("0.3.0", "^0.2.1")).toBe(false);
+    expect(satisfiesRange("2.1.9", "~2.1.0")).toBe(true);
+    expect(satisfiesRange("2.2.0", "~2.1.0")).toBe(false);
+    expect(satisfiesRange("1.5.0", ">=1.2.0 <2.0.0")).toBe(true);
+    expect(satisfiesRange("3.0.0", "^1.0.0 || ^3.0.0")).toBe(true);
+    expect(satisfiesRange("1.9.0", "1.x")).toBe(true);
+    expect(satisfiesRange("1.2.3", "*")).toBe(true);
+    expect(satisfiesRange("1.2.3", "banana")).toBe(false);
+    expect(satisfiesRange("1.5.0", "1.2.3 - 2.0.0")).toBe(true);
+    expect(satisfiesRange("2.0.1", "1.2.3 - 2.0.0")).toBe(false);
+    expect(satisfiesRange("1.0.0", "1.2.3 - 2.0.0")).toBe(false);
+    expect(satisfiesRange("1.5.0", ">= 1.0.0")).toBe(true);
+    expect(satisfiesRange("0.5.0", ">= 1.0.0")).toBe(false);
+    expect(satisfiesRange("1.5.0", ">= 1.2.0 < 2.0.0")).toBe(true);
+    expect(satisfiesRange("1.2.5", "^ 1.2.0")).toBe(true);
+    expect(satisfiesRange("1.2.5", "<=1.2")).toBe(true);
+    expect(satisfiesRange("1.3.0", "<=1.2")).toBe(false);
+    expect(satisfiesRange("1.9.9", "<=1")).toBe(true);
+    expect(satisfiesRange("2.0.0", "<=1")).toBe(false);
+    expect(satisfiesRange("1.2.4", "<=1.2.3")).toBe(false);
+  });
+  it("checkNativeModules gives typed reasons", () => {
+    expect(checkNativeModules({ x: "^1.0.0" }, { y: "1.0.0" })).toEqual({ reason: "native_module_missing", module: "x", required: "^1.0.0" });
+    expect(checkNativeModules({ x: "^2.0.0" }, { x: "1.0.0" })?.reason).toBe("native_module_version");
+    expect(checkNativeModules({ x: "^1.0.0" }, { x: "1.4.0" })).toBeNull();
+    expect(checkNativeModules(undefined, { x: "1.0.0" })).toBeNull();
+    expect(checkNativeModules({ x: "^1.0.0" }, undefined)).toBeNull();
   });
 });

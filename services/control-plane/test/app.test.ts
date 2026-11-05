@@ -35,6 +35,20 @@ describe("control plane", () => {
     // release without the field is offered to any shell
     expect((await app.request("/p/tide/1/b0.json?hbc=98", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(200);
   });
+  it("filters releases by the shell's native modules", async () => {
+    const withN = JSON.stringify({ body: JSON.stringify({ ...body, required_native_modules: { "@scope/maps": "^2.0.0" } }), signature: "AAAA" });
+    const env = { POINTERS: kv({ "p/tide/1/b0": withN }) } as any;
+    const missing = await app.request("/p/tide/1/b0.json?nm=other@1.0.0", {}, env);
+    expect(missing.status).toBe(404); expect(await missing.json()).toMatchObject({ error: "native_module_missing", module: "@scope/maps" });
+    const old = await app.request("/p/tide/1/b0.json?nm=@scope/maps@1.9.0", {}, env);
+    expect(old.status).toBe(404); expect(await old.json()).toMatchObject({ error: "native_module_version", have: "1.9.0", required: "^2.0.0" });
+    expect((await app.request("/p/tide/1/b0.json?nm=@scope/maps@2.3.0,other@1.0.0", {}, env)).status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json", {}, env)).status).toBe(200); // shell side unknown
+    expect((await app.request("/p/tide/1/b0.json?nm=other@1.0.0", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(200); // release side unknown
+    const pre = await app.request("/p/tide/1/b0.json?nm=@scope/maps@2.0.0-rc.1", {}, env);
+    expect(pre.status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json?nm=junk", {}, env)).status).toBe(400);
+  });
   it("404, 400 and corrupt", async () => {
     expect((await app.request("/p/tide/1/b0.json", {}, { POINTERS: kv({}) } as any)).status).toBe(404);
     expect((await app.request("/p/tide/1/zz.json", {}, { POINTERS: kv({}) } as any)).status).toBe(400);
