@@ -22,7 +22,11 @@ Coming soon.
 
 ## Test
 
-Coming soon. Until then, see [Test with an assistant](../test-with-an-assistant.md).
+| Tutorial | You will | Time | Level |
+| --- | --- | --- | --- |
+| [Have an AI assistant test your shop before every release](test-with-an-assistant.md) | Connect Claude or Cursor to your shop, have it shop like a customer, turn its run into a test and run it before a practice release | about two minutes of commands, plus 20 minutes to set up your assistant | Beginner |
+
+For ChatGPT and for apps that are already published, see [Test with an assistant](../test-with-an-assistant.md).
 
 ## Ship updates
 
