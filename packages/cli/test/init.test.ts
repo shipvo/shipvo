@@ -25,3 +25,19 @@ it("the starter does not claim a release before one exists", () => {
   expect(app).not.toMatch(/runningRelease \?\? 0/);
   expect(test).toContain('toSee("Hello from My Shop.")');
 });
+
+it("prints next steps in order", () => {
+  const dir = join(tmp, "my-shop");
+  const lines = (console.log as any).mock.calls.map((c: any[]) => String(c[0]));
+  const iNext = lines.findIndex((l) => l.includes("Next steps:"));
+  const iCd = lines.findIndex((l) => l.includes(`1. cd ${dir}`));
+  const iDoctor = lines.findIndex((l) => l.includes("2. npx shipvo doctor"));
+  const iSim = lines.findIndex((l) => l.includes("3. npm run sim"));
+  const iPublish = lines.findIndex((l) => l.includes("4. npx shipvo publish --dry-run"));
+
+  expect(iNext).toBeGreaterThanOrEqual(0);
+  expect(iNext).toBeLessThan(iCd);
+  expect(iCd).toBeLessThan(iDoctor);
+  expect(iDoctor).toBeLessThan(iSim);
+  expect(iSim).toBeLessThan(iPublish);
+});
