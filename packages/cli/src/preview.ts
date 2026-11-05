@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep, extname } from "node:path";
 import { args as parse, loadConfig } from "./config.js";
+import { RECORDER_JS } from "./preview-recorder.js";
 
 const API = "https://here.now/api/v1";
 const CLIENT = "shipvo/cli";
@@ -89,17 +90,25 @@ body.dark{background:#15171a;color:#eee}
 .stage{display:flex;justify-content:center;padding:0 10px 20px}
 iframe{border:0;background:#fff;border-radius:28px;box-shadow:0 8px 30px #0005;width:360px;height:760px;max-width:100%}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
-@media (max-width:500px){.bar,.note{display:none}.stage{padding:0}iframe{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0;box-shadow:none}}
+.panel{max-width:520px;margin:0 auto;padding:0 12px 24px;text-align:center}.panel p{opacity:.8}.panel button{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
+@media (max-width:500px){.bar,.note,.panel{display:none}.stage{padding:0}iframe{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0;box-shadow:none}}
 </style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-device="phone" aria-pressed="true">Phone</button><button data-device="iphone" aria-pressed="false">iPhone</button><button data-device="tablet" aria-pressed="false">Tablet</button>
 <button id="theme" aria-pressed="false">Dark</button></div>
 <div class="stage"><iframe id="app" src="app.html" title="${title}"></iframe></div>
 <p class="note">${title}: simulated device, public preview. System sheets such as permissions and payments are simulated.</p>
-<script>
+<section class="panel" aria-label="Recorder"><p id="honesty">This is the app's web build on Shipvo's simulated device, measured against Android and iOS in <a href="https://github.com/shipvo/shipvo/blob/main/docs/parity-results.md">docs/parity-results.md</a>. Native-only UI can differ.</p>
+<button id="rec" aria-pressed="false">Record</button> <button id="dl" disabled>Download test</button> <span id="count" aria-live="polite">0 steps</span></section>
+<script>${RECORDER_JS}
+var APP=${JSON.stringify(title)},recording=false;
+function step(s){if(recording){shipvoSteps.push(s);document.getElementById("count").textContent=shipvoSteps.length+" steps";document.getElementById("dl").disabled=false}}
+document.getElementById("app").addEventListener("load",function(){shipvoAttach(this,step)});
+document.getElementById("rec").onclick=function(){recording=!recording;this.setAttribute("aria-pressed",recording);this.textContent=recording?"Stop":"Record"};
+document.getElementById("dl").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([shipvoExport(APP,shipvoSteps)],{type:"text/typescript"}));a.download="recorded-session.test.ts";a.click()};
 var S={phone:[360,760],iphone:[390,844],tablet:[820,1180]},f=document.getElementById("app");
-document.querySelectorAll("[data-device]").forEach(function(b){b.onclick=function(){var s=S[b.dataset.device];f.style.width=s[0]+"px";f.style.height=s[1]+"px";document.querySelectorAll("[data-device]").forEach(function(o){o.setAttribute("aria-pressed",o===b)})}});
-var t=document.getElementById("theme");t.onclick=function(){var d=!document.body.classList.contains("dark");document.body.classList.toggle("dark",d);t.setAttribute("aria-pressed",d);t.textContent=d?"Light":"Dark";f.style.colorScheme=d?"dark":"light"};
+document.querySelectorAll("[data-device]").forEach(function(b){b.onclick=function(){var s=S[b.dataset.device];step({action:"note",text:"panel: device set to "+b.dataset.device});f.style.width=s[0]+"px";f.style.height=s[1]+"px";document.querySelectorAll("[data-device]").forEach(function(o){o.setAttribute("aria-pressed",o===b)})}});
+var t=document.getElementById("theme");t.onclick=function(){step({action:"note",text:"panel: theme toggled"});var d=!document.body.classList.contains("dark");document.body.classList.toggle("dark",d);t.setAttribute("aria-pressed",d);t.textContent=d?"Light":"Dark";f.style.colorScheme=d?"dark":"light"};
 </script></body></html>
 `;
 }
