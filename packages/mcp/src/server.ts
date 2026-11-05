@@ -20,10 +20,12 @@ const OWNER_TOKEN = process.env.PN_OWNER_TOKEN ?? "";
 // first use), or PN_APPS (JSON) to override. Falls back to the sample app when the simulator cannot be reached.
 const TIDE = { tide: { name: "Tide & Tackle", description: "Fishing-supplies shop in Douala: catalogue, cart, promo codes, delivery slots, cash or mobile money." } };
 type AppInfo = Record<string, { name: string; description: string }>;
+// Every call to the simulator has a time limit (default 30 s, SHIPVO_SIM_TIMEOUT_MS to change it).
+const simTimeoutMs = () => { const n = Number(process.env.SHIPVO_SIM_TIMEOUT_MS); return Number.isFinite(n) && n > 0 ? n : 30000; };
 async function localApps(): Promise<AppInfo> {
   if (process.env.PN_APPS) return JSON.parse(process.env.PN_APPS);
   try {
-    const r = await fetch(SIM + "/apps", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const r = await fetch(SIM + "/apps", { method: "POST", headers: { "content-type": "application/json" }, body: "{}", signal: AbortSignal.timeout(simTimeoutMs()) });
     if (r.ok) {
       const out: AppInfo = {};
       for (const a of ((await r.json()) as { apps?: { id: string; name?: string }[] }).apps ?? []) out[a.id] = { name: a.name ?? a.id, description: "The app this simulator serves." };
@@ -34,10 +36,20 @@ async function localApps(): Promise<AppInfo> {
 }
 
 type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string };
+// A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
+// call). It is never retried: the action may have run, so the agent should call `screen` and look.
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
-  const r = await fetch(SIM + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}. Is it running at ${SIM}?`);
-  return r.json() as Promise<Act>;
+  const ms = simTimeoutMs();
+  let r: Response;
+  try {
+    r = await fetch(SIM + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) });
+    if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}. Is it running at ${SIM}?`);
+    return (await r.json()) as Act;
+  } catch (e) {
+    if ((e as Error)?.name !== "TimeoutError") throw e;
+    const what = path === "/act" && typeof body.action === "string" ? `action "${body.action}"` : `request ${path}`;
+    return { ok: false, code: "sim_timeout", error: `the simulator did not answer ${what} within ${ms} ms. The action may still have run and the session may still be alive: call screen to see where it is.` };
+  }
 }
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
@@ -110,6 +122,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
 
 server.tool("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, RO, async () => {
   const r = await sim("/sessions", {}) as Act & { sessions?: { session: string; app: string; release: string | number; started_at: string | null }[] };
+  if (r.code === "sim_timeout") return result("", r);
   const rows = (r.sessions ?? []).filter((s) => !keyApps || keyApps.includes(s.app));
   return text(rows.length ? rows.map((s) => `${s.session}: ${s.app} release ${s.release}${s.started_at ? ` since ${s.started_at}` : ""}`).join("\n") : "no open sessions");
 });
@@ -126,6 +139,7 @@ server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/lef
 server.tool("back", "Go back one screen." + CH, { session: sid, compact }, WR, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
+  if (!r.ok && r.code === "sim_timeout") return result(session, r);
   if (!r.ok || !r.path) throw new Error(r.error ?? "no screenshot");
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
 });
@@ -142,13 +156,13 @@ server.tool("set_device", "Change what the simulated phone has: location, a barc
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
   async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,
-  async ({ session }) => { need(session); return text(JSON.stringify((await sim("/act", { session, action: "notifications" }) as { notifications?: unknown }).notifications ?? [], null, 2)); });
+  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "notifications" }) as Act & { notifications?: unknown }; if (r.code === "sim_timeout") return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() }, WR,
   async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
 server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   async ({ session, url }) => { need(session); return result(session, await sim("/act", { session, action: "open_url", url })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
-  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; return text(JSON.stringify({ note: "Everything here is simulated: no real biometric check or money movement took place.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
+  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (r.code === "sim_timeout") return result(session, r); return text(JSON.stringify({ note: "Everything here is simulated: no real biometric check or money movement took place.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
 server.tool("device_reset", "Put the simulated phone back to a known state (permissions undetermined, default location, nothing in front of the camera, log cleared), optionally with a new profile.", { session: sid, platform: z.enum(["android", "ios"]).optional(), api: z.number().optional() }, WR,
   async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
