@@ -1,5 +1,5 @@
 import vm from "node:vm";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -167,7 +167,63 @@ describe("device panel", () => {
     const r = runPanel("", {}, null); r.win.__pnDevice = undefined; r.click("pay-decline");
     expect(r.status.textContent).toMatch(/loading/);
   });
+  it("net-slow does not patch fetch while the app is loading", () => {
+    const r = runPanel("", {}, null); const orig = r.win.fetch; r.win.__pnDevice = undefined; r.click("net-slow");
+    expect(r.win.fetch).toBe(orig); expect(r.status.textContent).toMatch(/loading/);
+  });
   it("folds under the phone at phone width", () => {
     expect(framePage("Shop")).toMatch(/@media \(max-width:500px\)\{[^}]*\}?[^@]*\.panel\{width:auto/);
+  });
+});
+
+// The same panel script against the real simulated device (packages/device/src/index.web.ts), with a minimal document.
+describe("device panel against the real simulated device", () => {
+  const g = globalThis as any; const saved = { window: g.window, CustomEvent: g.CustomEvent, document: g.document };
+  let pn: any;
+  beforeAll(async () => {
+    g.window = { dispatchEvent: () => true, addEventListener() {}, removeEventListener() {} };
+    g.CustomEvent = class {};
+    g.document = { querySelectorAll: () => [], createElement: () => ({ style: {}, append() {}, appendChild() {}, setAttribute() {}, remove() {} }), body: { append() {}, appendChild() {} } };
+    await import("../../device/src/index.web");
+    pn = g.__pnDevice;
+  });
+  afterAll(() => { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete g[k]; else g[k] = v; } });
+  beforeEach(() => pn.reset());
+
+  it("location", () => {
+    runPanel("", { "location-list": "48.8566,2.3522" }, pn).click("location-set");
+    expect(pn.state.location).toEqual({ latitude: 48.8566, longitude: 2.3522, accuracy: 20 });
+    runPanel("", { lat: "-1.5", lng: "36.8" }, pn).click("coords-set");
+    expect(pn.state.location).toMatchObject({ latitude: -1.5, longitude: 36.8 });
+    runPanel("", { lat: "12abc", lng: "3" }, pn).click("coords-set");
+    expect(pn.state.location.latitude).toBe(-1.5);
+  });
+  it("camera", () => {
+    runPanel("", {}, pn).click("camera-set");
+    expect(pn.state.camera.barcode).toEqual({ type: "ean13", data: "6181234567890" });
+    expect(pn.state.camera.delayMs).toBe(800);
+    runPanel("", { "camera-list": "none|" }, pn).click("camera-set");
+    expect(pn.state.camera.barcode).toBeNull();
+  });
+  it("biometrics", () => {
+    const r = runPanel("", {}, pn); r.click("bio-fail"); expect(pn.state.biometrics).toMatchObject({ enrolled: true, nextResult: "fail" });
+    r.click("bio-success"); expect(pn.state.biometrics.nextResult).toBe("success");
+  });
+  it("payment", () => {
+    const r = runPanel("", {}, pn); r.click("pay-decline"); expect(pn.state.payment).toMatchObject({ nextResult: "decline", pin: "1234" });
+    r.click("pay-approve"); expect(pn.state.payment.nextResult).toBe("approve");
+  });
+  it("network", () => {
+    const r = runPanel("", {}, pn); r.click("net-offline"); expect(pn.state.online).toBe(false);
+    r.click("net-slow"); expect(pn.state.online).toBe(true);
+    r.click("net-offline"); r.click("net-online"); expect(pn.state.online).toBe(true);
+  });
+  it("push: blocked until permission is granted, then listed in the shade", () => {
+    pn.set({ permissions: { notifications: "undetermined" } });
+    const r = runPanel("", { "push-title": "Hi", "push-body": "Order shipped" }, pn); r.click("push-send");
+    expect(r.status.textContent).toMatch(/not delivered/i); expect(pn.notifications()).toEqual([]);
+    pn.set({ permissions: { notifications: "granted" } }); r.click("push-send");
+    expect(pn.notifications()).toEqual([expect.objectContaining({ title: "Hi", body: "Order shipped" })]);
+    expect(r.status.textContent).toMatch(/push sent/i);
   });
 });
