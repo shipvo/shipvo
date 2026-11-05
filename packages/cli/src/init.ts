@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { args as parse } from "./config.js";
-import { adopt, detectProject, isAdoptArgs } from "./adopt.js";
+import { adopt, detectProject, isAdoptArgs, positional } from "./adopt.js";
 
 const HOSTED = "https://api.shipvo.dev";
 const SDK = { expo: "~58.0.21", camera: "~58.0.14", clipboard: "~58.0.4", localAuth: "~58.0.2", location: "~58.0.20", notifications: "~58.1.7", statusBar: "~58.0.4", constants: "~58.0.0", metroRuntime: "~58.0.15", react: "19.3.0", rn: "0.88.1", rnw: "^0.21.4" };
@@ -46,7 +46,7 @@ Creates <dir> with a ready app. Every option is optional.
 const title = (s: string) => s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export async function init(argv: string[]) {
-  const [dirArg] = argv.filter((x) => !x.startsWith("--") && !argv[argv.indexOf(x) - 1]?.startsWith("--"));
+  const [dirArg] = positional(argv);
   const a = parse(argv);
   if (argv.includes("--help") || argv.includes("-h")) { console.log(INIT_HELP); return; }
   if (isAdoptArgs(argv) && (dirArg === "." || detectProject(process.cwd()).isExpo)) { await adopt(argv); return; }

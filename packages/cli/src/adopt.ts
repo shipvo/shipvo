@@ -68,7 +68,7 @@ export const isAdoptArgs = (argv: string[]) => {
   const pos = positional(argv);
   return pos.length === 0 || (pos.length === 1 && pos[0] === ".");
 };
-const positional = (argv: string[]) => argv.filter((x, i) => !x.startsWith("-") && !(argv[i - 1]?.startsWith("--") && !ADOPT_FLAGS.has(argv[i - 1].slice(2))));
+export const positional = (argv: string[]) => argv.filter((x, i) => !x.startsWith("-") && !(argv[i - 1]?.startsWith("--") && !ADOPT_FLAGS.has(argv[i - 1].slice(2))));
 const flag = (argv: string[], n: string) => { const i = argv.indexOf(`--${n}`); return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[i + 1] : undefined; };
 
 export async function adopt(argv: string[], dir = process.cwd(), overrides: Partial<AdoptDeps> = {}) {
@@ -124,6 +124,13 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   const wantDev = ["@shipvo/cli", "@shipvo/sim"].filter((n) => !have(n));
   if (wantDev.length) steps.push({ text: `Install ${wantDev.join(" and ")} as dev dependencies with ${p.packageManager}`, run: () => deps.install(p.packageManager, wantDev, dir, true) });
 
+
+  const gi = join(dir, ".gitignore");
+  const giText = existsSync(gi) ? readFileSync(gi, "utf8") : "";
+  if (!giText.split(/\r?\n/).some((l) => /^\/?\.shipvo\/?$/.test(l.trim())))
+    steps.push({ text: "Add .shipvo/ to .gitignore", run: () => writeFileSync(gi, giText + (giText && !giText.endsWith("\n") ? "\n" : "") + "# never commit the release signing seed\n.shipvo/\n") });
+
+  // .shipvo/ is ignored before the seed exists, so a stopped run never leaves it unignored.
   if (newSeed) steps.push({ text: "Create a signing key in .shipvo/seed.txt (git-ignored)", run: () => { mkdirSync(join(dir, ".shipvo"), { recursive: true }); writeFileSync(seedPath, newSeed!, { mode: 0o600 }); } });
 
   let printLines = false;
@@ -148,10 +155,6 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
     writeFileSync(path, JSON.stringify(j, null, /\n\t/.test(raw) ? "\t" : 2) + "\n");
   } });
 
-  const gi = join(dir, ".gitignore");
-  const giText = existsSync(gi) ? readFileSync(gi, "utf8") : "";
-  if (!giText.split(/\r?\n/).some((l) => /^\/?\.shipvo\/?$/.test(l.trim())))
-    steps.push({ text: "Add .shipvo/ to .gitignore", run: () => writeFileSync(gi, giText + (giText && !giText.endsWith("\n") ? "\n" : "") + "# never commit the release signing seed\n.shipvo/\n") });
 
   const wf = join(dir, ".github", "workflows", "publish.yml");
   if (!existsSync(wf)) steps.push({ text: "Add .github/workflows/publish.yml", run: () => { mkdirSync(join(dir, ".github", "workflows"), { recursive: true }); writeFileSync(wf, PUBLISH_WORKFLOW(p.packageManager)); } });

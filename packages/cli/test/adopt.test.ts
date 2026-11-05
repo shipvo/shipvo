@@ -142,3 +142,11 @@ it("the bare message says how to proceed if it is wrong", async () => {
   await expect(adopt(["--yes"], tmp, noop)).rejects.toThrow("exit 1");
   expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("remove the ios/ and android/ folders");
 });
+
+it("adds .shipvo/ to .gitignore before it writes the seed", async () => {
+  w("package.json", pkg()); w("app.json", JSON.stringify({ expo: { name: "Habits", slug: "habits" } }));
+  await adopt(["--dry-run"], tmp, noop);
+  const out = vi.mocked(console.log).mock.calls.map((c) => String(c[0])).join("\n");
+  expect(out.indexOf("Add .shipvo/ to .gitignore")).toBeGreaterThan(-1);
+  expect(out.indexOf("Add .shipvo/ to .gitignore")).toBeLessThan(out.indexOf("Create a signing key"));
+});
