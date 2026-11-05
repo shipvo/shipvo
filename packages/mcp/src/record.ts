@@ -2,11 +2,11 @@
 // Tree lines look like `- button "Add" [ref=e3]`, or YAML-quoted when they hold a colon.
 export type Found = { text: string; role: string; matches: number; passwordLike: boolean };
 
-const unquoteLine = (raw: string) => {
+export const unquoteLine = (raw: string) => {
   const q = /^(\s*- )'(.*)'(:.*)?$/.exec(raw);
   return q ? q[1] + q[2]!.replace(/''/g, "'") + (q[3] ?? "") : raw;
 };
-const parse = (raw: string): { role: string; text: string } | undefined => {
+export const parse = (raw: string): { role: string; text: string } | undefined => {
   const m = /^\s*- ([\w-]+)(?: ("(?:[^"\\]|\\.)*"))?/.exec(unquoteLine(raw));
   if (!m) return undefined;
   let text = "";

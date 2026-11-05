@@ -16,6 +16,7 @@ import { z } from "zod";
 import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
+import { satisfied, sameTree, wantsMatch, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
 const CONTROL = (process.env.PN_CONTROL ?? "https://api.shipvo.dev").replace(/\/$/, "");
@@ -67,18 +68,19 @@ const DEST = { readOnlyHint: false, destructiveHint: true };
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
-const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string; step?: Step } = {}) => {
+const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string; step?: Step; waited?: Waited } = {}) => {
   if (!r.ok || r.screen == null) return result(sid, r);
   const prev = trees.get(sid);
   trees.set(sid, r.screen);
   const change = prev === undefined ? "unknown (no earlier screen to compare)" : classify(prev, r.screen, action);
   if (o.step) steps.get(sid)?.push({ ...o.step, changed: prev === undefined ? undefined : change !== "none" });
   const head = [`Change: ${change}`];
+  if (o.waited) head.push(`Waited: ${o.waited.matched ? "matched" : "timed out"} after ${o.waited.ms} ms`);
   if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
   const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
   const res = result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
   const value = action === "type" ? (r.value ?? fieldValue(r.screen, o.ref ?? "")) : undefined;
-  return { ...res, structuredContent: { delivery: r.delivery ?? "delivered", ...(value !== undefined ? { value } : {}) } };
+  return { ...res, structuredContent: { delivery: r.delivery ?? "delivered", ...(value !== undefined ? { value } : {}), ...(o.waited ? { waited: o.waited } : {}) } };
 };
 const result = (sid: string, r: Act) => {
   const s = sessions.get(sid); if (s) s.steps++;
@@ -140,14 +142,37 @@ server.tool("list_sessions", "Open simulator sessions (phones) on this server: i
 const sid = z.string().describe("Session from open_app");
 const compact = z.boolean().optional().describe("When the change is 'content changed', return only the added/removed lines, not the whole screen");
 const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
+const waitFor = z.object({ ref: z.string().regex(/^e\d+$/).optional(), text: z.string().optional(), role: z.string().optional(), name: z.string().optional(), gone: z.boolean().optional() })
+  .refine((w) => wantsMatch(w), "give ref, text, or role and name").optional()
+  .describe("After the action, wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out.");
+const timeoutMs = z.number().int().min(0).max(30000).optional().describe("How long wait_for and settle may take, in ms (default 2000)");
+const settle = z.boolean().optional().describe("Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms");
+type Wait = { wait_for?: WaitFor; timeout_ms?: number; settle?: boolean };
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Poll the screen after an action. Returns the latest result and what happened. On timeout the action result is kept as is.
+async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; waited?: Waited }> {
+  if (!r.ok || r.screen == null || (!w.wait_for && !w.settle)) return { r };
+  const t0 = Date.now(), limit = w.timeout_ms ?? 2000, left = () => limit - (Date.now() - t0);
+  let cur = r, matched = true;
+  const read = async () => { const n = await sim("/act", { session, action: "screen" }); if (n.ok && n.screen != null) cur = { ...cur, screen: n.screen }; return n.ok && n.screen != null; };
+  if (w.wait_for) {
+    matched = satisfied(cur.screen!, w.wait_for);
+    while (!matched && left() > 0) { await sleep(Math.min(100, left())); if (await read()) matched = satisfied(cur.screen!, w.wait_for); }
+  }
+  if (w.settle && matched) {
+    matched = false;
+    while (left() > 0) { await sleep(Math.min(100, left())); const before = cur.screen!; if (await read() && sameTree(before, cur.screen!)) { matched = true; break; } }
+  }
+  return { r: cur, waited: { matched, ms: Date.now() - t0 } };
+}
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
 server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, WR, async ({ session, ref, compact }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
-server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact }, WR,
-  async ({ session, ref, text: t, enter, compact }) => { need(session); const tgt = findTarget(trees.get(session), ref); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
-server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact }, WR,
-  async ({ session, direction, ref, compact }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref }), { compact, step: { action: "scroll", direction } }); });
-server.tool("back", "Go back one screen." + CH, { session: sid, compact }, WR, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact, step: { action: "back" } }); });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "tap", ref }), { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
+server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
+  async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await sim("/act", { session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
+server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
+  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "scroll", direction, ref }), { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
+server.tool("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
   if (!r.ok) return result(session, r);
