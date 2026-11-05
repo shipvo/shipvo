@@ -30,8 +30,8 @@ beforeAll(async () => {
 });
 afterAll(() => { fake?.close(); if (out) rmSync(out, { recursive: true, force: true }); });
 
-async function connect() {
-  const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1" };
+async function connect(extra: Record<string, string> = {}) {
+  const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1", ...extra };
   delete env.PN_APPS;
   const c = new Client({ name: "test", version: "0" });
   await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
@@ -86,6 +86,35 @@ describe("local mcp", () => {
     for (const n of ["owner_command", "end_session"]) expect(by[n]?.destructiveHint, n).toBe(true);
     for (const n of ["open_app", "tap", "type", "scroll", "back", "set_device", "push_notification", "open_notification", "open_url", "device_reset"]) expect(by[n]?.readOnlyHint, n).toBe(false);
     await c.close();
+  });
+});
+
+describe("simulator timeout", () => {
+  it("returns sim_timeout within the limit and keeps serving", async () => {
+    let hang = true; const open: http.ServerResponse[] = [];
+    const slow = http.createServer(async (req, res) => {
+      let raw = ""; for await (const ch of req) raw += ch;
+      if (hang && (req.url === "/session" || (req.url === "/act" && JSON.parse(raw).action === "tap"))) { open.push(res); return; }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, screen: "heading Home" }));
+    });
+    await new Promise<void>((r) => slow.listen(0, r));
+    const p = (slow.address() as { port: number }).port;
+    const c = await connect({ PN_SIM: `http://localhost:${p}`, SHIPVO_SIM_TIMEOUT_MS: "500" });
+    const t0 = Date.now();
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "s", ref: "e1" } });
+    expect(Date.now() - t0).toBeLessThan(5000);
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent).toMatchObject({ ok: false, code: "sim_timeout" });
+    expect(textOf(r)).toContain('action "tap"');
+    expect(textOf(r)).toContain("call screen");
+    const o: any = await c.callTool({ name: "open_app", arguments: { app: "tide", session: "fresh" } });
+    expect(o.isError).toBe(true);
+    expect(o.structuredContent).toMatchObject({ ok: false, code: "sim_timeout" });
+    expect(textOf(o)).not.toContain("release: local");
+    hang = false;
+    expect(textOf(await c.callTool({ name: "screen", arguments: { session: "s" } }))).toBe("heading Home");
+    await c.close(); open.forEach((o) => o.destroy()); slow.close();
   });
 });
 
