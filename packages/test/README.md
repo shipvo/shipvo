@@ -20,6 +20,25 @@ npx shipvo sim          # the simulator, http://localhost:4545
 npx vitest run
 ```
 
+## Mock the network
+
+Stub what the app's `fetch` gets back, so you can test slow, empty and failing responses without a backend. Requests that match no rule go to the network as usual.
+
+```ts
+import { test, expect } from "@shipvo/test/vitest";
+
+test("shows an error when the catalogue is down", async ({ phone }) => {
+  await phone.mockNetwork([
+    { url: /\/api\/products/, status: 503, body: { error: "down" }, delayMs: 300 },
+  ]);
+  await phone.tap("Reload");
+  await phone.waitFor(/try again/i);
+  await phone.clearNetworkMocks(); // back to the real network
+});
+```
+
+A rule has `url` (a string that must equal the full request URL, or a RegExp), an optional `method` (any method if left out), `status`, `body` (a string, or an object sent as JSON), optional `headers` and optional `delayMs`. The first matching rule wins, and each `mockNetwork` call replaces the earlier rules. Only `fetch` and XHR calls are stubbed. A bad rule throws a `PhoneError` with code `mock_invalid`.
+
 ## Failure-path examples
 
 Runnable versions are in [`examples/flows.ts`](examples/flows.ts). They use the Tide & Tackle labels. Change them to match your app. The checkout flows need a cart, so open the phone with one: `openApp({ seedCart: [{ product_id: "rod-surf-36", quantity: 1 }] })`. The full purchase is in [`checkout.test.ts`](../../apps/tide-and-tackle/tests/checkout.test.ts).
