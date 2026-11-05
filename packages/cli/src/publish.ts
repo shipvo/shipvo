@@ -30,6 +30,24 @@ const platformsOf = (a: Record<string, string | undefined>): Platform[] => {
   throw new Error(`--platform must be android, ios or all (got "${a.platform}")`);
 };
 
+/**
+ * When the stage required by `policy.requireStageBeforeFull` went live: the oldest signed pointer `issued_at` across the platforms in use.
+ * Undefined if no rule applies, or if any pointer is missing or unreadable (unproven). Reads the real store, not the dry-run one.
+ */
+async function stageStart(cfg: ReturnType<typeof loadConfig>, bands: string[], platforms: Platform[]): Promise<Date | undefined> {
+  const sb = stageBandOf(cfg.policy);
+  if (!sb || !bands.includes("b2")) return undefined;
+  const kv = kvFor(cfg);
+  let oldest: Date | undefined;
+  for (const pf of platforms) {
+    let t: Date;
+    try { t = new Date(JSON.parse(JSON.parse((await kv.get(pointerKey(cfg.appId, cfg.shellMajor, sb, pf))) ?? "null").body).issued_at); } catch { return undefined; }
+    if (isNaN(t.getTime())) return undefined;
+    if (!oldest || t < oldest) oldest = t;
+  }
+  return oldest;
+}
+
 /** Unknown flags are errors: a typo like --dryrun must not fall through to a real publish. */
 function checkFlags(argv: string[], known: string[]) {
   const bad = argv.filter((x) => x.startsWith("--") && !known.includes(x.slice(2)));
@@ -83,7 +101,7 @@ Flags (write a value after a space, not =; on/off flags can be bare, or true/fal
   --max-bases N                How many older releases to build patches from (default 6)
   --skip-export               Reuse the last build in dist-ota/
   --skip-web                  Do not publish the web copy for the simulator
-  --dry-run-policy             Check shipvo.json policy for this publish, build nothing, exit 1 if refused
+  --dry-run-policy            Check shipvo.json policy for this publish, build nothing, exit 1 if refused
   --dry-run                    Build and sign, write files locally, send nothing
   --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)
   --help                       Show this help
@@ -95,11 +113,7 @@ export async function publish(argv: string[]) {
   const a = parse(argv), cfg = loadConfig();
   if (switchFlag(a, "dry-run-policy")) {
     const bands = (a.bands || "b0,b1,b2").split(",");
-    const sb = stageBandOf(cfg.policy);
-    let since: Date | undefined;
-    if (sb && bands.includes("b2")) { // the stage start is the signed pointer's issued_at; unreadable means unproven
-      try { since = new Date(JSON.parse(JSON.parse((await kvFor(cfg).get(`p/${cfg.appId}/${cfg.shellMajor}/${sb}`)) ?? "null").body).issued_at); if (isNaN(since.getTime())) since = undefined; } catch { since = undefined; }
-    }
+    const since = await stageStart(cfg, bands, platformsOf(a));
     const v = checkPublishPolicy(cfg.policy, bands, new Date(), process.env, since);
     if (!v.ok) { console.error(`Refused by policy rule ${v.rule}: ${v.reason}`); process.exitCode = 1; return; }
     console.log("Policy allows this publish."); return;
@@ -120,7 +134,7 @@ export async function publish(argv: string[]) {
   if (dry) console.error(`native modules this release requires: ${nativeModules ? Object.entries(nativeModules).map(([n, r]) => `${n}@${r}`).join(", ") : "none found"}`);
   const bands = (a.bands || "b0,b1,b2").split(",");
   if (dry) {
-    const verdict = checkPublishPolicy(cfg.policy, bands);
+    const verdict = checkPublishPolicy(cfg.policy, bands, new Date(), process.env, await stageStart(cfg, bands, platformsOf(a)));
     if (!verdict.ok) { console.error(`Refused by policy rule ${verdict.rule}: ${verdict.reason}`); process.exitCode = 1; return; }
   }
   const platforms = platformsOf(a);

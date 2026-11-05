@@ -158,9 +158,43 @@ describe("publish and the Hermes bytecode check", () => {
       await publish(["--dry-run-policy"]);
       expect(process.exitCode).toBeUndefined();
     });
+    it("refuses when the stage pointer is unreadable, or when one platform has none", async () => {
+      cfgPolicy.value = { requireStageBeforeFull: { percent: 10, minHours: 24 } };
+      values.set("p/demo/1/b1", "not json");
+      await publish(["--dry-run-policy"]);
+      expect(process.exitCode).toBe(1);
+      expect(out()).toMatch(/no release is live at 10%/);
+      process.exitCode = undefined;
+      values.set("p/demo/1/b1", JSON.stringify({ body: JSON.stringify({ release: 3, issued_at: "nope" }), signature: "x" }));
+      await publish(["--dry-run-policy"]);
+      expect(process.exitCode).toBe(1);
+      process.exitCode = undefined;
+      const old = JSON.stringify({ body: JSON.stringify({ release: 3, issued_at: new Date(Date.now() - 30 * 3_600_000).toISOString() }), signature: "x" });
+      values.set("p/demo/1/b1", old);
+      await publish(["--dry-run-policy", "--platform", "all"]); // no iOS pointer
+      expect(process.exitCode).toBe(1);
+      process.exitCode = undefined;
+      values.set("p/demo/1/ios/b1", old);
+      await publish(["--dry-run-policy", "--platform", "all"]);
+      expect(process.exitCode).toBeUndefined();
+    });
     it("a bad policy section throws naming the field", async () => {
       cfgPolicy.value = { maxCohortForAgents: "b9" };
       await expect(publish(["--dry-run-policy"])).rejects.toThrow(/policy\.maxCohortForAgents/);
+    });
+  });
+
+  describe("--dry-run with requireStageBeforeFull", () => {
+    const full = ["--skip-export", "true", "--skip-web", "true", "--dry-run"];
+    it("passes with an old b1 pointer and refuses without one", async () => {
+      withBundle(96);
+      cfgPolicy.value = { requireStageBeforeFull: { percent: 10, minHours: 24 } };
+      await publish(full);
+      expect(process.exitCode).toBe(1);
+      process.exitCode = undefined;
+      values.set("p/demo/1/b1", JSON.stringify({ body: JSON.stringify({ release: 3, issued_at: new Date(Date.now() - 30 * 3_600_000).toISOString() }), signature: "x" }));
+      await publish(full);
+      expect(process.exitCode).toBeUndefined();
     });
   });
 
