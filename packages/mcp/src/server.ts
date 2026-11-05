@@ -163,7 +163,7 @@ server.tool("set_device", "Change what the simulated phone has: location, the ad
   biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
   payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),
-}, WR, async ({ session, ...device }) => { need(session); const r = await sim("/act", { session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device }); return result(session, r); });
+}, WR, async ({ session, ...device }) => { need(session); const r = await sim("/act", { session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
   async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,

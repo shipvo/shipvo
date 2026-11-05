@@ -62,6 +62,16 @@ describe("export_test", () => {
     expect(t).not.toContain("screen(");
     await c.close();
   });
+  it("never exports the payment pin", async () => {
+    const c = await connect();
+    await c.callTool({ name: "open_app", arguments: { app: "shop", session: "s2" } });
+    await c.callTool({ name: "set_device", arguments: { session: "s2", payment: { nextResult: "approve", pin: "4321" } } });
+    const t = txt(await c.callTool({ name: "export_test", arguments: { session: "s2" } }));
+    expect(t).toContain("phone.device.set(");
+    expect(t).toContain("approve");
+    expect(t).not.toContain("4321");
+    await c.close();
+  });
   it("returns no_session for an unknown session", async () => {
     const c = await connect();
     const r: any = await c.callTool({ name: "export_test", arguments: { session: "ghost" } });
