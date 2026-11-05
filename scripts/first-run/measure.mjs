@@ -1,7 +1,9 @@
-// Times a new developer's first run offline: `shipvo init`, then `shipvo publish --dry-run`.
+// Times a new developer's first run: `shipvo init`, then `shipvo publish --dry-run`.
 // Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install]
-// The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets, no network.
-// With --with-install, also times `pnpm install` (or `npm install`) in the scaffolded app.
+// The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets.
+// Default run uses no network. With --with-install, also times an install in the scaffolded app,
+// which downloads packages (network). init prints `npm install (or pnpm / bun)`; we prefer pnpm
+// when it is on PATH, so the recorded number is quoted honestly.
 // The bundle export (`expo export`) needs an install and network, so it is not timed: a small
 // plain-JS bundle is staged where the export would write it, and publish runs with --skip-export.
 import { spawnSync } from "node:child_process";
@@ -52,10 +54,13 @@ export function measure(cli, withInstall = false) {
   const results = [];
   try {
     results.push(runStep("init", cli, ["init", app], root));
-    if (results[0].exit === 0) {
-      if (withInstall) {
-        results.push(runInstallStep(app));
-      }
+    let ok = results[0].exit === 0;
+    if (ok && withInstall) {
+      const inst = runInstallStep(app);
+      results.push(inst);
+      ok = inst.exit === 0;
+    }
+    if (ok) {
       const js = join(app, "dist-ota/_expo/static/js/android");
       mkdirSync(js, { recursive: true });
       writeFileSync(join(js, "index.js"), "console.log('first run');\n");
@@ -75,7 +80,8 @@ export function main(argv) {
   writeFileSync(out, JSON.stringify(results.map(({ step, ms, exit }) => ({ step, ms, exit })), null, 2) + "\n");
   console.log(table(results));
   if (withInstall) {
-    const pm = detectPackageManager();
+    const inst = results.find((r) => r.step === "install");
+    const pm = inst?.pm ?? detectPackageManager();
     const ver = spawnSync(pm, ["--version"], { encoding: "utf8" }).stdout.trim();
     console.log(`package manager: ${pm} ${ver}`);
   }
