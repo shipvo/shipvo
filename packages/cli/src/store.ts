@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, sep } from "node:path";
 import { checkCount, checkScreenshot, deriveStoreDetails, renderDataSafetyCsv, renderPrivacyPolicy, SCREENSHOT_SETS, type ScreenshotSet } from "@shipvo/store";
 import { args, loadConfig } from "./config.js";
 
@@ -33,17 +33,32 @@ export interface StoreDeps { render?: RenderFn; close?: () => Promise<void> }
 
 const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".css": "text/css", ".ttf": "font/ttf", ".ico": "image/x-icon" };
 
+/** Maps a request URL to a file inside `dist`. Anything outside `dist`, missing, or without an extension gets index.html (single-page app). */
+export function resolveStaticFile(dist: string, url: string): string {
+  const index = join(dist, "index.html");
+  let path: string;
+  try { path = decodeURIComponent(url.split("?")[0]); } catch { return index; }
+  const file = join(dist, normalize(path));
+  if (!file.startsWith(dist + sep) || extname(file) === "" || !existsSync(file)) return index;
+  return file;
+}
+
+/** `routes` must be an array of strings that start with "/". Returns a plain message, or undefined when valid. */
+export function checkRoutes(routes: unknown): string | undefined {
+  if (routes === undefined) return undefined;
+  if (!Array.isArray(routes) || !routes.every((r) => typeof r === "string" && r.startsWith("/"))) return `"routes" in shipvo.json must be a list of paths that start with "/", for example ["/", "/cart"].`;
+  return undefined;
+}
+
 /** Fast-mode renderer: the app's Playwright draws `sim-dist` (the same web build `shipvo sim` serves). JPEG output has no alpha channel. */
-async function playwrightRenderer(root: string): Promise<{ render: RenderFn; close: () => Promise<void> }> {
+export async function playwrightRenderer(root: string): Promise<{ render: RenderFn; close: () => Promise<void> }> {
   const dist = join(root, "sim-dist");
   if (!existsSync(join(dist, "index.html"))) { console.error("No sim-dist build. Run `shipvo sim` once (or `PN_SIM=1 npx expo export --platform web --output-dir sim-dist`) first."); process.exit(2); }
   let pw: { chromium: { launch(): Promise<any> } };
   try { pw = createRequire(join(root, "package.json"))("playwright"); }
   catch { console.error("Install playwright in this app: npm i -D playwright && npx playwright install chromium"); process.exit(2); }
   const server = createServer((req, res) => {
-    const rel = normalize(decodeURIComponent((req.url ?? "/").split("?")[0])).replace(/^([/\\]|\.\.)+/, "");
-    let file = join(dist, rel);
-    if (!rel || !existsSync(file) || !file.startsWith(dist) || extname(file) === "") file = join(dist, "index.html");
+    const file = resolveStaticFile(dist, req.url ?? "/");
     res.setHeader("content-type", MIME[extname(file)] ?? "application/octet-stream");
     res.end(readFileSync(file));
   });
@@ -70,12 +85,15 @@ const slug = (route: string) => route.replace(/^\/+|\/+$/g, "").replace(/[^a-zA-
 async function screenshots(rest: string[], deps: StoreDeps): Promise<void> {
   const a = args(rest);
   const cfg = loadConfig();
+  const badRoutes = checkRoutes(cfg.routes);
+  if (badRoutes) { console.error(badRoutes); process.exit(2); }
   const routes = cfg.routes?.length ? cfg.routes : ["/"];
   const out = a.out && a.out !== "true" ? a.out : "store-assets/raw";
   const own = deps.render ? undefined : await playwrightRenderer(process.cwd());
   const render = deps.render ?? own!.render;
   console.log("fast mode: simulator render, not the native UI");
   let bad = 0;
+  const short: string[] = [];
   try {
     for (const set of SCREENSHOT_SETS) {
       if (set.id === "play-icon") continue;   // the icon is your own file, not a screen; see below
@@ -92,8 +110,10 @@ async function screenshots(rest: string[], deps: StoreDeps): Promise<void> {
         if (!r.ok) bad++;
         console.log(`  ${r.ok ? "ok  " : "FAIL"} ${file}${r.ok ? "" : ": " + r.problems.join("; ")}`);
       }
+      if (set.id === "play-feature") console.log(`  note: the feature graphic is a placeholder (a render of "${list[0]}"). Replace it with your own artwork.`);
       const c = checkCount(set.id, list.length);
-      if (c) { bad++; console.log(`  FAIL ${c}. Add routes to "routes" in shipvo.json.`); }
+      if (c && list.length < set.min) { short.push(set.id); console.log(`  note: needs ${set.min} screens, has ${list.length}. Add ${set.min - list.length} more to "routes" in shipvo.json before you submit.`); }
+      else if (c) { bad++; console.log(`  FAIL ${c}. Remove ${list.length - set.max} from "routes" in shipvo.json.`); }
     }
     const icon = cfg.listing?.icon;
     if (icon && existsSync(icon)) {
@@ -102,7 +122,7 @@ async function screenshots(rest: string[], deps: StoreDeps): Promise<void> {
       console.log(`\nPlay icon ${icon}: ${r.ok ? "ok" : "FAIL " + r.problems.join("; ")}`);
     } else console.log("\nPlay icon: listing.icon not found, not checked (Shipvo does not draw icons).");
   } finally { await (deps.close ?? own?.close)?.(); }
-  console.log(`\nRaw files are in ${out}. ${bad === 0 ? "Every file passed the store checks." : `${bad} problem${bad === 1 ? "" : "s"} above.`}`);
+  console.log(`\nRaw files are in ${out}. ${bad === 0 ? `Every file passed the store checks.${short.length ? ` ${short.length} set${short.length === 1 ? " needs" : "s need"} more screens before you submit.` : ""}` : `${bad} problem${bad === 1 ? "" : "s"} above.`}`);
   console.log("Nothing was uploaded.");
   if (bad > 0) process.exitCode = 1;
 }

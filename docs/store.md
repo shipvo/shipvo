@@ -34,7 +34,8 @@ It also prints the questions it cannot answer: whether each data type is shared,
 
 Needs `sim-dist` (run `shipvo sim` once) and `playwright` installed in the app, as for `shipvo sim`.
 
-- Screens: `routes` in `shipvo.json`, a list of paths such as `["/", "/cart"]`. Default is `["/"]`.
+- Screens: `routes` in `shipvo.json`, a list of paths such as `["/", "/cart"]`. Default is `["/"]`. Each must be a path starting with `/`; anything else exits 2.
+- Too few screens: with fewer routes than a set needs (Play needs 2), the command prints "needs N screens" as a note and does not fail, so a fresh app exits 0. Too many (over 10 for Apple, over 8 for Play) is a failure.
 - Output: `store-assets/raw/<set>/<route>.jpg`. JPEG is used because it can never carry an alpha channel.
 - Nothing is uploaded and no store credentials are read.
 
@@ -49,6 +50,6 @@ Needs `sim-dist` (run `shipvo sim` once) and `playwright` installed in the app, 
 
 The checker (`checkScreenshot` in `@shipvo/store`) fails a file with the wrong size, an alpha channel, or a type other than PNG or JPEG, and fails a set with the wrong count. The Play icon is your own file: it is checked at `listing.icon` if present, never drawn. Exit code is 1 if any check fails.
 
-The sizes come from the Apple and Google Play spec pages named in `packages/store/src/screenshots.ts`. Check them before you submit; the stores change them.
+The sizes come from the Apple and Google Play spec pages named in `packages/store/src/screenshots.ts`. Check them before you submit; the stores change them. The Play tablet sizes are Shipvo's chosen minimums. The feature graphic is a placeholder render of the first route; replace it with your own artwork.
 
 See the package: [`packages/store`](../packages/store/README.md).

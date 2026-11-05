@@ -67,6 +67,7 @@ export function readImageInfo(b: Uint8Array): ImageInfo | string {
       const m = b[o + 1];
       if (m === 0xff) { o++; continue; }
       if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { format: "jpeg", height: dv.getUint16(o + 5), width: dv.getUint16(o + 7), alpha: false };
+      if (m === 0x01 || m === 0xd8 || m === 0xd9 || (m >= 0xd0 && m <= 0xd7)) { o += 2; continue; }   // no length field
       o += 2 + dv.getUint16(o + 2);
     }
     return "the JPEG has no size header";

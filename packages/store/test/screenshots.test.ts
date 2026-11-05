@@ -18,6 +18,10 @@ describe("checkScreenshot", () => {
   it("accepts a JPEG of the right size", () => {
     expect(checkScreenshot(jpeg(1206, 2622), "iphone-1206x2622").ok).toBe(true);
   });
+  it("skips restart markers and other markers without a length in a JPEG", () => {
+    const j = new Uint8Array([0xff, 0xd8, 0xff, 0xd0, 0xff, 0x01, 0xff, 0xc0, 0, 11, 8, 0x0a, 0x3e, 0x04, 0xb6, 1, 1, 0x11, 0, 0xff, 0xd9]);
+    expect(checkScreenshot(j, "iphone-1206x2622").info).toMatchObject({ width: 1206, height: 2622 });
+  });
   it("rejects the wrong size", () => {
     const r = checkScreenshot(png(1206, 2621), "iphone-1206x2622");
     expect(r.ok).toBe(false);
