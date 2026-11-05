@@ -24,6 +24,8 @@ Any other capability is listed as a question for you. It is never dropped.
 - `data-safety.csv`: the derived answers in the Play Data safety import layout. Check the column and response ids against the template you export from Play Console before you import.
 - `privacy-policy.md`: a draft that names only what the app declares. Review it before you publish. It is not legal advice.
 
+The command prints "Filled without you: x of y fields". That counts only the derived Data safety rows, not the questions list, so it does not mean you are done.
+
 It also prints the questions it cannot answer: whether each data type is shared, third-party SDKs, sign-in, data deletion and a contact address.
 
 See the package: [`packages/store`](../packages/store/README.md).
