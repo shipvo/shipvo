@@ -10,7 +10,11 @@ Step-by-step tutorials for people who have never used a terminal. Each one ends 
 
 ## Sell
 
-Coming soon.
+| Tutorial | You will | Time | Level |
+| --- | --- | --- | --- |
+| [Make a shop with your own products](your-own-shop.md) | Create a shop from the template, put in your products and prices, check the cart and run a practice release | about two minutes of commands, plus time to write your products | Beginner |
+
+Taking payments is not a tutorial yet: the shop template has no payment step.
 
 ## Run your app
 

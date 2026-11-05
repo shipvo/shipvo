@@ -69,7 +69,8 @@ const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
 const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string; step?: Step } = {}) => {
-  if (!r.ok || r.screen == null) return result(sid, r);
+  if (!r.ok) return result(sid, r);
+  if (r.screen == null) { const dl0 = deliveryLine(r); return { ...text(dl0), structuredContent: { ok: true, ...deliveryInfo(r) } }; }
   const info = deliveryInfo(r);
   const prev = trees.get(sid);
   trees.set(sid, r.screen);

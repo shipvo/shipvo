@@ -40,7 +40,7 @@ export type OpenOptions = {
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 /** An action the simulator refused. `code` is set for typed failures such as `no_url_listener` or `stale_ref`. */
 export class PhoneError extends Error {
-  /** `safeToRetry` is true only when the input never reached the app (`stale_ref`, `not_visible`, `disabled`, `covered`). */
+  /** `safeToRetry` is true only when the input never reached the app (`stale_ref`, `not_visible`, `disabled`, `covered`, `not_text_field`, `bad_wait_for`). */
   constructor(message: string, readonly code?: string, readonly safeToRetry?: boolean) { super(message); this.name = "PhoneError"; }
 }
 /** What a mocked request answers with. An object `body` is sent as JSON. */
