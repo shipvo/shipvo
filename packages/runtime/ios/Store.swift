@@ -76,6 +76,11 @@ final class Store {
     list = Array(list.suffix(49)) + [e]
     d.set(list.joined(separator: "\n"), forKey: "events")
   }
+  /// Like addEvent, but does nothing when the same event is already queued (repeated polls for one rejected release).
+  func addEventOnce(_ e: String) {
+    let list = (d.string(forKey: "events") ?? "").split(separator: "\n").map(String.init)
+    if !list.contains(e) { addEvent(e) }
+  }
   func consumeEvents() -> [String] {
     let list = (d.string(forKey: "events") ?? "").split(separator: "\n").map(String.init).filter { !$0.isEmpty }
     d.removeObject(forKey: "events"); return list

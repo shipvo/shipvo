@@ -22,11 +22,15 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 ## Events to forward
 
-`Runtime.consumeEvents()` returns strings such as `verify_failed:<release>`. Forward `crash_loop_revert`, `rolled_back` and `verify_failed` to telemetry (`POST /t`), once per event. The sample app does this in `apps/tide-and-tackle/src/runtimeEvents.ts`. `verify_failed` is reported under the failed release id. A rejected or corrupt release then shows on the server, not only as repeated downloads.
+`Runtime.consumeEvents()` returns strings such as `verify_failed:<release>`. Forward `crash_loop_revert`, `rolled_back`, `verify_failed` and `bytecode_mismatch:<release>` to telemetry (`POST /t`), once per event. The sample app does this in `apps/tide-and-tackle/src/runtimeEvents.ts`. `verify_failed` is reported under the failed release id. A rejected or corrupt release then shows on the server, not only as repeated downloads.
 
 The runtime does not emit `download_failed` yet. The sample app and the control plane accept it, so it can be forwarded once the runtime raises it.
 
 Events are read at launch. A `verify_failed` raised during `checkForUpdate` is reported on the next cold start.
+
+## Hermes bytecode check
+
+The config plugin takes an optional `hermesBytecodeVersion` prop (a positive integer, for example `96`). The runtime compares it with the signed pointer's `hermes_bytecode_version` before it downloads anything. On a mismatch, `checkForUpdate` returns `{ status: "rejected", reason: "bytecode_mismatch", release }`, nothing is staged and the current release keeps running. If either side has no value, the release applies as before. The event `bytecode_mismatch:<release>` is queued once until it is consumed; later checks for the same release do not add it again.
 
 ## Crash after `markHealthy`
 

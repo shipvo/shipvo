@@ -26,6 +26,15 @@ internal object BootRules {
   /** True when a release was built for another Hermes bytecode version than this shell runs. Either side missing = no mismatch. */
   fun bytecodeMismatch(shell: Int?, release: Int?): Boolean = shell != null && release != null && shell != release
 
+  /** Manifest meta-data may arrive as a String or, for a numeric android:value, an Integer. Bundle.getString drops the Integer. */
+  fun metaString(v: Any?): String? = v?.toString()
+
+  /** A positive whole number from a String or Number, else null (missing, zero, negative or not a number). */
+  fun positiveInt(v: Any?): Int? {
+    val n = when (v) { is Int -> v; is Number -> if (v.toDouble() == v.toInt().toDouble()) v.toInt() else null; is String -> v.trim().toIntOrNull(); else -> null }
+    return n?.takeIf { it > 0 }
+  }
+
   fun clear(c: BootCounts) { c.unhealthyBoots = 0; c.firstUnhealthyAt = 0 }
 
   /** The load that last reported healthy (0 = none). */

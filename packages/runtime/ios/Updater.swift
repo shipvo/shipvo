@@ -39,7 +39,7 @@ enum Updater {
     try require(!Verify.semverLess(s.shellVersion, body["min_shell_version"] as? String ?? "0.0.0"), "shell too old for release \(release)")
     // In addition to the signature and hash checks: never stage bytecode this shell cannot run. Keep the current release.
     if bytecodeMismatch(shell: s.hermesBytecodeVersion, release: (body["hermes_bytecode_version"] as? NSNumber)?.intValue) {
-      s.addEvent("bytecode_mismatch:\(release)")
+      s.addEventOnce("bytecode_mismatch:\(release)")
       return ["status": "rejected", "reason": "bytecode_mismatch", "release": release]
     }
     let verifyPointerMs = (Store.now() - t0) * 1000

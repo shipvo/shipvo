@@ -70,6 +70,11 @@ internal class Store(private val ctx: Context) : BootCounts {
     val list = p.getString("events", "")!!.split('\n').filter { it.isNotBlank() }.takeLast(49) + e
     p.edit().putString("events", list.joinToString("\n")).commit()
   }
+  /** Like addEvent, but does nothing when the same event is already queued (repeated polls for one rejected release). */
+  fun addEventOnce(e: String) {
+    if (p.getString("events", "")!!.split('\n').contains(e)) return
+    addEvent(e)
+  }
   fun consumeEvents(): List<String> {
     val list = p.getString("events", "")!!.split('\n').filter { it.isNotBlank() }
     p.edit().remove("events").commit(); return list
@@ -77,13 +82,13 @@ internal class Store(private val ctx: Context) : BootCounts {
 
   private fun meta(key: String): String? = try {
     val ai = ctx.packageManager.getApplicationInfo(ctx.packageName, PackageManager.GET_META_DATA)
-    ai.metaData?.getString(key)
+    BootRules.metaString(ai.metaData?.get(key))
   } catch (_: Exception) { null }
   val baseUrl: String get() = (meta("dev.shipvo.BASE_URL") ?: "").trimEnd('/')
   val publicKey: String get() = meta("dev.shipvo.PUBLIC_KEY") ?: ""
   val appId: String get() = meta("dev.shipvo.APP_ID") ?: ""
   /** Hermes bytecode version this shell runs, from the config plugin. Null = unknown, so the check is skipped. */
-  val hermesBytecodeVersion: Int? get() = meta("dev.shipvo.HERMES_BYTECODE_VERSION")?.toIntOrNull()
+  val hermesBytecodeVersion: Int? get() = BootRules.positiveInt(meta("dev.shipvo.HERMES_BYTECODE_VERSION"))
   val shellMajor: Int get() = (meta("dev.shipvo.SHELL_MAJOR") ?: "1").toIntOrNull() ?: 1
 
   companion object {

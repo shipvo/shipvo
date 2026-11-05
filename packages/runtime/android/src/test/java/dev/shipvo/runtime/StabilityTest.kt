@@ -80,4 +80,9 @@ class BytecodeMismatchTest {
   @org.junit.Test fun sameVersionMatches() { org.junit.Assert.assertFalse(BootRules.bytecodeMismatch(96, 96)) }
   @org.junit.Test fun missingReleaseFieldApplies() { org.junit.Assert.assertFalse(BootRules.bytecodeMismatch(96, null)) }
   @org.junit.Test fun unknownShellVersionApplies() { org.junit.Assert.assertFalse(BootRules.bytecodeMismatch(null, 98)) }
+  @org.junit.Test fun integerMetaDataIsRead() { org.junit.Assert.assertEquals(96, BootRules.positiveInt(BootRules.metaString(96))) }
+  @org.junit.Test fun stringMetaDataIsRead() { org.junit.Assert.assertEquals(96, BootRules.positiveInt(" 96 ")) }
+  @org.junit.Test fun nonPositiveOrNonNumericIsMissing() {
+    for (v in listOf<Any?>(0, -3, "abc", "", null, true, 96.5)) org.junit.Assert.assertNull("$v", BootRules.positiveInt(v))
+  }
 }

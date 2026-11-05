@@ -159,6 +159,12 @@ final class RuntimeTests: XCTestCase {
     XCTAssertTrue(s.consumeEvents().contains("bytecode_mismatch:5"))
   }
 
+  func testRepeatedMismatchQueuesOneEvent() async throws {
+    let s = store("hbc-mismatch", hbc: 96)
+    _ = try await Updater.check(s); _ = try await Updater.check(s)
+    XCTAssertEqual(s.consumeEvents().filter { $0 == "bytecode_mismatch:5" }.count, 1)
+  }
+
   func testBytecodeMatchStages() async throws {
     let s = store("hbc-match", hbc: 96)
     let r = try await Updater.check(s)
