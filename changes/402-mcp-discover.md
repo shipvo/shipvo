@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: the HTTP endpoint answers `server/discover` and rejects 2026-07-28 requests whose `Mcp-Method`/`Mcp-Name` headers disagree with the body (HTTP 400, JSON-RPC error -32001). 2025-era clients are unchanged.
+- Migration: none.

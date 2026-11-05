@@ -76,7 +76,7 @@ The HTTP endpoint is stateless. There is no protocol session: each POST is handl
 ### Protocol versions
 
 - **2025-era clients** (`initialize`, then calls, with or without `Mcp-Session-Id`): work. `initialize` is answered, no session id is issued, and any `Mcp-Session-Id` a client sends is ignored.
-- **2026-07-28 clients**: `tools/list` and `tools/call` work with no session and no `initialize`. Not done yet: `server/discover`, the `Mcp-Method`/`Mcp-Name` headers, `ttlMs`/`cacheScope` on list results. `tools/list` order is fixed (registration order).
-- This package uses `@modelcontextprotocol/sdk` 1.x. Stdio is unchanged.
+- **2026-07-28 clients**: `tools/list` and `tools/call` work with no session and no `initialize`. `server/discover` is answered (supported versions, tools capability, server info). A request counts as 2026-era if it calls `server/discover`, sends `Mcp-Method`, or names a 2026 protocol version in `params._meta`; those must carry `Mcp-Method` (and `Mcp-Name` for `tools/call`, `prompts/get`, `resources/read`) matching the body, or get a 400 JSON-RPC error. Requests with no 2026 marker are not checked. Not done yet: `ttlMs`/`cacheScope` on list results. `tools/list` order is fixed (registration order).
+- This package uses `@modelcontextprotocol/sdk` 1.x (the TypeScript SDK v2 is not stable on npm yet; 1.32.2 is `latest`). Tested by `test/http-stateless.test.ts`: discover without `initialize`, header/body mismatch, scope per request, 2025-era `initialize` clients. Stdio is unchanged.
 
  Requests without a valid key are refused. The hosted version at `sim.shipvo.dev` will issue keys per account with scopes (test, owner, read).

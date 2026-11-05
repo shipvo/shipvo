@@ -93,8 +93,10 @@ const result = (sid: string, r: Act) => {
 const need = (_sid: string) => {};
 
 type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
+const SERVER_VERSION = "0.0.4";
+const SUPPORTED_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 function makeServer(ctx: Ctx = {}) {
-const server = new McpServer({ name: "shipvo", version: "0.0.4" }, { instructions:
+const server = new McpServer({ name: "shipvo", version: SERVER_VERSION }, { instructions:
 `You can use Shipvo apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
 Only what is on screen is listed, like a phone: a horizontal product rail shows a few items, so "scroll right" on the rail (its ref) to see more; "scroll down" the page for the rest.
@@ -288,6 +290,27 @@ if (argi < 0) {
     let body: unknown;
     try { let raw = ""; for await (const ch of req) raw += ch; body = raw ? JSON.parse(raw) : undefined; }
     catch { res.writeHead(400, { "content-type": "application/json" }); return res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null })); }
+    // MCP 2026-07-28: answer server/discover, and refuse requests whose Mcp-Method/Mcp-Name headers disagree with the body.
+    const bad = (code: number, message: string, id: unknown = null) => { res.writeHead(400, { "content-type": "application/json" }); return res.end(JSON.stringify({ jsonrpc: "2.0", error: { code, message }, id })); };
+    const msg = body && typeof body === "object" && !Array.isArray(body) ? body as { id?: unknown; method?: unknown; params?: Record<string, unknown> } : undefined;
+    if (msg && typeof msg.method === "string") {
+      const hm = req.headers["mcp-method"] as string | undefined, hn = req.headers["mcp-name"] as string | undefined;
+      const meta = (msg.params?._meta ?? {}) as Record<string, unknown>;
+      const pv = Object.entries(meta).find(([k]) => /protocolversion$/i.test(k))?.[1];
+      const era2026 = msg.method === "server/discover" || hm !== undefined || (typeof pv === "string" && pv >= "2026-07-28");
+      if (era2026) {
+        if (hm === undefined) return bad(-32001, "Missing Mcp-Method header", msg.id ?? null);
+        if (hm !== msg.method) return bad(-32001, `Header mismatch: Mcp-Method is '${hm}' but the body method is '${msg.method}'`, msg.id ?? null);
+        const nameKey = msg.method === "tools/call" || msg.method === "prompts/get" ? "name" : msg.method === "resources/read" ? "uri" : undefined;
+        const want = nameKey ? msg.params?.[nameKey] : undefined;
+        if (nameKey && hn === undefined) return bad(-32001, "Missing Mcp-Name header", msg.id ?? null);
+        if (hn !== undefined && hn !== want) return bad(-32001, `Header mismatch: Mcp-Name is '${hn}' but the body says '${String(want)}'`, msg.id ?? null);
+      }
+      if (msg.method === "server/discover") {
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id ?? null, result: { supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "shipvo", version: SERVER_VERSION } } }));
+      }
+    }
     // Behind sim.shipvo.dev the Worker has checked the key and says which app and scope it grants; locally
     // there are no such headers and every app is allowed. A client's mcp-session-id header is ignored.
     const h = (n: string) => (req.headers[n] as string) || undefined;
