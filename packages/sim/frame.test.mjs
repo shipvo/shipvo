@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderFrame, normalizeStatus } from "./frame.mjs";
+import { renderFrame, normalizeStatus, statusFromDevice, isDarkBackground, statusParts, statusClientScript } from "./frame.mjs";
 
 test("each skin has its own markup and screen size", () => {
   const a = renderFrame({ skin: "android" }), i = renderFrame({ skin: "ios" });
@@ -49,4 +49,35 @@ test("is pure markup: no script and no scaling code", () => {
 
 test("renderFrame rejects an unknown skin", () => {
   assert.throws(() => renderFrame({ skin: "x" }), /Unknown skin/);
+});
+
+const at = new Date(2026, 10, 5, 14, 7);
+test("network off shows no signal and no wifi; back on restores them", () => {
+  const on = renderFrame({ status: statusFromDevice({ online: true }, at) }).html;
+  const off = renderFrame({ status: statusFromDevice({ online: false }, at) }).html;
+  assert.match(on, /data-part="wifi"/); assert.match(on, /data-part="signal" data-level="4"/);
+  assert.doesNotMatch(off, /data-part="wifi"/); assert.match(off, /data-part="signal" data-level="0"/);
+});
+test("airplane shows the airplane icon, battery shows the level", () => {
+  const f = renderFrame({ status: statusFromDevice({ airplane: true, battery: { level: 42, charging: true } }, at) }).html;
+  assert.match(f, /data-part="airplane"/); assert.doesNotMatch(f, /data-part="signal"/);
+  const b = renderFrame({ status: statusFromDevice({ battery: { level: 42, charging: true } }, at) }).html;
+  assert.match(b, /data-part="battery" data-level="42" data-charging="true"/);
+  assert.equal(statusFromDevice({ online: true, airplane: true }, at).wifi, false);
+});
+test("the clock is the real time in 12-hour form", () => {
+  assert.equal(statusFromDevice({}, at).time, "2:07");
+  assert.equal(statusFromDevice({}, new Date(2026, 0, 1, 0, 5)).time, "12:05");
+  assert.match(renderFrame({ status: statusFromDevice({}, at) }).html, />2:07</);
+});
+test("status text colour follows the app's top background", () => {
+  for (const c of ["#000", "#111827", "rgb(10, 20, 30)", "rgba(0,0,0,0.9)"]) assert.equal(isDarkBackground(c), true, c);
+  for (const c of ["#fff", "#f5f5f5", "rgb(255,255,255)", "rgba(0,0,0,0)", "transparent", "", undefined, "red-ish"]) assert.equal(isDarkBackground(c), false, String(c));
+  assert.match(renderFrame({ dark: isDarkBackground("#0b1020") }).html, /data-theme="dark"/);
+  assert.match(renderFrame({ dark: isDarkBackground("#fff") }).html, /data-theme="light"/);
+});
+test("statusParts and the client script are usable", () => {
+  const p = statusParts(statusFromDevice({ online: false }, at));
+  assert.equal(p.time, "2:07"); assert.match(p.icons, /data-level="0"/);
+  assert.doesNotThrow(() => new Function(statusClientScript("app")));
 });

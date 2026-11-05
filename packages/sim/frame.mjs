@@ -25,6 +25,57 @@ export function normalizeStatus(status = {}) {
   };
 }
 
+/** Maps the simulated device ({ online, airplane, battery } from @shipvo/device) and a clock to a status object. Network off shows no signal and no wifi. */
+export function statusFromDevice(device = {}, now = new Date()) {
+  const d = device && typeof device === "object" ? device : {};
+  const online = d.online !== false && d.airplane !== true;
+  const h = now.getHours() % 12 || 12, m = String(now.getMinutes()).padStart(2, "0");
+  return { time: `${h}:${m}`, signal: online ? 4 : 0, wifi: online, airplane: d.airplane === true, battery: d.battery };
+}
+
+/** True when a CSS colour (#rgb, #rrggbb, rgb(), rgba()) is dark, so the status text should be light. Unknown or transparent colours count as light. */
+export function isDarkBackground(color) {
+  const c = String(color ?? "").trim().toLowerCase();
+  let r, g, b, a = 1, m;
+  if ((m = /^#([0-9a-f]{3})$/.exec(c))) [r, g, b] = [...m[1]].map((x) => parseInt(x + x, 16));
+  else if ((m = /^#([0-9a-f]{6})/.exec(c))) [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+  else if ((m = /^rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?/.exec(c))) { [r, g, b] = [+m[1], +m[2], +m[3]]; if (m[4] != null) a = m[4].endsWith("%") ? parseFloat(m[4]) / 100 : +m[4]; }
+  else return false;
+  return a >= 0.5 && 0.2126 * r + 0.7152 * g + 0.0722 * b < 128;
+}
+
+/** The parts of the status bar that change: the clock text and the icons markup. */
+export function statusParts(status) {
+  const st = normalizeStatus(status);
+  return { time: st.time, icons: icons(st) };
+}
+
+/**
+ * Browser script for the page that holds the frame. It watches the app's "pn:status" events (sent by @shipvo/device when network,
+ * airplane or battery change), redraws the status bar, ticks the clock each minute and flips the text colour from the app's top background.
+ * `iframeId` is the app iframe. It expects the markup from renderFrame and the functions below inlined by this script.
+ */
+export function statusClientScript(iframeId = "app", skin = "android") {
+  return `(function(){
+var statusParts=${statusParts.toString()},normalizeStatus=${normalizeStatus.toString()},icons=${icons.toString()},battery=${battery.toString()},svg=${svg.toString()},isDarkBackground=${isDarkBackground.toString()},statusFromDevice=${statusFromDevice.toString()};
+var clean=${clean.toString()},clamp=${clamp.toString()};
+var dev={online:true,airplane:false,battery:{level:100,charging:false}};
+function root(){return document.querySelector('[data-part="phone-body"]')}
+function draw(){var r=root();if(!r)return;var p=statusParts(statusFromDevice(dev,new Date()));
+r.querySelector('[data-part="time"]').textContent=p.time;r.querySelector(".sf-icons").innerHTML=p.icons}
+function topColor(w){try{var d=w.document,e=d.elementFromPoint(Math.floor(w.innerWidth/2),1);
+while(e){var c=w.getComputedStyle(e).backgroundColor;if(c&&c!=="transparent"&&!/rgba\(.*,\s*0\)$/.test(c))return c;e=e.parentElement}}catch(x){}return"#fff"}
+function theme(w){var r=root();if(!r)return;var dark=isDarkBackground(topColor(w));
+r.setAttribute("data-theme",dark?"dark":"light");r.style.setProperty("--sf-fg",dark?"#fff":"#111");r.style.setProperty("--sf-bg",dark?"#000":"#fff")}
+function hook(){var f=document.getElementById(${JSON.stringify(iframeId)});var w=f&&f.contentWindow;if(!w)return;
+if(w.__pnDevice&&w.__pnDevice.status)dev=w.__pnDevice.status();draw();theme(w);
+if(!w.__shipvoStatusHooked){w.__shipvoStatusHooked=true;w.addEventListener("pn:status",function(e){dev=e.detail;draw();theme(w)})}}
+var f=document.getElementById(${JSON.stringify(iframeId)});if(f)f.addEventListener("load",hook);
+(function tick(){draw();var n=new Date();setTimeout(tick,(60-n.getSeconds())*1000-n.getMilliseconds()+50)})();
+setInterval(function(){var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)theme(f.contentWindow)},2000);
+})();`;
+}
+
 const svg = (w, h, body, extra = "") => `<svg class="sf-ico" ${extra} width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${body}</svg>`;
 
 function icons(st) {
