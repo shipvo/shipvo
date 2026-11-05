@@ -21,10 +21,20 @@ test("playwright cache", () => {
 });
 test("one-time install", () => {
   const calls = []; const logs = [];
-  const r = resolveBrowser({ ...base, log: (m) => logs.push(m), fileExists: () => false, run: (c, a) => { calls.push([c, a]); return { status: 0 }; } });
+  const r = resolveBrowser({ ...base, log: (m) => logs.push(m), fileExists: () => calls.length > 0, run: (c, a) => { calls.push([c, a]); return { status: 0 }; } });
   assert.deepEqual(r, {});
   assert.deepEqual(calls, [["npx", ["playwright", "install", "chromium"]]]);
   assert.equal(logs.length, 1);
+});
+test("--chromium path wins over everything", () => {
+  const r = resolveBrowser({ ...base, executablePath: "/my/chrome", fileExists: () => true, run: noRun });
+  assert.deepEqual(r, { executablePath: "/my/chrome" });
+});
+test("install exits 0 but no browser appears", () => {
+  assert.throws(() => resolveBrowser({ ...base, fileExists: () => false, run: () => ({ status: 0 }) }), /no browser was installed/);
+});
+test("install failure includes the spawn error", () => {
+  assert.throws(() => resolveBrowser({ ...base, fileExists: () => false, run: () => ({ status: null, error: new Error("spawn npx ENOENT") }) }), /ENOENT/);
 });
 test("install failure throws", () => {
   assert.throws(() => resolveBrowser({ ...base, fileExists: () => false, run: () => ({ status: 1 }) }), /failed/);

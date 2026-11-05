@@ -28,7 +28,8 @@ const defaultRun = (cmd, args) => spawnSync(cmd, args, { stdio: "inherit", shell
  * Returns the options to pass to `chromium.launch`.
  * Order: system Chrome, system Edge, Playwright cache, one-time install.
  */
-export function resolveBrowser({ pw, env = process.env, fileExists = existsSync, run = defaultRun, platform = process.platform, log = (m) => console.error(m) }) {
+export function resolveBrowser({ pw, executablePath, env = process.env, fileExists = existsSync, run = defaultRun, platform = process.platform, log = (m) => console.error(m) }) {
+  if (executablePath) return { executablePath };
   for (const channel of ["chrome", "msedge"]) {
     if (systemBrowserPaths(channel, platform, env).some((p) => fileExists(p))) return { channel };
   }
@@ -42,7 +43,10 @@ export function resolveBrowser({ pw, env = process.env, fileExists = existsSync,
   const [cmd, ...args] = INSTALL_COMMAND.split(" ");
   const res = run(cmd, args);
   if (!res || res.status !== 0 || res.error) {
-    throw new Error(`\`${INSTALL_COMMAND}\` failed. Run it yourself and check the output`);
+    const why = res && res.error ? `: ${res.error.message}` : "";
+    throw new Error(`\`${INSTALL_COMMAND}\` failed${why}. Run it yourself and check the output`);
   }
+  let after; try { after = pw.chromium.executablePath(); } catch { after = undefined; }
+  if (!after || !fileExists(after)) throw new Error(`\`${INSTALL_COMMAND}\` failed: it exited 0 but no browser was installed. Run it yourself and check the output`);
   return {};
 }

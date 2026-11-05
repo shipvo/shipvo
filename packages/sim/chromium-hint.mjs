@@ -1,7 +1,7 @@
 // The fix to print when Playwright cannot find the Chromium build it wants.
 export const CHROMIUM_MISSING = /Executable doesn't exist/;
 // Linux: the browser exists but shared libraries are missing.
-export const LIBS_MISSING = /error while loading shared libraries|Host system is missing dependencies|install-deps/i;
+export const LIBS_MISSING = /error while loading shared libraries|Host system is missing dependencies/i;
 
 /** The one-line install command for the resolved playwright version, plus the Linux hint. */
 export function chromiumInstallFix(version) {
