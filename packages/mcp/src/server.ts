@@ -160,8 +160,8 @@ server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/lef
 server.tool("back", "Go back one screen." + CH, { session: sid, compact }, WR, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
-  if (!r.ok && r.code === "sim_timeout") return result(session, r);
-  if (!r.ok || !r.path) throw new Error(r.error ?? "no screenshot");
+  if (!r.ok) return result(session, r);
+  if (!r.path) throw new Error("no screenshot");
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
 });
 // The simulated device: what the phone has, and what happens to it.
@@ -178,7 +178,7 @@ server.tool("set_device", "Change what the simulated phone has: location, the ad
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
   async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,
-  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "notifications" }) as Act & { notifications?: unknown }; if (r.code === "sim_timeout") return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
+  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() }, WR,
   async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
 server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -190,7 +190,12 @@ server.tool("device_reset", "Put the simulated phone back to a known state (perm
   async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
 
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, DEST, async ({ session }) => {
-  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session); logs.delete(session);
+  need(session);
+  // The simulator is the source of truth: end a session it lists even if this server did not open it; otherwise no_session.
+  const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string }[] };
+  if (!listed.ok) return result(session, listed);
+  if (!(listed.sessions ?? []).some((x) => x.session === session)) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
+  const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session); logs.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
