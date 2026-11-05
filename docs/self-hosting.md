@@ -65,6 +65,18 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 
 `GET /p/:app/:major/:band` pointer · `GET /b/:app/:file` bundle · `GET /w/:app/releases.json`, `GET /w/:app/:rel/*` web artifact · `GET /c/:app/content.json` live content · `POST /o/:app` orders · `POST /t` telemetry, `GET /t/:app` summary · `GET /app/:id/admin` admin · `GET /app/:id/api/describe`, `POST /app/:id/api/command` owner API (bearer `OWNER_TOKEN` or admin session).
 
+## Revert alerts (webhook)
+
+An app owner can set one `https://` URL that is called when devices revert a release. With the owner token:
+
+```bash
+curl -X POST https://<your-worker>/app/<id>/api/command \
+  -H "authorization: Bearer $OWNER_TOKEN" -H "content-type: application/json" \
+  -d '{"name":"set_alert_webhook","args":{"url":"https://example.com/hooks/shipvo"}}'
+```
+
+Send an empty `url` to remove it. `http://` URLs and URLs with a user name or password are refused (`bad_webhook_url`). When a `rolled_back` or `crash_loop_revert` telemetry event arrives, the control plane sends one POST with `{"app":"tide","release":3,"event":"crash_loop_revert","time":"<ISO time>"}`. A release alerts at most once per hour, and an app sends at most 10 alerts per hour whatever the release numbers. `POST /t` is not authenticated, so someone could send fake release numbers to use up the 10 slots and hide a real alert for an hour. The call runs after the telemetry response, has a 5 second limit, is not retried (a failed POST uses up its slot for that hour), and a failure never affects telemetry. The payload holds no secrets, but the URL itself may, so the command answers with the host only, and the audit log and the agent confirm plan show only the host. Agents must send `confirm: true` under the default policy. Apply migration `0014_alert_webhook.sql` first.
+
 ## The hosted simulator (optional)
 
 `services/sim` is a second Worker that gives agents the simulator over HTTPS without a laptop: it checks an API key (D1 `api_keys`, created with the owner command `create_api_key`), starts or reuses an [E2B](https://e2b.dev) sandbox per key from the `shipvo-sim` template (`services/sim/Dockerfile`: Playwright + `@shipvo/sim` + `@shipvo/mcp --http`), and proxies `/mcp`. Deploy with the `deploy-sim` workflow; it needs `E2B_API_KEY`, `SIM_OWNER_TOKEN` and `SIM_SMOKE_KEY` secrets. A Cloudflare Containers backend is kept in `wrangler.containers.jsonc` for accounts with Workers Paid.
