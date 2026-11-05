@@ -22,7 +22,11 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 ## Events to forward
 
-`Runtime.consumeEvents()` returns strings such as `verify_failed:<release>`. Forward `crash_loop_revert`, `rolled_back`, `verify_failed` and `download_failed` to telemetry (`POST /t`), once per event. The sample app does this in `apps/tide-and-tackle/src/runtimeEvents.ts`. A rejected or corrupt release then shows on the server, not only as repeated downloads.
+`Runtime.consumeEvents()` returns strings such as `verify_failed:<release>`. Forward `crash_loop_revert`, `rolled_back` and `verify_failed` to telemetry (`POST /t`), once per event. The sample app does this in `apps/tide-and-tackle/src/runtimeEvents.ts`. `verify_failed` is reported under the failed release id. A rejected or corrupt release then shows on the server, not only as repeated downloads.
+
+The runtime does not emit `download_failed` yet. The sample app and the control plane accept it, so it can be forwarded once the runtime raises it.
+
+Events are read at launch. A `verify_failed` raised during `checkForUpdate` is reported on the next cold start.
 
 ## Crash after `markHealthy`
 

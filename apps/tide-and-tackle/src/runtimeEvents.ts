@@ -2,10 +2,14 @@
 export const FORWARDED_EVENTS = ["crash_loop_revert", "rolled_back", "verify_failed", "download_failed"] as const;
 export type ForwardedEvent = (typeof FORWARDED_EVENTS)[number];
 
+const CARRIES_RELEASE: string[] = ["verify_failed", "download_failed"];
+
 /**
  * Turn runtime event strings ("name" or "name:<release>") into telemetry reports.
- * `release` is the id in the event when it has one, so a failed release is reported
- * under its own id. Otherwise it is left to the sender (the running release).
+ * Only `verify_failed` and `download_failed` carry a release id: a failed release is
+ * reported under its own id. `crash_loop_revert` and `rolled_back` never override the
+ * release, so the sender uses the running release as before. A missing or non-numeric
+ * id also falls back to the running release.
  */
 export function forwardRuntimeEvents(
   events: string[],
@@ -14,7 +18,7 @@ export function forwardRuntimeEvents(
   for (const e of events) {
     const [name, id] = e.split(":");
     if (!(FORWARDED_EVENTS as readonly string[]).includes(name)) continue;
-    const release = id !== undefined && /^\d+$/.test(id) ? Number(id) : undefined;
+    const release = CARRIES_RELEASE.includes(name) && id !== undefined && /^\d+$/.test(id) ? Number(id) : undefined;
     send(name as ForwardedEvent, release);
   }
 }
