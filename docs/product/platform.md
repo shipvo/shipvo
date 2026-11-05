@@ -58,6 +58,10 @@ This section is set by the owner. The Head of Product plans from it and does not
 
 **Risks to watch:** Apple and Google rules on updates (stay on interpreted code and declared capabilities, and document compliance publicly); trust in AI-written code (the merge contract and test evidence are the answer, never hidden); and adoption (only real users prove anything).
 
+### Shipvo Testers (owner, 5 Nov 2026)
+
+The Shipvo Testers Google Group is live: `shipvo-testers@googlegroups.com` (join: https://groups.google.com/g/shipvo-testers, short link planned at shipvo.dev/testers). Anyone can join; members cannot see each other's addresses; only managers post. Founders on new personal Play accounts add it as a tester group on their closed track to help meet the 12-testers / 14-days rule, and join it themselves to test other founders' apps. Never publish member counts or promise a number of testers.
+
 ### Positioning: what Shipvo is (owner, 5 Nov 2026)
 
 Use this wording, or close to it, on the site, in docs, blog posts, tutorials and videos, so Shipvo is described the same way everywhere.
