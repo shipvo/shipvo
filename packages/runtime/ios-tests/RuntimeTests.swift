@@ -16,8 +16,8 @@ final class RuntimeTests: XCTestCase {
   }
   override func tearDown() { if let tmp { try? FileManager.default.removeItem(at: tmp) } }
 
-  private func store(_ app: String, shell: String = "1.0.0", binary: String = "1.0.0/1", key: String? = nil) -> Store {
-    let s = Store(overrides: .init(suite: "shipvo.test.\(UUID().uuidString)", dir: tmp, baseUrl: base, publicKey: key ?? pub, appId: app, shellMajor: 1, shellVersion: shell, binaryVersion: binary))
+  private func store(_ app: String, shell: String = "1.0.0", binary: String = "1.0.0/1", key: String? = nil, hbc: [Int] = [], nm: [String: String] = [:]) -> Store {
+    let s = Store(overrides: .init(suite: "shipvo.test.\(UUID().uuidString)", dir: tmp, baseUrl: base, publicKey: key ?? pub, appId: app, shellMajor: 1, shellVersion: shell, binaryVersion: binary, hermesBytecodeVersions: hbc, nativeModules: nm))
     s.binaryVersion = binary
     return s
   }
@@ -40,8 +40,8 @@ final class RuntimeTests: XCTestCase {
   }
 
   /// A device that runs release 5 (the fixture's `good` bundle) and is offered release 6.
-  private func storeRunningRelease5(_ app: String) throws -> Store {
-    let s = store(app)
+  private func storeRunningRelease5(_ app: String, hbc: [Int] = [], nm: [String: String] = [:]) throws -> Store {
+    let s = store(app, hbc: hbc, nm: nm)
     try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
     let path = tmp.appendingPathComponent("r5.hbc")
     try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!).write(to: path)
@@ -163,6 +163,31 @@ final class RuntimeTests: XCTestCase {
   func testRefusesAnotherKey() async throws {
     let s = store("good", key: Data(repeating: 7, count: 32).base64EncodedString())
     do { _ = try await Updater.check(s); XCTFail("wrong trust root must be refused") } catch let e as UpdateError { XCTAssertTrue(e.message.contains("signature")) }
+  }
+
+  func testPointerUrlHasNoQueryWithoutDeclaredVersions() {
+    XCTAssertFalse(Updater.pointerURL(store("good")).contains("?"))
+  }
+
+  func testPointerUrlCarriesBytecodeVersionsAndEncodedNativeModules() {
+    let url = Updater.pointerURL(store("good", hbc: [96, 98], nm: ["@scope/pkg": "1.2.3", "other": "2.0.0"]))
+    XCTAssertTrue(url.hasSuffix(".json?hbc=96,98&nm=%40scope%2Fpkg%401.2.3,other%402.0.0"), url)
+    XCTAssertFalse(Updater.pointerURL(store("good", nm: ["a": "1.0.0"])).contains("hbc="))
+  }
+
+  func testPointerUrlIsSentAndAMismatchKeepsTheCurrentRelease() async throws {
+    for reason in ["hermes_bytecode_mismatch", "native_module_missing", "native_module_version"] {
+      let s = try storeRunningRelease5("good", hbc: [96], nm: ["@scope/pkg": "1.0.0"])
+      StubPointer.seen = []; StubPointer.reply = (404, "{\"error\":\"\(reason)\"}")
+      URLProtocol.registerClass(StubPointer.self); defer { URLProtocol.unregisterClass(StubPointer.self) }
+      let r = try await Updater.check(s)
+      XCTAssertEqual(r["status"] as? String, "none")
+      XCTAssertEqual(r["reason"] as? String, reason)
+      XCTAssertEqual(StubPointer.seen.first?.query, "hbc=96&nm=%40scope%2Fpkg%401.0.0")
+      XCTAssertEqual(s.currentRelease, 5)
+      XCTAssertEqual(s.pendingRelease, 0)
+      XCTAssertNil(s.pendingPath)
+    }
   }
 
   func testNeverReadsTheAndroidPointer() async throws {
@@ -311,4 +336,21 @@ final class HermesGuardTests: XCTestCase {
     XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: nil, shellVersion: 96))
     XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: 96, shellVersion: nil))
   }
+}
+
+/// Answers pointer requests with a fixed reply and records their URLs. Everything else goes to the real fixture server.
+final class StubPointer: URLProtocol {
+  nonisolated(unsafe) static var seen: [URL] = []
+  nonisolated(unsafe) static var reply: (Int, String) = (404, "")
+  override class func canInit(with request: URLRequest) -> Bool { request.url?.path.hasSuffix(".json") == true && request.url?.path.contains("/ios/b") == true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func startLoading() {
+    let url = request.url!
+    Self.seen.append(url)
+    let resp = HTTPURLResponse(url: url, statusCode: Self.reply.0, httpVersion: "HTTP/1.1", headerFields: nil)!
+    client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: Data(Self.reply.1.utf8))
+    client?.urlProtocolDidFinishLoading(self)
+  }
+  override func stopLoading() {}
 }

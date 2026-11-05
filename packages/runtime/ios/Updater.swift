@@ -16,12 +16,32 @@ enum Updater {
 
   private static func resolve(_ s: Store, _ url: String) -> String { url.hasPrefix("http") ? url : "\(s.baseUrl)/\(url.drop(while: { $0 == "/" }))" }
 
+  /// Pointer URL. `?hbc=` and `?nm=` are added only when the shell declares them. Scoped names are percent-encoded.
+  static func pointerURL(_ s: Store) -> String {
+    var url = "\(s.baseUrl)/p/\(s.appId)/\(s.shellMajor)/ios/\(s.band).json"
+    func enc(_ x: String) -> String { x.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")) ?? x }
+    var q: [String] = []
+    let hbc = s.hermesBytecodeVersions
+    if !hbc.isEmpty { q.append("hbc=" + hbc.map(String.init).joined(separator: ",")) }
+    let nm = s.nativeModules
+    if !nm.isEmpty { q.append("nm=" + nm.keys.sorted().map { enc($0) + "%40" + enc(nm[$0]!) }.joined(separator: ",")) }
+    if !q.isEmpty { url += "?" + q.joined(separator: "&") }
+    return url
+  }
+
   static func check(_ s: Store) async throws -> [String: Any] {
     try require(!s.baseUrl.isEmpty && !s.publicKey.isEmpty && !s.appId.isEmpty, "runtime not configured")
     let known = max(s.currentRelease, s.pendingRelease, s.blockedRelease)
-    let (data, resp) = try await URLSession.shared.data(for: request("\(s.baseUrl)/p/\(s.appId)/\(s.shellMajor)/ios/\(s.band).json", etag: known > 0 ? "\"\(known)\"" : nil))
+    let (data, resp) = try await URLSession.shared.data(for: request(pointerURL(s), etag: known > 0 ? "\"\(known)\"" : nil))
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-    if code == 304 || code == 404 { return ["status": "none"] }
+    if code == 404 {
+      // The control plane says this shell cannot run the release. Keep the current one; stage nothing.
+      let text = String(data: data, encoding: .utf8) ?? ""
+      let reason = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["error"] as? String ?? text.trimmingCharacters(in: .whitespacesAndNewlines)
+      if ["hermes_bytecode_mismatch", "native_module_missing", "native_module_version"].contains(reason) { return ["status": "none", "reason": reason] }
+      return ["status": "none"]
+    }
+    if code == 304 { return ["status": "none"] }
     try require(code == 200, "pointer HTTP \(code)")
     guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
           let bodyStr = envelope["body"] as? String, let sig = envelope["signature"] as? String else { throw UpdateError("pointer is not an envelope") }
