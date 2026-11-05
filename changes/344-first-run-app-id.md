@@ -1,1 +1,0 @@
-- `scripts/first-run`: the measure script registers the app under a fresh `first-run-<6 chars>` id (the scaffold id `app` is reserved) and writes it to `shipvo.json`, so the real publish is timed.

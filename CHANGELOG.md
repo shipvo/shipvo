@@ -2,6 +2,44 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## 2026-11-05 (release)
+
+- **@shipvo/cli 0.1.4**: cli: preview frame with Android and iPhone skins, size switch and back control (slice 1 of #285); store: new @shipvo/store package, shipvo store details --dry-run (slice 1 of #249); cli: shop template gets a Pay button and paid/declined tests; cli: plain message for a failed sim --watch rebuild; schema, cli: shipvo.policy section and a policy check in publish --dry-run (slice 2 of #295)
+- **@shipvo/device 0.1.2**: device: optional Expo modules no longer break shipvo publish; device, sim: simulate push notifications (permission, receive, tap); device, sim: simulate a file picker (seed, pick, cancel) with a declared support level; device, sim: simulate calendar (seed, permission, read) with a declared support level; device, sim: simulate contacts (seed, permission, read) with a declared support level
+- **@shipvo/mcp 0.0.8**: mcp: wait_for and settle on actions (slice 2 of #242); mcp: tap, type, scroll and back report delivered or not_delivered (slice 1 of #242); device, sim: simulate push notifications (permission, receive, tap); mcp: one test checks every session tool returns a typed code (slice 3 of #222); device, sim: simulate a file picker (seed, pick, cancel) with a declared support level
+- **@shipvo/runtime 0.1.4**: runtime (iOS): patch the first update against the embedded bundle; telemetry: report refused releases (Hermes mismatch, native modules); runtime (iOS): say the bundle header is the Hermes version source of truth; runtime (Android): send bytecode versions and native modules with the pointer request; runtime: config plugin declares Hermes bytecode versions and native modules
+- **@shipvo/schema 0.0.4**: control-plane: hourly telemetry export to the owner's R2 bucket as Parquet (slice 1 of #318); schema, cli: shipvo.policy section and a policy check in publish --dry-run (slice 2 of #295); telemetry: report refused releases (Hermes mismatch, native modules); schema: reject native-module ranges with trailing junk, add range edge-case tests; schema, cli, control-plane: refuse releases that need native modules the shell lacks
+- **@shipvo/sim 0.1.4**: mcp: tap, type, scroll and back report delivered or not_delivered (slice 1 of #242); device, sim: simulate push notifications (permission, receive, tap); mcp: every session tool returns a typed no_session code for an unknown session (slice 1 of #222); test, sim: phone.mockNetwork stubs fetch in the simulator (slice 1 of #195); sim: redirect / to /app/ and print the full app link
+- **@shipvo/test 0.1.2**: device, sim: simulate push notifications (permission, receive, tap); device, sim: simulate a file picker (seed, pick, cancel) with a declared support level; device, sim: simulate calendar (seed, permission, read) with a declared support level; test, sim: phone.mockNetwork stubs fetch in the simulator (slice 1 of #195); device, sim: simulate contacts (seed, permission, read) with a declared support level
+
+### Changes
+
+- `@shipvo/mcp`: `tap`, `type`, `scroll` and `back` return `delivery` (`delivered` or `not_delivered`) in `structuredContent`. On `not_delivered` they add `reason` (`stale_ref`, `not_visible`, `disabled`, `covered`) and `safe_to_retry`. `type` also returns `value`.
+- `@shipvo/sim`: `/act` checks that the target is visible, enabled and not covered before tap, type and back, and returns the same fields.
+- Migration: none; the fields are additive.
+- `@shipvo/mcp`: `tap`, `type`, `scroll` and `back` take optional `wait_for` (ref, text, or role+name, with `gone: true` to wait for it to disappear), `settle` and `timeout_ms`. The result reports `waited: { matched, ms }`.
+- Migration: none; the fields are optional and results without them are unchanged.
+- **New package `@shipvo/store` and `shipvo store details --dry-run [--out dir]`.** Reads `listing.capabilities` in `shipvo.json`, prints Play Data safety answers and the questions only you can answer, and writes `data-safety.csv` and `privacy-policy.md` (default `.shipvo/store`). A capability outside the mapping table is listed as a question, not dropped. Nothing is uploaded and no credentials are read; without `--dry-run` it exits 2. The CSV ids are not yet checked against Play Console. Migration: none; additive. `@shipvo/cli` now depends on `@shipvo/store`.
+- `@shipvo/schema`, `@shipvo/cli`: optional `policy` section in `shipvo.json` (slice 2 of #295). New schema exports `ShipvoPolicy`, `PolicyWeekday` and `parsePolicy`. Three rules: `maxBand`, `agentMaxBand`, and `blockedWeekdays` with `blockedAfterHour`. `shipvo publish --dry-run` checks them and, on a refusal, prints the rule and reason and exits 1. The real upload path is unchanged. A bad section names the field. See [docs/cli.md](docs/cli.md).
+- Migration: none; without `policy` nothing changes.
+- `@shipvo/cli`: `shipvo init --template shop` also writes `src/data/shop.json` (`currency`, `position` `before`|`after`, `decimals`, `locale`), and `src/money.ts` reads it. Defaults give `$6.50` as before. For FCFA set `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` to get `6 500 FCFA`.
+- Migration: none for new apps; existing apps can keep their `money.ts`.
+- `@shipvo/cli`: `shipvo sim --watch` prints one plain line for a broken JSON file, and hides the build stack unless you pass `--verbose`.
+- Migration: none. Scripts that parse the old "build failed: ..." text should use `--verbose`.
+- `@shipvo/cli`: the `shop` template of `shipvo init` has a Pay button on the cart. It calls `device.pay.charge`, shows "Order placed" or "Payment failed: <reason>", and ships a paid and a declined test.
+- Migration: none; applies to newly created apps only.
+- `@shipvo/cli`: the `shop` template's `src/data/shop.json` has a `code` field (ISO 4217, for example `USD` or `XAF`). Pay sends it as the currency and sends the amount in whole currency units.
+- docs: record the first CI first-run numbers in the strategy doc.
+- `@shipvo/schema`: adds `TELEMETRY_EXPORT_VERSION`, `TELEMETRY_EXPORT_COLUMNS` and `TelemetryExportRow` for the Parquet telemetry export.
+- control plane: an hourly cron exports telemetry to an R2 bucket as Parquet, partitioned by app and day. Off until you bind `EXPORT_BUCKET`; see `docs/telemetry-export.md`.
+- Migration: run `0015_telemetry_export.sql`; it only adds a table.
+- cli: `shipvo preview` frame page has Android and iPhone skins with status bars, a phone / large phone / tablet size switch (no reload) and a Back control that presses the app's Back button, like the simulator's back action.
+- cli: in `shipvo preview`, Back presses the app's Back button, or falls back to browser history when the screen has none (the simulator's back action throws instead). It also does nothing if the app is on another origin.
+- `@shipvo/device`: optional Expo modules (contacts, calendar, document picker and the rest) no longer break `shipvo publish` when the app does not install them. Migration: none.
+- `control-plane`: new `audit_log` table, `recordAudit(db, row)` and `GET /audit/:app` (slice 1 of #305). The endpoint returns that app's rows newest first, with `?limit=` (default 50, max 200) and `?before=<id>`. It takes the owner token or the app's publish token. Nothing calls `recordAudit` yet.
+- Migration: `0016_audit_log.sql` adds one table and one index. It is additive and safe to run twice.
+- `scripts/first-run`: the measure script registers the app under a fresh `first-run-<6 chars>` id (the scaffold id `app` is reserved) and writes it to `shipvo.json`, so the real publish is timed.
+
 ## Unreleased
 
 - **@shipvo/cli**: `shipvo init` prints a fifth next step, `npx shipvo preview`, and `docs/getting-started.md` has a "Share a preview" section. No other output changes. Migration: none.

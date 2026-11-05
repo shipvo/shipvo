@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo init --template shop` also writes `src/data/shop.json` (`currency`, `position` `before`|`after`, `decimals`, `locale`), and `src/money.ts` reads it. Defaults give `$6.50` as before. For FCFA set `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` to get `6 500 FCFA`.
-- Migration: none for new apps; existing apps can keep their `money.ts`.
