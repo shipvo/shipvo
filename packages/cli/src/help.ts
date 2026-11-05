@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "status", "audit", "test", "keys", "mcp",
+  "init", "sim", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "audit", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -9,14 +9,19 @@ Start
   init <dir>                  Create a new app wired to Shipvo
   sim [--port 4545]           Build the app and run it in the simulator
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
+                              First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
+                              Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.
+  run android|ios [--no-open] [--port n]  Open the app in a phone frame in your browser (no Playwright)
+  run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
   explore [--max-depth 3] [--max-steps 100] [--fail-on-findings]  Walk the app in the simulator, write explore-report.md and .json
   preview [--json]            Publish a public 24-hour preview link (here.now, no account)
 
 Ship
-  publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release
+  publish [--bands b0,b1,b2] [--release N]  Build, sign and publish an over-the-air release
   publish --dry-run [--out d] Check a release offline: build and sign, write nothing remote
   promote [--to b1,b2]        Widen a staged release to more bands (same release, new signature)
   promote --dry-run           Preview a promote, write nothing
+  promote --report <file>     Refuse to widen when the test report has a failing flow for this release
   auto-halt [--threshold 0.2 --min-reports 20 | --off]  Show, turn on or turn off auto-halt
   rollback --to <release>     Republish an earlier release as a new release
   rollback --to <n> --dry-run Preview a rollback, write nothing
@@ -31,6 +36,8 @@ Ship
                               Render each route at store sizes (fast mode: simulator, not the native UI)
   store status [--mark <step> [--as waiting|done]]
                               Show each store's steps and what to do next
+  ci init --framework capacitor [--dry-run] [--force]
+                              Write .github/workflows/shipvo-build.yml (signed Android and iOS builds)
   status [--app id] [--json]  Show how the newest releases are doing on phones
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
   test [files] [--repair [--write]] [--report <file> [--release <id>]]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release

@@ -11,4 +11,11 @@ Read `docs/product/platform.md` (the mission: easy and accessible to everyone), 
 
 Commit (`git add`, `git commit -m "tutorials: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (the outcome taught, time it took you, issues filed).
 
-This runs every day and builds a growing library: many tutorials, each a different outcome. Keep `docs/tutorials/index.md` ("Learn" hub, first page of the "Learn" group) up to date: every tutorial listed by goal (Start, Sell, Run your app, Test, Ship updates), with time needed and level. Never repeat an existing tutorial; extend or refresh an old one only when the product changed.
+This runs twice a day and builds a growing library: many tutorials, each a different outcome. Keep `docs/tutorials/index.md` ("Learn" hub, first page of the "Learn" group) up to date: every tutorial listed by goal (Start, Sell, Run your app, Test, Ship updates), with time needed and level. Never repeat an existing tutorial; extend or refresh an old one only when the product changed.
+
+## Content follows code (shared with docs, blog, tutorials and videos)
+
+`docs/content-coverage.md` is the team's content ledger: one row per user-visible feature or advantage (from `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs), with columns **Docs**, **Tutorial**, **Video**, **Blog**, each a link or empty. Before picking a topic, read it and pick the biggest gap in your column, newest and most important features first (what makes Shipvo stronger than the alternatives: signed OTA with rollback, the agent simulator over MCP, measured parity, the store path, `shipvo run`, framework adapters, self-hosting). After your work, add your link to the ledger in the same commit, and add any feature you found missing from it. Create the file if it does not exist, backfilled from everything shipped so far.
+
+
+Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (one line, the loop, comparisons as facts, parity as proof).

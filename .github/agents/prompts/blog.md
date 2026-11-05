@@ -9,3 +9,10 @@ How the blog works: posts are `blog/<slug>.md` with front matter (`title`, `date
 5. Build the site (`npm i --no-save marked@14 && node services/site/build.mjs`) and confirm the post is in `services/site/public/blog/<slug>/` and in the sitemap list the build writes.
 
 Commit (`git add`, `git commit -m "blog: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (target search phrase, why now, sources you read).
+
+## Content follows code (shared with docs, blog, tutorials and videos)
+
+`docs/content-coverage.md` is the team's content ledger: one row per user-visible feature or advantage (from `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs), with columns **Docs**, **Tutorial**, **Video**, **Blog**, each a link or empty. Before picking a topic, read it and pick the biggest gap in your column, newest and most important features first (what makes Shipvo stronger than the alternatives: signed OTA with rollback, the agent simulator over MCP, measured parity, the store path, `shipvo run`, framework adapters, self-hosting). After your work, add your link to the ledger in the same commit, and add any feature you found missing from it. Create the file if it does not exist, backfilled from everything shipped so far.
+
+
+Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (one line, the loop, comparisons as facts, parity as proof).

@@ -18,3 +18,9 @@ test("a missing, zero or invalid value is never shown as 0 s", () => {
   assert.equal(secondsOrNull(undefined), null);
   assert.equal(publishToHealthyLine({ firstRun: { publishToHealthyMs: 3000, downloadMs: 0 } }), "Publish to healthy (first-run app, emulator): 3.00 s");
 });
+
+test("a refusal row shows the reason read from telemetry", () => {
+  const r = rows({ scenarios: [{ name: "m", pass: true, refusalReason: "hermes_bytecode_mismatch" }, { name: "n", pass: false, refusalReason: null }] });
+  assert.equal(r[0], "| m | pass | refused, reason from telemetry: hermes_bytecode_mismatch | - |");
+  assert.equal(r[1], "| n | FAIL | not refused, reason from telemetry: none | - |");
+});

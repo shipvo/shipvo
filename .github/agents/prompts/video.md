@@ -14,4 +14,26 @@ House style (from the owner): visuals are **handcrafted from scratch in code**, 
 
 Commit (`git add`, `git commit -m "video: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (topic, length, size, how you checked it).
 
-This runs every day and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
+This runs three times a day and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
+
+## Content follows code (shared with docs, blog, tutorials and videos)
+
+`docs/content-coverage.md` is the team's content ledger: one row per user-visible feature or advantage (from `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs), with columns **Docs**, **Tutorial**, **Video**, **Blog**, each a link or empty. Before picking a topic, read it and pick the biggest gap in your column, newest and most important features first (what makes Shipvo stronger than the alternatives: signed OTA with rollback, the agent simulator over MCP, measured parity, the store path, `shipvo run`, framework adapters, self-hosting). After your work, add your link to the ledger in the same commit, and add any feature you found missing from it. Create the file if it does not exist, backfilled from everything shipped so far.
+
+## Background music (every video)
+
+Every video gets a quiet music bed that ducks under the narration, mixed with `scripts/video/bgmusic.py` (loudness-matched, sidechain-ducked by the voice, fades in and out; the picture is untouched):
+1. Pick the mood from the video (explainer or tech: `--want tech,documentary,ambient --avoid upbeat`; calm tutorial: `ambient,acoustic`; launch teaser: `upbeat,cinematic`).
+2. **Tracks.** Owner decision (5 Nov 2026): any Jamendo track from the corpus may be used, always credited. Prefer tracks you have not used yet so videos do not all sound the same.
+3. `python3 scripts/video/bgmusic.py analyze --ids ...` and pick the flattest (lowest LRA, 3 to 7 LU), then `mix --video ... --narration <full-length narration wav> --music music/<id>.mp3 --out ... --credits services/site/public/videos/<slug>.credits.json`. Default `--bed 0.5`; 0.35 for dense narration.
+4. **Credits ship with every video.** `--credits` writes `services/site/public/videos/<slug>.credits.json` (track id, title, artist, licence, licence link, source link and a ready `credit_line`), read from the track's own tags. Commit it with the video. Show the credit in a closed info box under the video in `docs/videos.md` (and wherever the video is embedded), never as a visible line:
+   `<details class="credits"><summary>ⓘ Copyright credits</summary>` + the `credit_line` with the source and licence as links + `</details>`.
+   Style it as a small, muted info box (`services/site/site.css`, class `credits`) that matches the transcript box. In descriptions where the video is posted elsewhere, put the `credit_line` at the end. Add `"credits": "/videos/<slug>.credits.json"` to the video's entry in `services/site/media.json`. Record the track id in `scripts/video/scripts/<slug>.json` so the mix can be rebuilt. Never commit MP3 files.
+5. Backfill: when a published video has no music, remix and republish it with a bed (new R2 key, update `docs/videos.md`).
+
+## App demos recorded by driving the app
+
+For product demos, record the real app instead of drawing it: drive the sample app (or a marketplace app) through `@shipvo/mcp` and use `record_start`, `record_marker` and `record_stop` (#501) to capture it in the Shipvo Phone frame with visible taps and captions, then add narration and the music bed. Until those tools are on main, record with Playwright from the simulator as you do now.
+
+
+Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (one line, the loop, comparisons as facts, parity as proof).

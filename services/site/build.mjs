@@ -3,6 +3,7 @@
 // with a grouped sidebar, a client-side search index, an on-page outline and "edit on GitHub" links.
 //   node build-docs.mjs            → public/docs/<slug>/index.html + public/docs/index.json
 import { marked } from "marked";
+import { transformPhones } from "./phone-embed.mjs";
 import { head as headTag, nav as navTag, footer as footTag, crumbs } from "./shell.mjs";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { corona } from "./corona.mjs";
@@ -48,6 +49,7 @@ const NAV = [
   ]},
 ];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+import { parseMinutes, TYPES, GOALS, LEVELS, TIMES } from "./public/learn-search.js";
 const slugify = (s) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const docPages = NAV.flatMap((g) => g.pages.map((p) => ({ ...p, group: g.group, base: "docs" })));
 const url = (p) => `/${p.base || "docs"}/${p.slug}/`;
@@ -69,11 +71,13 @@ const tutorials = readdirSync(join(ROOT, "docs/tutorials")).filter((f) => f.ends
   const slug = f.replace(/\.md$/, ""), src = `docs/tutorials/${f}`, md = readFileSync(join(ROOT, src), "utf8");
   const own = md.match(/\*\*Level:\*\*\s*([^.]+)\./), ownTime = md.match(/\*\*Time:\*\*\s*([^.]+)\./);
   const m = tutorialMeta[slug] || {};
-  const firstPara = md.replace(/^# .*\n/, "").split(/\n\s*\n/).map((x) => x.trim()).find((x) => x && !x.startsWith("**Level"));
+  const firstPara = md.replace(/^# .*\n/, "").split(/\n\s*\n/).map((x) => x.trim()).find((x) => x && !x.startsWith("**Level") && !x.startsWith("<"));
   return { slug, src, base: "learn", group: m.group || "More", kind: "tutorial", title: md.match(/^# (.*)/)?.[1] ?? slug, desc: clipText(plain(firstPara || "")), time: m.time || ownTime?.[1] || "", level: m.level || (own ? own[1][0].toUpperCase() + own[1].slice(1) : ""), date: lastmod(src) };
 }).sort((a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug));
 const videosMd = readFileSync(join(ROOT, "docs/videos.md"), "utf8");
-const videos = [...videosMd.matchAll(/^## (.+)\n+<video\b([^>]*)>/gm)].map((m) => { const a = (n) => m[2].match(new RegExp(`${n}="([^"]*)"`))?.[1] ?? ""; return { title: m[1].trim(), id: slugify(m[1]), poster: a("poster"), length: a("data-length") }; });
+const videos = [...videosMd.matchAll(/^#{2,3} (.+)\n+<video\b([^>]*)>/gm)].map((m) => { const a = (n) => m[2].match(new RegExp(`${n}="([^"]*)"`))?.[1] ?? ""; const before = videosMd.slice(0, m.index), rest = videosMd.slice(m.index + m[0].length); const body = rest.slice(0, rest.search(/\n#{2,3} /) < 0 ? undefined : rest.search(/\n#{2,3} /)); return { title: m[1].trim(), id: slugify(m[1]), poster: a("poster"), length: a("data-length"), group: before.match(/^## (.+)$(?![\s\S]*^## )/m)?.[1].trim() ?? "", text: plain(body.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim() }; });
+const glossaryTerms = [...readFileSync(join(ROOT, "docs/glossary.md"), "utf8").matchAll(/^\*\*(.+?)\.\*\*\s*(.+)$/gm)].map((m) => ({ title: m[1], id: `term-${slugify(m[1])}`, text: plain(m[2]) }));
+const VIDEO_GOAL = { "Get started": "start" };
 const GROUP_ORDER = ["Start", "Sell", "Run your app", "Test", "Ship updates"];
 const learnPages = [
   { slug: "videos", src: "docs/videos.md", title: "Videos", desc: "Short captioned videos that show how Shipvo works: over-the-air updates, signing, staged rollout and rollback, in plain words." },
@@ -107,6 +111,8 @@ function render(page) {
   renderer.table = function ({ header, rows }) { const cell = (c) => `<${c.header ? "th" : "td"}${c.align ? ` style="text-align:${c.align}"` : ""}>${this.parser.parseInline(c.tokens)}</${c.header ? "th" : "td"}>`; return `<div class="table-wrap"><table><thead><tr>${header.map(cell).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("")}</tbody></table></div>\n`; };
   marked.use({ renderer, gfm: true });
   let html = marked.parse(md.replace(/^# .*\n/, "")).replace(/src="\.github\/assets\/brand\/banner\.png"/g, 'src="/img/brand/banner.webp"');   // the page title comes from NAV; drop the file's H1
+  html = transformPhones(html);   // live phone embeds (issue #420)
+  if (page.slug === "glossary") html = html.replace(/<p><strong>([^<]+?)\.<\/strong>/g, (m, t) => `<p id="term-${slugify(t)}"><strong>${t}.</strong>`);   // link targets for search (issue #456)
   // Admonitions: a blockquote starting with **Note** / **Warning** becomes a callout.
   html = html.replace(/<blockquote>\s*<p><strong>(Note|Warning|Tip)<\/strong>:?/g, (_, k) => `<blockquote class="callout ${k.toLowerCase()}"><p><strong>${k}</strong>`);
   const text = md.replace(/```[\s\S]*?```/g, " ").replace(/[#*`>|\[\]()]/g, " ").replace(/\s+/g, " ").trim();
@@ -117,7 +123,7 @@ function layout(page, body, headings, prev, next) {
   const learn = page.base === "learn";
   const link = (p) => `<a href="${url(p)}"${p === page ? ' aria-current="page"' : ""}>${esc(p.title)}</a>`;
   const groups = learn
-    ? [{ group: "Learn", html: '<a href="/learn/">All of Learn</a>' }, { group: "Tutorials", pages: tutorials }, { group: "More", pages: learnPages }]
+    ? [{ group: "Learn", html: '<a href="/learn/">All of Learn</a>' }, { group: "Tutorials", pages: tutorials }, { group: "Videos", html: `<a href="/learn/videos/">All videos</a>${videos.map((v) => `<a href="/learn/videos/#${v.id}">${esc(v.title)}</a>`).join("")}` }, { group: "Glossary", html: `<a href="/learn/glossary/">All terms</a>${glossaryTerms.map((g) => `<a href="/learn/glossary/#${g.id}">${esc(g.title)}</a>`).join("")}` }]
     : NAV.map((g) => g.group === "Get started" ? { ...g, html: '<a href="/learn/">Learn: tutorials and videos</a>' } : g);
   const side = groups.map((g) => `<div class="side-group"><div class="side-title">${esc(g.group)}</div>${(g.pages || []).map(link).join("")}${g.html || ""}</div>`).join("");
   const section = learn ? ["Learn", "/learn/", "learn"] : ["Docs", "/docs/overview/", "docs"];
@@ -131,11 +137,12 @@ ${headTag({ title: `${esc(page.title)} — Shipvo ${learn ? "Learn" : "Docs"}`, 
 ${navTag(section[2])}
 <div class="docs-shell">
   <aside class="side" id="side">
-    <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="docsearch" type="search" placeholder="Search docs and Learn" aria-label="Search docs" autocomplete="off"><kbd>/</kbd></label>
-    <div class="results" id="results" hidden></div>
+    ${learn ? `<label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="sidefilter" type="search" placeholder="Filter Learn" aria-label="Filter the Learn menu" autocomplete="off"><kbd>/</kbd></label>
+    <p class="side-empty" id="side-empty" hidden>Nothing matches. <a href="/learn/">Search all of Learn</a></p>` : `<label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="docsearch" type="search" placeholder="Search docs and Learn" aria-label="Search docs" autocomplete="off"><kbd>/</kbd></label>
+    <div class="results" id="results" hidden></div>`}
     ${side}
   </aside>
-  <button class="side-toggle" type="button" aria-controls="side" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h16"/></svg><span>Docs menu</span></button>
+  <button class="side-toggle" type="button" aria-controls="side" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h16"/></svg><span>${learn ? "Learn menu" : "Docs menu"}</span></button>
   <main class="doc" id="main">
     <div class="doc-head"><div><div class="eyebrow">${esc(page.group)}</div><h1>${esc(page.title)}</h1><p class="sub">${esc(page.desc)}</p></div><a class="edit" href="${REPO}${page.src}" rel="noopener">Edit on GitHub</a></div>
     <article class="prose">${body}</article>
@@ -144,7 +151,8 @@ ${navTag(section[2])}
   <aside class="toc">${toc ? `<div class="side-title">On this page</div>${toc}` : ""}</aside>
 </div>
 ${footTag()}
-<script src="/docs.js" defer></script>
+<script src="/docs.js" defer></script>${learn ? '<script src="/learn-side.js" defer></script>' : ""}
+<script src="/phone.js" defer></script>
 </body>
 </html>`;
 }
@@ -166,19 +174,34 @@ writeFileSync(join(OUT, "index.json"), JSON.stringify(index));
 {
   const tutorialCard = (t) => `<a class="lcard" href="${url(t)}"><span class="lgroup">${esc(t.group)}</span><b>${esc(t.title)}</b><span class="ldesc">${esc(t.desc)}</span><span class="lmeta">${t.time ? `<span>${esc(t.time)}</span>` : ""}${t.level ? `<span>${esc(t.level)}</span>` : ""}</span></a>`;
   const videoCard = (v) => `<a class="lcard lvideo" href="/learn/videos/#${v.id}">${v.poster ? `<img src="${esc(v.poster)}" alt="" loading="lazy" width="640" height="360">` : ""}<b>${esc(v.title)}</b><span class="lmeta"><span>${esc(v.length)}</span><span>Captions and transcript</span></span></a>`;
+  // Search index for the hub (issue #456): titles, descriptions, headings and transcripts, built here so search needs no network round trip beyond this file.
+  const goalSlug = (g) => slugify(g);
+  const learnIndex = [
+    ...tutorials.map((t) => { const e = index.find((x) => x.path === url(t)); return { type: "tutorial", title: t.title, desc: t.desc, path: url(t), goal: goalSlug(t.group), level: slugify(t.level), minutes: parseMinutes(t.time), time: t.time, headings: e?.headings ?? [], text: (e?.text ?? "").slice(0, 6000) }; }),
+    ...videos.map((v) => ({ type: "video", title: v.title, desc: `Video, ${v.length}.`, path: `/learn/videos/#${v.id}`, goal: VIDEO_GOAL[v.group] ?? goalSlug(v.group), level: "", minutes: parseMinutes(v.length), time: v.length, poster: v.poster, headings: [], text: v.text.slice(0, 8000) })),
+    ...glossaryTerms.map((g) => ({ type: "glossary", title: g.title, desc: clipText(g.text), path: `/learn/glossary/#${g.id}`, goal: "", level: "", minutes: null, time: "", headings: [], text: g.text })),
+  ].map((e, order) => ({ ...e, order }));
+  writeFileSync(join(LOUT, "index.json"), JSON.stringify(learnIndex));
+  const chips = (key, label, opts) => `<fieldset class="lfilter" data-key="${key}"><legend>${label}</legend>${opts.map(([v, l]) => `<button type="button" class="chip" data-value="${v}" aria-pressed="false">${l}<span class="n"></span></button>`).join("")}</fieldset>`;
   const groups = [...new Set([...GROUP_ORDER, ...tutorials.map((t) => t.group)])].filter((g) => tutorials.some((t) => t.group === g));
   const desc = "Tutorials, videos and a glossary for people who are new to Shipvo, in plain words. No coding or terminal experience needed.";
   mkdirSync(LOUT, { recursive: true });
   writeFileSync(join(LOUT, "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Learn Shipvo: tutorials, videos and glossary", desc, path: "/learn/", ld: [crumbs([["Home", "/"], ["Learn", "/learn/"]])], extraCss: '<link rel="stylesheet" href="/learn.css">' })}</head><body>${navTag("learn")}<main id="main"><section class="learn"><div class="wrap">
 <div class="eyebrow">Learn</div><h1>Learn Shipvo, one small step at a time.</h1>
 <p class="lede">You do not need to be a developer. These tutorials take you from nothing to an app on a simulated phone in your browser. Each one says how long it takes and who it is for, and every new word is explained once in the <a class="link" href="/learn/glossary/">glossary</a>.</p>
+<form class="lsearch" role="search" id="lsearch" onsubmit="return false"><label for="lq" class="sr">Search tutorials, videos and the glossary</label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="lq" type="search" placeholder="Search tutorials, videos and words" autocomplete="off" autofocus><kbd>/</kbd></form>
+<div class="lfilters" id="lfilters">${chips("type", "Type", TYPES)}${chips("goal", "Goal", GOALS)}${chips("level", "Level", LEVELS)}${chips("time", "Time", TIMES)}<button type="button" class="lclear" id="lclear" hidden>Clear all</button></div>
+<p class="lcount" id="lcount" role="status" aria-live="polite" hidden></p>
+<div class="lgrid" id="lresults" hidden></div>
+<div id="lstatic">
 <h2 id="tutorials">Tutorials</h2><p class="lsub">Newest first. Tutorials are grouped by what you want to do: ${groups.map(esc).join(", ")}.</p>
 <div class="lgrid">${tutorials.map(tutorialCard).join("")}</div>
 <h2 id="videos">Videos</h2><p class="lsub">Short, captioned, with a written transcript. <a class="link" href="/learn/videos/">All videos</a></p>
 <div class="lgrid">${videos.map(videoCard).join("")}</div>
 <h2 id="glossary">Glossary</h2><p class="lsub">Stuck on a word? <a class="link" href="/learn/glossary/">Open the glossary</a> for plain-English meanings.</p>
+</div>
 <h2 id="next">Next: Docs</h2><p class="lsub">Ready for reference material? Go to the <a class="link" href="/docs/overview/">Docs</a>, or start with <a class="link" href="/docs/getting-started/">Build your first app</a>.</p>
-</div></section></main>${footTag()}</body></html>`);
+</div></section></main>${footTag()}<script type="module" src="/learn.js"></script></body></html>`);
 }
 // /docs/ → the overview
 writeFileSync(join(OUT, "index.html"), `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/docs/overview/"><link rel="canonical" href="/docs/overview/"><title>Shipvo Docs</title>`);

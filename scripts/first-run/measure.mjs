@@ -5,7 +5,7 @@
 // With --control-url, after the dry run it registers the scaffolded app with the local dev key
 // (SHIPVO_LOCAL_DEV_KEY, default sv_test_localdev), points shipvo.json "controlPlane" at the URL, runs a real
 // `shipvo publish`, then GETs the pointer and checks it is signed and names the release just published.
-// Steps recorded: "publish" (real) and "pointer". A non-2xx publish exits 1 and prints the server's message.
+// Steps recorded: "publish" (real), "pointer" and "bundle" (fetches the bundle the pointer names; checks signature, size and sha256). A non-2xx publish exits 1 and prints the server's message.
 // With --with-install --with-session, a "first agent session" step then starts `shipvo sim` for the scaffolded app (its web build
 // counts), opens the app with @shipvo/test, reads the screen and stops the simulator. Needs playwright's chromium.
 // The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets.
@@ -23,7 +23,7 @@
 // the export would write it, and publish runs with --skip-export.
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
-import { createPublicKey, verify } from "node:crypto";
+import { createPublicKey, createHash, verify } from "node:crypto";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
@@ -67,6 +67,27 @@ export function logTail(file, n = 20) {
   return `\n--- last ${Math.min(n, lines.length)} lines of the control plane log (${file}) ---\n${lines.slice(-n).join("\n")}`;
 }
 
+/**
+ * Fetches the bundle the pointer names and checks it the way a shell does: the pointer signature first, then the
+ * size and sha256 the signed body promises. A phone would refuse the update on any mismatch.
+ */
+export async function bundleStep(base, env, body, key) {
+  const t0 = performance.now();
+  const res = (exit, msg) => ({ step: "bundle", ms: Math.round(performance.now() - t0), exit, stderr: msg });
+  try {
+    if (!verify(null, Buffer.from(env.body), key, Buffer.from(env.signature, "base64"))) return res(1, "bundle: pointer signature does not verify, so its hash cannot be trusted");
+    const core = body.core;
+    if (!core || typeof core.url !== "string" || typeof core.sha256 !== "string") return res(1, "bundle: pointer has no core.url and core.sha256");
+    const r = await fetch(`${base}/${core.url.replace(/^\//, "")}`);
+    if (!r.ok) return res(1, `bundle: GET ${core.url} returned HTTP ${r.status}`);
+    const bytes = Buffer.from(await r.arrayBuffer());
+    if (typeof core.size === "number" && bytes.length !== core.size) return res(1, `bundle: ${core.url} is ${bytes.length} bytes, the signed pointer says ${core.size}`);
+    const sha = createHash("sha256").update(bytes).digest("hex");
+    if (sha !== core.sha256) return res(1, `bundle: ${core.url} has sha256 ${sha}, the signed pointer says ${core.sha256}`);
+    return res(0, "");
+  } catch (e) { return res(1, `bundle: ${e.message}`); }
+}
+
 /** Real publish against a control plane, then check the pointer it serves. Returns the steps to record. */
 async function realPublish(cli, app, controlUrl, withExport, controlLog) {
   const base = controlUrl.replace(/\/$/, "");
@@ -102,7 +123,7 @@ async function realPublish(cli, app, controlUrl, withExport, controlLog) {
       if (typeof env.body !== "string" || typeof env.signature !== "string" || !verify(null, Buffer.from(env.body), key, Buffer.from(env.signature, "base64"))) return [pub, pointer(1, "pointer: response is not signed with the app's key")];
       const body = JSON.parse(env.body);
       if (body.app_id !== cfg.appId || released === undefined || body.release !== released) return [pub, pointer(1, `pointer names release ${body.release} of ${body.app_id}, expected release ${released} of ${cfg.appId}`)];
-      return [pub, pointer(0, "")];
+      return [pub, pointer(0, ""), await bundleStep(base, env, body, key)];
     } catch (e) { return [pub, pointer(1, `pointer: ${e.message}`)]; }
   } finally {
     await fetch(`${base}/apps/${cfg.appId}`, { method: "DELETE", headers: { authorization: `Bearer ${devKey()}` } }).catch(() => {});

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { keyFromSeed, b64, signBytes } from "../src/index";
@@ -100,5 +100,41 @@ describe("promote", () => {
     await expect(promote(["--dryrun"])).rejects.toThrow(/Unknown flag --dryrun/);
     put("p/demo/1/b0", 3);
     await expect(promote(["--to", "b9"], { fetchFn: ok })).rejects.toThrow(/Unknown band b9/);
+  });
+  describe("test report gate", () => {
+    const report = (release: unknown, failed: string[]) => writeFileSync("shipvo-test-report.json", JSON.stringify({ release, flows: [{ name: "ok.flow", status: "passed" }, ...failed.map((name) => ({ name, status: "failed" }))] }));
+    it("blocks a failing report for the same release and names the flows", async () => {
+      put("p/demo/1/b0", 3); report("3", ["login.flow", "cart.flow"]);
+      await expect(promote([], { fetchFn: ok })).rejects.toThrow(/login\.flow, cart\.flow/);
+      expect(values.has("p/demo/1/b1")).toBe(false);
+    });
+    it("passing, stale and missing reports promote; stale warns", async () => {
+      put("p/demo/1/b0", 3); report("3", []);
+      await promote([], { fetchFn: ok });
+      expect(values.has("p/demo/1/b1")).toBe(true);
+      values.delete("p/demo/1/b1"); values.delete("p/demo/1/b2"); logs = [];
+      report("2", ["login.flow"]);
+      await promote([], { fetchFn: ok });
+      expect(values.has("p/demo/1/b1")).toBe(true);
+      expect(logs.join("\n")).toMatch(/Warning: .*stale/);
+    });
+    it("promotes with no report file", async () => {
+      put("p/demo/1/b0", 3);
+      await promote([], { fetchFn: ok });
+      expect(values.has("p/demo/1/b1")).toBe(true);
+    });
+    it("--force overrides and says so", async () => {
+      put("p/demo/1/b0", 3); report(3, ["login.flow"]);
+      await promote(["--force"], { fetchFn: ok });
+      expect(values.has("p/demo/1/b1")).toBe(true);
+      expect(logs.join("\n")).toMatch(/login\.flow.*Overridden by --force/);
+    });
+    it("--dry-run shows the block, and --report picks the file", async () => {
+      put("p/demo/1/b0", 3); report(3, ["login.flow"]);
+      await expect(promote(["--dry-run"], { fetchFn: ok })).rejects.toThrow(/login\.flow/);
+      writeFileSync("other.json", JSON.stringify({ release: 3, flows: [] }));
+      await promote(["--dry-run", "--report", "other.json"], { fetchFn: ok });
+      expect(logs.join("\n")).toMatch(/Would write b1/);
+    });
   });
 });
