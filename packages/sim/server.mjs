@@ -40,7 +40,15 @@ async function resolveApp(spec) {
 }
 mkdirSync(DIR, { recursive: true });
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".ico": "image/x-icon", ".ttf": "font/ttf", ".css": "text/css" };
-const browser = await chromium.launch();
+// Chromium starts after the server is listening (see the end of this file). Handlers await this shared promise.
+const LAUNCH_TIMEOUT_MS = 60_000;
+let launchBrowser;
+const browserReady = new Promise((resolve, reject) => { launchBrowser = () => {
+  const timer = setTimeout(() => reject(new Error(`Chromium did not start within ${LAUNCH_TIMEOUT_MS / 1000} s`)), LAUNCH_TIMEOUT_MS);
+  const executablePath = arg("chromium", undefined);
+  chromium.launch(executablePath ? { executablePath } : {}).then(resolve, reject).finally(() => clearTimeout(timer));
+}; });
+browserReady.catch((e) => { console.error(`sim: could not launch Chromium: ${e.message.split("\n")[0]}`); process.exit(1); });
 const sessions = new Map();
 
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
@@ -49,6 +57,7 @@ async function newSession(id, opts = {}) {
   if (sessions.has(id)) await sessions.get(id).ctx.close();
   const target = await resolveApp(opts.app);
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
+  const browser = await browserReady;
   const ctx = await browser.newContext({ ...phone, colorScheme: opts.dark ? "dark" : "light" });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
@@ -238,3 +247,4 @@ const server = http.createServer(async (req, res) => {
 // Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
 server.listen(PORT, () => console.log(`Shipvo UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));
+launchBrowser();
