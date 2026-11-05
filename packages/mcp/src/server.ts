@@ -11,6 +11,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import http from "node:http";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
+import { classify, compactDiff, fieldValue } from "./change.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
 const CONTROL = (process.env.PN_CONTROL ?? "https://api.shipvo.dev").replace(/\/$/, "");
@@ -39,7 +40,21 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
   return r.json() as Promise<Act>;
 }
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
+// Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
+const trees = new Map<string, string>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
+// Action result with a "Change:" line on top. Compares this tree with the session's last one.
+// compact: on "content changed", return only the added/removed lines instead of the full tree.
+const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string } = {}) => {
+  if (!r.ok || r.screen == null) return result(sid, r);
+  const prev = trees.get(sid);
+  trees.set(sid, r.screen);
+  const change = prev === undefined ? "unknown (no earlier screen to compare)" : classify(prev, r.screen, action);
+  const head = [`Change: ${change}`];
+  if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
+  const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
+  return result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
+};
 const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}`); };
 // Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
@@ -80,6 +95,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
+  if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
 });
 
@@ -89,14 +105,16 @@ server.tool("list_sessions", "Open simulator sessions (phones) on this server: i
   return text(rows.length ? rows.map((s) => `${s.session}: ${s.app} release ${s.release}${s.started_at ? ` since ${s.started_at}` : ""}`).join("\n") : "no open sessions");
 });
 const sid = z.string().describe("Session from open_app");
+const compact = z.boolean().optional().describe("When the change is 'content changed', return only the added/removed lines, not the whole screen");
+const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
-server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); return result(session, await sim("/act", { session, action: "screen" })); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen.", { session: sid, ref }, async ({ session, ref }) => { need(session); return result(session, await sim("/act", { session, action: "tap", ref })); });
-server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards") },
-  async ({ session, ref, text: t, enter }) => { need(session); return result(session, await sim("/act", { session, action: "type", ref, text: t, enter })); });
-server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen.", { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page") },
-  async ({ session, direction, ref }) => { need(session); return result(session, await sim("/act", { session, action: "scroll", direction, ref })); });
-server.tool("back", "Go back one screen.", { session: sid }, async ({ session }) => { need(session); return result(session, await sim("/act", { session, action: "back" })); });
+server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, async ({ session, ref, compact }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact }); });
+server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact },
+  async ({ session, ref, text: t, enter, compact }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref }); });
+server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact },
+  async ({ session, direction, ref, compact }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref }), { compact }); });
+server.tool("back", "Go back one screen." + CH, { session: sid, compact }, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
   if (!r.ok || !r.path) throw new Error(r.error ?? "no screenshot");
@@ -127,7 +145,7 @@ server.tool("device_reset", "Put the simulated phone back to a known state (perm
   async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
 
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, async ({ session }) => {
-  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session);
+  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));

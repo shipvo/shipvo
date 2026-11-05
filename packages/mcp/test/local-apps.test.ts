@@ -63,3 +63,88 @@ describe("local mcp", () => {
     await c.close();
   });
 });
+
+describe("change line", () => {
+  let c: Awaited<ReturnType<typeof connect>>;
+  const screens: Record<string, string> = {};
+  let step = "";
+  beforeAll(async () => {
+    const list = ['- heading "Shop"', '- button "Buy" [ref=e1]', '- button "Dead" [ref=e2]', '- textbox "Name" [ref=e3]', '- text "Row 1"', '- text "Row 2"', '- text "Row 3"', '- text "Row 4"'];
+    screens.home = list.join("\n");
+    screens.typed = list.map((l) => (l.includes("Name") ? l + ": Ana" : l)).join("\n");
+    screens.attrs = list.map((l) => (l.includes("Name") ? '- textbox "Name" [ref=e3] [cursor=pointer]: Ana' : l)).join("\n");
+    screens.quoted = list.map((l) => (l.includes("Name") ? `- 'textbox "a: b" [ref=e3]': Ana` : l)).join("\n");
+    screens.gone = list.filter((l) => !l.includes("Name")).join("\n");
+    screens.reordered = [list[0], ...list.slice(1).reverse()].join("\n");
+    screens.badge = list.concat('- text "Added to cart" [ref=e9]').join("\n");
+    screens.next = '- heading "Cart"\n- button "Pay" [ref=e4]';
+    screens.scrolled = list.slice(0, 1).concat(['- text "Row 5"', '- text "Row 6"']).join("\n");
+    fake.removeAllListeners("request");
+    fake.on("request", async (req, res) => {
+      let raw = ""; for await (const ch of req) raw += ch;
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu" }] }));
+      if (req.url === "/session") return res.end(JSON.stringify({ ok: true, screen: screens.home }));
+      res.end(JSON.stringify({ ok: true, screen: screens[step] ?? screens.home }));
+    });
+    c = await connect();
+    await c.callTool({ name: "open_app", arguments: { app: "menu", session: "chg" } });
+  });
+  afterAll(async () => { await c?.close(); });
+  const act = async (name: string, s: string, args: Record<string, unknown> = {}) => { step = s; return textOf(await c.callTool({ name, arguments: { session: "chg", ...args } })); };
+
+  it("says none when a tap changes nothing", async () => {
+    expect(await act("tap", "home", { ref: "e2" })).toMatch(/^Change: none\n/);
+  });
+  it("says new screen on navigation", async () => {
+    expect(await act("tap", "next", { ref: "e1" })).toMatch(/^Change: new screen\n/);
+    expect(await act("back", "home")).toMatch(/^Change: new screen\n/);
+  });
+  it("gives the field value after typing", async () => {
+    const t = await act("type", "typed", { ref: "e3", text: "Ana" });
+    expect(t).toMatch(/^Change: content changed\nValue of e3: "Ana"/);
+  });
+  it("says scrolled after a scroll", async () => {
+    expect(await act("scroll", "scrolled", { direction: "down" })).toMatch(/^Change: scrolled\n/);
+    await act("scroll", "home", { direction: "up" });
+  });
+  it("compact returns only changed lines, shorter than the full tree, refs intact", async () => {
+    await act("tap", "home", { ref: "e2" });
+    const full = await act("tap", "badge", { ref: "e1" });
+    await act("tap", "home", { ref: "e2" });
+    const compact = await act("tap", "badge", { ref: "e1", compact: true });
+    expect(full).toContain('- text "Row 1"');
+    expect(compact).toContain('+ - text "Added to cart" [ref=e9]');
+    expect(compact).not.toContain("Row 1");
+    expect(compact.length).toBeLessThan(full.length);
+  });
+  it("finds the value when attributes follow the ref", async () => {
+    await act("tap", "home", { ref: "e2" });
+    expect(await act("type", "attrs", { ref: "e3", text: "Ana" })).toContain('Value of e3: "Ana"');
+  });
+  it("finds the value on a YAML-quoted line", async () => {
+    await act("tap", "home", { ref: "e2" });
+    expect(await act("type", "quoted", { ref: "e3", text: "Ana" })).toContain('Value of e3: "Ana"');
+  });
+  it("finds the value when the whole line is quoted", async () => {
+    screens.quoted2 = `- 'textbox "a: b" [ref=e3]: Ana'`;
+    await act("tap", "home", { ref: "e2" });
+    expect(await act("type", "quoted2", { ref: "e3", text: "Ana" })).toContain('Value of e3: "Ana"');
+  });
+  it("says when the value is not shown", async () => {
+    expect(await act("type", "gone", { ref: "e3", text: "Ana" })).toContain("Value of e3: not shown");
+  });
+  it("does not return an empty diff when lines only moved", async () => {
+    await act("tap", "home", { ref: "e2" });
+    const r = await act("tap", "reordered", { ref: "e1", compact: true });
+    expect(r).toContain("(same lines, new order)");
+  });
+  it("does not claim new screen for a session this server never opened", async () => {
+    step = "home";
+    const call = async () => textOf(await c.callTool({ name: "tap", arguments: { session: "stranger", ref: "e2" } }));
+    const first = await call();
+    expect(first).not.toMatch(/new screen/);
+    expect(first).toMatch(/^Change: unknown/);
+    expect(await call()).toMatch(/^Change: none\n/);
+  });
+});
