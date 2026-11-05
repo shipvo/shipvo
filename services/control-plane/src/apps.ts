@@ -31,7 +31,7 @@ async function developer(c: any): Promise<{ account_id: number; login: string } 
 }
 
 /** The publish token of one app. */
-async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number } | null> {
+export async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number } | null> {
   const k = bearer(c); if (!k.startsWith("sv_publish_")) return null;
   const key = await c.env.DB.prepare("SELECT id, expires_at FROM publish_tokens WHERE key_hash = ? AND app_id = ? AND revoked_at IS NULL").bind(await sha256(k), appId).first();
   if (!key || (key.expires_at && key.expires_at < now())) return null;

@@ -23,7 +23,7 @@ Update `docs/ROADMAP.md` so its themes and "Now" list match the bets. Keep the p
 
 For each bet, make sure the backlog has an `epic` issue and its first 2–3 slices (follow the issue format in `.github/agents/prompts/planner.md`; search first, no duplicates).
 
-Rules: only real, linked evidence; never invent users, numbers or quotes; do not copy competitors' text or code. No changes outside `docs/product/` and `docs/ROADMAP.md`; `docs/product/platform.md` keeps its mission section exactly as the owner wrote it.
+Rules: only real, linked evidence; never invent users, numbers or quotes; do not copy competitors' text or code. No changes outside `docs/product/` and `docs/ROADMAP.md`; `docs/product/platform.md` keeps its mission and "Direction from the owner" sections exactly as the owner wrote them; plan the strategy inside that direction.
 
 Commit (`git add`, `git commit -m "product: weekly strategy review"`). Do not push. Write `/tmp/agent/pr_title.txt` ("product: strategy review <date>") and `/tmp/agent/pr_body.md` (the 5-line summary: what we learned, what changed, the bets).
 

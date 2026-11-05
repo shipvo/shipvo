@@ -55,7 +55,7 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 | KV | `b/<app>/r<N>.hbc`, `b/<app>/d-<sha>-r<N>.bsdiff`, `b/<app>/base-<sha>.hbc` | Bundles, patches, shells' embedded bundles |
 | KV | `w/<app>/r<N>/*`, `w/<app>/releases` | The web artifact of each release for the simulator |
 | KV | `h/<app>/r<N>` | Release history (sha, size, min shell) for rollback |
-| KV | `halt-config/<app>`, `halt/<app>` | Auto-halt. You write `halt-config/<app>` as `{"threshold": 0.2, "min_reports": 20}` to turn halting on. The control plane writes `halt/<app>` as `{"release": 5, "halted_at": "<ISO time>", "reports": n, "failed": n, "threshold": 0.2}` when release 5 fails on too many devices. While it holds the live release, the pointer answers 404 `release_halted` and shells keep their current release. Publishing a new release clears the effect; you do not need to delete the key. |
+| KV | `halt-config/<app>`, `halt/<app>` | Auto-halt. Turn it on with `shipvo auto-halt --threshold 0.2 --min-reports 20` (see [the CLI docs](cli.md#shipvo-auto-halt)). That writes `halt-config/<app>`; you can also write it yourself as `{"threshold": 0.2, "min_reports": 20}` to turn halting on. The control plane writes `halt/<app>` as `{"release": 5, "halted_at": "<ISO time>", "reports": n, "failed": n, "threshold": 0.2}` when release 5 fails on too many devices. While it holds the live release, the pointer answers 404 `release_halted` and shells keep their current release. Publishing a new release clears the effect; you do not need to delete the key. |
 | D1 | `telemetry` | applied / reverted / cold-start / download events from phones |
 | D1 | `content`, `content_history` | Live content per app, with an audit trail of owner changes |
 | D1 | `orders` | What apps post to `/o/<app>` |
@@ -64,6 +64,18 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 ## Routes
 
 `GET /p/:app/:major/:band` pointer · `GET /b/:app/:file` bundle · `GET /w/:app/releases.json`, `GET /w/:app/:rel/*` web artifact · `GET /c/:app/content.json` live content · `POST /o/:app` orders · `POST /t` telemetry, `GET /t/:app` summary · `GET /app/:id/admin` admin · `GET /app/:id/api/describe`, `POST /app/:id/api/command` owner API (bearer `OWNER_TOKEN` or admin session).
+
+## Revert alerts (webhook)
+
+An app owner can set one `https://` URL that is called when devices revert a release. With the owner token:
+
+```bash
+curl -X POST https://<your-worker>/app/<id>/api/command \
+  -H "authorization: Bearer $OWNER_TOKEN" -H "content-type: application/json" \
+  -d '{"name":"set_alert_webhook","args":{"url":"https://example.com/hooks/shipvo"}}'
+```
+
+Send an empty `url` to remove it. `http://` URLs and URLs with a user name or password are refused (`bad_webhook_url`). When a `rolled_back` or `crash_loop_revert` telemetry event arrives, the control plane sends one POST with `{"app":"tide","release":3,"event":"crash_loop_revert","time":"<ISO time>"}`. A release alerts at most once per hour, and an app sends at most 10 alerts per hour whatever the release numbers. `POST /t` is not authenticated, so someone could send fake release numbers to use up the 10 slots and hide a real alert for an hour. The call runs after the telemetry response, has a 5 second limit, is not retried (a failed POST uses up its slot for that hour), and a failure never affects telemetry. The payload holds no secrets, but the URL itself may, so the command answers with the host only, and the audit log and the agent confirm plan show only the host. Agents must send `confirm: true` under the default policy. Apply migration `0014_alert_webhook.sql` first.
 
 ## The hosted simulator (optional)
 

@@ -10,7 +10,7 @@ import { device } from "@shipvo/device";
 
 ```ts
 device.kind                 // "native" | "simulated"
-device.capabilities()       // { camera: "real" | "simulated" | "unavailable", location: …, biometrics, payments, notifications, share, clipboard, contacts, calendar, network }
+device.capabilities()       // { camera: "real" | "simulated" | "unavailable", location: …, biometrics, payments, notifications, share, clipboard, contacts, calendar, files, network }
 ```
 
 Every capability declares how it is provided *here*. There is no silent fallback: on a phone without `expo-camera` installed, `camera` is `unavailable` and `scan()` throws; in the simulator every capability is `simulated`. Tests and agents read this to know what was actually exercised. Simulated results are also marked in what they return: receipts start with `SIMULATED-` (simulator) or `SANDBOX-` (the built-in sandbox provider on phones until a gateway is configured), and every entry in the simulator's device log carries `simulated: true`.
@@ -65,8 +65,13 @@ The amount/PIN prompt is your app's own sheet, identical on every platform (Tide
 
 ```ts
 const id = await device.notifications.show({ title, body, data? });
-const off = device.notifications.onOpen((n) => { /* n.data */ });
+const off = device.notifications.onTapped((n) => { /* n.data */ });   // onOpen is the same
+const stop = device.notifications.onReceived((n) => { /* n.title, n.body, n.data */ });
 ```
+
+Support level for `notifications`: `real` with `expo-notifications`, `simulated` in the simulator, `unavailable` otherwise. Permission is `"notifications"`: if it is not granted, no notification reaches the app and `getPermissionsAsync` reports `denied` (or `undetermined` if never asked). Simulated pushes are payloads only: no push token, APNs or FCM delivery, scheduling or badges.
+
+In tests: `await phone.device.set({ permissions: { notifications: "granted" } })`, then `await phone.notifications.receive({ title, body, data })` (resolves `false` when permission blocked it) and `await phone.notifications.tap()`. Agents use the `push_notification` and `open_notification` MCP tools.
 
 Phones: a local notification through `expo-notifications`; tapping it fires `onOpen`. Simulator: a heads-up banner over the status bar for 5 seconds (as on a phone), then it lives in the notification shade: agents list it with the `notifications` MCP tool and tap it with `open_notification`, which fires `onOpen` exactly as a banner tap would.
 
@@ -121,6 +126,26 @@ await phone.device.set({ permissions: { calendar: "granted" } });   // or "denie
 
 Agents use `set_device(calendar: [...], permissions: { calendar })` over MCP.
 
+## Files
+
+Support level: **simulated** in the simulator, **real** on a phone when `expo-document-picker` is installed (`unavailable` otherwise). One file at a time; camera, photo library, saving and sharing files are not covered.
+
+```ts
+const f = await device.files.pick({ type: "image/*" });   // { name, mimeType, size, uri } | null (cancelled)
+```
+
+`type` is a MIME filter (`image/*`, `application/pdf`, or a list). Without it every file is offered. On a phone with `expo-document-picker` missing, `pick()` throws `expo-document-picker is not installed`. In the simulator a "Choose a file" dialog lists the seeded files that match `type`, plus a Cancel button. A picked file's `uri` can be read with `fetch(uri)`. Apps that import `expo-document-picker` directly work too: `getDocumentAsync` returns `{ canceled, assets }`.
+
+Test it with `@shipvo/test`:
+
+```ts
+await phone.files.set([{ name: "receipt.pdf", mimeType: "application/pdf", content: "..." }]);
+// the app opens the picker, then:
+await phone.files.pick("receipt.pdf");   // or phone.files.cancel()
+```
+
+Agents use `set_device(files: [...])` over MCP, then tap the file or Cancel in the dialog.
+
 ## Network
 
 ```ts
@@ -134,12 +159,12 @@ Simulator: `set_device(online: false)` takes the phone offline; the app's offlin
 
 | MCP tool | Effect |
 | --- | --- |
-| `set_device(session, platform?, api?, permissions?, contacts?, calendar?, location?, camera?, biometrics?, payment?, online?)` | Change any part of the device state mid-session |
+| `set_device(session, platform?, api?, permissions?, contacts?, calendar?, files?, location?, camera?, biometrics?, payment?, online?)` | Change any part of the device state mid-session |
 | `device_reset(session, profile?)` | Back to a known state: permissions undetermined, default location, nothing in view, log cleared |
-| `push_notification(session, title, body, data?)` | Deliver a notification to the phone |
+| `push_notification(session, title, body, data?)` | Deliver a notification to the phone (needs notification permission) |
 | `notifications(session)` / `open_notification(session, id?)` | The shade; tap one |
 | `device_log(session)` | Every device event in the session (permission prompts and answers, location reads, scans, auth, payments, notifications, shares), each `simulated: true`, plus `capabilities()` |
 
 ## Using raw Expo modules
 
-Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication`, `expo-notifications`, `expo-clipboard`, `expo-contacts` or `expo-calendar` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.
+Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication`, `expo-notifications`, `expo-clipboard`, `expo-contacts`, `expo-calendar` or `expo-document-picker` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.

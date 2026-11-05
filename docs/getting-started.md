@@ -74,6 +74,14 @@ curl -s -X POST localhost:4545/session -H 'content-type: application/json' -d '{
 curl -s -X POST localhost:4545/act -H 'content-type: application/json' -d '{"session":"s1","action":"tap","ref":"e11"}'
 ```
 
+## Share a preview
+
+```bash
+npx shipvo preview
+```
+
+This builds the web app with the simulated device and publishes it to here.now. It needs no account. It prints `Preview:` with a public link that shows the app in a phone-sized frame (you can switch between phone, iPhone and tablet, and light and dark), then a claim link and an expiry time when here.now returns them. The link is public: anyone who has it can open it. It expires in 24 hours unless you open the claim link and sign in to here.now. Add `--json` to get the result as JSON. It never uploads `.shipvo/`, `.env` files, key files or source maps, and it refuses a build that references a secret.
+
 ## 3. Use the device API in your own screens
 
 ```tsx
