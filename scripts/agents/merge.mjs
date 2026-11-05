@@ -19,7 +19,7 @@ const DRY = process.env.DRY_RUN === "true";
 import { LOCKED, GUARDED } from "./contract.mjs";
 const GREEN = new Set(["success", "skipped", "neutral"]);
 
-const gh = (...args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+const gh = (...args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 256 * 1024 * 1024 });
 const api = (path, ...rest) => JSON.parse(gh("api", path, ...rest) || "null");
 const apiAll = (path) => JSON.parse(gh("api", "--paginate", "--slurp", path)).flat();
 const log = (...a) => console.log(...a);
