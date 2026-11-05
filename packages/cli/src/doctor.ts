@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { createServer } from "node:net";
+import { execSync } from "node:child_process";
+import { portFree } from "./sim.js";
 import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
 import { parseDeclared } from "./hermes.js";
@@ -31,26 +32,21 @@ const defaultDeps = (): DoctorDeps => ({
   readText: (path) => readFileSync(path, "utf8"),
   port: 4545,
   chromiumPath: playwrightChromiumPath,
-  portFree: isPortFree,
+  portFree,
 });
 
-/** Finds Playwright the way @shipvo/sim does (the app's own install first, then this package's) and asks it where Chromium should be. */
+/** Finds Playwright the way packages/sim/server.mjs does (the app's install, then this package's and @shipvo/sim's, then the global npm root) and asks it where Chromium should be. */
 function playwrightChromiumPath(cwd: string): string | null {
-  for (const base of [join(cwd, "package.json"), import.meta.url]) {
-    try {
-      const pw = createRequire(base)("playwright");
-      return pw.chromium.executablePath() as string;
-    } catch {}
+  const tries: Array<() => any> = [
+    () => createRequire(join(cwd, "package.json"))("playwright"),
+    () => createRequire(import.meta.url)("playwright"),
+    () => createRequire(createRequire(import.meta.url).resolve("@shipvo/sim/package.json"))("playwright"),
+    () => createRequire(import.meta.url)(join(execSync("npm root -g", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(), "playwright")),
+  ];
+  for (const get of tries) {
+    try { return get().chromium.executablePath() as string; } catch {}
   }
   return null;
-}
-
-function isPortFree(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const s = createServer();
-    s.once("error", () => resolve(false));
-    s.listen(port, () => s.close(() => resolve(true)));
-  });
 }
 
 function hasSimScript(deps: DoctorDeps): boolean {
@@ -143,7 +139,8 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
 export async function doctor(argv: string[]) {
   const a = parseArgs(argv);
   const port = a.port === undefined ? 4545 : Number(a.port);
-  if (argv.some((x) => !x.startsWith("--") && !(argv[argv.indexOf(x) - 1] === "--port")) || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>]"); process.exit(2); }
+  const stray = argv.some((x, i) => !x.startsWith("--") && argv[i - 1] !== "--port");
+  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>]"); process.exit(2); }
   const results = await runDoctorChecks({ port });
   for (const r of results) console.log(`${r.ok ? `PASS ${r.name}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
   if (results.some((r) => !r.ok)) process.exit(1);

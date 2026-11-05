@@ -204,4 +204,22 @@ describe("shipvo doctor sim checks", () => {
     try { await expect(doctor([])).rejects.toThrow("exit"); expect(exit).toHaveBeenCalledWith(1); }
     finally { process.chdir(prev); vi.restoreAllMocks(); }
   });
+
+  it.each([["foo"], ["--port", "abc"], ["--port", "4545", "4545"]])("rejects bad arguments %j with exit 2", async (...argv) => {
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try { await expect(doctor(argv)).rejects.toThrow("exit"); expect(exit).toHaveBeenCalledWith(2); }
+    finally { vi.restoreAllMocks(); }
+  });
+
+  it("default portFree sees a real busy port", async () => {
+    const { portFree } = await import("../src/sim.js");
+    const { createServer } = await import("node:net");
+    const srv = createServer();
+    await new Promise<void>((r) => srv.listen(0, r));
+    const busy = (srv.address() as { port: number }).port;
+    expect(await portFree(busy)).toBe(false);
+    await new Promise((r) => srv.close(r));
+    expect(await portFree(busy)).toBe(true);
+  });
 });
