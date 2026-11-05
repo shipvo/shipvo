@@ -11,6 +11,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import http from "node:http";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
+import { classify, compactDiff, fieldValue } from "./change.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
 const CONTROL = (process.env.PN_CONTROL ?? "https://api.shipvo.dev").replace(/\/$/, "");
@@ -38,8 +39,20 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
   if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}. Is it running at ${SIM}?`);
   return r.json() as Promise<Act>;
 }
-const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
+const sessions = new Map<string, { app: string; steps: number; startedAt: number; tree?: string }>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
+// Action result with a "Change:" line on top. Compares this tree with the session's last one.
+// compact: on "content changed", return only the added/removed lines instead of the full tree.
+const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string } = {}) => {
+  const s = sessions.get(sid);
+  if (!r.ok || r.screen == null) return result(sid, r);
+  const prev = s?.tree; if (s) s.tree = r.screen;
+  const change = classify(prev, r.screen, action);
+  const head = [`Change: ${change}`];
+  if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); if (v !== undefined) head.push(`Value of ${o.ref}: ${JSON.stringify(v)}`); }
+  const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
+  return result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
+};
 const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}`); };
 // Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
@@ -79,7 +92,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
-  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
+  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), tree: r.screen ?? undefined });
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
 });
 
@@ -89,14 +102,16 @@ server.tool("list_sessions", "Open simulator sessions (phones) on this server: i
   return text(rows.length ? rows.map((s) => `${s.session}: ${s.app} release ${s.release}${s.started_at ? ` since ${s.started_at}` : ""}`).join("\n") : "no open sessions");
 });
 const sid = z.string().describe("Session from open_app");
+const compact = z.boolean().optional().describe("When the change is 'content changed', return only the added/removed lines, not the whole screen");
+const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
-server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); return result(session, await sim("/act", { session, action: "screen" })); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen.", { session: sid, ref }, async ({ session, ref }) => { need(session); return result(session, await sim("/act", { session, action: "tap", ref })); });
-server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards") },
-  async ({ session, ref, text: t, enter }) => { need(session); return result(session, await sim("/act", { session, action: "type", ref, text: t, enter })); });
-server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen.", { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page") },
-  async ({ session, direction, ref }) => { need(session); return result(session, await sim("/act", { session, action: "scroll", direction, ref })); });
-server.tool("back", "Go back one screen.", { session: sid }, async ({ session }) => { need(session); return result(session, await sim("/act", { session, action: "back" })); });
+server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); const s = sessions.get(session); if (s && r.ok && r.screen != null) s.tree = r.screen; return result(session, r); });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, async ({ session, ref, compact }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact }); });
+server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact },
+  async ({ session, ref, text: t, enter, compact }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref }); });
+server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact },
+  async ({ session, direction, ref, compact }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref }), { compact }); });
+server.tool("back", "Go back one screen." + CH, { session: sid, compact }, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
   if (!r.ok || !r.path) throw new Error(r.error ?? "no screenshot");
