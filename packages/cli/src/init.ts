@@ -252,7 +252,10 @@ jobs:
         with: { name: simulator-log, path: sim.log }
 `;
 
-const TEST_APP = (name: string) => `// Tests that run your app in the Shipvo simulator: a phone-sized, headless copy of the real app. No emulator, no device.
+const TEST_APP = (name: string) => `// These tests check the starter screen that "shipvo init" made in App.tsx.
+// When you replace App.tsx, they will fail: replace these tests with ones for your own screens.
+// Nothing is wrong with your setup when they fail after that.
+// Tests that run your app in the Shipvo simulator: a phone-sized, headless copy of the real app. No emulator, no device.
 // Run them with "npm test" (start the simulator first: npm run sim) and in CI (.github/workflows/test.yml).
 import { test, expect } from "@shipvo/test/vitest";
 import { RELEASE } from "../src/release";
