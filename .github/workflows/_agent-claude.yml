@@ -78,7 +78,15 @@ jobs:
         uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
-        run: pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
+        run: |
+          # A PR that changed a package.json without the lockfile must not stop its own fixer or reviewer:
+          # install anyway, and tell the agent the lockfile needs committing (CI keeps --frozen-lockfile).
+          if ! pnpm install --frozen-lockfile; then
+            echo "::warning::pnpm-lock.yaml is out of date with a package.json; installing without --frozen-lockfile"
+            pnpm install --no-frozen-lockfile
+            echo "LOCKFILE_STALE=1" >> "$GITHUB_ENV"
+          fi
+          pnpm --filter @shipvo/schema build
       - name: Install Chromium for the simulator
         # Code roles run @shipvo/sim, the sim tests and scripts that start it; without this, Playwright has no browser.
         if: steps.chk.outputs.ok == 'true' && inputs.mode != 'read' && inputs.engine == 'claude'
@@ -117,6 +125,8 @@ jobs:
               t = t.replace("{{" + k + "}}", str(val))
           if os.environ.get("MERGE_CONFLICT"):
               t += "\n\nmain was merged into this branch and has conflicts (see `git status`). Resolve every conflict marker correctly, then `git add` and `git commit --no-edit` before anything else."
+          if os.environ.get("LOCKFILE_STALE"):
+              t += "\n\npnpm-lock.yaml did not match a package.json on this branch, so `pnpm install --frozen-lockfile` failed (CI fails the same way). The job ran `pnpm install --no-frozen-lockfile`; if you write code, commit the updated pnpm-lock.yaml. If you review, treat a stale lockfile as a required change."
           t += "\n\nScratch files go in /tmp/agent/. Today is " + v["TODAY"] + "."
           open("/tmp/agent/prompt.md", "w").write(t)
           EOF
