@@ -16,7 +16,9 @@ Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none 
 
 - `wait_for`: `{ ref }`, `{ text }` or `{ role, name }` that must appear on the screen, or add `gone: true` to wait for it to disappear. `text` and `name` match as substrings.
 - `settle: true`: wait until the screen stops changing (two reads 100 ms apart that are equal, ignoring ref numbers).
-- `timeout_ms`: the most time `wait_for` and `settle` may take together (default 2000, at most 30000).
+- `timeout_ms`: the most time `wait_for` and `settle` may take together (default 2000, at most 30000). One read of the simulator can itself take up to the time limit below, so this is not a hard cap on the call.
+
+Refs are renumbered between screens, so with `gone: true` prefer `text` or `role` + `name` over `ref`.
 
 The result gets a line `Waited: matched | timed out after <ms> ms` and `structuredContent.waited = { matched, ms }`. On a timeout the action still happened: the result is the latest screen, it is not an error, and the action's own outcome (such as `delivered`) is unchanged. Without these fields the result is the same as before.
 
