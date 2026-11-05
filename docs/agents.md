@@ -34,8 +34,40 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `set_device(...)` · `device_reset(...)` | What the simulated phone has: platform, permissions, location, barcode in view, biometrics, payment outcome, network |
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
+| `export_test(session)` | Read-only. The steps taken so far as a `@shipvo/test` script (vitest) you can run in CI with no agent. Call it before `end_session` |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
+
+## Turn a session into a test
+
+An agent explores once; `export_test(session)` hands back a script that repeats it without the agent. Targets are the visible text of each element, never the ref, because refs change between sessions. After each step that changed the screen the script waits for text that is new on it.
+
+This is the real output for a session on Tide & Tackle (open with a rod in the cart, open the cart, choose delivery, pick pickup, choose mobile money, type a number). It came from the simulator in CI-like conditions, and the same text is in `apps/tide-and-tackle/tests/exported.test.ts`, which CI runs against the simulator:
+
+```ts
+import { test } from "vitest";
+import { openApp } from "@shipvo/test";
+
+test("exported from an MCP session on tide", async () => {
+  const phone = await openApp({ app: "tide", seedCart: [{"product_id":"rod-surf-36","quantity":1}] });
+  await phone.tap("Open cart, 1 items");
+  await phone.waitFor("Cart");
+  await phone.tap("Choose delivery and pay");
+  await phone.waitFor("Delivery and payment");
+  await phone.tap("Any day Shop pickup, Bonanjo 09:00-19:00, free");
+  await phone.waitFor("Cash at pickup");
+  await phone.tap("Mobile money");
+  await phone.waitFor("Mobile money number");
+  await phone.type("Mobile money number", "677000111");
+});
+```
+
+Rules:
+- `screenshot`, `screen` and `owner_*` calls are not recorded. Owner tokens never appear.
+- Text that matches more than one element becomes a `// TODO: ambiguous` comment, not a guess. Fix it by hand with `{ role, name }`.
+- Text typed into a field whose name looks like a password, PIN, token, secret or CVV is not written. The script reads `process.env.SHIPVO_TEST_<FIELD NAME>` instead, and a `payment.pin` in `set_device` becomes `process.env.SHIPVO_TEST_PAYMENT_PIN`.
+- Steps are kept in memory until `end_session`. An unknown session returns the error code `unknown_session`.
+- Not yet: assertions from the `end_session` orders, and a CLI command.
 
 ## What the tree shows (and hides), on purpose
 

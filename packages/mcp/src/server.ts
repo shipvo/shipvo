@@ -4,6 +4,7 @@
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
 // Tools: list_apps, open_app, screen, tap, type, scroll, back, screenshot, end_session (UI simulator);
+//        export_test (the session as a @shipvo/test script);
 //        owner_describe, owner_command (the app's live content, prices, orders: owner token required).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -12,6 +13,7 @@ import http from "node:http";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { classify, compactDiff, fieldValue } from "./change.js";
+import { exportTest, isSecret, redactDevice, target, waitText, type OpenInfo, type Step } from "./export.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
 const CONTROL = (process.env.PN_CONTROL ?? "https://api.shipvo.dev").replace(/\/$/, "");
@@ -54,6 +56,8 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
 const trees = new Map<string, string>();
+// What export_test needs per session: how it was opened and the steps taken since (no screenshots, no owner calls).
+const logs = new Map<string, { open: OpenInfo; steps: Step[] }>();
 // Tool annotations (MCP hints): clients use them to decide what to run without asking.
 const RO = { readOnlyHint: true, destructiveHint: false };
 const WR = { readOnlyHint: false, destructiveHint: false };
@@ -61,16 +65,30 @@ const DEST = { readOnlyHint: false, destructiveHint: true };
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
-const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string } = {}) => {
+type Rec = { text?: string; enter?: boolean; direction?: string };
+const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string; rec?: Rec } = {}) => {
   if (!r.ok || r.screen == null) return result(sid, r);
   const prev = trees.get(sid);
   trees.set(sid, r.screen);
   const change = prev === undefined ? "unknown (no earlier screen to compare)" : classify(prev, r.screen, action);
+  record(sid, action, prev, r.screen, change, o);
   const head = [`Change: ${change}`];
   if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
   const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
   return result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
 };
+// Remember a successful step for export_test. The target is looked up in the tree the agent acted on.
+function record(sid: string, action: string, prev: string | undefined, next: string, change: string, o: { ref?: string; rec?: Rec }) {
+  const log = logs.get(sid); if (!log) return;
+  const wait = change === "none" ? undefined : waitText(prev, next, o.rec?.text ? [o.rec.text] : []);
+  if (action === "back") log.steps.push({ kind: "back", wait });
+  else if (action === "scroll") { const on = o.ref ? target(prev, o.ref) : undefined; log.steps.push({ kind: "scroll", direction: o.rec?.direction ?? "down", on: on && { label: on.label, problem: on.problem }, wait }); }
+  else if (action === "tap") { const t = target(prev, o.ref); log.steps.push({ kind: "tap", label: t.label, problem: t.problem, wait }); }
+  else if (action === "type") {
+    const t = target(prev, o.ref, true); const secret = isSecret(t.label, t.role);
+    log.steps.push({ kind: "type", label: t.label, text: secret ? "" : o.rec?.text ?? "", enter: o.rec?.enter, secret, problem: t.problem, wait: secret ? undefined : wait });
+  }
+}
 const result = (sid: string, r: Act) => {
   const s = sessions.get(sid); if (s) s.steps++;
   if (r.ok) return text(r.screen ?? "");
@@ -117,6 +135,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
   if (r.code === "sim_timeout") return result(sid, r);
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
+  logs.set(sid, { open: { app: app, dark, seedCart: seed_cart?.map((l) => ({ product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })) }, steps: [] });
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
 });
@@ -132,11 +151,11 @@ const compact = z.boolean().optional().describe("When the change is 'content cha
 const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
 server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, WR, async ({ session, ref, compact }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact }); });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, WR, async ({ session, ref, compact }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact, ref }); });
 server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact }, WR,
-  async ({ session, ref, text: t, enter, compact }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref }); });
+  async ({ session, ref, text: t, enter, compact }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref, rec: { text: t, enter } }); });
 server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact }, WR,
-  async ({ session, direction, ref, compact }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref }), { compact }); });
+  async ({ session, direction, ref, compact }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref }), { compact, ref, rec: { direction } }); });
 server.tool("back", "Go back one screen." + CH, { session: sid, compact }, WR, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
@@ -153,7 +172,7 @@ server.tool("set_device", "Change what the simulated phone has: location, a barc
   biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
   payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),
-}, WR, async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "set_device", device })); });
+}, WR, async ({ session, ...device }) => { need(session); const r = await sim("/act", { session, action: "set_device", device }); if (r.ok) logs.get(session)?.steps.push({ kind: "device", settings: redactDevice(device) }); return result(session, r); });
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
   async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,
@@ -169,10 +188,16 @@ server.tool("device_reset", "Put the simulated phone back to a known state (perm
   async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
 
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, DEST, async ({ session }) => {
-  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session);
+  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session); logs.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
+});
+
+server.tool("export_test", "Turn this session's steps into a TypeScript @shipvo/test script (vitest) that replays them in CI with no agent. Targets are the visible text, never refs. Text that matches several elements becomes a '// TODO: ambiguous' comment. Values typed into password-like fields become process.env placeholders. Call before end_session.", { session: sid }, RO, async ({ session }) => {
+  const log = logs.get(session);
+  if (!log) return { ...text(`Error [unknown_session]: this server has no steps for session "${session}". Call open_app first; steps are kept until end_session.`), isError: true as const, structuredContent: { ok: false, code: "unknown_session", error: `no steps for session "${session}"` } };
+  return text(exportTest(log.open, log.steps));
 });
 
 // Owner side: the same typed commands the admin at /app/<id>/admin uses.
