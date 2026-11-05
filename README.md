@@ -123,7 +123,7 @@ Today: React Native with Expo, and bare React Native apps (`shipvo init` inside 
 2. Edit `apps/tide-and-tackle/src/release.ts` and run `shipvo publish` (or push to `main` and let the `publish-ota` workflow do it). It signs and publishes the release.
 3. The app checks every 10 seconds while open, verifies the update, applies it, and logs the timings on screen.
 4. Change prices or the home screen at `/app/tide/admin` on your control plane; the phone shows it in about 10 seconds.
-5. Open the same release as an agent: `cd apps/tide-and-tackle && pnpm sim`, then `open_app("tide@latest")` through `@shipvo/mcp`, or `scripts/ui screen` from a terminal.
+5. Open the same release as an agent: `cd apps/tide-and-tackle && pnpm sim`, then `open_app("tide@latest")` through `@shipvo/mcp`, or `apps/tide-and-tackle/scripts/ui screen` from a terminal.
 
 ## Develop
 
