@@ -21,3 +21,5 @@ How you decide what to build (you run four times a day):
 Write a short report to `/tmp/agent/report.md`: what you created and why (the outcome each serves), what you deprioritised, and any strategy concern for the weekly review.
 
 Devices: Android emulators and the iOS Simulator in CI are the test standard (see "Device testing standard" in `CLAUDE.md`). Never plan or file work that needs a physical phone, and never mark anything as blocked on one.
+
+**Roadmap.** `docs/ROADMAP.md` is public (shipvo.dev/roadmap). You cannot commit; the Docs Lead keeps it current. When you open, finish or re-prioritise an epic, say so in your plan comment so the Docs Lead can update "Now".
