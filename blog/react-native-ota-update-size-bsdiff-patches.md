@@ -73,7 +73,7 @@ We track this as a known gap. The next step in the spike notes is to build the e
 
 Hermes bytecode is not like text. Other teams have written about this. The maintainer of react-native-update says that Hermes re-sorts its string table on each compile and stores absolute offsets, so a one-line change can move many bytes ([DEV Community](https://dev.to/sunnylqm/why-hermes-bytecode-defeats-binary-diffing-and-how-we-got-a-one-line-ota-hotfix-down-to-34-kb-2cn2)). That is their analysis and their benchmark, and we have not reproduced it. We mention it because it explains why a "one-line" change does not give a "one-line" patch.
 
-Expo added bundle diffing to EAS Update in SDK 55 and estimates much smaller downloads ([Expo blog](https://expo.dev/blog/ship-smaller-ota-updates-bundle-diffing-comes-to-ota-updates-in-sdk-55)). We have not measured EAS Update, so we make no size comparison with it. If you compare tools, measure the same app, the same change and the same base.
+Expo added bundle diffing to EAS Update in SDK 55 and estimates smaller downloads ([Expo blog](https://expo.dev/blog/ship-smaller-ota-updates-bundle-diffing-comes-to-ota-updates-in-sdk-55)). We have not measured EAS Update, so we make no size comparison with it. If you compare tools, measure the same app, the same change and the same base.
 
 ## The smallest update is not code
 
