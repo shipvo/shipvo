@@ -136,7 +136,7 @@ class ShipvoRuntimeModule : Module() {
       val reason = PointerQuery.mismatchReason(try { conn.errorStream?.bufferedReader()?.use { it.readText() } } catch (_: Exception) { null })
       conn.disconnect()
       if (reason == null) return mapOf("status" to "none")
-      s.addEvent("pointer_rejected:$reason")
+      PointerQuery.rejectionEvent(s.pendingEvents(), reason)?.let { s.addEvent(it) }
       return mapOf("status" to "none", "reason" to reason)
     }
     if (code == 304) { conn.disconnect(); return mapOf("status" to "none") }

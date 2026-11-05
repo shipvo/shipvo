@@ -24,4 +24,12 @@ internal object PointerQuery {
     val m = Regex("\"error\"\\s*:\\s*\"([a-z_]+)\"").find(body ?: return null) ?: return null
     return m.groupValues[1].takeIf { it in MISMATCH_REASONS }
   }
+
+  /**
+   * The event to queue for a rejected pointer, or null when the same reason is already queued.
+   * A shell that stays mismatched would otherwise add one event per check and push out
+   * `crash_loop_revert`, `rolled_back` and `verify_failed` (the queue keeps 50).
+   */
+  fun rejectionEvent(queued: List<String>, reason: String): String? =
+    "pointer_rejected:$reason".takeIf { it !in queued }
 }

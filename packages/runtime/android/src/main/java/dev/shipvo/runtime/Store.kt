@@ -70,6 +70,8 @@ internal class Store(private val ctx: Context) : BootCounts {
     val list = p.getString("events", "")!!.split('\n').filter { it.isNotBlank() }.takeLast(49) + e
     p.edit().putString("events", list.joinToString("\n")).commit()
   }
+  /** Events queued and not yet consumed, oldest first. */
+  fun pendingEvents(): List<String> = p.getString("events", "")!!.split('\n').filter { it.isNotBlank() }
   fun consumeEvents(): List<String> {
     val list = p.getString("events", "")!!.split('\n').filter { it.isNotBlank() }
     p.edit().remove("events").commit(); return list
@@ -77,16 +79,20 @@ internal class Store(private val ctx: Context) : BootCounts {
 
   private fun meta(key: String): String? = try {
     val ai = ctx.packageManager.getApplicationInfo(ctx.packageName, PackageManager.GET_META_DATA)
-    // Manifests can store numbers (such as 96) as integers, so convert any type to a string.
+    ai.metaData?.getString(key)
+  } catch (_: Exception) { null }
+  /** Like [meta], but also accepts numbers: a manifest can store a single version such as 96 as an integer. */
+  private fun metaAny(key: String): String? = try {
+    val ai = ctx.packageManager.getApplicationInfo(ctx.packageName, PackageManager.GET_META_DATA)
     ai.metaData?.get(key)?.toString()
   } catch (_: Exception) { null }
   val baseUrl: String get() = (meta("dev.shipvo.BASE_URL") ?: "").trimEnd('/')
   val publicKey: String get() = meta("dev.shipvo.PUBLIC_KEY") ?: ""
   val appId: String get() = meta("dev.shipvo.APP_ID") ?: ""
   /** Hermes bytecode versions this shell runs, e.g. "96,98". Null when the shell does not declare them. */
-  val hermesBytecodeVersions: String? get() = meta("dev.shipvo.HERMES_BYTECODE_VERSIONS")?.takeIf { it.isNotBlank() }
+  val hermesBytecodeVersions: String? get() = metaAny("dev.shipvo.HERMES_BYTECODE_VERSIONS")?.takeIf { it.isNotBlank() }
   /** Native modules in this shell, e.g. "react-native-mmkv@3.1.0,@scope/pkg@1.0.0". Null when not declared. */
-  val nativeModules: String? get() = meta("dev.shipvo.NATIVE_MODULES")?.takeIf { it.isNotBlank() }
+  val nativeModules: String? get() = metaAny("dev.shipvo.NATIVE_MODULES")?.takeIf { it.isNotBlank() }
   val shellMajor: Int get() = (meta("dev.shipvo.SHELL_MAJOR") ?: "1").toIntOrNull() ?: 1
 
   companion object {
