@@ -5,6 +5,7 @@ import { b64, keyFromSeed, sha256Hex, signBytes, signDoc, verifyDoc } from "./in
 import { seed } from "./config.js";
 import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
+import { promote } from "./promote.js";
 import { sim } from "./sim.js";
 import { preview } from "./preview.js";
 import { keys, login, mcp } from "./login.js";
@@ -22,6 +23,7 @@ switch (cmd) {
   case "sim": await sim(rest); break;
   case "preview": await preview(rest); break;
   case "publish": await publish(rest); break;
+  case "promote": await promote(rest); break;
   case "rollback": await rollback(rest); break;
   case "login": await login(rest); break;
   case "doctor": await doctor(rest); break;

@@ -97,11 +97,13 @@ Build and submit one new binary with the Shipvo plugin and your public key in it
 npx shipvo publish --bands b0
 ```
 
-Watch crash rates, then widen:
+Watch crash rates, then widen the same release:
 
 ```bash
-npx shipvo publish
+npx shipvo promote
 ```
+
+`promote` copies the release on `b0` to `b1` and `b2` with a new signature. It does not rebuild, so the release you watched is the one everyone gets. It refuses a halted release or one with reported reverts unless you pass `--force`. Use `--to b1` to widen one band at a time, `--platform android|ios|all`, and `--dry-run` to preview. Running `shipvo publish` again would build a new release number instead.
 
 Useful flags: `--platform android|ios|all` (default `android`), `--release N`, `--min-shell X.Y.Z`, `--max-bases N`. Run `shipvo publish --help` for the full list.
 

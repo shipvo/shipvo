@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "preview", "publish", "rollback", "app", "login", "doctor", "status", "keys", "mcp",
+  "init", "sim", "preview", "publish", "promote", "rollback", "app", "login", "doctor", "status", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -14,6 +14,8 @@ Start
 Ship
   publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release
   publish --dry-run [--out d] Check a release offline: build and sign, write nothing remote
+  promote [--to b1,b2]        Widen a staged release to more bands (same release, new signature)
+  promote --dry-run           Preview a promote, write nothing
   rollback --to <release>     Republish an earlier release as a new release
   rollback --to <n> --dry-run Preview a rollback, write nothing
   app create | list | delete  Register, list or remove apps on the hosted control plane
