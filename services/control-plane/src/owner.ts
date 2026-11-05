@@ -29,8 +29,17 @@ const RELEASE_POLICY_KEY = (appId: string) => `c/${appId}/release_policy`;
 /** The stored release policy. A missing, corrupt or invalid value means no limit. */
 export async function loadReleasePolicy(env: { kv: KVNamespace; appId: string }): Promise<ReleasePolicy> {
   try {
-    const r = ShipvoPolicy.safeParse(JSON.parse((await env.kv.get(RELEASE_POLICY_KEY(env.appId))) ?? "{}"));
-    return r.success ? r.data : {};
+    const raw = JSON.parse((await env.kv.get(RELEASE_POLICY_KEY(env.appId))) ?? "{}");
+    if (!raw || typeof raw !== "object") return {};
+    // Keep every field that is valid on its own, so one bad field does not drop the other rules.
+    const out: Record<string, unknown> = {};
+    for (const k of ["maxBand", "agentMaxBand", "blockedWeekdays", "blockedAfterHour", "timeZone", "maxCohortForAgents", "requireStageBeforeFull"]) {
+      if (!(k in raw)) continue;
+      // blockedAfterHour only makes sense with blockedWeekdays, so test it next to a valid one.
+      if (ShipvoPolicy.safeParse({ ...(k === "blockedAfterHour" ? { blockedWeekdays: ["mon"] } : {}), [k]: raw[k] }).success) out[k] = raw[k];
+    }
+    if (!ShipvoPolicy.safeParse(out).success) delete out.blockedAfterHour;
+    return out as ReleasePolicy;
   } catch { return {}; }
 }
 /** What a publish reaches. Telemetry has no device id, so this counts update reports, not phones. */
@@ -229,7 +238,10 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
       if (days.length) v.blockedWeekdays = days;
       if (a.blockedAfterHour !== undefined && a.blockedAfterHour !== "") v.blockedAfterHour = Number(a.blockedAfterHour);
       if (a.timeZone) v.timeZone = String(a.timeZone);
-      if (a.stagePercent || a.stageMinHours) v.requireStageBeforeFull = { percent: Number(a.stagePercent), minHours: Number(a.stageMinHours) };
+      if (a.stagePercent || a.stageMinHours) {
+        if (!a.stagePercent || !a.stageMinHours) return fail("bad_param", "stagePercent and stageMinHours go together");
+        v.requireStageBeforeFull = { percent: Number(a.stagePercent), minHours: Number(a.stageMinHours) };
+      }
       const r = ShipvoPolicy.safeParse(v);
       if (!r.success) return fail("bad_param", r.error.issues.map((i) => `${i.path.join(".") || "policy"}: ${i.message}`).join("; "));
       await env.kv.put(RELEASE_POLICY_KEY(env.appId), JSON.stringify(r.data)); return r.data;

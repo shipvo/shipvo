@@ -13,7 +13,7 @@ async function pointer(band: string) {
   return { pk, buf: JSON.stringify({ body, signature: sig }) };
 }
 
-async function publish(band: string, policy: object | undefined, headers: Record<string, string> = {}, kvExtra: Record<string, string> = {}) {
+async function publish(band: string, policy: object | undefined, headers: Record<string, string> = {}, kvExtra: Record<string, string> = {}, store?: Record<string, string>) {
   const { pk, buf } = await pointer(band);
   const audits: any[] = [];
   const DB = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
@@ -25,8 +25,8 @@ async function publish(band: string, policy: object | undefined, headers: Record
       return null;
     },
   }) }) } as any;
-  const put = vi.fn(async () => {});
-  const get = async (k: string) => (k === "c/tide/release_policy" && policy ? JSON.stringify(policy) : kvExtra[k] ?? null);
+  const put = vi.fn(async (k: string, v: unknown) => { if (store) store[k] = typeof v === "string" ? v : new TextDecoder().decode(v as ArrayBuffer); });
+  const get = async (k: string) => (k === "c/tide/release_policy" && policy ? JSON.stringify(policy) : kvExtra[k] ?? store?.[k] ?? null);
   const r = await app.request(`/apps/tide/kv/p/tide/1/${band}`, { method: "PUT", headers: { authorization: `Bearer ${KEY}`, ...headers }, body: buf }, { DB, POINTERS: { put, get } } as any);
   return { r, put, audits };
 }
@@ -62,7 +62,7 @@ describe("publish enforces the stored release policy", () => {
   });
 });
 
-const staged = (release: number, issued_at: string) => JSON.stringify({ body: JSON.stringify({ release, issued_at, band: "b0" }), signature: "x" });
+const T = (iso: string) => String(Date.parse(iso)); // server-side stage record: ms since epoch
 const refusal = async (x: Awaited<ReturnType<typeof publish>>, rule: string, reason?: string) => {
   expect(x.r.status).toBe(403);
   expect(await x.r.json()).toMatchObject({ code: "policy_refused", rule, reason: expect.stringContaining(reason ?? "") });
@@ -92,18 +92,33 @@ describe("publish enforces weekday and staging rules", () => {
   it("requireStageBeforeFull refuses b2 for a release never staged, or staged too briefly", async () => {
     at("2026-11-05T12:00:00Z");
     await refusal(await publish("b2", stage), "requireStageBeforeFull");
-    const young = await publish("b2", stage, {}, { "p/tide/1/b1": staged(7, "2026-11-05T00:00:00Z") });
+    const young = await publish("b2", stage, {}, { "s/tide/7/b1": T("2026-11-05T00:00:00Z") });
     await refusal(young, "requireStageBeforeFull", "24 h");
-    const other = await publish("b2", stage, {}, { "p/tide/1/b1": staged(6, "2026-11-01T00:00:00Z") });
+    const other = await publish("b2", stage, {}, { "s/tide/6/b1": T("2026-11-01T00:00:00Z") });
     await refusal(other, "requireStageBeforeFull");
   });
   it("requireStageBeforeFull allows b2 after minHours at the stage, and never limits narrower bands", async () => {
     at("2026-11-05T12:00:00Z");
-    const ok = await publish("b2", stage, {}, { "p/tide/1/b1": staged(7, "2026-11-04T11:00:00Z") });
+    const ok = await publish("b2", stage, {}, { "s/tide/7/b1": T("2026-11-04T11:00:00Z") });
     expect(ok.r.status).toBe(200); expect(ok.put).toHaveBeenCalled();
     expect((await publish("b1", stage)).r.status).toBe(200);
     // b0 is 1%, below the 10% stage, so it does not count
-    await refusal(await publish("b2", stage, {}, { "p/tide/1/b0": staged(7, "2026-11-01T00:00:00Z") }), "requireStageBeforeFull");
+    await refusal(await publish("b2", stage, {}, { "s/tide/7/b0": T("2026-11-01T00:00:00Z") }), "requireStageBeforeFull");
+  });
+});
+
+describe("stage time is recorded by the server", () => {
+  afterEach(() => vi.useRealTimers());
+  it("a b1 pointer with a backdated issued_at does not count as staged for b2", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-05T12:00:00Z") });
+    const mem: Record<string, string> = {};
+    const b1 = await publish("b1", undefined, {}, {}, mem); // issued_at in the pointer is 2026-01-01
+    expect(b1.r.status).toBe(200);
+    expect(mem["s/tide/7/b1"]).toBe(T("2026-11-05T12:00:00Z"));
+    const stage = { requireStageBeforeFull: { percent: 10, minHours: 24 } };
+    await refusal(await publish("b2", stage, {}, mem), "requireStageBeforeFull", "24 h");
+    vi.setSystemTime(new Date("2026-11-06T13:00:00Z"));
+    expect((await publish("b2", stage, {}, mem)).r.status).toBe(200);
   });
 });
 
@@ -129,5 +144,12 @@ describe("release policy owner commands", () => {
     const rules = await runOwnerCommand(env(false), "set_release_policy", { blockedWeekdays: "fri, sat", blockedAfterHour: 12, timeZone: "Europe/Paris", stagePercent: 10, stageMinHours: 24 });
     expect(rules.result).toEqual({ blockedWeekdays: ["fri", "sat"], blockedAfterHour: 12, timeZone: "Europe/Paris", requireStageBeforeFull: { percent: 10, minHours: 24 } });
     expect((await runOwnerCommand(env(false), "set_release_policy", { timeZone: "Mars/Base" })).error.code).toBe("bad_param");
+    expect((await runOwnerCommand(env(false), "set_release_policy", { stagePercent: 10 })).error.message).toContain("go together");
+  });
+});
+
+describe("a stored policy with one bad field", () => {
+  it("still enforces maxBand", async () => {
+    await refusal(await publish("b2", { maxBand: "b1", timeZone: "Mars/Base" }), "maxBand");
   });
 });
