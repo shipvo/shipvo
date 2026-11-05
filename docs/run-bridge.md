@@ -8,7 +8,7 @@ The bridge applies the same screen rules as the simulator (`packages/sim/screen-
 
 ## What is the same
 
-CI checks this against the sample app (`packages/cli/test/run-bridge.test.ts`): on every screen, the sequence of (role, name) of every button, link, textbox, checkbox, radio, switch, tab and heading is equal to the simulator's. Refs are not compared.
+CI checks this against the sample app (`packages/cli/test/run-bridge.test.ts`): on every screen, the sequence of role, name, states (`checked`, `disabled`, `level`, `expanded`, `selected`, `pressed`) and, for textboxes, value of every button, link, textbox, checkbox, radio, switch, tab and heading is equal to the simulator's. Refs are not compared.
 
 ## What differs from the simulator tree
 

@@ -1,5 +1,5 @@
 // Slice 3b of #448: the frame-page bridge answers `tree` over the agent channel, and the tree is equivalent
-// (for an agent) to the simulator's. Equivalence = the same (role, name) sequence for every interactive element and heading.
+// (for an agent) to the simulator's. Equivalence = the same role, name, states and textbox value for every interactive element and heading.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
@@ -14,10 +14,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 const app = resolve(here, "../../../apps/tide-and-tackle");
 const simDir = resolve(here, "../../sim");
 const require = createRequire(join(simDir, "package.json"));
-const KEPT = /^\s*- '?(button|link|textbox|searchbox|checkbox|radio|switch|tab|heading) ("(?:[^"\\]|\\.)*")?/;
+const KEPT = /^\s*- '?(button|link|textbox|searchbox|checkbox|radio|switch|tab|heading) ("(?:[^"\\]|\\.)*")?((?: \[(?:checked|disabled|level=\d|expanded|selected|pressed)(?:=\w+)?\])*)/;
+const VALUE = /\]'?: (.*)$/;
 
-/** The (role, name) sequence the equivalence check compares. */
-const interactive = (tree: string): string[] => tree.split("\n").flatMap((l) => { const m = KEPT.exec(l); return m ? [`${m[1]} ${m[2] ?? ""}`.trim()] : []; });
+/** The sequence the equivalence check compares: role, name, [checked] [disabled] [level] states, and a textbox's value. Refs are left out. */
+const interactive = (tree: string): string[] => tree.split("\n").flatMap((l) => {
+  const m = KEPT.exec(l); if (!m) return [];
+  const v = /^(textbox|searchbox)$/.test(m[1]) ? VALUE.exec(l)?.[1] : undefined;
+  return [`${m[1]} ${m[2] ?? ""}${m[3] ?? ""}${v !== undefined ? ": " + v : ""}`.trim()];
+});
 
 let s: Awaited<ReturnType<typeof startRunServer>>; let browser: any; let page: any; let driver: WebSocket; let nextId = 1;
 const pending = new Map<number, (m: any) => void>();
@@ -76,7 +81,9 @@ beforeAll(async () => {
   await click("Choose delivery and pay"); await capture("checkout");
   await click("Mobile money"); await capture("checkout-mobile-money");
   await click("Back"); await click("Back"); await click("Back"); await click("Back");
-  await click("My orders").catch(() => {}); await capture("orders");
+  const before = await simulatorTree();
+  await click("My orders"); await capture("orders");
+  expect(screens.orders.sim, "My orders opens a new screen").not.toBe(before);
   await click("Back"); await click("About this build"); await capture("about");
 }, 240_000);
 

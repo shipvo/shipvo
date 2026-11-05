@@ -6,7 +6,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, 
 import { createServer, type Server } from "node:http";
 import { join, extname, normalize, resolve, sep } from "node:path";
 import { loadConfig } from "./config.js";
-import { AGENT_PATH, isAgentRole, isLoopback, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
+import { AGENT_PATH, hostAllowed, isAgentRole, isLoopback, originAllowed, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
 import { bridgeScript } from "./run-bridge.js";
 import { acceptWebSocket, type Peer } from "./run-ws.js";
 import { portFree, rebuildInto } from "./sim.js";
@@ -109,7 +109,9 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
   const token = randomBytes(24).toString("hex");
   const page = runFramePage(opts.platform, opts.name, token);
   const bridge = bridgeScript();
+  let boundPort = -1; // set once the server listens; Host and Origin must match it
   const server = createServer((req, res) => {
+    if (!hostAllowed(req.headers.host, boundPort)) { res.writeHead(403); return void res.end("Forbidden"); }
     let path: string;
     try { path = decodeURIComponent((req.url ?? "/").split("?")[0]); }
     catch { res.writeHead(400); return void res.end("Bad request"); }
@@ -136,6 +138,7 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== AGENT_PATH) return refuse("404 Not Found");
     if (!isLoopback(req.socket.remoteAddress)) return refuse("403 Forbidden");
+    if (!hostAllowed(req.headers.host, boundPort) || !originAllowed(req.headers.origin, boundPort)) return refuse("403 Forbidden");
     if (!tokenMatches(url.searchParams.get("token"), token)) return refuse("401 Unauthorized");
     const role = url.searchParams.get("role");
     if (!isAgentRole(role)) return refuse("400 Bad Request");
@@ -155,6 +158,7 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
     server.once("error", fail);
     server.listen(opts.port ?? 0, "127.0.0.1", () => {
       const port = (server.address() as { port: number }).port;
+      boundPort = port;
       if (infoPath) {
         const info: RunInfo = { port, platform: opts.platform, app: opts.name, token, pid: process.pid };
         mkdirSync(join(infoPath, ".."), { recursive: true });

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { request as httpRequest } from "node:http";
 import { mkdtempSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -68,5 +69,36 @@ describe("ensureShipvoIgnored", () => {
 describe("shipvo init", () => {
   it("writes a .gitignore that ignores .shipvo/", () => {
     expect(readFileSync(join(__dirname, "../src/init.ts"), "utf8")).toMatch(/w\("\.gitignore", `[^`]*\\n\.shipvo\/\\n`\)/);
+  });
+});
+
+describe("run server Host and Origin checks", () => {
+  const raw = (port: number, headers: Record<string, string>, upgrade: boolean, token = "") => new Promise<number>((ok, fail) => {
+    const req = httpRequest({ host: "127.0.0.1", port, path: upgrade ? `/__shipvo/agent?role=driver&token=${token}` : "/", headers: upgrade ? { Connection: "Upgrade", Upgrade: "websocket", "Sec-WebSocket-Version": "13", "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==", ...headers } : headers });
+    req.on("response", (r) => { ok(r.statusCode ?? 0); r.resume(); });
+    req.on("upgrade", (r, sock) => { ok(r.statusCode ?? 0); sock.destroy(); });
+    req.on("error", fail); req.end();
+  });
+  it("refuses a wrong Host for the page and the bridge script", async () => {
+    const { s } = await setup();
+    expect(await raw(s.port, { Host: "evil.example" }, false)).toBe(403);
+    expect(await raw(s.port, { Host: `evil.example:${s.port}` }, false)).toBe(403);
+    expect(await raw(s.port, { Host: `127.0.0.1:${s.port}` }, false)).toBe(200);
+    expect(await raw(s.port, { Host: `localhost:${s.port}` }, false)).toBe(200);
+    await s.close();
+  });
+  it("refuses a WebSocket upgrade with a wrong Host", async () => {
+    const { s } = await setup();
+    expect(await raw(s.port, { Host: "evil.example" }, true, s.token)).toBe(403);
+    expect(await raw(s.port, { Host: `127.0.0.1:${s.port}` }, true, s.token)).toBe(101);
+    await s.close();
+  });
+  it("refuses a WebSocket upgrade with a foreign Origin", async () => {
+    const { s } = await setup();
+    const host = `127.0.0.1:${s.port}`;
+    expect(await raw(s.port, { Host: host, Origin: "http://evil.example" }, true, s.token)).toBe(403);
+    expect(await raw(s.port, { Host: host, Origin: `http://127.0.0.1:${s.port + 1}` }, true, s.token)).toBe(403);
+    expect(await raw(s.port, { Host: host, Origin: `http://${host}` }, true, s.token)).toBe(101);
+    await s.close();
   });
 });

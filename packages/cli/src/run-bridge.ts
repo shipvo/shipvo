@@ -5,10 +5,15 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
-/** The shared screen rules (`@shipvo/sim`), as source that the page can run. Same copy the simulator uses. */
+/**
+ * The shared screen rules (`@shipvo/sim`), as source that the page can run. Same copy the simulator uses.
+ * Only plain `export function` / `export const` lines are supported: `export default` and `export {…}` would not be stripped.
+ */
 export function screenRulesSource(): string {
   const path = createRequire(import.meta.url).resolve("@shipvo/sim/screen-rules.mjs");
-  return readFileSync(path, "utf8").replace(/^export /gm, "");
+  const src = readFileSync(path, "utf8");
+  if (/^export\s+(default\b|\{|\*)/m.test(src)) throw new Error("screen-rules.mjs may only use `export function` or `export const`");
+  return src.replace(/^export /gm, "");
 }
 
 /** Runs in the page. Everything it needs is nested inside, because it is serialised with `String(fn)`. */
@@ -149,14 +154,16 @@ function bridgeMain(win: any, token: string) {
   };
 }
 
-/** The script text served at `/__shipvo/bridge.js`. It reads the session token from its own `data-token` attribute. */
+/** The script text served at `/__shipvo/bridge.js`. It reads the session token from its own `data-token` attribute and then removes the attribute. */
 export function bridgeScript(rules: string = screenRulesSource()): string {
   return `(function(){
 var __rules=(function(){${rules}
 return {clearScreenRules:clearScreenRules,applyScreenRules:applyScreenRules,filterTree:filterTree};})();
 globalThis.__shipvoRules=__rules;
 var tag=document.currentScript;
-(${bridgeMain.toString()})(window, tag?tag.getAttribute("data-token")||"":"");
+var tok=tag?tag.getAttribute("data-token")||"":"";
+if(tag)tag.removeAttribute("data-token");
+(${bridgeMain.toString()})(window, tok);
 })();
 `;
 }
