@@ -1,8 +1,11 @@
 package dev.shipvo.runtime
 
-import com.sun.net.httpserver.HttpServer
 import java.io.File
-import java.net.InetSocketAddress
+import java.io.IOException
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
+import kotlin.concurrent.thread
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -14,23 +17,40 @@ class ResumableDownloadTest {
   private val data = ByteArray(300_000) { (it * 31 % 251).toByte() }
   private val ranges = mutableListOf<String?>()
   private var honourRange = true
-  private lateinit var server: HttpServer
+  private lateinit var server: ServerSocket
   private lateinit var dir: File
-  private val url get() = "http://127.0.0.1:${server.address.port}/b"
+  private val url get() = "http://127.0.0.1:${server.localPort}/b"
+
+  // A tiny HTTP server on plain sockets: the Android unit-test classpath has no com.sun.net.httpserver.
+  private fun serve(sock: Socket) = sock.use {
+    val reader = it.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+    var range: String? = null
+    while (true) {
+      val line = reader.readLine() ?: break
+      if (line.isEmpty()) break
+      if (line.startsWith("Range:", ignoreCase = true)) range = line.substringAfter(":").trim()
+    }
+    synchronized(ranges) { ranges.add(range) }
+    val start = if (honourRange && range != null) range.removePrefix("bytes=").removeSuffix("-").toInt() else 0
+    val body = data.copyOfRange(start, data.size)
+    val status = if (start > 0) "206 Partial Content" else "200 OK"
+    val out = it.getOutputStream()
+    out.write("HTTP/1.1 $status\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
+    out.write(body)
+    out.flush()
+  }
 
   @Before fun start() {
     dir = File.createTempFile("shipvo", "dl").apply { delete(); mkdirs() }
-    server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-    server.createContext("/b") { ex ->
-      val r = ex.requestHeaders.getFirst("Range"); ranges.add(r)
-      val start = if (honourRange && r != null) r.removePrefix("bytes=").removeSuffix("-").toInt() else 0
-      val body = data.copyOfRange(start, data.size)
-      ex.sendResponseHeaders(if (start > 0) 206 else 200, body.size.toLong())
-      ex.responseBody.use { it.write(body) }
+    server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+    thread(isDaemon = true) {
+      while (!server.isClosed) {
+        val sock = try { server.accept() } catch (e: IOException) { break }
+        serve(sock)
+      }
     }
-    server.start()
   }
-  @After fun stop() { server.stop(0); dir.deleteRecursively() }
+  @After fun stop() { server.close(); dir.deleteRecursively() }
 
   @Test fun secondRequestStartsAtThePartialSize() {
     val part = ResumableDownload.partialFile(dir, "abc")
