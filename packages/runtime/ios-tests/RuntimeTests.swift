@@ -382,6 +382,16 @@ final class HermesGuardTests: XCTestCase {
     XCTAssertEqual(HermesGuard.mismatchEvent(release: 7, releaseVersion: 98, shellVersion: 96), "hermes_bytecode_mismatch:7:release=98:shell=96")
   }
 
+  func testVersionFieldMustBeAWholePositiveNumber() {
+    XCTAssertEqual(HermesGuard.releaseVersionOf(96 as NSNumber), 96)
+    XCTAssertNil(HermesGuard.releaseVersionOf(96.5 as NSNumber))
+    XCTAssertNil(HermesGuard.releaseVersionOf("96"))
+    XCTAssertNil(HermesGuard.releaseVersionOf(0 as NSNumber))
+    XCTAssertNil(HermesGuard.releaseVersionOf(-3 as NSNumber))
+    XCTAssertNil(HermesGuard.releaseVersionOf(true as NSNumber))
+    XCTAssertNil(HermesGuard.releaseVersionOf(nil))
+  }
+
   func testMatchIsAccepted() { XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: 96, shellVersion: 96)) }
 
   func testMissingFieldIsAccepted() {
