@@ -72,6 +72,24 @@ describe("shipvo init", () => {
   });
 });
 
+describe("page credential", () => {
+  it("is not the agent token, and only opens the screen role", async () => {
+    const { s } = await setup();
+    const html = await (await fetch(`http://127.0.0.1:${s.port}/`)).text();
+    expect(html).not.toContain(s.token);
+    const page = /data-token="([0-9a-f]+)"/.exec(html)![1];
+    expect(page).not.toBe(s.token);
+    const open = (role: string) => new Promise<string>((ok) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${s.port}/__shipvo/agent?role=${role}&token=${page}`);
+      ws.onopen = () => { ws.close(); ok("open"); };
+      ws.onerror = () => ok("refused");
+    });
+    expect(await open("screen")).toBe("open");
+    expect(await open("driver")).toBe("refused");
+    await s.close();
+  });
+});
+
 describe("run server Host and Origin checks", () => {
   const raw = (port: number, headers: Record<string, string>, upgrade: boolean, token = "") => new Promise<number>((ok, fail) => {
     const req = httpRequest({ host: "127.0.0.1", port, path: upgrade ? `/__shipvo/agent?role=driver&token=${token}` : "/", headers: upgrade ? { Connection: "Upgrade", Upgrade: "websocket", "Sec-WebSocket-Version": "13", "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==", ...headers } : headers });

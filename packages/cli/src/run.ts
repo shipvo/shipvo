@@ -107,7 +107,9 @@ export function ensureShipvoIgnored(dir: string): void {
 export function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string }): Promise<{ server: Server; port: number; token: string; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const token = randomBytes(24).toString("hex");
-  const page = runFramePage(opts.platform, opts.name, token);
+  // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
+  const pageToken = randomBytes(24).toString("hex");
+  const page = runFramePage(opts.platform, opts.name, pageToken);
   const bridge = bridgeScript();
   let boundPort = -1; // set once the server listens; Host and Origin must match it
   const server = createServer((req, res) => {
@@ -139,8 +141,10 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
     if (url.pathname !== AGENT_PATH) return refuse("404 Not Found");
     if (!isLoopback(req.socket.remoteAddress)) return refuse("403 Forbidden");
     if (!hostAllowed(req.headers.host, boundPort) || !originAllowed(req.headers.origin, boundPort)) return refuse("403 Forbidden");
-    if (!tokenMatches(url.searchParams.get("token"), token)) return refuse("401 Unauthorized");
+    const given = url.searchParams.get("token");
     const role = url.searchParams.get("role");
+    const ok = tokenMatches(given, token) || (role === "screen" && tokenMatches(given, pageToken));
+    if (!ok) return refuse("401 Unauthorized");
     if (!isAgentRole(role)) return refuse("400 Bad Request");
     const other: AgentRole = role === "screen" ? "driver" : "screen";
     const peer = acceptWebSocket(req, socket, (text) => {

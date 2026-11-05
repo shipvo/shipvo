@@ -1,4 +1,4 @@
 - `@shipvo/cli`: the `shipvo run` frame page now answers `tree` requests on the agent channel with an accessibility tree, in the simulator's line shape and with stable `eN` refs. The shared screen rules are applied first. Differences from the simulator tree are in `docs/run-bridge.md`.
 - `@shipvo/cli` now depends on `@shipvo/sim`; `@shipvo/sim` exports `./screen-rules.mjs`.
 - Migration: none.
-- `@shipvo/cli`: the `shipvo run` server now rejects HTTP requests and WebSocket upgrades whose `Host` is not `127.0.0.1:<port>` or `localhost:<port>`, and upgrades whose `Origin` is set to anything else. The bridge script removes its `data-token` attribute after reading it.
+- `@shipvo/cli`: the `shipvo run` server now rejects HTTP requests and WebSocket upgrades whose `Host` is not `127.0.0.1:<port>` or `localhost:<port>`, and upgrades whose `Origin` is set to anything else. The page gets its own random in-memory credential that opens only the `screen` role; the agent token stays in `.shipvo/run.json` and is never served. The bridge script removes its `data-token` attribute after reading it.
