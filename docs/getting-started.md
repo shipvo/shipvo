@@ -59,6 +59,8 @@ This builds the web bundle with the simulated device and serves it on `http://lo
 { "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
 ```
 
+To see the app in a phone frame in your own browser, run `shipvo run android` or `shipvo run ios`. It builds the same web export, serves it locally and opens the frame page. Add `--no-open` to print the URL, or `--native` to run `npx expo run:android` / `run:ios` instead. See [cli.md](cli.md).
+
 Ask the agent to `open_app("myshop")`. It gets the first screen as an accessibility tree with refs and can `tap`, `type`, `scroll`, `back`, `screenshot`. Tap "Scan a code" and the Android camera permission dialog appears in the tree; the agent answers it like a person would. `set_device` decides what the phone has:
 
 ```
