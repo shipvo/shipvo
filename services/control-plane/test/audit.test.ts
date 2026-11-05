@@ -99,15 +99,15 @@ describe("GET /audit/:app", () => {
 
 describe("audit on publish", () => {
   const pub = Buffer.alloc(32, 7).toString("base64");
-  async function pointer(band = "b0") {
+  async function pointer(band = "b0", url = "x") {
     const kp: any = await crypto.subtle.generateKey({ name: "Ed25519" } as any, true, ["sign", "verify"]);
     const pk = Buffer.from(await crypto.subtle.exportKey("raw", kp.publicKey)).toString("base64");
     const h = "a".repeat(64);
-    const body = JSON.stringify({ schema_version: "1.0", app_id: "tide", shell_major: 1, band, release: 7, issued_at: "2026-01-01T00:00:00Z", core: { version: "1.0.0", sha256: h, size: 1, url: "x" }, min_shell_version: "1.0.0" });
+    const body = JSON.stringify({ schema_version: "1.0", app_id: "tide", shell_major: 1, band, release: 7, issued_at: "2026-01-01T00:00:00Z", core: { version: "1.0.0", sha256: h, size: 1, url }, min_shell_version: "1.0.0" });
     const sig = Buffer.from(await crypto.subtle.sign({ name: "Ed25519" } as any, kp.privateKey, new TextEncoder().encode(body))).toString("base64");
     return { pk, buf: JSON.stringify({ body, signature: sig }) };
   }
-  async function run(pk: string, bodyText: string, failAudit = false) {
+  async function run(pk: string, bodyText: string, failAudit = false, prev?: string) {
     const key = "sv_publish_tide";
     const calls: any[] = [];
     const DB = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
@@ -120,7 +120,7 @@ describe("audit on publish", () => {
       },
     }) }) } as any;
     const put = vi.fn(async () => {});
-    const r = await app.request("/apps/tide/kv/p/tide/1/b0", { method: "PUT", headers: { authorization: `Bearer ${key}` }, body: bodyText }, { DB, POINTERS: { put } } as any);
+    const r = await app.request("/apps/tide/kv/p/tide/1/b0", { method: "PUT", headers: { authorization: `Bearer ${key}` }, body: bodyText }, { DB, POINTERS: { put, get: async () => prev ?? null } } as any);
     return { r, calls: calls.filter((x) => x.sql.includes("INSERT INTO audit_log")), put };
   }
   it("records one row with owner, release and short after, and no token", async () => {
@@ -133,6 +133,21 @@ describe("audit on publish", () => {
     expect(calls[0].args[5]).toBe(7);
     expect(JSON.parse(calls[0].args[8] as string)).toEqual({ release: 7, band: "b0", platform: "android" });
     expect(JSON.stringify(calls[0].args)).not.toContain("sv_publish_");
+  });
+  it("records a rollback when the pointer names an older bundle, with the previous release as before", async () => {
+    const { pk, buf } = await pointer("b0", "b/tide/r3.hbc");
+    const prev = JSON.stringify({ body: JSON.stringify({ release: 6 }), signature: "s" });
+    const { r, calls } = await run(pk, buf, false, prev);
+    expect(r.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args[4]).toBe("rollback");
+    expect(JSON.parse(calls[0].args[7] as string)).toEqual({ release: 6 });
+    expect(JSON.parse(calls[0].args[8] as string).rolled_back_to).toBe(3);
+  });
+  it("records a normal publish (bundle matches release) as publish", async () => {
+    const { pk, buf } = await pointer("b0", "b/tide/r7.hbc");
+    const { calls } = await run(pk, buf);
+    expect(calls[0].args[4]).toBe("publish");
   });
   it("records nothing for a rejected publish", async () => {
     const { pk, buf } = await pointer();

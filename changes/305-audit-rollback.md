@@ -1,0 +1,1 @@
+- `control-plane`: a release pointer that names an older bundle (what `shipvo rollback` writes) is audited as `rollback` with `rolled_back_to`; publish and rollback rows now also carry the previous release in `before`. Migration: none.
