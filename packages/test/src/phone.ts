@@ -5,6 +5,8 @@ import { find, parseScreen, type Node, type Target } from "./tree.js";
 export type Contact = { id: string; name: string; phoneNumbers?: string[]; emails?: string[] };
 /** One calendar event. `start` and `end` are ISO 8601 strings. */
 export type CalendarEvent = { id: string; title: string; start: string; end: string; allDay?: boolean; location?: string; notes?: string };
+/** A file the simulated picker offers. `content` is its text. */
+export type SeedFile = { name: string; mimeType: string; content: string };
 type Grant = "granted" | "denied" | "undetermined";
 /** What the simulated phone has. Takes effect for the next action. */
 export type DeviceSettings = {
@@ -16,6 +18,8 @@ export type DeviceSettings = {
   contacts?: Contact[];
   /** The calendar events the app can read once calendar permission is granted. Replaces the current ones. */
   calendar?: CalendarEvent[];
+  /** The files the file picker offers. Replaces the current ones. */
+  files?: SeedFile[];
   biometrics?: { enrolled?: boolean; nextResult?: "success" | "fail" | "cancel" };
   payment?: { nextResult?: "approve" | "decline" | "timeout" | "insufficient_funds"; pin?: string };
   online?: boolean;
@@ -53,7 +57,9 @@ export class Phone {
   /** The simulated address book. */
   readonly contacts: Contacts;
   readonly calendar: Calendar;
-  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); this.calendar = new Calendar(this); }
+  /** The simulated file picker. */
+  readonly files: Files;
+  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); this.calendar = new Calendar(this); this.files = new Files(this); }
 
   /** @internal */
   async call(path: string, body: Record<string, unknown>): Promise<Reply> {
@@ -170,6 +176,17 @@ export class Contacts {
   constructor(private readonly phone: Phone) {}
   /** Seed the address book (replaces what was there). The app still asks for permission; answer with `phone.device.set({ permissions: { contacts } })` or tap the dialog. */
   async set(contacts: Contact[]): Promise<Phone> { await this.phone.act("set_device", { device: { contacts } }); return this.phone; }
+}
+
+/** The simulated file picker. The app opens it with `expo-document-picker` or `device.files.pick()`; you answer it here. */
+export class Files {
+  constructor(private readonly phone: Phone) {}
+  /** Seed the files the picker offers (replaces what was there). */
+  async set(files: SeedFile[]): Promise<Phone> { await this.phone.act("set_device", { device: { files } }); return this.phone; }
+  /** Pick a file in the open picker dialog by name. */
+  async pick(name: string): Promise<Phone> { return this.phone.tap({ role: "button", name }); }
+  /** Cancel the open picker dialog. */
+  async cancel(): Promise<Phone> { return this.phone.tap({ role: "button", name: "Cancel" }); }
 }
 
 /** The simulated calendar. Apps read it with `expo-calendar` or `device.calendar.getEvents()`; writing back is not simulated. */

@@ -31,3 +31,14 @@ it("phone.calendar.set seeds the calendar through set_device", async () => {
   await phone.device.set({ permissions: { calendar: "denied" } });
   expect(seen).toEqual([{ calendar: events }, { permissions: { calendar: "denied" } }]);
 });
+
+it("phone.files.set seeds files; pick and cancel tap the dialog buttons", async () => {
+  seen.length = 0;
+  const phone = await openApp({ app: "demo", sim });
+  const files = [{ name: "a.pdf", mimeType: "application/pdf", content: "x" }];
+  expect(await phone.files.set(files)).toBe(phone);
+  expect(seen).toEqual([{ files }]);
+  const taps: any[] = []; (phone as any).tap = async (t: any) => { taps.push(t); return phone; };
+  await phone.files.pick("a.pdf"); await phone.files.cancel();
+  expect(taps).toEqual([{ role: "button", name: "a.pdf" }, { role: "button", name: "Cancel" }]);
+});

@@ -11,10 +11,14 @@ export type Contact = { id: string; name: string; phoneNumbers?: string[]; email
 export type CalendarEvent = { id: string; title: string; start: string; end: string; allDay?: boolean; location?: string; notes?: string };
 /** A time range for reading events. Events that overlap it are returned. */
 export type DateRange = { start: string | Date; end: string | Date };
+/** A file the person picked. `uri` can be read with `fetch`. */
+export type PickedFile = { name: string; mimeType: string; size: number; uri: string };
+/** Options for the file picker. `type` is a MIME filter such as `image/*` or `application/pdf` (or a list of them). Default: any file. */
+export type PickFileOptions = { type?: string | string[] };
 export type PermissionName = "camera" | "location" | "notifications" | "contacts" | "calendar";
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 
-export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "contacts" | "calendar";
+export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "contacts" | "calendar" | "files";
 /** How a capability is provided here: by the real OS/SDK, by the simulated device, or not at all. Never a silent fallback. */
 export type Support = "real" | "simulated" | "unavailable";
 export interface Device {
@@ -35,6 +39,8 @@ export interface Device {
   contacts: { getAll(): Promise<Contact[]> };
   /** Reads calendar events that overlap `range`, ordered by start. Asks for permission first; throws `Calendar permission denied` when refused. Read-only. */
   calendar: { getEvents(range: DateRange): Promise<CalendarEvent[]> };
+  /** Opens the system file picker for one file. Resolves with the file, or null if the person cancels. */
+  files: { pick(options?: PickFileOptions): Promise<PickedFile | null> };
   clipboard: { set(text: string): Promise<void>; get(): Promise<string> };
   net: { online(): boolean; onChange(cb: (online: boolean) => void): () => void };
 }
