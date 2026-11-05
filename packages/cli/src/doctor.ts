@@ -1,5 +1,9 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { createRequire } from "node:module";
+import { execSync } from "node:child_process";
+import { portFree } from "./sim.js";
+import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
 import { parseDeclared } from "./hermes.js";
 
@@ -14,6 +18,11 @@ type DoctorDeps = {
   readText: (path: string) => string;
   platform: NodeJS.Platform;
   fileMode: (path: string) => number | null;
+  /** Port the simulator will use (default 4545). */
+  port: number;
+  /** Path of the Playwright Chromium binary, or null if Playwright is not installed. */
+  chromiumPath: (cwd: string) => string | null;
+  portFree: (port: number) => Promise<boolean>;
 };
 
 const defaultDeps = (): DoctorDeps => ({
@@ -25,7 +34,31 @@ const defaultDeps = (): DoctorDeps => ({
   readText: (path) => readFileSync(path, "utf8"),
   platform: process.platform,
   fileMode: (path) => { try { return statSync(path).mode & 0o777; } catch { return null; } },
+  port: 4545,
+  chromiumPath: playwrightChromiumPath,
+  portFree,
 });
+
+/** Finds Playwright the way packages/sim/server.mjs does (the app's install, then this package's and @shipvo/sim's, then the global npm root) and asks it where Chromium should be. */
+function playwrightChromiumPath(cwd: string): string | null {
+  const tries: Array<() => any> = [
+    () => createRequire(join(cwd, "package.json"))("playwright"),
+    () => createRequire(import.meta.url)("playwright"),
+    () => createRequire(createRequire(import.meta.url).resolve("@shipvo/sim/package.json"))("playwright"),
+    () => createRequire(import.meta.url)(join(execSync("npm root -g", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(), "playwright")),
+  ];
+  for (const get of tries) {
+    try { return get().chromium.executablePath() as string; } catch {}
+  }
+  return null;
+}
+
+function hasSimScript(deps: DoctorDeps): boolean {
+  try {
+    const pkg = JSON.parse(deps.readText(join(deps.cwd, "package.json")));
+    return typeof pkg?.scripts?.sim === "string";
+  } catch { return false; }
+}
 
 const parseMajor = (v: string) => Number(v.split(".")[0] || 0);
 const pub = (s: string) => b64(keyFromSeed(s).publicKey);
@@ -129,12 +162,22 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   }
   results.push({ name: "hermesBytecodeVersion (if present) is set", ok: hermesOk, fix: "set hermesBytecodeVersion to a positive integer or list (for example 96 or [96, 98])" });
 
+  // Simulator checks only apply to projects that have a `sim` script.
+  if (hasSimScript(deps)) {
+    const exe = deps.chromiumPath(deps.cwd);
+    results.push({ name: "Playwright Chromium installed", ok: !!exe && deps.fileExists(exe), fix: "npx playwright install chromium" });
+    results.push({ name: `sim port ${deps.port} is free`, ok: await deps.portFree(deps.port), fix: "Stop the other process or pass --port <n>" });
+  }
+
   return results;
 }
 
 export async function doctor(argv: string[]) {
-  if (argv.length) { console.error("Usage: shipvo doctor"); process.exit(2); }
-  const results = await runDoctorChecks();
+  const a = parseArgs(argv);
+  const port = a.port === undefined ? 4545 : Number(a.port);
+  const stray = argv.some((x, i) => !x.startsWith("--") && argv[i - 1] !== "--port");
+  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>]"); process.exit(2); }
+  const results = await runDoctorChecks({ port });
   for (const r of results) console.log(`${r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
   if (results.some((r) => !r.ok)) process.exit(1);
 }
