@@ -5,17 +5,35 @@ import { randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { args as parse } from "./config.js";
+import { adopt, detectProject, isAdoptArgs, isBareApp, positional } from "./adopt.js";
 
 const HOSTED = "https://api.shipvo.dev";
 const SDK = { expo: "~58.0.21", camera: "~58.0.14", clipboard: "~58.0.4", localAuth: "~58.0.2", location: "~58.0.20", notifications: "~58.1.7", statusBar: "~58.0.4", constants: "~58.0.0", metroRuntime: "~58.0.15", react: "19.3.0", rn: "0.88.1", rnw: "^0.21.4" };
 
-const TEMPLATES = ["blank", "content"];
+const TEMPLATES = ["blank", "content", "shop"];
 
 const INIT_NEEDS_DIR = `shipvo: init needs a folder name.
 Try:  shipvo init myshop
 This creates ./myshop with a ready app. Other options (app id, bundle id, control plane) have defaults; see 'shipvo init --help'.`;
 
 const INIT_HELP = `Usage: shipvo init <dir> [options]
+       shipvo init [.] [--dry-run] [--yes] [--device]   (adopt mode, inside an existing Expo or bare React Native app)
+
+Adopt mode: run it inside an Expo app (package.json with expo, plus app.json or app.config.js/ts).
+It shows a plan, then applies it after you confirm. It installs @shipvo/runtime, adds the config plugin
+and a signing key, writes shipvo.json, adds sim/publish/rollback scripts, and adds a publish workflow if
+there is none. It never overwrites a file and never touches ios/ or android/. It refuses apps that use
+expo-updates or CodePush. See docs/cli.md.
+
+In a bare React Native app (ios/ and android/ committed, no Expo config plugins) it also writes the Shipvo
+values into AndroidManifest.xml and Info.plist, and runs npx install-expo-modules@latest if Expo Modules are
+missing. Only after you confirm.
+
+  --dry-run              Print the plan and change nothing.
+  --yes                  Apply the plan without asking.
+  --device               Also install @shipvo/device.
+
+Creating a new app:
 
 Creates <dir> with a ready app. Every option is optional.
 
@@ -27,14 +45,16 @@ Creates <dir> with a ready app. Every option is optional.
   --template <name>      Starting app. One of: ${TEMPLATES.join(", ")}. Default: blank.
                            blank    the starter with device API buttons.
                            content  a list screen and a detail screen reading titles and text from src/data/articles.json.
+                           shop     a product list, a product page and a cart, reading products and prices from src/data/products.json.
   --help                 Show this text.`;
 
 const title = (s: string) => s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export async function init(argv: string[]) {
-  const [dirArg] = argv.filter((x) => !x.startsWith("--") && !argv[argv.indexOf(x) - 1]?.startsWith("--"));
+  const [dirArg] = positional(argv);
   const a = parse(argv);
   if (argv.includes("--help") || argv.includes("-h")) { console.log(INIT_HELP); return; }
+  if (isAdoptArgs(argv) && (dirArg === "." || detectProject(process.cwd()).isExpo || isBareApp(process.cwd()))) { await adopt(argv); return; }
   if (!dirArg) { console.error(INIT_NEEDS_DIR); process.exit(2); }
   if (a.template === "true") { console.error(`shipvo: --template needs a name. Valid templates: ${TEMPLATES.join(", ")}.`); process.exit(2); }
   const template = a.template ?? "blank";
@@ -96,10 +116,19 @@ export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/releas
     w("src/screens/List.tsx", CONTENT_LIST);
     w("src/screens/Detail.tsx", CONTENT_DETAIL);
     w("src/data/articles.json", CONTENT_DATA);
+  } else if (template === "shop") {
+    w("App.tsx", SHOP_APP_TSX(name));
+    w("src/cart.tsx", SHOP_CART_STATE);
+    w("src/money.ts", SHOP_MONEY);
+    w("src/screens/List.tsx", SHOP_LIST);
+    w("src/screens/Detail.tsx", SHOP_DETAIL);
+    w("src/screens/Cart.tsx", SHOP_CART);
+    w("src/data/products.json", SHOP_DATA);
   } else w("App.tsx", APP_TSX(name, appId));
   w(".github/workflows/publish.yml", WORKFLOW);
   w(".github/workflows/test.yml", TEST_WORKFLOW);
-  w("tests/app.test.ts", template === "content" ? CONTENT_TEST : TEST_APP(name));
+  w(".github/workflows/preview.yml", PREVIEW_WORKFLOW);
+  w("tests/app.test.ts", template === "content" ? CONTENT_TEST : template === "shop" ? SHOP_TEST : TEST_APP(name));
   w("vitest.config.ts", VITEST_CONFIG);
   w("README.md", README(name, appId, controlPlane, template));
 
@@ -223,7 +252,10 @@ jobs:
         with: { name: simulator-log, path: sim.log }
 `;
 
-const TEST_APP = (name: string) => `// Tests that run your app in the Shipvo simulator: a phone-sized, headless copy of the real app. No emulator, no device.
+const TEST_APP = (name: string) => `// These tests check the starter screen that "shipvo init" made in App.tsx.
+// When you replace App.tsx, they will fail: replace these tests with ones for your own screens.
+// Nothing is wrong with your setup when they fail after that.
+// Tests that run your app in the Shipvo simulator: a phone-sized, headless copy of the real app. No emulator, no device.
 // Run them with "npm test" (start the simulator first: npm run sim) and in CI (.github/workflows/test.yml).
 import { test, expect } from "@shipvo/test/vitest";
 import { RELEASE } from "../src/release";
@@ -271,6 +303,34 @@ const VITEST_CONFIG = `import { defineConfig } from "vitest/config";
 export default defineConfig({ test: { include: ["tests/**/*.test.ts"], testTimeout: 30_000 } });
 `;
 
+const PREVIEW_WORKFLOW = `name: preview
+# Publishes the pull request's web build to here.now (no account) and comments the link.
+# The link is public and expires in 24 hours. Pull requests from forks are skipped.
+on:
+  pull_request:
+jobs:
+  preview:
+    if: \${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - name: Publish the preview
+        id: preview
+        run: echo "json=$(npx shipvo preview --json | tail -n 1)" >> "$GITHUB_OUTPUT"
+      - name: Comment the link
+        env:
+          GH_TOKEN: \${{ github.token }}
+          PREVIEW: \${{ steps.preview.outputs.json }}
+        run: |
+          url=$(echo "$PREVIEW" | jq -r .url)
+          gh pr comment "\${{ github.event.pull_request.number }}" --body "Preview: $url (public link, expires in 24 hours)"
+`;
+
 const WORKFLOW = `name: publish
 on:
   push:
@@ -305,7 +365,7 @@ A [Shipvo](https://github.com/shipvo/shipvo) app: one React Native codebase that
 - \`npm run sim\` opens it in the simulator; \`npx -y @shipvo/mcp\` lets Claude, Cursor or ChatGPT use it (\`open_app("${appId}")\`).
 - \`npx expo run:android\` builds the native shell (the trust root and control plane \`${cp}\` are pinned in it).
 - Push to \`main\`: the publish workflow signs the new JavaScript and every phone and simulator gets it.
-- ${template === "content" ? "`src/data/articles.json` is the first thing to edit: it holds the titles and text. `src/screens/` has the list and detail screens." : "`src/release.ts` is the first thing to edit; `App.tsx` shows the device API (camera, location, biometrics, notifications)."}
+- ${template === "content" ? "`src/data/articles.json` is the first thing to edit: it holds the titles and text. `src/screens/` has the list and detail screens." : template === "shop" ? "`src/data/products.json` is the first thing to edit: it holds the product names, prices (in cents) and descriptions. `src/screens/` has the list, detail and cart screens." : "`src/release.ts` is the first thing to edit; `App.tsx` shows the device API (camera, location, biometrics, notifications)."}
 `;
 
 const CONTENT_DATA = JSON.stringify([
@@ -409,5 +469,217 @@ test("opening a title shows its text, and Back returns to the list", async ({ ph
   await phone.waitFor(articles[0].body);
   await phone.tap("Back");
   await phone.waitFor(articles[1].title);
+});
+`;
+
+const SHOP_DATA = JSON.stringify([
+  { id: "canvas-tote", name: "Canvas tote", price: 1800, description: "A sturdy cotton bag with a long strap." },
+  { id: "enamel-mug", name: "Enamel mug", price: 1200, description: "A light mug that keeps coffee warm on a walk." },
+  { id: "pocket-notebook", name: "Pocket notebook", price: 650, description: "Sixty plain pages and a soft cover." },
+  { id: "wool-beanie", name: "Wool beanie", price: 2400, description: "A warm hat in undyed wool." },
+  { id: "steel-bottle", name: "Steel bottle", price: 2900, description: "A one litre bottle with a screw cap." },
+], null, 2) + "\n";
+
+const SHOP_MONEY = `// Prices are whole cents in src/data/products.json. This is the one place that turns them into text.
+export const formatPrice = (cents: number) => "$" + (cents / 100).toFixed(2);
+`;
+
+const SHOP_CART_STATE = `import { createContext, useContext, useState, type ReactNode } from "react";
+import products from "./data/products.json";
+
+export type Line = { id: string; qty: number };
+type Cart = { lines: Line[]; add: (id: string) => void; remove: (id: string) => void; totalCents: number };
+
+const Ctx = createContext<Cart | null>(null);
+
+export function CartProvider({ children }: { children: ReactNode }) {
+  const [lines, setLines] = useState<Line[]>([]);
+  const add = (id: string) => setLines((l) => l.some((x) => x.id === id) ? l.map((x) => x.id === id ? { ...x, qty: x.qty + 1 } : x) : [...l, { id, qty: 1 }]);
+  const remove = (id: string) => setLines((l) => l.filter((x) => x.id !== id));
+  const totalCents = lines.reduce((sum, x) => sum + x.qty * (products.find((p) => p.id === x.id)?.price ?? 0), 0);
+  return <Ctx.Provider value={{ lines, add, remove, totalCents }}>{children}</Ctx.Provider>;
+}
+
+export function useCart() {
+  const c = useContext(Ctx);
+  if (!c) throw new Error("useCart needs a CartProvider");
+  return c;
+}
+`;
+
+const SHOP_APP_TSX = (name: string) => `import { useEffect, useRef, useState } from "react";
+import { AppState, StyleSheet, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { Runtime } from "@shipvo/runtime";
+import { CartProvider } from "./src/cart";
+import { List } from "./src/screens/List";
+import { Detail } from "./src/screens/Detail";
+import { Cart } from "./src/screens/Cart";
+import products from "./src/data/products.json";
+
+type Route = { name: "list" } | { name: "detail"; id: string } | { name: "cart" };
+
+export default function App() {
+  const [route, setRoute] = useState<Route>({ name: "list" });
+  // Tell the runtime the first screen rendered, so this release is kept.
+  // Then check for new releases now and while the app is open.
+  const busy = useRef(false);
+  useEffect(() => {
+    try { Runtime.markHealthy(); } catch {}
+    const check = async () => {
+      if (busy.current) return; busy.current = true;
+      try { await Runtime.checkForUpdate(true); } catch {}
+      finally { busy.current = false; }
+    };
+    check(); const id = setInterval(() => { if (AppState.currentState === "active") check(); }, 60000);
+    return () => clearInterval(id);
+  }, []);
+  const product = route.name === "detail" ? products.find((p) => p.id === route.id) : undefined;
+  const toList = () => setRoute({ name: "list" });
+  const toCart = () => setRoute({ name: "cart" });
+  return (
+    <CartProvider>
+      <View style={s.root}>
+        <StatusBar style="dark" />
+        {route.name === "cart" ? <Cart onBack={toList} />
+          : product ? <Detail product={product} onBack={toList} onCart={toCart} />
+          : <List title="${name}" products={products} onOpen={(id) => setRoute({ name: "detail", id })} onCart={toCart} />}
+      </View>
+    </CartProvider>
+  );
+}
+
+const s = StyleSheet.create({ root: { flex: 1, backgroundColor: "#F6F8F7" } });
+`;
+
+const SHOP_LIST = `import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { formatPrice } from "../money";
+
+export type Product = { id: string; name: string; price: number; description: string };
+
+export function List({ title, products, onOpen, onCart }: { title: string; products: Product[]; onOpen: (id: string) => void; onCart: () => void }) {
+  return (
+    <ScrollView contentContainerStyle={s.page}>
+      <View style={s.head}>
+        <Text style={s.h1} accessibilityRole="header">{title}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Cart" onPress={onCart} style={s.cart}><Text style={s.cartText}>Cart</Text></Pressable>
+      </View>
+      {products.map((p) => (
+        <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={p.name} onPress={() => onOpen(p.id)} style={s.row}>
+          <Text style={s.rowText}>{p.name}</Text>
+          <Text style={s.price}>{formatPrice(p.price)}</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+const s = StyleSheet.create({
+  page: { padding: 20, paddingTop: 56, gap: 12 },
+  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  h1: { fontSize: 28, fontWeight: "800", color: "#111" },
+  cart: { minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }, cartText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
+  row: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: "#CBD5D1", flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, backgroundColor: "#fff" },
+  rowText: { fontSize: 16, fontWeight: "700", color: "#111" },
+  price: { fontSize: 16, color: "#111" },
+});
+`;
+
+const SHOP_DETAIL = `import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCart } from "../cart";
+import { formatPrice } from "../money";
+import type { Product } from "./List";
+
+export function Detail({ product, onBack, onCart }: { product: Product; onBack: () => void; onCart: () => void }) {
+  const { add } = useCart();
+  return (
+    <ScrollView contentContainerStyle={s.page}>
+      <View style={s.head}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={s.link}><Text style={s.linkText}>Back</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Cart" onPress={onCart} style={s.link}><Text style={s.linkText}>Cart</Text></Pressable>
+      </View>
+      <Text style={s.h1} accessibilityRole="header">{product.name}</Text>
+      <Text style={s.price}>{formatPrice(product.price)}</Text>
+      <Text style={s.body}>{product.description}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Add to cart" onPress={() => add(product.id)} style={s.add}><Text style={s.addText}>Add to cart</Text></Pressable>
+    </ScrollView>
+  );
+}
+
+const s = StyleSheet.create({
+  page: { padding: 20, paddingTop: 56, gap: 12 },
+  head: { flexDirection: "row", justifyContent: "space-between" },
+  link: { minHeight: 48, justifyContent: "center" }, linkText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
+  h1: { fontSize: 24, fontWeight: "800", color: "#111" },
+  price: { fontSize: 18, fontWeight: "700", color: "#111" },
+  body: { fontSize: 16, lineHeight: 24, color: "#111" },
+  add: { minHeight: 48, borderRadius: 10, backgroundColor: "#1F4E5F", alignItems: "center", justifyContent: "center" }, addText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+});
+`;
+
+const SHOP_CART = `import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCart } from "../cart";
+import { formatPrice } from "../money";
+import products from "../data/products.json";
+
+export function Cart({ onBack }: { onBack: () => void }) {
+  const { lines, remove, totalCents } = useCart();
+  return (
+    <ScrollView contentContainerStyle={s.page}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={s.back}><Text style={s.backText}>Back</Text></Pressable>
+      <Text style={s.h1} accessibilityRole="header">Cart</Text>
+      {lines.length === 0 ? <Text style={s.body}>Your cart is empty</Text> : null}
+      {lines.map((l) => {
+        const p = products.find((x) => x.id === l.id);
+        if (!p) return null;
+        return (
+          <View key={l.id} style={s.row}>
+            <Text style={s.body}>{p.name} x {l.qty}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={"Remove " + p.name} onPress={() => remove(l.id)} style={s.remove}><Text style={s.backText}>Remove</Text></Pressable>
+          </View>
+        );
+      })}
+      <Text style={s.total}>{"Total: " + formatPrice(totalCents)}</Text>
+    </ScrollView>
+  );
+}
+
+const s = StyleSheet.create({
+  page: { padding: 20, paddingTop: 56, gap: 12 },
+  back: { minHeight: 48, justifyContent: "center" }, backText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
+  h1: { fontSize: 24, fontWeight: "800", color: "#111" },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  remove: { minHeight: 48, justifyContent: "center" },
+  body: { fontSize: 16, color: "#111" },
+  total: { fontSize: 20, fontWeight: "800", color: "#111" },
+});
+`;
+
+const SHOP_TEST = `// Runs the app in the Shipvo simulator. Start it first: npm run sim.
+// Names and prices come from src/data/products.json, so editing that file does not break this test.
+// Keep product names unique and not a substring of each other: tap(name) fails if two elements match.
+// The total is computed with formatPrice from the app, so this test does not check that function.
+import { test, expect } from "@shipvo/test/vitest";
+import products from "../src/data/products.json";
+import { formatPrice } from "../src/money";
+
+test("the list shows every product", async ({ phone }) => {
+  for (const p of products) expect(phone).toSee(p.name);
+  expect(phone.screen).not.toMatch(/something went wrong|unhandled|exception/i);
+});
+
+test("adding two products puts their total in the cart, and Remove takes one out", async ({ phone }) => {
+  const [a, b] = products;
+  await phone.tap(a.name);
+  await phone.waitFor(a.description);
+  await phone.tap("Add to cart");
+  await phone.tap("Back");
+  await phone.waitFor(b.name);
+  await phone.tap(b.name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.waitFor("Total: " + formatPrice(a.price + b.price));
+  await phone.tap("Remove " + b.name);
+  await phone.waitFor("Total: " + formatPrice(a.price));
 });
 `;

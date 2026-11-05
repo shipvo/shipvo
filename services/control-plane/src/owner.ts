@@ -4,8 +4,32 @@ import { AppContent, ContentBlock } from "@shipvo/schema";
 
 type Content = AppContent;
 type P = { type: "string" | "number" | "boolean" | "object"; required?: boolean; description: string; enum?: string[] };
-export type OwnerCommand = { description: string; params: Record<string, P>; mutates: boolean; run: (draft: Content, a: any, env: OwnerEnv) => Promise<unknown> | unknown };
-export type OwnerEnv = { db: D1Database; kv: KVNamespace; appId: string; actor: string };
+export type OwnerCommand = { description: string; params: Record<string, P>; mutates: boolean;
+  /** Set on commands that cannot be undone or reach users: returns what would change (null = this call is harmless). */
+  plan?: (draft: Content, a: any, env: OwnerEnv) => Promise<string[] | null> | string[] | null;
+  /** Agents may not run this (it changes the rules agents follow). */
+  adminOnly?: boolean;
+  run: (draft: Content, a: any, env: OwnerEnv) => Promise<unknown> | unknown };
+export type AgentPolicy = "ask" | "deny" | "allow";
+/** agent: the caller is an AI agent holding the owner token (not the signed-in admin). `local` is a stricter policy the caller's own shipvo.json asked for. */
+export type OwnerEnv = { db: D1Database; kv: KVNamespace; appId: string; actor: string; agent?: boolean; local?: { agentPolicy?: string; agentDeny?: string[] } };
+
+/** The actor name for a caller holding the owner token (an AI agent). */
+export const AGENT_ACTOR = "agent (owner token)";
+const POLICY_KEY = (appId: string) => `c/${appId}/agent_policy`;
+export async function loadPolicy(env: { kv: KVNamespace; appId: string }): Promise<{ agentPolicy: AgentPolicy; agentDeny: string[] }> {
+  try {
+    const p = JSON.parse((await env.kv.get(POLICY_KEY(env.appId))) ?? "{}");
+    return { agentPolicy: ["ask", "deny", "allow"].includes(p.agentPolicy) ? p.agentPolicy : "ask", agentDeny: Array.isArray(p.agentDeny) ? p.agentDeny.map(String) : [] };
+  } catch { return { agentPolicy: "ask", agentDeny: [] }; }
+}
+/** What a publish reaches. Telemetry has no device id, so this counts update reports, not phones. */
+async function reach(env: OwnerEnv): Promise<string> {
+  try {
+    const r = await env.db.prepare("SELECT COUNT(*) AS n FROM telemetry WHERE app_id = ? AND event = 'applied'").bind(env.appId).first<{ n: number }>();
+    return r?.n ? `Reaches every installed phone. ${r.n} update reports received so far (the number of phones is not known).` : "Reaches every installed phone. No update reports received yet (the number of phones is not known).";
+  } catch { return "Reaches every installed phone (count unavailable)."; }
+}
 
 export class OwnerError extends Error { code: string; constructor(code: string, message: string) { super(message); this.code = code; } }
 const fail = (code: string, message: string): never => { throw new OwnerError(code, message); };
@@ -18,7 +42,8 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
   list_products: { description: "List products with price and stock.", params: {}, mutates: false,
     run: (d) => d.products.map((p) => ({ id: p.id, name: p.name, department: p.department, price: p.price, stock: p.stock, water: p.water })) },
   update_product: {
-    description: "Change a product. Only the fields you pass are changed.", mutates: true,
+    description: "Change a product. Only the fields you pass are changed. A price change needs confirm: true when called by an agent.", mutates: true,
+    plan: (d, a) => { if (a.price === undefined) return null; const p = product(d, a.product_id); const n = Math.round(Number(a.price)); return n === p.price ? null : [`Price of ${p.name}: ${p.price} → ${n} FCFA in the draft. Customers see it once you publish.`]; },
     params: {
       product_id: { type: "string", required: true, description: "Product id" }, name: { type: "string", description: "New name" },
       price: { type: "number", description: "Unit price in FCFA (whole number)" }, stock: { type: "number", description: "Units in stock" },
@@ -52,11 +77,13 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
       d.products.push(p as any); return p;
     },
   },
-  remove_product: { description: "Remove a product.", mutates: true, params: { product_id: { type: "string", required: true, description: "Product id" } },
+  remove_product: { description: "Remove a product.", mutates: true,
+    plan: (d, a) => { const p = product(d, a.product_id); return [`Delete product ${p.name} (${p.id}, price ${p.price}, stock ${p.stock}) from the draft. Customers lose it once you publish.`]; }, params: { product_id: { type: "string", required: true, description: "Product id" } },
     run: (d, a) => { product(d, a.product_id); d.products = d.products.filter((p) => p.id !== a.product_id); return { removed: a.product_id }; } },
   list_promos: { description: "List promo codes.", params: {}, mutates: false, run: (d) => d.promos },
   upsert_promo: {
     description: "Create or change a promo code.", mutates: true,
+    plan: (d, a) => { const code = String(a.code).trim().toUpperCase(); const o = d.promos.find((x) => x.code === code); return [o ? `Change offer ${code}: ${o.percent}% → ${Math.round(Number(a.percent))}% off in the draft.` : `Add offer ${code}: ${Math.round(Number(a.percent))}% off in the draft.`, "Customers can use it once you publish."]; },
     params: {
       code: { type: "string", required: true, description: "Code, 3-16 capital letters or digits" }, percent: { type: "number", required: true, description: "Percent off (1-90)" },
       min_subtotal: { type: "number", description: "Minimum cart subtotal in FCFA (default 0)" }, description: { type: "string", required: true, description: "Shown to customers" },
@@ -71,6 +98,7 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
     },
   },
   set_promo_active: { description: "Turn a promo code on or off.", mutates: true,
+    plan: (d, a) => { const p = d.promos.find((x) => x.code === String(a.code).toUpperCase()) ?? fail("not_found", `No promo '${a.code}'`); return [`Turn offer ${p.code} (${p.percent}% off) ${a.active ? "on" : "off"} in the draft. Customers see it once you publish.`]; },
     params: { code: { type: "string", required: true, description: "Code" }, active: { type: "boolean", required: true, description: "On or off" } },
     run: (d, a) => { const p = d.promos.find((x) => x.code === String(a.code).toUpperCase()) ?? fail("not_found", `No promo '${a.code}'`); p.active = !!a.active; return p; } },
   list_home_blocks: { description: "List the home screen blocks in order.", params: {}, mutates: false, run: (d) => d.screens.home },
@@ -97,7 +125,8 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
   move_home_block: { description: "Move a home block to a new position (0 = top).", mutates: true,
     params: { block_id: { type: "string", required: true, description: "Block id" }, to_index: { type: "number", required: true, description: "New index" } },
     run: (d, a) => { const b = block(d, a.block_id); const list = d.screens.home.filter((x) => x !== b); list.splice(Math.max(0, Math.min(list.length, Number(a.to_index))), 0, b); d.screens.home = list; return list.map((x) => x.id); } },
-  remove_home_block: { description: "Remove a home block.", mutates: true, params: { block_id: { type: "string", required: true, description: "Block id" } },
+  remove_home_block: { description: "Remove a home block.", mutates: true,
+    plan: (d, a) => { const b = block(d, a.block_id); return [`Delete home block ${b.id} (${b.type}) from the draft. Customers lose it once you publish.`]; }, params: { block_id: { type: "string", required: true, description: "Block id" } },
     run: (d, a) => { block(d, a.block_id); d.screens.home = d.screens.home.filter((x) => x.id !== a.block_id); return d.screens.home.map((x) => x.id); } },
   set_theme: { description: "Set the brand accent colour (#RRGGBB) and optionally the shop name and tagline.", mutates: true,
     params: { accent: { type: "string", description: "Accent colour #RRGGBB" }, name: { type: "string", description: "Shop name" }, tagline: { type: "string", description: "Tagline" } },
@@ -105,7 +134,8 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
   diff: { description: "What changed in the draft compared with the live version.", params: {}, mutates: false,
     run: async (d, _a, env) => diffContent(await liveContent(env), d) },
   publish: {
-    description: "Validate the draft and make it live on every device (usually within seconds).", mutates: false,
+    description: "Validate the draft and make it live on every device (usually within seconds). Needs confirm: true when called by an agent.", mutates: false,
+    plan: async (d, _a, env) => { const ch = diffContent(await liveContent(env), d); return [await reach(env), ch.length ? `Changes: ${ch.join("; ")}.` : "No changes compared with the live version."]; },
     params: { note: { type: "string", description: "What changed, for the history" } },
     run: async (d, a, env) => {
       const live = await liveContent(env);
@@ -122,6 +152,7 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
     },
   },
   discard_draft: { description: "Throw away unpublished changes.", params: {}, mutates: false,
+    plan: async (d, _a, env) => { const ch = diffContent(await liveContent(env), d); return ch.length ? [`Delete unpublished draft changes (cannot be undone): ${ch.join("; ")}. Does not reach phones.`] : null; },
     run: async (_d, _a, env) => { const live = await liveContent(env); if (!live) fail("no_live", "Nothing published yet"); await env.db.prepare("INSERT OR REPLACE INTO content_draft (app_id, json, updated_at) VALUES (?,?,?)").bind(env.appId, JSON.stringify(live), new Date().toISOString()).run(); return { reset_to: live!.version }; } },
   list_versions: { description: "Published versions, newest first.", params: {}, mutates: false,
     run: async (_d, _a, env) => (await env.db.prepare("SELECT version, published_at, published_by, note, length(json) AS bytes FROM content_versions WHERE app_id = ? ORDER BY version DESC LIMIT 30").bind(env.appId).all()).results },
@@ -137,6 +168,7 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
     run: async (_d, a, env) => (await env.db.prepare("SELECT order_id, total, received_at, json FROM orders WHERE app_id = ? ORDER BY id DESC LIMIT ?").bind(env.appId, Math.min(200, Number(a.limit ?? 50))).all()).results.map((r: any) => ({ ...JSON.parse(r.json), received_at: r.received_at })) },
   // Agent API keys for the hosted simulator (sim.shipvo.dev). The key is shown once; only its hash is stored.
   create_api_key: {
+    plan: (_d, a) => [`Create a '${a.scope}' API key${a.scope === "owner" ? " that can run owner commands, including publish" : ""}. Does not reach phones.`],
     description: "Create an API key that lets an AI agent open this app in the hosted simulator. Scope 'test' = sandbox sessions only; 'owner' = may also run owner commands; 'read' = reports only. The key is returned once.",
     params: { scope: { type: "string", required: true, description: "test, owner or read", enum: ["test", "owner", "read"] }, label: { type: "string", description: "What this key is for, e.g. 'Claude Code', 'PiPilot CI'" }, expires_in_days: { type: "number", description: "Optional: the key stops working after this many days (default: never)" } }, mutates: false,
     run: async (_d, a, env) => {
@@ -151,8 +183,16 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
   },
   list_api_keys: { description: "API keys for this app (prefix, scope, label, last use); never the key itself.", params: {}, mutates: false,
     run: async (_d, _a, env) => (await env.db.prepare("SELECT prefix, scope, label, created_at, last_used_at, revoked_at FROM api_keys WHERE app_id = ? ORDER BY id DESC").bind(env.appId).all()).results },
-  revoke_api_key: { description: "Revoke an API key by its prefix (from list_api_keys).", params: { prefix: { type: "string", required: true, description: "Key prefix, e.g. sv_test_abc1" } }, mutates: false,
+  revoke_api_key: { description: "Revoke an API key by its prefix (from list_api_keys).", plan: (_d, a) => [`Revoke API key ${a.prefix}. Whoever uses it is locked out (cannot be undone). Does not reach phones.`], params: { prefix: { type: "string", required: true, description: "Key prefix, e.g. sv_test_abc1" } }, mutates: false,
     run: async (_d, a, env) => { const r = await env.db.prepare("UPDATE api_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE app_id = ? AND prefix = ? AND revoked_at IS NULL").bind(env.appId, String(a.prefix)).run(); return { revoked: (r.meta?.changes ?? 0) > 0 }; } },
+  get_agent_policy: { description: "What AI agents may do without asking: agentPolicy (ask, deny or allow) and the per-command deny list.", params: {}, mutates: false,
+    run: async (_d, _a, env) => loadPolicy(env) },
+  set_agent_policy: { description: "Set agentPolicy (ask is the default, deny, or allow) and a comma-separated deny list of command names. Owner sign-in only: agents cannot call it.", mutates: false, adminOnly: true,
+    params: { agentPolicy: { type: "string", required: true, description: "ask, deny or allow", enum: ["ask", "deny", "allow"] }, agentDeny: { type: "string", description: "Comma-separated commands agents may never run" } },
+    run: async (_d, a, env) => {
+      const v = { agentPolicy: String(a.agentPolicy), agentDeny: String(a.agentDeny ?? "").split(",").map((x) => x.trim()).filter(Boolean) };
+      await env.kv.put(POLICY_KEY(env.appId), JSON.stringify(v)); return v;
+    } },
   audit_log: { description: "Who changed what, newest first.", params: {}, mutates: false,
     run: async (_d, _a, env) => (await env.db.prepare("SELECT at, actor, command, args_json, ok FROM audit WHERE app_id = ? ORDER BY id DESC LIMIT 100").bind(env.appId).all()).results },
 };
@@ -186,7 +226,7 @@ export function diffContent(a: Content | null, b: Content): string[] {
   return out;
 }
 
-export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<string, unknown>) {
+export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<string, unknown>): Promise<any> {
   const cmd = OWNER_COMMANDS[name];
   if (!cmd) return { ok: false, error: { code: "unknown_command", message: `Unknown command '${name}'` } };
   for (const [k, p] of Object.entries(cmd.params)) {
@@ -195,8 +235,26 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   }
   const draft = await loadDraft(env);
   if (!draft) return { ok: false, error: { code: "no_content", message: "No content yet" } };
+  const { confirm, ...rest } = args; args = rest;
   let res: any;
+  let confirmed = false, denied = false, gated = false;
   try {
+    if (env.agent) {
+      if (cmd.adminOnly) fail("admin_only", `'${name}' needs the owner signed in to the admin; agents cannot run it.`);
+      const stored = await loadPolicy(env);
+      const rank = { allow: 0, ask: 1, deny: 2 } as Record<string, number>;
+      const asked = env.local?.agentPolicy;
+      // The caller's own shipvo.json can only make the rules stricter, never looser.
+      const policy = asked && asked in rank && rank[asked]! > rank[stored.agentPolicy]! ? asked : stored.agentPolicy;
+      if ([...stored.agentDeny, ...(env.local?.agentDeny ?? [])].includes(name)) { denied = true; fail("denied", `'${name}' is on this app's agent deny list.`); }
+      const plan = cmd.plan ? await cmd.plan(draft, args, env) : null;
+      if (plan) {
+        gated = true;
+        if (policy === "deny") { denied = true; fail("denied", `agentPolicy is "deny": agents may not run '${name}'.`); }
+        if (policy === "ask" && confirm !== true) return { ok: false, error: { code: "needs_confirm", message: `Nothing was changed. Call '${name}' again with the same arguments and confirm: true to run it.` }, code: "needs_confirm", plan };
+        if (policy === "ask") confirmed = true; // only a call that ran after an explicit confirm: true
+      }
+    }
     const result = await cmd.run(draft, args, env);
     if (cmd.mutates) {
       const ok = AppContent.safeParse({ ...draft }); // keep the draft valid at every step
@@ -207,9 +265,9 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   } catch (e) {
     res = e instanceof OwnerError ? { ok: false, error: { code: e.code, message: e.message } } : { ok: false, error: { code: "internal", message: String(e) } };
   }
-  if (cmd.mutates || name === "publish" || name === "restore_version" || name === "discard_draft")
+  if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy")
     await env.db.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
-      .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(args).slice(0, 2000), res.ok ? 1 : 0).run();
+      .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(denied ? { ...args, denied: true } : confirmed ? { ...args, confirmed: true } : args).slice(0, 2000), res.ok && !denied ? 1 : 0).run();
   return res;
 }
 

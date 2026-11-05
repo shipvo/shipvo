@@ -22,3 +22,12 @@ it("phone.contacts.set seeds the address book through set_device", async () => {
   await phone.device.set({ permissions: { contacts: "denied" } });
   expect(seen).toEqual([{ contacts: list }, { permissions: { contacts: "denied" } }]);
 });
+
+it("phone.calendar.set seeds the calendar through set_device", async () => {
+  seen.length = 0;
+  const phone = await openApp({ app: "demo", sim });
+  const events = [{ id: "e1", title: "Dentist", start: "2026-11-10T09:00:00Z", end: "2026-11-10T10:00:00Z" }];
+  expect(await phone.calendar.set(events)).toBe(phone);
+  await phone.device.set({ permissions: { calendar: "denied" } });
+  expect(seen).toEqual([{ calendar: events }, { permissions: { calendar: "denied" } }]);
+});
