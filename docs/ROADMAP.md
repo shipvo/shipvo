@@ -43,25 +43,24 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 
 ## Now
 
-The planner keeps this list to the 5–10 most valuable items in flight. Each line links its issue.
+The planner keeps this list current: the epics in flight, newest owner direction first. Each line links its epic; open the epic for its slices.
 
-Bet 1, a bundle never reaches a shell that cannot run it (epic #14):
-- [x] #17 Shells declare their Hermes bytecode version; control plane skips mismatched releases (merged)
-- [x] #18 Runtime refuses a mismatched release (after #17)
+**Win the lane (owner direction, 5 to 6 Nov 2026):**
+- Shipvo Phone: a native-feeling simulated phone, Android style and iPhone style, with gestures, notification shade and Control Center, Settings, restart, an app store inside the phone, a built-in Browser app, real browser camera, mic and location with simulated fallback, and agent control of everything over MCP (#466)
+- `shipvo run android|ios`: the app on Shipvo Phone in your own browser in seconds, no Playwright needed; your coding agent drives the same live phone while you watch, with screenshots and demo-video recording (#442)
+- From working app to both stores: route by account type, the 12-testers clock with the Shipvo Testers group, screenshot studio, store forms (#249)
+- Framework adapters: Capacitor first, then Cordova (signed web-bundle updates, `shipvo eas setup`, own-CI build template) (#297)
+- Learn: top-level section with interactive tutorials, videos, search and filters
 
-Bet 2, iOS reaches Android update quality (epic #15):
-- [x] #2 bsdiff patches on iOS
-- [x] #1 Measure OTA apply time on the iOS Simulator in CI
+**Stage 2:**
+- The closed QA loop: an agent explores, tests in plain language, repairs its tests, and the fix ships to 1% the same hour (#317)
+- Release governance: audit log, approvals, release policy as code (#295)
+- Enterprise access and hosting: single sign-on, roles, private deployment, LTS (#296)
 
-Bet 3, first run in under 10 minutes, and measured (epic #16):
-- [x] #19 `shipvo doctor`
-- [x] #20 Script counting weekly healthy releases per app
-- [x] #26 `shipvo publish --dry-run` (first slice merged in #36; `rollback --dry-run` is done; it reads the bundle, so it is not offline)
-
-Other:
-- [x] #3 More typed-test examples for `@shipvo/test`
-
-Review of 2026-11-04: priority order is unchanged (update safety first). Bets 1 and 2 are update safety. Bet 3 is developer experience, chosen because we cannot yet measure activation. See `docs/product/strategy.md`.
+**Finishing:**
+- A bundle never reaches a shell that cannot run it (#14)
+- iOS reaches Android update quality (#15)
+- First run in under 10 minutes, and measured (#16)
 
 ## Shipped
 
