@@ -282,7 +282,8 @@ jobs:
             gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress --remove-label agent:ready || true
             gh issue close "$ISSUE" -R "$REPO" --reason completed || true
           fi
-          if [ -f /tmp/agent/escalate.md ]; then
+          if [ -f /tmp/agent/escalate.md ] && [ "${{ inputs.role }}" != "steward" ]; then
+            # (The steward never escalates to itself; what it cannot fix waits for the owner's hourly steward.)
             # An agent hit something only the team's own setup can fix (workflows, prompts, secrets, settings).
             # It becomes an agent:escalate issue; the steward acts on these every hour.
             gh label create agent:escalate -R "$REPO" --color b60205 --description "For the steward: the team's setup needs a fix" --force > /dev/null 2>&1 || true

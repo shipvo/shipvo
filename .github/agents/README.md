@@ -30,7 +30,8 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Team lead (report) | Claude | daily 20:53 UTC | `agent-digest.yml` |
 | Release train | rules, no AI | daily 18:41 UTC, only if main is green | `agent-release.yml` |
 | Health check | rules, no AI: clears stale labels, restarts an idle team, reports the rest on the `agent:health` issue | after every merge-bot pass | `scripts/agents/health.mjs` in `agent-merger.yml` |
-| Steward | Claude, as the owner's operator (a scheduled Claude session, outside Actions) | hourly, and at once on an escalation or a red main CI (`agent-steward-call.yml`) | wakes the team, acts on `agent:health` and `agent:escalate`, fixes the team's own setup, emails the owner only when a decision is theirs |
+| Steward (Actions) | Claude in GitHub Actions (`agent-steward-call.yml`, prompt `steward.md`) | at once on an escalation or a red main CI | reads the escalation or failed run, fixes product code, tests and scripts on `agent/steward/<n>`, opens a PR and comments; proposes setup changes it may not make |
+| Steward | Claude, as the owner's operator (a scheduled Claude session, outside Actions) | hourly (and at once if `STEWARD_FIRE_TOKEN` is set) | wakes the team, acts on `agent:health` and `agent:escalate`, fixes the team's own setup, emails the owner only when a decision is theirs |
 
 ## How work flows
 
@@ -84,7 +85,7 @@ Repository secrets (Settings > Secrets and variables > Actions):
 | `CLAUDE_CODE_OAUTH_TOKEN` | From `claude setup-token` (uses your Claude subscription). Or set `ANTHROPIC_API_KEY` instead to pay per use. |
 | `MISTRAL_API_KEY` | Your Mistral API key(s), comma-separated, for the Mistral engineer. Rotated like the Kilo keys. |
 | `OPENAI_COMPAT_API_KEY` | Your Kilo AI Gateway keys for the Aider engineer, comma-separated (one is fine). Each run starts on a different key and moves on when a key is rate-limited or rejected (up to 5 per run). If none works, or the secret is empty, Aider runs in Kilo's anonymous mode on free models, so a bad key never stops a run. Every key is masked in logs. |
-| `STEWARD_FIRE_TOKEN` | Optional. The API trigger token of the steward scheduled task (claude.ai/code/routines > the steward > Add another trigger > API > Generate token). With it, escalations and a red main CI reach the steward at once instead of within the hour. |
+| `STEWARD_FIRE_TOKEN` | Optional. The API trigger token of the steward scheduled task (claude.ai/code/routines > the steward > Add another trigger > API > Generate token). Without it, the Actions steward still handles escalations at once; with it, the owner's steward is also called at once instead of within the hour. |
 | `AGENT_TOKEN` | Fine-grained personal access token for `shipvo/shipvo` with: Contents, Issues, Pull requests, Actions: read and write; Metadata: read; Repository security advisories: read and write. No Workflows permission, so agents can never change workflows. Your account needs a Copilot plan for the Copilot engineer. |
 
 Settings to turn on:
