@@ -1,12 +1,11 @@
 // `shipvo sim`: build the app's web bundle with the simulated device and serve it in the simulator.
 import { execSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, watch, rmSync, renameSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
 import { args as parse, loadConfig } from "./config.js";
-import { watch } from "node:fs";
 
-const IGNORED = new Set(["node_modules", "sim-dist", ".shipvo", ".git"]);
+const IGNORED = new Set(["node_modules", "sim-dist", ".shipvo", ".git", ".expo"]);
 
 export function isIgnoredPath(p: string): boolean {
   return p.split(/[\\/]/).some((part) => IGNORED.has(part));
@@ -50,16 +49,23 @@ function waitListening(port: number, stop: () => boolean): Promise<boolean> {
   });
 }
 
-export function buildBundle(cfg: any, a: any, force = false): { ok: boolean; ms: number; error?: string } {
+export function buildBundle(cfg: any, a: any, force = false, watchMode = false): { ok: boolean; ms: number; error?: string } {
   const start = Date.now();
   if (!force && a["skip-build"] === "true" && existsSync("sim-dist/index.html")) {
     return { ok: true, ms: 0 };
   }
   console.error(`Building ${cfg.name} for the simulator…`);
+  const tmp = ".shipvo/sim-next";
+  rmSync(tmp, { recursive: true, force: true });
+  mkdirSync(tmp, { recursive: true, force: true } as any);
+  const stdio = watchMode ? "pipe" : "inherit";
   try {
-    execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "pipe", env: { ...process.env, PN_SIM: "1" } });
+    execSync("npx expo export --platform web --output-dir " + tmp + " --clear", { stdio, env: { ...process.env, PN_SIM: "1" } });
+    rmSync("sim-dist", { recursive: true, force: true });
+    renameSync(tmp, "sim-dist");
     return { ok: true, ms: Date.now() - start };
   } catch (e: any) {
+    rmSync(tmp, { recursive: true, force: true });
     const out = [e.stdout?.toString?.(), e.stderr?.toString?.(), e.message].filter(Boolean).join("\n");
     return { ok: false, ms: Date.now() - start, error: out };
   }
@@ -74,7 +80,7 @@ export async function sim(argv: string[]) {
     process.exit(1);
   }
 
-  const initial = buildBundle(cfg, a, false);
+  const initial = buildBundle(cfg, a, false, false);
   if (!initial.ok) {
     console.error(initial.error);
     if (!watchMode || !existsSync("sim-dist/index.html")) process.exit(1);
@@ -92,15 +98,29 @@ export async function sim(argv: string[]) {
 
   if (!watchMode) return;
 
-  const rebuild = debounce(() => {
-    const r = buildBundle(cfg, a, true);
+  let building = false;
+  let dirty = false;
+
+  const runBuild = () => {
+    if (building) { dirty = true; return; }
+    building = true;
+    const r = buildBundle(cfg, a, true, true);
+    building = false;
     if (r.ok) console.log(`rebuilt in ${(r.ms / 1000).toFixed(1)} s`);
-    else console.error(r.error);
-  }, 300);
+    else console.error(`Build failed, still serving the last good build:\n${r.error}`);
+    if (dirty) { dirty = false; runBuild(); }
+  };
+
+  const rebuild = debounce(() => { runBuild(); }, 300);
 
   const watcher = watch(process.cwd(), { recursive: true }, (_event, filename) => {
     if (!filename || isIgnoredPath(String(filename))) return;
     rebuild();
   });
   watcher.on("error", () => {});
+
+  p.on("exit", () => {
+    watcher.close();
+    rebuild.cancel();
+  });
 }
