@@ -23,3 +23,4 @@ public/security/
 *.webm
 *.mkv
 .gradle/
+dist-test-*

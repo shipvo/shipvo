@@ -8,7 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const root = resolve(__dirname, "..");
-let out = ""; let fake: http.Server; let port = 0;
+let listFails = false; let out = ""; let fake: http.Server; let port = 0;
 
 // Stand-in simulator that behaves like the real one: only session "live" exists.
 beforeAll(async () => {
@@ -19,6 +19,7 @@ beforeAll(async () => {
     let raw = ""; for await (const c of req) raw += c;
     res.writeHead(200, { "content-type": "application/json" });
     const body = raw ? JSON.parse(raw) : {};
+    if (req.url === "/sessions" && listFails) return res.end(JSON.stringify({ ok: false, code: "sim_busy", error: "simulator is busy" }));
     if (req.url === "/sessions") return res.end(JSON.stringify({ ok: true, sessions: [{ session: "live", app: "menu", release: "local", started_at: null }] }));
     if (req.url === "/act" && body.session !== "live") return res.end(JSON.stringify({ ok: false, code: "no_session", error: `no session '${body.session}': call /session first`, screen: null }));
     res.end(JSON.stringify({ ok: true, screen: "heading Menu" }));
@@ -68,5 +69,15 @@ describe("end_session", () => {
     expect(r.isError).toBe(true);
     expect(r.structuredContent).toMatchObject({ ok: false, code: "no_session" });
     await c.close();
+  });
+  it("returns the simulator's own error, not no_session, when /sessions fails", async () => {
+    listFails = true;
+    try {
+      const c = await connect();
+      const r: any = await c.callTool({ name: "end_session", arguments: { session: "live" } });
+      expect(r.isError).toBe(true);
+      expect(r.structuredContent).toMatchObject({ ok: false, code: "sim_busy" });
+      await c.close();
+    } finally { listFails = false; }
   });
 });

@@ -173,8 +173,8 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
   need(session);
   // The simulator is the source of truth: end a session it lists even if this server did not open it; otherwise no_session.
   const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string }[] };
-  if (listed.code === "sim_timeout") return result(session, listed);
-  if (!(listed.sessions ?? []).some((x) => x.session === session)) { sessions.delete(session); trees.delete(session); return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` }); }
+  if (!listed.ok) return result(session, listed);
+  if (!(listed.sessions ?? []).some((x) => x.session === session)) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
   const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
