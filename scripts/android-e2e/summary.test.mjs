@@ -7,3 +7,9 @@ test("rows show pass or FAIL, medians and sizes", () => {
   assert.equal(r[0], "| a | pass | pointer to healthy 900 ms | 2.0 KB |");
   assert.equal(r[1], "| b | FAIL | - | - |");
 });
+
+test("a refusal row shows the reason read from telemetry", () => {
+  const r = rows({ scenarios: [{ name: "m", pass: true, refusalReason: "hermes_bytecode_mismatch" }, { name: "n", pass: false, refusalReason: null }] });
+  assert.equal(r[0], "| m | pass | refused, reason from telemetry: hermes_bytecode_mismatch | - |");
+  assert.equal(r[1], "| n | FAIL | not refused, reason from telemetry: none | - |");
+});
