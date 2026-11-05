@@ -63,3 +63,12 @@ describe("decide.ts stays framework-free", () => {
     expect(code).not.toMatch(/\bimport\b|require\(|react-native|expo-/);
   });
 });
+
+describe("@shipvo/runtime/decide subpath", () => {
+  it("is exported and resolves to a module that works without the main entry", async () => {
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    expect(pkg.exports["./decide"]).toEqual({ types: "./src/decide.ts", default: "./src/decide.ts" });
+    const mod = await import(/* @vite-ignore */ new URL("../" + pkg.exports["./decide"].default, import.meta.url).href);
+    expect(mod.decideRelease(ptr, shell)).toEqual({ take: true });
+  });
+});

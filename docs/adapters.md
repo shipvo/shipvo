@@ -19,7 +19,7 @@ Shipvo's update core is meant to be reused. This page says what a second framewo
 | Pointer, envelope, band, telemetry shapes | [`packages/schema/src/index.ts`](../packages/schema/src/index.ts) | Zod schemas. `ReleasePointer` carries `platform`, `shell_major`, `min_shell_version`, `hermes_bytecode_version`, `required_native_modules`. |
 | Band for a cohort (`bandForCohort`) | same file | Cohort 0-999: `b0` below 10, `b1` below 100, else `b2`. |
 | Semver ranges and native-module match (`satisfiesRange`, `checkNativeModules`) | same file | Used by the control plane to answer 404 `native_module_missing` / `native_module_version`. |
-| **Release decision** (`decideRelease`, `semverLess`) | [`packages/runtime/src/decide.ts`](../packages/runtime/src/decide.ts) | New in slice 1. No React Native import. Tests: [`test/decide.test.ts`](../packages/runtime/test/decide.test.ts). Also exported from `@shipvo/runtime`. |
+| **Release decision** (`decideRelease`, `semverLess`) | [`packages/runtime/src/decide.ts`](../packages/runtime/src/decide.ts) | New in slice 1. No React Native import. Tests: [`test/decide.test.ts`](../packages/runtime/test/decide.test.ts). Import it from `@shipvo/runtime/decide`. The main entry `@shipvo/runtime` also re-exports it, but that entry imports Expo. |
 
 `decideRelease(pointer, shell)` runs these checks in order and returns `{ take: true }` or `{ take: false, reason }`:
 
@@ -47,11 +47,20 @@ The shipped shells do **not** call `decideRelease`. A native module cannot call 
 | Patch (bsdiff) and resumable download | `Patch.kt`, `ResumableDownload.kt` | `Patch.swift` |
 | Stage, trial boots, crash-loop rollback | [`BootRules.kt`](../packages/runtime/android/src/main/java/dev/shipvo/runtime/BootRules.kt), [`ShipvoHostHandler.kt`](../packages/runtime/android/src/main/java/dev/shipvo/runtime/ShipvoHostHandler.kt) (3 boots in 60 s) | `Store.swift`, `BundleSelector.swift` |
 
-Known differences a port must decide on: Android does not check `platform`; Android requires `min_shell_version` to be present while iOS defaults it to `0.0.0`.
+Known differences a port must decide on: Android does not check `platform`; Android reads `min_shell_version` with `body.getString`, which throws when the field is absent, so a pointer without it errors on Android instead of being cleanly rejected, while iOS defaults it to `0.0.0`.
 
 ## What a Capacitor adapter needs
 
-- **Reuse as is:** the schema package, the control plane, `decideRelease` (if the plugin core is TypeScript), the signing format and the pointer URL scheme.
+- **Reuse as is:** the schema package, the control plane, `decideRelease` (if the plugin core is TypeScript; see the example below), the signing format and the pointer URL scheme.
+  ```ts
+  // Import the subpath. The main entry would pull in Expo.
+  import { decideRelease, type PointerFields, type ShellFacts } from "@shipvo/runtime/decide";
+
+  const pointer: PointerFields = { app_id: "tide", shell_major: 1, release: 4, min_shell_version: "1.0.0" };
+  const shell: ShellFacts = { platform: "android", appId: "tide", shellMajor: 1, shellVersion: "1.0.2", knownRelease: 3 };
+
+  decideRelease(pointer, shell); // { take: true }
+  ```
 - **Port per platform:** everything in the table above, in the plugin's native code (or in TypeScript where Capacitor allows it: a Capacitor plugin can do download and hash checks in JS, but signature checks should stay native with the pinned key).
 - **Replace:** the React Native parts: bundle loading (`ShipvoHostHandler.kt`, `BundleSelector.swift`, `ShipvoReactDelegateHandler.swift`), the Expo config plugin (`app.plugin.js`), and the Hermes guard (a Capacitor app ships web assets, so `hermes_bytecode_version` would be absent and the guard is skipped).
 - **Open question for later slices:** a Capacitor release is a folder of web assets, not one bundle file. The pointer's `core` is a single file today. That needs a design before code.

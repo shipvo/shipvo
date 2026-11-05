@@ -12,6 +12,10 @@
       "browser": "./src/index.web.ts",
       "default": "./src/index.ts"
     },
+    "./decide": {
+      "types": "./src/decide.ts",
+      "default": "./src/decide.ts"
+    },
     "./app.plugin.js": "./app.plugin.js",
     "./package.json": "./package.json"
   },
