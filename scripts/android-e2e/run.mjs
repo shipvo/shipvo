@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { startServer } from "./server.mjs";
 import { publishRelease } from "./release.mjs";
-import { median, parseLog, sha256, telemetry } from "./lib.mjs";
+import { median, parseLog, restoreGood, sha256, telemetry } from "./lib.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const APK = resolve(arg("apk", "shell.apk")), BUNDLES = resolve(arg("bundles", "bundles")), KEY = JSON.parse(readFileSync(arg("key", "key.json"), "utf8"));
@@ -165,13 +165,16 @@ for (const [kind, file, title, maxBadRuns] of [
 
 // The crash scenarios can leave the app dead or on a bad release (a late JS error destroys the React host but keeps the
 // process alive, see the device-lab report). Put the device back on a known good release so staged rollout is tested on its own.
-{
-  const p = await publish(bundle("v1"), { bases: [] });
-  stop(); await sleep(800); launch();
-  const ev = await waitFor(() => healthy(p.release, p.at), 120_000);
-  if (ev) history.push({ rel: p.release, bytes: bundle("v1") }); else await scenario("restore a good release before the staged rollout scenario", async () => ({ pass: false, release: p.release, error: "the device did not report the restored release healthy within 120 s" }));
-}
+const restore = await restoreGood({
+  publish: () => publish(bundle("v1"), { bases: [] }),
+  relaunch: async () => { stop(); await sleep(800); launch(); },
+  waitHealthy: (p, ms) => waitFor(() => healthy(p.release, p.at), ms),
+});
+if (restore.ok) history.push({ rel: restore.release, bytes: bundle("v1") });
+else await scenario("restore a good release before the staged rollout scenario", async () => ({ pass: false, release: restore.release, error: restore.error }));
 
+// Staged rollout needs a known good release on the device. If the restore failed, running it would fail for the wrong reason, so skip it.
+if (restore.ok) {
 await scenario("staged rollout: a device outside the cohort does not get the release", async () => {
   const others = ["b0", "b1", "b2"].filter((b) => b !== BAND), cur = good().rel;
   const p = await publish(bundle("v1"), { bands: others });
@@ -186,6 +189,7 @@ await scenario("staged rollout: a device outside the cohort does not get the rel
   const ev = await waitFor(() => healthy(p.release, q.at), 120_000);
   return { pass: outsideOk && !!ev, deviceBand: BAND, cohort: prefs().cohort, publishedToBands: others, devicePollsWhileOutside: ownPolls.length, devicePollStatuses: [...new Set(ownPolls.map((x) => x.status))], downloadsOfNewRelease: fetched, currentWhileOutside: after.current_release, joinedAfterWideningMs: ev ? ev.at - q.at : null };
 });
+}
 
 writeFileSync(join(WORK, "logcat-crash.txt"), adb("logcat", "-d", "-b", "crash"));
 const report = { env, scenarios: results, allPassed: results.every((r) => r.pass), serverLog: LOG };

@@ -35,3 +35,12 @@ export const telemetry = (entries) => entries.filter((e) => e.method === "POST" 
 
 /** Percent change from base to now; positive means slower or larger. */
 export const pctChange = (base, now) => (base ? Math.round(((now - base) / base) * 1000) / 10 : null);
+
+// Put the device back on a known good release. `publish`, `relaunch` and `waitHealthy(p)` are supplied by the runner.
+// Returns { ok: true, release } when the device reports the release healthy, else { ok: false, release, error }.
+export async function restoreGood({ publish, relaunch, waitHealthy, timeoutMs = 120_000 }) {
+  const p = await publish();
+  await relaunch();
+  const ev = await waitHealthy(p, timeoutMs);
+  return ev ? { ok: true, release: p.release } : { ok: false, release: p.release, error: `the device did not report the restored release healthy within ${Math.round(timeoutMs / 1000)} s` };
+}

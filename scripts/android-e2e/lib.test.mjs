@@ -24,3 +24,19 @@ test("log parsing", () => {
   assert.equal(e.length, 1); assert.deepEqual(telemetry(e), [{ at: 1, event: "applied", release: 2 }]);
 });
 test("pctChange", () => { assert.equal(pctChange(100, 125), 25); assert.equal(pctChange(0, 5), null); });
+
+import { restoreGood } from "./lib.mjs";
+
+test("restoreGood reports ok when the release turns healthy", async () => {
+  const calls = [];
+  const r = await restoreGood({ publish: async () => (calls.push("publish"), { release: 7 }), relaunch: async () => calls.push("relaunch"), waitHealthy: async (p) => (calls.push("wait"), { at: 1, release: p.release }) });
+  assert.deepEqual(r, { ok: true, release: 7 });
+  assert.deepEqual(calls, ["publish", "relaunch", "wait"]);
+});
+
+test("restoreGood reports a failure when the release never turns healthy", async () => {
+  const r = await restoreGood({ publish: async () => ({ release: 7 }), relaunch: async () => {}, waitHealthy: async () => null, timeoutMs: 5000 });
+  assert.equal(r.ok, false);
+  assert.equal(r.release, 7);
+  assert.match(r.error, /within 5 s/);
+});

@@ -9,7 +9,7 @@ Pieces:
 - `server.mjs`: static release server that logs every request, including telemetry, as JSON lines.
 - `release.mjs`: signs and publishes one release (bundle, bsdiff patches, pointer per band), with `--tamper signature|hash|size`.
 - `run.mjs`: starts the server in-process, runs the scenarios, and writes the report.
-  Before the staged-rollout scenario it publishes a known good release and waits for it to be healthy. If that fails, it records a failed scenario instead of running staged rollout on a bad device.
+  Before the staged-rollout scenario it publishes a known good release and waits for it to be healthy. If that fails, it records a failed scenario and skips the staged-rollout scenario, so staged rollout is never run on a bad device. The restore logic is `restoreGood` in `lib.mjs`, with unit tests.
 
 Run (needs `pnpm --filter @shipvo/cli build`, `pip install bsdiff4`, and `adb` with one emulator):
 
@@ -20,7 +20,7 @@ scripts/android-e2e/make-bundles.sh bundles 8
 node scripts/android-e2e/run.mjs --apk shell.apk --bundles bundles --key key.json
 ```
 
-Tests for the helpers: `node --test scripts/android-e2e/*.test.mjs`. Build `@shipvo/schema` and `@shipvo/cli` first, because the tests import `packages/cli/dist`. `pnpm -r test` does not run these tests, and no workflow does yet (`.github/` is locked, so a human has to wire them in). The bsdiff patch test is skipped when `bsdiff4` is missing, unless the `CI` env var is set; then it fails.
+Tests for the helpers: `node --test scripts/android-e2e/*.test.mjs`. Build `@shipvo/schema` and `@shipvo/cli` first, because the tests import `packages/cli/dist`, and run `pip install bsdiff4` (the patch test needs it). `pnpm -r test` does not run these tests, and no workflow does yet (`.github/` is locked, so a human has to wire them in). The bsdiff patch test is skipped when `bsdiff4` is missing, unless the `CI` env var is set; then it fails.
 
 Build note: `build-apk.sh` passes `-x lintVitalRelease`. Lint rejects the hardcoded `debuggable` flag that the harness needs for `run-as`.
 
