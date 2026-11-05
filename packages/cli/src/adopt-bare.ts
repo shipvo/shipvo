@@ -176,7 +176,8 @@ export function checkExpoModules(dir: string): ExpoModulesCheck {
     missing.push("the Expo setup in MainApplication");
   }
   const delegates = walk(join(dir, "ios"), /^AppDelegate\.(swift|mm?|h)$/);
-  if (!delegates.some((f) => /ExpoAppDelegate|ExpoReactNativeFactory|import Expo|<Expo\//.test(readFileSync(f, "utf8")))) missing.push("the Expo setup in AppDelegate");
+  const stripLineComments = (t: string) => t.replace(/^\s*\/\/.*$/gm, "");
+  if (!delegates.some((f) => /ExpoAppDelegate|ExpoReactNativeFactory|import Expo|<Expo\//.test(stripLineComments(readFileSync(f, "utf8"))))) missing.push("the Expo setup in AppDelegate");
   return missing.length === 0 ? { installed: true, missing } : { installed: false, missing, planStep: INSTALL_EXPO_MODULES };
 }
 

@@ -173,3 +173,54 @@ it("does not treat the word Expo in a comment as Expo setup", () => {
   writeFileSync(join(tmp, "ios/Hello/AppDelegate.swift"), "// TODO: add Expo later\nclass AppDelegate: RCTAppDelegate {}");
   expect(checkExpoModules(tmp).missing).toContain("the Expo setup in AppDelegate");
 });
+
+it("does not treat a commented-out `import Expo` as Expo setup", () => {
+  makeApp({ expo: false });
+  writeFileSync(join(tmp, "ios/Hello/AppDelegate.swift"), "// import Expo\nclass AppDelegate: RCTAppDelegate {}");
+  expect(checkExpoModules(tmp).missing).toContain("the Expo setup in AppDelegate");
+});
+
+it("keeps bool, array, nested dict and real values through an Info.plist write", () => {
+  const p = join(tmp, "Info.plist");
+  writeFileSync(p, `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>B</key><true/>
+<key>A</key><array><string>x</string><integer>2</integer></array>
+<key>D</key><dict><key>k</key><string>v</string></dict>
+<key>R</key><real>1.5</real>
+</dict></plist>`);
+  writeIosConfig(p, TABLE[0].props);
+  const out = plist.parse(readFileSync(p, "utf8")) as Record<string, unknown>;
+  expect(out.B).toBe(true);
+  expect(out.A).toEqual(["x", 2]);
+  expect(out.D).toEqual({ k: "v" });
+  expect(out.R).toBe(1.5);
+});
+
+it("updates a multi-line <meta-data> and adds android:value to one without it", () => {
+  const m = join(tmp, "AndroidManifest.xml");
+  const name = "dev.shipvo.BASE_URL";
+  writeFileSync(m, `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <meta-data
+      android:name="${name}"
+      android:value="old" />
+  </application>
+</manifest>
+`);
+  writeAndroidConfig(m, TABLE[0].props);
+  const xml = readFileSync(m, "utf8");
+  expect(xml).not.toContain('"old"');
+  expect(xml.match(new RegExp(`android:name="${name}"`, "g"))).toHaveLength(1);
+
+  writeFileSync(m, `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <meta-data android:name="${name}"/>
+  </application>
+</manifest>
+`);
+  writeAndroidConfig(m, TABLE[0].props);
+  const xml2 = readFileSync(m, "utf8");
+  expect(xml2).toMatch(new RegExp(`android:name="${name}" android:value="[^"]+"/>`));
+  expect(xml2.match(new RegExp(`android:name="${name}"`, "g"))).toHaveLength(1);
+});
