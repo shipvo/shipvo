@@ -108,6 +108,26 @@ describe("native modules", () => {
     expect(satisfiesRange("2.0.0", "<=1")).toBe(false);
     expect(satisfiesRange("1.2.4", "<=1.2.3")).toBe(false);
   });
+  it("satisfiesRange covers partial, caret and zero-major edges", () => {
+    const cases: [string, string, boolean][] = [
+      ["1.2.3", "=1.2.3", true], ["1.2.3", "v1.2.3", true], ["1.2.4", "1.2.3", false],
+      ["1.9.9", "1", true], ["2.0.0", "1", false], ["1.2.9", "1.2", true], ["1.3.0", "1.2", false],
+      ["0.0.3", "^0.0.3", true], ["0.0.4", "^0.0.3", false], ["0.5.0", "^0", true], ["1.0.0", "^0", false],
+      ["0.0.9", "^0.0", true], ["0.1.0", "^0.0", false], ["1.4.0", "^1.2.x", true], ["2.0.0", "^1.2.x", false],
+      ["1.9.0", "~1", true], ["2.0.0", "~1", false], ["1.0.0", ">1", false], ["2.0.0", ">1", true],
+      ["1.2.9", ">1.2", false], ["1.5.0", ">1.2", true], ["1.9.9", "<2", true], ["2.0.0", "<2", false],
+      ["1.3.0", "<1.3", false], ["2.0.0", "1.x || 2.x", true], ["3.0.0", "1.x || 2.x", false],
+      ["1.1.0", "^1.0.0 ^1.2.0", false], ["1.2.3", "^1.0.0 banana", false], ["10.0.0", "^1.0.0", false],
+      ["1.10.0", "1.1.x", false], ["1.2", "^1.0.0", false], ["1.2.3", ">=1.2.3-rc.1", true],
+    ];
+    for (const [v, r, want] of cases) expect([v, r, satisfiesRange(v, r)]).toEqual([v, r, want]);
+  });
+  it("satisfiesRange rejects ranges with trailing junk", () => {
+    expect(satisfiesRange("1.2.3", "1.2.3foo")).toBe(false);
+    expect(satisfiesRange("1.2.3", "1.2.3.4")).toBe(false);
+    expect(satisfiesRange("1.2.3", "^1.0.0abc")).toBe(false);
+    expect(satisfiesRange("1.2.3", "1.2.3-beta.1")).toBe(true);
+  });
   it("checkNativeModules gives typed reasons", () => {
     expect(checkNativeModules({ x: "^1.0.0" }, { y: "1.0.0" })).toEqual({ reason: "native_module_missing", module: "x", required: "^1.0.0" });
     expect(checkNativeModules({ x: "^2.0.0" }, { x: "1.0.0" })?.reason).toBe("native_module_version");
