@@ -12,6 +12,8 @@ Start the simulator first (`shipvo sim` in the app). The server asks the simulat
 
 Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none | content changed | new screen | scrolled`, then the screen. `type` also adds `Value of <ref>: "..."`. Pass `compact: true` to get only the added (`+`) and removed (`-`) lines when the change is `content changed`; refs match the full screen. If the server has no earlier screen for the session (for example after a reconnect), the first line is `Change: unknown`. The `content changed` / `new screen` split is a heuristic (under half the lines kept means a new screen), so on a short screen one change can read as `new screen`.
 
+**Time limit.** Every call to the simulator stops after 30 s; set `SHIPVO_SIM_TIMEOUT_MS` to change it. A call that gets no answer returns an error result (`isError: true`, code `sim_timeout`, also in `structuredContent`). The action may still have run and the session may still be alive, so call `screen` to see where it is. Timed-out actions are not retried.
+
 Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `end_session`, `owner_describe`, `owner_command`.
 
 Native features work with no phone: the simulated device (see `@shipvo/device`) shows permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners and the share sheet as real dialogs in the tree; `set_device` decides what the phone has (location, a barcode in view, whether the fingerprint matches, whether a payment is approved, network off).
