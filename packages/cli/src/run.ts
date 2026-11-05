@@ -1,12 +1,15 @@
 // `shipvo run android|ios`: build the web export with the simulated device, serve it on a local port and
 // open a phone frame page in the default browser. No browser automation. `--native` runs `npx expo run:<platform>`.
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { join, extname, normalize, resolve, sep } from "node:path";
 import { loadConfig } from "./config.js";
+import { AGENT_PATH, isAgentRole, isLoopback, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
+import { acceptWebSocket, type Peer } from "./run-ws.js";
 import { portFree, rebuildInto } from "./sim.js";
 
 export type Platform = "android" | "ios";
@@ -90,11 +93,21 @@ const TYPES: Record<string, string> = {
   ".ttf": "font/ttf", ".otf": "font/otf", ".woff": "font/woff", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8", ".wasm": "application/wasm",
 };
 
+/** Adds `.shipvo/` to `<dir>/.gitignore` when it is not already ignored. */
+export function ensureShipvoIgnored(dir: string): void {
+  const path = join(dir, ".gitignore");
+  const text = existsSync(path) ? readFileSync(path, "utf8") : "";
+  if (/^\/?\.shipvo\/?\s*$/m.test(text)) return;
+  appendFileSync(path, (text && !text.endsWith("\n") ? "\n" : "") + ".shipvo/\n");
+}
+
 /**
  * Serves the frame page at `/` and the web export at `/app/` (and its absolute asset paths at `/`).
  * Port 0 picks a free port. Resolves once listening.
+ * The agent channel is a WebSocket at `/__shipvo/agent?role=screen|driver&token=...`, loopback only. It relays JSON
+ * messages between the `screen` and the `driver`. With `projectDir`, `.shipvo/run.json` describes the session while it runs.
  */
-export async function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; render?: RenderFrame }): Promise<{ server: Server; port: number; close: () => Promise<void> }> {
+export async function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string; render?: RenderFrame }): Promise<{ server: Server; port: number; token: string; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const render = opts.render ?? await loadFrameRenderer();
   const pages = { light: runFramePage(opts.platform, opts.name, render), dark: runFramePage(opts.platform, opts.name, render, true) };
@@ -121,11 +134,38 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     res.writeHead(200, { "content-type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream" });
     res.end(readFileSync(target));
   });
+  const token = randomBytes(24).toString("hex");
+  const peers: Partial<Record<AgentRole, Peer>> = {};
+  server.on("upgrade", (req, socket) => {
+    const refuse = (line: string) => socket.end(`HTTP/1.1 ${line}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    const url = new URL(req.url ?? "/", "http://localhost");
+    if (url.pathname !== AGENT_PATH) return refuse("404 Not Found");
+    if (!isLoopback(req.socket.remoteAddress)) return refuse("403 Forbidden");
+    if (!tokenMatches(url.searchParams.get("token"), token)) return refuse("401 Unauthorized");
+    const role = url.searchParams.get("role");
+    if (!isAgentRole(role)) return refuse("400 Bad Request");
+    const other: AgentRole = role === "screen" ? "driver" : "screen";
+    const peer = acceptWebSocket(req, socket, (text) => {
+      try { JSON.parse(text); } catch { return; }
+      peers[other]?.send(text);
+    }, () => { if (peers[role] === peer) delete peers[role]; });
+    if (!peer) return;
+    const old = peers[role]; // a reloaded tab or a restarted agent replaces the old connection
+    peers[role] = peer;
+    old?.close();
+  });
+  const infoPath = opts.projectDir ? join(resolve(opts.projectDir), ".shipvo", "run.json") : undefined;
+  const cleanup = () => { if (infoPath) rmSync(infoPath, { force: true }); };
   return new Promise((ok, fail) => {
     server.once("error", fail);
     server.listen(opts.port ?? 0, "127.0.0.1", () => {
       const port = (server.address() as { port: number }).port;
-      ok({ server, port, close: () => new Promise<void>((r) => { server.close(() => r()); server.closeAllConnections?.(); }) });
+      if (infoPath) {
+        const info: RunInfo = { port, platform: opts.platform, app: opts.name, token, pid: process.pid };
+        mkdirSync(join(infoPath, ".."), { recursive: true });
+        writeFileSync(infoPath, JSON.stringify(info, null, 2) + "\n", { mode: 0o600 });
+      }
+      ok({ server, port, token, close: () => new Promise<void>((r) => { cleanup(); for (const p of Object.values(peers)) p?.close(); server.close(() => r()); server.closeAllConnections?.(); }) });
     });
   });
 }
@@ -169,7 +209,8 @@ export async function run(argv: string[]): Promise<number> {
   const out = join(process.cwd(), "sim-dist");
   console.error(`Building ${name} for web with the simulated device…`);
   try { await buildWeb(process.cwd()); } catch (e) { console.error((e as Error).message); return 1; }
-  const s = await startRunServer({ dir: out, platform: o.platform, name, port: o.port });
+  try { ensureShipvoIgnored(process.cwd()); } catch { /* read-only project: the session still works */ }
+  const s = await startRunServer({ dir: out, platform: o.platform, name, port: o.port, projectDir: process.cwd() });
   const url = `http://127.0.0.1:${s.port}/`;
   console.error(`Simulated ${FRAMES[o.platform].label} phone at ${url}  (Ctrl+C to stop)`);
   if (o.open) openBrowser(url);
