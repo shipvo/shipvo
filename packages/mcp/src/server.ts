@@ -112,7 +112,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   dark: z.boolean().optional().describe("Dark mode"),
 }, WR, async ({ app, session, seed_cart, dark }) => {
   const id = app.split("@")[0];
-  if (!(await allowed(id))) throw new Error(keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}`);
+  if (!(await allowed(id))) return result("", { ok: false, code: "unknown_app", error: keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
