@@ -77,3 +77,35 @@ Options: `--skip-build` publishes the last build in `.shipvo/preview-build`.
 Agents can call the MCP tool `publish_preview`; it runs `shipvo preview --json` in `PN_APP_DIR` (or the current folder) and returns `{ url, claimUrl, expiresAt }`.
 
 `shipvo init` adds `.github/workflows/preview.yml`, which publishes each pull request's web build and comments the link on the pull request. Pull requests from forks are skipped.
+
+## `policy` in `shipvo.json`
+
+An optional `policy` section writes release rules down. `shipvo publish --dry-run` checks them. If a rule refuses, it prints the rule and the reason and exits with code 1. The real upload is not checked yet; that comes in a later slice.
+
+```json
+{
+  "appId": "habits",
+  "policy": {
+    "maxBand": "b1",
+    "agentMaxBand": "b0",
+    "blockedWeekdays": ["fri"],
+    "blockedAfterHour": 12
+  }
+}
+```
+
+Then run:
+
+```bash
+shipvo publish --dry-run --bands b0,b1,b2
+# Refused by policy rule maxBand: this publish reaches b2, but policy.maxBand is b1
+```
+
+| Field | Meaning |
+| --- | --- |
+| `maxBand` | Widest band any publish may reach: `b0`, `b1` or `b2`. The widest band in `--bands` counts. |
+| `agentMaxBand` | Same, for a publish run by an agent. Set `SHIPVO_ACTOR=agent` in the agent's environment. Without it the publish counts as human. |
+| `blockedWeekdays` | Days with no publish: `mon` to `sun`, in local time. |
+| `blockedAfterHour` | Hour 0-23, local time. Publishes on `blockedWeekdays` are refused from this hour on (12 means from 12:00). Without it, the whole day is blocked. Needs `blockedWeekdays`. |
+
+Without a `policy` section nothing is checked. A bad section (unknown field, wrong value) stops the dry run and names the field, for example `policy.maxBand`.

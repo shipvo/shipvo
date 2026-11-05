@@ -253,3 +253,26 @@ export function checkNativeModules(required: Record<string, string> | undefined,
   }
   return null;
 }
+
+export const PolicyWeekday = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+/** The optional `policy` section of shipvo.json. Every rule is optional; an empty section means no rules. */
+export const ShipvoPolicy = z.object({
+  /** Widest cohort band any publish may reach. */
+  maxBand: Band.optional(),
+  /** Widest cohort band a publish run by an agent may reach. */
+  agentMaxBand: Band.optional(),
+  /** No publish on these local weekdays (from `blockedAfterHour` on, or all day if that is not set). */
+  blockedWeekdays: z.array(PolicyWeekday).min(1).optional(),
+  /** Local hour 0-23. From this hour on, publishes on `blockedWeekdays` are refused. */
+  blockedAfterHour: z.number().int().min(0).max(23).optional(),
+}).strict().superRefine((p, ctx) => {
+  if (p.blockedAfterHour !== undefined && !p.blockedWeekdays) ctx.addIssue({ code: "custom", path: ["blockedAfterHour"], message: "blockedAfterHour needs blockedWeekdays" });
+});
+export type ShipvoPolicy = z.infer<typeof ShipvoPolicy>;
+
+/** Validates the `policy` value from shipvo.json. Throws an Error whose message names each bad field (`policy.maxBand: ...`). */
+export function parsePolicy(value: unknown): ShipvoPolicy {
+  const r = ShipvoPolicy.safeParse(value);
+  if (r.success) return r.data;
+  throw new Error(r.error.issues.map((i) => `policy${i.path.length ? "." + i.path.join(".") : ""}: ${i.message}`).join("; "));
+}
