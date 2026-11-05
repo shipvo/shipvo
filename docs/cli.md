@@ -77,3 +77,19 @@ Options: `--skip-build` publishes the last build in `.shipvo/preview-build`.
 Agents can call the MCP tool `publish_preview`; it runs `shipvo preview --json` in `PN_APP_DIR` (or the current folder) and returns `{ url, claimUrl, expiresAt }`.
 
 `shipvo init` adds `.github/workflows/preview.yml`, which publishes each pull request's web build and comments the link on the pull request. Pull requests from forks are skipped.
+
+## `shipvo auto-halt`
+
+Stops serving a release on its own when too many devices fail to apply it.
+
+```bash
+shipvo auto-halt                                   # print the current setting
+shipvo auto-halt --threshold 0.2 --min-reports 20  # on: halt when more than 20% of at least 20 reports failed
+shipvo auto-halt --off                             # off
+shipvo auto-halt --threshold 0.2 --dry-run         # print the change, write nothing
+```
+
+- `--threshold` is above 0 and at most 1. `--min-reports` is a whole number from 1 to 10000 (default 20).
+- It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create` (`SHIPVO_PUBLISH_TOKEN` or `.shipvo/publish-token`).
+- `shipvo status` shows the setting: `auto-halt: off` or `auto-halt: on at 20% after 20 reports`.
+- The route behind it is `GET`, `PUT` and `DELETE` on `/app/<app>/api/halt-config`. A bad value is a 400 with `error: "bad_halt_config"`.
