@@ -37,3 +37,5 @@ Neither replaces fixing the bug. Both shorten the time during which it counts ag
 
 - Android Developers, [Android vitals](https://developer.android.com/google/play/vitals): bad behavior thresholds and the 28-day assessment window.
 - Shipvo, [spike results](https://shipvo.dev/docs/spike-results/): the crash-loop revert test.
+
+Related: [How to roll back a bad React Native over-the-air update](https://shipvo.dev/blog/roll-back-a-bad-react-native-update/).
