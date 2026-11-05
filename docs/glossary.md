@@ -2,6 +2,8 @@
 
 Plain-English meanings for the words Shipvo docs and tutorials use. Each tutorial explains a word the first time it appears and links here.
 
+**Accessibility tree.** The list of buttons, headings and text on a screen that a screen reader reads aloud. An assistant uses the same list to see your app, so a button it cannot find is also hard for a person using a screen reader.
+
 **App id.** A short name for your app with no spaces, such as `tideshop`. Shipvo uses it to find your app.
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
@@ -41,4 +43,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Rollback.** Sending people back to the last good release.
 
 **Parquet.** A file format for tables of data. Tools such as DuckDB read it, so you can ask questions about your releases with SQL.
+
+**Test.** A small file that repeats the steps a customer takes and fails if the result changes. It runs on your computer in seconds.
 

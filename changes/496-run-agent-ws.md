@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo run` now hosts a loopback-only agent WebSocket at `/__shipvo/agent` (session token required) and writes `.shipvo/run.json` (`port`, `platform`, `app`, `token`, `pid`) while it runs. It adds `.shipvo/` to `.gitignore` if missing. Nothing visible changes yet.
+- Migration: none. `startRunServer` takes an optional `projectDir` and also returns `token`.

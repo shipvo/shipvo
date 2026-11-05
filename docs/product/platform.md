@@ -57,3 +57,34 @@ This section is set by the owner. The Head of Product plans from it and does not
 **Frameworks.** The core (signing, pointers, cohorts, rollback, health, agents, store setup) does not depend on a framework. Each framework gets an adapter with three parts: a runtime (verify, stage, apply, roll back), a build path (EAS Build for React Native and Expo; the team's own CI for others, with a Shipvo template), and submission through EAS Submit. Order: React Native and Expo (done), then Capacitor and Cordova (their updates are web bundles, and their apps already run in our simulator almost as on a phone), then others when users ask. Apps are never converted from one framework to another: Shipvo meets teams where they are.
 
 **Risks to watch:** Apple and Google rules on updates (stay on interpreted code and declared capabilities, and document compliance publicly); trust in AI-written code (the merge contract and test evidence are the answer, never hidden); and adoption (only real users prove anything).
+
+### Positioning: what Shipvo is (owner, 5 Nov 2026)
+
+Use this wording, or close to it, on the site, in docs, blog posts, tutorials and videos, so Shipvo is described the same way everywhere.
+
+**One line:** Shipvo is the mobile platform for the AI era: your agent builds the app, tests it on a phone in your browser, records the demo, and ships it to the stores and to every phone.
+
+**The loop, in one place, for people and their AI agents together:**
+1. Your agent writes code; `shipvo run` shows the app on Shipvo Phone in your browser in seconds. No emulator, no Xcode, no install.
+2. The agent tests it on that same phone while you watch: taps, gestures, notifications, offline, permissions, payments, other apps.
+3. It records a demo video of the app in the phone frame.
+4. Shipvo takes you to the stores: screenshots, store forms, testers and submission (EAS or your own CI builds the native binary).
+5. Every later change goes out as a signed over-the-air update with staged rollout and rollback.
+6. Everything is measured and published: parity of Shipvo Phone against the Android emulator and iOS Simulator, update speed on a 2 GB phone.
+
+**Against each kind of tool** (state differences as facts, never attack):
+- Expo: Shipvo adds agent-operable apps, the instant browser phone, testing and demos; it works with Expo (EAS builds and submits).
+- Agent phone tools (mobile-mcp, agent-phone, Phone Harness): they drive a device; Shipvo gives a whole phone (apps, store, hardware, lifecycle) plus updates and the store path.
+- QA agent startups: Shipvo is open source and the testing runs inside your own build loop.
+- Over-the-air update tools (CodePush successors, Capgo): Shipvo adds simulation, testing, demos and the store path.
+- Device clouds: Shipvo is instant, free and in your browser, made for agents.
+
+**Proof:** every claim about Shipvo Phone is backed by published parity results against the Android emulator and iOS Simulator (`docs/parity-results.md`). Talk about parity, with the measured numbers and links, rather than general claims.
+
+### Win the lane, and keep the gap growing (5 Nov 2026)
+
+Shipvo aims to be the clear best in its lane, so far ahead that a copy cannot catch up, because we ship, refine and measure every day. In practice:
+- **Shipvo Phone** (epic #466): a native-feeling simulated phone in two skins, Android style and iPhone style (our own artwork and names, never Apple or Google assets or "Shipvo iOS/Android"), with real gestures, shade and Control Center, Settings, restart, an app store inside the phone, multi-app flows, real browser camera/mic/location with simulated fallback, live OTA updates on the phone, and agent control of everything over MCP.
+- **`shipvo run android|ios`** (epic #442): the app on that phone in the person's own browser in seconds, no Playwright needed; the coding agent in the repo drives the same live phone while the person watches (#448).
+- **Content follows code:** every feature gets docs, an interactive tutorial, a video and a blog post (`docs/content-coverage.md`), in the top-level Learn section.
+- **Proof, not claims:** every feature has a parity check against the Android emulator and iOS Simulator, published.

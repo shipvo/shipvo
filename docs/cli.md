@@ -128,7 +128,8 @@ shipvo publish --dry-run-policy --bands b0,b1,b2
 | --- | --- |
 | `maxBand` | Widest band any publish may reach: `b0`, `b1` or `b2`. The widest band in `--bands` counts. |
 | `agentMaxBand` | Same, for a publish run by an agent. Set `SHIPVO_ACTOR=agent` in the agent's environment. Without it the publish counts as human. |
-| `blockedWeekdays` | Days with no publish: `mon` to `sun`, in local time. |
+| `blockedWeekdays` | Days with no publish: `mon` to `sun`, in the policy's time zone (see `timeZone`). |
+| `timeZone` | IANA name such as `Europe/Paris`. Sets the zone for `blockedWeekdays` and `blockedAfterHour`. Without it the CLI uses the machine's local time and the control plane uses UTC. |
 | `blockedAfterHour` | Hour 0-23, local time. Publishes on `blockedWeekdays` are refused from this hour on (12 means from 12:00). Without it, the whole day is blocked. Needs `blockedWeekdays`. |
 
 Without a `policy` section nothing is checked. A bad section (unknown field, wrong value) stops the dry run and names the field, for example `policy.maxBand`.
@@ -176,6 +177,32 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 - `--native` runs `npx expo run:android` or `npx expo run:ios` instead and says so.
 - If the app cannot build for web, the command exits with code 1 and names the module or file that failed.
 - Ctrl+C stops the server.
+
+## `shipvo promote`
+
+Widens a staged release to more bands. It reads a test report and refuses to widen a release whose flows failed.
+
+```bash
+shipvo test flows/ --release 3 --report shipvo-test-report.json
+shipvo promote                         # reads shipvo-test-report.json if it exists
+shipvo promote --report out/report.json
+shipvo promote --force                 # promote anyway; prints that it overrode a failing report
+```
+
+- A report whose `release` matches the release being promoted and has any failed flow stops promote with a non-zero exit. The message lists the failing flows. `--dry-run` stops the same way.
+- A report for a different release is stale. Promote prints a warning and goes on.
+- With no report file, promote behaves as before.
+
+## First run of the simulator
+
+`shipvo sim`, `shipvo explore`, `shipvo test` and `shipvo store screenshots` check the browser setup before they start:
+
+1. If `playwright` is not installed, the CLI installs it as a dev dependency with your package manager (pnpm, yarn, bun or npm, chosen from the lockfile).
+2. The simulator uses system Chrome or Edge when it finds one. Otherwise it uses Playwright's Chromium, and downloads it once with `npx playwright install chromium` if it is missing.
+
+`shipvo doctor` shows which browser it found. With no Chrome, Edge or Chromium it still passes, and notes that the first run downloads Chromium once.
+
+Set `SHIPVO_NO_AUTO_INSTALL=1` to turn both installs off. The command then stops and prints what to run yourself, and `shipvo doctor` fails the browser check when nothing is installed.
 
 ## Troubleshooting
 

@@ -79,7 +79,7 @@ const tutorials = readdirSync(join(ROOT, "docs/tutorials")).filter((f) => f.ends
   const slug = f.replace(/\.md$/, ""), src = `docs/tutorials/${f}`, md = readFileSync(join(ROOT, src), "utf8");
   const own = md.match(/\*\*Level:\*\*\s*([^.]+)\./), ownTime = md.match(/\*\*Time:\*\*\s*([^.]+)\./);
   const m = tutorialMeta[slug] || {};
-  const firstPara = md.replace(/^# .*\n/, "").split(/\n\s*\n/).map((x) => x.trim()).find((x) => x && !x.startsWith("**Level") && !x.startsWith("<"));
+  const firstPara = md.replace(/^# .*\n/, "").split(/\n\s*\n/).map((x) => x.trim()).find((x) => x && !x.startsWith("**Level") && !x.startsWith("**Time") && !x.startsWith("<") && !x.startsWith("#") && !/^Prefer to watch/i.test(x) && !/^Music:/i.test(x) && !/^>/.test(x));
   return { slug, src, base: "learn", group: m.group || "More", kind: "tutorial", title: md.match(/^# (.*)/)?.[1] ?? slug, desc: clipText(plain(firstPara || "")), time: m.time || ownTime?.[1] || "", level: m.level || (own ? own[1][0].toUpperCase() + own[1].slice(1) : ""), date: lastmod(src) };
 }).sort((a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug));
 const videosMd = readFileSync(join(ROOT, "docs/videos.md"), "utf8");
@@ -287,6 +287,10 @@ for (const p of mdDocs) writeFileSync(join(p.base === "learn" ? LOUT : OUT, `${p
 const mdList = (pages) => pages.map((p) => `- [${p.title}](${SITE}${url(p).slice(0, -1)}.md): ${p.desc}`).join("\n");
 const groups = [...new Set(mdDocs.map((p) => p.group))];
 writeFileSync(join(PUB, "docs.md"), `# Shipvo documentation\n\n> Every docs page is also available as Markdown at \`/docs/<page>.md\`. Everything in one file: ${SITE}/llms-full.txt\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n`);
+// Published packages, read from packages/*/package.json so llms.txt never lists a stale set.
+const PUBLIC_PACKAGES = readdirSync(join(ROOT, "packages")).filter((d) => {
+  try { const pk = JSON.parse(readFileSync(join(ROOT, "packages", d, "package.json"), "utf8")); return !pk.private && pk.name?.startsWith("@shipvo/"); } catch { return false; }
+}).map((d) => JSON.parse(readFileSync(join(ROOT, "packages", d, "package.json"), "utf8")).name.replace("@shipvo/", "")).sort();
 const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published.
 
 Things to know before answering questions about Shipvo:
@@ -297,7 +301,7 @@ Things to know before answering questions about Shipvo:
 - CLI commands include init, sim, preview, publish (with --dry-run and --dry-run-policy), rollback, auto-halt, audit, test (with --repair and --report), explore, store, doctor, eas setup and ci init (Expo and Capacitor).
 - Release rules live in a policy section of shipvo.json (maxBand, agentMaxBand, blocked weekdays) and the control plane keeps an audit log of publishes, halts and rollbacks.
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
-- Packages are on npm under @shipvo: cli, mcp, runtime, device, sim, schema, test, store and capacitor. Source: https://github.com/shipvo/shipvo`;
+- Packages are on npm under @shipvo (${PUBLIC_PACKAGES.join(", ")}). Source: https://github.com/shipvo/shipvo`;
 const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");
 writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Learn](${SITE}/learn/): tutorials, videos and a glossary for people who are new to Shipvo\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
 writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}${url(p)}\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);

@@ -3,6 +3,7 @@
 //   test("checkout", async ({ phone }) => { await phone.tap("Add to cart"); expect(phone).toSee("Cart (1)"); });
 import { expect, test as base } from "vitest";
 import { openApp, type Phone } from "./phone.js";
+import { redact } from "./secrets.js";
 
 interface ShipvoMatchers<R = unknown> {
   /** The phone's current screen contains this text or pattern. */
@@ -19,11 +20,11 @@ const show = (t: string | RegExp) => (t instanceof RegExp ? String(t) : JSON.str
 expect.extend({
   toSee(phone: Phone, text: string | RegExp) {
     const pass = phone.sees(text);
-    return { pass, message: () => (pass ? `expected the screen not to show ${show(text)}\n\n${phone.screen}` : `expected the screen to show ${show(text)}\n\nScreen now:\n${phone.screen}`) };
+    return { pass, message: () => redact(pass ? `expected the screen not to show ${show(text)}\n\n${phone.screen}` : `expected the screen to show ${show(text)}\n\nScreen now:\n${phone.screen}`) };
   },
   toHaveButton(phone: Phone, name: string | RegExp) {
     const pass = phone.nodes().some((n) => n.role === "button" && (name instanceof RegExp ? name.test(n.name) : n.name === name));
-    return { pass, message: () => (pass ? `expected no button ${show(name)}` : `expected a button ${show(name)}\n\nScreen now:\n${phone.screen}`) };
+    return { pass, message: () => redact(pass ? `expected no button ${show(name)}` : `expected a button ${show(name)}\n\nScreen now:\n${phone.screen}`) };
   },
 });
 

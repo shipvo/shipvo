@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Rebuild only the poster (no ffmpeg, no playwright): node poster.mjs <slug> <out.png>
 // Needs a Chromium (CHROME_PATH, default /usr/bin/chromium). Uses the same plan and CSS as render.mjs.
-import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -15,7 +15,7 @@ const [slug, outArg, manArg] = process.argv.slice(2);
 const script = JSON.parse(readFileSync(join(here, "scripts", slug + ".json"), "utf8"));
 const man = JSON.parse(readFileSync(resolve(manArg), "utf8"));
 const plan = buildPlan(script, man);
-const img = (n) => "data:image/png;base64," + readFileSync(join(here, "../../services/site/public/tutorials/first-app", n + ".png")).toString("base64");
+const img = (n) => { const d = ["first-app", "test-with-an-assistant"].find((x) => existsSync(join(here, "../../services/site/public/tutorials", x, n + ".png"))); return "data:image/png;base64," + readFileSync(join(here, "../../services/site/public/tutorials", d, n + ".png")).toString("base64"); };
 const fill = (h) => h.replace(/\{\{SYMBOL:(#[0-9A-Fa-f]+)\}\}/g, (_, c) => symbol(c).replace(/width="\d+" height="\d+"/, 'width="100%"')).replace(/\{\{IMG:([\w-]+)\}\}/g, (_, n) => img(n)).replace("{{MARK}}", mark("deck").replace(/width="512" height="512"/, 'width="100%"'));
 const body = script.scenes.map((s) => `<section class="scene" id="s-${s.id}">${fill(SCENES[s.visual]())}</section>`).join("\n");
 const t = plan.scenes[0].start + (script.posterAt ?? 6);

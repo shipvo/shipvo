@@ -1,5 +1,5 @@
 // Times a new developer's first run: `shipvo init`, `shipvo doctor --offline --skip-sim`, then `shipvo publish --dry-run`.
-// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install] [--with-session] [--control-url <url>]
+// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install] [--with-session] [--control-url <url>] [--apply-report android-e2e-report.json]
 // Against a local control plane (docker compose up, or wrangler dev):
 //   node scripts/first-run/measure.mjs --control-url http://localhost:8787
 // With --control-url, after the dry run it registers the scaffolded app with the local dev key
@@ -281,6 +281,18 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
   return results;
 }
 
+/** The "publish to healthy" row from an android-e2e report's `firstRun` block, or null if it is missing or not a positive number. */
+export function applyRow(report) {
+  const ms = report?.firstRun?.publishToHealthyMs;
+  if (typeof ms !== "number" || !Number.isFinite(ms) || ms <= 0) return null;
+  const { downloadMs, applyMs } = report.firstRun;
+  const ok = (n) => (typeof n === "number" && Number.isFinite(n) && n > 0 ? n : undefined);
+  const row = { step: "publish to healthy (full-bundle update scenario, emulator)", ms: Math.round(ms), exit: 0 };
+  if (ok(downloadMs)) row.downloadMs = Math.round(ok(downloadMs));
+  if (ok(applyMs)) row.applyMs = Math.round(ok(applyMs));
+  return row;
+}
+
 export async function main(argv) {
   const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
   const here = dirname(fileURLToPath(import.meta.url));
@@ -291,8 +303,13 @@ export async function main(argv) {
   let results;
   try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export"), argv.includes("--with-session"), opt("--control-log", undefined)); }
   catch (e) { console.error(e.message); return 1; }
-  writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }], null, 2) + "\n");
+  const applyPath = opt("--apply-report", undefined);
+  let apply = null, applyErr = false;
+  if (applyPath) { try { apply = applyRow(JSON.parse(readFileSync(applyPath, "utf8"))); } catch (e) { applyErr = true; console.error(`--apply-report ${applyPath}: ${e.code === "ENOENT" ? "file not found" : e.message}`); }
+    if (!apply && !applyErr) console.error(`--apply-report ${applyPath}: report has no firstRun timing (the full-bundle update scenario failed or was not run)`); }
+  writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }, ...(apply ? [apply] : [])], null, 2) + "\n");
   console.log(table(results, results.totalMs));
+  if (applyPath) console.log(apply ? `\npublish to healthy (full-bundle update scenario, emulator): ${secs(apply.ms)} s (not part of the total above)` : "\npublish to healthy (full-bundle update scenario, emulator): not measured");
   if (withInstall) {
     const inst = results.find((r) => r.step === "install");
     const pm = inst?.pm;

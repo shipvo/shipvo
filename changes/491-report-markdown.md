@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo test --report-md <file>` writes the test report as Markdown for issues and PR comments.
+- Migration: none; new flag.
