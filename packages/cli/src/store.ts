@@ -11,7 +11,8 @@ export async function storeCmd(argv: string[]): Promise<number> {
   const cfg = loadConfig();
   const d = deriveStoreDetails(cfg);
   const o = args(rest).out;
-  const out = o && o !== "true" ? o : "store-details";
+  if (rest.includes("--out") && (!o || o === "true")) { console.error("shipvo store details: --out needs a directory"); return 2; }
+  const out = o || "store-details";
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "data-safety.csv"), dataSafetyCsv(d));
   writeFileSync(join(out, "privacy-policy.md"), renderPrivacyPolicy(d, cfg));

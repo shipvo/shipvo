@@ -16,12 +16,12 @@ describe("deriveStoreDetails", () => {
     const d = deriveStoreDetails(contacts);
     expect(d.rows.map((r) => r.capability)).toEqual(["contacts"]);
     expect(d.rows[0].dataType.typeId).toBe("PSL_CONTACTS");
-    expect(d.unknown.map((u) => u.id)).toEqual(["shared:contacts", "retention", "encryption", "contact"]);
+    expect(d.unknown.map((u) => u.id)).toEqual(["shared:contacts", "leaves-device", "retention", "encryption", "contact"]);
   });
   it("contacts + location + camera: three rows, no contact question when a website is set", () => {
     const d = deriveStoreDetails(three);
     expect(d.rows.map((r) => r.capability)).toEqual(["contacts", "location", "camera"]);
-    expect(d.unknown.map((u) => u.id)).toEqual(["shared:contacts", "shared:location", "shared:camera", "retention", "encryption", "location-precision"]);
+    expect(d.unknown.map((u) => u.id)).toEqual(["shared:contacts", "shared:location", "shared:camera", "leaves-device", "retention", "encryption", "location-precision"]);
   });
   it("lists a capability that is not in the table as unknown", () => {
     const d = deriveStoreDetails(app(["contacts", "hologram", "constructor"]));
@@ -54,14 +54,31 @@ describe("privacy policy", () => {
 });
 
 describe("dataSafetyCsv", () => {
-  it("has a header, a collects flag and a row per data type", () => {
-    const lines = dataSafetyCsv(deriveStoreDetails(three)).trim().split("\n");
+  it("has a header and a row per data type, and does not assert collection", () => {
+    const csv = dataSafetyCsv(deriveStoreDetails(three));
+    const lines = csv.trim().split("\n");
     expect(lines[0]).toContain("Question ID (machine readable)");
-    expect(lines[1]).toMatch(/^PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA,,true,/);
+    expect(csv).not.toContain("COLLECTS_PERSONAL_DATA");
     expect(lines.filter((l) => l.startsWith("PSL_DATA_TYPES_"))).toHaveLength(3);
+    expect(csv).toContain("unconfirmed");
   });
-  it("says false when nothing is collected", () => {
-    expect(dataSafetyCsv(deriveStoreDetails(none))).toContain("COLLECTS_PERSONAL_DATA,,false,");
+  it("a no-data app gets only the header", () => {
+    expect(dataSafetyCsv(deriveStoreDetails(none)).trim().split("\n")).toHaveLength(1);
+  });
+  it("asks whether data leaves the device", () => {
+    expect(deriveStoreDetails(contacts).unknown.find((u) => u.id === "leaves-device")?.question).toBe("Does any of this data leave the device?");
+  });
+  it("quotes fields with quotes, commas and newlines so they parse back", () => {
+    const d = deriveStoreDetails(contacts);
+    d.rows[0] = { ...d.rows[0], purpose: 'Say "hi", then\nleave' };
+    const csv = dataSafetyCsv(d);
+    expect(csv).toContain('"Purpose for Contacts: Say ""hi"", then\nleave"');
+    const rec: string[][] = []; let f = "", row: string[] = [], inq = false;
+    for (let i = 0; i < csv.length; i++) { const c = csv[i];
+      if (inq) { if (c === '"' && csv[i + 1] === '"') { f += '"'; i++; } else if (c === '"') inq = false; else f += c; }
+      else if (c === '"') inq = true; else if (c === ",") { row.push(f); f = ""; } else if (c === "\n") { row.push(f); rec.push(row); row = []; f = ""; } else f += c; }
+    expect(rec.every((r) => r.length === 5)).toBe(true);
+    expect(rec[rec.length - 1][4]).toBe('Purpose for Contacts: Say "hi", then\nleave');
   });
   it("quotes values that contain commas", () => {
     const d = deriveStoreDetails(contacts);

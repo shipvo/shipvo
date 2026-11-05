@@ -13,8 +13,8 @@ export type DataType = { category: string; categoryId: string; type: string; typ
 export type DataSafetyRow = {
   capability: string;
   dataType: DataType;
-  /** The app reads this data on the device, because it declares the capability. */
-  collected: true;
+  /** The app can read this data on the device, because it declares the capability. This does not mean it is collected: Play counts data as collected only when it leaves the device. */
+  readsOnDevice: true;
   /** What the app does with the data. A default for the capability; check it. */
   purpose: string;
   /** Whether the data leaves the device is not in shipvo.json. */
@@ -54,12 +54,13 @@ export function deriveStoreDetails(manifest: StoreManifest): StoreDetails {
   for (const cap of declared) {
     const m = Object.hasOwn(DATA_CAPABILITIES, cap) ? DATA_CAPABILITIES[cap] : undefined;
     if (m) {
-      rows.push({ capability: cap, dataType: m.dataType, collected: true, purpose: m.purpose, shared: "unknown" });
+      rows.push({ capability: cap, dataType: m.dataType, readsOnDevice: true, purpose: m.purpose, shared: "unknown" });
       unknown.push({ id: `shared:${cap}`, question: `Is ${m.dataType.type.toLowerCase()} sent off the device, or to anyone else?`, why: `The app declares "${cap}". shipvo.json does not say where the data goes.` });
     } else if ((NO_DATA_CAPABILITIES as readonly string[]).includes(cap)) noData.push(cap);
     else unknown.push({ id: `capability:${cap}`, question: `What user data does the "${cap}" capability read, and where does it go?`, why: `"${cap}" is not in the mapping table, so no answer was guessed.` });
   }
   if (rows.length) {
+    unknown.push({ id: "leaves-device", question: "Does any of this data leave the device?", why: "Play counts data as collected only when it leaves the device. shipvo.json does not say, so the CSV does not answer it." });
     unknown.push({ id: "retention", question: "How long is this data kept, and can users ask you to delete it?", why: "Both stores ask for a deletion route." });
     unknown.push({ id: "encryption", question: "Is the data encrypted in transit?", why: "Play's Data safety form asks this." });
   }
@@ -91,14 +92,13 @@ export function renderPrivacyPolicy(d: StoreDetails, manifest?: StoreManifest): 
 const q = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
 /**
- * Rows for Google Play's Data safety CSV import (columns as in Play Console's template).
- * Only answers derived from the manifest are written; open questions are left out for you to answer in the console.
+ * Rows for a Google Play Data safety CSV. The columns and question IDs were written from memory and have not been checked against Play Console; the PSL_DATA_USAGE_RESPONSES:...:PSL_DATA_USAGE_PURPOSE and PSL_APP_FUNCTIONALITY IDs are the least certain.
+ * Only answers derived from the manifest are written. Whether data is collected (leaves the device) is not written; it is an open question.
  */
 export function dataSafetyCsv(d: StoreDetails): string {
   const lines = [["Question ID (machine readable)", "Response ID (machine readable)", "Response value", "Answer requirement", "Human-friendly question label"]];
-  lines.push(["PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA", "", d.rows.length ? "true" : "false", "REQUIRED", "Does your app collect or share any of the required user data types?"]);
   for (const r of d.rows) {
-    lines.push([r.dataType.categoryId, r.dataType.typeId, "true", "OPTIONAL", `Data type: ${r.dataType.category} / ${r.dataType.type} (declared capability: ${r.capability})`]);
+    lines.push([r.dataType.categoryId, r.dataType.typeId, "true", "OPTIONAL", `Data type: ${r.dataType.category} / ${r.dataType.type} (declared capability: ${r.capability}; unconfirmed: applies only if the data leaves the device)`]);
     lines.push([`PSL_DATA_USAGE_RESPONSES:${r.dataType.typeId}:PSL_DATA_USAGE_PURPOSE`, "PSL_APP_FUNCTIONALITY", "true", "OPTIONAL", `Purpose for ${r.dataType.type}: ${r.purpose}`]);
   }
   return lines.map((l) => l.map(q).join(",")).join("\n") + "\n";
@@ -108,7 +108,7 @@ export function dataSafetyCsv(d: StoreDetails): string {
 export function formatSummary(d: StoreDetails): string {
   const out = [`Data safety answers for ${d.appName}`];
   if (!d.rows.length) out.push("  (no declared capability reads user data)");
-  for (const r of d.rows) out.push(`  ${r.capability}: ${r.dataType.category} / ${r.dataType.type}; collected: yes; purpose: ${r.purpose}; shared: unknown`);
+  for (const r of d.rows) out.push(`  ${r.capability}: ${r.dataType.category} / ${r.dataType.type}; read on device: yes; collected: unknown; purpose: ${r.purpose}; shared: unknown`);
   if (d.noDataCapabilities.length) out.push(`  No data collected by: ${d.noDataCapabilities.join(", ")}`);
   out.push("", d.unknown.length ? "You must answer:" : "Nothing left for you to answer.");
   for (const u of d.unknown) out.push(`  - ${u.question}`);

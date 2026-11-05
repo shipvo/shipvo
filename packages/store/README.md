@@ -27,7 +27,7 @@ const csv = dataSafetyCsv(details);                      // Data safety CSV
 
 - `deriveStoreDetails(manifest)` returns `{ appId, appName, rows, noDataCapabilities, unknown }`. There is one row per declared capability that reads user data (`contacts`, `location`, `camera`, `payments`, `notifications`). `biometrics`, `share`, `clipboard` and `network` read no data and are listed in `noDataCapabilities`. Any other capability is never dropped: it appears in `unknown`. Whether data leaves the device is not in `shipvo.json`, so every row has `shared: "unknown"` and a matching question.
 - `renderPrivacyPolicy(details, manifest?)` returns Markdown that names only the declared data. It starts with a "Review before publishing" note, is not legal advice, and marks gaps with `[TO FILL IN]`.
-- `dataSafetyCsv(details)` returns CSV with the columns of Play Console's Data safety template. It holds only derived answers. Check the result in Play Console when you import it; the question IDs are written from the template and have not been run against the console from this repo.
+- `dataSafetyCsv(details)` returns CSV in the shape of a Play Data safety CSV. It holds only derived answers. Check the result in Play Console when you import it; the question IDs were written from memory, not from the template, and have not been checked against Play Console. The least certain are the `PSL_DATA_USAGE_RESPONSES:...:PSL_DATA_USAGE_PURPOSE` and `PSL_APP_FUNCTIONALITY` ones. The CSV does not say whether data is collected; that is an open question (does the data leave the device?).
 - `formatSummary(details)` returns the text the CLI prints.
 
 ## CLI
