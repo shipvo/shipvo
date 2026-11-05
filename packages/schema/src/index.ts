@@ -68,6 +68,8 @@ export const ReleasePointer = z.object({
   band: Band,
   /** Absent = Android (the original runtime). iOS pointers say so, so a signed pointer cannot be replayed across platforms. */
   platform: z.enum(["ios"]).optional(),
+  /** Absent = a React Native JS bundle. "web" = a bundle of web assets for a Capacitor shell (`@shipvo/capacitor`); `core` describes the one archive file. */
+  kind: z.enum(["web"]).optional(),
   release: z.number().int().positive(),
   issued_at: z.string().datetime(),
   core: z.object({
