@@ -242,7 +242,12 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
 }
 // Changelog from CHANGELOG.md
 {
-  const md = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8").replace(/^# .*\n/, "");
+  // Entries merged since the last release (changes/*.md) show at the top as "On main, not yet released",
+  // so the page is current on every deploy, not only after the daily release train.
+  const pending = readdirSync(join(ROOT, "changes")).filter((f) => f.endsWith(".md") && f !== "README.md").sort()
+    .flatMap((f) => readFileSync(join(ROOT, "changes", f), "utf8").split("\n").filter((l) => /^- /.test(l) && !/^- Migration: none/i.test(l)));
+  const unreleased = pending.length ? `## On main, not yet released\n\nMerged and live on the hosted services where it applies; packages reach npm with the next daily release.\n\n${pending.join("\n")}\n\n` : "";
+  const md = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8").replace(/^# .*\n/, "").replace(/^\s*Dated, newest first\.[^\n]*\n/, (m) => m + "\n" + unreleased);
   marked.use({ renderer: new marked.Renderer(), gfm: true });
   const body = marked.parse(md);
   mkdirSync(join(PUB, "changelog"), { recursive: true });
