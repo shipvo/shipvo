@@ -44,9 +44,9 @@ export const FRAMES = {
 export type RenderFrame = (o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string };
 
 /** Loads the frame renderer from @shipvo/sim: the app's install first, then the one next to this CLI. */
-export async function loadFrameRenderer(): Promise<RenderFrame> {
+export async function loadFrameRenderer(bases: string[] = [process.cwd() + "/package.json", import.meta.url]): Promise<RenderFrame> {
   let file: string | undefined;
-  for (const base of [process.cwd() + "/package.json", import.meta.url]) {
+  for (const base of bases) {
     try { file = createRequire(base).resolve("@shipvo/sim/frame.mjs"); break; } catch {}
   }
   if (!file) throw new Error("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager).");

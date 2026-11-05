@@ -46,3 +46,7 @@ test("is pure markup: no script and no scaling code", () => {
   const f = renderFrame({});
   assert.doesNotMatch(f.html, /<script/i); assert.doesNotMatch(f.css, /@import|url\(/);
 });
+
+test("renderFrame rejects an unknown skin", () => {
+  assert.throws(() => renderFrame({ skin: "x" }), /Unknown skin/);
+});

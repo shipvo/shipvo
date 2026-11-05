@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 vi.mock("node:child_process", async (orig) => {
   const m = await orig<typeof import("node:child_process")>();
   return { ...m, spawnSync: vi.fn((...a: Parameters<typeof m.spawnSync>) => (process.env.RUN_TEST_FAKE_NATIVE ? ({ status: 0 } as never) : m.spawnSync(...a))) };
@@ -55,8 +56,14 @@ describe("frame page, shared renderer", () => {
       expect(l).toContain('<iframe id="app" src="/app/"'); expect(l).toContain("scale(");
     }
   });
-  it("loadFrameRenderer finds @shipvo/sim or says how to install it", async () => {
-    try { expect(typeof await loadFrameRenderer()).toBe("function"); } catch (e) { expect(String(e)).toContain("npm i -D @shipvo/sim"); }
+  it("loadFrameRenderer resolves @shipvo/sim and returns a function", async () => {
+    // @shipvo/sim is not linked into the CLI package, so point at the sim package, which can resolve its own export.
+    const sim = join(dirname(fileURLToPath(import.meta.url)), "../../sim/package.json");
+    expect(typeof await loadFrameRenderer([sim])).toBe("function");
+  });
+  it("loadFrameRenderer says how to install @shipvo/sim when it is missing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "noSim-"));
+    await expect(loadFrameRenderer([join(dir, "package.json")])).rejects.toThrow(/npm i -D @shipvo\/sim/);
   });
 });
 
