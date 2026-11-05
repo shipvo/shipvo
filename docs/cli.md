@@ -63,6 +63,22 @@ What it does:
 2. Wraps it in a frame page (`index.html`) with a phone, iPhone-size and tablet switcher and a light and dark switch. Your app's own page is served as `app.html` inside the frame. On a phone-width screen the app fills the screen.
 3. Publishes anonymously: create, upload, finalize. Expired upload URLs are refreshed. A 429 from here.now is retried after `retry_after` seconds. Warnings from here.now are printed.
 
+### The device panel
+
+The preview page has a panel beside the phone (under it on a phone-width screen). It drives the same simulated device as MCP `set_device`. Every event is simulated.
+
+- **Skin and size:** Phone and Large phone use the Android skin, iPhone uses the iOS skin, Tablet uses Android. Switching does not reload the app. Permission and payment dialogs use each platform's wording.
+- **Location:** pick a city or type latitude and longitude.
+- **Camera:** put a QR code or barcode in view, or nothing.
+- **Fingerprint or Face ID:** the next check matches or does not.
+- **Payment:** the next payment is approved or declined.
+- **Network:** online or offline. A slow network is not simulated yet.
+- **Push notification:** a title and body that arrive as a banner.
+- **Download test:** saves taps, typed text, back and panel actions as a `@shipvo/test` script. Typed passwords are not saved; the script reads `SHIPVO_TEST_<FIELD>` instead. Opening a PR from the recorder is not built yet.
+- **Comment:** tap Comment, tap a spot, write a note. Notes list with the screen and the number of steps before them. "Download notes" saves `comments.json`. There is no server storage for comments yet.
+
+The page says that this is the app's web build on the simulated device, measured against real Android and iOS in [parity-results.md](parity-results.md), and that native-only UI can differ. There is no screen recording of the panel yet.
+
 **The link is public and expires in 24 hours.** Anyone with the link can open it. To keep it, open the claim link and sign in to here.now. The claim link is shown once; copy it as printed.
 
 Safety rules:
