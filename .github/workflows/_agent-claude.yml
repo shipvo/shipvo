@@ -112,6 +112,8 @@ jobs:
           git rev-parse HEAD > /tmp/agent/start_sha
           if [ "${{ inputs.mode }}" = "pr-branch" ]; then
             # Bring in main first; if that conflicts, the markers stay for Claude to resolve and commit.
+            # CHANGELOG.md lines from both sides are kept (older branches still edit it; new PRs use changes/).
+            echo 'CHANGELOG.md merge=union' >> .git/info/attributes
             git merge --no-edit origin/main > /tmp/agent/merge.txt 2>&1 || echo "MERGE_CONFLICT=1" >> "$GITHUB_ENV"
           fi
 

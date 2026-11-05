@@ -49,6 +49,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     }
   }
   const apiChanged = files.some((f) => /^packages\/[^/]+\/src\/index\.ts$/.test(f.filename));
-  if (apiChanged && !files.some((f) => f.filename === "CHANGELOG.md")) out.attention.push("C6: an exported index.ts changed but CHANGELOG.md did not; check whether the public API changed.");
+  if (apiChanged && !files.some((f) => f.filename === "CHANGELOG.md" || /^changes\/(?!README).+\.md$/.test(f.filename))) out.attention.push("C6: an exported index.ts changed but CHANGELOG.md did not; check whether the public API changed.");
   console.log(JSON.stringify(out, null, 2));
 }
