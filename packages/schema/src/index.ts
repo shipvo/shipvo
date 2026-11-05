@@ -27,6 +27,8 @@ export const ShellManifest = z.object({
   addon_api: z.number().int().positive(),
   /** Hermes bytecode format version(s) this shell can run. Absent = unknown, so the control plane offers any release. */
   hermes_bytecode_versions: z.array(z.number().int().positive()).min(1).optional(),
+  /** Native modules compiled into this shell: package name to version. Absent = unknown, so the control plane offers any release. */
+  native_modules: z.record(z.string().min(1), semver).optional(),
   control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }),
   public_key: b64,
   owner_root_public_key: b64,
@@ -78,6 +80,8 @@ export const ReleasePointer = z.object({
   min_shell_version: semver,
   /** Hermes bytecode format version of `core` (from the .hbc header). Absent on older releases and plain-JS bundles. */
   hermes_bytecode_version: z.number().int().positive().optional(),
+  /** Native modules `core` needs: package name to semver range. Absent on older releases = unknown. */
+  required_native_modules: z.record(z.string().min(1), z.string().min(1)).optional(),
   /** The agent-facing web build of this same release, served by the control plane at `base` (sim.shipvo.dev opens it). */
   web: z.object({ base: z.string().min(1), entry: z.string().min(1), sha256, files: z.number().int().nonnegative() }).optional(),
   new_control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }).optional(),
@@ -201,3 +205,50 @@ export const AppContent = z.object({
   const codes = new Set<string>(); c.promos.forEach((p, i) => { if (codes.has(p.code)) ctx.addIssue({ code: "custom", path: ["promos", i, "code"], message: "duplicate code" }); codes.add(p.code); });
 });
 export type AppContent = z.infer<typeof AppContent>;
+
+const parseV = (v: string) => { const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v.trim().replace(/^[=v]+/, "")); return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null; };
+const cmpV = (a: number[], b: number[]) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+/** Does `version` satisfy `range`? Supports exact, ^, ~, >, >=, <, <=, x-ranges, `*`, AND (spaces) and OR (`||`). Pre-release tags are ignored. Unreadable ranges return false. */
+export function satisfiesRange(version: string, range: string): boolean {
+  const v = parseV(version);
+  if (!v) return false;
+  return range.split("||").some((part) => {
+    const toks = part.trim().split(/\s+/).filter(Boolean);
+    return toks.length > 0 && toks.every((t) => {
+      if (t === "*" || t === "x" || t === "X") return true;
+      const m = /^(\^|~|>=|<=|>|<|=)?v?(\d+|[xX*])(?:\.(\d+|[xX*]))?(?:\.(\d+|[xX*]))?/.exec(t);
+      if (!m) return false;
+      const op = m[1] ?? "=";
+      const wild = (x?: string) => x === undefined || /[xX*]/.test(x);
+      const n = [m[2], m[3], m[4]].map((x) => (wild(x) ? 0 : Number(x)));
+      if (wild(m[2])) return true;
+      if (op === "=") {
+        if (wild(m[3])) return v[0] === n[0];
+        if (wild(m[4])) return v[0] === n[0] && v[1] === n[1];
+        return cmpV(v, n) === 0;
+      }
+      if (op === ">=") return cmpV(v, n) >= 0;
+      if (op === ">") return wild(m[3]) ? v[0] > n[0] : wild(m[4]) ? v[0] > n[0] || (v[0] === n[0] && v[1] > n[1]) : cmpV(v, n) > 0;
+      if (op === "<=") return cmpV(v, n) <= 0;
+      if (op === "<") return cmpV(v, n) < 0;
+      let hi: number[];
+      if (op === "~") hi = wild(m[3]) ? [n[0] + 1, 0, 0] : [n[0], n[1] + 1, 0];
+      else hi = n[0] > 0 || wild(m[3]) ? [n[0] + 1, 0, 0] : n[1] > 0 || wild(m[4]) ? [0, n[1] + 1, 0] : [0, 0, n[2] + 1];
+      return cmpV(v, n) >= 0 && cmpV(v, hi) < 0;
+    });
+  });
+}
+
+export type NativeModuleReason = { reason: "native_module_missing" | "native_module_version"; module: string; required: string; have?: string };
+
+/** Compare a release's required native modules with a shell's. Returns null when compatible or when either side is unknown. */
+export function checkNativeModules(required: Record<string, string> | undefined, shell: Record<string, string> | undefined): NativeModuleReason | null {
+  if (!required || !shell) return null;
+  for (const [module, range] of Object.entries(required)) {
+    const have = shell[module];
+    if (have === undefined) return { reason: "native_module_missing", module, required: range };
+    if (!satisfiesRange(have, range)) return { reason: "native_module_version", module, required: range, have };
+  }
+  return null;
+}
