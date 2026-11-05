@@ -15,7 +15,7 @@ Run (needs `pnpm --filter @shipvo/cli build`, `pip install bsdiff4`, and `adb` w
 ```bash
 node scripts/ios-e2e/keygen.mjs > key.json
 scripts/android-e2e/build-apk.sh "$(node -p 'require("./key.json").publicKey')" 8110 shell.apk
-scripts/android-e2e/make-bundles.sh bundles 8
+scripts/android-e2e/make-bundles.sh bundles 10
 node scripts/android-e2e/run.mjs --apk shell.apk --bundles bundles --key key.json
 ```
 
@@ -26,3 +26,7 @@ Build note: `build-apk.sh` passes `-x lintVitalRelease`. Lint rejects the hardco
 How times are taken: the server and the runner share one clock. "Pointer published" is the time the pointer file became visible. "Healthy" is the time the server received the app's `applied` telemetry for the new release (sent after `markHealthy`). The app polls every 10 s while open, so pointer-to-healthy includes up to one poll interval.
 
 Run time: a full run takes about 18 minutes (the crash-loop scenarios alone take about 10). If you run it from a tool with a time limit, set the limit above 20 minutes. The staged-rollout scenario runs before the crash-loop scenarios on purpose: a failed late-crash run leaves the app open with a dead React host, and the staged check needs a device that is polling.
+
+## Patch update timeline
+
+The patch scenario runs `--patch-trials` trials (default 5). Each trial records a `timeline`: pointer seen, patch received, staged (runtime finished download and verify) and healthy (`applied` telemetry after `markHealthy`), all in ms after publish, from the server log and telemetry. `phaseMedianMs` in the report gives the median gap between phases and `unaccountedMs`, the time that the runtime's own download and apply numbers do not explain. Poll misses (pointer fetched more than 3 s after publish) and the trial after one are left out of the median. The scenario needs `v1` to `v10` bundles (`make-bundles.sh bundles 10`).

@@ -24,3 +24,21 @@ test("log parsing", () => {
   assert.equal(e.length, 1); assert.deepEqual(telemetry(e), [{ at: 1, event: "applied", release: 2 }]);
 });
 test("pctChange", () => { assert.equal(pctChange(100, 125), 25); assert.equal(pctChange(0, 5), null); });
+
+import { phaseTimeline, steadyTrials } from "./lib.mjs";
+test("phaseTimeline splits a trial into gaps", () => {
+  const entries = [{ t: 1100, method: "GET", status: 200, path: "/p/tide/1/b0.json" }, { t: 1160, method: "GET", status: 200, path: "/b/tide/d-r1.r2.patch" }];
+  const tele = [{ at: 1200, event: "applied", release: 2, bytes_downloaded: 5, published_at: "x", apply_ms: 55 }, { at: 1400, event: "applied", release: 2, apply_ms: 148 }];
+  const t = phaseTimeline({ entries, tele, publishedAt: 1000, release: 2, pointerPath: "/p/tide/1/b0.json", downloadMs: 55, applyMs: 148 });
+  assert.deepEqual(t.gaps, { publishToPointerMs: 100, pointerToPatchMs: 60, patchToStagedMs: 40, stagedToHealthyMs: 200 });
+  assert.equal(t.unaccountedMs, 197);
+});
+test("phaseTimeline gives nulls for missing phases", () => {
+  const t = phaseTimeline({ entries: [], tele: [], publishedAt: 1, release: 2, pointerPath: "/p" });
+  assert.equal(t.healthyMs, null); assert.equal(t.unaccountedMs, null);
+});
+test("steadyTrials drops poll misses and the trial after one", () => {
+  const mk = (ms) => ({ timeline: { pointerSeenMs: ms } });
+  const kept = steadyTrials([mk(100), mk(10000), mk(120), mk(90), mk(null)]);
+  assert.deepEqual(kept.map((t) => t.timeline.pointerSeenMs), [100, 90]);
+});
