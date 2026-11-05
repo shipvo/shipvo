@@ -31,6 +31,8 @@ Shipvo's update core is meant to be reused. This page says what a second framewo
 
 It does not verify signature, hash or size. Run it after the signature check.
 
+The `./decide` export points at the `.ts` source, like the main entry, so a consumer needs a bundler that compiles TypeScript from `node_modules`.
+
 ## Not shared yet: only in Kotlin or Swift
 
 The shipped shells do **not** call `decideRelease`. A native module cannot call TypeScript, so the same rules still exist in each shell. They match `decide.ts` by reading; nothing tests that yet.
