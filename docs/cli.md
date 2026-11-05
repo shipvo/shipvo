@@ -97,7 +97,7 @@ The preview page has a **Device** panel beside the phone (under it at phone widt
 
 ## `policy` in `shipvo.json`
 
-An optional `policy` section writes release rules down. `shipvo publish --dry-run` checks them. If a rule refuses, it prints the rule and the reason and exits with code 1. The real upload is not checked yet; that comes in a later slice.
+An optional `policy` section writes release rules down. `shipvo publish --dry-run` checks them. If a rule refuses, it prints the rule and the reason and exits with code 1. The control plane checks the same rules on the real publish, including `shipvo promote`. It refuses with 403 `policy_refused`, the rule and the reason, and writes one audit row.
 
 ```json
 {
@@ -214,7 +214,7 @@ These come from fixed issues in this repository.
 
 **`shipvo publish` fails with `ECONNRESET` or a similar network error.** The CLI shows the real error and the key it was writing, and retries network failures twice. If it still fails, check your connection and the control plane address. HTTP errors such as 401 are not retried: check your token.
 
-**`shipvo publish --dry-run` says `Refused by policy rule ...`.** Your `policy` section in `shipvo.json` forbids this publish. Change the cohort bands you publish to, or change the rule. Use `--dry-run-policy` to test the rule without building.
+**`shipvo publish` says `Refused by policy rule ...` (also on `--dry-run`).** Your `policy` section in `shipvo.json` forbids this publish. Change the cohort bands you publish to, or change the rule. Use `--dry-run-policy` to test the rule without building.
 
 **`shipvo audit` exits 1 with a status code.** The token is missing or wrong. Set `SHIPVO_OWNER_TOKEN`, or use the publish token from `shipvo app create`.
 
@@ -226,4 +226,3 @@ These come from fixed issues in this repository.
 - [Store details and screenshots](store.md).
 - [Self-host the control plane](self-hosting.md).
 - [Glossary](glossary.md) for the words used here.
-

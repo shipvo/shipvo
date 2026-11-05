@@ -38,7 +38,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Cohort band.** A group of people who get a release first (`b0`), then more (`b1`, `b2`). Starting small limits the damage if something is wrong.
 
-**Policy.** Rules you write in `shipvo.json` about releases, such as "never publish on Friday". `shipvo publish --dry-run` checks them.
+**Policy.** Rules you write in `shipvo.json` about releases, such as no publishing on Fridays (`blockedWeekdays`) or after 3pm (`blockedAfterHour`). `shipvo publish --dry-run` checks them, and the control plane enforces them on every real publish.
 
 **Rollback.** Sending people back to the last good release.
 

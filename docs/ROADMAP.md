@@ -65,13 +65,13 @@ Review of 2026-11-04: priority order is unchanged (update safety first). Bets 1 
 
 ## Shipped
 
-Newest first. One line per user-visible feature.
+Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
 - 2026-11-05: Release rules in `shipvo.json` (`policy`), checked by `shipvo publish --dry-run-policy` and enforced on publish by the control plane ([CLI guide](cli.md), #426)
 - 2026-11-05: `shipvo audit` exports the audit log; publishes, halts and rollbacks are recorded ([CLI guide](cli.md), #346, #353, #354, #359, #403)
 - 2026-11-05: `shipvo explore` walks the app in the simulator and reports findings ([Agents](agents.md), #366)
 - 2026-11-05: `shipvo test --repair` and `--report`; plain-English steps in `@shipvo/test` ([Testing](testing.md), #350, #396, #425)
-- 2026-11-05: `shipvo preview` device panel, recording and tester comments (#335, #338, #339, #369)
+- 2026-11-05: `shipvo preview` device panel, recording and tester comments ([Getting started](getting-started.md), #335, #338, #339, #369)
 - 2026-11-05: MCP `tap`, `type`, `scroll` and `back` report delivery; `wait_for` and `settle` ([Agents](agents.md), #336, #337)
 - 2026-11-05: Store help: `shipvo store details`, `setup`, `screenshots` ([Store](store.md), #315, #363, #386, #400)
 - 2026-11-05: Capacitor: `@shipvo/capacitor`, `shipvo eas setup`, `shipvo ci init --framework capacitor` ([Capacitor](capacitor.md), #432, #428, #438)
