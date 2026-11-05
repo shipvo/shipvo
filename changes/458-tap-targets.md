@@ -1,0 +1,1 @@
+- `@shipvo/site`: footer, logo, nav, blog and Learn links and buttons now have a 44 px minimum hit area on phones and tablets. A new check runs in `pnpm test` over every sitemap page at 390x844 and 768x1024.
