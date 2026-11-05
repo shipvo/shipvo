@@ -28,6 +28,8 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 `shipvo init` wires all of this for you.
 
+Other framework adapters can import the release rules without Expo or React Native: `import { decideRelease } from "@shipvo/runtime/decide"`. See [docs/adapters.md](../../docs/adapters.md).
+
 ## Events to forward
 
 `Runtime.consumeEvents()` returns strings such as `verify_failed:<release>`. Forward `crash_loop_revert`, `rolled_back` and `verify_failed` to telemetry (`POST /t`), once per event. The sample app does this in `apps/tide-and-tackle/src/runtimeEvents.ts`. `verify_failed` is reported under the failed release id. A rejected or corrupt release then shows on the server, not only as repeated downloads.

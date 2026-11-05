@@ -7,8 +7,8 @@ const ptr: PointerFields = { app_id: "tide", shell_major: 1, release: 4, min_she
 
 describe("decideRelease", () => {
   it("takes a newer matching release", () => { expect(decideRelease(ptr, shell)).toEqual({ take: true }); });
-  it("android rejects an ios pointer and ios rejects an android one", () => {
-    expect(decideRelease({ ...ptr, platform: "ios" }, shell)).toMatchObject({ take: false, reason: "wrong_platform" });
+  it("android does not check platform (as the Android shell); ios rejects an android pointer", () => {
+    expect(decideRelease({ ...ptr, platform: "ios" }, shell)).toEqual({ take: true });
     expect(decideRelease(ptr, { ...shell, platform: "ios" })).toMatchObject({ take: false, reason: "wrong_platform" });
     expect(decideRelease({ ...ptr, platform: "ios" }, { ...shell, platform: "ios" })).toEqual({ take: true });
   });
@@ -39,11 +39,11 @@ describe("decideRelease", () => {
     expect(decideRelease({ ...ptr, hermes_bytecode_version: 98 }, { ...shell, hermesBytecodeVersion: null })).toEqual({ take: true });
   });
   it("checks in a fixed order: platform, app, newer, shell version, bytecode", () => {
-    const bad = { ...ptr, platform: "ios" as const, app_id: "x", release: 1, min_shell_version: "9.0.0", hermes_bytecode_version: 1 };
-    expect(decideRelease(bad, shell)).toMatchObject({ reason: "wrong_platform" });
-    expect(decideRelease({ ...bad, platform: undefined }, shell)).toMatchObject({ reason: "other_app_or_shell" });
-    expect(decideRelease({ ...bad, platform: undefined, app_id: "tide" }, shell)).toMatchObject({ reason: "not_newer" });
-    expect(decideRelease({ ...bad, platform: undefined, app_id: "tide", release: 9 }, shell)).toMatchObject({ reason: "shell_too_old" });
+    const bad = { ...ptr, app_id: "x", release: 1, min_shell_version: "9.0.0", hermes_bytecode_version: 1 };
+    expect(decideRelease(bad, { ...shell, platform: "ios" })).toMatchObject({ reason: "wrong_platform" });
+    expect(decideRelease(bad, shell)).toMatchObject({ reason: "other_app_or_shell" });
+    expect(decideRelease({ ...bad, app_id: "tide" }, shell)).toMatchObject({ reason: "not_newer" });
+    expect(decideRelease({ ...bad, app_id: "tide", release: 9 }, shell)).toMatchObject({ reason: "shell_too_old" });
   });
 });
 
@@ -54,6 +54,11 @@ describe("semverLess", () => {
     expect(semverLess("1.0.0", "1.0.0")).toBe(false);
     expect(semverLess("1.0", "1.0.1")).toBe(true);
     expect(semverLess("1.0.0-beta", "1.0.0")).toBe(false);
+  });
+  it("treats a part that is not a whole number as 0, like Verify.kt and Verify.swift", () => {
+    expect(semverLess("1x.0.0", "1.0.0")).toBe(true);
+    expect(semverLess("1.x.0", "1.0.1")).toBe(true);
+    expect(semverLess("1.0.2+build", "1.0.1")).toBe(true);
   });
 });
 

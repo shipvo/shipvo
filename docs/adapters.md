@@ -12,18 +12,18 @@ Shipvo's update core is meant to be reused. This page says what a second framewo
 6. **Report.** Tell the app which events happened and send telemetry (`rolled_back`, `crash_loop_revert`, `verify_failed`, `pointer_rejected:*`).
 7. **Roll back.** Count unhealthy boots; after too many in the window, go back to the previous release and block the bad one.
 
-## Shared today
+## Shared today, or available to adapters
 
 | Rule | Where | Notes |
 | --- | --- | --- |
 | Pointer, envelope, band, telemetry shapes | [`packages/schema/src/index.ts`](../packages/schema/src/index.ts) | Zod schemas. `ReleasePointer` carries `platform`, `shell_major`, `min_shell_version`, `hermes_bytecode_version`, `required_native_modules`. |
 | Band for a cohort (`bandForCohort`) | same file | Cohort 0-999: `b0` below 10, `b1` below 100, else `b2`. |
 | Semver ranges and native-module match (`satisfiesRange`, `checkNativeModules`) | same file | Used by the control plane to answer 404 `native_module_missing` / `native_module_version`. |
-| **Release decision** (`decideRelease`, `semverLess`) | [`packages/runtime/src/decide.ts`](../packages/runtime/src/decide.ts) | New in slice 1. No React Native import. Tests: [`test/decide.test.ts`](../packages/runtime/test/decide.test.ts). Import it from `@shipvo/runtime/decide`. The main entry `@shipvo/runtime` also re-exports it, but that entry imports Expo. |
+| **Release decision** (`decideRelease`, `semverLess`), available to adapters | [`packages/runtime/src/decide.ts`](../packages/runtime/src/decide.ts) | New in slice 1. No React Native import. Tests: [`test/decide.test.ts`](../packages/runtime/test/decide.test.ts). Import it from `@shipvo/runtime/decide`. The main entry `@shipvo/runtime` also re-exports it, but that entry imports Expo. |
 
 `decideRelease(pointer, shell)` runs these checks in order and returns `{ take: true }` or `{ take: false, reason }`:
 
-1. `wrong_platform`: pointer `platform` (absent means Android) is not the shell's platform.
+1. `wrong_platform`: only for an iOS shell, when the pointer does not say `"ios"`. An Android shell does not check `platform`, as the real Android shell does not, so it takes an `"ios"` pointer.
 2. `other_app_or_shell`: `app_id` or `shell_major` differs.
 3. `not_newer`: `release` is not above the newest current, pending or blocked release.
 4. `shell_too_old`: shell version is below `min_shell_version` (missing counts as `0.0.0`).
@@ -47,7 +47,7 @@ The shipped shells do **not** call `decideRelease`. A native module cannot call 
 | Patch (bsdiff) and resumable download | `Patch.kt`, `ResumableDownload.kt` | `Patch.swift` |
 | Stage, trial boots, crash-loop rollback | [`BootRules.kt`](../packages/runtime/android/src/main/java/dev/shipvo/runtime/BootRules.kt), [`ShipvoHostHandler.kt`](../packages/runtime/android/src/main/java/dev/shipvo/runtime/ShipvoHostHandler.kt) (3 boots in 60 s) | `Store.swift`, `BundleSelector.swift` |
 
-Known differences a port must decide on: Android does not check `platform`; Android reads `min_shell_version` with `body.getString`, which throws when the field is absent, so a pointer without it errors on Android instead of being cleanly rejected, while iOS defaults it to `0.0.0`.
+Known differences a port must decide on: Android does not check `platform` (`decideRelease` mirrors this for an Android shell, so a new adapter that wants to reject the other platform's pointers must add that check itself); a version part that is not a whole number (such as `1x`) counts as 0 in `decideRelease`, `Verify.kt` and `Verify.swift` alike; Android reads `min_shell_version` with `body.getString`, which throws when the field is absent, so a pointer without it errors on Android instead of being cleanly rejected, while iOS defaults it to `0.0.0`.
 
 ## What a Capacitor adapter needs
 

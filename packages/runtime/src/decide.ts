@@ -34,9 +34,9 @@ export type ReleaseDecision =
   /** The shell must also block this release number so it is not tried again. */
   | { take: false; reason: "hermes_bytecode_mismatch"; release: number; block: true; releaseVersion: number; shellVersion: number };
 
-/** True when `a` is an older version than `b`. Compares major.minor.patch; a pre-release tag is ignored; missing parts are 0. */
+/** True when `a` is an older version than `b`. Compares major.minor.patch; a pre-release tag is ignored; missing parts and parts that are not whole numbers are 0, as in Verify.kt and Verify.swift. */
 export function semverLess(a: string, b: string): boolean {
-  const parts = (s: string) => s.split("-")[0].split(".").map((x) => { const n = parseInt(x, 10); return Number.isNaN(n) ? 0 : n; });
+  const parts = (s: string) => s.split("-")[0].split(".").map((x) => { return /^\d+$/.test(x) ? parseInt(x, 10) : 0; });
   const pa = parts(a), pb = parts(b);
   for (let i = 0; i < 3; i++) {
     const x = pa[i] ?? 0, y = pb[i] ?? 0;
@@ -53,13 +53,13 @@ function positiveInt(v: unknown): number | null {
 /**
  * May this shell take the release a verified pointer names? Checks, in order: platform, app and shell major,
  * newer than known, shell version against `min_shell_version`, Hermes bytecode version.
- * Android pointers carry no `platform`, and the Android shell does not check it today; this function keeps that,
- * so an Android shell accepts any pointer whose platform is absent and rejects `"ios"`.
+ * The Android shell does not check `platform` today, so this function skips that check when `shell.platform` is
+ * "android" (an Android shell takes an `"ios"` pointer, as the real one does). An iOS shell requires `"ios"`.
  */
 export function decideRelease(pointer: PointerFields, shell: ShellFacts): ReleaseDecision {
   const release = pointer.release;
   const pointerPlatform = pointer.platform === "ios" ? "ios" : "android";
-  if (pointerPlatform !== shell.platform) return { take: false, reason: "wrong_platform", release };
+  if (shell.platform === "ios" && pointerPlatform !== "ios") return { take: false, reason: "wrong_platform", release };
   if (pointer.app_id !== shell.appId || pointer.shell_major !== shell.shellMajor) return { take: false, reason: "other_app_or_shell", release };
   if (release <= shell.knownRelease) return { take: false, reason: "not_newer", release };
   if (semverLess(shell.shellVersion, pointer.min_shell_version ?? "0.0.0")) return { take: false, reason: "shell_too_old", release };
