@@ -2,6 +2,8 @@
 
 Plain-English meanings for the words Shipvo docs and tutorials use. Each tutorial explains a word the first time it appears and links here.
 
+**Accessibility tree.** The list of buttons, headings and text on a screen that a screen reader reads aloud. An assistant uses the same list to see your app, so a button it cannot find is also hard for a person using a screen reader.
+
 **App id.** A short name for your app with no spaces, such as `tideshop`. Shipvo uses it to find your app.
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
@@ -31,4 +33,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Template.** A ready-made app you change into your own, such as the shop template.
 
 **Terminal.** A window where you type commands instead of clicking. On a Mac it is called Terminal. On Windows use "Windows Terminal" or "PowerShell". On Linux it is also called Terminal.
+
+**Test.** A small file that repeats the steps a customer takes and fails if the result changes. It runs on your computer in seconds.
 
