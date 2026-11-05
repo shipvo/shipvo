@@ -59,12 +59,22 @@ html,body{margin:0;height:100%;overflow:hidden;background:#e8eaed;font:14px syst
 iframe{flex:1;min-height:0;border:0;background:#fff;width:100%}
 .bar{flex:none;height:${platform === "ios" ? 34 : 24}px;display:flex;justify-content:center;align-items:center}
 .bar i{display:block;width:${platform === "ios" ? 134 : 108}px;height:5px;border-radius:3px;background:#fff}
+.sheet{position:absolute;left:0;right:0;bottom:0;top:0;background:#0007;display:none;align-items:${platform === "ios" ? "center" : "flex-end"};justify-content:center;z-index:5}
+.sheet.open{display:flex}
+.sheet .box{background:#fff;color:#111;width:${platform === "ios" ? "270px" : "100%"};box-sizing:border-box;padding:20px;border-radius:${platform === "ios" ? "14px" : "28px 28px 0 0"};text-align:center}
+.sheet button{display:block;width:100%;margin-top:8px;padding:10px;border:0;border-radius:${platform === "ios" ? "8px" : "20px"};background:#eee;font:inherit;cursor:pointer}
+.sheetbtn{position:fixed;right:12px;top:10px;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
 .tag{position:fixed;left:12px;top:10px;padding:3px 10px;border-radius:12px;background:#111;color:#fff;font-size:12px}
 </style></head><body>
 <div class="tag" role="status">Simulated ${f.label} (${f.width}x${f.height}). The app's web build on the simulated device.</div>
-<div id="fit"><div class="phone" id="phone" data-platform="${platform}">${top}<iframe id="app" src="/app/" title="${title}"></iframe>${bottom}</div></div>
+<button class="sheetbtn" id="sheetbtn" type="button">Show ${f.label} system sheet</button>
+<div id="fit"><div class="phone" id="phone" data-platform="${platform}">${top}<iframe id="app" src="/app/" title="${title}"></iframe>${bottom}<div class="sheet" id="sheet" role="dialog" aria-label="${f.label} system sheet" data-part="system-sheet"><div class="box"><p>${f.sheet.title}</p><button type="button" data-act="allow">${f.sheet.allow}</button><button type="button" data-act="deny">${f.sheet.deny}</button></div></div></div></div>
 <script>
-window.SHIPVO_SHEET=${JSON.stringify(f.sheet)};
+var sh=document.getElementById("sheet");
+function sheet(on){sh.classList.toggle("open",on)}
+document.getElementById("sheetbtn").onclick=function(){sheet(!sh.classList.contains("open"))};
+sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet(false)};
+addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
 function fit(){var s=Math.min(1,(innerWidth-24)/${f.width},(innerHeight-60)/${f.height});var e=document.getElementById("fit");e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${f.width}px";e.style.height="${f.height}px"}
 addEventListener("resize",fit);fit();
 </script></body></html>`;
@@ -93,9 +103,15 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
     if (rel.endsWith("/")) rel += "index.html";
     const file = normalize(join(root, rel));
     if (file !== root && !file.startsWith(root + sep)) { res.writeHead(403); return void res.end("Forbidden"); }
-    if (!existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); return void res.end("Not found"); }
-    res.writeHead(200, { "content-type": TYPES[extname(file).toLowerCase()] ?? "application/octet-stream" });
-    res.end(readFileSync(file));
+    let target = file;
+    if (!existsSync(target) || !statSync(target).isFile()) {
+      // A client-side route inside the frame (for example a reload on /app/settings): serve the app shell.
+      const spa = path.startsWith("/app/") && !extname(path) ? join(root, "index.html") : "";
+      if (!spa || !existsSync(spa)) { res.writeHead(404); return void res.end("Not found"); }
+      target = spa;
+    }
+    res.writeHead(200, { "content-type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream" });
+    res.end(readFileSync(target));
   });
   return new Promise((ok, fail) => {
     server.once("error", fail);

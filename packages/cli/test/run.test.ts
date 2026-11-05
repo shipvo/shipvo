@@ -1,8 +1,12 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseRunArgs, nativeCommand, runFramePage, startRunServer, describeWebBuildFailure, buildWeb } from "../src/run";
+vi.mock("node:child_process", async (orig) => {
+  const m = await orig<typeof import("node:child_process")>();
+  return { ...m, spawnSync: vi.fn((...a: Parameters<typeof m.spawnSync>) => (process.env.RUN_TEST_FAKE_NATIVE ? ({ status: 0 } as never) : m.spawnSync(...a))) };
+});
+import { parseRunArgs, nativeCommand, runFramePage, startRunServer, describeWebBuildFailure, buildWeb, run } from "../src/run";
 
 describe("parseRunArgs", () => {
   it("parses platform and flags", () => {
@@ -31,6 +35,7 @@ describe("frame page", () => {
     expect(h).toContain("412px"); expect(h).toContain("915px");
     expect(h).toContain('data-part="punch-hole"'); expect(h).toContain('data-part="gesture-bar"');
     expect(h).not.toContain("dynamic-island"); expect(h).toContain("Simulated"); expect(h).toContain("While using the app");
+    expect(h).toContain('data-part="system-sheet"'); expect(h).toContain("Don't allow"); expect(h).toContain("shipvo:system-sheet");
   });
   it("has the iOS frame", () => {
     const h = runFramePage("ios", "Tide");
@@ -67,6 +72,16 @@ describe("server", () => {
     expect((await fetch(base + "/%E0%A4%A")).status).toBe(400);
     expect((await fetch(base + "/app/")).status).toBe(200);
   });
+  it("falls back to index.html for client-side routes under /app/ but not for missing files", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-"));
+    writeFileSync(join(dir, "index.html"), "<p>the app</p>");
+    const s = await startRunServer({ dir, platform: "android", name: "Tide" });
+    close = s.close;
+    const base = `http://127.0.0.1:${s.port}`;
+    expect(await (await fetch(base + "/app/settings")).text()).toBe("<p>the app</p>");
+    expect((await fetch(base + "/app/missing.js")).status).toBe(404);
+    expect((await fetch(base + "/nope")).status).toBe(404);
+  });
   it("redirects /app to /app/", async () => {
     const dir = mkdtempSync(join(tmpdir(), "run-"));
     writeFileSync(join(dir, "index.html"), "x");
@@ -102,7 +117,28 @@ describe("buildWeb", () => {
   });
 });
 
-describe("no playwright", () => {
+describe("run()", () => {
+  it("--native prints that it is not the simulated device; bad args return 2; missing config returns 1", async () => {
+    const err: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...a) => { err.push(a.join(" ")); });
+    const cwd = process.cwd(); const dir = mkdtempSync(join(tmpdir(), "run-c-"));
+    try {
+      expect(await run([])).toBe(2);
+      process.chdir(dir);
+      expect(await run(["android"])).toBe(1);
+      expect(err.length).toBeGreaterThan(1);
+    } finally { process.chdir(cwd); spy.mockRestore(); }
+  });
+  it("--native says so", async () => {
+    const err: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...a) => { err.push(a.join(" ")); });
+    process.env.RUN_TEST_FAKE_NATIVE = "1";
+    try { expect(await run(["ios", "--native"])).toBe(0); } finally { spy.mockRestore(); delete process.env.RUN_TEST_FAKE_NATIVE; }
+    expect(err.join("\n")).toContain("not the simulated device");
+  });
+});
+
+describe("no playwright (source grep guard)", () => {
   it("run.ts and what it imports never reference playwright", () => {
     for (const f of ["run.ts", "config.ts"]) expect(readFileSync(join(__dirname, "../src", f), "utf8")).not.toMatch(/playwright/i);
     const sim = readFileSync(join(__dirname, "../src/sim.ts"), "utf8");

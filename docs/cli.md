@@ -164,8 +164,9 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 
 `shipvo run android` or `shipvo run ios` builds the web export with the simulated device (the same build as `shipvo sim`), serves it on a local port and opens your default browser at a phone frame page. It does not use Playwright.
 
-- Android frame: 412x915, status bar, punch-hole camera, gesture bar, Android wording in system sheets.
-- iOS frame: 393x852, Dynamic Island, home indicator, iOS wording in system sheets.
+- Android frame: 412x915, status bar, punch-hole camera, gesture bar. A "Show Android system sheet" button (or a `postMessage` of `{ type: "shipvo:system-sheet" }` from the app, `open: false` to close) opens an overlay with Android permission wording.
+- iOS frame: 393x852, Dynamic Island, home indicator. A "Show iOS system sheet" button or the same `postMessage` opens an overlay with iOS permission wording.
+- Reloading on a client-side route under `/app/` (no file extension) serves the app shell.
 - The page shows a "Simulated" label and scales the phone to fit the window.
 - `--no-open` prints the URL and does not open a browser. `--port <n>` picks the port (default: any free port).
 - `--native` runs `npx expo run:android` or `npx expo run:ios` instead and says so.
