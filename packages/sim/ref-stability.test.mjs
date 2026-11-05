@@ -55,7 +55,10 @@ before(async () => {
   writeFileSync(join(dist, "index.html"), ONE); writeFileSync(join(dist, "two.html"), TWO);
   proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", dir, "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
   let err = ""; proc.stderr.on("data", (d) => { err += d; });
-  for (let i = 0; i < 100; i++) { try { await fetch(`http://localhost:${PORT}/`); break; } catch { if (proc.exitCode !== null) throw new Error(`sim exited: ${err}`); await new Promise((r) => setTimeout(r, 200)); } }
+  // A loaded CI runner can take a while to start Chromium, so wait up to 90 s and fail loudly instead of falling through.
+  let up = false;
+  for (let i = 0; i < 450 && !up; i++) { try { await fetch(`http://localhost:${PORT}/`); up = true; } catch { if (proc.exitCode !== null) throw new Error(`sim exited: ${err}`); await new Promise((r) => setTimeout(r, 200)); } }
+  if (!up) throw new Error(`sim did not start listening on port ${PORT} within 90 s: ${err}`);
 });
 after(async () => {
   if (proc && proc.exitCode === null) { const done = new Promise((r) => proc.once("exit", r)); proc.kill("SIGKILL"); await done; }
