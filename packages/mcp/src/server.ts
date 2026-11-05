@@ -17,7 +17,7 @@ import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
 import { FORMATS } from "./demo.js";
-import { mixAudio, newRec, recordingsDir, render, swipeFor, type Rec } from "./recorder.js";
+import { checkNarration, mixAudio, newRec, recordingsDir, render, swipeFor, type Rec } from "./recorder.js";
 import { satisfied, sameTree, wantsMatch, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -251,12 +251,15 @@ server.tool("record_marker", "Add an on-screen caption (lower third) from this m
 server.tool("record_stop", "Stop recording and encode the demo video (H.264 MP4, needs ffmpeg). Returns { file, duration_s, width, height, chapters: [{ t, caption }] }. Saved under .shipvo/recordings/. narration is the path of a WAV file; music mixes a credited music bed under it and writes the credits JSON next to the video.", { session: sid, narration: z.string().optional().describe("Path of a WAV voiceover"), music: z.boolean().optional() }, WR, async ({ session, narration, music }) => {
   const rec = recs.get(session);
   if (!rec) return result(session, { ok: false, code: "not_recording", error: "call record_start first" });
-  await rec.pending; recs.delete(session);
+  await rec.pending;
+  // The recording stays in `recs` until the video is written, so a failed stop (no ffmpeg, bad path) can be retried.
   try {
+    checkNarration(narration);
     const slug = (rec.opts.title ?? session).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "demo";
     const out = join(recordingsDir(), `${slug}-${new Date(rec.t0).toISOString().replace(/[:.]/g, "-")}.mp4`);
     const v = await render(rec, { out });
     const credits = mixAudio(out, { narration, music });
+    recs.delete(session);
     const res = { file: out, duration_s: v.duration_s, width: v.width, height: v.height, chapters: v.chapters, ...(credits ? { music_credits: credits } : {}), ...(rec.markers.length && !v.captions ? { note: "this ffmpeg has no drawtext, so captions are in chapters only, not on screen" } : {}) };
     return { ...text(JSON.stringify(res, null, 2)), structuredContent: res };
   } catch (e) {

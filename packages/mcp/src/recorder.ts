@@ -59,6 +59,13 @@ export async function render(rec: Rec, enc: EncodeOpts): Promise<{ duration_s: n
   return { duration_s: Math.round(dur * 10) / 10, width: w, height: h, chapters: ch, captions };
 }
 
+// The narration must be an existing .wav file. Checked before any encoding so the agent gets a plain error.
+export function checkNarration(narration?: string): void {
+  if (narration === undefined) return;
+  if (!/\.wav$/i.test(narration)) throw new Error(`narration_not_wav: narration must be a .wav file, got '${narration}'.`);
+  if (!existsSync(narration)) throw new Error(`narration_not_found: no file at '${narration}'. Give the path of an existing .wav file, or call record_stop without narration.`);
+}
+
 // Mix narration and/or music into the video. Music uses scripts/video/bgmusic.py (ducked bed) and writes the credits JSON.
 export function mixAudio(file: string, o: { narration?: string; music?: boolean }): string | undefined {
   const tmp = file.replace(/\.mp4$/, ".mix.mp4");
