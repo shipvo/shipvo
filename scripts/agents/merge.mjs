@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const REPO = process.env.GITHUB_REPOSITORY;
-const MAX_MERGES = Number(process.env.AGENT_MAX_MERGES_PER_DAY || 100);
+const MAX_MERGES = Number(process.env.AGENT_MAX_MERGES_PER_DAY || 250);
 const STALE_DAYS = Number(process.env.AGENT_STALE_DAYS || 4);
 const DRY = process.env.DRY_RUN === "true";
 

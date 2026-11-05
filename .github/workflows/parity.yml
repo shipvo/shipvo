@@ -26,7 +26,7 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
+      - run: pnpm --filter "@shipvo/cli..." build
       - name: Build emulator APK (x86_64)
         working-directory: apps/tide-and-tackle
         run: |

@@ -4,6 +4,7 @@
 // signing key never leaves the developer's machine or CI.
 import { Hono } from "hono";
 import { ReleasePointerBody } from "@shipvo/schema";
+import { recordAudit } from "./audit";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; OWNER_TOKEN?: string };
 export const apps = new Hono<{ Bindings: Env }>();
@@ -192,6 +193,19 @@ async function pointerProblem(id: string, key: string, pub: string, buf: ArrayBu
   return "could not verify the pointer signature";
 }
 
+/** One audit row per accepted release pointer. Actor is the app owner behind the publish token; no token or key goes in the row. Never throws. */
+async function auditPublish(db: any, id: string, key: string, buf: ArrayBuffer) {
+  try {
+    const body = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body);
+    const owner = await db.prepare("SELECT acc.github_login AS login FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ?").bind(id).first();
+    await recordAudit(db, {
+      app_id: id, actor: String(owner?.login ?? id), actor_kind: "person", action: "publish",
+      release: body.release, release_id: key,
+      after: JSON.stringify({ release: body.release, band: body.band, platform: body.platform ?? "android" }),
+    });
+  } catch { console.warn(`audit write failed: app=${id} action=publish`); }
+}
+
 apps.put("/:id/kv/*", async (c) => {
   const id = c.req.param("id"); const app = await publisher(c, id); if (!app) return c.json({ error: "unauthorized" }, 401);
   const k = keyOf(c, id); if (!keyAllowed(id, k)) return c.json({ error: "forbidden_key", message: `Keys must start with one of ${PREFIXES.map((p) => `${p}/${id}/`).join(", ")}` }, 403);
@@ -200,6 +214,7 @@ apps.put("/:id/kv/*", async (c) => {
   if (app.bytes_used + buf.byteLength > MAX_APP_BYTES) return c.json({ error: "app_storage_exceeded", message: `This app has used its ${MAX_APP_BYTES / 1048576} MB beta storage.` }, 413);
   if (k.startsWith(`p/${id}/`)) { const why = await pointerProblem(id, k, app.public_key, buf); if (why) return c.json({ error: "bad_pointer", message: why }, 422); }
   await c.env.POINTERS.put(k, buf);
+  if (k.startsWith(`p/${id}/`)) await auditPublish(c.env.DB, id, k, buf);
   await c.env.DB.prepare("UPDATE apps SET bytes_used = bytes_used + ? WHERE app_id = ?").bind(buf.byteLength, id).run();
   if (k === `w/${id}/releases`) { try { const idx = JSON.parse(new TextDecoder().decode(buf)); if (Number.isInteger(idx.latest)) await c.env.DB.prepare("UPDATE apps SET latest_release = ?, published_at = ? WHERE app_id = ?").bind(idx.latest, now(), id).run(); } catch {} }
   return c.json({ ok: true, key: k, bytes: buf.byteLength });

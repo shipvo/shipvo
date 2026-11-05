@@ -23,8 +23,7 @@ jobs:
       - run: pnpm -r --filter "./packages/**" build
       # Package tests (e.g. @shipvo/sim) drive a headless browser, so install it before they run.
       - name: Install Chromium for browser tests
-        working-directory: packages/sim
-        run: npx playwright install --with-deps chromium
+        run: bash scripts/agents/install-chromium.sh
       - run: pnpm -r test
       - name: npm package size budget (each @shipvo package under 10 MB unpacked)
         run: |
@@ -35,8 +34,8 @@ jobs:
       - name: Device end-to-end through MCP (simulator, no phone)
         working-directory: apps/tide-and-tackle
         run: |
-          pnpm --filter @shipvo/cli build && pnpm --filter @shipvo/mcp build
-          npx playwright install --with-deps chromium
+          pnpm --filter "@shipvo/cli..." build && pnpm --filter @shipvo/mcp build
+          bash ../../scripts/agents/install-chromium.sh
           PN_SIM=1 npx expo export --platform web --output-dir sim-dist
           node sim/server.mjs --dir /tmp/pn-ui > sim.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
