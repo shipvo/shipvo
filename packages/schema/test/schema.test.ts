@@ -146,4 +146,17 @@ describe("parsePolicy", () => {
     expect(() => parsePolicy({ maxBand: "b9" })).toThrow(/policy\.maxBand/);
     expect(() => parsePolicy({ blockedAfterHour: 5 })).toThrow(/policy\.blockedAfterHour/);
   });
+  it("parses maxCohortForAgents and requireStageBeforeFull", () => {
+    expect(parsePolicy({ maxCohortForAgents: "b1", requireStageBeforeFull: { percent: 10, minHours: 24 } })).toEqual({ maxCohortForAgents: "b1", requireStageBeforeFull: { percent: 10, minHours: 24 } });
+    expect(parsePolicy({ maxCohortForAgents: 25 }).maxCohortForAgents).toBe(25);
+  });
+  it("rejects bad values and unknown keys in the new rules", () => {
+    expect(() => parsePolicy({ maxCohortForAgents: 0 })).toThrow(/policy\.maxCohortForAgents/);
+    expect(() => parsePolicy({ maxCohortForAgents: 101 })).toThrow(/policy\.maxCohortForAgents/);
+    expect(() => parsePolicy({ maxCohortForAgents: "everyone" })).toThrow(/policy\.maxCohortForAgents/);
+    expect(() => parsePolicy({ requireStageBeforeFull: { percent: 100, minHours: 1 } })).toThrow(/requireStageBeforeFull\.percent/);
+    expect(() => parsePolicy({ requireStageBeforeFull: { percent: 10, minHours: 0 } })).toThrow(/requireStageBeforeFull\.minHours/);
+    expect(() => parsePolicy({ requireStageBeforeFull: { percent: 10, minHours: 1, extra: 1 } })).toThrow(/requireStageBeforeFull/);
+    expect(() => parsePolicy({ nope: true })).toThrow(/policy/);
+  });
 });
