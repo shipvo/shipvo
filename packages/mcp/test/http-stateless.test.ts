@@ -120,4 +120,3 @@ describe("stateless HTTP", () => {
     expect(bad.body.result.content[0].text).toContain("Error [no_url_listener]");
   });
 });
-});
