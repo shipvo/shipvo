@@ -6,7 +6,8 @@ vi.mock("node:child_process", async (orig) => {
   const m = await orig<typeof import("node:child_process")>();
   return { ...m, spawnSync: vi.fn((...a: Parameters<typeof m.spawnSync>) => (process.env.RUN_TEST_FAKE_NATIVE ? ({ status: 0 } as never) : m.spawnSync(...a))) };
 });
-import { parseRunArgs, nativeCommand, runFramePage, startRunServer, describeWebBuildFailure, buildWeb, run } from "../src/run";
+import { renderFrame } from "../../sim/frame.mjs";
+import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, describeWebBuildFailure, buildWeb, run } from "../src/run";
 
 describe("parseRunArgs", () => {
   it("parses platform and flags", () => {
@@ -31,17 +32,31 @@ describe("--native", () => {
 
 describe("frame page", () => {
   it("has the Android frame", () => {
-    const h = runFramePage("android", "Tide");
+    const h = runFramePage("android", "Tide", renderFrame);
     expect(h).toContain("412px"); expect(h).toContain("915px");
     expect(h).toContain('data-part="punch-hole"'); expect(h).toContain('data-part="gesture-bar"');
     expect(h).not.toContain("dynamic-island"); expect(h).toContain("Simulated"); expect(h).toContain("While using the app");
     expect(h).toContain('data-part="system-sheet"'); expect(h).toContain("Don't allow"); expect(h).toContain("shipvo:system-sheet");
   });
   it("has the iOS frame", () => {
-    const h = runFramePage("ios", "Tide");
+    const h = runFramePage("ios", "Tide", renderFrame);
     expect(h).toContain("393px"); expect(h).toContain("852px");
     expect(h).toContain('data-part="dynamic-island"'); expect(h).toContain('data-part="home-indicator"');
     expect(h).not.toContain("punch-hole"); expect(h).toContain("Allow While Using App");
+  });
+});
+
+describe("frame page, shared renderer", () => {
+  it("uses the sim frame body, with light and dark status text and a Simulated label", () => {
+    for (const p of ["android", "ios"] as const) {
+      const l = runFramePage(p, "Tide", renderFrame), d = runFramePage(p, "Tide", renderFrame, true);
+      expect(l).toContain('data-part="phone-body"'); expect(l).toContain('data-part="simulated-label"');
+      expect(l).toContain("--sf-fg:#111"); expect(d).toContain("--sf-fg:#fff");
+      expect(l).toContain('<iframe id="app" src="/app/"'); expect(l).toContain("scale(");
+    }
+  });
+  it("loadFrameRenderer finds @shipvo/sim or says how to install it", async () => {
+    try { expect(typeof await loadFrameRenderer()).toBe("function"); } catch (e) { expect(String(e)).toContain("npm i -D @shipvo/sim"); }
   });
 });
 
@@ -53,7 +68,7 @@ describe("server", () => {
     writeFileSync(join(dir, "index.html"), "<p>the app</p>");
     mkdirSync(join(dir, "_expo"));
     writeFileSync(join(dir, "_expo", "a.js"), "1");
-    const s = await startRunServer({ dir, platform: "ios", name: "Tide" });
+    const s = await startRunServer({ dir, platform: "ios", name: "Tide", render: renderFrame });
     close = s.close;
     const base = `http://127.0.0.1:${s.port}`;
     expect(await (await fetch(base + "/")).text()).toContain("dynamic-island");
@@ -66,7 +81,7 @@ describe("server", () => {
   it("answers 400 to a malformed escape and keeps serving", async () => {
     const dir = mkdtempSync(join(tmpdir(), "run-"));
     writeFileSync(join(dir, "index.html"), "<p>the app</p>");
-    const s = await startRunServer({ dir, platform: "android", name: "Tide" });
+    const s = await startRunServer({ dir, platform: "android", name: "Tide", render: renderFrame });
     close = s.close;
     const base = `http://127.0.0.1:${s.port}`;
     expect((await fetch(base + "/%E0%A4%A")).status).toBe(400);
@@ -75,7 +90,7 @@ describe("server", () => {
   it("falls back to index.html for client-side routes under /app/ but not for missing files", async () => {
     const dir = mkdtempSync(join(tmpdir(), "run-"));
     writeFileSync(join(dir, "index.html"), "<p>the app</p>");
-    const s = await startRunServer({ dir, platform: "android", name: "Tide" });
+    const s = await startRunServer({ dir, platform: "android", name: "Tide", render: renderFrame });
     close = s.close;
     const base = `http://127.0.0.1:${s.port}`;
     expect(await (await fetch(base + "/app/settings")).text()).toBe("<p>the app</p>");
@@ -85,7 +100,7 @@ describe("server", () => {
   it("redirects /app to /app/", async () => {
     const dir = mkdtempSync(join(tmpdir(), "run-"));
     writeFileSync(join(dir, "index.html"), "x");
-    const s = await startRunServer({ dir, platform: "android", name: "Tide" });
+    const s = await startRunServer({ dir, platform: "android", name: "Tide", render: renderFrame });
     close = s.close;
     const r = await fetch(`http://127.0.0.1:${s.port}/app`, { redirect: "manual" });
     expect(r.status).toBe(302);
@@ -144,5 +159,14 @@ describe("no playwright (source grep guard)", () => {
     const sim = readFileSync(join(__dirname, "../src/sim.ts"), "utf8");
     // sim.ts may import our own ensure step ("./ensure-playwright.js"), never the playwright package.
     expect(sim.replace(/from "\.\/ensure-playwright\.js"/g, "")).not.toMatch(/import[^\n]*playwright|require\(["']playwright/);
+  });
+});
+
+describe("server dark page", () => {
+  it("serves the dark frame at /?dark=1", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-"));
+    writeFileSync(join(dir, "index.html"), "x");
+    const s = await startRunServer({ dir, platform: "android", name: "Tide", render: renderFrame });
+    try { expect(await (await fetch(`http://127.0.0.1:${s.port}/?dark=1`)).text()).toContain("--sf-fg:#fff"); } finally { await s.close(); }
   });
 });
