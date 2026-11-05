@@ -45,7 +45,9 @@ These fields come from `packages/sim/server.mjs`; with an older simulator they a
 | `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
 | `mock_invalid` | A network mock rule is not valid. | Fix the rule. |
 
-Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `end_session`, `owner_describe`, `owner_command`.
+Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `export_test`, `end_session`, `owner_describe`, `owner_command`.
+
+`export_test { session }` is read-only. It turns the taps, typing, scrolls, `back` and `set_device` calls recorded in a session into a `@shipvo/test` script and returns the source. Targets are named by visible text; an ambiguous target becomes a `// TODO` comment, and a password-like field uses `process.env.SHIPVO_TEST_<LABEL>` so the typed value is never in the output. Only sessions opened through this server are recorded; an unknown session returns `no_session`. Steps are dropped when the session ends. `payment.pin` is removed from recorded `set_device` calls. Only labels and roles that look like a password, passcode or PIN are treated as secret; other secret-like fields (card number, token) are exported as typed. `type` with `enter: true` and `scroll` with a `ref` are recorded without the Enter or the ref, so a replay can differ from the session.
 
 **Owner commands that cannot be undone need `confirm: true`.** `owner_command` takes an optional `confirm`. `publish`, price changes, offers, deletes and API keys first return `{ code: "needs_confirm", plan }` and do nothing; call again with the same `args` and `confirm: true` to run. `agentPolicy` (`ask` default, `deny`, `allow`) and `agentDeny` in `shipvo.json` (read from `PN_APP_DIR` or the current folder) can only tighten the control plane's rules. Details: `docs/agents.md`.
 
