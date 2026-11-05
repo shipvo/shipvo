@@ -15,6 +15,7 @@ import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
+import { PhoneBrowser, BrowserError } from "./phone-browser.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -61,7 +62,7 @@ const sessions = new Map();
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
 
 async function newSession(id, opts = {}) {
-  if (sessions.has(id)) await sessions.get(id).ctx.close();
+  if (sessions.has(id)) { await sessions.get(id).browserApp?.close(); await sessions.get(id).ctx.close(); }
   const target = await resolveApp(opts.app);
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
   const browser = await browserReady;
@@ -74,7 +75,7 @@ async function newSession(id, opts = {}) {
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString() });
+  sessions.set(id, { ctx, page, errors, browserOpts: { skin: opts.platform === "ios" ? "ios" : "android", allowHosts: Array.isArray(opts.allow_hosts) ? opts.allow_hosts : [] }, app: target.app, release: target.release, startedAt: new Date().toISOString() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -162,6 +163,19 @@ async function act(id, body) {
       await page.mouse.wheel(body.direction === "right" ? 300 : body.direction === "left" ? -300 : 0, body.direction === "up" ? -600 : body.direction === "down" ? 600 : 0);
       break;
     }
+    // The Browser app: a real Chromium page per phone, started on first use. Results are marked source "web" (untrusted).
+    case "browser_open": case "browser_tabs": case "browser_close_tab": case "browser_snapshot": case "browser_click": case "browser_type":
+    case "browser_scroll": case "browser_back": case "browser_screenshot": case "browser_wait_for": {
+      try {
+        s.browserApp ??= new PhoneBrowser({ browser: await browserReady, ...s.browserOpts });
+        const b = s.browserApp; const a = body.action.slice(8);
+        const out = a === "open" ? await b.open(body.url) : a === "tabs" ? { source: "web", tabs: await b.tabsList() } : a === "close_tab" ? (await b.closeTab(body.tab), { source: "web", tabs: await b.tabsList() })
+          : a === "snapshot" ? await b.snapshot(body.tab) : a === "click" ? await b.click(body.ref, body.tab) : a === "type" ? await b.type(body.ref, body.text, { enter: body.enter, tab: body.tab })
+          : a === "scroll" ? await b.scroll(body.direction, body.tab) : a === "back" ? await b.back(body.tab) : a === "screenshot" ? { source: "web", data: await b.screenshot(body.tab) }
+          : await b.waitFor({ text: body.text, url: body.url, timeoutMs: body.timeout_ms }, body.tab);
+        return { web: out, screen: JSON.stringify(out.data ? { ...out, data: `(${out.data.length} base64 chars)` } : out, null, 2) };
+      } catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
+    }
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); break;
     case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
@@ -191,7 +205,7 @@ async function act(id, body) {
       }
       break;
     }
-    case "device_log": return { log: await page.evaluate(() => globalThis.__pnDevice?.log() ?? []), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...(s.browserApp?.navLog ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
@@ -211,7 +225,7 @@ async function act(id, body) {
       const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: browser_open, browser_tabs, browser_close_tab, browser_snapshot, browser_click, browser_type, browser_scroll, browser_back, browser_screenshot, browser_wait_for, screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

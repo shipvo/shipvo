@@ -19,6 +19,7 @@
     "chromium-hint.mjs",
     "browser-resolver.mjs",
     "app-name.mjs",
+    "phone-browser.mjs",
     "mock-rules.mjs",
     "screen-rules.mjs",
     "push-notification.mjs",

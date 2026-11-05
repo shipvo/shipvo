@@ -1,0 +1,3 @@
+- `@shipvo/sim`: new Browser app core (`phone-browser.mjs`): one isolated Chromium context per phone, mobile emulation with a "ShipvoPhone" user agent, optional `allow_hosts` per session, downloads and uploads off, navigations logged in `device_log`.
+- `@shipvo/mcp`: new tools `browser_open`, `browser_tabs`, `browser_close_tab`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_scroll`, `browser_back`, `browser_screenshot`, `browser_wait_for`. Results are marked `source: "web"` (untrusted).
+- Migration: none; new tools and actions only.
