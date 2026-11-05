@@ -22,6 +22,7 @@ beforeAll(async () => {
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, app: "menu", release: "local", screen: "heading Table Menu" }));
+    if (req.url === "/act" && JSON.parse(raw).session === "m1") return res.end(JSON.stringify({ ok: false, error: "no session 'm1': call /session first", screen: null }));
     if (req.url === "/act" && JSON.parse(raw).ref === "e5") return res.end(JSON.stringify({ ok: false, code: "stale_ref", error: 'stale ref e5: the screen changed. Take a new snapshot (action "screen") and use a ref from it.', screen: "- button \"Item 9\" [ref=e7]" }));
     res.end(JSON.stringify({ ok: true }));
   });
@@ -85,6 +86,14 @@ describe("local mcp", () => {
     const r: any = await c.callTool({ name: "screen", arguments: { session: "s" } });
     expect(r.isError).toBeFalsy();
     expect(r.structuredContent).toBeUndefined();
+    await c.close();
+  });
+  it("returns an error, not an empty log, for device_log on an unknown session", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "device_log", arguments: { session: "m1" } });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toMatch(/^Error: no session 'm1'/);
+    expect(textOf(r)).not.toContain('"log"');
     await c.close();
   });
   it("declares annotations on every tool", async () => {

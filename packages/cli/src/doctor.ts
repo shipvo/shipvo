@@ -23,6 +23,10 @@ type DoctorDeps = {
   /** Path of the Playwright Chromium binary, or null if Playwright is not installed. */
   chromiumPath: (cwd: string) => string | null;
   portFree: (port: number) => Promise<boolean>;
+  /** Skip the checks that need the network (control plane reachable and /health). */
+  offline: boolean;
+  /** Skip the simulator checks (Chromium, port) even when package.json has a `sim` script. */
+  skipSim: boolean;
 };
 
 const defaultDeps = (): DoctorDeps => ({
@@ -37,6 +41,8 @@ const defaultDeps = (): DoctorDeps => ({
   port: 4545,
   chromiumPath: playwrightChromiumPath,
   portFree,
+  offline: false,
+  skipSim: false,
 });
 
 /** Finds Playwright the way packages/sim/server.mjs does (the app's install, then this package's and @shipvo/sim's, then the global npm root) and asks it where Chromium should be. */
@@ -114,16 +120,18 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   const needCfg = "fix shipvo.json first";
   results.push({ name: "signing key matches shipvo.json publicKey", ok: signingOk, fix: !cfg ? needCfg : "restore the right seed with `shipvo keys import` (or set SHIPVO_SIGNING_SEED)" });
 
+  const skipped = "skipped, --offline";
   let controlPlaneOk = false;
   let cpFix = "check shipvo.json controlPlane and your network access (5 second timeout)";
-  if (cfg?.controlPlane && typeof cfg.controlPlane === "string") {
+  if (!deps.offline && cfg?.controlPlane && typeof cfg.controlPlane === "string") {
     try {
       const res = await deps.fetchFn(cfg.controlPlane.replace(/\/$/, ""), { signal: AbortSignal.timeout(5000) });
       if (res.status >= 500) cpFix = `the control plane answered HTTP ${res.status}; check its deploy and logs`;
       else controlPlaneOk = true;
     } catch {}
   }
-  results.push({ name: "control plane reachable", ok: controlPlaneOk, fix: !cfg ? needCfg : cpFix });
+  if (deps.offline) results.push({ name: "control plane reachable", ok: true, fix: "none", note: skipped });
+  else results.push({ name: "control plane reachable", ok: controlPlaneOk, fix: !cfg ? needCfg : cpFix });
 
   const keyName = "signing key file is private";
   const keyPath = seedFilePath(deps.env, deps.cwd);
@@ -139,7 +147,7 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
 
   let healthOk = false;
   let healthFix = "check shipvo.json controlPlane and your network access (5 second timeout)";
-  if (cfg?.controlPlane && typeof cfg.controlPlane === "string") {
+  if (!deps.offline && cfg?.controlPlane && typeof cfg.controlPlane === "string") {
     try {
       const res = await deps.fetchFn(cfg.controlPlane.replace(/\/$/, "") + "/health", { signal: AbortSignal.timeout(5000) });
       if (res.status !== 200) healthFix = `/health answered HTTP ${res.status}, expected 200; check the control plane URL and deploy`;
@@ -150,7 +158,8 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
       healthFix = e instanceof Error && e.name === "TimeoutError" ? "/health did not answer within 5 seconds; check the URL and your network" : healthFix;
     }
   }
-  results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix });
+  if (deps.offline) results.push({ name: "control plane /health returns JSON", ok: true, fix: "none", note: skipped });
+  else results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix });
 
   let hermesOk = true;
   if (cfg && Object.prototype.hasOwnProperty.call(cfg, "hermesBytecodeVersion")) {
@@ -163,7 +172,7 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   results.push({ name: "hermesBytecodeVersion (if present) is set", ok: hermesOk, fix: "set hermesBytecodeVersion to a positive integer or list (for example 96 or [96, 98])" });
 
   // Simulator checks only apply to projects that have a `sim` script.
-  if (hasSimScript(deps)) {
+  if (!deps.skipSim && hasSimScript(deps)) {
     const exe = deps.chromiumPath(deps.cwd);
     results.push({ name: "Playwright Chromium installed", ok: !!exe && deps.fileExists(exe), fix: "npx playwright install chromium" });
     results.push({ name: `sim port ${deps.port} is free`, ok: await deps.portFree(deps.port), fix: "Stop the other process or pass --port <n>" });
@@ -175,9 +184,11 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
 export async function doctor(argv: string[]) {
   const a = parseArgs(argv);
   const port = a.port === undefined ? 4545 : Number(a.port);
+  const offline = argv.includes("--offline");
+  const skipSim = argv.includes("--skip-sim");
   const stray = argv.some((x, i) => !x.startsWith("--") && argv[i - 1] !== "--port");
-  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>]"); process.exit(2); }
-  const results = await runDoctorChecks({ port });
+  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>] [--offline] [--skip-sim]"); process.exit(2); }
+  const results = await runDoctorChecks({ port, offline, skipSim });
   for (const r of results) console.log(`${r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
   if (results.some((r) => !r.ok)) process.exit(1);
 }

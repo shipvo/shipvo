@@ -109,7 +109,7 @@ Settings to turn on:
 | `AGENT_MAX_NEW_ISSUES` | 4 | Most issues the planner files per run. |
 | `AGENT_MAX_RESEARCH_ISSUES` | 3 | Most issues the research lead files per run. |
 | `AGENT_RELEASES` | unset | `false` stops the daily npm release train. |
-| `AGENT_MAX_MERGES_PER_DAY` | 40 | Merge bot cap. |
+| `AGENT_MAX_MERGES_PER_DAY` | 100 | Merge bot cap. |
 | `AGENT_MAX_FIX_ROUNDS` | 3 | Fix attempts before a PR is closed and reassigned. |
 | `AGENT_STALE_DAYS` | 4 | Idle agent PRs are closed after this many days. |
 
