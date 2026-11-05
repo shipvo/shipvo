@@ -17,6 +17,7 @@
     "expo-local-authentication": "*",
     "expo-notifications": "*",
     "expo-clipboard": "*",
+    "expo-contacts": "*",
     "react-native": "*",
     "react": "*"
   },
@@ -34,6 +35,9 @@
       "optional": true
     },
     "expo-clipboard": {
+      "optional": true
+    },
+    "expo-contacts": {
       "optional": true
     }
   },
