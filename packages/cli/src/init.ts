@@ -150,6 +150,7 @@ Next steps:
   2. npx shipvo doctor             # setup checks
   3. npm run sim                   # open the app in the simulator on http://localhost:4545
   4. npx shipvo publish --dry-run  # see what a release would contain
+  5. npx shipvo preview            # get a link you can open on any phone
 `);
 }
 

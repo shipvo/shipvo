@@ -27,6 +27,7 @@ const NAV = [
   { group: "Learn", pages: [
     { slug: "learn", src: "docs/tutorials/index.md", title: "Learn", desc: "Step-by-step Shipvo tutorials for people who have never used a terminal, grouped by goal, with the time each one takes and its level." },
     { slug: "first-app", src: "docs/tutorials/first-app.md", title: "Create your first app", desc: "Create a shop app, open it on a simulated phone in your browser, change its words and check a release. No phone and no coding needed." },
+    { slug: "your-own-shop", src: "docs/tutorials/your-own-shop.md", title: "Make a shop with your own products", desc: "Start from the shop template, put in your own products and prices by editing one file, check the cart on a simulated phone and run a safe practice release." },
     { slug: "glossary", src: "docs/glossary.md", title: "Glossary", desc: "Plain-English meanings for the words Shipvo docs and tutorials use, such as terminal, simulator, release and over the air." },
     { slug: "videos", src: "docs/videos.md", title: "Videos", desc: "Short captioned videos that show how Shipvo works: over-the-air updates, signing, staged rollout and rollback, in plain words." },
   ]},
