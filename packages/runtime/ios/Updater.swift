@@ -40,6 +40,8 @@ enum Updater {
           let wantSize = (core["size"] as? NSNumber)?.intValue, let url = core["url"] as? String else { throw UpdateError("pointer core incomplete") }
     let tmp = s.dir.appendingPathComponent("dl-\(release).tmp")
     try? FileManager.default.removeItem(at: tmp)
+    let part = partialURL(s, sha: wantSha)
+    dropOtherPartials(s, keep: part)
 
     var via = "full", downloadedBytes = 0
     let d0 = Store.now()
@@ -48,21 +50,20 @@ enum Updater {
       ready = true; via = "patch"; downloadedBytes = patch
     }
     var downloadMs = (Store.now() - d0) * 1000
+    var resumedFrom = 0
     if !ready {
       let f0 = Store.now()
-      let (fileURL, dresp) = try await URLSession.shared.download(for: request(resolve(s, url), etag: nil))
-      let dcode = (dresp as? HTTPURLResponse)?.statusCode ?? 0
-      try require(dcode == 200, "bundle HTTP \(dcode)")
+      resumedFrom = try await downloadFull(s, url: resolve(s, url), part: part, wantSize: wantSize)
       try? FileManager.default.removeItem(at: tmp)
-      try FileManager.default.moveItem(at: fileURL, to: tmp)
+      try FileManager.default.moveItem(at: part, to: tmp)
       downloadMs += (Store.now() - f0) * 1000
     }
 
     let v0 = Store.now()
     let size = (try? FileManager.default.attributesOfItem(atPath: tmp.path)[.size] as? Int) ?? -1
-    if via == "full" { downloadedBytes = size }
+    if via == "full" { downloadedBytes = max(0, size - resumedFrom) }
     let ok = try (size == wantSize && Verify.sha256Hex(file: tmp) == wantSha)
-    if !ok { try? FileManager.default.removeItem(at: tmp); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
+    if !ok { try? FileManager.default.removeItem(at: tmp); try? FileManager.default.removeItem(at: part); s.addEvent("verify_failed:\(release)"); throw UpdateError("bundle hash/size mismatch") }
     let verifyMs = (Store.now() - v0) * 1000 + verifyPointerMs
 
     let dest = s.dir.appendingPathComponent("r\(release).hbc")
@@ -71,6 +72,47 @@ enum Updater {
     stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String)
     return ["status": "staged", "release": release, "bytes": downloadedBytes, "via": via, "bundleBytes": size,
             "downloadMs": Int(downloadMs), "verifyMs": Int(verifyMs), "issuedAt": body["issued_at"] as? String ?? ""]
+  }
+
+  /// Partial full-bundle download, named by the release sha256 so a different release never reuses it.
+  static func partialURL(_ s: Store, sha: String) -> URL { s.dir.appendingPathComponent("dl-\(sha).part") }
+
+  /// The release changed: partial files for other hashes can never complete.
+  private static func dropOtherPartials(_ s: Store, keep: URL) {
+    let files = (try? FileManager.default.contentsOfDirectory(at: s.dir, includingPropertiesForKeys: nil)) ?? []
+    for f in files where f.pathExtension == "part" && f.lastPathComponent != keep.lastPathComponent { try? FileManager.default.removeItem(at: f) }
+  }
+
+  /// Download the full bundle into `part`, resuming with `Range: bytes=<n>-` when a partial file exists.
+  /// A 200 answer means the server ignored the range: start over. Returns how many bytes were already on disk.
+  /// If the connection drops, the partial file stays for the next attempt. The caller still checks the signed hash.
+  private static func downloadFull(_ s: Store, url: String, part: URL, wantSize: Int) async throws -> Int {
+    let fm = FileManager.default
+    func have() -> Int { (try? fm.attributesOfItem(atPath: part.path)[.size] as? Int) ?? 0 }
+    var offset = have()
+    if offset > wantSize { try? fm.removeItem(at: part); offset = 0 }
+    if offset == wantSize { return offset }
+    for attempt in 0..<2 {
+      var req = try request(url, etag: nil)
+      if offset > 0 { req.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range") }
+      let (stream, resp) = try await URLSession.shared.bytes(for: req)
+      let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+      if code == 416 && offset > 0 && attempt == 0 { try? fm.removeItem(at: part); offset = 0; continue }
+      try require(code == 200 || (code == 206 && offset > 0), "bundle HTTP \(code)")
+      if code == 200 { try? fm.removeItem(at: part); offset = 0 }
+      if !fm.fileExists(atPath: part.path) { try require(fm.createFile(atPath: part.path, contents: nil), "cannot create partial file") }
+      let h = try FileHandle(forWritingTo: part)
+      defer { try? h.close() }
+      try h.seekToEnd()
+      var buf = Data(); buf.reserveCapacity(64 * 1024)
+      for try await b in stream {
+        buf.append(b)
+        if buf.count >= 64 * 1024 { try h.write(contentsOf: buf); buf.removeAll(keepingCapacity: true) }
+      }
+      if !buf.isEmpty { try h.write(contentsOf: buf) }
+      return offset
+    }
+    throw UpdateError("bundle download failed")
   }
 
   /// Try the patch from the bundle this device runs. Writes the rebuilt bundle to `tmp` and returns the patch size,

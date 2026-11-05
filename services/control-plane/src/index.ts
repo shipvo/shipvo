@@ -88,7 +88,15 @@ app.get("/b/:app/:file", async (c) => {
   if (!ID.test(appId) || !/^[a-z0-9._-]{1,128}$/i.test(file)) return c.json({ error: "bad_request" }, 400);
   const buf = await c.env.POINTERS.get(`b/${appId}/${file}`, "arrayBuffer");
   if (!buf) return c.json({ error: "not_found" }, 404);
-  return new Response(buf, { headers: { "content-type": "application/octet-stream", "cache-control": "public, max-age=31536000, immutable" } });
+  const headers = { "content-type": "application/octet-stream", "cache-control": "public, max-age=31536000, immutable", "accept-ranges": "bytes" };
+  // Resume support: a single `bytes=<n>-` range answers 206 with the tail. Anything else gets the whole file.
+  const m = /^bytes=(\d+)-$/.exec(c.req.header("range") || "");
+  if (m) {
+    const start = Number(m[1]);
+    if (start >= buf.byteLength) return new Response(null, { status: 416, headers: { "content-range": `bytes */${buf.byteLength}` } });
+    return new Response(buf.slice(start), { status: 206, headers: { ...headers, "content-range": `bytes ${start}-${buf.byteLength - 1}/${buf.byteLength}` } });
+  }
+  return new Response(buf, { headers });
 });
 
 /** Device telemetry for the spike: applied / reverted / timings. */

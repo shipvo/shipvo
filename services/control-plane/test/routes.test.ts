@@ -103,6 +103,18 @@ describe("web artifacts and bundles", () => {
     expect((await app.request("/b/tide/a%20b", {}, env)).status).toBe(400);
     expect((await app.request("/b/tide/missing.hbc", {}, env)).status).toBe(404);
   });
+
+  it("serves the tail of a bundle for a Range request", async () => {
+    const e = { POINTERS: kv({ "b/tide/r3.hbc": "0123456789" }) } as any;
+    const r = await app.request("/b/tide/r3.hbc", { headers: { range: "bytes=4-" } }, e);
+    expect(r.status).toBe(206);
+    expect(r.headers.get("content-range")).toBe("bytes 4-9/10");
+    expect(await r.text()).toBe("456789");
+    expect((await app.request("/b/tide/r3.hbc", { headers: { range: "bytes=10-" } }, e)).status).toBe(416);
+    const full = await app.request("/b/tide/r3.hbc", {}, e);
+    expect(full.status).toBe(200);
+    expect(full.headers.get("accept-ranges")).toBe("bytes");
+  });
 });
 
 describe("owner auth", () => {
