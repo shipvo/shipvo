@@ -19,3 +19,12 @@ migrations_dir = "migrations"
 [vars]
 SIM_URL = "https://sim.shipvo.dev"
 GITHUB_CLIENT_ID = "Ov23liAQ86H1hYxN9DuD"   # public GitHub OAuth app id (device flow needs no client secret)
+
+# Telemetry export: the cron below runs hourly and does nothing until you uncomment the bucket.
+# Create it with `npx wrangler r2 bucket create shipvo-telemetry`. See docs/telemetry-export.md.
+[triggers]
+crons = ["17 * * * *"]
+
+# [[r2_buckets]]
+# binding = "EXPORT_BUCKET"
+# bucket_name = "shipvo-telemetry"
