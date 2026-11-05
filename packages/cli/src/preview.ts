@@ -105,6 +105,19 @@ iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 .device[data-skin=iphone] .back::after{content:"";position:absolute;left:0;right:0;top:50%;height:5px;margin-top:-2px;border-radius:3px;background:#fff}
 .back:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .device[data-skin=android] .back{border:0}
+.side{max-width:360px;margin:0 auto 20px;padding:0 10px;box-sizing:border-box}
+.side h2{font-size:14px;margin:0 0 6px}.side ol{padding-left:20px;margin:6px 0}.side li{margin-bottom:6px}.side small{opacity:.7}
+.side button,.side input{font:inherit}
+.side input{width:100%;box-sizing:border-box;min-height:36px;background:transparent;color:inherit;border:1px solid #888;border-radius:6px;padding:4px 8px;margin:4px 0}
+body.dark .side input{background:#15171a;color:#eee}body.dark .side small{opacity:.85}
+.fab{position:fixed;right:12px;bottom:12px;z-index:10;min-width:44px;min-height:44px;padding:8px 14px;font:inherit;border:1px solid #888;border-radius:22px;background:#fff;color:#111;cursor:pointer;box-shadow:0 2px 8px #0004}
+.fab[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}
+.fab:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+body.dark .fab{background:#2a2d31;color:#eee}body.dark .fab[aria-pressed=true]{background:#2563eb;color:#fff}
+.device{position:relative}
+#pin{position:absolute;inset:0;display:none;cursor:crosshair;background:#2563eb22;z-index:5}
+#pin.on{display:block}
+#pin .hint{position:absolute;left:8px;right:8px;top:8px;padding:6px 8px;border-radius:6px;background:#111;color:#fff;font-size:13px;text-align:center}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
 .recp a{color:inherit;text-decoration:underline}body.dark .recp a{color:#93c5fd}.recp button:focus-visible,.bar button:focus-visible,.recp a:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
 .recp{max-width:520px;margin:0 auto;padding:0 12px 24px;text-align:center}.recp p{opacity:.8}.recp button{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
@@ -118,9 +131,10 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 <button data-skin="android" aria-pressed="true">Android</button><button data-skin="iphone" aria-pressed="false">iPhone</button>
 <button data-size="phone" aria-pressed="true">Phone</button><button data-size="large" aria-pressed="false">Large phone</button><button data-size="tablet" aria-pressed="false">Tablet</button>
 <button id="theme" aria-pressed="false">Dark</button></div>
+<button id="comment" class="fab" aria-pressed="false">Comment</button>
 <div class="stage"><div class="device" id="device" data-skin="android" style="width:360px;height:760px">
 <div class="status" id="status"><span id="clock">9:41</span><span class="notch"></span><span class="icons" id="icons">&#9679;&#9679; 5G 100%</span></div>
-<iframe id="app" src="app.html" title="${title}"></iframe>
+<iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" role="button" tabindex="0" aria-label="Tap where the problem is, or press Enter to mark the centre of the device"><span class="hint">Tap where the problem is. Press Escape to cancel.</span></div>
 <div class="nav"><button class="back" id="back" aria-label="Back" title="Back">&#9664; Back</button></div>
 </div>
 <aside class="panel" id="device-panel" aria-label="Device controls"><h2>Device</h2>
@@ -133,15 +147,50 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 <fieldset><legend>Push notification</legend><input data-control="push-title" placeholder="Title" aria-label="Title"><input data-control="push-body" placeholder="Body" aria-label="Body"><button data-control="push-send">Send</button></fieldset>
 <p class="sim" id="panel-status" role="status">All device events here are simulated.</p></aside>
 </div>
+<div class="side" id="side"><h2>Comments (<span id="count">0</span>)</h2>
+<form id="noteform" hidden><label for="notetext">Note for the point you tapped</label><br><input id="notetext"> <button type="submit">Save</button></form><span id="notesaved" role="status"></span>
+<ol id="notelist"></ol>
+<button id="export">Export comments.json</button>
+<p><small>Notes live in this browser until you export them. Nothing is uploaded.</small></p></div>
 <p class="note">${title}: simulated device, public preview. System sheets such as permissions and payments are simulated.</p>
+<script data-notes>
+(function(){
+var KEY="shipvo-preview-comments",steps=[],pending=null,notes=[];
+function $(id){return document.getElementById(id)}
+try{notes=JSON.parse(localStorage.getItem(KEY)||"[]");if(!Array.isArray(notes))notes=[]}catch(e){notes=[]}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(notes))}catch(e){}}
+function esc(t){return String(t).replace(/[&<>"']/g,function(c){return"&#"+c.charCodeAt(0)+";"})}
+function screenName(){try{var w=$("app").contentWindow,t=w.document.title,r=w.location.pathname+(w.location.hash||"");return t?t+" ("+r+")":r}catch(e){return"unknown"}}
+function step(text){steps.push(text)}
+function add(note,x,y){var n={note:String(note),x:Math.round(x),y:Math.round(y),screen:screenName(),steps:steps.slice()};notes.push(n);save();render();return n}
+function exportJson(){return JSON.stringify(notes,null,2)}
+function render(){var l=$("notelist"),c=$("count");if(c)c.textContent=notes.length;if(l)l.innerHTML=notes.map(function(n){return"<li>"+esc(n.note)+"<br><small>"+esc(n.screen)+" at "+Number(n.x)+","+Number(n.y)+", "+(n.steps||[]).length+" steps</small></li>"}).join("")}
+function download(){var b=new Blob([exportJson()],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="comments.json";document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}
+function label(e){var t=e.getAttribute&&(e.getAttribute("aria-label")||e.textContent)||"";return String(t).trim().slice(0,40)}
+var seen=typeof WeakSet==="function"?new WeakSet():null;
+function watch(){try{var d=$("app").contentWindow.document;if(seen){if(seen.has(d))return;seen.add(d)}d.addEventListener("click",function(ev){var e=ev.target,k=e&&e.closest&&e.closest("button,[role=button],a,input");step("tap "+(k?label(k)||"control":"screen"))},true)}catch(e){}}
+function setMode(on,refocus){var p=$("pin"),b=$("comment");if(p)p.className=on?"on":"";if(b){b.setAttribute("aria-pressed",on);if(refocus&&b.focus)b.focus()}if(on&&p&&p.focus)p.focus()}
+var cb=$("comment");if(cb)cb.onclick=function(){setMode($("pin").className!=="on")};
+function place(x,y){pending={x:x,y:y};setMode(false);$("noteform").hidden=false;if($("notetext").focus)$("notetext").focus()}
+var pin=$("pin");if(pin){pin.onclick=function(ev){var r=pin.getBoundingClientRect?pin.getBoundingClientRect():{left:0,top:0};place(ev.clientX-r.left,ev.clientY-r.top)};
+pin.onkeydown=function(ev){if(ev.key==="Enter"||ev.key===" "){if(ev.preventDefault)ev.preventDefault();var r=pin.getBoundingClientRect?pin.getBoundingClientRect():{width:0,height:0};place((r.width||0)/2,(r.height||0)/2)}}}
+var fm=$("noteform");if(fm)fm.onsubmit=function(ev){if(ev&&ev.preventDefault)ev.preventDefault();var t=$("notetext");if(pending&&t.value.trim()){add(t.value.trim(),pending.x,pending.y)}t.value="";pending=null;fm.hidden=true;var st=$("notesaved");if(st)st.textContent="Saved";setMode(false,true);return false};
+if(document.addEventListener)document.addEventListener("keydown",function(ev){if(ev.key==="Escape"){var was=$("pin")&&$("pin").className==="on",f=$("noteform");if(was||(f&&!f.hidden)){if(f)f.hidden=true;pending=null;setMode(false,true)}}});
+var ex=$("export");if(ex)ex.onclick=download;
+var bk=$("back");if(bk&&bk.addEventListener)bk.addEventListener("click",function(){step("back")});
+var ap=$("app");if(ap){if(ap.addEventListener)ap.addEventListener("load",watch);watch()}
+window.shipvoNotes={add:add,step:step,list:function(){return notes.slice()},exportJson:exportJson,download:download};
+render();
+})();
+</script>
 <section class="recp" aria-label="Recorder"><p id="honesty">This is the app's web build on Shipvo's simulated device, measured against Android and iOS in <a href="https://github.com/shipvo/shipvo/blob/main/docs/parity-results.md">docs/parity-results.md</a>. Native-only UI can differ.</p>
-<button id="rec" aria-pressed="false">Record</button> <button id="dl" disabled>Download test</button> <span id="count" aria-live="polite">0 steps</span></section>
+<button id="rec" aria-pressed="false">Record</button> <button id="dl" disabled>Download test</button> <span id="stepcount" aria-live="polite">0 steps</span></section>
 <script>${RECORDER_JS}
 var APP=${JSON.stringify(appId).replace(/</g, "\\u003c")},TITLE=${JSON.stringify(title).replace(/</g, "\\u003c")},recording=false;
-function step(s){if(recording){shipvoSteps.push(s);document.getElementById("count").textContent=shipvoSteps.length+(shipvoSteps.length===1?" step":" steps");document.getElementById("dl").disabled=false}}
+function step(s){if(recording){shipvoSteps.push(s);document.getElementById("stepcount").textContent=shipvoSteps.length+(shipvoSteps.length===1?" step":" steps");document.getElementById("dl").disabled=false}}
 document.getElementById("app").addEventListener("load",function(){shipvoAttach(this,step)});
 (function(a){if(a.contentDocument&&a.contentDocument.readyState==="complete")shipvoAttach(a,step)})(document.getElementById("app"));
-document.getElementById("rec").onclick=function(){recording=!recording;if(recording){shipvoSteps.length=0;document.getElementById("count").textContent="0 steps";document.getElementById("dl").disabled=true}this.setAttribute("aria-pressed",recording)};
+document.getElementById("rec").onclick=function(){recording=!recording;if(recording){shipvoSteps.length=0;document.getElementById("stepcount").textContent="0 steps";document.getElementById("dl").disabled=true}this.setAttribute("aria-pressed",recording)};
 document.getElementById("dl").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([shipvoExport(APP,shipvoSteps,TITLE)],{type:"text/typescript"}));a.download="recorded-session.test.ts";a.click()};
 var SIZES={phone:[360,760],large:[412,892],tablet:[820,1180]},IPHONE={phone:[390,844],large:[430,932],tablet:[820,1180]};
 var skin="android",size="phone",d=document.getElementById("device"),f=document.getElementById("app"),bk=document.getElementById("back");

@@ -111,7 +111,7 @@ describe("frame page", () => {
     const clicked: string[] = [];
     const backBtn = { getAttribute: () => "Back", textContent: "", click: () => clicked.push("btn") };
     const win = { document: { querySelectorAll: () => [backBtn] }, history: { back: () => clicked.push("history") } };
-    for (const id of ["device", "app", "back", "icons", "theme", "rec", "dl", "count"]) nodes[id] = mk(id === "app" ? { contentWindow: win } : {});
+    for (const id of ["device", "app", "back", "icons", "theme", "rec", "dl", "stepcount"]) nodes[id] = mk(id === "app" ? { contentWindow: win } : {});
     const chips = [["skin", "iphone"], ["size", "tablet"]].map(([k, v]) => mk({ dataset: { [k]: v } }));
     const doc = { getElementById: (id: string) => nodes[id], querySelectorAll: (s: string) => (s === "[data-skin]" ? [chips[0]] : s === "[data-size]" ? [chips[1]] : []), body: mk() };
     new Function("document", script)(doc);
@@ -134,6 +134,124 @@ describe("frame page", () => {
     const out = wrapBuild(d, "Shop");
     expect(Buffer.from(out.find((f) => f.path === "app.html")!.bytes).toString()).toBe("<app>");
     expect(Buffer.from(out.find((f) => f.path === "index.html")!.bytes).toString()).toContain("app.html");
+  });
+});
+
+describe("frame page comments", () => {
+  function boot(store: Record<string, string> = {}) {
+    const script = framePage("Shop").match(/<script data-notes>([\s\S]*?)<\/script>/)![1];
+    const mk = (extra: object = {}) => ({ attrs: {} as Record<string, unknown>, setAttribute(k: string, v: unknown) { this.attrs[k] = v; }, className: "", textContent: "", innerHTML: "", value: "", hidden: true, ...extra });
+    const appDoc = { title: "Cart", listeners: {} as Record<string, any>, addEventListener(t: string, fn: any) { this.listeners[t] = fn; } };
+    const nodes: Record<string, any> = {};
+    for (const id of ["comment", "pin", "noteform", "notetext", "export", "notelist", "count", "back"]) nodes[id] = mk();
+    nodes.app = mk({ contentWindow: { document: appDoc, location: { pathname: "/cart", hash: "" } } });
+    const downloaded: string[] = [];
+    const doc = { addEventListener(t: string, fn: any) { (doc as any).l = { ...(doc as any).l, [t]: fn }; }, getElementById: (id: string) => nodes[id], createElement: () => ({ click() { downloaded.push((this as any).download); } }), body: { appendChild() {}, removeChild() {} } };
+    const ls = { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; } };
+    const win: any = {};
+    const blobs: string[] = [];
+    new Function("document", "localStorage", "window", "Blob", "URL", script)(doc, ls, win, class { constructor(p: string[]) { blobs.push(p[0]); } }, { createObjectURL: () => "blob:x", revokeObjectURL() {} });
+    return { win, nodes, appDoc, doc, store, downloaded, blobs };
+  }
+  it("shows the Comment button, side list, export button and the browser-only notice", () => {
+    const h = framePage("Shop");
+    expect(h).toContain('id="comment"');
+    expect(h).toContain('id="notelist"');
+    expect(h).toContain("Export comments.json");
+    expect(h).toContain("Notes live in this browser until you export them");
+  });
+  it("records note, point, screen and the steps taken", () => {
+    const { win, appDoc, nodes } = boot();
+    appDoc.listeners.click({ target: { closest: () => ({ getAttribute: () => "Add to cart", textContent: "" }) } });
+    win.shipvoNotes.step("back");
+    const n = win.shipvoNotes.add("Price is cut off", 10.4, 20.6);
+    expect(n).toEqual({ note: "Price is cut off", x: 10, y: 21, screen: "Cart (/cart)", steps: ["tap Add to cart", "back"] });
+    expect(nodes.count.textContent).toBe(1);
+    expect(nodes.notelist.innerHTML).toContain("Cart");
+  });
+  it("exports valid JSON with every note, and downloads comments.json", () => {
+    const { win, nodes, downloaded, blobs } = boot();
+    win.shipvoNotes.add("one", 1, 2); win.shipvoNotes.add("two", 3, 4);
+    expect(JSON.parse(win.shipvoNotes.exportJson()).map((n: any) => n.note)).toEqual(["one", "two"]);
+    win.shipvoNotes.step("tap Buy");
+    win.shipvoNotes.add("three", 5, 6);
+    for (const n of JSON.parse(win.shipvoNotes.exportJson()).slice(2)) {
+      expect(n.screen).toBe("Cart (/cart)");
+      expect(n.steps.length).toBeGreaterThan(0);
+    }
+    nodes.export.onclick();
+    expect(downloaded).toEqual(["comments.json"]);
+    expect(JSON.parse(blobs[0])).toHaveLength(3);
+  });
+  it("keeps the Comment button outside the toolbar that the 500px rule hides", () => {
+    const h = framePage("Shop");
+    const bar = h.match(/<div class="bar"[\s\S]*?<\/div>/)![0];
+    expect(bar).not.toContain('id="comment"');
+    expect(h).toMatch(/\.fab\{position:fixed/);
+    expect(h).toMatch(/@media \(max-width:500px\)\{\.bar,\.note\{display:none\}/);
+    expect(h).not.toMatch(/@media \(max-width:500px\)\{[^\n]*\.fab\{[^}]*display:none/);
+    expect(h).toMatch(/\.fab\{[^}]*min-height:44px/);
+    expect(h).toContain("body.dark .side input");
+    expect(h).not.toContain('size="30"');
+  });
+  it("does not record a tap on the pin overlay as a step", () => {
+    const { win, nodes } = boot();
+    nodes.comment.onclick();
+    nodes.pin.onclick({ clientX: 1, clientY: 2 });
+    nodes.notetext.value = "x"; nodes.noteform.onsubmit({ preventDefault() {} });
+    expect(win.shipvoNotes.list()[0].steps).toEqual([]);
+  });
+  it("gives different screens for a fixed title and a changing route", () => {
+    const { win, nodes } = boot();
+    win.shipvoNotes.add("a", 1, 1);
+    nodes.app.contentWindow.location.hash = "#/checkout";
+    win.shipvoNotes.add("b", 1, 1);
+    const [a, b] = win.shipvoNotes.list();
+    expect(a.screen).not.toBe(b.screen);
+    expect(b.screen).toBe("Cart (/cart#/checkout)");
+  });
+  it("cancels comment mode with Escape and shows visible hint text", () => {
+    const { nodes, doc } = boot();
+    nodes.comment.onclick(); expect(nodes.pin.className).toBe("on");
+    (doc as any).l.keydown({ key: "Escape" });
+    expect(nodes.pin.className).toBe("");
+    expect(framePage("Shop")).toContain("Tap where the problem is. Press Escape");
+  });
+  it("lets a keyboard user place a point with Enter, save, and get focus back", () => {
+    const { win, nodes } = boot();
+    const focused: string[] = [];
+    for (const k of ["comment", "pin", "notetext"]) nodes[k].focus = () => focused.push(k);
+    nodes.pin.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 200 });
+    const h = framePage("Shop");
+    expect(h).toMatch(/id="pin" role="button" tabindex="0"/);
+    nodes.comment.onclick(); expect(focused.pop()).toBe("pin");
+    nodes.pin.onkeydown({ key: "Enter", preventDefault() {} });
+    expect(nodes.noteform.hidden).toBe(false);
+    nodes.notetext.value = "kbd"; nodes.noteform.onsubmit({ preventDefault() {} });
+    expect(win.shipvoNotes.list()[0]).toMatchObject({ note: "kbd", x: 50, y: 100 });
+    expect(focused.pop()).toBe("comment");
+  });
+  it("returns focus to the Comment button on Escape", () => {
+    const { nodes, doc } = boot();
+    const focused: string[] = [];
+    nodes.comment.focus = () => focused.push("comment");
+    nodes.comment.onclick();
+    (doc as any).l.keydown({ key: "Escape" });
+    expect(focused).toEqual(["comment"]);
+  });
+  it("keeps notes after a reload via localStorage", () => {
+    const first = boot();
+    first.win.shipvoNotes.add("kept", 5, 6);
+    const second = boot(first.store);
+    expect(second.win.shipvoNotes.list().map((n: any) => n.note)).toEqual(["kept"]);
+    expect(second.nodes.count.textContent).toBe(1);
+  });
+  it("saves a note through the form after a tap on the pin overlay", () => {
+    const { win, nodes } = boot();
+    nodes.comment.onclick(); expect(nodes.pin.className).toBe("on");
+    nodes.pin.onclick({ clientX: 30, clientY: 40 });
+    nodes.notetext.value = "Looks wrong"; nodes.noteform.onsubmit({ preventDefault() {} });
+    expect(win.shipvoNotes.list()[0]).toMatchObject({ note: "Looks wrong", x: 30, y: 40, screen: "Cart (/cart)" });
   });
 });
 

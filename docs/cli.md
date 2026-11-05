@@ -74,6 +74,8 @@ Options: `--skip-build` publishes the last build in `.shipvo/preview-build`.
 
 `shipvo.json` has a `preview` setting: `"here.now"` (default). `"control-plane"` (permanent hosting at `/w/{app}/r{release}/`) is reserved and not built yet; setting it stops with a message.
 
+Testers can tap **Comment** (a button that stays visible on phones), tap a point in the app and type a note. Each note stores the text, the point, the screen and the steps taken so far. Notes show in a side list, stay in the browser (localStorage) until exported, and **Export comments.json** downloads them. Nothing is uploaded. The point is measured from the top left of the whole device box, status bar included. Steps are kept in memory, so notes saved after a reload start with an empty step list.
+
 Agents can call the MCP tool `publish_preview`; it runs `shipvo preview --json` in `PN_APP_DIR` (or the current folder) and returns `{ url, claimUrl, expiresAt }`.
 
 `shipvo init` adds `.github/workflows/preview.yml`, which publishes each pull request's web build and comments the link on the pull request. Pull requests from forks are skipped.

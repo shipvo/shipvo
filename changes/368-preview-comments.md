@@ -1,0 +1,2 @@
+- `shipvo preview`: the preview page has a Comment button. Testers tap a point and type a note; each note keeps the screen and the steps taken. Notes show in a side list, stay in the browser (localStorage) and export as `comments.json`. Nothing is uploaded.
+- Migration: none.
