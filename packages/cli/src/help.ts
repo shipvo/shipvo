@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "publish", "rollback", "app", "login", "doctor", "keys", "mcp",
+  "init", "sim", "publish", "rollback", "app", "login", "doctor", "status", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -18,6 +18,7 @@ Ship
   app create | list | delete  Register, list or remove apps on the hosted control plane
   login                       Sign in with GitHub and get a key for the hosted simulator
   doctor                      Check setup before first publish
+  status [--app id] [--json]  Show how the newest releases are doing on phones
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine

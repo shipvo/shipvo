@@ -4,6 +4,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **@shipvo/cli**: new command `shipvo status [--app <id>] [--json]` reads `/t/<app>/summary` from the control plane in `shipvo.json` and prints event counts and median apply and cold start times for the newest releases. Prints "No telemetry yet" when empty; exits 1 with a plain message when the control plane is unreachable. Migration: none.
 - **@shipvo/runtime**: Android and iOS shells now refuse a release whose `hermes_bytecode_version` differs from the Hermes bytecode version of the shell's embedded bundle. The release is discarded and the current release keeps running. `consumeEvents()` returns `hermes_bytecode_mismatch:<release>:release=<n>:shell=<m>`, and `checkForUpdate` returns `{ status: "none", reason: "hermes_bytecode_mismatch" }`. A missing field on the release, or an embedded bundle that is not Hermes bytecode, means the release is applied as before. This runs in addition to the signature and hash checks. Migration: none; `CheckResult` gains an optional `reason`.
 
 ## 2026-11-04 (release)
