@@ -290,6 +290,19 @@ jobs:
             if [ "$ISSUE" != "0" ] && [ ! -f /tmp/agent/blocked.md ]; then
               gh issue comment "$ISSUE" -R "$REPO" --body "Agent run ended without changes. Run: $RUN_URL" || true
               gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:in-progress || true
+              # Two empty runs in a row: this engineer cannot do it. Hand it to Claude, or, if Claude is the one
+              # failing, block it so the Head of Product re-slices it. Never loop on the same issue.
+              LAST2=$(gh api "repos/$REPO/issues/$ISSUE/comments?per_page=100" --jq '[.[]|.body][-2:]|map(startswith("Agent run ended without changes"))|all')
+              if [ "$LAST2" = "true" ]; then
+                LABELS=$(gh api "repos/$REPO/issues/$ISSUE" --jq '[.labels[].name]|join(",")')
+                if echo "$LABELS" | grep -qE "agent:(mistral|aider)"; then
+                  gh issue edit "$ISSUE" -R "$REPO" --remove-label agent:mistral --remove-label agent:aider --add-label agent:claude || true
+                  gh issue comment "$ISSUE" -R "$REPO" --body "Two runs in a row ended without changes, so this goes to the Claude engineer." || true
+                else
+                  gh issue edit "$ISSUE" -R "$REPO" --add-label agent:blocked || true
+                  gh issue comment "$ISSUE" -R "$REPO" --body "Two runs in a row ended without changes. Blocked until the Head of Product re-slices it into smaller issues." || true
+                fi
+              fi
             fi
             exit 0
           fi

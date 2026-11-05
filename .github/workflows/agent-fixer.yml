@@ -110,7 +110,9 @@ jobs:
           if not (B.startswith("agent/") or B.startswith("copilot/")): raise SystemExit
           # Copilot PRs left over from before are fixed by Claude.
           engine = "aider" if B.startswith(("agent/aider/", "agent/mistral/")) else "claude"
-          provider = "mistral" if B.startswith("agent/mistral/") else "kilo"
+          # Aider cannot resolve merge conflicts; Claude resolves them on any engineer's PR.
+          if E["LABEL"] == "agent:conflict" and E["EVENT"] != "workflow_run": engine = "claude"
+          provider = "mistral" if B.startswith("agent/mistral/") and engine == "aider" else "kilo"
           details = ""
           if engine == "aider":
               # Aider has no GitHub tools, so hand it the failing log and the latest review comment.
