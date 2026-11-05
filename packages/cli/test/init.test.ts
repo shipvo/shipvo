@@ -146,3 +146,64 @@ it("--template with no value says it needs a name", async () => {
   expect(String(err.mock.calls[0][0])).toContain("--template needs a name");
   err.mockRestore(); exit.mockRestore();
 });
+
+import { mkdirSync, mkdtempSync as mk, writeFileSync } from "node:fs";
+const inExpo = (expo: boolean) => {
+  const d = mk(join(tmpdir(), "route-"));
+  writeFileSync(join(d, "package.json"), JSON.stringify(expo ? { name: "habits", dependencies: { expo: "~58.0.21" } } : { name: "plain" }));
+  if (expo) writeFileSync(join(d, "app.json"), JSON.stringify({ expo: { name: "Habits", slug: "habits" } }));
+  return d;
+};
+const run = async (cwd: string, argv: string[]) => {
+  const prev = process.cwd(); process.chdir(cwd);
+  const logs: string[] = [], errs: string[] = [];
+  vi.spyOn(console, "log").mockImplementation((m?: unknown) => { logs.push(String(m)); });
+  vi.spyOn(console, "error").mockImplementation((m?: unknown) => { errs.push(String(m)); });
+  const exit = vi.spyOn(process, "exit").mockImplementation(((c?: number) => { throw new Error(`exit ${c}`); }) as never);
+  let code: string | null = null;
+  try { await init(argv); } catch (e) { code = (e as Error).message; } finally { process.chdir(prev); exit.mockRestore(); }
+  return { out: logs.join("\n"), err: errs.join("\n"), code };
+};
+
+it("init with no folder or '.' inside an Expo app enters adopt mode and changes nothing with --dry-run", async () => {
+  const d = inExpo(true);
+  for (const argv of [["--dry-run"], [".", "--dry-run"], ["--dry-run", "."], ["--yes", ".", "--dry-run"]]) {
+    const r = await run(d, argv);
+    expect(r.out).toContain("Shipvo found an Expo app");
+    expect(r.out).toContain("nothing was changed");
+  }
+  expect(existsSync(join(d, "shipvo.json"))).toBe(false);
+  rmSync(d, { recursive: true, force: true });
+});
+
+it("init <dir> inside an Expo app still creates the new app", async () => {
+  const d = inExpo(true);
+  const r = await run(d, ["child", "--public-key", "AAAA"]);
+  expect(r.code).toBeNull();
+  expect(existsSync(join(d, "child", "shipvo.json"))).toBe(true);
+  rmSync(d, { recursive: true, force: true });
+});
+
+it("init with no folder in a non-Expo folder exits 2 with the needs-a-folder message", async () => {
+  const d = inExpo(false);
+  const r = await run(d, []);
+  expect(r.code).toBe("exit 2");
+  expect(r.err).toContain("init needs a folder name");
+  rmSync(d, { recursive: true, force: true });
+});
+
+it("init --yes . and init --dry-run . in a non-Expo folder show the adopt refusal", async () => {
+  const d = inExpo(false);
+  for (const argv of [["--yes", "."], ["--dry-run", "."]]) {
+    const r = await run(d, argv);
+    expect(r.code).toBe("exit 1");
+    expect(r.err).toContain("is not an Expo app");
+  }
+  rmSync(d, { recursive: true, force: true });
+});
+
+it("init --help mentions adopt mode and --dry-run", async () => {
+  const r = await run(tmp, ["--help"]);
+  expect(r.out).toContain("adopt mode");
+  expect(r.out).toContain("--dry-run");
+});
