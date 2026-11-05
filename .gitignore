@@ -22,3 +22,4 @@ public/security/
 *.mov
 *.webm
 *.mkv
+.gradle/
