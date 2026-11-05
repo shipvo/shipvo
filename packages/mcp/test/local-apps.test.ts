@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import http from "node:http";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -209,5 +209,33 @@ describe("change line", () => {
     expect(first).not.toMatch(/new screen/);
     expect(first).toMatch(/^Change: unknown/);
     expect(await call()).toMatch(/^Change: none\n/);
+  });
+});
+
+describe("owner_command confirm", () => {
+  let control: http.Server; const seen: { headers: http.IncomingHttpHeaders; body: any }[] = [];
+  beforeAll(async () => {
+    control = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      seen.push({ headers: req.headers, body: JSON.parse(raw || "{}") });
+      res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ ok: true }));
+    });
+    await new Promise<void>((r) => control.listen(0, r));
+  });
+  afterAll(() => control?.close());
+  const url = () => `http://127.0.0.1:${(control.address() as { port: number }).port}`;
+  it("passes confirm and the shipvo.json agent rules to the control plane", async () => {
+    const dir = mkdtempSync(join(root, "dist-test-app-"));
+    writeFileSync(join(dir, "shipvo.json"), JSON.stringify({ agentPolicy: "deny", agentDeny: ["set_theme", "publish"] }));
+    try {
+      const c = await connect({ PN_CONTROL: url(), PN_OWNER_TOKEN: "t", PN_APP_DIR: dir });
+      await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x" }, confirm: true } });
+      await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x" } } });
+      expect(seen[0]!.body).toEqual({ name: "publish", args: { note: "x", confirm: true } });
+      expect(seen[0]!.headers["x-shipvo-agent-policy"]).toBe("deny");
+      expect(seen[0]!.headers["x-shipvo-agent-deny"]).toBe("set_theme,publish");
+      expect(seen[1]!.body.args).toEqual({ note: "x" });
+      await c.close();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
