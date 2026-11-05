@@ -73,3 +73,5 @@ that no order was placed, using end_session at the end.
 The simulator is not a phone. It renders your app on the web and simulates the device, so it does not catch native crashes, real camera or GPU behaviour, or how your app runs on a slow phone. Everything simulated is labelled: receipts start with `SIMULATED-` and the device log marks each event `simulated: true`. We publish where the simulator and real devices differ in the [parity results](/docs/parity-results/), including the gaps.
 
 Use the assistant for exploration, the questions you would not think to write down. When you find a flow worth protecting, write it as a [typed test](/docs/testing/) so it runs on every pull request. The assistant finds the bug once; the test makes sure it stays fixed.
+
+New to terminals? Read [how to build a mobile app without coding, and what to plan for after version one](/blog/build-a-mobile-app-without-coding/).
