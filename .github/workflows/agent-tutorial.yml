@@ -1,7 +1,7 @@
 # Founder Academy: one complete, tested tutorial for non-technical founders, with screenshots, on shipvo.dev.
 name: agent-tutorial
 on:
-  schedule: [{ cron: "43 7 * * *" }]
+  schedule: [{ cron: "43 7,19 * * *" }]
   workflow_dispatch:
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
 concurrency: { group: agent-tutorial }

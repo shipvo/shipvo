@@ -1,7 +1,7 @@
 # Video Studio: one handcrafted educational video (code-built scenes, real simulator recordings, open-source narration) published on shipvo.dev.
 name: agent-video
 on:
-  schedule: [{ cron: "23 8 * * *" }]
+  schedule: [{ cron: "23 2,10,18 * * *" }]
   workflow_dispatch:
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
 concurrency: { group: agent-video }
