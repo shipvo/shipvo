@@ -69,3 +69,7 @@ export const Runtime: Native = native
       reload: () => native.reload(),
     }
   : fallback;
+
+// Framework-free release decision. Lives in ./decide so other adapters can import it without React Native.
+export { decideRelease, semverLess } from "./decide";
+export type { PointerFields, ShellFacts, ReleaseDecision } from "./decide";
