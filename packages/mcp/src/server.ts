@@ -101,7 +101,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
 });
 
-server.tool("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, async () => {
+server.tool("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, { readOnlyHint: true }, async () => {
   const r = await sim("/sessions", {}) as Act & { sessions?: { session: string; app: string; release: string | number; started_at: string | null }[] };
   const rows = (r.sessions ?? []).filter((s) => !keyApps || keyApps.includes(s.app));
   return text(rows.length ? rows.map((s) => `${s.session}: ${s.app} release ${s.release}${s.started_at ? ` since ${s.started_at}` : ""}`).join("\n") : "no open sessions");
@@ -110,7 +110,7 @@ const sid = z.string().describe("Session from open_app");
 const compact = z.boolean().optional().describe("When the change is 'content changed', return only the added/removed lines, not the whole screen");
 const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
-server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); }, { annotations: { readOnlyHint: true } });
+server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, { readOnlyHint: true }, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
 server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, { readOnlyHint: false }, async ({ session, ref, compact }: { session: string; ref: string; compact?: boolean }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact }); });
 server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact },
   { readOnlyHint: false }, async ({ session, ref, text: t, enter, compact }: { session: string; ref: string; text: string; enter?: boolean; compact?: boolean }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref }); });
