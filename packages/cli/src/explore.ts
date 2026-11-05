@@ -58,6 +58,7 @@ export function elements(tree: string): El[] {
 /** The tree without refs, to tell whether two screens are the same. */
 export const signature = (tree: string) => tree.replace(/\s*\[ref=\w+\]/g, "");
 const redScreen = (tree: string) => /Uncaught (\w*Error)|Unhandled Runtime Error|Application error|Something went wrong/i.exec(tree)?.[0];
+// Accepts "close" too, but the sim `back` action only clicks a button named exactly "Back"; the replay fallback covers the rest.
 const hasBack = (els: El[]) => els.some((e) => /^(back|go back|close)$/i.test(e.name));
 const label = (e: { role: string; name: string }) => `${e.role} "${e.name}"`;
 
@@ -96,7 +97,7 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
     seenScreens.add(sig);
     await checkErrors(screen, path);
     const els = elements(screen);
-    if (!els.length && !hasBack(els)) add({ kind: "dead_end", message: "Dead end: no actionable element and no back path", screen, steps: path });
+    if (!els.length) add({ kind: "dead_end", message: "Dead end: no actionable element and no back path", screen, steps: path });
     for (const e of els) if (!e.name) add({ kind: "unnamed", message: `Unnamed ${e.role}: it has no accessible name`, screen, steps: path });
     let current = screen;
     for (const e of els) {
