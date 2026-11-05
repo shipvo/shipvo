@@ -78,7 +78,7 @@ This is the part we think no-code guides miss. Your assistant can use the app as
 
 Then ask: "Open my app and try to find the bakery's opening hours. Tell me where you got stuck." The assistant reads the screen as a list of labelled buttons and text, taps through it and reports back. If it cannot find a button, a screen reader user probably cannot either. See [test your app with an assistant](/docs/test-with-an-assistant/) for the full steps, and [your assistant can test your app now](/blog/your-assistant-can-test-your-app/) for why this works.
 
-An assistant is a reviewer, not a guarantee. It finds confusing screens. It does not replace a person trying the app on a real phone before a big launch.
+An assistant is a reviewer, not a guarantee. It finds confusing screens. Have a person try the flows that matter most before a big launch.
 
 ## Changing the app after it is live
 
