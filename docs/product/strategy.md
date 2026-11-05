@@ -28,6 +28,11 @@ Why they would still choose something else today:
 
 **North-star metric: weekly OTA releases applied and healthy on devices that are not ours.** Not measured yet. How: count distinct app IDs other than `tide-and-tackle` with at least one `healthy` telemetry row per week in the control-plane `telemetry` table. Needs a read-only query script (bet 3).
 
+**How to run the north-star query:**
+```bash
+CLOUDFLARE_ACCOUNT_ID=xxx CLOUDFLARE_API_TOKEN=xxx node scripts/count-healthy-releases.mjs
+```
+
 Input metrics:
 
 | Metric | Current value | Source or how to measure |
