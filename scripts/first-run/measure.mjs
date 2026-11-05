@@ -28,10 +28,8 @@ function cleanEnv() {
 }
 
 function detectPackageManager() {
-  try {
-    const v = spawnSync("pnpm", ["--version"], { encoding: "utf8" });
-    if (v.status === 0) return "pnpm";
-  } catch {}
+  const v = spawnSync("pnpm", ["--version"], { encoding: "utf8" });
+  if (!v.error && v.status === 0) return "pnpm";
   return "npm";
 }
 
@@ -41,7 +39,9 @@ function runInstallStep(cwd) {
   const r = spawnSync(pm, ["install"], { cwd, encoding: "utf8", env: cleanEnv() });
   const ms = Math.round(performance.now() - t0);
   const exit = r.status ?? (r.error ? 127 : 1);
-  return { step: "install", ms, exit, stderr: r.stderr || (r.error ? String(r.error) : ""), pm };
+  const v = spawnSync(pm, ["--version"], { encoding: "utf8" });
+  const version = (v.stdout || "").trim();
+  return { step: "install", ms, exit, stderr: r.stderr || (r.error ? String(r.error) : ""), pm, version };
 }
 
 export function table(results) {
@@ -81,8 +81,8 @@ export function main(argv) {
   console.log(table(results));
   if (withInstall) {
     const inst = results.find((r) => r.step === "install");
-    const pm = inst?.pm ?? detectPackageManager();
-    const ver = spawnSync(pm, ["--version"], { encoding: "utf8" }).stdout.trim();
+    const pm = inst?.pm;
+    const ver = inst?.version;
     console.log(`package manager: ${pm} ${ver}`);
   }
   const bad = results.filter((r) => r.exit !== 0);

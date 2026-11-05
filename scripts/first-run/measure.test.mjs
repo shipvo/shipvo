@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, readFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { table } from "./measure.mjs";
@@ -61,10 +61,13 @@ test("with --with-install, install step is included", () => {
   const pnpm = join(bindir, "pnpm");
   writeFileSync(pnpm, "#!/bin/sh\necho 9.9.9\nexit 0\n");
   chmodSync(pnpm, 0o755);
+  const npm = join(bindir, "npm");
+  writeFileSync(npm, "#!/bin/sh\nexit 0\n");
+  chmodSync(npm, 0o755);
   const f = fake(`import {mkdirSync} from "node:fs"; if (process.argv[2]==="init") mkdirSync(process.argv[3],{recursive:true});`);
   const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], {
     encoding: "utf8",
-    env: { ...process.env, PATH: bindir + ":" + process.env.PATH },
+    env: { ...process.env, PATH: bindir + ":" + dirname(process.execPath) },
   });
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
@@ -76,15 +79,33 @@ test("with --with-install, install step is included", () => {
 test("a failing install stops the run and shows its stderr", () => {
   const bindir = mkdtempSync(join(tmpdir(), "fake-pnpm-"));
   const pnpm = join(bindir, "pnpm");
-  writeFileSync(pnpm, "#!/bin/sh\necho boom: install failed >&2\nexit 1\n");
+  writeFileSync(pnpm, "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 9.9.9; exit 0; fi\necho boom: install failed >&2\nexit 1\n");
   chmodSync(pnpm, 0o755);
+  const npm = join(bindir, "npm");
+  writeFileSync(npm, "#!/bin/sh\nexit 0\n");
+  chmodSync(npm, 0o755);
   const f = fake(`import {mkdirSync} from "node:fs"; if (process.argv[2]==="init") mkdirSync(process.argv[3],{recursive:true});`);
   const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], {
     encoding: "utf8",
-    env: { ...process.env, PATH: bindir + ":" + process.env.PATH },
+    env: { ...process.env, PATH: bindir + ":" + dirname(process.execPath) },
   });
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /boom: install failed/);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
   assert.deepEqual(j.map((x) => x.step), ["init", "install"]);
+});
+
+test("with --with-install, a failing init runs no install", () => {
+  const bindir = mkdtempSync(join(tmpdir(), "fake-pnpm-"));
+  const pnpm = join(bindir, "pnpm");
+  writeFileSync(pnpm, "#!/bin/sh\necho 9.9.9\nexit 0\n");
+  chmodSync(pnpm, 0o755);
+  const f = fake(`console.error("init broke"); process.exit(1);`);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: bindir + ":" + dirname(process.execPath) },
+  });
+  assert.notEqual(r.status, 0);
+  const j = JSON.parse(readFileSync(f.out, "utf8"));
+  assert.deepEqual(j.map((x) => x.step), ["init"]);
 });
