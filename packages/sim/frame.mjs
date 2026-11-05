@@ -82,7 +82,8 @@ iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 .lock ul{list-style:none;margin:0;padding:0 16px;width:100%;box-sizing:border-box;display:grid;gap:8px}
 .lock li{background:#ffffff26;border-radius:16px;padding:10px 14px;font:14px system-ui,sans-serif}.lock li b{display:block}
 .lock .hint{position:absolute;bottom:22px;font:13px system-ui,sans-serif;opacity:.8}
-.lock .unlock{position:absolute;bottom:0;left:25%;right:25%;height:44px;opacity:0;cursor:pointer}
+.lock .unlock{position:absolute;bottom:56px;left:25%;right:25%;height:44px;border:0;border-radius:22px;background:#ffffff33;color:#fff;font:600 16px system-ui,sans-serif;cursor:pointer}
+.lock .unlock:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
 .boot,.off{background:#000;justify-content:center}
 .boot svg{width:84px;height:84px;animation:pulse 1.2s ease-in-out infinite}.boot p{margin:16px 0 0;font:600 18px system-ui,sans-serif;letter-spacing:1px}
 @keyframes pulse{50%{opacity:.45}}
@@ -101,11 +102,11 @@ export function frameMarkup({ skin = "android", title = "App", src = "app.html" 
   return `<div class="fit" id="fit"><div class="device" id="device" data-skin="${name}" data-mode="on" style="--w:${k.width}px;--h:${k.height}px" role="group" aria-label="Shipvo Phone, ${k.label} (simulated)">
 <button class="side-btn power" id="power" aria-label="Power" title="Power (hold for menu)"></button><button class="side-btn volup" id="volup" aria-label="Volume up"></button><button class="side-btn voldn" id="voldn" aria-label="Volume down"></button>
 <div class="screen" id="screen">
-<div class="status" id="status" role="status" aria-label="Status bar"><span class="l"><span id="clock">9:41</span><span class="dots" id="dots"></span></span><span class="cut"></span><span class="icons" id="icons"></span></div>
+<div class="status" id="status" aria-label="Status bar"><span class="l"><span id="clock">9:41</span><span class="dots" id="dots"></span></span><span class="cut"></span><span class="icons" id="icons"></span></div>
 <iframe id="app" src="${src}" title="${title}"></iframe><div id="pin" role="button" tabindex="0" aria-label="Tap where the problem is, or press Enter to mark the centre of the device"><span class="hint">Tap where the problem is. Press Escape to cancel.</span></div>
 <div class="nav"><button class="back" id="back" aria-label="Back" title="Back">&#9664; Back</button></div>
 <div class="vol" id="vol" aria-hidden="true"><i id="volbar"></i></div>
-<div class="layer lock" id="lock" hidden aria-label="Lock screen"><div class="t" id="lt">9:41</div><div class="d" id="ld"></div><ul id="ln" aria-label="Notifications"></ul><div class="hint">Swipe up to unlock</div><button class="unlock" id="unlock" aria-label="Unlock"></button></div>
+<div class="layer lock" id="lock" hidden aria-label="Lock screen"><div class="t" id="lt">9:41</div><div class="d" id="ld"></div><ul id="ln" aria-label="Notifications"></ul><div class="hint">Swipe up to unlock</div><button class="unlock" id="unlock">Unlock</button></div>
 <div class="layer pmenu" id="pmenu" hidden role="dialog" aria-label="Power menu"><button id="restart">Restart</button><button id="poweroff">Power off</button><button class="x" id="pmcancel">Cancel</button></div>
 <div class="layer boot" id="boot" hidden role="status" aria-label="Starting"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M32 6 52 40H12z"/><path fill="#60a5fa" d="M8 48c8 4 16 6 24 6s16-2 24-6l-4 8c-6 3-13 4-20 4s-14-1-20-4z"/></svg><p>Shipvo</p></div>
 <div class="layer off" id="off" hidden aria-label="Screen off"><p>Press Power to turn on</p></div>
@@ -124,12 +125,13 @@ var d=document.getElementById("device"),f=document.getElementById("app"),ps={mod
 function $(i){return document.getElementById(i)}
 function dev(){try{return f.contentWindow&&f.contentWindow.__pnDevice||null}catch(e){return null}}
 function note(k,x){var v=dev();if(v&&v.frameEvent)v.frameEvent(k,x)}
-function paint(){d.dataset.mode=ps.mode;$("lock").hidden=ps.mode!=="locked";$("lock").style.transform="";$("boot").hidden=ps.mode!=="booting";$("off").hidden=ps.mode!=="off";$("pmenu").hidden=!ps.menu;f.style.visibility=ps.mode==="off"?"hidden":"visible";var on=appInteractive(ps);[f,$("back")].forEach(function(e){if(on)e.removeAttribute("inert");else e.setAttribute("inert","")});if(ps.mode==="locked")$("unlock").focus()}
+function paint(){d.dataset.mode=ps.mode;$("lock").hidden=ps.mode!=="locked";$("lock").style.transform="";$("boot").hidden=ps.mode!=="booting";$("off").hidden=ps.mode!=="off";$("pmenu").hidden=!ps.menu;f.style.visibility=ps.mode==="off"?"hidden":"visible";var on=appInteractive(ps);[f,$("back")].forEach(function(e){if(on)e.removeAttribute("inert");else e.setAttribute("inert","")});if(ps.mode==="locked")$("unlock").focus();else if(ps.menu)$("restart").focus()}
 var booted=0;
-function send(ev,fromDevice){var n=phoneStep(ps,ev);ps={mode:n.mode,menu:n.menu};var v=dev();
+function noteLater(k,x,tries){var v=dev();if(v&&v.frameEvent)v.frameEvent(k,x);else if(tries>0)setTimeout(function(){noteLater(k,x,tries-1)},250)}
+function send(ev,fromDevice){var wasMenu=ps.menu,n=phoneStep(ps,ev);ps={mode:n.mode,menu:n.menu};var v=dev();
  if(!fromDevice&&v){if(n.event==="lock")v.lock();else if(n.event==="unlock")v.unlock()}
- if(n.reload){var id=++booted;f.setAttribute("src",f.getAttribute("src"));setTimeout(function(){if(id===booted){send("booted");note("restart",{storage:"kept"})}},1600)}
- if(n.event&&n.event!=="lock"&&n.event!=="unlock"&&n.event!=="restart")note(n.event);paint()}
+ if(n.reload){var id=++booted;f.setAttribute("src",f.getAttribute("src"));setTimeout(function(){if(id===booted){send("booted");noteLater(n.event,n.event==="restart"?{storage:"kept"}:undefined,20)}},1600)}
+ if(n.event&&n.event!=="lock"&&n.event!=="unlock"&&!n.reload)note(n.event);paint();if(wasMenu&&!ps.menu&&ps.mode==="on")$("power").focus()}
 window.shipvoPhone={send:send,state:function(){return{mode:ps.mode,menu:ps.menu}}};
 var lt=0,lp=false;
 function down(){lp=false;lt=setTimeout(function(){lp=true;send("longpress")},600)}
@@ -138,23 +140,30 @@ var pw=$("power");pw.addEventListener("pointerdown",down);pw.addEventListener("p
 pw.addEventListener("click",function(){if(lp){lp=false;return}send("power")});
 function bump(by){vol=Math.max(0,Math.min(100,vol+by));$("volbar").style.transform="scaleY("+vol/100+")";$("vol").className="vol on";clearTimeout(volT);volT=setTimeout(function(){$("vol").className="vol"},1200);note("volume",{level:vol})}
 $("volup").addEventListener("click",function(){bump(10)});$("voldn").addEventListener("click",function(){bump(-10)});
-$("restart").addEventListener("click",function(){send("restart")});$("poweroff").addEventListener("click",function(){send("poweroff")});$("pmcancel").addEventListener("click",function(){send("dismiss");paint()});
+$("restart").addEventListener("click",function(){send("restart")});$("poweroff").addEventListener("click",function(){send("poweroff")});$("pmcancel").addEventListener("click",function(){send("dismiss")});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&ps.menu)send("dismiss")});
 var lk=$("lock"),y0=null;
 lk.addEventListener("pointerdown",function(e){y0=e.clientY});
 lk.addEventListener("pointermove",function(e){if(y0!==null)lk.style.transform="translateY("+Math.min(0,e.clientY-y0)+"px)"});
 lk.addEventListener("pointerup",function(e){if(y0!==null&&e.clientY-y0<-80)send("unlock");else lk.style.transform="";y0=null});
 $("unlock").addEventListener("click",function(){send("unlock")});
+// Only touch the DOM when a value changed, so assistive tech is not disturbed twice a second.
+var seen={};
+function setText(i,t){if(seen[i]!==t){seen[i]=t;$(i).textContent=t}}
+function setHtml(i,h,label){if(seen[i]!==h){seen[i]=h;$(i).innerHTML=h;if(label!==undefined)$(i).setAttribute("aria-label",label)}}
 function tick(){var v=dev(),now=new Date(),st=v&&v.state||{},bg="";
  try{bg=f.contentWindow.getComputedStyle(f.contentDocument.body).backgroundColor}catch(e){}
  var nl=[];try{nl=v&&v.notifications?v.notifications():[]}catch(e){}
  if(v&&v.locked&&(ps.mode==="on"||ps.mode==="locked")){var l=v.locked();if(l&&ps.mode==="on")send("lock",true);else if(!l&&ps.mode==="locked")send("unlock",true)}
  var m=statusModel(st,now,bg,nl.length),s=$("status");s.style.color=m.textColor;s.style.background=m.background;
- $("clock").textContent=m.time;$("lt").textContent=m.time;$("ld").textContent=now.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
- $("icons").innerHTML=m.icons.map(function(i){return ICONS[i]}).join("")+batteryIcon(m.battery);
- $("icons").setAttribute("aria-label",(m.icons[0]==="airplane"?"Airplane mode. ":m.icons[0]==="nosignal"?"No signal. ":"Signal and wifi. ")+"Battery "+m.battery.level+" percent"+(m.battery.charging?", charging":""));
- var dots="";for(var i=0;i<m.notifications;i++)dots+='<span class="dot"></span>';$("dots").innerHTML=dots;
- $("ln").innerHTML=nl.map(function(n){return"<li><b></b><span></span></li>"}).join("");
- var li=$("ln").children;for(var j=0;j<nl.length;j++){li[j].children[0].textContent=nl[j].title;li[j].children[1].textContent=nl[j].body}}
+ var day=now.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+ setText("clock",m.time);setText("lt",m.time);setText("ld",day);
+ var label=(m.icons[0]==="airplane"?"Airplane mode. ":m.icons[0]==="nosignal"?"No signal. ":"Signal and wifi. ")+"Battery "+m.battery.level+" percent"+(m.battery.charging?", charging":"");
+ setHtml("icons",m.icons.map(function(i){return ICONS[i]}).join("")+batteryIcon(m.battery),label);
+ var dots="";for(var i=0;i<m.notifications;i++)dots+='<span class="dot"></span>';setHtml("dots",dots);
+ var key=JSON.stringify(nl.map(function(n){return[n.title,n.body]}));
+ if(key!==seen.ln){seen.ln=key;$("ln").innerHTML=nl.map(function(n){return"<li><b></b><span></span></li>"}).join("");
+  var li=$("ln").children;for(var j=0;j<nl.length;j++){li[j].children[0].textContent=nl[j].title;li[j].children[1].textContent=nl[j].body}}}
 // Scale to fit the window with a CSS transform only (no layout work while resizing).
 function fit(){var w=$("fit"),k=1,full=window.innerWidth<=500;w.style.transform="";w.style.width="";w.style.height="";
  if(!full){var ow=d.offsetWidth,oh=d.offsetHeight,aw=window.innerWidth-24,ah=window.innerHeight-90;k=Math.min(1,aw/ow,ah/oh);if(k<1){w.style.transform="scale("+k+")";w.style.width=ow*k+"px";w.style.height=oh*k+"px";w.style.transformOrigin="top left"}}}

@@ -68,3 +68,88 @@ test("the app is inert unless the phone is on with no menu open", () => {
   assert.match(js, /setAttribute\("inert",""\)/);
   assert.match(js, /removeAttribute\("inert"\)/);
 });
+
+// A tiny fake page: just enough DOM to run the page script and watch what it does.
+function runPhone({ withDevice = true } = {}) {
+  const els = {}, listeners = {}, timers = [], log = [], focused = [];
+  const el = (id) => els[id] ??= { id, hidden: false, style: {}, dataset: {}, children: [], attrs: {}, _html: "", _text: "", writes: 0,
+    addEventListener(t, fn) { (listeners[id + ":" + t] ??= []).push(fn); },
+    setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; }, getAttribute: () => "app.html",
+    focus() { focused.push(id); },
+    set innerHTML(v) { this._html = v; this.writes++; }, get innerHTML() { return this._html },
+    set textContent(v) { this._text = v; this.writes++; }, get textContent() { return this._text } };
+  const frame = el("app");
+  const win = {};
+  frame.contentWindow = win; frame.contentDocument = { body: {} };
+  win.getComputedStyle = () => ({ backgroundColor: "rgb(255, 255, 255)" });
+  let isLocked = false;
+  const dev = () => ({ state: {}, notifications: () => [], frameEvent: (k) => log.push(k), lock() { isLocked = true; }, unlock() { isLocked = false; }, locked: () => isLocked });
+  if (withDevice) win.__pnDevice = dev();
+  const doc = { getElementById: el, addEventListener(t, fn) { (listeners["doc:" + t] ??= []).push(fn); } };
+  const g = { document: doc, window: { innerWidth: 1000, innerHeight: 1000, addEventListener() {} }, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout() {}, setInterval() { return 0; }, Date };
+  new Function("document", "window", "setTimeout", "clearTimeout", "setInterval", frameScript())(g.document, g.window, g.setTimeout, g.clearTimeout, g.setInterval);
+  const fire = (key, e = {}) => (listeners[key] || []).forEach((fn) => fn(e));
+  return { els, fire, timers, log, focused, win, boot: () => { if (!withDevice) win.__pnDevice = dev(); timers.filter((t) => t.ms === 1600).at(-1).fn(); } };
+}
+
+test("the script sets inert on the app and Back in every non-interactive state", () => {
+  const p = runPhone();
+  assert.equal("inert" in p.els.app.attrs, false);
+  p.fire("power:click"); // locks
+  assert.equal(p.els.lock.hidden, false);
+  assert.equal("inert" in p.els.app.attrs && "inert" in p.els.back.attrs, true);
+  assert.equal(p.focused.at(-1), "unlock");
+  p.fire("unlock:click");
+  assert.equal("inert" in p.els.app.attrs, false);
+});
+test("the Unlock button is visible and shows a focus ring", () => {
+  assert.doesNotMatch(FRAME_CSS, /\.unlock\{[^}]*opacity:0/);
+  assert.match(FRAME_CSS, /\.unlock:focus-visible\{outline:/);
+  assert.match(frameMarkup(), />Unlock<\/button>/);
+});
+test("the status bar is not a live region and unchanged values are not rewritten", () => {
+  assert.doesNotMatch(frameMarkup(), /id="status"[^>]*role=/);
+  const p = runPhone();
+  const before = [p.els.clock.writes, p.els.icons.writes, p.els.dots.writes, p.els.ln.writes];
+  p.els.app.contentWindow.__pnDevice.state = {};
+  p.fire("app:load");
+  assert.deepEqual([p.els.clock.writes, p.els.icons.writes, p.els.dots.writes, p.els.ln.writes], before);
+});
+test("the power menu takes focus, and Escape or Cancel closes it", () => {
+  const p = runPhone();
+  p.fire("power:pointerdown");
+  p.timers.find((t) => t.ms === 600).fn();
+  assert.equal(p.els.pmenu.hidden, false);
+  assert.equal(p.focused.at(-1), "restart");
+  p.fire("doc:keydown", { key: "Escape" });
+  assert.equal(p.els.pmenu.hidden, true);
+  assert.equal("inert" in p.els.app.attrs, false);
+  p.fire("power:pointerdown"); p.timers.filter((t) => t.ms === 600).at(-1).fn();
+  p.fire("doc:keydown", { key: "a" });
+  assert.equal(p.els.pmenu.hidden, false);
+  p.fire("pmcancel:click");
+  assert.equal(p.els.pmenu.hidden, true);
+});
+test("power_on is logged by the new document after the reload, not the old one", () => {
+  const p = runPhone();
+  p.fire("power:pointerdown"); p.timers.find((t) => t.ms === 600).fn();
+  p.fire("poweroff:click");
+  assert.deepEqual(p.log, ["power_menu", "power_off"]);
+  p.fire("power:click"); // swallowed: it ends the long press
+  p.fire("power:click"); // power on: reload starts
+  assert.equal(p.log.includes("power_on"), false);
+  p.win.__pnDevice = { state: {}, notifications: () => [], frameEvent: (k) => (p.log2 ??= []).push(k) };
+  p.boot();
+  assert.deepEqual(p.log2, ["power_on"]);
+  assert.equal(p.log.includes("power_on"), false);
+});
+test("a restart event waits for the new document's device and retries", () => {
+  const p = runPhone({ withDevice: false });
+  p.fire("power:pointerdown"); p.timers.find((t) => t.ms === 600).fn();
+  p.fire("restart:click");
+  p.timers.filter((t) => t.ms === 1600).at(-1).fn(); // device not there yet
+  assert.equal(p.log.includes("restart"), false);
+  p.win.__pnDevice = { state: {}, notifications: () => [], frameEvent: (k) => p.log.push(k) };
+  p.timers.filter((t) => t.ms === 250).at(-1).fn();
+  assert.equal(p.log.at(-1), "restart");
+});
