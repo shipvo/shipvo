@@ -32,6 +32,10 @@ Node 22, pnpm 10. CI (`.github/workflows/ci.yml`, job `test`) must pass before a
 - **Match the code around you.** TypeScript strict, ES modules, no new dependencies unless the issue needs one (say why in the PR).
 - **Write plain English** in docs, comments and PR text: short sentences, no hype words.
 
+## When the team's own setup is in your way
+
+If you are stuck because of something you may not change (a workflow, a prompt, CI, a secret, a repository setting, missing tools on the runner), do not work around it in product code. Write `/tmp/agent/escalate.md` (Aider: `.agent/escalate.md`): first line a short title, then what blocked you, the evidence (log lines, run links), and the fix you propose. It becomes an `agent:escalate` issue, and the steward acts on it within the hour. Then finish what you can, or write `blocked.md` as usual.
+
 ## Device testing standard
 
 Android emulators and the iOS Simulator in CI are our device test standard. Prove features there and ship on that evidence. Never block work, mark an issue `needs-human`, or file an issue because something has not been tried on a physical phone, and do not add "not tested on a real device" notes to docs, the site, the README or release notes. Report what CI measured, on what, as it is.
