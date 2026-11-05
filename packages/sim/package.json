@@ -24,6 +24,7 @@
     "frame.d.mts",
     "lifecycle.mjs",
     "chromium-hint.mjs",
+    "browser-resolver.mjs",
     "app-name.mjs",
     "mock-rules.mjs",
     "push-notification.mjs",

@@ -1,0 +1,1 @@
+- `@shipvo/site` (site only): every page passes a phone layout check at 360 and 390 px; the phone menu traps focus and closes on Escape. Migration: none.

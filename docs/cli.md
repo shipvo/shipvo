@@ -172,3 +172,18 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 - `--native` runs `npx expo run:android` or `npx expo run:ios` instead and says so.
 - If the app cannot build for web, the command exits with code 1 and names the module or file that failed.
 - Ctrl+C stops the server.
+
+## `shipvo promote`
+
+Widens a staged release to more bands. It reads a test report and refuses to widen a release whose flows failed.
+
+```bash
+shipvo test flows/ --release 3 --report shipvo-test-report.json
+shipvo promote                         # reads shipvo-test-report.json if it exists
+shipvo promote --report out/report.json
+shipvo promote --force                 # promote anyway; prints that it overrode a failing report
+```
+
+- A report whose `release` matches the release being promoted and has any failed flow stops promote with a non-zero exit. The message lists the failing flows. `--dry-run` stops the same way.
+- A report for a different release is stale. Promote prints a warning and goes on.
+- With no report file, promote behaves as before.
