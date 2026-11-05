@@ -51,7 +51,7 @@ jobs:
           num = lambda: (re.search(r"#(\d+)", cmd) or done("name the issue or PR as #<number>.", False)).group(1)
           try:
               if low == "pause":
-                  var("true"); done("the team is paused. Every agent workflow skips until you send `control: resume`.")
+                  var("true"); gh("api", "-X", "POST", f"repos/{R}/actions/workflows/agent-merger.yml/dispatches", "-f", "ref=main", check=False); done("the team is paused. Every agent workflow skips until you send `control: resume`.")
               elif low == "resume":
                   var("false")
                   for wf in ["agent-engineer.yml", "agent-mistral.yml", "agent-aider.yml", "agent-merger.yml"]:
