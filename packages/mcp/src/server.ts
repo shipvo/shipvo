@@ -16,6 +16,7 @@ import { classify, compactDiff, fieldValue } from "./change.js";
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
 const CONTROL = (process.env.PN_CONTROL ?? "https://api.shipvo.dev").replace(/\/$/, "");
 const OWNER_TOKEN = process.env.PN_OWNER_TOKEN ?? "";
+const SIM_TIMEOUT_MS = Number(process.env.SHIPVO_SIM_TIMEOUT_MS ?? 30_000);
 // Apps this server can open. Hosted: the account's apps. Local: the app the simulator serves (it is asked on
 // first use), or PN_APPS (JSON) to override. Falls back to the sample app when the simulator cannot be reached.
 const TIDE = { tide: { name: "Tide & Tackle", description: "Fishing-supplies shop in Douala: catalogue, cart, promo codes, delivery slots, cash or mobile money." } };
@@ -23,21 +24,33 @@ type AppInfo = Record<string, { name: string; description: string }>;
 async function localApps(): Promise<AppInfo> {
   if (process.env.PN_APPS) return JSON.parse(process.env.PN_APPS);
   try {
-    const r = await fetch(SIM + "/apps", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const r = await fetch(SIM + "/apps", { method: "POST", headers: { "content-type": "application/json" }, body: "{}", signal: AbortSignal.timeout(SIM_TIMEOUT_MS) });
     if (r.ok) {
       const out: AppInfo = {};
       for (const a of ((await r.json()) as { apps?: { id: string; name?: string }[] }).apps ?? []) out[a.id] = { name: a.name ?? a.id, description: "The app this simulator serves." };
       if (Object.keys(out).length) return out;
     }
-  } catch {}
+  } catch (e) {
+    if (e instanceof Error && e.name === "TimeoutError") throw new Error(`sim_timeout: localApps timed out after ${SIM_TIMEOUT_MS}ms. The simulator may still be running.`);
+    throw e;
+  }
   return TIDE;
 }
 
 type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string };
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
-  const r = await fetch(SIM + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}. Is it running at ${SIM}?`);
-  return r.json() as Promise<Act>;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SIM_TIMEOUT_MS);
+  try {
+    const r = await fetch(SIM + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
+    clearTimeout(timeout);
+    if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}. Is it running at ${SIM}?`);
+    return r.json() as Promise<Act>;
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e instanceof Error && e.name === "AbortError") throw new Error(`sim_timeout: ${path} timed out after ${SIM_TIMEOUT_MS}ms. The session may still be alive; call screen to check.`);
+    throw e;
+  }
 }
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
@@ -46,7 +59,10 @@ const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
 const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string } = {}) => {
-  if (!r.ok || r.screen == null) return result(sid, r);
+  if (!r.ok || r.screen == null) {
+    if (r.error?.includes("sim_timeout")) return result(sid, { ok: false, error: r.error, code: "sim_timeout" });
+    return result(sid, r);
+  }
   const prev = trees.get(sid);
   trees.set(sid, r.screen);
   const change = prev === undefined ? "unknown (no earlier screen to compare)" : classify(prev, r.screen, action);
@@ -56,6 +72,7 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
   return result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
 };
 const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; return text(r.ok ? (r.screen ?? "") : `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}`); };
+const isError = (r: Act) => !r.ok && r.error != null;
 // Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
 const need = (_sid: string) => {};
