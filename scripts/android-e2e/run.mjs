@@ -152,6 +152,7 @@ await scenario("staged rollout: a device outside the cohort does not get the rel
   const outsideOk = ownPolls.length >= 2 && fetched === 0 && after.current_release === cur && !after.pending_release && !tele().some((x) => x.release === p.release && x.at >= p.at);
   const q = publishRelease({ root: TREE, app: APP, seed: KEY.seed, release: p.release, bytes: bundle("v1"), bands: [BAND] }); // widen the rollout to the device's band
   const ev = await waitFor(() => healthy(p.release, q.at), 120_000);
+  if (ev) history.push({ rel: p.release, bytes: bundle("v1") }); // the device now runs this release, so the crash-loop scenarios must expect it as the previous one
   return { pass: outsideOk && !!ev, deviceBand: BAND, cohort: prefs().cohort, publishedToBands: others, devicePollsWhileOutside: ownPolls.length, devicePollStatuses: [...new Set(ownPolls.map((x) => x.status))], downloadsOfNewRelease: fetched, currentWhileOutside: after.current_release, joinedAfterWideningMs: ev ? ev.at - q.at : null };
 });
 
@@ -173,6 +174,7 @@ for (const [kind, file, title, maxBadRuns] of [
       restored = await waitFor(() => healthy(prev, p.at) || (pid() ? null : "dead"), 15_000, 500);
       if (restored === "dead") restored = null; else if (!restored && pid()) { mark("force-stop"); stop(); } // a hung boot counts as a failed boot
     }
+    if (boots > maxBadRuns + 1) writeFileSync(join(WORK, `logcat-${kind}-r${p.release}.txt`), adb("logcat", "-d")); // too many launches: keep the device log for the issue
     const pr = prefs(), after = entries().filter((e) => e.t >= (restored?.at ?? Infinity) && e.path.includes(`r${p.release}.hbc`)).length;
     const revertEvent = tele().some((e) => e.event === "crash_loop_revert" && e.at >= p.at);
     const badRuns = boots - 1;
