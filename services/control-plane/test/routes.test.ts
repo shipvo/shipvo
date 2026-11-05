@@ -158,3 +158,31 @@ describe("owner auth", () => {
     expect(r.status).toBe(401);
   });
 });
+
+describe("GET /t/:app/summary", () => {
+  const fake = (counts: any[], apply: any[], cold: any[]) => ({
+    prepare: (sql: string) => ({ bind: () => ({ all: async () => ({
+      results: sql.includes("COUNT(*) AS n") ? counts : sql.includes("apply_ms IS NOT NULL") ? apply : cold,
+    }) }) }),
+  }) as any;
+  it("groups counts and medians per release, newest first", async () => {
+    const d = fake(
+      [{ release: 2, event: "applied", n: 3, last_id: 5 }, { release: 2, event: "reverted", n: 1, last_id: 9 }, { release: 1, event: "applied", n: 2, last_id: 4 }],
+      [{ release: 2, m: 120 }], [{ release: 2, m: 800 }, { release: 1, m: 900 }]);
+    const r = await app.request("/t/tide/summary", {}, { DB: d } as any);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ releases: [
+      { release: 2, events: { applied: 3, reverted: 1 }, apply_ms_median: 120, cold_start_ms_median: 800 },
+      { release: 1, events: { applied: 2 }, apply_ms_median: null, cold_start_ms_median: 900 },
+    ] });
+  });
+  it("returns an empty list for an app with no rows", async () => {
+    const r = await app.request("/t/tide/summary", {}, { DB: fake([], [], []) } as any);
+    expect(await r.json()).toEqual({ releases: [] });
+  });
+  it("rejects a bad app id", async () => {
+    const r = await app.request("/t/Bad!/summary", {}, { DB: fake([], [], []) } as any);
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: "bad_request" });
+  });
+});
