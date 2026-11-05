@@ -1,4 +1,4 @@
-- `@shipvo/sim`: the simulator finds a browser itself: Chrome or Edge if installed, then Playwright's shared Chromium, then it installs Chromium once. A missing `playwright` is added as a dev dependency with your package manager. New export `@shipvo/sim/browser.mjs`.
+- `@shipvo/sim`: the simulator finds a browser itself: Chrome or Edge if installed, then Playwright's shared Chromium, then it installs Chromium once. A missing `playwright` is added as a dev dependency with your package manager. `@shipvo/sim/browser.mjs` is internal and may change.
 - `@shipvo/cli`: `shipvo sim` and `shipvo explore` install a missing `@shipvo/sim` the same way. `shipvo doctor` explains the new behaviour.
 - Set `SHIPVO_NO_AUTO_INSTALL=1` to turn all installs off (CI, offline); the error then names the command to run.
 - Migration: none.

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { launchErrorMessage } from "./chromium-hint.mjs";
 import { detectPackageManager, devInstallCommand, resolvePlaywright, launchResolved, autoInstallOff } from "./browser.mjs";
 
 const missing = "browserType.launch: Executable doesn't exist at /x/chrome";
@@ -101,4 +102,15 @@ test("launchResolved waits for the async Chromium install before launching again
   const d = mkDeps({ runAsync: async () => { order.push("install-start"); await new Promise((r) => setTimeout(r, 20)); order.push("install-end"); return 0; } });
   await launchResolved(pw, {}, d);
   assert.deepEqual(order, ["launch", "launch", "launch", "install-start", "install-end", "launch"]);
+});
+
+test("on Linux, the install-deps command survives launchErrorMessage", async () => {
+  const pw = fakePw(["error while loading shared libraries: libnss3.so", "error while loading shared libraries: libnss3.so", "error while loading shared libraries: libnss3.so"]);
+  const err = await launchResolved(pw, {}, mkDeps({ platform: "linux" })).catch((e) => e);
+  assert.match(launchErrorMessage(err.message), /npx playwright install-deps chromium/);
+});
+
+test("on Linux, a broken system Chrome falls through to the next option", async () => {
+  const pw = fakePw(["error while loading shared libraries: libnss3.so", missing, "ok"]);
+  assert.deepEqual(await launchResolved(pw, {}, mkDeps({ platform: "linux" })), { browser: true });
 });

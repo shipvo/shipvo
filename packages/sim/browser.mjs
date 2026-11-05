@@ -82,9 +82,10 @@ export async function launchResolved(pw, { cwd = process.cwd(), executablePath, 
   const d = { ...defaultDeps, ...deps };
   const { chromium } = pw;
   if (executablePath) return chromium.launch({ executablePath });
+  let libsError = null; // a missing-libraries error is remembered; the next option may still work
   const libs = (e) => {
     if (d.platform === "linux" && MISSING_LIBS.test(String(e?.message))) {
-      throw new Error(`Chromium cannot start because system libraries are missing: ${String(e.message).split("\n")[0]}\nFix: run \`${installDepsCommand}\``);
+      libsError ||= new Error(`Chromium cannot start because system libraries are missing: ${String(e.message).split("\n")[0]}. Run \`${installDepsCommand}\``);
     }
   };
   for (const channel of ["chrome", "msedge"]) {
@@ -94,6 +95,7 @@ export async function launchResolved(pw, { cwd = process.cwd(), executablePath, 
   try { return await chromium.launch(); }
   catch (e) {
     libs(e);
+    if (libsError) throw libsError;
     if (!NOT_INSTALLED.test(String(e?.message))) throw e;
   }
   const manual = "npx playwright install chromium";
@@ -102,5 +104,5 @@ export async function launchResolved(pw, { cwd = process.cwd(), executablePath, 
   if (await d.runAsync("npx", ["playwright", "install", "chromium"], cwd) !== 0) throw new Error(`could not install Chromium. Run: ${manual}`);
   d.log("sim: Chromium installed.");
   try { return await chromium.launch(); }
-  catch (e) { libs(e); throw e; }
+  catch (e) { libs(e); throw libsError || e; }
 }
