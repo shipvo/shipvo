@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import app from "../src/index";
 import { runOwnerCommand } from "../src/owner";
+import { MAX_ALERTS_PER_APP } from "../src/alerts";
 
 // A tiny D1 stand-in for the three statements the alert code uses.
 function fakeDb(webhook: string | null) {
@@ -12,11 +13,15 @@ function fakeDb(webhook: string | null) {
         if (prev && !(prev <= a[3])) return { meta: { changes: 0 } };
         sent.set(k, a[2]); return { meta: { changes: 1 } };
       }
+      if (sql.startsWith("DELETE FROM alert_sent")) {
+        for (const [k, v] of sent) if (k.startsWith(`${a[0]}/`) && v <= a[1]) sent.delete(k);
+        return { meta: { changes: 1 } };
+      }
       if (sql.startsWith("INSERT INTO app_alerts")) hook = a[1];
       if (sql.startsWith("DELETE FROM app_alerts")) hook = null;
       return { meta: { changes: 1 } };
     },
-    first: async () => (sql.includes("FROM app_alerts") && hook ? { webhook: hook } : null),
+    first: async () => sql.includes("COUNT(*)") ? { n: [...sent.keys()].filter((k) => k.startsWith(`${a[0]}/`)).length } : (sql.includes("FROM app_alerts") && hook ? { webhook: hook } : null),
   }) }) } as any;
   return { d, get hook() { return hook; } };
 }
@@ -57,6 +62,17 @@ describe("revert webhook alert", () => {
     expect(f).toHaveBeenCalledTimes(1);
     now.mockReturnValue(t0 + 3600_000 + 1000); await send(d, ev("rolled_back"), x.c); await x.done();
     expect(f).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
+  it("caps alerts per app across distinct releases, and frees the cap after the hour", async () => {
+    const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
+    const { d } = fakeDb("https://hooks.example.com/x"); const x = ctx();
+    const t0 = Date.now(); const now = vi.spyOn(Date, "now"); now.mockReturnValue(t0);
+    for (let r = 1; r <= 25; r++) await send(d, ev("rolled_back", r), x.c);
+    await x.done();
+    expect(f).toHaveBeenCalledTimes(MAX_ALERTS_PER_APP);
+    now.mockReturnValue(t0 + 3600_000 + 1000); await send(d, ev("rolled_back", 99), x.c); await x.done();
+    expect(f).toHaveBeenCalledTimes(MAX_ALERTS_PER_APP + 1);
     now.mockRestore();
   });
   it("sends nothing without a webhook, or for events that are not reverts", async () => {

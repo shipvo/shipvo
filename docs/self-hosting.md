@@ -55,7 +55,7 @@ curl -X POST https://<your-worker>/app/<id>/api/command \
   -d '{"name":"set_alert_webhook","args":{"url":"https://example.com/hooks/shipvo"}}'
 ```
 
-Send an empty `url` to remove it. `http://` URLs and URLs with a user name or password are refused (`bad_webhook_url`). When a `rolled_back` or `crash_loop_revert` telemetry event arrives, the control plane sends one POST with `{"app":"tide","release":3,"event":"crash_loop_revert","time":"<ISO time>"}`. A release alerts at most once per hour. The call runs after the telemetry response, has a 5 second limit, is not retried, and a failure never affects telemetry. The payload holds no secrets, but the URL itself may, so the command answers with the host only. Apply migration `0014_alert_webhook.sql` first.
+Send an empty `url` to remove it. `http://` URLs and URLs with a user name or password are refused (`bad_webhook_url`). When a `rolled_back` or `crash_loop_revert` telemetry event arrives, the control plane sends one POST with `{"app":"tide","release":3,"event":"crash_loop_revert","time":"<ISO time>"}`. A release alerts at most once per hour, and an app sends at most 10 alerts per hour whatever the release numbers. The call runs after the telemetry response, has a 5 second limit, is not retried (a failed POST uses up its slot for that hour), and a failure never affects telemetry. The payload holds no secrets, but the URL itself may, so the command answers with the host only. Apply migration `0014_alert_webhook.sql` first.
 
 ## The hosted simulator (optional)
 
