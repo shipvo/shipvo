@@ -1,0 +1,130 @@
+# Migrate from CodePush to Shipvo
+
+This guide moves a React Native app that used `react-native-code-push` to Shipvo over-the-air (OTA) updates. Every command and flag below comes from `packages/cli` (`src/help.ts`, `src/init.ts`, `src/publish.ts`). The dry-run output was captured by running the CLI on the sample app in this repo.
+
+Shipvo has no migration tool. You do the steps by hand, and you ship one new store build.
+
+## What maps to what
+
+CodePush facts are from the [react-native-code-push README](https://github.com/microsoft/react-native-code-push#readme) and its [docs folder](https://github.com/microsoft/react-native-code-push/tree/master/docs).
+
+| CodePush | Shipvo | Notes |
+| --- | --- | --- |
+| Deployment key (`CodePushDeploymentKey` in `Info.plist` or `strings.xml`) | `appId` and `controlPlane` in `shipvo.json`, passed to the `@shipvo/runtime` plugin in `app.json` | There is no per-environment secret key in the app. The shell trusts one control plane URL and one public key. |
+| `appcenter codepush release-react` | `shipvo publish` | Builds the bundle, signs it, publishes it. |
+| `--rollout 25` | `--bands b0,b1,b2` | Shipvo releases to cohorts (bands), not a free percentage. The default is all three, `b0,b1,b2`. |
+| `appcenter codepush rollback` | `shipvo rollback --to <release>` | Republishes an earlier release as a new release number. |
+| Code signing (`CodePushPublicKey`, `--privateKeyPath`) | Ed25519 key made by `shipvo init`, public key pinned in the shell | Signing is always on. The seed is in `.shipvo/seed.txt` or `SHIPVO_SIGNING_SEED`. |
+| Client-side rollback after a crash | Crash-loop revert | After three failed boots the runtime goes back to the last good bundle. Measured in [spike-results.md](spike-results.md). |
+
+## Before you start
+
+- Node 22.
+- An Expo-based React Native app. `shipvo publish` runs `npx expo export`, and the runtime ships as an Expo config plugin.
+- A control plane: the hosted one (`shipvo login`, then `shipvo app create`) or your own ([self-hosting.md](self-hosting.md)).
+
+## Step 1. Create a Shipvo config
+
+`shipvo init <dir>` creates a new app. It refuses to write into a folder that exists, so it cannot change your app in place. Run it in a scratch folder and copy what you need:
+
+```bash
+npx -y @shipvo/cli init shipvo-scratch --app-id myshop --name "My Shop"
+```
+
+From `shipvo-scratch` take:
+
+1. `shipvo.json` to the root of your app.
+2. The `@shipvo/runtime` entry from the `plugins` list in `app.json`. It holds `baseUrl`, `publicKey`, `appId` and `shellMajor`.
+3. `.shipvo/seed.txt`, your signing seed. It is git-ignored. Back it up (`shipvo keys export`) and keep a copy offline. If you lose it, installed apps will not accept another update. See [new-machine.md](new-machine.md).
+
+Other `init` flags: `--control-plane URL`, `--public-key B64` (use an existing key, then no seed is made), `--bundle-id`.
+
+Then install the runtime and CLI in your app:
+
+```bash
+npm install @shipvo/runtime @shipvo/device
+npm install --save-dev @shipvo/cli
+```
+
+## Step 2. Swap the update code
+
+In the same release, remove `react-native-code-push` and call the Shipvo runtime so no build has two update mechanisms. The sample code in the file `App.tsx` that `init` writes shows the calls: `Runtime.markHealthy()` once the first screen renders, and `Runtime.checkForUpdate(true)` to look for a release. Copy that pattern.
+
+Remove the CodePush deployment key and public key from `Info.plist` and `strings.xml`.
+
+## Step 3. Check the setup
+
+```bash
+npx shipvo doctor
+```
+
+Each line starts with PASS or FAIL. A FAIL line ends with the fix.
+
+## Step 4. Dry run
+
+```bash
+npx shipvo publish --dry-run --out .shipvo/dry-run
+```
+
+This builds and signs a release and writes files locally. It sends nothing. `--out` defaults to `.shipvo/dry-run`. A dry run builds no patches. Unknown flags are errors, so a typo like `--dryrun` cannot start a real publish.
+
+Output from the sample app (`apps/tide-and-tackle`, with a throwaway key; the Metro progress lines are left out):
+
+```
+native modules this release requires: none found
+dry run: nothing is sent anywhere; files go to /tmp/agent/dry. No patches are built offline. Release is 1 (pass --release N to match the control plane).
+...
+Exported: dist-ota
+patches: none
+...
+Exported: dist-web
+Dry run complete. Nothing was sent.
+  Release:  1
+  Size:     1.79 MB
+  Files:    /tmp/agent/dry
+Full bundles are fine for a first release. Small patches matter once you have older releases to compare against.
+```
+
+The pointer files are under `p/<appId>/<shell major>/<band>`. Check one with `shipvo verify <pointer> [public-key-b64]`.
+
+## Step 5. Ship the store build
+
+Build and submit one new binary with the Shipvo plugin and your public key in it. Users on the old CodePush build keep running their last CodePush bundle. They get Shipvo updates only after they install this binary. Shipvo cannot update a build that does not contain its runtime.
+
+## Step 6. Publish
+
+```bash
+npx shipvo publish --bands b0
+```
+
+Watch crash rates, then widen:
+
+```bash
+npx shipvo publish
+```
+
+Useful flags: `--platform android|ios|all` (default `android`), `--release N`, `--min-shell X.Y.Z`, `--max-bases N`. Run `shipvo publish --help` for the full list.
+
+For speed numbers, see [spike-results.md](spike-results.md). Those were measured on one phone and apply only to that setup.
+
+## Step 7. Roll back
+
+```bash
+npx shipvo rollback --to 3 --dry-run   # preview
+npx shipvo rollback --to 3
+```
+
+This signs the code of release 3 as the next release number and publishes it to the bands you name (default all). It needs the control plane, so the preview reads from it too. `--bands` and `--platform` work as in `publish`.
+
+## What Shipvo does not do
+
+- It does not read your CodePush history, deployments or keys. There is no import.
+- It has no `--mandatory` flag, no per-release description flag and no `--target-binary-version`. Binary compatibility uses `--min-shell` and the native module check in `publish`.
+- Rollout is by cohort (`b0`, `b1`, `b2`), not by a percentage you choose.
+- It does not update apps that do not contain `@shipvo/runtime`.
+- It is not a drop-in for bare React Native projects without Expo. The publish command calls `expo export`.
+
+## Next
+
+- [Build your first app](getting-started.md)
+- [Self-hosting the control plane](self-hosting.md)

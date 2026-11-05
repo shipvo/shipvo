@@ -54,7 +54,7 @@ npm run sim                      # the app in the simulator; agents: open_app("m
 npx expo run:android             # the native shell; `shipvo publish` ships changes over the air
 ```
 
-Guides: [Build your first app](docs/getting-started.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
+Guides: [Build your first app](docs/getting-started.md) · [Migrate from CodePush](docs/migrate-from-codepush.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
 
 ## Use an app as an AI agent (no phone)
 
