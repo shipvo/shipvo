@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { median, max, parseVmRssKb, parsePpid, treeRssMb } from "./stats.mjs";
+import { median, max, parseVmRssKb, parsePpid, treeRssMb } from "./bench-stats.mjs";
 
 const status = (ppid, kb) => `Name:\tx\nState:\tS (sleeping)\nPPid:\t${ppid}\nVmPeak:\t  999999 kB\nVmRSS:\t   ${kb} kB\nThreads:\t4\n`;
 
