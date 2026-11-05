@@ -42,7 +42,7 @@ let gitAuth = false;
 function mergeChangelogOnly(pr) {
   if (pr.head.repo?.full_name !== REPO) return false;
   const dir = mkdtempSync(join(tmpdir(), "shipvo-merge-"));
-  const git = (...a) => spawnSync("git", ["-C", dir, "-c", "user.name=shipvo-merge-bot", "-c", "user.email=merge-bot@users.noreply.github.com", ...a], { encoding: "utf8" });
+  const git = (...a) => spawnSync("git", ["-C", dir, "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "user.name=shipvo-merge-bot", "-c", "user.email=merge-bot@users.noreply.github.com", ...a], { encoding: "utf8" });
   const must = (...a) => { const r = git(...a); if (r.status !== 0) throw new Error(`git ${a[0]}: ${(r.stderr || "").trim().slice(0, 300)}`); return r.stdout; };
   try {
     if (!gitAuth) { gh("auth", "setup-git"); gitAuth = true; }
@@ -66,7 +66,9 @@ function mergeChangelogOnly(pr) {
     log(`#${pr.number}: CHANGELOG.md merge skipped: ${e.message}`);
     return false;
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    // A late git write can make rmdir fail with ENOTEMPTY; a temp dir left behind must not end the pass.
+    try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+    catch (e) { log(`#${pr.number}: could not remove ${dir}: ${e.code || e.message}`); }
   }
 }
 
