@@ -194,14 +194,19 @@ async function pointerProblem(id: string, key: string, pub: string, buf: ArrayBu
 }
 
 /** One audit row per accepted release pointer. Actor is the app owner behind the publish token; no token or key goes in the row. Never throws. */
-async function auditPublish(db: any, id: string, key: string, buf: ArrayBuffer) {
+async function auditPublish(db: any, id: string, key: string, buf: ArrayBuffer, prev: string | null) {
   try {
     const body = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body);
+    // `shipvo rollback` signs a new release whose bundle is an older one (r<N>.hbc, N != release).
+    const m = /(?:^|\/)(?:ios-)?r(\d+)\.hbc$/.exec(String(body.core?.url ?? ""));
+    const backTo = m && Number(m[1]) !== body.release ? Number(m[1]) : null;
+    let before: string | null = null;
+    try { const r = prev ? JSON.parse(JSON.parse(prev).body).release : null; if (Number.isInteger(r)) before = JSON.stringify({ release: r }); } catch { /* no usable previous pointer */ }
     const owner = await db.prepare("SELECT acc.github_login AS login FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ?").bind(id).first();
     await recordAudit(db, {
-      app_id: id, actor: String(owner?.login ?? id), actor_kind: "person", action: "publish",
-      release: body.release, release_id: key,
-      after: JSON.stringify({ release: body.release, band: body.band, platform: body.platform ?? "android" }),
+      app_id: id, actor: String(owner?.login ?? id), actor_kind: "person", action: backTo === null ? "publish" : "rollback",
+      release: body.release, release_id: key, before,
+      after: JSON.stringify({ release: body.release, band: body.band, platform: body.platform ?? "android", ...(backTo === null ? {} : { rolled_back_to: backTo }) }),
     });
   } catch { console.warn(`audit write failed: app=${id} action=publish`); }
 }
@@ -213,8 +218,11 @@ apps.put("/:id/kv/*", async (c) => {
   if (buf.byteLength > MAX_VALUE) return c.json({ error: "too_large" }, 413);
   if (app.bytes_used + buf.byteLength > MAX_APP_BYTES) return c.json({ error: "app_storage_exceeded", message: `This app has used its ${MAX_APP_BYTES / 1048576} MB beta storage.` }, 413);
   if (k.startsWith(`p/${id}/`)) { const why = await pointerProblem(id, k, app.public_key, buf); if (why) return c.json({ error: "bad_pointer", message: why }, 422); }
+  const isPtr = k.startsWith(`p/${id}/`);
+  let prev: string | null = null;
+  if (isPtr) { try { prev = (await c.env.POINTERS.get(k)) ?? null; } catch { /* before is optional */ } }
   await c.env.POINTERS.put(k, buf);
-  if (k.startsWith(`p/${id}/`)) await auditPublish(c.env.DB, id, k, buf);
+  if (isPtr) await auditPublish(c.env.DB, id, k, buf, prev);
   await c.env.DB.prepare("UPDATE apps SET bytes_used = bytes_used + ? WHERE app_id = ?").bind(buf.byteLength, id).run();
   if (k === `w/${id}/releases`) { try { const idx = JSON.parse(new TextDecoder().decode(buf)); if (Number.isInteger(idx.latest)) await c.env.DB.prepare("UPDATE apps SET latest_release = ?, published_at = ? WHERE app_id = ?").bind(idx.latest, now(), id).run(); } catch {} }
   return c.json({ ok: true, key: k, bytes: buf.byteLength });
