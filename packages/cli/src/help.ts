@@ -7,7 +7,7 @@ export const help = `shipvo <command>
 
 Start
   init <dir>                  Create a new app wired to Shipvo
-  sim [--port 4545]           Build the app and run it in the simulator
+  sim [--port 4545] [--watch] Build the app and run it in the simulator; rebuild on edit
 
 Ship
   publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release

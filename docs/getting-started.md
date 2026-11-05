@@ -45,6 +45,12 @@ If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with P
 npm run sim
 ```
 
+Add `--watch` to rebuild on edit while keeping the server running:
+
+```bash
+npx shipvo sim --watch
+```
+
 This builds the web bundle with the simulated device and serves it on `http://localhost:4545`. Now let an agent use it. In Claude Desktop, Claude Code, Cursor or PiPilot:
 
 ```json
