@@ -23,7 +23,13 @@ it("the starter does not claim a release before one exists", () => {
   expect(app).toContain('"Running local build"');
   expect(app).toContain('"local build"');
   expect(app).not.toMatch(/runningRelease \?\? 0/);
-  expect(test).toContain('toSee("Hello from My Shop.")');
+  expect(test).toContain("toSee(RELEASE.headline)");
+});
+
+it("the scaffold test reads the headline from src/release.ts, so editing it keeps the test green", () => {
+  expect(test).toContain('import { RELEASE } from "../src/release";');
+  expect(test).not.toContain("Hello from");
+  expect(test).not.toContain("My Shop");
 });
 
 it("ends with the four next steps, in order, using the directory given", async () => {
