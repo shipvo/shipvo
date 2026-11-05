@@ -471,7 +471,7 @@
  },
  {
   "name": "push_notification",
-  "description": "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.",
+  "description": "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap. The app receives it only if notification permission is granted; otherwise nothing is delivered.",
   "inputSchema": {
    "type": "object",
    "properties": {

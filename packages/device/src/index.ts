@@ -76,9 +76,15 @@ export const device: Device = {
       const N = opt<any>("expo-notifications"); if (!N) return "";
       return N.scheduleNotificationAsync({ content: { title: n.title, body: n.body, data: n.data ?? {} }, trigger: null });
     },
-    onOpen(cb) {
+    onOpen(cb) { return device.notifications.onTapped(cb); },
+    onTapped(cb) {
       const N = opt<any>("expo-notifications"); if (!N) return () => {};
       const sub = N.addNotificationResponseReceivedListener((r: any) => { const c = r.notification.request.content; cb({ id: r.notification.request.identifier, title: c.title ?? "", body: c.body ?? "", data: c.data }); });
+      return () => sub.remove();
+    },
+    onReceived(cb) {
+      const N = opt<any>("expo-notifications"); if (!N) return () => {};
+      const sub = N.addNotificationReceivedListener((n: any) => { const c = n.request.content; cb({ id: n.request.identifier, title: c.title ?? "", body: c.body ?? "", data: c.data }); });
       return () => sub.remove();
     },
   },
