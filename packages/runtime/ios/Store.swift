@@ -44,6 +44,7 @@ final class Store {
   var blockedRelease: Int { get { d.integer(forKey: "blocked_release") } set { d.set(newValue, forKey: "blocked_release") } }
   /// Shell binary the stored OTA bundles were downloaded under.
   var binaryVersion: String? { get { d.string(forKey: "binary_version") } set { d.set(newValue, forKey: "binary_version") } }
+  var appBundle: Bundle { bundle }
   func block(_ release: Int) { if release > blockedRelease { blockedRelease = release } }
 
   var trialBoots: Int { get { d.integer(forKey: "trial_boots") } set { d.set(newValue, forKey: "trial_boots") } }

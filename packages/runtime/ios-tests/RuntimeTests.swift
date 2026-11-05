@@ -287,3 +287,28 @@ private extension Data {
     self = d
   }
 }
+
+/// Needs no fixture server: the Hermes bytecode version rule is pure.
+final class HermesGuardTests: XCTestCase {
+  private func hbc(_ v: Int) -> Data {
+    Data([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f, UInt8(v & 0xff), UInt8((v >> 8) & 0xff), UInt8((v >> 16) & 0xff), UInt8((v >> 24) & 0xff)])
+  }
+
+  func testReadsVersionFromHeader() {
+    XCTAssertEqual(HermesGuard.version(of: hbc(96)), 96)
+    XCTAssertEqual(HermesGuard.version(of: hbc(300)), 300)
+    XCTAssertNil(HermesGuard.version(of: Data("var a = 1; // js".utf8)))
+    XCTAssertNil(HermesGuard.version(of: Data(count: 4)))
+  }
+
+  func testMismatchIsRefusedWithTypedReason() {
+    XCTAssertEqual(HermesGuard.mismatchEvent(release: 7, releaseVersion: 98, shellVersion: 96), "hermes_bytecode_mismatch:7:release=98:shell=96")
+  }
+
+  func testMatchIsAccepted() { XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: 96, shellVersion: 96)) }
+
+  func testMissingFieldIsAccepted() {
+    XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: nil, shellVersion: 96))
+    XCTAssertNil(HermesGuard.mismatchEvent(release: 7, releaseVersion: 96, shellVersion: nil))
+  }
+}
