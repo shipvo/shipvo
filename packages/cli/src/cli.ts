@@ -10,6 +10,7 @@ import { autoHalt } from "./autohalt.js";
 import { explore } from "./explore.js";
 import { sim } from "./sim.js";
 import { preview } from "./preview.js";
+import { run } from "./run.js";
 import { keys, login, mcp } from "./login.js";
 import { verifyPointer } from "./verify.js";
 import { signingKey } from "./signing.js";
@@ -28,6 +29,7 @@ switch (cmd) {
   case "init": await init(rest); break;
   case "sim": await sim(rest); break;
   case "explore": process.exitCode = await explore(rest); break;
+  case "run": process.exitCode = await run(rest); break;
   case "preview": await preview(rest); break;
   case "publish": await publish(rest); break;
   case "promote": await promote(rest); break;

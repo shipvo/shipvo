@@ -1,0 +1,156 @@
+// `shipvo run android|ios`: build the web export with the simulated device, serve it on a local port and
+// open a phone frame page in the default browser. No browser automation. `--native` runs `npx expo run:<platform>`.
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import { join, extname, normalize, resolve, sep } from "node:path";
+import { loadConfig } from "./config.js";
+import { portFree } from "./sim.js";
+
+export type Platform = "android" | "ios";
+export type RunOptions = { platform: Platform; open: boolean; port?: number; native: boolean };
+
+/** Parses `run` arguments. Throws a plain message for anything it does not know. */
+export function parseRunArgs(argv: string[]): RunOptions {
+  let platform: Platform | undefined; let open = true; let port: number | undefined; let native = false;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "android" || a === "ios") platform = a;
+    else if (a === "--no-open") open = false;
+    else if (a === "--native") native = true;
+    else if (a === "--port") {
+      const v = argv[++i];
+      if (!v || !/^\d+$/.test(v) || Number(v) > 65535) throw new Error(`--port needs a number from 0 to 65535, got "${v ?? ""}".`);
+      port = Number(v);
+    } else throw new Error(`Unknown argument "${a}". Usage: shipvo run android|ios [--no-open] [--port <n>] [--native]`);
+  }
+  if (!platform) throw new Error("Say which phone: shipvo run android or shipvo run ios.");
+  return { platform, open, port, native };
+}
+
+/** The command `--native` runs. */
+export const nativeCommand = (p: Platform): { cmd: string; args: string[] } => ({ cmd: "npx", args: ["expo", `run:${p}`] });
+
+export const FRAMES = {
+  android: { width: 412, height: 915, radius: 36, label: "Android", sheet: { title: "Allow access?", allow: "While using the app", deny: "Don't allow" } },
+  ios: { width: 393, height: 852, radius: 55, label: "iOS", sheet: { title: "Would Like to Access", allow: "Allow While Using App", deny: "Don't Allow" } },
+} as const;
+
+/** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. */
+export function runFramePage(platform: Platform, name: string): string {
+  const f = FRAMES[platform];
+  const title = name.replace(/[<>&"']/g, "");
+  const top = platform === "android"
+    ? `<div class="status"><span>9:41</span><span class="hole" data-part="punch-hole"></span><span>5G 100%</span></div>`
+    : `<div class="status"><span>9:41</span><span class="island" data-part="dynamic-island"></span><span>5G 100%</span></div>`;
+  const bottom = platform === "android"
+    ? `<div class="bar" data-part="gesture-bar"><i></i></div>`
+    : `<div class="bar" data-part="home-indicator"><i></i></div>`;
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title} on ${f.label} (simulated)</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#e8eaed;font:14px system-ui,sans-serif}
+#fit{position:absolute;left:50%;top:50%;transform-origin:center;}
+.phone{width:${f.width}px;height:${f.height}px;border-radius:${f.radius}px;background:#000;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 30px #0006;position:relative}
+.status{flex:none;height:${platform === "ios" ? 54 : 32}px;display:flex;justify-content:space-between;align-items:center;padding:0 ${platform === "ios" ? 36 : 22}px;color:#fff;font-size:13px;position:relative}
+.hole{position:absolute;left:50%;top:8px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#111;border:1px solid #333}
+.island{position:absolute;left:50%;top:11px;width:120px;height:34px;margin-left:-60px;border-radius:20px;background:#000;border:1px solid #222}
+iframe{flex:1;min-height:0;border:0;background:#fff;width:100%}
+.bar{flex:none;height:${platform === "ios" ? 34 : 24}px;display:flex;justify-content:center;align-items:center}
+.bar i{display:block;width:${platform === "ios" ? 134 : 108}px;height:5px;border-radius:3px;background:#fff}
+.tag{position:fixed;left:12px;top:10px;padding:3px 10px;border-radius:12px;background:#111;color:#fff;font-size:12px}
+</style></head><body>
+<div class="tag" role="status">Simulated ${f.label} (${f.width}x${f.height}). The app's web build on the simulated device.</div>
+<div id="fit"><div class="phone" id="phone" data-platform="${platform}">${top}<iframe id="app" src="/app/" title="${title}"></iframe>${bottom}</div></div>
+<script>
+window.SHIPVO_SHEET=${JSON.stringify(f.sheet)};
+function fit(){var s=Math.min(1,(innerWidth-24)/${f.width},(innerHeight-60)/${f.height});var e=document.getElementById("fit");e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${f.width}px";e.style.height="${f.height}px"}
+addEventListener("resize",fit);fit();
+</script></body></html>`;
+}
+
+const TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json",
+  ".png": "image/png", ".jpg": "image/jpeg", ".gif": "image/gif", ".svg": "image/svg+xml", ".webp": "image/webp", ".ico": "image/x-icon",
+  ".ttf": "font/ttf", ".otf": "font/otf", ".woff": "font/woff", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8", ".wasm": "application/wasm",
+};
+
+/**
+ * Serves the frame page at `/` and the web export at `/app/` (and its absolute asset paths at `/`).
+ * Port 0 picks a free port. Resolves once listening.
+ */
+export function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number }): Promise<{ server: Server; port: number; close: () => Promise<void> }> {
+  const root = resolve(opts.dir);
+  const page = runFramePage(opts.platform, opts.name);
+  const server = createServer((req, res) => {
+    const path = decodeURIComponent((req.url ?? "/").split("?")[0]);
+    if (path === "/" || path === "/index.html") { res.writeHead(200, { "content-type": TYPES[".html"] }); return void res.end(page); }
+    let rel = path.startsWith("/app/") ? path.slice(4) : path;
+    if (rel.endsWith("/")) rel += "index.html";
+    const file = normalize(join(root, rel));
+    if (file !== root && !file.startsWith(root + sep)) { res.writeHead(403); return void res.end("Forbidden"); }
+    if (!existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); return void res.end("Not found"); }
+    res.writeHead(200, { "content-type": TYPES[extname(file).toLowerCase()] ?? "application/octet-stream" });
+    res.end(readFileSync(file));
+  });
+  return new Promise((ok, fail) => {
+    server.once("error", fail);
+    server.listen(opts.port ?? 0, "127.0.0.1", () => {
+      const port = (server.address() as { port: number }).port;
+      ok({ server, port, close: () => new Promise<void>((r) => { server.close(() => r()); server.closeAllConnections?.(); }) });
+    });
+  });
+}
+
+/** Names the module or file a web build failed on, from the build's error output. */
+export function describeWebBuildFailure(output: string): string {
+  const m = /Unable to resolve module ['"]?([^'"\s]+)['"]?(?: from ['"]?([^'":\s]+))?/.exec(output)
+    ?? /Module not found: (?:Error: )?Can't resolve '([^']+)'(?: in '([^']+)')?/.exec(output)
+    ?? /Cannot find module ['"]([^'"]+)['"]/.exec(output);
+  if (m) return `The app cannot build for web: ${m[1]} fails to resolve${m[2] ? ` (from ${m[2]})` : ""}. Fix or stub that module for web, or use \`shipvo run <platform> --native\`.`;
+  const f = /(?:SyntaxError|Error)[^\n]*\n?[^\n]*?(\S+\.(?:tsx?|jsx?|json))/.exec(output) ?? /(\S+\.(?:tsx?|jsx?|json))/.exec(output);
+  const last = output.trim().split("\n").slice(-1)[0] ?? "";
+  return `The app cannot build for web${f ? ` (in ${f[1]})` : ""}: ${last || "see the build output above"}. Use \`shipvo run <platform> --native\` to run it natively.`;
+}
+
+function buildWeb(root: string, out: string): Promise<void> {
+  return new Promise((ok, fail) => {
+    const p = spawn("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out], { cwd: root, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "inherit", "pipe"] });
+    let tail = "";
+    p.stderr!.on("data", (d) => { process.stderr.write(d); tail = (tail + d).slice(-4000); });
+    p.on("error", (e) => fail(new Error(`Could not start the web build: ${e.message}`)));
+    p.on("exit", (c) => (c === 0 ? ok() : fail(new Error(describeWebBuildFailure(tail)))));
+  });
+}
+
+function openBrowser(url: string) {
+  const [cmd, args] = process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
+  const p = spawn(cmd, args, { stdio: "ignore", detached: true });
+  p.on("error", () => console.error(`Could not open a browser. Open ${url} yourself.`));
+  p.unref();
+}
+
+/** Returns the exit code. */
+export async function run(argv: string[]): Promise<number> {
+  let o: RunOptions;
+  try { o = parseRunArgs(argv); } catch (e) { console.error((e as Error).message); return 2; }
+  if (o.native) {
+    const { cmd, args } = nativeCommand(o.platform);
+    console.error(`Running natively: ${cmd} ${args.join(" ")} (not the simulated device)`);
+    return spawnSync(cmd, args, { stdio: "inherit" }).status ?? 1;
+  }
+  let name: string;
+  try { name = loadConfig().name; } catch (e) { console.error((e as Error).message); return 1; }
+  if (o.port !== undefined && o.port !== 0 && !(await portFree(o.port))) { console.error(`Port ${o.port} is in use. Pass another --port <n>.`); return 1; }
+  const out = join(process.cwd(), ".shipvo", "run-build");
+  console.error(`Building ${name} for web with the simulated device…`);
+  try { await buildWeb(process.cwd(), out); } catch (e) { console.error((e as Error).message); return 1; }
+  const s = await startRunServer({ dir: out, platform: o.platform, name, port: o.port });
+  const url = `http://127.0.0.1:${s.port}/`;
+  console.error(`Simulated ${FRAMES[o.platform].label} phone at ${url}  (Ctrl+C to stop)`);
+  if (o.open) openBrowser(url);
+  await new Promise<void>((done) => { for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, done); });
+  await s.close();
+  return 0;
+}
