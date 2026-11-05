@@ -1,6 +1,6 @@
 // The Browser app of a Shipvo Phone: a real Chromium context per phone, driven for agents.
 // One isolated context per phone (own cookies and storage, never the person's profile). Mobile emulation, a user agent
-// marked "ShipvoPhone", an optional host allowlist, downloads off, no file uploads, and every navigation logged.
+// marked "ShipvoPhone", an optional host allowlist, private and loopback hosts refused unless allow_private, downloads off, no file uploads, and every navigation logged.
 // Everything read from a page is returned with source "web": it is data, not instructions.
 
 export const UA_MARK = "ShipvoPhone";
@@ -15,11 +15,34 @@ export function hostAllowed(url, hosts) {
   return hosts.some((p) => { p = String(p).toLowerCase(); return p.startsWith("*.") ? h.endsWith(p.slice(1)) : h === p; });
 }
 
+/** True for loopback, link-local, private-range and .local/.internal hosts (judged on the literal host, no DNS lookup). */
+export function privateHost(url) {
+  let h; try { h = new URL(url).hostname.toLowerCase().replace(/\.$/, ""); } catch { return true; }
+  if (h === "localhost" || /\.(localhost|local|internal)$/.test(h)) return true;
+  if (h.startsWith("[")) {
+    const v = h.slice(1, -1);
+    const m = /^::ffff:(?:(\d+\.\d+\.\d+\.\d+)|([0-9a-f]{1,4}):([0-9a-f]{1,4}))$/.exec(v);
+    if (m) return m[1] ? privateHost(`http://${m[1]}/`) : privateHost(`http://${parseInt(m[2], 16) >> 8}.${parseInt(m[2], 16) & 255}.${parseInt(m[3], 16) >> 8}.${parseInt(m[3], 16) & 255}/`);
+    return v === "::" || v === "::1" || /^f[cd][0-9a-f]{2}:/.test(v) || /^fe[89ab][0-9a-f]:/.test(v);
+  }
+  const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(h);
+  if (!m) return false;
+  const a = +m[1], b = +m[2];
+  return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
 export class PhoneBrowser {
-  /** @param {{ browser: import("playwright").Browser, skin?: "android"|"ios", allowHosts?: string[], log?: (e: object) => void }} o */
-  constructor({ browser, skin = "android", allowHosts, log }) {
+  /** @param {{ browser: import("playwright").Browser, skin?: "android"|"ios", allowHosts?: string[], allowPrivate?: boolean, log?: (e: object) => void }} o */
+  constructor({ browser, skin = "android", allowHosts, allowPrivate, log }) {
+    this.allowPrivate = allowPrivate === true; this.ids = new Map();
     this.browser = browser; this.skin = SKINS[skin] ? skin : "android"; this.allowHosts = allowHosts ?? [];
     this.navLog = []; this.onLog = log; this.tabs = new Map(); this.active = null; this.nextTab = 1; this.ctx = null;
+  }
+  /** Why a url may not be opened, or null. Private hosts are refused unless allow_private is set or the host is listed in allowHosts. */
+  blocked(url) {
+    if (!hostAllowed(url, this.allowHosts)) return "host_not_allowed";
+    if (!this.allowPrivate && privateHost(url) && !(this.allowHosts.length && hostAllowed(url, this.allowHosts))) return "host_not_allowed";
+    return null;
   }
   record(e) { const entry = { at: Date.now(), source: "browser", ...e }; this.navLog.push(entry); this.onLog?.(entry); }
   async context() {
@@ -30,19 +53,34 @@ export class PhoneBrowser {
     // Main-frame navigations (typed, clicked or redirected) to a host outside the allowlist are stopped.
     await this.ctx.route("**/*", (route) => {
       const req = route.request();
-      if (req.isNavigationRequest() && !req.frame().parentFrame() && !hostAllowed(req.url(), this.allowHosts)) {
+      let top = false; try { top = req.isNavigationRequest() && !req.frame().parentFrame(); } catch { top = req.isNavigationRequest(); }
+      if (top && this.blocked(req.url())) {
         this.record({ name: "navigate", url: req.url(), ok: false, code: "host_not_allowed" });
         return route.abort("blockedbyclient");
       }
+      if (top) return this.followRedirect(route);
       return route.fallback();
     });
+    this.ctx.on("page", (p) => { this.track(p); });
     return this.ctx;
   }
+  /** Playwright does not route the hops of a redirect, so a navigation is fetched with redirects off and each Location is checked here. */
+  async followRedirect(route) {
+    let res;
+    try { res = await route.fetch({ maxRedirects: 0 }); } catch { return route.fallback(); }
+    const loc = res.status() >= 300 && res.status() < 400 ? res.headers()["location"] : null;
+    if (loc) {
+      let to; try { to = new URL(loc, route.request().url()).href; } catch { to = null; }
+      if (!to || this.blocked(to)) { this.record({ name: "navigate", url: to ?? loc, ok: false, code: "host_not_allowed" }); return route.abort("blockedbyclient"); }
+    }
+    return route.fulfill({ response: res });
+  }
   async track(page) {
-    const id = `t${this.nextTab++}`; this.tabs.set(id, page); this.active = id;
+    if (this.ids.has(page)) { this.active = this.ids.get(page); return this.active; }
+    const id = `t${this.nextTab++}`; this.tabs.set(id, page); this.ids.set(page, id); this.active = id;
     page.on("framenavigated", (f) => { if (f === page.mainFrame()) this.record({ name: "navigate", tab: id, url: f.url(), ok: true }); });
     page.on("filechooser", (fc) => { this.record({ name: "file_upload", tab: id, ok: false, code: "uploads_off" }); fc.setFiles([]).catch(() => {}); });
-    page.on("close", () => { this.tabs.delete(id); if (this.active === id) this.active = [...this.tabs.keys()].pop() ?? null; });
+    page.on("close", () => { this.tabs.delete(id); this.ids.delete(page); if (this.active === id) this.active = [...this.tabs.keys()].pop() ?? null; });
     return id;
   }
   page(tab) {
@@ -54,9 +92,15 @@ export class PhoneBrowser {
   async open(url) {
     let u; try { u = new URL(url); } catch { throw new BrowserError("bad_url", `not a url: ${url}`); }
     if (!/^https?:$/.test(u.protocol)) throw new BrowserError("bad_url", `the Browser app opens http and https pages, not ${u.protocol}`);
-    if (!hostAllowed(u.href, this.allowHosts)) { this.record({ name: "navigate", url: u.href, ok: false, code: "host_not_allowed" }); throw new BrowserError("host_not_allowed", `${u.hostname} is not in this phone's allowed hosts`); }
+    if (this.blocked(u.href)) { this.record({ name: "navigate", url: u.href, ok: false, code: "host_not_allowed" }); throw new BrowserError("host_not_allowed", `${u.hostname} is not allowed on this phone (outside allow_hosts, or a private address without allow_private)`); }
     const page = await (await this.context()).newPage(); const tab = await this.track(page);
-    await page.goto(u.href, { waitUntil: "load" }).catch((e) => { if (/blockedbyclient/i.test(e.message)) throw new BrowserError("host_not_allowed", "the page redirected to a host outside this phone's allowed hosts"); throw e; });
+    try { await page.goto(u.href, { waitUntil: "load" }); }
+    catch (e) {
+      await page.close().catch(() => {}); this.tabs.delete(tab); this.ids.delete(page);
+      if (this.active === tab) this.active = [...this.tabs.keys()].pop() ?? null;
+      if (/blocked_?by_?client/i.test(e.message)) throw new BrowserError("host_not_allowed", "the page went to a host this phone does not allow (outside allow_hosts, or a private address)");
+      throw e;
+    }
     return this.snapshot(tab);
   }
   async tabsList() { return Promise.all([...this.tabs].map(async ([tab, p]) => ({ tab, url: p.url(), title: await p.title().catch(() => ""), active: tab === this.active }))); }
@@ -96,11 +140,12 @@ export class PhoneBrowser {
   async waitFor({ text, url, timeoutMs = 10000 }, tab) {
     const p = this.page(tab);
     if (!text && !url) throw new BrowserError("bad_args", "browser_wait_for needs text or url");
+    const end = Date.now() + timeoutMs; const left = () => Math.max(1, end - Date.now());
     try {
-      if (url) await p.waitForURL((u) => u.href.includes(url), { timeout: timeoutMs });
-      if (text) await p.getByText(text).first().waitFor({ timeout: timeoutMs });
+      if (url) await p.waitForURL((u) => u.href.includes(url), { timeout: left() });
+      if (text) await p.getByText(text).first().waitFor({ timeout: left() });
     } catch { throw new BrowserError("timeout", `did not see ${text ? `text "${text}"` : `url "${url}"`} within ${timeoutMs} ms`); }
     return this.snapshot(tab);
   }
-  async close() { await this.ctx?.close().catch(() => {}); this.ctx = null; this.tabs.clear(); this.active = null; }
+  async close() { await this.ctx?.close().catch(() => {}); this.ctx = null; this.tabs.clear(); this.ids.clear(); this.active = null; }
 }

@@ -84,7 +84,7 @@ async function newSession(id, opts = {}) {
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, errors, browserOpts: { skin: opts.platform === "ios" ? "ios" : "android", allowHosts: Array.isArray(opts.allow_hosts) ? opts.allow_hosts : [] }, app: target.app, release: target.release, startedAt: new Date().toISOString() });
+  sessions.set(id, { ctx, page, errors, browserOpts: { skin: opts.platform === "ios" ? "ios" : "android", allowHosts: Array.isArray(opts.allow_hosts) ? opts.allow_hosts : [], allowPrivate: opts.allow_private === true }, app: target.app, release: target.release, startedAt: new Date().toISOString() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an

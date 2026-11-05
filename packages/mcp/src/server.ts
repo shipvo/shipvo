@@ -137,9 +137,10 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   seed_cart: z.array(z.object({ product_id: z.string().optional(), id: z.string().optional(), quantity: z.number().int().positive().optional(), qty: z.number().int().positive().optional() }).refine((l) => (l.product_id ?? l.id) && (l.quantity ?? l.qty), "each line needs product_id (or id) and quantity (or qty)")).optional().describe("Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."),
   dark: z.boolean().optional().describe("Dark mode"),
   platform: z.enum(["android", "ios"]).optional().describe("Phone skin for the Browser app (user agent and viewport). Default android."),
-  allow_hosts: z.array(z.string()).optional().describe("Browser app only: hosts that browser_open may navigate to, such as 'example.com' or '*.example.com'. Empty or missing allows all. Checks page navigations only, not images, scripts or iframes, so it is not network isolation."),
+  allow_hosts: z.array(z.string()).optional().describe("Browser app only: hosts that browser_open may navigate to, such as 'example.com' or '*.example.com'. Empty or missing allows all public hosts. Checks page navigations only, not images, scripts or iframes, so it is not network isolation."),
+  allow_private: z.boolean().optional().describe("Browser app only: allow loopback, link-local, private-network, .local and .internal hosts. Default false: they are refused with host_not_allowed unless listed in allow_hosts."),
   attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
-}, WR, async ({ app, session, seed_cart, dark, platform, allow_hosts, attach }) => {
+}, WR, async ({ app, session, seed_cart, dark, platform, allow_hosts, allow_private, attach }) => {
   const id = app.split("@")[0];
   if (!(await allowed(id))) return result("", { ok: false, code: "unknown_app", error: keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
@@ -164,7 +165,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
       attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark, platform, allow_hosts }) as Act & { release?: string | number };
+  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark, platform, allow_hosts, allow_private }) as Act & { release?: string | number };
   if (r.code === "sim_timeout") return result(sid, r);
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);

@@ -3,3 +3,4 @@
 - Migration: none; new tools and actions only.
 - `@shipvo/sim`: new `POST /end {session}`. Ending a session, or restarting its id, now closes the Browser app's Chromium context too.
 - `@shipvo/mcp`: `open_app` takes optional `platform` and `allow_hosts`. `browser_screenshot` returns an MCP `image` block. `end_session` calls `/end`.
+- `@shipvo/sim`, `@shipvo/mcp`: the Browser app refuses loopback, link-local, private-network, `.local` and `.internal` hosts by default, including on redirects. Opt in with `allow_private: true` (on `/session` and `open_app`) or by listing the host in `allow_hosts`. Failed opens leave no tab; pages a site opens (`target=_blank`) become tabs; `browser_wait_for` uses one deadline.

@@ -158,9 +158,10 @@ describe("Browser app tools", () => {
   });
   it("passes allow_hosts and platform from open_app to the simulator", async () => {
     const c = await connect();
-    await c.callTool({ name: "open_app", arguments: { app: "menu", session: "ah", allow_hosts: ["example.com"], platform: "ios" } });
+    await c.callTool({ name: "open_app", arguments: { app: "menu", session: "ah", allow_hosts: ["example.com"], platform: "ios", allow_private: true } });
     const sent = JSON.parse(bodies[posts.map((p, i) => (p === "/session" && bodies[i].includes('"ah"') ? i : -1)).filter((i) => i >= 0).pop()!]);
     expect(sent.allow_hosts).toEqual(["example.com"]);
+    expect(sent.allow_private).toBe(true);
     expect(sent.platform).toBe("ios");
     await c.close();
   });

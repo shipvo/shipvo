@@ -9,7 +9,7 @@ npx shipvo-sim --dist ./sim-dist --app myshop
 
 HTTP API (used by `@shipvo/mcp`): `POST /session {session, app, seed_cart, dark, device}`, `POST /act {session, action, ...}` with actions `screen tap type scroll back screenshot set_device push_notification notifications open_notification device_log device_reset`, and a per-session mock control plane at `/s/<session>/...` that records the orders the app posts (`GET /s/<session>/orders`).
 
-`POST /session` also takes `platform` (`android` or `ios`) and `allow_hosts` for the Browser app. `POST /end {session}` closes a session, including the Browser app's Chromium context; starting a session with an existing id does the same to the old one.
+`POST /session` also takes `platform` (`android` or `ios`), `allow_hosts` and `allow_private` for the Browser app. By default the Browser app refuses loopback, link-local, private-network, `.local` and `.internal` hosts (judged on the literal host, redirects included) with `host_not_allowed`; set `allow_private: true` or list the host in `allow_hosts` to open one. `POST /end {session}` closes a session, including the Browser app's Chromium context; starting a session with an existing id does the same to the old one.
 
 **Browser app.** The actions `browser_open browser_tabs browser_close_tab browser_snapshot browser_click browser_type browser_scroll browser_back browser_screenshot browser_wait_for` drive a real Chromium page per phone, started on first use. The result has `web` (marked `source: "web"`, untrusted) and `screen` (JSON text; a screenshot shows only its size, the PNG is in `web.data`). `allow_hosts` is checked on page navigations and redirects only; images, scripts and iframes are not restricted, so it is not network isolation. Errors:
 

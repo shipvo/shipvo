@@ -50,7 +50,7 @@ after(async () => {
 const until = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise((r) => setTimeout(r, 100)); };
 
 test("browser_open returns a tree marked source web; screenshot carries the PNG in web.data", async () => {
-  assert.ok((await call("/session", { session: "w1" })).ok);
+  assert.ok((await call("/session", { session: "w1", allow_private: true })).ok);
   const r = await act("w1", { action: "browser_open", url: `${base}/` });
   assert.equal(r.ok, true, r.error);
   assert.equal(r.web.source, "web");
@@ -62,7 +62,7 @@ test("browser_open returns a tree marked source web; screenshot carries the PNG 
 });
 
 test("a BrowserError becomes a typed error code", async () => {
-  assert.ok((await call("/session", { session: "w2" })).ok);
+  assert.ok((await call("/session", { session: "w2", allow_private: true })).ok);
   assert.equal((await act("w2", { action: "browser_snapshot" })).code, "no_tab");
   assert.equal((await act("w2", { action: "browser_open", url: "not a url" })).code, "bad_url");
   const nope = await call("/session", { session: "w3", allow_hosts: ["example.com"] });
@@ -73,7 +73,7 @@ test("a BrowserError becomes a typed error code", async () => {
 });
 
 test("/end closes the Browser app's context and forgets the session", async () => {
-  assert.ok((await call("/session", { session: "w4" })).ok);
+  assert.ok((await call("/session", { session: "w4", allow_private: true })).ok);
   assert.ok((await act("w4", { action: "browser_open", url: `${base}/` })).ok);
   await until(() => held > 0);
   assert.ok(held > 0, "the page should hold a request open");
@@ -86,11 +86,11 @@ test("/end closes the Browser app's context and forgets the session", async () =
 });
 
 test("restarting a session id closes its old Browser app", async () => {
-  assert.ok((await call("/session", { session: "w5" })).ok);
+  assert.ok((await call("/session", { session: "w5", allow_private: true })).ok);
   assert.ok((await act("w5", { action: "browser_open", url: `${base}/` })).ok);
   await until(() => held > 0);
   const before = held;
-  assert.ok((await call("/session", { session: "w5" })).ok);
+  assert.ok((await call("/session", { session: "w5", allow_private: true })).ok);
   await until(() => held < before);
   assert.ok(held < before);
 });
