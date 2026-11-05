@@ -24,7 +24,7 @@ jobs:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
       REPO: ${{ github.repository }}
       WANT: ${{ github.event.issue.number || inputs.issue || '' }}
-      MAX_ACTIVE: ${{ vars.AGENT_AIDER_MAX_ACTIVE || 3 }}
+      MAX_ACTIVE: 1   # one docs or test task at a time (see Shipvo HQ merge rates)
     steps:
       - id: pick
         run: |
@@ -52,6 +52,11 @@ jobs:
               perm = json.loads(gh("api", f"repos/{R}/collaborators/{i['author']['login']}/permission"))["permission"] if not i["author"].get("is_bot") else "bot"
               if perm not in ("admin", "maintain", "write", "bot"):
                   print(f"#{i['number']}: author {i['author']['login']} is not on the team; skipping"); continue
+              # Measured on Shipvo HQ: this engineer merges few PRs outside docs and tests. Anything else goes to Claude.
+              if not names & {"type:docs", "type:test"}:
+                  gh("issue", "edit", str(i["number"]), "-R", R, "--remove-label", "agent:aider", "--add-label", "agent:claude")
+                  gh("issue", "comment", str(i["number"]), "-R", R, "--body", "Moved to the Claude engineer: Aider takes only docs and test tasks.")
+                  print(f"#{i['number']}: not a docs or test task; moved to Claude"); continue
               n = i["number"]
               gh("issue", "edit", str(n), "-R", R, "--add-label", "agent:in-progress")
               v = json.dumps({"ISSUE": n, "ISSUE_TEXT": f"# {i['title']}\n\n{i['body'] or ''}"})

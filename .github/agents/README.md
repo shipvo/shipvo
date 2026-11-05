@@ -14,8 +14,8 @@ Shipvo is developed day and night by a team of AI agents in GitHub Actions: Clau
 | Design Lead (senior UI/UX) | Claude with screenshots | Wed and Sat | `agent-design.yml` |
 | Head of Product (senior PM) | Claude | daily planning 4 times a day; strategy review Mondays | `agent-planner.yml`, `agent-pm.yml` |
 | Engineer | Claude | on `agent:claude` label, sweep hourly | `agent-engineer.yml` |
-| Engineer | Mistral `labs-leanstral-1-5` via Aider (`MISTRAL_API_KEY`; free daily use through Mistral Labs) | on `agent:mistral` label, on every CI/merge, hourly | `agent-mistral.yml` |
-| Engineer | Aider (open source) via Kilo AI Gateway | on `agent:aider` label, sweep hourly | `agent-aider.yml` |
+| Engineer (docs and tests only, one task at a time) | Mistral `labs-leanstral-1-5` via Aider (`MISTRAL_API_KEY`; free daily use through Mistral Labs) | on `agent:mistral` label, on every CI/merge, hourly | `agent-mistral.yml` |
+| Engineer (docs and tests only, one task at a time) | Aider (open source) via Kilo AI Gateway | on `agent:aider` label, sweep hourly | `agent-aider.yml` |
 | Code reviewer | Claude | every agent PR, on open and on each push | `agent-reviewer.yml` |
 | Fix engineer | each engineer fixes its own PRs (Claude fixes any leftover Copilot PRs) | CI red, changes requested, merge conflict | `agent-fixer.yml` |
 | Contract checker | rules + Claude | before merging any PR that touches guarded code | `agent-contract.yml` |
