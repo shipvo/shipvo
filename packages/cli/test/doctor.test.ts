@@ -20,6 +20,29 @@ function withConfig(body: string, seed?: string) {
 }
 
 describe("shipvo doctor checks", () => {
+  it("--skip-sim leaves out the simulator checks", async () => {
+    const seed = makeSeed();
+    const cwd = withConfig(JSON.stringify({ appId: "a", publicKey: makePub(seed) }), seed);
+    writeFileSync(join(cwd, "package.json"), JSON.stringify({ scripts: { sim: "shipvo sim" } }));
+    const chromiumPath = () => null;
+    const withSim = await runDoctorChecks({ cwd, offline: true, chromiumPath });
+    const skipped = await runDoctorChecks({ cwd, offline: true, chromiumPath, skipSim: true });
+    expect(nameOf(withSim, "Playwright Chromium installed").ok).toBe(false);
+    expect(skipped.some((r) => r.name === "Playwright Chromium installed" || r.name.startsWith("sim port"))).toBe(false);
+  });
+
+  it("--offline makes no network call and passes the two network checks", async () => {
+    const seed = makeSeed();
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
+    const fetchFn = vi.fn(async () => { throw new Error("no network"); });
+    const off = await runDoctorChecks({ cwd, offline: true, fetchFn: fetchFn as unknown as typeof fetch });
+    const on = await runDoctorChecks({ cwd, fetchFn: fetchFn as unknown as typeof fetch });
+    expect(fetchFn).toHaveBeenCalledTimes(2); // only the online run
+    expect(nameOf(off, "control plane reachable")).toMatchObject({ ok: true, note: "skipped, --offline" });
+    expect(nameOf(off, "control plane /health returns JSON").ok).toBe(true);
+    expect(nameOf(on, "control plane reachable").ok).toBe(false);
+  });
+
   it("passes Node version >= 22 and fails older Node", async () => {
     const seed = makeSeed();
     const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
