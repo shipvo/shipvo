@@ -32,4 +32,18 @@ describe("forwardRuntimeEvents", () => {
   it("ignores unknown events", () => {
     expect(run(["applied:3"])).toEqual([]);
   });
+  it("reports hermes_bytecode_mismatch under its release id", () => {
+    expect(run(["hermes_bytecode_mismatch:12:release=96:shell=98"])).toEqual([["hermes_bytecode_mismatch", 12]]);
+  });
+  it("falls back to the running release when the mismatch id is malformed", () => {
+    expect(run(["hermes_bytecode_mismatch:x:release=1:shell=2", "hermes_bytecode_mismatch"])).toEqual([
+      ["hermes_bytecode_mismatch", undefined], ["hermes_bytecode_mismatch", undefined]]);
+  });
+  it("reports native-module pointer rejections once each", () => {
+    expect(run(["pointer_rejected:native_module_missing", "pointer_rejected:native_module_version"])).toEqual([
+      ["native_module_missing", undefined], ["native_module_version", undefined]]);
+  });
+  it("ignores other pointer_rejected reasons", () => {
+    expect(run(["pointer_rejected:hermes_bytecode_mismatch", "pointer_rejected:x", "pointer_rejected"])).toEqual([]);
+  });
 });
