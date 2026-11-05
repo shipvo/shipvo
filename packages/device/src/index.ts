@@ -24,10 +24,12 @@ export const device: Device = {
     camera: MODS["expo-camera"] ? "real" : "unavailable", location: MODS["expo-location"] ? "real" : "unavailable",
     biometrics: MODS["expo-local-authentication"] ? "real" : "unavailable", notifications: MODS["expo-notifications"] ? "real" : "unavailable",
     clipboard: MODS["expo-clipboard"] ? "real" : "unavailable", contacts: MODS["expo-contacts"] ? "real" : "unavailable", calendar: MODS["expo-calendar"] ? "real" : "unavailable", files: MODS["expo-document-picker"] ? "real" : "unavailable", share: "real", network: "real",
+    microphone: "unavailable",
     payments: "simulated", // sandbox provider until a gateway is configured: receipts are prefixed SANDBOX-
   }),
   permissions: {
     async get(name) {
+      if (name === "microphone") return "denied"; // the microphone API is web and simulator only
       if (name === "camera") { const C = opt<any>("expo-camera"); return C ? map((await C.Camera.getCameraPermissionsAsync()).status) : "denied"; }
       if (name === "location") { const L = opt<any>("expo-location"); return L ? map((await L.getForegroundPermissionsAsync()).status) : "denied"; }
       if (name === "contacts") { const K = opt<any>("expo-contacts"); return K ? map((await K.getPermissionsAsync()).status) : "denied"; }
@@ -35,6 +37,7 @@ export const device: Device = {
       const N = opt<any>("expo-notifications"); return N ? map((await N.getPermissionsAsync()).status) : "denied";
     },
     async request(name) {
+      if (name === "microphone") return "denied";
       if (name === "camera") { const C = opt<any>("expo-camera"); return C ? map((await C.Camera.requestCameraPermissionsAsync()).status) : "denied"; }
       if (name === "location") { const L = opt<any>("expo-location"); return L ? map((await L.requestForegroundPermissionsAsync()).status) : "denied"; }
       if (name === "contacts") { const K = opt<any>("expo-contacts"); return K ? map((await K.requestPermissionsAsync()).status) : "denied"; }

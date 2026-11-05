@@ -15,10 +15,11 @@ export type DateRange = { start: string | Date; end: string | Date };
 export type PickedFile = { name: string; mimeType: string; size: number; uri: string };
 /** Options for the file picker. `type` is a MIME filter such as `image/*` or `application/pdf` (or a list of them). Default: any file. */
 export type PickFileOptions = { type?: string | string[] };
-export type PermissionName = "camera" | "location" | "notifications" | "contacts" | "calendar";
+export type PermissionName = "camera" | "microphone" | "location" | "notifications" | "contacts" | "calendar";
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 
-export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "contacts" | "calendar" | "files";
+export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "microphone" | "contacts" | "calendar" | "files";
+export type MicrophoneSession = { source: "real" | "simulated"; stream?: unknown; /** Loudness, 0 to 1. Present for the simulated microphone, and for a real one when the browser has Web Audio. */ level?(): number; stop(): void };
 /** How a capability is provided here: by the real OS/SDK, by the simulated device, or not at all. Never a silent fallback. */
 export type Support = "real" | "simulated" | "unavailable";
 export interface Device {
@@ -30,6 +31,8 @@ export interface Device {
   location: { current(): Promise<Coords> };
   /** Opens the camera to scan one barcode or QR code. Resolves with the code, or null if the person cancels. */
   camera: { scan(opts?: { prompt?: string }): Promise<ScanResult | null> };
+  /** Web and simulator only. Opens the microphone: the real one when a person is present and allows it, else the simulated one. `source` says which. */
+  microphone?: { open(): Promise<MicrophoneSession> };
   auth: { available(): Promise<boolean>; confirm(reason: string): Promise<AuthResult> };
   /** Charges through the configured provider. The prompt UI (amount, PIN) is the app's own sheet, identical on every platform. */
   pay: { charge(req: PaymentRequest, pin: string): Promise<PaymentResult> };
