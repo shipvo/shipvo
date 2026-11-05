@@ -304,6 +304,11 @@ jobs:
               { echo "**Agent could not finish this.**"; echo; cat /tmp/agent/blocked.md; echo; echo "Run: $RUN_URL"; } > /tmp/agent/b.md
               gh issue comment "$T" -R "$REPO" --body-file /tmp/agent/b.md || true
               gh issue edit "$T" -R "$REPO" --remove-label agent:in-progress --add-label agent:blocked || true
+            elif [ "${{ inputs.role }}" != "steward" ]; then
+              # A scheduled role (video, blog, tutorial, ...) has no issue to report on: escalate so the steward sees it.
+              { echo "The ${{ inputs.role }} run could not finish:"; echo; cat /tmp/agent/blocked.md; echo; echo "Run: $RUN_URL"; } > /tmp/agent/b.md
+              gh label create agent:escalate -R "$REPO" --color b60205 --force > /dev/null 2>&1 || true
+              gh issue create -R "$REPO" --title "Escalation: ${{ inputs.role }} run blocked: $(head -n1 /tmp/agent/blocked.md | sed 's/^#* *//' | cut -c1-70)" --label agent:escalate --body-file /tmp/agent/b.md || true
             fi
           fi
           [ "$MODE" = "read" ] && exit 0

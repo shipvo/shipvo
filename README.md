@@ -101,6 +101,7 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 | `packages/test` | `@shipvo/test`: typed end-to-end tests that run your app in the simulator, in Vitest or any runner, headless in CI (`docs/testing.md`) |
 | `packages/device` | `@shipvo/device`: one device API (camera, location, biometrics, payments, notifications, share, network), real on phones, simulated in the simulator, plus Metro aliases for raw Expo imports |
 | `packages/store` | `@shipvo/store`: drafts Play Data safety answers and a privacy policy from `shipvo.json`, and checks store screenshot sizes (`docs/store.md`) |
+| `packages/capacitor` | `@shipvo/capacitor`: release decisions, Ed25519 + sha-256 verification and rollback rules for signed Capacitor web bundles (core only; native apply comes next) |
 | `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
 | `services/sim` | Hosted simulator Worker: one sandbox per API key, the same MCP tools over HTTPS (sim.shipvo.dev) |
 | `services/site` | shipvo.dev: landing page and the public app marketplace |

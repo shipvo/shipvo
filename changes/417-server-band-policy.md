@@ -1,0 +1,3 @@
+- `control-plane`: new owner commands `set_release_policy` (owner sign-in only) and `get_release_policy` store `maxBand` and `agentMaxBand` per app in KV. A release pointer publish to a wider band is refused with 403 `{ code: "policy_refused", rule, reason }`, nothing is written, and an audit row (`action: publish`, `after.refused: true`) is recorded. Calls with the `x-shipvo-actor: agent` header count as agents. No stored policy means no change.
+- `cli`: `shipvo publish` sends that header when `SHIPVO_ACTOR=agent` and prints the server's rule and reason on a refusal.
+- Migration: none.

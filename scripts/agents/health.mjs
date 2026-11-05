@@ -69,6 +69,17 @@ if (!ready.length && !working.length && !live.some((r) => r.name === "agent-plan
   fixed.push("The issue queue was empty; asked the Head of Product to plan the next slices.");
 }
 
+// 3c. Daily content roles: GitHub sometimes drops scheduled runs. Start any that has not run for 26 hours.
+for (const wf of ["agent-blog.yml", "agent-tutorial.yml", "agent-video.yml"]) {
+  try {
+    const last = api(`repos/${REPO}/actions/workflows/${wf}/runs?per_page=1`).workflow_runs[0];
+    if (!last || (last.status === "completed" && mins(last.created_at) > 26 * 60)) {
+      dispatch(wf);
+      fixed.push(`${wf} had not run for over a day (missed schedule); started it.`);
+    }
+  } catch (e) { console.log(`skip ${wf}:`, e.message); }
+}
+
 // 4. Failed agent runs in the last 3 hours.
 const recent = runs.filter((r) => r.status === "completed" && mins(r.created_at) < 180 && r.conclusion !== "skipped");
 const failed = recent.filter((r) => r.conclusion === "failure" && r.name !== "ci");
