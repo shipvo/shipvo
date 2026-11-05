@@ -18,6 +18,7 @@ import { status } from "./status.js";
 import { doctor } from "./doctor.js";
 import { audit } from "./audit.js";
 import { store } from "./store.js";
+import { easCmd } from "./eas.js";
 import { testCmd } from "./test.js";
 import { failure, help, unknownCommand } from "./help.js";
 
@@ -38,6 +39,7 @@ switch (cmd) {
   case "audit": await audit(rest); break;
   case "test": process.exitCode = await testCmd(rest); break;
   case "store": await store(rest); break;
+  case "eas": process.exitCode = await easCmd(rest); break;
   case "app": await appCmd(rest); break;
   case "keys": if (rest[0] === "export" || rest[0] === "import") await signingKey(rest); else await keys(); break;
   case "mcp": mcp(); break;
