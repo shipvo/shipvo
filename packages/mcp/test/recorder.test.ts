@@ -1,0 +1,99 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import http from "node:http";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Recorder, RecorderError } from "../src/recorder.js";
+
+const root = resolve(__dirname, "..");
+const have = (bin: string) => spawnSync(bin, ["-version"]).status === 0;
+const required = process.env.SHIPVO_REQUIRE_FFMPEG === "1";
+const ffmpegOk = have("ffmpeg") && have("ffprobe");
+if (required && !ffmpegOk) throw new Error("SHIPVO_REQUIRE_FFMPEG=1 but ffmpeg or ffprobe is missing");
+
+let page: http.Server; let url = ""; let out = ""; let dist = "";
+beforeAll(async () => {
+  out = mkdtempSync(join(tmpdir(), "rec-")); dist = mkdtempSync(join(root, "dist-test-"));
+  page = http.createServer((_, res) => { res.writeHead(200, { "content-type": "text/html" }); res.end("<body style='margin:0;background:#136'><h1 style='color:#fff'>Phone frame</h1></body>"); });
+  await new Promise<void>((r) => page.listen(0, r));
+  url = `http://127.0.0.1:${(page.address() as { port: number }).port}/`;
+  const b = spawnSync(process.execPath, [createRequire(join(root, "package.json")).resolve("typescript/bin/tsc"), "-p", root, "--outDir", dist], { encoding: "utf8" });
+  if (b.status !== 0) throw new Error(b.stdout + b.stderr);
+});
+afterAll(() => { page?.close(); for (const d of [out, dist]) if (d) rmSync(d, { recursive: true, force: true }); });
+
+const probe = (file: string) => {
+  const r = spawnSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,codec_name:format=duration", "-of", "json", file], { encoding: "utf8" });
+  const j = JSON.parse(r.stdout); return { width: j.streams[0].width, height: j.streams[0].height, codec: j.streams[0].codec_name, duration: Number(j.format.duration) };
+};
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe.skipIf(!ffmpegOk)("Recorder", () => {
+  it.each([["9:16", 1080, 1920], ["16:9", 1920, 1080], ["1:1", 1080, 1080]] as const)("writes an H.264 MP4 for %s", async (format, width, height) => {
+    const r = new Recorder();
+    await r.start({ url, format, title: "My Demo", dir: out });
+    await sleep(500); const a = r.marker("first"); await sleep(500); const b = r.marker("second"); await sleep(300);
+    const res = await r.stop();
+    expect(res).toMatchObject({ width, height });
+    expect(res.file).toMatch(/my-demo-\d{14}\.mp4$/);
+    expect(existsSync(res.file)).toBe(true);
+    const p = probe(res.file);
+    expect(p).toMatchObject({ width, height, codec: "h264" });
+    expect(Math.abs(p.duration - res.duration_s)).toBeLessThan(0.7);
+    expect(res.duration_s).toBeGreaterThanOrEqual(1.3);
+    expect(res.chapters.map((c) => c.caption)).toEqual(["first", "second"]);
+    expect(a.t).toBeGreaterThan(0); expect(b.t).toBeGreaterThan(a.t); expect(res.duration_s).toBeGreaterThanOrEqual(b.t);
+  }, 60000);
+
+  it("refuses a second start while recording", async () => {
+    const r = new Recorder(); await r.start({ url, dir: out });
+    await expect(r.start({ url, dir: out })).rejects.toMatchObject({ code: "recording_active" });
+    await r.stop();
+  }, 60000);
+});
+
+describe("Recorder without a recording", () => {
+  it("stop and marker throw no_recording", async () => {
+    const r = new Recorder();
+    await expect(r.stop()).rejects.toBeInstanceOf(RecorderError);
+    expect(() => r.marker("x")).toThrow(/record_start/);
+  });
+});
+
+describe("MCP tools", () => {
+  async function connect(extra: Record<string, string> = {}) {
+    const env = { ...(process.env as Record<string, string>), ...extra, PN_SIM: "http://127.0.0.1:1", PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "test", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(dist, "server.js")], env, cwd: out }));
+    return c;
+  }
+  it("lists the three tools with their schemas", async () => {
+    const c = await connect();
+    const tools = (await c.listTools()).tools.filter((t) => t.name.startsWith("record_")).sort((a, b) => a.name.localeCompare(b.name));
+    expect(tools.map((t) => ({ name: t.name, inputSchema: t.inputSchema }))).toMatchSnapshot();
+    await c.close();
+  });
+  it.each([["record_stop", {}], ["record_marker", { caption: "x" }]])("%s without record_start returns a typed error", async (name, args) => {
+    const c = await connect();
+    const r: any = await c.callTool({ name, arguments: args });
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent.code).toBe("no_recording");
+    expect(r.structuredContent.error).toMatch(/record_start/);
+    await c.close();
+  });
+  it.skipIf(!ffmpegOk)("records a scripted session end to end", async () => {
+    const c2 = await connect({ SHIPVO_FRAME_URL: url });
+    await c2.callTool({ name: "record_start", arguments: { format: "1:1", title: "e2e" } });
+    await sleep(400); await c2.callTool({ name: "record_marker", arguments: { caption: "hello" } }); await sleep(400);
+    const r: any = await c2.callTool({ name: "record_stop", arguments: {} });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent.file).toContain(join(".shipvo", "recordings"));
+    expect(probe(r.structuredContent.file)).toMatchObject({ width: 1080, height: 1080 });
+    expect(r.structuredContent.chapters).toEqual([{ t: expect.any(Number), caption: "hello" }]);
+    await c2.close();
+  }, 60000);
+});

@@ -16,6 +16,7 @@ import { z } from "zod";
 import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
+import { Recorder, RecorderError } from "./recorder.js";
 import { satisfied, sameTree, wantsMatch, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -56,6 +57,7 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
     return { ok: false, code: "sim_timeout", error: `the simulator did not answer ${what} within ${ms} ms. The action may still have run and the session may still be alive: call screen to see where it is.` };
   }
 }
+const recorder = new Recorder();
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
 const trees = new Map<string, string>();
@@ -232,6 +234,22 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
+});
+
+// Record the phone frame page to an MP4 (one recording per server). Page: SHIPVO_FRAME_URL, default the simulator's root.
+const recFail = (e: unknown) => { if (e instanceof RecorderError) return result("", { ok: false, code: e.code, error: e.message }); throw e; };
+server.tool("record_start", "Start recording the phone frame to an MP4 under .shipvo/recordings/. Use record_marker for chapters and record_stop to finish.", {
+  format: z.enum(["9:16", "16:9", "1:1"]).optional().describe("Video shape (default 9:16: 1080x1920; 16:9 is 1920x1080; 1:1 is 1080x1080)"),
+  fps: z.union([z.literal(30), z.literal(60)]).optional().describe("Frames per second (default 30)"),
+  title: z.string().optional().describe("Used in the file name"),
+}, WR, async ({ format, fps, title }) => {
+  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
+});
+server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
+  try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
+});
+server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters.", {}, WR, async () => {
+  try { const r = await recorder.stop(); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 
 // Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.
