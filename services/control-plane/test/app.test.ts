@@ -23,6 +23,15 @@ describe("control plane", () => {
     expect((await app.request("/p/tide/1/b0.json", {}, env)).headers.get("etag")).toBe('"3"');
     expect((await app.request("/p/tide/1/ios/b0.json", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(404);
   });
+  it("answers 404 release_halted for a halted release only", async () => {
+    const halt = (release: number) => JSON.stringify({ release, halted_at: "2026-11-05T00:00:00Z" });
+    const r = await app.request("/p/tide/1/b0.json", { headers: { "if-none-match": '"3"' } }, { POINTERS: kv({ "p/tide/1/b0": envl, "halt/tide": halt(3) }) } as any);
+    expect(r.status).toBe(404); expect(await r.json()).toEqual({ error: "release_halted", release: 3 });
+    expect(r.headers.get("cache-control")).toBe("public, max-age=5");
+    expect((await app.request("/p/tide/1/b0.json", {}, { POINTERS: kv({ "p/tide/1/b0": envl, "halt/tide": halt(2) }) } as any)).status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json", {}, { POINTERS: kv({ "p/tide/1/b0": envl, "halt/tide": "{nope" }) } as any)).status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json", {}, { POINTERS: kv({ "p/tide/1/b0": envl, "halt/other": halt(3) }) } as any)).status).toBe(200);
+  });
   it("filters releases by the shell's Hermes bytecode versions", async () => {
     const withV = JSON.stringify({ body: JSON.stringify({ ...body, hermes_bytecode_version: 96 }), signature: "AAAA" });
     const env = { POINTERS: kv({ "p/tide/1/b0": withV }) } as any;
