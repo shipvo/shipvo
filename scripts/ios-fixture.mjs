@@ -30,11 +30,11 @@ function bsdiff(oldB, newB) {
   const ctrl = bz(Buffer.concat([i64(oldB.length), i64(newB.length - oldB.length), i64(0)])), d = bz(diff), extra = bz(newB.subarray(oldB.length));
   return Buffer.concat([Buffer.from("BSDIFF40"), i64(ctrl.length), i64(d.length), i64(newB.length), ctrl, d, extra]);
 }
-function patchPointer(app, patchBytes) {
-  const url = `b/${app}/d-r6.bsdiff`, sha = sha256Hex(bundle2);
+function patchPointer(app, patchBytes, { from = sha256Hex(bundle), sha = sha256Hex(bundle2) } = {}) {
+  const url = `b/${app}/d-r6.bsdiff`;
   for (const band of ["b0", "b1", "b2"]) {
     const body = JSON.stringify({ schema_version: "1.0", app_id: app, shell_major: 1, band, platform: "ios", release: 6, issued_at: new Date().toISOString(),
-      core: { version: "1.0.6", sha256: sha, size: bundle2.length, url: `b/${app}/ios-r6.hbc`, patches: [{ from_sha256: sha256Hex(bundle), url, size: patchBytes.length, sha256: sha256Hex(patchBytes) }] }, addons: [], screens: [], min_shell_version: "1.0.0" });
+      core: { version: "1.0.6", sha256: sha, size: bundle2.length, url: `b/${app}/ios-r6.hbc`, patches: [{ from_sha256: from, url, size: patchBytes.length, sha256: sha256Hex(patchBytes) }] }, addons: [], screens: [], min_shell_version: "1.0.0" });
     put(`p/${app}/1/ios/${band}.json`, JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), seed) }));
   }
   put(url, patchBytes); put(`b/${app}/ios-r6.hbc`, bundle2);
@@ -42,6 +42,8 @@ function patchPointer(app, patchBytes) {
 const goodPatch = bsdiff(bundle, bundle2);
 patchPointer("patch", goodPatch);                              // release 6, patch from the release 5 bundle
 patchPointer("bad-patch", Buffer.concat([goodPatch.subarray(0, 40), Buffer.alloc(30, 1)])); // valid hash, broken contents: must fall back to the full bundle
+patchPointer("wrong-base", goodPatch, { from: "1".repeat(64) });       // patch is for some other base: full download
+patchPointer("wrong-result", goodPatch, { sha: "2".repeat(64) });      // patch applies but the result is not the signed hash: full download fails verification
 put("b/good/ios-r5.hbc", bundle);
 pointer("good");                                   // release 5, valid
 pointer("no-range");                               // same as good, but its server ignores Range
