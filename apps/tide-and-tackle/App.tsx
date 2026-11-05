@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Runtime, type RuntimeState } from "@shipvo/runtime";
+import { forwardRuntimeEvents } from "./src/runtimeEvents";
 import { RELEASE } from "./src/release";
 import { useContent } from "./src/content/useContent";
 import { ShopApp } from "./src/ui/Shop";
@@ -38,8 +39,7 @@ export default function App() {
       const events = Runtime.consumeEvents();
       events.forEach((e) => add(e.replace(":", " release ")));
       report(s, "applied", isReload ? { apply_ms: h.sinceLoadMs } : { cold_start_ms: h.coldStartMs });
-      events.filter((e) => e.startsWith("crash_loop_revert")).forEach(() => report(s, "crash_loop_revert"));
-      events.filter((e) => e.startsWith("rolled_back")).forEach(() => report(s, "rolled_back"));
+      forwardRuntimeEvents(events, (event, release) => report(s, event, release === undefined ? {} : { release }));
       add(isReload ? `Running release ${s.runningRelease} (applied in ${h.sinceLoadMs} ms, no restart)` : `Running release ${s.runningRelease} (cold start ${h.coldStartMs} ms)`);
     } catch { add("Runtime unavailable (simulator)"); }
   }, []);

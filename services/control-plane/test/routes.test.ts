@@ -36,6 +36,13 @@ describe("POST /t telemetry", () => {
     expect((a[7] as string).length).toBe(40); expect((a[8] as string).length).toBe(80);
     expect(a[9]).toBe(34); expect(a[10]).toBe("patch");
   });
+  it("stores verify_failed and download_failed with the release id", async () => {
+    for (const event of ["verify_failed", "download_failed"]) {
+      const { d, calls } = db();
+      expect((await post("/t", { ...ev, release: 9, event }, { DB: d } as any)).status).toBe(202);
+      expect(calls[0].args.slice(0, 3)).toEqual(["tide", 9, event]);
+    }
+  });
   it("drops unknown 'via' and non-integer android_api", async () => {
     const { d, calls } = db();
     await post("/t", { ...ev, via: "zip", android_api: 34.5 }, { DB: d } as any);
