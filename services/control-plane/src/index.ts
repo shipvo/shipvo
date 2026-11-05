@@ -130,6 +130,7 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const verdict = shouldHalt(counts, { threshold, minReports });
   if (!verdict.halt) return;
   const key = `halt/${appId}`;
+  // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
   const cur = await env.POINTERS.get(key);
   if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
   await env.POINTERS.put(key, JSON.stringify({ release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold }));
@@ -149,7 +150,8 @@ app.post("/t", async (c) => {
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
     extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
-  if (FAILED_EVENTS.includes(d.event)) await maybeHalt(c.env, d.app_id, d.release);
+  // Halting is a best-effort side effect: the event is stored, so never fail the response.
+  if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release); } catch (e) { console.error("halt check failed", e); } }
   return c.json({ ok: true }, 202);
 });
 
