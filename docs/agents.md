@@ -63,6 +63,46 @@ end_session → { steps: 18, orders: [{ id: "TT-1001", total: 4200, payment: "mo
 
 18 steps, 76 seconds, no phone. The same flow runs on a real Android emulator with identical screens and the same order ([parity-results.md](parity-results.md)).
 
+## Turn a session into a test
+
+`export_test` turns the steps an agent took in a session into a `@shipvo/test` script. Targets are named by their visible text, because refs like `e7` change between sessions. A password field uses an environment variable, never the typed value. Anything the tool cannot name safely becomes a `// TODO` comment.
+
+A test in this repo does the whole loop on the Tide & Tackle sample app. It opens the app through the MCP server, taps "My orders", goes back and taps "Department Rods", calls `export_test`, writes the script to a temp file and runs it with Vitest against the simulator. To print the script and the Vitest output:
+
+```bash
+REPLAY_DEBUG=1 pnpm --filter @shipvo/mcp exec vitest run test/export-replay.test.ts
+```
+
+The script `export_test` returned:
+
+```ts
+import { test } from "@shipvo/test/vitest";
+import { openApp } from "@shipvo/test";
+
+test("recorded session for tide", async () => {
+  const phone = await openApp({ app: "tide" });
+  await phone.tap("My orders");
+  await phone.waitFor(/\S/); // TODO: name the text that should appear
+  await phone.back();
+  await phone.waitFor(/\S/); // TODO: name the text that should appear
+  await phone.tap("Department Rods");
+  await phone.waitFor(/\S/); // TODO: name the text that should appear
+});
+```
+
+What Vitest printed when it ran that file, with no agent and no MCP server:
+
+```
+ RUN  v2.1.9
+
+ ✓ recorded.replay.ts > recorded session for tide 2647ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+```
+
+The `waitFor(/\S/)` lines only wait for the screen to have some text. Replace each with the text you expect, so the test checks something. The test ran Vitest against the simulator in headless Chromium.
+
 ## Walk an app with `shipvo explore`
 
 `shipvo explore` is a walker with no LLM inside. It starts the simulator on your app, opens the start screen and each deep link in `routes` in `shipvo.json`, and taps every actionable element once, going back after each. It stops at `--max-steps` (default 100) and `--max-depth` (default 3) and says so in the report.
