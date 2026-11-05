@@ -142,11 +142,47 @@ jobs:
           xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/cold-start.png"
           echo "iOS OTA verified on a simulator: fetch, verify, stage, reload, promote, cold start on the new bundle." | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Measure OTA timings (3 fresh installs, medians)
+        # Issue #1. Each run reinstalls the app, so it starts on the embedded bundle and must download release 1 again.
+        # The pointer is already published when the app launches, so "publish to healthy" here is launch to healthy.
+        # "healthy" is when the app's telemetry reports release 1, polled every 250 ms.
+        continue-on-error: true
+        run: |
+          APP=$(ls -d apps/tide-and-tackle/ios/build/Build/Products/Release-iphonesimulator/*.app | head -1)
+          ms() { python3 -c 'import time; print(int(time.time()*1000))'; }
+          echo "[" > "$RUNNER_TEMP/marks.json"
+          for run in 1 2 3; do
+            xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true
+            xcrun simctl uninstall "$UDID" "$BID"; xcrun simctl install "$UDID" "$APP"
+            : > "$RUNNER_TEMP/server.log"
+            T0=$(ms); xcrun simctl launch "$UDID" "$BID" > /dev/null
+            H=""
+            for i in $(seq 1 480); do
+              if grep -q '^POST /t .*"release":1' "$RUNNER_TEMP/server.log"; then H=$(ms); break; fi
+              sleep 0.25
+            done
+            [ -n "$H" ] || { echo "run $run: app did not report release 1 within 120 s"; exit 1; }
+            echo "run $run: launch to healthy $((H - T0)) ms"
+            [ $run = 1 ] || echo "," >> "$RUNNER_TEMP/marks.json"
+            echo "{\"pointer_published\": $T0, \"app_launched\": $T0, \"healthy\": $H}" >> "$RUNNER_TEMP/marks.json"
+          done
+          echo "]" >> "$RUNNER_TEMP/marks.json"
+          {
+            echo "### iOS Simulator OTA timings"
+            echo
+            node scripts/ios-e2e/analyze.mjs "$RUNNER_TEMP/server.log.jsonl" "$RUNNER_TEMP/marks.json"
+            echo
+            echo "Simulator: $(xcrun simctl list devices | grep "$UDID" | sed 's/ (.*//;s/^ *//'), $(xcodebuild -version | head -1). Publish-to-healthy is launch to healthy (pointer published before launch). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } | tee "$RUNNER_TEMP/ios-timings.md" >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ios-e2e
           path: |
             ${{ runner.temp }}/server.log
+            ${{ runner.temp }}/server.log.jsonl
+            ${{ runner.temp }}/marks.json
+            ${{ runner.temp }}/ios-timings.md
             ${{ runner.temp }}/*.png
             ${{ runner.temp }}/xcodebuild.log
