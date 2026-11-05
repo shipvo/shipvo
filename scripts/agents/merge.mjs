@@ -94,10 +94,8 @@ for (const pr of prs) {
   const n = pr.number, L = labels(pr);
   if (pr.head.repo?.full_name !== REPO) continue;
   if (!L.includes("agent-pr")) addLabel(n, "agent-pr");
-  // Our own fixer works on agent PRs; Copilot auto-assignment would spend Copilot credits and race it.
-  if (!isCopilot(pr) && (pr.assignees || []).some((a) => /copilot/i.test(a.login))) {
-    act(`unassign Copilot from #${n}`, () => gh("api", "-X", "DELETE", `repos/${REPO}/issues/${n}/assignees`, "-f", "assignees[]=Copilot"));
-  }
+  // (Copilot is auto-assigned by an account setting and GitHub refuses to unassign it; trying every pass
+  // counted as PR activity and hid stuck PRs from the nudges below, so the merge bot leaves it alone.)
 
   // Idle agent PRs: close and send the issue back to the backlog.
   const idleDays = (Date.now() - new Date(pr.updated_at)) / 864e5;

@@ -46,12 +46,16 @@ jobs:
           node - <<'JS'
           const fs = require("fs"); const r = require("/tmp/release.json");
           const date = new Date().toISOString().slice(0, 10);
-          let entry = `## ${date} (release)\n\n` + r.map((p) => `- **${p.name} ${p.to}**: ${p.changes.slice(0, 5).map((c) => c.replace(/ \(#\d+\)$/, "")).join("; ")}`).join("\n") + "\n\n";
+          // Changelog entries written by each PR in changes/*.md go into this release's section, then are deleted.
+          const frag = fs.existsSync("changes") ? fs.readdirSync("changes").filter((f) => f.endsWith(".md") && f !== "README.md").sort() : [];
+          const notes = frag.map((f) => fs.readFileSync("changes/" + f, "utf8").trim()).filter(Boolean).join("\n");
+          frag.forEach((f) => fs.unlinkSync("changes/" + f));
+          let entry = `## ${date} (release)\n\n` + r.map((p) => `- **${p.name} ${p.to}**: ${p.changes.slice(0, 5).map((c) => c.replace(/ \(#\d+\)$/, "")).join("; ")}`).join("\n") + "\n\n" + (notes ? `### Changes\n\n${notes}\n\n` : "");
           const c = fs.readFileSync("CHANGELOG.md", "utf8"); const i = c.indexOf("\n## ");
           fs.writeFileSync("CHANGELOG.md", i < 0 ? c + "\n" + entry : c.slice(0, i + 1) + entry + c.slice(i + 1));
           JS
           git config user.name "Shipvo Release Bot"; git config user.email "agents@shipvo.dev"
-          git add -A packages CHANGELOG.md
+          git add -A packages CHANGELOG.md changes
           git commit -qm "release: $(node -e "console.log(require('/tmp/release.json').map(p=>p.name+' '+p.to).join(', '))")"
           git tag -a "$TAG" -m "Release $DATE"
           U="https://x-access-token:${GH_TOKEN}@github.com/${R}.git"
