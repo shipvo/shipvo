@@ -23,6 +23,8 @@ beforeAll(async () => {
     if (req.url === "/sessions") return res.end(JSON.stringify({ ok: true, sessions: [{ session: "live", app: "menu", release: "local", started_at: null }] }));
     if (req.url === "/act" && body.session !== "live") return res.end(JSON.stringify({ ok: false, code: "no_session", error: `no session '${body.session}': call /session first`, screen: null }));
     if (req.url === "/act" && body.ref === "e999") return res.end(JSON.stringify({ ok: false, code: "stale_ref", error: "stale ref e999: the screen changed. Take a new snapshot (action \"screen\") and use a ref from it.", screen: "heading Menu" }));
+    if (req.url === "/act" && body.ref === "e998") return res.end(JSON.stringify({ ok: false, code: "disabled", delivery: "not_delivered", reason: "disabled", safe_to_retry: true, error: "e998 is disabled", screen: "heading Menu" }));
+    if (req.url === "/act" && body.action === "type") return res.end(JSON.stringify({ ok: true, delivery: "delivered", value: body.text, screen: "- textbox \"Name\" [ref=e1]: ignored" }));
     if (req.url === "/act" && body.action === "push_notification") return res.end(JSON.stringify({ ok: true, delivered: body.title !== "blocked", screen: "heading Menu" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Menu" }));
   });
@@ -114,6 +116,24 @@ describe("push_notification", () => {
     const c = await connect();
     const r: any = await c.callTool({ name: "push_notification", arguments: { session: "live", title: "ok", body: "b" } });
     expect(r.content[0].text).toBe("heading Menu");
+    await c.close();
+  });
+});
+
+describe("delivery", () => {
+  it("not_delivered carries reason and safe_to_retry, and keeps code and error", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "live", ref: "e998" } });
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent).toMatchObject({ ok: false, code: "disabled", delivery: "not_delivered", reason: "disabled", safe_to_retry: true });
+    await c.close();
+  });
+  it("delivered actions say so; type gives the value the field holds", async () => {
+    const c = await connect();
+    expect(((await c.callTool({ name: "back", arguments: { session: "live" } })) as any).structuredContent).toEqual({ delivery: "delivered" });
+    const r: any = await c.callTool({ name: "type", arguments: { session: "live", ref: "e1", text: "Ana" } });
+    expect(r.structuredContent).toEqual({ delivery: "delivered", value: "Ana" });
+    expect(r.content[0].text).toMatch(/^Change: /);
     await c.close();
   });
 });

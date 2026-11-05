@@ -39,7 +39,7 @@ async function localApps(): Promise<AppInfo> {
   return TIDE;
 }
 
-type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; delivered?: boolean };
+type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
@@ -76,13 +76,15 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
   const head = [`Change: ${change}`];
   if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
   const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
-  return result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
+  const res = result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
+  const value = action === "type" ? (r.value ?? fieldValue(r.screen, o.ref ?? "")) : undefined;
+  return { ...res, structuredContent: { delivery: r.delivery ?? "delivered", ...(value !== undefined ? { value } : {}) } };
 };
 const result = (sid: string, r: Act) => {
   const s = sessions.get(sid); if (s) s.steps++;
   if (r.ok) return text(r.screen ?? "");
   const t = `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}${r.screen ? `\n\nScreen now:\n${r.screen}` : ""}`;
-  return { ...text(t), isError: true as const, structuredContent: { ok: false, code: r.code ?? null, error: r.error ?? null } };
+  return { ...text(t), isError: true as const, structuredContent: { ok: false, code: r.code ?? null, error: r.error ?? null, ...(r.delivery ? { delivery: r.delivery, reason: r.reason, safe_to_retry: r.safe_to_retry === true } : {}) } };
 };
 // Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
