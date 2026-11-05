@@ -56,6 +56,8 @@ export function publishToken(): string | null {
   try { return readFileSync(join(process.cwd(), ".shipvo", "publish-token"), "utf8").trim() || null; } catch { return null; }
 }
 
+const RETRIES = 2;
+
 /** Publishing through the hosted control plane: the same get/put/keys, scoped to this app and signed-pointer checked server side. */
 function hostedKv(cfg: ShipvoConfig, token: string) {
   const base = `${cfg.controlPlane.replace(/\/$/, "")}/apps/${cfg.appId}/kv`;
@@ -63,18 +65,25 @@ function hostedKv(cfg: ShipvoConfig, token: string) {
   const path = (k: string) => `${base}/${k.split("/").map(encodeURIComponent).join("/")}`;
   const host = cfg.controlPlane.replace(/\/$/, "");
   /** One place for the two first-run failures: the server is not there, or it does not accept the token. */
-  const call = async (url: string, init: RequestInit) => {
-    let r: Response;
-    try { r = await fetch(url, init); } catch { throw new Error(`Cannot reach the control plane at ${host}. Check "controlPlane" in shipvo.json, then run \`shipvo doctor\`.`); }
+  const call = async (url: string, init: RequestInit, what: string) => {
+    let r: Response | undefined;
+    for (let attempt = 0; ; attempt++) {
+      try { r = await fetch(url, init); break; } catch (err: any) {
+        // Network errors only, never HTTP statuses. Every call here is a GET or a PUT of the same bytes to the same key, so repeating it is safe.
+        if (attempt < RETRIES) { await new Promise((ok) => setTimeout(ok, 150 * 2 ** attempt)); continue; }
+        const cause = err?.cause?.code ?? err?.code ?? err?.cause?.message ?? err?.message ?? "unknown error";
+        throw new Error(`Cannot reach the control plane at ${host} (${cause}) while ${init.method ?? "GET"} ${what}. Check "controlPlane" in shipvo.json, then run \`shipvo doctor\`.`);
+      }
+    }
     if (r.status === 401 || r.status === 403) throw new Error(`The control plane at ${host} rejected your publish token (${r.status}). Run \`shipvo login\`, then \`shipvo app create\` for a new token.`);
     return r;
   };
   return {
-    async get(k: string) { const r = await call(path(k), { headers: auth }); return r.ok ? r.text() : null; },
-    async getBytes(k: string) { const r = await call(path(k), { headers: auth }); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; },
-    async keys(prefix: string) { const r = await call(`${base}?prefix=${encodeURIComponent(prefix)}`, { headers: auth }); return r.ok ? ((await r.json()) as any).keys as string[] : []; },
+    async get(k: string) { const r = await call(path(k), { headers: auth }, k); return r.ok ? r.text() : null; },
+    async getBytes(k: string) { const r = await call(path(k), { headers: auth }, k); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; },
+    async keys(prefix: string) { const r = await call(`${base}?prefix=${encodeURIComponent(prefix)}`, { headers: auth }, `keys ${prefix}`); return r.ok ? ((await r.json()) as any).keys as string[] : []; },
     async put(k: string, body: BodyInit, type: string) {
-      const r = await call(path(k), { method: "PUT", headers: { ...auth, "content-type": type }, body });
+      const r = await call(path(k), { method: "PUT", headers: { ...auth, "content-type": type }, body }, k);
       if (!r.ok) { let m = ""; try { const j: any = await r.json(); m = j.message ?? j.error; } catch {} throw new Error(`publish ${k}: ${r.status} ${m}`); }
     },
   };
