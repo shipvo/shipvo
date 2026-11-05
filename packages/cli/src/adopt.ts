@@ -46,11 +46,12 @@ export function detectProject(dir: string): Project {
 
 const ADOPT_FLAGS = new Set(["yes", "dry-run", "device"]);
 type Step = { text: string; run: () => void };
-export type AdoptDeps = { install: (pm: PackageManager, pkgs: string[], dir: string) => void; confirm: (q: string) => Promise<boolean>; doctor: boolean };
+export type AdoptDeps = { install: (pm: PackageManager, pkgs: string[], dir: string, dev?: boolean) => void; confirm: (q: string) => Promise<boolean>; doctor: boolean };
 
 const defaultDeps: AdoptDeps = {
-  install(pm, pkgs, dir) {
-    const r = spawnSync(pm, [pm === "npm" ? "install" : "add", ...pkgs], { cwd: dir, stdio: "inherit" });
+  install(pm, pkgs, dir, dev = false) {
+    const devFlag = dev ? [pm === "npm" ? "--save-dev" : pm === "yarn" || pm === "bun" ? "--dev" : "-D"] : [];
+    const r = spawnSync(pm, [pm === "npm" ? "install" : "add", ...devFlag, ...pkgs], { cwd: dir, stdio: "inherit" });
     if (r.status !== 0) throw new Error(`${pm} could not install ${pkgs.join(", ")}`);
   },
   async confirm(q) {
@@ -88,6 +89,7 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   }
   if (p.isBare) return fail(bareNote());
 
+  if (p.configKind === "app.json" && !readJson(join(dir, "app.json"))) return fail("shipvo: app.json is not valid JSON, so I changed nothing. Fix it and run this again.");
   const pkg = readJson(join(dir, "package.json"));
   const have = (n: string) => !!(pkg.dependencies?.[n] ?? pkg.devDependencies?.[n]);
   const cfgPath = join(dir, "shipvo.json");
@@ -100,17 +102,27 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   const controlPlane = (flag(argv, "control-plane") ?? existingCfg?.controlPlane ?? HOSTED).replace(/\/$/, "");
 
   // Signing key: the one given, the one in shipvo.json, the seed already on disk, or a new one.
-  let publicKey = flag(argv, "public-key") ?? existingCfg?.publicKey;
+  const givenKey = flag(argv, "public-key");
+  if (givenKey !== undefined && !isPublicKey(givenKey)) return fail(`shipvo: --public-key must be a base64 string that decodes to 32 bytes. I changed nothing.`, 2);
+  const seedKey = existsSync(seedPath) ? b64(keyFromSeed(readFileSync(seedPath, "utf8").trim()).publicKey) : null;
+  if (existingCfg?.publicKey && seedKey && existingCfg.publicKey !== seedKey)
+    return fail(`shipvo: the publicKey in shipvo.json does not match the seed in .shipvo/seed.txt. Updates signed with the seed would be rejected by the app. I changed nothing.\nFix: restore the matching seed, or set publicKey in shipvo.json to the key of this seed.`);
+  let publicKey = givenKey ?? existingCfg?.publicKey;
   let newSeed: string | null = null;
   if (!publicKey) {
-    if (existsSync(seedPath)) publicKey = b64(keyFromSeed(readFileSync(seedPath, "utf8").trim()).publicKey);
+    if (seedKey) publicKey = seedKey;
     else { newSeed = b64(randomBytes(32)); publicKey = b64(keyFromSeed(newSeed).publicKey); }
   }
+  if (existingCfg?.publicKey && givenKey && givenKey !== existingCfg.publicKey) console.log(`note: shipvo.json already has a publicKey, and --public-key differs. The flag goes into the plugin props; shipvo.json is kept. Make them match before you ship.`);
+  if (existingCfg?.controlPlane && flag(argv, "control-plane") && controlPlane !== String(existingCfg.controlPlane).replace(/\/$/, "")) console.log(`note: --control-plane differs from shipvo.json; the flag is used for the plugin, the file is kept.`);
   const pluginProps = { baseUrl: controlPlane, publicKey, appId, shellMajor: 1 };
 
   const steps: Step[] = [];
   const wantPkgs = ["@shipvo/runtime", ...(withDevice ? ["@shipvo/device"] : [])].filter((n) => !have(n));
   if (wantPkgs.length) steps.push({ text: `Install ${wantPkgs.join(" and ")} with ${p.packageManager}`, run: () => deps.install(p.packageManager, wantPkgs, dir) });
+  // The scripts and the workflow run `shipvo`; without @shipvo/cli, npx would fetch an unrelated package.
+  const wantDev = ["@shipvo/cli", "@shipvo/sim"].filter((n) => !have(n));
+  if (wantDev.length) steps.push({ text: `Install ${wantDev.join(" and ")} as dev dependencies with ${p.packageManager}`, run: () => deps.install(p.packageManager, wantDev, dir, true) });
 
   if (newSeed) steps.push({ text: "Create a signing key in .shipvo/seed.txt (git-ignored)", run: () => { mkdirSync(join(dir, ".shipvo"), { recursive: true }); writeFileSync(seedPath, newSeed!, { mode: 0o600 }); } });
 
@@ -144,19 +156,27 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   const wf = join(dir, ".github", "workflows", "publish.yml");
   if (!existsSync(wf)) steps.push({ text: "Add .github/workflows/publish.yml", run: () => { mkdirSync(join(dir, ".github", "workflows"), { recursive: true }); writeFileSync(wf, PUBLISH_WORKFLOW(p.packageManager)); } });
 
-  console.log(`Shipvo found an Expo app${p.expoSdk ? ` (SDK ${p.expoSdk})` : ""} in ${dir}\n  package manager: ${p.packageManager}   config: ${p.configFile}   expo-updates: no   CodePush: no\n`);
+  console.log(`Shipvo found an Expo app${p.expoSdk ? ` (SDK ${p.expoSdk})` : ""} in ${dir}\n  package manager: ${p.packageManager}   config: ${p.configFile}   expo-updates: ${p.expoUpdates ? "yes" : "no"}   CodePush: ${p.codePush ? "yes" : "no"}\n`);
   if (!steps.length) { console.log("Nothing to change: this app is already set up for Shipvo."); }
   else {
     console.log("Plan:");
     steps.forEach((s, i) => console.log(`  ${i + 1}. ${s.text}`));
   }
+  if (printLines && newSeed) console.log(`\n(The public key below is new and is only written when you apply the plan. Do not paste it before then.)`);
   if (printLines) console.log(`\n${p.configFile} is code, so I will not rewrite it. Add this to its "plugins" list:\n\n  ["@shipvo/runtime", ${JSON.stringify(pluginProps)}],\n`);
   console.log("\nI will not touch ios/ or android/, and I will not overwrite any file.");
   if (dry) { console.log("\n--dry-run: nothing was changed."); return; }
   if (!steps.length) return;
   if (!yes && !(await deps.confirm("\nApply this plan? [y/N] "))) { console.log("Nothing was changed."); return; }
 
-  for (const s of steps) { s.run(); console.log(`done: ${s.text}`); }
+  const applied: string[] = [];
+  for (const s of steps) {
+    try { s.run(); } catch (e) {
+      console.error(`shipvo: a step failed: ${s.text}\n${(e as Error).message}${applied.length ? `\nAlready applied:\n${applied.map((a) => `  - ${a}`).join("\n")}` : ""}`);
+      process.exit(1);
+    }
+    applied.push(s.text); console.log(`done: ${s.text}`);
+  }
   if (newSeed) console.log(`\nBack up .shipvo/seed.txt offline and put it in the SHIPVO_SIGNING_SEED secret of your CI. Lose it and you cannot publish to installed shells.`);
 
   if (deps.doctor) {
@@ -169,17 +189,19 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
 }
 
 const bareNote = () => `shipvo: this looks like a bare React Native app (ios/ and android/ are committed, no Expo config plugins).
-Bare support will add the native config for the runtime and check that Expo modules are present. It is not available yet (see issue #201), so I changed nothing.`;
+Bare support will add the native config for the runtime and check that Expo modules are present. It is not available yet (see issue #201), so I changed nothing.
+If this is an Expo managed app, add any config plugin to app.json (or app.config.*), or remove the ios/ and android/ folders, and run this again.`;
+
+const isPublicKey = (k: string) => /^[A-Za-z0-9+/]+={0,2}$/.test(k) && Buffer.from(k, "base64").length === 32;
 
 const PUBLISH_WORKFLOW = (pm: PackageManager) => `name: publish
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  workflow_dispatch:   # manual only; add a push trigger with a paths filter when you are ready to ship on merge
 jobs:
   publish:
     runs-on: ubuntu-latest
     concurrency: shipvo-publish
+    if: \${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[no-ota]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
