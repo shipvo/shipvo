@@ -33,14 +33,16 @@ If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with P
 
 `init` also writes `tests/app.test.ts`, which tests the starter screen. When you replace `App.tsx` with your own screens, replace or delete that file too, or `npm test` fails on buttons that no longer exist.
 
+To start from a reader app instead, add `--template content`: a list screen and a detail screen that read titles and text from `src/data/articles.json`, with a matching `tests/app.test.ts`. For this template, `src/data/articles.json` is the first thing to edit. `--template blank` is the default. `shipvo init --help` lists the templates.
+
 `init` writes a complete Expo app:
 
 | File | What it is |
 | --- | --- |
 | `shipvo.json` | App id, name, control plane URL, the public key pinned in the shell. Every `shipvo` command reads it. |
 | `app.json` | Expo config with the `@shipvo/runtime` plugin (trust root + control plane go into the native shell) and the Expo permission strings. |
-| `App.tsx` | A small screen that boots the OTA runtime and exercises the device API: scan, location, fingerprint, notification. |
-| `src/release.ts` | The first thing you edit: push a change and every phone and simulator gets it. |
+| `App.tsx` (blank template) | A small screen that boots the OTA runtime and exercises the device API: scan, location, fingerprint, notification. |
+| `src/release.ts` (blank template) | The first thing you edit: push a change and every phone and simulator gets it. |
 | `metro.config.js` | `withShipvoSim`: simulator builds swap Expo's native modules for the simulated device. |
 | `.github/workflows/publish.yml` | Runs `shipvo publish` for you on every push to `main` (optional; you can always run it yourself). |
 | `.shipvo/seed.txt` | Your Ed25519 release signing seed, git-ignored. **Back it up offline.** Lose it and installed shells will never accept another update. Run `shipvo keys export` and keep a copy ([moving machines](new-machine.md)). |
@@ -128,6 +130,8 @@ To check a release before you have a control plane or token, run `shipvo publish
 If your first publish fails, run `shipvo doctor` first. It checks your Node version, `shipvo.json`, signing key match, control plane reachability, and `hermesBytecodeVersion` when present.
 
 Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
+
+To see whether the release reached phones, run `shipvo status [--app <id>] [--json]`. It reads the control plane's `/t/<app>/summary` and prints one row per recent release: counts for each telemetry event, and the median apply and cold start times in milliseconds. It prints "No telemetry yet" when phones have not reported. `--json` prints the endpoint's payload unchanged.
 
 Agents open the exact release phones run with `open_app("myshop@r8")` or `open_app("myshop@latest")`.
 

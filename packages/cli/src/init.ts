@@ -10,6 +10,8 @@ import { adopt, detectProject, isAdoptArgs } from "./adopt.js";
 const HOSTED = "https://api.shipvo.dev";
 const SDK = { expo: "~58.0.21", camera: "~58.0.14", clipboard: "~58.0.4", localAuth: "~58.0.2", location: "~58.0.20", notifications: "~58.1.7", statusBar: "~58.0.4", constants: "~58.0.0", metroRuntime: "~58.0.15", react: "19.3.0", rn: "0.88.1", rnw: "^0.21.4" };
 
+const TEMPLATES = ["blank", "content"];
+
 const INIT_NEEDS_DIR = `shipvo: init needs a folder name.
 Try:  shipvo init myshop
 This creates ./myshop with a ready app. Other options (app id, bundle id, control plane) have defaults; see 'shipvo init --help'.`;
@@ -36,6 +38,9 @@ Creates <dir> with a ready app. Every option is optional.
   --bundle-id <id>       iOS bundle id and Android package. Default: dev.shipvo.<app id>.
   --control-plane <url>  Where releases are published. Default: ${HOSTED}.
   --public-key <b64>     Signing public key to pin. Default: a new key is made for you.
+  --template <name>      Starting app. One of: ${TEMPLATES.join(", ")}. Default: blank.
+                           blank    the starter with device API buttons.
+                           content  a list screen and a detail screen reading titles and text from src/data/articles.json.
   --help                 Show this text.`;
 
 const title = (s: string) => s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -46,6 +51,9 @@ export async function init(argv: string[]) {
   if (argv.includes("--help") || argv.includes("-h")) { console.log(INIT_HELP); return; }
   if (isAdoptArgs(argv) && (dirArg === "." || detectProject(process.cwd()).isExpo)) { await adopt(argv); return; }
   if (!dirArg) { console.error(INIT_NEEDS_DIR); process.exit(2); }
+  if (a.template === "true") { console.error(`shipvo: --template needs a name. Valid templates: ${TEMPLATES.join(", ")}.`); process.exit(2); }
+  const template = a.template ?? "blank";
+  if (!TEMPLATES.includes(template)) { console.error(`shipvo: unknown template "${template}". Valid templates: ${TEMPLATES.join(", ")}.`); process.exit(2); }
   const dir = resolve(dirArg);
   if (existsSync(dir)) { console.error(`${dir} already exists`); process.exit(1); }
   const appId = (a["app-id"] || dirArg.split("/").pop()!.toLowerCase().replace(/[^a-z0-9-]/g, "-")).slice(0, 32);
@@ -98,12 +106,17 @@ module.exports = withShipvoSim(getDefaultConfig(__dirname));
   w("src/release.ts", `// Edit and push: the publish workflow signs and ships this to every installed phone and to the simulator.
 export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/release.ts and run \`shipvo publish\`." };
 `);
-  w("App.tsx", APP_TSX(name, appId));
+  if (template === "content") {
+    w("App.tsx", CONTENT_APP_TSX(name));
+    w("src/screens/List.tsx", CONTENT_LIST);
+    w("src/screens/Detail.tsx", CONTENT_DETAIL);
+    w("src/data/articles.json", CONTENT_DATA);
+  } else w("App.tsx", APP_TSX(name, appId));
   w(".github/workflows/publish.yml", WORKFLOW);
   w(".github/workflows/test.yml", TEST_WORKFLOW);
-  w("tests/app.test.ts", TEST_APP(name));
+  w("tests/app.test.ts", template === "content" ? CONTENT_TEST : TEST_APP(name));
   w("vitest.config.ts", VITEST_CONFIG);
-  w("README.md", README(name, appId, controlPlane));
+  w("README.md", README(name, appId, controlPlane, template));
 
   console.log(`
 Created ${name} in ${dirArg}
@@ -228,9 +241,10 @@ jobs:
 const TEST_APP = (name: string) => `// Tests that run your app in the Shipvo simulator: a phone-sized, headless copy of the real app. No emulator, no device.
 // Run them with "npm test" (start the simulator first: npm run sim) and in CI (.github/workflows/test.yml).
 import { test, expect } from "@shipvo/test/vitest";
+import { RELEASE } from "../src/release";
 
 test("the app opens and shows its headline", async ({ phone }) => {
-  expect(phone).toSee("Hello from ${name}.");
+  expect(phone).toSee(RELEASE.headline);
   expect(phone.screen).not.toMatch(/something went wrong|unhandled|exception/i);
 });
 
@@ -299,12 +313,116 @@ jobs:
         run: npx shipvo publish | tee -a "$GITHUB_STEP_SUMMARY"
 `;
 
-const README = (name: string, appId: string, cp: string) => `# ${name}
+const README = (name: string, appId: string, cp: string, template = "blank") => `# ${name}
 
 A [Shipvo](https://github.com/shipvo/shipvo) app: one React Native codebase that people install from the stores and AI agents operate in a simulator, kept current with signed over-the-air releases.
 
 - \`npm run sim\` opens it in the simulator; \`npx -y @shipvo/mcp\` lets Claude, Cursor or ChatGPT use it (\`open_app("${appId}")\`).
 - \`npx expo run:android\` builds the native shell (the trust root and control plane \`${cp}\` are pinned in it).
 - Push to \`main\`: the publish workflow signs the new JavaScript and every phone and simulator gets it.
-- \`src/release.ts\` is the first thing to edit; \`App.tsx\` shows the device API (camera, location, biometrics, notifications).
+- ${template === "content" ? "`src/data/articles.json` is the first thing to edit: it holds the titles and text. `src/screens/` has the list and detail screens." : "`src/release.ts` is the first thing to edit; `App.tsx` shows the device API (camera, location, biometrics, notifications)."}
+`;
+
+const CONTENT_DATA = JSON.stringify([
+  { id: "welcome", title: "Welcome", body: "This is the first article. Edit src/data/articles.json to change the titles and text." },
+  { id: "add-more", title: "Add more articles", body: "Each article has an id, a title and a body. Add an object to the list and it shows up on the first screen." },
+  { id: "ship-it", title: "Ship it", body: "Run shipvo publish and every installed phone gets your new articles over the air." },
+], null, 2) + "\n";
+
+const CONTENT_APP_TSX = (name: string) => `import { useEffect, useRef, useState } from "react";
+import { AppState, StyleSheet, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { Runtime } from "@shipvo/runtime";
+import { List } from "./src/screens/List";
+import { Detail } from "./src/screens/Detail";
+import articles from "./src/data/articles.json";
+
+export default function App() {
+  const [openId, setOpenId] = useState<string | null>(null);
+  // Tell the runtime the first screen rendered, so this release is kept.
+  // Then check for new releases now and while the app is open.
+  const busy = useRef(false);
+  useEffect(() => {
+    try { Runtime.markHealthy(); } catch {}
+    const check = async () => {
+      if (busy.current) return; busy.current = true;
+      try { await Runtime.checkForUpdate(true); } catch {}
+      finally { busy.current = false; }
+    };
+    check(); const id = setInterval(() => { if (AppState.currentState === "active") check(); }, 60000);
+    return () => clearInterval(id);
+  }, []);
+  const open = articles.find((a) => a.id === openId);
+  return (
+    <View style={s.root}>
+      <StatusBar style="dark" />
+      {open ? <Detail article={open} onBack={() => setOpenId(null)} /> : <List title="${name}" articles={articles} onOpen={setOpenId} />}
+    </View>
+  );
+}
+
+const s = StyleSheet.create({ root: { flex: 1, backgroundColor: "#F6F8F7" } });
+`;
+
+const CONTENT_LIST = `import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+
+export type Article = { id: string; title: string; body: string };
+
+export function List({ title, articles, onOpen }: { title: string; articles: Article[]; onOpen: (id: string) => void }) {
+  return (
+    <ScrollView contentContainerStyle={s.page}>
+      <Text style={s.h1} accessibilityRole="header">{title}</Text>
+      {articles.map((a) => (
+        <Pressable key={a.id} accessibilityRole="button" accessibilityLabel={a.title} onPress={() => onOpen(a.id)} style={s.row}>
+          <Text style={s.rowText}>{a.title}</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+const s = StyleSheet.create({
+  page: { padding: 20, paddingTop: 56, gap: 12 },
+  h1: { fontSize: 28, fontWeight: "800", color: "#111" },
+  row: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: "#CBD5D1", justifyContent: "center", paddingHorizontal: 16, backgroundColor: "#fff" },
+  rowText: { fontSize: 16, fontWeight: "700", color: "#111" },
+});
+`;
+
+const CONTENT_DETAIL = `import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import type { Article } from "./List";
+
+export function Detail({ article, onBack }: { article: Article; onBack: () => void }) {
+  return (
+    <ScrollView contentContainerStyle={s.page}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={s.back}><Text style={s.backText}>Back</Text></Pressable>
+      <Text style={s.h1} accessibilityRole="header">{article.title}</Text>
+      <Text style={s.body}>{article.body}</Text>
+    </ScrollView>
+  );
+}
+
+const s = StyleSheet.create({
+  page: { padding: 20, paddingTop: 56, gap: 12 },
+  back: { minHeight: 48, justifyContent: "center" }, backText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
+  h1: { fontSize: 24, fontWeight: "800", color: "#111" },
+  body: { fontSize: 16, lineHeight: 24, color: "#111" },
+});
+`;
+
+const CONTENT_TEST = `// Runs the app in the Shipvo simulator. Start it first: npm run sim.
+import { test, expect } from "@shipvo/test/vitest";
+import articles from "../src/data/articles.json";
+
+test("the list shows every title", async ({ phone }) => {
+  for (const a of articles) expect(phone).toSee(a.title);
+  expect(phone.screen).not.toMatch(/something went wrong|unhandled|exception/i);
+});
+
+test("opening a title shows its text, and Back returns to the list", async ({ phone }) => {
+  await phone.tap(articles[0].title);
+  await phone.waitFor(articles[0].body);
+  await phone.tap("Back");
+  await phone.waitFor(articles[1].title);
+});
 `;
