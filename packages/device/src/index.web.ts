@@ -155,8 +155,9 @@ export const device: Device = {
   },
   calendar: {
     async getEvents(range) {
-      if ((await askPermission("calendar")) !== "granted") throw new Error("Calendar permission denied");
       const from = new Date(range.start).getTime(), to = new Date(range.end).getTime();
+      if (isNaN(from) || isNaN(to)) throw new Error("Calendar range needs valid start and end dates");
+      if ((await askPermission("calendar")) !== "granted") throw new Error("Calendar permission denied");
       const found = state.calendar.filter((e) => new Date(e.start).getTime() < to && new Date(e.end).getTime() > from).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
       log("calendar", { count: found.length }); return found.map((e) => ({ ...e }));
     },

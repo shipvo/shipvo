@@ -96,11 +96,14 @@ export const device: Device = {
   calendar: {
     async getEvents(range) {
       const K = opt<any>("expo-calendar"); if (!K) throw new Error("expo-calendar is not installed");
+      const from = new Date(range.start), to = new Date(range.end);
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) throw new Error("Calendar range needs valid start and end dates");
       let st = (await K.getCalendarPermissionsAsync()).status;
       if (st !== "granted") st = (await K.requestCalendarPermissionsAsync()).status;
       if (st !== "granted") throw new Error("Calendar permission denied");
       const cals = (await K.getCalendarsAsync(K.EntityTypes.EVENT)) as any[];
-      const evs = (await K.getEventsAsync(cals.map((c) => c.id), new Date(range.start), new Date(range.end))) as any[];
+      if (cals.length === 0) return [];
+      const evs = (await K.getEventsAsync(cals.map((c) => c.id), from, to)) as any[];
       const iso = (v: any) => new Date(v).toISOString();
       return evs.map((e): CalendarEvent => ({ id: String(e.id), title: e.title ?? "", start: iso(e.startDate), end: iso(e.endDate), allDay: !!e.allDay, location: e.location ?? undefined, notes: e.notes ?? undefined }))
         .sort((a, b) => a.start.localeCompare(b.start));

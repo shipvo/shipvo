@@ -2,8 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { find, parseScreen, type Node, type Target } from "./tree.js";
 
 /** One address-book entry. */
-export type CalendarEvent = { id: string; title: string; start: string; end: string; allDay?: boolean; location?: string; notes?: string };
 export type Contact = { id: string; name: string; phoneNumbers?: string[]; emails?: string[] };
+/** One calendar event. `start` and `end` are ISO 8601 strings. */
+export type CalendarEvent = { id: string; title: string; start: string; end: string; allDay?: boolean; location?: string; notes?: string };
 type Grant = "granted" | "denied" | "undetermined";
 /** What the simulated phone has. Takes effect for the next action. */
 export type DeviceSettings = {
