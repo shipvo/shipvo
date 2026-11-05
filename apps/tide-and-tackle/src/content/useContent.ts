@@ -33,11 +33,12 @@ export function useContent(baseUrl: string | undefined, appId: string | undefine
   });
   const versionRef = useRef(content.version);
 
-  const refresh = useCallback(async (): Promise<{ changed: boolean; version: number; ms: number }> => {
+  const refresh = useCallback(async (): Promise<{ changed: boolean; version: number; ms: number; error?: string }> => {
     const t0 = Date.now();
     if (!baseUrl || !appId) return { changed: false, version: versionRef.current, ms: 0 };
     try {
       const r = await fetch(`${baseUrl}/c/${appId}/content.json`, { headers: { "If-None-Match": `"${versionRef.current}"` } });
+      if (r.status >= 500) return { changed: false, version: versionRef.current, ms: Date.now() - t0, error: `HTTP ${r.status}` };
       if (r.status !== 200) return { changed: false, version: versionRef.current, ms: Date.now() - t0 };
       const text = await r.text(); const c = JSON.parse(text);
       if (!isUsableContent(c) || c.version <= versionRef.current) return { changed: false, version: versionRef.current, ms: Date.now() - t0 };

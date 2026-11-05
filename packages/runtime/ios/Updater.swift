@@ -3,7 +3,7 @@ import Foundation
 struct UpdateError: Error { let message: String; init(_ m: String) { message = m } }
 
 /// Fetch, verify and stage the newest signed release for this device's band. Mirrors Android `check()`.
-/// Uses a bsdiff patch when the pointer lists one from the bundle this device runs; any patch problem falls back to the full bundle.
+/// Uses a bsdiff patch when the pointer lists one from the bundle this device runs (or the app's embedded bundle); any patch problem falls back to the full bundle.
 enum Updater {
   private static func require(_ cond: Bool, _ msg: @autoclosure () -> String) throws { if !cond { throw UpdateError(msg()) } }
 
@@ -143,16 +143,19 @@ enum Updater {
   /// Try the patch from the bundle this device runs. Writes the rebuilt bundle to `tmp` and returns the patch size,
   /// or throws (nothing left behind) so the caller can fetch the full bundle. The caller still checks the signed hash.
   private static func patched(_ s: Store, core: [String: Any], wantSha: String, wantSize: Int, to tmp: URL) async throws -> Int {
-    guard let base = s.currentPath, s.currentSha != nil, FileManager.default.fileExists(atPath: base),
+    // Base: the bundle this device runs, or the embedded main.jsbundle before the first update.
+    let baseFile = s.currentPath.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil }
+    let baseSha: String? = baseFile != nil ? s.currentSha : s.embeddedSha()
+    guard let baseSha,
           let list = core["patches"] as? [[String: Any]],
-          let entry = list.first(where: { $0["from_sha256"] as? String == s.currentSha }),
+          let entry = list.first(where: { $0["from_sha256"] as? String == baseSha }),
           let purl = entry["url"] as? String, let psha = entry["sha256"] as? String, let psize = (entry["size"] as? NSNumber)?.intValue,
           psize > 0, psize < wantSize else { throw UpdateError("no usable patch") }
     do {
       let (data, resp) = try await URLSession.shared.data(for: request(resolve(s, purl), etag: nil))
       try require((resp as? HTTPURLResponse)?.statusCode == 200 && data.count == psize && Verify.sha256Hex(data) == psha, "patch download invalid")
-      let old = try Data(contentsOf: URL(fileURLWithPath: base))
-      try require(Verify.sha256Hex(old) == s.currentSha, "current bundle changed on disk")
+      guard let old = try baseFile.map({ try Data(contentsOf: URL(fileURLWithPath: $0)) }) ?? s.embeddedBundle() else { throw UpdateError("no base bundle") }
+      try require(Verify.sha256Hex(old) == baseSha, "base bundle changed on disk")
       let new = try Patch.apply(old: old, patch: data)
       try require(new.count == wantSize && Verify.sha256Hex(new) == wantSha, "patched bundle does not match")
       try new.write(to: tmp)

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import http from "node:http";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -9,7 +9,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const root = resolve(__dirname, "..");
 let out = ""; let fake: http.Server; let port = 0;
-const posts: string[] = [];
+const posts: string[] = []; const bodies: string[] = [];
 
 beforeAll(async () => {
   out = mkdtempSync(join(root, "dist-test-"));
@@ -18,7 +18,7 @@ beforeAll(async () => {
   // a stand-in simulator that serves the scaffolded app "menu"
   fake = http.createServer(async (req, res) => {
     let raw = ""; for await (const c of req) raw += c;
-    posts.push(req.url ?? "");
+    posts.push(req.url ?? ""); bodies.push(raw);
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, app: "menu", release: "local", screen: "heading Table Menu" }));
@@ -41,6 +41,16 @@ async function connect(extra: Record<string, string> = {}) {
 const textOf = (r: any) => r.content[0].text as string;
 
 describe("local mcp", () => {
+  it("set_device accepts contacts and passes them to the simulator", async () => {
+    const c = await connect();
+    const contacts = [{ id: "1", name: "Amina Njoya", phoneNumbers: ["+237655001122"] }];
+    const r: any = await c.callTool({ name: "set_device", arguments: { session: "menu-1", contacts, permissions: { contacts: "denied" } } });
+    expect(r.isError).toBeFalsy();
+    const sent = JSON.parse(bodies.filter((b) => b.includes('"set_device"')).at(-1)!);
+    expect(sent.device).toEqual({ contacts, permissions: { contacts: "denied" } });
+    await c.close();
+  });
+
   it("opens the app the simulator serves, with no PN_APPS", async () => {
     const c = await connect();
     expect(textOf(await c.callTool({ name: "list_apps", arguments: {} }))).toContain('menu: Table Menu');
@@ -209,5 +219,40 @@ describe("change line", () => {
     expect(first).not.toMatch(/new screen/);
     expect(first).toMatch(/^Change: unknown/);
     expect(await call()).toMatch(/^Change: none\n/);
+  });
+});
+
+describe("owner_command confirm", () => {
+  let control: http.Server; const seen: { headers: http.IncomingHttpHeaders; body: any }[] = [];
+  beforeAll(async () => {
+    control = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      seen.push({ headers: req.headers, body: JSON.parse(raw || "{}") });
+      res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ ok: true }));
+    });
+    await new Promise<void>((r) => control.listen(0, r));
+  });
+  afterAll(() => control?.close());
+  const url = () => `http://127.0.0.1:${(control.address() as { port: number }).port}`;
+  it("passes confirm and the shipvo.json agent rules to the control plane", async () => {
+    const dir = mkdtempSync(join(root, "dist-test-app-"));
+    writeFileSync(join(dir, "shipvo.json"), JSON.stringify({ agentPolicy: "deny", agentDeny: ["set_theme", "publish"] }));
+    try {
+      const c = await connect({ PN_CONTROL: url(), PN_OWNER_TOKEN: "t", PN_APP_DIR: dir });
+      await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x" }, confirm: true } });
+      await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x" } } });
+      expect(seen[0]!.body).toEqual({ name: "publish", args: { note: "x", confirm: true } });
+      expect(seen[0]!.headers["x-shipvo-agent-policy"]).toBe("deny");
+      expect(seen[0]!.headers["x-shipvo-agent-deny"]).toBe("set_theme,publish");
+      expect(seen[1]!.body.args).toEqual({ note: "x" });
+      await c.close();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+  it("ignores confirm inside args unless the top-level confirm is true", async () => {
+    const c = await connect({ PN_CONTROL: url(), PN_OWNER_TOKEN: "t" });
+    const n = seen.length;
+    await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x", confirm: true } } });
+    expect(seen[n]!.body.args).toEqual({ note: "x" });
+    await c.close();
   });
 });

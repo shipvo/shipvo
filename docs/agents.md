@@ -99,6 +99,19 @@ end_session → { steps: 18, orders: [{ id: "TT-1001", total: 4200, payment: "mo
 
 With an owner token, the same MCP server exposes the app's typed owner commands: change content, prices and offers, read orders, publish to every phone. Every change is audited with who made it. `owner_describe("tide")` lists the commands with their arguments; the admin at `/app/<id>/admin` is the same API with a form on top.
 
+**Confirm before anything that cannot be undone.** These owner commands reach customers or cannot be undone: `publish`, `update_product` with a new price, `remove_product`, `upsert_promo`, `set_promo_active`, `remove_home_block`, `discard_draft` (when the draft has changes), `create_api_key` and `revoke_api_key`. When an agent calls one without `confirm: true`, nothing changes and the result is `{ ok: false, code: "needs_confirm", plan: [...] }`. The plan says what would change and who it reaches; for `publish` it includes how many update reports the server has received (telemetry has no device id, so the number of phones is not known). The control plane cannot check that the plan was shown to the owner, so the agent must show it. Show it to the owner, then call again with the same arguments and `confirm: true`. Every call that ran after `confirm: true` is written to the audit log (`audit_log`) with who, what and when, and `"confirmed": true`. A refused call is logged with `"denied": true`. A call that ran under `agentPolicy: "allow"` is logged without `confirmed`. Changes to the policy (`set_agent_policy`) are logged with the admin as actor. No owner command sends notifications today.
+
+Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_policy` command, which only a signed-in owner can run:
+
+```json
+{ "agentPolicy": "ask", "agentDeny": ["remove_product"] }
+```
+
+- `agentPolicy` is `"ask"` (default: the confirm step above), `"deny"` (those commands are refused with code `denied`) or `"allow"` (no confirm step; never the default, and only the control plane's own setting can turn it on).
+- `agentDeny` lists commands agents may never run, confirm or not.
+- The `shipvo.json` read by `@shipvo/mcp` (from `PN_APP_DIR` or the current folder) can only make the rules stricter than the control plane's.
+- The signed-in admin at `/app/<id>/admin` is not gated: the confirm step is for agents holding the owner token.
+
 ## Grading an agent
 
 `end_session` returns what the app actually sent to its backend, not what the agent says it did. The Tide & Tackle repo has an agent-eval harness that scores tasks that way ([agent-gate-results.md](agent-gate-results.md)).

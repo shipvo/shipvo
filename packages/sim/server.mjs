@@ -9,6 +9,7 @@ import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, sta
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
+import { parseMockRules } from "./mock-rules.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -172,6 +173,24 @@ async function act(id, body) {
       if (!handled) throw new SimError("no_url_listener", `the app has no URL listener, so it did not handle ${body.url}. Register one with onUrl from @shipvo/device.`);
       await page.waitForTimeout(400); break;
     }
+    // Stub fetch/XHR on the page. Rules live on the session; unmatched requests continue untouched.
+    case "set_network_mocks": {
+      let rules; try { rules = parseMockRules(body.rules ?? []); } catch (e) { throw new SimError(e.code ?? "mock_invalid", e.message); }
+      s.mocks = rules;
+      if (!s.mockRoute) {
+        s.mockRoute = true;
+        await page.route("**/*", async (route) => {
+          const req = route.request();
+          const type = req.resourceType();
+          const rule = (type === "fetch" || type === "xhr") && (s.mocks ?? []).find((m) => (!m.method || m.method === req.method()) && m.match(req.url()));
+          if (!rule) return route.fallback();
+          if (rule.delayMs) await new Promise((r) => setTimeout(r, rule.delayMs));
+          // The app page may come from another origin, so the stub must pass the browser's CORS check.
+          await route.fulfill({ status: rule.status, body: rule.body, headers: { "access-control-allow-origin": "*", ...rule.headers } }).catch(() => {});
+        });
+      }
+      break;
+    }
     case "device_log": return { log: await page.evaluate(() => globalThis.__pnDevice?.log() ?? []), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
@@ -185,7 +204,7 @@ async function act(id, body) {
     case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
     case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) await b.first().click(); else throw new Error("no Back button on this screen"); break; }
     case "screenshot": { const p = join(DIR, `${id}-${Date.now()}.png`); await page.screenshot({ path: p }); return { path: p, screen: await screen(page) }; }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, device_log, device_reset`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, device_log, device_reset, set_network_mocks`);
   }
   return { screen: await screen(page) };
 }

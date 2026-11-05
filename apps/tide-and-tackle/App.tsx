@@ -49,6 +49,7 @@ export default function App() {
     busyRef.current = true;
     try {
       const c = await refresh();
+      if (c.error) add(`Content check failed: ${c.error}`);
       if (c.changed) { add(`Content v${c.version} live (${c.ms} ms)`); if (state) report(state, "content_applied", { apply_ms: c.ms }); }
       let r;
       try { r = await Runtime.checkForUpdate(true); } catch { return; }
