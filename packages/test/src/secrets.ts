@@ -1,4 +1,7 @@
+/** Secret values read so far. Shared by the whole process and never cleared. */
 const known = new Set<string>();
+/** Values shorter than this are not masked: masking `1` would garble every error. */
+const MIN_MASK = 4;
 
 /** Read `SHIPVO_TEST_<NAME>` from the environment. Throws, naming the variable, if it is missing or empty. The value is masked as `***` in errors from this package. */
 export function secret(name: string): string {
@@ -10,7 +13,7 @@ export function secret(name: string): string {
     (err as Error & { code?: string }).code = "secret_missing";
     throw err;
   }
-  known.add(value);
+  if (value.length >= MIN_MASK) known.add(value);
   return value;
 }
 

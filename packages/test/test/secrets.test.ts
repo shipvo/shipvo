@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { secret, redact, parseSteps, runSteps, PhoneError } from "../src/index.js";
-import type { Phone } from "../src/index.js";
+import { Phone } from "../src/index.js";
 
 afterEach(() => { delete process.env.SHIPVO_TEST_PASSWORD; });
 
@@ -49,5 +49,33 @@ describe("{secret:NAME} steps", () => {
     const { phone, typed } = make();
     await expect(runSteps(phone, parseSteps('type "{secret:PASSWORD}" into "Password"'))).rejects.toThrow(/line 1.*SHIPVO_TEST_PASSWORD/s);
     expect(typed).toEqual([]);
+  });
+});
+
+describe("Phone errors", () => {
+  const phoneShowing = (screen: string) => {
+    const phone = new Phone("s1", "http://sim.invalid", "app", "latest");
+    phone.screen = screen;
+    phone.call = async () => ({ ok: true, screen });
+    return phone;
+  };
+  const SCREEN = '- textbox "Password" [ref=e1]\n- text "oops s3cr3t-zz" [ref=e2]';
+  it("masks the secret in locate, waitFor and waitForGone errors", async () => {
+    process.env.SHIPVO_TEST_PASSWORD = "s3cr3t-zz";
+    secret("PASSWORD");
+    const phone = phoneShowing(SCREEN);
+    expect(() => phone.locate("Nope")).toThrow(/\*\*\*/);
+    try { phone.locate("Nope"); } catch (e) { expect((e as Error).message).not.toContain("s3cr3t-zz"); }
+    const w = await phone.waitFor("never here", { timeout: 1, interval: 1 }).catch((e) => e as Error) as Error;
+    expect(w.message).toContain("***");
+    expect(w.message).not.toContain("s3cr3t-zz");
+    const g = await phone.waitForGone("oops", { timeout: 1, interval: 1 }).catch((e) => e as Error) as Error;
+    expect(g.message).toContain("***");
+    expect(g.message).not.toContain("s3cr3t-zz");
+  });
+  it("does not mask values shorter than 4 characters", () => {
+    process.env.SHIPVO_TEST_PASSWORD = "12";
+    secret("PASSWORD");
+    expect(redact("code 12")).toBe("code 12");
   });
 });

@@ -129,3 +129,24 @@ describe("secrets in reports", () => {
     expect(text).not.toContain("hunter2-value");
   });
 });
+
+describe("secrets in logs", () => {
+  it("never logs a secret that the screen or an error shows, even in repair candidates", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "shipvo-secret-"));
+    const f = join(dir, "login.steps");
+    writeFileSync(f, 'tap "Sign in"\n');
+    const k: TestKit = {
+      openApp: async () => ({ screen: '- textbox "hunter2-value" [ref=e1]' }),
+      parseSteps: () => [{ kind: "tap", target: "Sign in", line: 1 }],
+      runSteps: async () => { throw new Error("bad hunter2-value\n\nScreen now:\nhunter2-value"); },
+      redact: (t) => t.split("hunter2-value").join("***"),
+      proposeRepair: () => ({ kind: "unresolved", candidates: [{ role: "textbox", name: "hunter2-value", text: "", ref: "e1" } as never] }),
+    };
+    const out: string[] = [];
+    await testCmd([f, "--repair"], k, (s) => out.push(s));
+    const text = out.join("\n");
+    expect(text).toContain("candidates:");
+    expect(text).toContain("***");
+    expect(text).not.toContain("hunter2-value");
+  });
+});

@@ -81,7 +81,7 @@ function flagValue(argv: string[], name: string): string | undefined {
 }
 
 /** Runs the suite. Returns the exit code: 0 when every step passed (or every failure was repaired and written), 1 otherwise. */
-export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) => void = console.log): Promise<number> {
+export async function testCmd(argv: string[], kit?: TestKit, rawLog: (s: string) => void = console.log): Promise<number> {
   const repair = argv.includes("--repair");
   const write = argv.includes("--write");
   if (write && !repair) { console.error("--write only works with --repair"); return 2; }
@@ -95,6 +95,8 @@ export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) =>
   if (!files.length) { console.error("No tests found. Put plain-language steps in tests/*.steps, or pass file names."); return 2; }
   const k = kit ?? (await loadKit());
   const scrub = (t: string) => k.redact?.(t) ?? t;
+  // Every line goes through scrub: screen text and errors can echo a secret.
+  const log = (s: string) => rawLog(scrub(s));
   let failed = 0, repaired = 0, unresolved = 0;
   for (const file of files) {
     const text = readFileSync(file, "utf8");
