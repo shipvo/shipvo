@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { PARITY_LIMITS } from "./explore.js";
+import { renderReportMarkdown } from "./report-md.js";
 import { pathToFileURL } from "node:url";
 
 type Node = { role: string; name: string; text: string; ref: string };
@@ -13,6 +14,7 @@ export type TestKit = {
   openApp(): Promise<PhoneLike>;
   parseSteps(text: string): StepLike[];
   runSteps(phone: PhoneLike, steps: StepLike[]): Promise<void>;
+  redact?(text: string): string;
   proposeRepair(step: StepLike, tree: string): { kind: "repaired"; step: StepLike; reason: string } | { kind: "unresolved"; candidates: Node[] };
 };
 
@@ -80,19 +82,24 @@ function flagValue(argv: string[], name: string): string | undefined {
 }
 
 /** Runs the suite. Returns the exit code: 0 when every step passed (or every failure was repaired and written), 1 otherwise. */
-export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) => void = console.log): Promise<number> {
+export async function testCmd(argv: string[], kit?: TestKit, rawLog: (s: string) => void = console.log): Promise<number> {
   const repair = argv.includes("--repair");
   const write = argv.includes("--write");
   if (write && !repair) { console.error("--write only works with --repair"); return 2; }
   const reportPath = flagValue(argv, "--report");
   const release = flagValue(argv, "--release");
+  const reportMdPath = flagValue(argv, "--report-md");
   if (argv.includes("--report") && !reportPath) { console.error("--report needs a file name"); return 2; }
-  const valueIdx = new Set(["--report", "--release"].map((f) => argv.indexOf(f) + 1).filter((i) => i > 0));
+  if (argv.includes("--report-md") && !reportMdPath) { console.error("--report-md needs a file name"); return 2; }
+  const valueIdx = new Set(["--report", "--report-md", "--release"].map((f) => argv.indexOf(f) + 1).filter((i) => i > 0));
   const given = argv.filter((a, i) => !a.startsWith("--") && !valueIdx.has(i));
   const flows: FlowReport[] = [];
   const files = given.length ? given : findStepFiles("tests");
   if (!files.length) { console.error("No tests found. Put plain-language steps in tests/*.steps, or pass file names."); return 2; }
   const k = kit ?? (await loadKit());
+  const scrub = (t: string) => k.redact?.(t) ?? t;
+  // Every line goes through scrub: screen text and errors can echo a secret.
+  const log = (s: string) => rawLog(scrub(s));
   let failed = 0, repaired = 0, unresolved = 0;
   for (const file of files) {
     const text = readFileSync(file, "utf8");
@@ -105,8 +112,8 @@ export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) =>
       try { await k.runSteps(phone, [step]); continue; }
       catch (e) {
         failed++;
-        if (!flow.failedStep) { flow.status = "failed"; flow.failedStep = step; flow.message = (e as Error).message.split("\n")[0]!; }
-        log(`FAIL ${file}:${step.line}: ${(e as Error).message.split("\n")[0]}`);
+        if (!flow.failedStep) { flow.status = "failed"; flow.failedStep = step; flow.message = scrub((e as Error).message.split("\n")[0]!); }
+        log(`FAIL ${file}:${step.line}: ${scrub((e as Error).message.split("\n")[0]!)}`);
         if (!repair) break;
         const r = k.proposeRepair(step, phone.screen);
         if (r.kind === "unresolved") {
@@ -132,10 +139,10 @@ export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) =>
   }
   if (repair) log(`${failed} failed step(s): ${repaired} repaired${write ? " and written" : " (not written; add --write)"}, ${unresolved} unresolved`);
   else log(failed ? `${failed} failed` : "all steps passed");
-  if (reportPath) {
+  if (reportPath || reportMdPath) {
     const report = { app: appIdFromConfig(), commit: gitCommit(), release: release ?? null, time: new Date().toISOString(), parityLimits: PARITY_LIMITS, flows };
-    writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
-    log(`wrote report ${reportPath}`);
+    if (reportPath) { writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n"); log(`wrote report ${reportPath}`); }
+    if (reportMdPath) { writeFileSync(reportMdPath, renderReportMarkdown(report)); log(`wrote Markdown report ${reportMdPath}`); }
   }
   return failed === 0 || (write && repaired === failed) ? 0 : 1;
 }

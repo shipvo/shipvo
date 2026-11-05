@@ -2,7 +2,7 @@
 
 Also in: [Français](fr/getting-started.md)
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="Ship an update to phones in minutes" data-length="1 min 30 s" poster="/videos/ship-an-update.png" src="/media/videos/ship-an-update-988335b3.mp4"><track kind="captions" src="/videos/ship-an-update.vtt" srclang="en" label="English" default>Your browser cannot play this video. See the video page for a transcript.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="Ship an update to phones in minutes" data-length="1 min 30 s" poster="/videos/ship-an-update.png" src="/media/videos/ship-an-update-988335b3.mp4"><track kind="captions" src="/videos/ship-an-update.vtt" srclang="en" label="English">Your browser cannot play this video. See the video page for a transcript.</video>
 
 Video: [Ship an update to phones in minutes](videos.md), 1 min 30 s, with captions and a transcript.
 
@@ -58,6 +58,8 @@ This builds the web bundle with the simulated device and serves it on `http://lo
 ```json
 { "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
 ```
+
+To see the app in a phone frame in your own browser, run `shipvo run android` or `shipvo run ios`. It builds the same web export, serves it locally and opens the frame page. Add `--no-open` to print the URL, or `--native` to run `npx expo run:android` / `run:ios` instead. See [cli.md](cli.md).
 
 Ask the agent to `open_app("myshop")`. It gets the first screen as an accessibility tree with refs and can `tap`, `type`, `scroll`, `back`, `screenshot`. Tap "Scan a code" and the Android camera permission dialog appears in the tree; the agent answers it like a person would. `set_device` decides what the phone has:
 

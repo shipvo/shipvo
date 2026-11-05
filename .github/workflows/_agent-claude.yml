@@ -100,6 +100,18 @@ jobs:
           if [ -f scripts/agents/install-chromium.sh ]; then bash scripts/agents/install-chromium.sh && exit 0
           else pnpm --filter @shipvo/sim exec playwright-core install --with-deps chromium && exit 0; fi
           echo "::warning::Chromium install failed; simulator runs will not work in this job"
+      - name: Install ffmpeg
+        # Video renders, narration timing, music mixing and the MCP demo-recording tests need ffmpeg and ffprobe
+        # (the runner has neither, escalation #484). Same lock timeout as install-chromium.sh.
+        if: steps.chk.outputs.ok == 'true' && inputs.mode != 'read' && inputs.engine == 'claude'
+        run: |
+          command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && exit 0
+          for i in 1 2 3; do
+            sudo apt-get -o DPkg::Lock::Timeout=120 update -qq && \
+            sudo apt-get -o DPkg::Lock::Timeout=120 install -y -qq --no-install-recommends ffmpeg >/dev/null && break
+            sleep 10
+          done
+          command -v ffprobe >/dev/null && ffmpeg -version | head -1 || echo "::warning::ffmpeg install failed; video steps will not work in this job"
 
       - name: Prepare branch
         if: steps.chk.outputs.ok == 'true'

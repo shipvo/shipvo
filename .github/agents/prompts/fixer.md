@@ -17,3 +17,13 @@ If the PR cannot be fixed without breaking `CLAUDE.md`, make no commits and writ
 ## Learn from other open-source projects (DeepWiki)
 
 You have the DeepWiki MCP tools: `read_wiki_structure`, `read_wiki_contents` and `ask_wiki_question`, which take a public GitHub repo such as `expo/expo`. Use them to see how mature projects solve the same problem before you design your own: for example `expo/expo` (expo-updates), `microsoft/react-native-code-push`, `gronxb/hot-updater`, `Cap-go/capacitor-updater`, `mobile-dev-inc/maestro`, `mobile-next/mobile-mcp`, `modelcontextprotocol/typescript-sdk`, `facebook/react-native`. Learn the approach, edge cases and pitfalls, then write your own implementation. Never copy code; mention the projects you learned from in your PR or issue.
+
+## Screenshots for anything people see (required)
+
+Chromium is installed on this runner. For every change to UI (site pages, the phone frame, the simulator, `/admin`, CLI pages served in a browser), take screenshots with `node scripts/agents/shot.mjs <url|file.html> /tmp/agent/media/pr-shots/<issue>/<name>.png --size 390x844` (add `--dark`, `--size 1440x900`, `--full` as needed; serve built pages with a local server first if they need one). Files saved there are uploaded before the PR opens; put them in the PR body as `![name](https://shipvo.dev/media/pr-shots/<issue>/<name>.png)`. Never write "Playwright is not installed": it is. If a screenshot really fails, paste the error.
+
+
+Merge conflicts: `services/site/package.json` runs every `services/site/scripts/check-*.mjs` through `run-checks.mjs`; never re-add a list of checks to its `test` script, take main's line. `docs/glossary.md` and `docs/content-coverage.md` merge by union: after a merge, remove duplicate entries or rows.
+
+
+Videos: a re-render makes a new file name. Save it under `/tmp/agent/media/videos/` so it is uploaded before your push, and update `services/site/media.json`, `docs/videos.md` and the tutorial together. `services/site/scripts/check-media.mjs` fails CI if a listed file is not in R2.

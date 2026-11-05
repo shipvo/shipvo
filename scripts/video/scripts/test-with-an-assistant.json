@@ -1,0 +1,61 @@
+{
+  "slug": "test-with-an-assistant",
+  "posterAt": 4.5,
+  "title": "Have an AI assistant test your shop before every release",
+  "tutorial": "docs/tutorials/test-with-an-assistant.md",
+  "voice": "af_heart",
+  "music": {
+    "id": 341563,
+    "bed": 0.5,
+    "credits": "services/site/public/videos/test-with-an-assistant.credits.json"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "visual": "taHook",
+      "min": 9,
+      "narration": "Who tests your app before you ship it? You can ask an A I assistant to do it. It taps every button, like a customer. And it needs no phone.",
+      "caption": "Who tests your app before you ship it? You can ask an AI assistant to do it. It taps every button, like a customer. And it needs no phone."
+    },
+    {
+      "id": "connect",
+      "visual": "taConnect",
+      "min": 12,
+      "narration": "Step one. Start your shop in the simulator. Then give your assistant one setting. It tells Claude, or Cursor, to start the Shipvo tools. That plug is called M C P.",
+      "caption": "Step one. Start your shop in the simulator. Then give your assistant one setting. It tells Claude, or Cursor, to start the Shipvo tools. That plug is called MCP."
+    },
+    {
+      "id": "shop",
+      "visual": "taShop",
+      "min": 12,
+      "narration": "Step two. Ask it to shop like a customer. Buy the tote. Make the payment fail, then make it work. The assistant taps through the app and tells you what the screen said."
+    },
+    {
+      "id": "proof",
+      "visual": "taProof",
+      "min": 13,
+      "narration": "Step three. Ask for proof. The device log lists everything the app asked the phone to do. In our run, the log showed the payment going to My Shop. But this shop is called Sandbar. The assistant caught a real mistake.",
+      "caption": "Step three. Ask for proof. The device log lists everything the app asked the phone to do. In our run, the log showed the payment going to \"My Shop\". But this shop is called Sandbar. The assistant caught a real mistake."
+    },
+    {
+      "id": "test",
+      "visual": "taTest",
+      "min": 12,
+      "narration": "Step four. Turn its run into a test. Ask for export test, and save the file. Then write the words that should appear on each screen. Now the check repeats by itself, in seconds."
+    },
+    {
+      "id": "habit",
+      "visual": "taHabit",
+      "min": 11,
+      "narration": "Step five. Make it a habit. Run your tests, and then a practice release. If a test fails, the line stops. Nothing is sent to your users.",
+      "caption": "Step five. Make it a habit. Run your tests, and then a practice release. If a test fails, the line stops. Nothing is sent to your users."
+    },
+    {
+      "id": "cta",
+      "visual": "taCta",
+      "min": 12,
+      "narration": "That is a safety check you can run before every release. The full guide is at shipvo dot dev, slash docs, slash test with an assistant.",
+      "caption": "That is a safety check you can run before every release. The full guide is at shipvo.dev/docs/test-with-an-assistant."
+    }
+  ]
+}

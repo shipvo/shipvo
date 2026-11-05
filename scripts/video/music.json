@@ -1,0 +1,29 @@
+{
+  "note": "Tracks already checked and liked. Owner decision (5 Nov 2026): any Jamendo track may be used, always credited via bgmusic.py --credits.",
+  "tracks": [
+    {
+      "id": 341563,
+      "license": "CC BY-SA 3.0",
+      "moods": "ambient, calm, chill, electronic, hopeful, lounge",
+      "source": "https://www.jamendo.com/track/341563"
+    },
+    {
+      "id": 633200,
+      "license": "CC BY 3.0",
+      "moods": "acoustic, dream, instrumental, love, sad",
+      "source": "https://www.jamendo.com/track/633200"
+    },
+    {
+      "id": 1178100,
+      "license": "CC BY-SA 3.0",
+      "moods": "dark, ethnic, melancholic, melodic, peaceful",
+      "source": "https://www.jamendo.com/track/1178100"
+    },
+    {
+      "id": 1375974,
+      "license": "CC BY-SA 3.0",
+      "moods": "dark, sad",
+      "source": "https://www.jamendo.com/track/1375974"
+    }
+  ]
+}

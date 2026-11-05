@@ -71,6 +71,20 @@ export function steadyTrials(trials, pollMissMs = 3000) {
   return trials.filter((_, i) => !miss[i] && !(i > 0 && miss[i - 1]));
 }
 
+export const FULL_BUNDLE_SCENARIO = "update: full bundle (no patches offered)";
+
+/**
+ * The `firstRun` block of the report. The first-run app is not published in this job, so the honest equivalent is the
+ * median of the full-bundle update scenario: a device with no patch base, which is what a new app's first update is.
+ * Returns null when that scenario failed or has no timing, so the summary says "not measured".
+ */
+export function firstRunFrom(scenarios) {
+  const s = scenarios.find((x) => x.name === FULL_BUNDLE_SCENARIO);
+  const m = s?.pass ? s.median : null;
+  if (!m || !(typeof m.pointerToHealthyMs === "number" && m.pointerToHealthyMs > 0)) return null;
+  return { source: s.name, publishToHealthyMs: m.pointerToHealthyMs, downloadMs: m.downloadMs ?? null, applyMs: m.applyMs ?? null };
+}
+
 const HBC_MAGIC = [0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f];
 
 /** Hermes bytecode version in a bundle header (8-byte magic, then a 32-bit little-endian version), or null for plain JS. Same rule as `HermesGuard.versionOf`. */

@@ -8,6 +8,8 @@ vi.mock("../src/config.js", async (orig) => ({
   ...(await orig<typeof import("../src/config.js")>()),
   loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k" }),
 }));
+const ensure = vi.hoisted(() => vi.fn());
+vi.mock("../src/ensure-playwright.js", () => ({ ensurePlaywright: ensure }));
 const exec = vi.hoisted(() => vi.fn());
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: exec }));
 import { sim } from "../src/sim";
@@ -68,6 +70,7 @@ setTimeout(() => process.exit(0), 3000);`);
     ]);
     expect(Date.now() - started).toBeGreaterThanOrEqual(500);
     expect(err).toHaveBeenCalled();
+    expect(ensure).toHaveBeenCalledWith({ cwd: process.cwd() });
   });
 
   it("never prints 'Simulator on' and exits 1 when the server exits without listening", async () => {

@@ -21,8 +21,22 @@
     w.addEventListener('keydown',function(e){if(e.key==='Escape'){open(false);b.focus()}});
   });
   document.addEventListener('click',function(e){document.querySelectorAll('.has-menu.open').forEach(function(w){if(!w.contains(e.target)){w.classList.remove('open');w.querySelector('button').setAttribute('aria-expanded','false')}})});
+  // phone menu: a dialog with a focus trap; Escape or a click on the button closes it and returns focus
   var burger=document.querySelector('.burger'),mm=document.querySelector('.mobile-menu');
-  if(burger&&mm)burger.addEventListener('click',function(){var o=mm.hidden;mm.hidden=!o;burger.setAttribute('aria-expanded',o);burger.classList.toggle('x',o)});
+  if(burger&&mm){
+    var items=function(){return Array.prototype.slice.call(mm.querySelectorAll('a[href],button')).filter(function(e){return e.offsetParent})};
+    var setOpen=function(o){mm.hidden=!o;burger.setAttribute('aria-expanded',o);burger.classList.toggle('x',o);if(o){var f=items()[0];f&&f.focus()}};
+    burger.addEventListener('click',function(){setOpen(mm.hidden)});
+    document.addEventListener('keydown',function(e){
+      if(mm.hidden)return;
+      if(e.key==='Escape'){setOpen(false);burger.focus();return}
+      if(e.key!=='Tab')return;
+      var list=[burger].concat(items()),i=list.indexOf(document.activeElement);
+      if(e.shiftKey&&i<=0){e.preventDefault();list[list.length-1].focus()}
+      else if(!e.shiftKey&&(i===list.length-1||i<0)){e.preventDefault();list[0].focus()}});
+    mm.addEventListener('click',function(e){if(e.target.closest('a[href^="#"]'))setOpen(false)});
+    matchMedia('(min-width:981px)').addEventListener('change',function(m){if(m.matches&&!mm.hidden)setOpen(false)});
+  }
   // GitHub stars (live, cached an hour per browser)
   var el=document.querySelector('[data-stars]');
   if(el){try{var c=JSON.parse(localStorage.getItem('shipvo.stars')||'null');if(c&&Date.now()-c.t<36e5){el.textContent=c.v;el=null}}catch(e){}
