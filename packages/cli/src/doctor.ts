@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -7,7 +7,7 @@ import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
 import { parseDeclared } from "./hermes.js";
 
-type CheckResult = { name: string; ok: boolean; fix: string };
+type CheckResult = { name: string; ok: boolean; fix: string; note?: string };
 type ShipvoConfig = { publicKey?: unknown; controlPlane?: unknown; hermesBytecodeVersion?: unknown };
 type DoctorDeps = {
   cwd: string;
@@ -16,6 +16,8 @@ type DoctorDeps = {
   fetchFn: typeof fetch;
   fileExists: typeof existsSync;
   readText: (path: string) => string;
+  platform: NodeJS.Platform;
+  fileMode: (path: string) => number | null;
   /** Port the simulator will use (default 4545). */
   port: number;
   /** Path of the Playwright Chromium binary, or null if Playwright is not installed. */
@@ -30,6 +32,8 @@ const defaultDeps = (): DoctorDeps => ({
   fetchFn: fetch,
   fileExists: existsSync,
   readText: (path) => readFileSync(path, "utf8"),
+  platform: process.platform,
+  fileMode: (path) => { try { return statSync(path).mode & 0o777; } catch { return null; } },
   port: 4545,
   chromiumPath: playwrightChromiumPath,
   portFree,
@@ -58,6 +62,11 @@ function hasSimScript(deps: DoctorDeps): boolean {
 
 const parseMajor = (v: string) => Number(v.split(".")[0] || 0);
 const pub = (s: string) => b64(keyFromSeed(s).publicKey);
+
+function seedFilePath(env: NodeJS.ProcessEnv, cwd: string): string | null {
+  if (env.SHIPVO_SIGNING_SEED || env.PURENATIVE_SIGNING_SEED) return null;
+  return env.SHIPVO_SIGNING_SEED_FILE || env.PURENATIVE_SIGNING_SEED_FILE || join(cwd, ".shipvo", "seed.txt");
+}
 
 function resolveSeed(env: NodeJS.ProcessEnv, cwd: string, readText: (path: string) => string): string | null {
   const direct = env.SHIPVO_SIGNING_SEED || env.PURENATIVE_SIGNING_SEED;
@@ -116,6 +125,33 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   }
   results.push({ name: "control plane reachable", ok: controlPlaneOk, fix: !cfg ? needCfg : cpFix });
 
+  const keyName = "signing key file is private";
+  const keyPath = seedFilePath(deps.env, deps.cwd);
+  if (deps.platform === "win32") {
+    results.push({ name: keyName, ok: true, fix: "none", note: "skipped on Windows, file modes do not apply" });
+  } else if (!keyPath) {
+    results.push({ name: keyName, ok: true, fix: "none", note: "skipped, the seed comes from an environment variable" });
+  } else {
+    const mode = deps.fileMode(keyPath);
+    if (mode === null) results.push({ name: keyName, ok: true, fix: "none", note: "skipped, no key file found" });
+    else results.push({ name: keyName, ok: (mode & 0o077) === 0, fix: `run \`chmod 600 ${keyPath}\` (it is mode ${mode.toString(8).padStart(3, "0")})` });
+  }
+
+  let healthOk = false;
+  let healthFix = "check shipvo.json controlPlane and your network access (5 second timeout)";
+  if (cfg?.controlPlane && typeof cfg.controlPlane === "string") {
+    try {
+      const res = await deps.fetchFn(cfg.controlPlane.replace(/\/$/, "") + "/health", { signal: AbortSignal.timeout(5000) });
+      if (res.status !== 200) healthFix = `/health answered HTTP ${res.status}, expected 200; check the control plane URL and deploy`;
+      else {
+        try { await res.json(); healthOk = true; } catch { healthFix = "/health answered 200 but not JSON; controlPlane may point at the wrong service"; }
+      }
+    } catch (e) {
+      healthFix = e instanceof Error && e.name === "TimeoutError" ? "/health did not answer within 5 seconds; check the URL and your network" : healthFix;
+    }
+  }
+  results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix });
+
   let hermesOk = true;
   if (cfg && Object.prototype.hasOwnProperty.call(cfg, "hermesBytecodeVersion")) {
     try {
@@ -142,6 +178,6 @@ export async function doctor(argv: string[]) {
   const stray = argv.some((x, i) => !x.startsWith("--") && argv[i - 1] !== "--port");
   if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>]"); process.exit(2); }
   const results = await runDoctorChecks({ port });
-  for (const r of results) console.log(`${r.ok ? `PASS ${r.name}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
+  for (const r of results) console.log(`${r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
   if (results.some((r) => !r.ok)) process.exit(1);
 }
