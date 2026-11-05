@@ -295,7 +295,7 @@ app.put("/app/:id/api/halt-config", async (c) => {
   const appId = c.req.param("id");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
   if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
-  let body: any; try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
+  let body: any; try { body = await c.req.json(); } catch { return bad(c, "body must be JSON like {\"threshold\": 0.2}"); }
   const t = body?.threshold, m = body?.min_reports === undefined ? 20 : body.min_reports;
   if (typeof t !== "number" || !Number.isFinite(t) || t <= 0 || t > 1) return bad(c, "threshold must be a number above 0 and at most 1");
   if (typeof m !== "number" || !Number.isInteger(m) || m < 1 || m > 10000) return bad(c, "min_reports must be an integer from 1 to 10000");

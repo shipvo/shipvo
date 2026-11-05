@@ -45,7 +45,7 @@ describe("shipvo auto-halt", () => {
   it("prints the current setting with no flags", async () => {
     await autoHalt([], { fetchFn: reply(200, { enabled: true, threshold: 0.25, min_reports: 1 }) });
     expect(calls[0].init.method).toBe("GET");
-    expect(logs[0]).toBe("auto-halt: on at 25% after 1 reports");
+    expect(logs[0]).toBe("auto-halt: on at 25% after 1 report");
   });
   it("--dry-run writes nothing", async () => {
     await autoHalt(["--threshold", "0.2", "--dry-run"], { fetchFn: reply(200, {}) });

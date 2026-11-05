@@ -1,5 +1,6 @@
 // `shipvo auto-halt`: show, turn on or turn off auto-halt for this app, through the control plane.
 import { args as parse, loadConfig, publishToken } from "./config.js";
+import { describeAutoHalt } from "./status.js";
 
 export const AUTOHALT_FLAGS = ["threshold", "min-reports", "off", "dry-run"];
 
@@ -20,7 +21,7 @@ Needs SHIPVO_OWNER_TOKEN, or the publish token from shipvo app create (SHIPVO_PU
 
 type Setting = { enabled: boolean; threshold?: number; min_reports?: number };
 
-const describe = (s: Setting) => (s.enabled ? `auto-halt: on at ${Math.round((s.threshold as number) * 1000) / 10}% after ${s.min_reports} reports` : "auto-halt: off");
+const describe = (s: Setting) => describeAutoHalt(s.enabled ? { threshold: s.threshold as number, min_reports: s.min_reports as number } : null);
 
 export async function autoHalt(argv: string[], deps: { fetchFn?: typeof fetch } = {}) {
   if (argv.includes("--help") || argv.includes("-h")) { console.log(AUTOHALT_HELP); return; }

@@ -90,6 +90,6 @@ shipvo auto-halt --threshold 0.2 --dry-run         # print the change, write not
 ```
 
 - `--threshold` is above 0 and at most 1. `--min-reports` is a whole number from 1 to 10000 (default 20).
-- It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create` (`SHIPVO_PUBLISH_TOKEN` or `.shipvo/publish-token`).
+- It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create` (`SHIPVO_PUBLISH_TOKEN` or `.shipvo/publish-token`). A publish token can turn auto-halt off, so a leaked CI publish token can disable it.
 - `shipvo status` shows the setting: `auto-halt: off` or `auto-halt: on at 20% after 20 reports`.
 - The route behind it is `GET`, `PUT` and `DELETE` on `/app/<app>/api/halt-config`. A bad value is a 400 with `error: "bad_halt_config"`.

@@ -1,12 +1,19 @@
 import { describe, it, expect } from "vitest";
 import app from "../src/index";
 
-function setup(healthy = 14, failed = 6) {
+const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+type Tok = { app_id: string; revoked_at?: string | null; expires_at?: string | null };
+
+function setup(healthy = 14, failed = 6, tokens: Record<string, Tok> = {}) {
   const store: Record<string, string> = {};
   const POINTERS = { get: async (k: string) => store[k] ?? null, put: async (k: string, v: string) => { store[k] = v; }, delete: async (k: string) => { delete store[k]; } } as any;
   const DB = { prepare: (sql: string) => ({ bind: (..._a: unknown[]) => ({
     run: async () => ({}),
-    first: async () => null,
+    first: async () => {
+      if (sql.includes("FROM publish_tokens")) { const [h, app_] = _a as string[]; const t = tokens[h]; return t && t.app_id === app_ && !t.revoked_at ? { id: 1, expires_at: t.expires_at ?? null } : null; }
+      if (sql.includes("FROM apps")) return { public_key: "k", bytes_used: 0 };
+      return null;
+    },
     all: async () => ({ results: sql.includes("GROUP BY event") ? [{ event: "applied", n: healthy }, { event: "rolled_back", n: failed }] : [] }),
   }) }) } as any;
   return { env: { POINTERS, DB, OWNER_TOKEN: "tok" } as any, store };
@@ -47,7 +54,9 @@ describe("halt-config route", () => {
       expect(r.status).toBe(400);
       expect((await r.json() as any).error).toBe("bad_halt_config");
     }
-    expect((await app.request("/app/tide/api/halt-config", { method: "PUT", headers: H, body: "nope" }, s.env)).status).toBe(400);
+    const bj = await app.request("/app/tide/api/halt-config", { method: "PUT", headers: H, body: "nope" }, s.env);
+    expect(bj.status).toBe(400);
+    expect((await bj.json() as any).error).toBe("bad_halt_config");
     expect(s.store["halt-config/tide"]).toBeUndefined();
   });
   it("turns off with DELETE, and GET says off", async () => {
@@ -65,6 +74,40 @@ describe("halt-config route", () => {
     await put(s.env, { threshold: 0.2, min_reports: 20 });
     await fail();
     expect(JSON.parse(s.store["halt/tide"])).toMatchObject({ release: 5, reports: 20, failed: 6, threshold: 0.2 });
+  });
+});
+
+describe("halt-config route with a publish token", () => {
+  const PUB = "sv_publish_good", OTHER = "sv_publish_other", REVOKED = "sv_publish_revoked", EXPIRED = "sv_publish_expired";
+  const mk = async () => setup(14, 6, {
+    [await sha(PUB)]: { app_id: "tide" },
+    [await sha(OTHER)]: { app_id: "reef" },
+    [await sha(REVOKED)]: { app_id: "tide", revoked_at: "2026-01-01T00:00:00Z" },
+    [await sha(EXPIRED)]: { app_id: "tide", expires_at: "2000-01-01T00:00:00.000Z" },
+  });
+  const hdr = (t: string) => ({ authorization: `Bearer ${t}`, "content-type": "application/json" });
+  const del = (env: any, t: string) => app.request("/app/tide/api/halt-config", { method: "DELETE", headers: hdr(t) }, env);
+  const get = (env: any, t: string) => app.request("/app/tide/api/halt-config", { headers: hdr(t) }, env);
+
+  it("lets a valid token for the app GET, PUT and DELETE", async () => {
+    const s = await mk();
+    expect((await put(s.env, { threshold: 0.3, min_reports: 10 }, hdr(PUB))).status).toBe(200);
+    expect(JSON.parse(s.store["halt-config/tide"])).toEqual({ threshold: 0.3, min_reports: 10 });
+    const g = await get(s.env, PUB);
+    expect(g.status).toBe(200);
+    expect(await g.json()).toEqual({ enabled: true, threshold: 0.3, min_reports: 10 });
+    expect((await del(s.env, PUB)).status).toBe(200);
+    expect(s.store["halt-config/tide"]).toBeUndefined();
+  });
+  it("rejects another app's, a revoked and an expired token, and writes nothing", async () => {
+    for (const t of [OTHER, REVOKED, EXPIRED]) {
+      const s = await mk();
+      s.store["halt-config/tide"] = JSON.stringify({ threshold: 0.2, min_reports: 20 });
+      expect((await get(s.env, t)).status).toBe(401);
+      expect((await put(s.env, { threshold: 0.9 }, hdr(t))).status).toBe(401);
+      expect((await del(s.env, t)).status).toBe(401);
+      expect(JSON.parse(s.store["halt-config/tide"])).toEqual({ threshold: 0.2, min_reports: 20 });
+    }
   });
 });
 
