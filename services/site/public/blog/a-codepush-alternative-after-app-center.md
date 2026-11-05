@@ -34,6 +34,8 @@ iOS over-the-air updates are verified on the iOS Simulator in CI on every change
 
 ## A migration in three steps
 
+For the full Shipvo steps with commands, see the [CodePush migration guide](https://github.com/shipvo/shipvo/blob/main/docs/migrate-from-codepush.md).
+
 1. Pick the service from the checklist above and run it beside CodePush on a test build.
 2. Ship one release to a small cohort and watch crash rates before widening.
 3. Remove the CodePush SDK in the same release that switches the update URL, so no build has two update mechanisms.

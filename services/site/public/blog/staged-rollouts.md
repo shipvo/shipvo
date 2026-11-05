@@ -35,3 +35,5 @@ This is a complement to the stores' tools, not a replacement. Use the store mech
 
 - Bitrise, [How to minimize the negative impact of a faulty release with a staged rollout](https://bitrise.io/blog/post/how-to-minimize-the-negative-impact-of-a-faulty-release-with-a-staged-rollout).
 - Shipvo, [Publishing over the air](https://shipvo.dev/docs/getting-started/#5-publish-over-the-air) and [spike results](https://shipvo.dev/docs/spike-results/).
+
+Related: [How to roll back a bad React Native over-the-air update](https://shipvo.dev/blog/roll-back-a-bad-react-native-update/).
