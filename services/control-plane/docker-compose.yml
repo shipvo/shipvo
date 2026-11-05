@@ -1,0 +1,15 @@
+# docker compose up   (run in services/control-plane/)
+services:
+  control-plane:
+    build:
+      context: ../..
+      dockerfile: services/control-plane/Dockerfile
+    ports:
+      - "127.0.0.1:8787:8787"     # local only: no TLS, no public URL
+    environment:
+      # A local developer key for the smoke script. Change it if others can reach this machine.
+      SHIPVO_LOCAL_DEV_KEY: ${SHIPVO_LOCAL_DEV_KEY:-sv_test_localdev}
+    volumes:
+      - control-plane-data:/data
+volumes:
+  control-plane-data:

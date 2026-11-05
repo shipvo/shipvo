@@ -216,9 +216,10 @@ const TEST_APP = (name: string) => `// These tests check the starter screen that
 // Tests that run your app in the Shipvo simulator: a phone-sized, headless copy of the real app. No emulator, no device.
 // Run them with "npm test" (start the simulator first: npm run sim) and in CI (.github/workflows/test.yml).
 import { test, expect } from "@shipvo/test/vitest";
+import { RELEASE } from "../src/release";
 
 test("the app opens and shows its headline", async ({ phone }) => {
-  expect(phone).toSee("Hello from ${name}.");
+  expect(phone).toSee(RELEASE.headline);
   expect(phone.screen).not.toMatch(/something went wrong|unhandled|exception/i);
 });
 
