@@ -42,3 +42,27 @@ test("steadyTrials drops poll misses and the trial after one", () => {
   const kept = steadyTrials([mk(100), mk(10000), mk(120), mk(90), mk(null)]);
   assert.deepEqual(kept.map((t) => t.timeline.pointerSeenMs), [100, 90]);
 });
+
+import { hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion } from "./lib.mjs";
+const hbc = (v) => { const b = new Uint8Array(32); b.set([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f]); new DataView(b.buffer).setUint32(8, v, true); return b; };
+test("hermesVersionOf reads the header and returns null for plain JS", () => {
+  assert.equal(hermesVersionOf(hbc(96)), 96);
+  assert.equal(hermesVersionOf(new TextEncoder().encode("var a=1; // plain js bundle")), null);
+  assert.equal(hermesVersionOf(new Uint8Array(4)), null);
+});
+test("withHermesVersion changes only the version and refuses plain JS", () => {
+  const out = withHermesVersion(hbc(96), 98);
+  assert.equal(hermesVersionOf(out), 98); assert.equal(out.length, 32);
+  assert.throws(() => withHermesVersion(new Uint8Array(32), 98));
+});
+test("otherHermesVersion always differs", () => { assert.notEqual(otherHermesVersion(96), 96); assert.notEqual(otherHermesVersion(1), 1); });
+test("refusalReason reads the telemetry reason for one release after a time", () => {
+  const t = [{ event: "hermes_bytecode_mismatch", release: 7, at: 100 }, { event: "applied", release: 7, at: 120 }];
+  assert.equal(refusalReason(t, 7, 50), "hermes_bytecode_mismatch");
+  assert.equal(refusalReason(t, 8, 50), null); assert.equal(refusalReason(t, 7, 101), null);
+});
+test("buildPointer signs hermes_bytecode_version into the body only when given", () => {
+  const base = { app: "tide", seed: Buffer.alloc(32, 1).toString("base64"), release: 1, band: "b0", bytes: new Uint8Array(3), url: "u" };
+  assert.equal(JSON.parse(buildPointer({ ...base, hermesBytecodeVersion: 98 }).body).hermes_bytecode_version, 98);
+  assert.equal("hermes_bytecode_version" in JSON.parse(buildPointer(base).body), false);
+});

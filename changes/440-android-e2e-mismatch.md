@@ -1,0 +1,2 @@
+- Android e2e: new scenario publishes a release whose `hermes_bytecode_version` differs from the shell's. It fails if the app applies, downloads or crashes on it, and the run summary shows the refusal reason read from telemetry (`hermes_bytecode_mismatch`).
+- Migration: none; this is test tooling only.
