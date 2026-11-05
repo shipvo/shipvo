@@ -10,6 +10,7 @@ import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
+import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -164,7 +165,7 @@ async function act(id, body) {
     }
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); break;
-    case "push_notification": { const nid = await page.evaluate((n) => globalThis.__pnDevice?.push(n), { title: body.title ?? "", body: body.body ?? "", data: body.data ?? {} }); await page.waitForTimeout(200); return { delivered: !!nid, id: nid ?? undefined, screen: await screen(page) }; }
+    case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
     case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
     case "open_notification": { const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {

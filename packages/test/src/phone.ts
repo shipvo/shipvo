@@ -117,7 +117,7 @@ export class Phone {
     }
   }
 
-  /** Deliver a push notification: it shows as a banner the app can be opened from. */
+  /** Deliver a push notification: it shows as a banner the app can be opened from. It reaches the app only if notification permission is granted (`phone.device.set({ permissions: { notifications: "granted" } })`); otherwise nothing is delivered and this still resolves. Use `phone.notifications.receive()` to learn whether it was delivered. */
   async notify(n: { title: string; body: string; data?: Record<string, unknown> }): Promise<this> { await this.act("push_notification", n); return this; }
   /** Tap a notification from the shade (the newest if no id). */
   async openNotification(id?: string): Promise<this> { await this.act("open_notification", { id }); return this; }
