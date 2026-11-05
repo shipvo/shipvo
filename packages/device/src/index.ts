@@ -1,6 +1,6 @@
 // Phone implementation: thin wrappers over Expo modules. Each module is optional so an app only pays for what it uses.
 import { Platform, Share, Linking } from "react-native";
-import type { Device, PermissionStatus, Notification, Contact, CalendarEvent } from "./types";
+import type { Device, PermissionStatus, Notification, Contact, CalendarEvent, PickedFile } from "./types";
 export * from "./types";
 
 // Metro needs static requires; each module is optional so an app only pays for what it installs.
@@ -13,6 +13,7 @@ const MODS: Record<string, any> = {
   "expo-clipboard": tryReq(() => require("expo-clipboard")),
   "expo-contacts": tryReq(() => require("expo-contacts")),
   "expo-calendar": tryReq(() => require("expo-calendar")),
+  "expo-document-picker": tryReq(() => require("expo-document-picker")),
 };
 function opt<T>(name: string): T | null { return (MODS[name] as T) ?? null; }
 const map = (s: string): PermissionStatus => (s === "granted" ? "granted" : s === "denied" ? "denied" : "undetermined");
@@ -23,7 +24,7 @@ export const device: Device = {
   capabilities: () => ({
     camera: MODS["expo-camera"] ? "real" : "unavailable", location: MODS["expo-location"] ? "real" : "unavailable",
     biometrics: MODS["expo-local-authentication"] ? "real" : "unavailable", notifications: MODS["expo-notifications"] ? "real" : "unavailable",
-    clipboard: MODS["expo-clipboard"] ? "real" : "unavailable", contacts: MODS["expo-contacts"] ? "real" : "unavailable", calendar: MODS["expo-calendar"] ? "real" : "unavailable", share: "real", network: "real",
+    clipboard: MODS["expo-clipboard"] ? "real" : "unavailable", contacts: MODS["expo-contacts"] ? "real" : "unavailable", calendar: MODS["expo-calendar"] ? "real" : "unavailable", files: MODS["expo-document-picker"] ? "real" : "unavailable", share: "real", network: "real",
     payments: "simulated", // sandbox provider until a gateway is configured: receipts are prefixed SANDBOX-
   }),
   permissions: {
@@ -113,6 +114,15 @@ export const device: Device = {
       const iso = (v: any) => new Date(v).toISOString();
       return evs.map((e): CalendarEvent => ({ id: String(e.id), title: e.title ?? "", start: iso(e.startDate), end: iso(e.endDate), allDay: !!e.allDay, location: e.location ?? undefined, notes: e.notes ?? undefined }))
         .sort((a, b) => a.start.localeCompare(b.start));
+    },
+  },
+  files: {
+    async pick(options) {
+      const K = opt<any>("expo-document-picker"); if (!K) throw new Error("expo-document-picker is not installed");
+      const r = await K.getDocumentAsync({ type: options?.type ?? "*/*", copyToCacheDirectory: true, multiple: false });
+      if (r.canceled || !r.assets?.length) return null;
+      const a = r.assets[0];
+      return { name: a.name ?? "", mimeType: a.mimeType ?? "application/octet-stream", size: a.size ?? 0, uri: a.uri } as PickedFile;
     },
   },
   clipboard: {

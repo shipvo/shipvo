@@ -1,7 +1,7 @@
 // Simulated device: the same API, backed by a device state the Shipvo simulator controls, with system sheets
 // (permission dialog, camera viewfinder, fingerprint prompt, payment prompt, notification banner, share sheet)
 // drawn as real dialogs so an agent sees and operates them exactly as it would a phone's.
-import type { Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification, Contact, CalendarEvent, PermissionName } from "./types";
+import type { Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification, Contact, CalendarEvent, PermissionName, PickedFile } from "./types";
 export * from "./types";
 
 export type DeviceState = {
@@ -13,6 +13,8 @@ export type DeviceState = {
   contacts: Contact[];
   /** The calendar the app can read once calendar permission is granted. */
   calendar: CalendarEvent[];
+  /** The files the picker offers. `content` is the file's text. */
+  files: { name: string; mimeType: string; content: string }[];
   location: Coords;
   /** What the camera "sees": a barcode in view, or nothing. */
   camera: { barcode?: { type: string; data: string } | null; delayMs?: number };
@@ -31,6 +33,7 @@ const state: DeviceState = {
   permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: platform === "android" && api < 33 ? "granted" : "undetermined" },
   contacts: [],
   calendar: [],
+  files: [],
   location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, // Bonapriso, Douala
   camera: { barcode: null, delayMs: 800 },
   biometrics: { enrolled: true, nextResult: "success" },
@@ -83,7 +86,7 @@ async function askPermission(name: PermissionName): Promise<PermissionStatus> {
   state.permissions[name] = result; log("permission", { name, result }); return result;
 }
 
-const ALL_SIM = { camera: "simulated", location: "simulated", biometrics: "simulated", payments: "simulated", notifications: "simulated", share: "simulated", clipboard: "simulated", contacts: "simulated", calendar: "simulated", network: "simulated" } as const;
+const ALL_SIM = { camera: "simulated", location: "simulated", biometrics: "simulated", payments: "simulated", notifications: "simulated", share: "simulated", clipboard: "simulated", contacts: "simulated", calendar: "simulated", files: "simulated", network: "simulated" } as const;
 export const device: Device = {
   kind: "simulated",
   capabilities: () => ({ ...ALL_SIM }),
@@ -164,6 +167,24 @@ export const device: Device = {
       log("calendar", { count: found.length }); return found.map((e) => ({ ...e }));
     },
   },
+  files: {
+    async pick(options) {
+      const want = ([] as string[]).concat(options?.type ?? ["*/*"]).map((t) => t.toLowerCase());
+      const ok = (m: string) => want.some((w) => w === "*/*" || w === "*" || w === m.toLowerCase() || (w.endsWith("/*") && m.toLowerCase().startsWith(w.slice(0, -1))));
+      const offered = state.files.filter((f) => ok(f.mimeType));
+      let chosen: DeviceState["files"][number] | null = null;
+      await sheet("Choose a file", (card, close) => {
+        if (offered.length === 0) card.append(p("No files"));
+        for (const f of offered) card.append(btn(f.name, () => { chosen = f; close(); }));
+        card.append(btn("Cancel", () => close()));
+      });
+      if (!chosen) { log("files", { picked: null }); return null; }
+      const f = chosen as DeviceState["files"][number];
+      const blob = new Blob([f.content], { type: f.mimeType });
+      const out: PickedFile = { name: f.name, mimeType: f.mimeType, size: blob.size, uri: URL.createObjectURL(blob) };
+      log("files", { picked: f.name }); return out;
+    },
+  },
   clipboard: { async set(t) { state.clipboard = t; }, async get() { return state.clipboard; } },
   net: { online: () => state.online, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
 };
@@ -190,7 +211,7 @@ function showBanner(n: Notification) {
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
 g.__pnDevice = {
   state,
-  set(patch: Partial<DeviceState>) { Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, camera: { ...state.camera, ...(patch.camera ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (patch.online !== undefined) netSubs.forEach((f) => f(state.online)); },
+  set(patch: Partial<DeviceState>) { Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (patch.online !== undefined) netSubs.forEach((f) => f(state.online)); },
   /** Push a notification to the app. Returns its id, or null when permission is not granted. */
   push(n: Omit<Notification, "id">) { return deliver(n); },
   log: () => state.log,
@@ -204,7 +225,7 @@ g.__pnDevice = {
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
     Object.assign(state, { permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
-      location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", contacts: [], calendar: [], log: [] }, profile ?? {});
+      location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
     recent.length = 0; seq = 0;
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },

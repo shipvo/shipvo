@@ -61,6 +61,16 @@ describe("local mcp", () => {
     await c.close();
   });
 
+  it("set_device accepts files and passes them to the simulator", async () => {
+    const c = await connect();
+    const files = [{ name: "a.pdf", mimeType: "application/pdf", content: "x" }];
+    const r: any = await c.callTool({ name: "set_device", arguments: { session: "menu-1", files } });
+    expect(r.isError).toBeFalsy();
+    const sent = JSON.parse(bodies.filter((b) => b.includes('"set_device"')).at(-1)!);
+    expect(sent.device).toEqual({ files });
+    await c.close();
+  });
+
   it("opens the app the simulator serves, with no PN_APPS", async () => {
     const c = await connect();
     expect(textOf(await c.callTool({ name: "list_apps", arguments: {} }))).toContain('menu: Table Menu');

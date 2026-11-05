@@ -1,7 +1,7 @@
 // Metro helper: in a Shipvo simulator build (platform web with PN_SIM=1), route raw Expo native-module imports
 // to the simulated device, so apps that import expo-camera / expo-location directly still run in the simulator.
 const path = require("node:path");
-const SHIMS = { "expo-camera": "camera", "expo-location": "location", "expo-local-authentication": "auth", "expo-notifications": "notifications", "expo-clipboard": "clipboard", "expo-contacts": "contacts", "expo-calendar": "calendar", "expo-sharing": "share" };
+const SHIMS = { "expo-camera": "camera", "expo-location": "location", "expo-local-authentication": "auth", "expo-notifications": "notifications", "expo-clipboard": "clipboard", "expo-contacts": "contacts", "expo-calendar": "calendar", "expo-document-picker": "document-picker", "expo-sharing": "share" };
 module.exports = function withShipvoSim(config) {
   const prev = config.resolver.resolveRequest;
   config.resolver.resolveRequest = (ctx, moduleName, platform) => {

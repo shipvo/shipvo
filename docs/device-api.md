@@ -10,7 +10,7 @@ import { device } from "@shipvo/device";
 
 ```ts
 device.kind                 // "native" | "simulated"
-device.capabilities()       // { camera: "real" | "simulated" | "unavailable", location: …, biometrics, payments, notifications, share, clipboard, contacts, calendar, network }
+device.capabilities()       // { camera: "real" | "simulated" | "unavailable", location: …, biometrics, payments, notifications, share, clipboard, contacts, calendar, files, network }
 ```
 
 Every capability declares how it is provided *here*. There is no silent fallback: on a phone without `expo-camera` installed, `camera` is `unavailable` and `scan()` throws; in the simulator every capability is `simulated`. Tests and agents read this to know what was actually exercised. Simulated results are also marked in what they return: receipts start with `SIMULATED-` (simulator) or `SANDBOX-` (the built-in sandbox provider on phones until a gateway is configured), and every entry in the simulator's device log carries `simulated: true`.
@@ -126,6 +126,26 @@ await phone.device.set({ permissions: { calendar: "granted" } });   // or "denie
 
 Agents use `set_device(calendar: [...], permissions: { calendar })` over MCP.
 
+## Files
+
+Support level: **simulated** in the simulator, **real** on a phone when `expo-document-picker` is installed (`unavailable` otherwise). One file at a time; camera, photo library, saving and sharing files are not covered.
+
+```ts
+const f = await device.files.pick({ type: "image/*" });   // { name, mimeType, size, uri } | null (cancelled)
+```
+
+`type` is a MIME filter (`image/*`, `application/pdf`, or a list). Without it every file is offered. On a phone with `expo-document-picker` missing, `pick()` throws `expo-document-picker is not installed`. In the simulator a "Choose a file" dialog lists the seeded files that match `type`, plus a Cancel button. A picked file's `uri` can be read with `fetch(uri)`. Apps that import `expo-document-picker` directly work too: `getDocumentAsync` returns `{ canceled, assets }`.
+
+Test it with `@shipvo/test`:
+
+```ts
+await phone.files.set([{ name: "receipt.pdf", mimeType: "application/pdf", content: "..." }]);
+// the app opens the picker, then:
+await phone.files.pick("receipt.pdf");   // or phone.files.cancel()
+```
+
+Agents use `set_device(files: [...])` over MCP, then tap the file or Cancel in the dialog.
+
 ## Network
 
 ```ts
@@ -139,7 +159,7 @@ Simulator: `set_device(online: false)` takes the phone offline; the app's offlin
 
 | MCP tool | Effect |
 | --- | --- |
-| `set_device(session, platform?, api?, permissions?, contacts?, calendar?, location?, camera?, biometrics?, payment?, online?)` | Change any part of the device state mid-session |
+| `set_device(session, platform?, api?, permissions?, contacts?, calendar?, files?, location?, camera?, biometrics?, payment?, online?)` | Change any part of the device state mid-session |
 | `device_reset(session, profile?)` | Back to a known state: permissions undetermined, default location, nothing in view, log cleared |
 | `push_notification(session, title, body, data?)` | Deliver a notification to the phone (needs notification permission) |
 | `notifications(session)` / `open_notification(session, id?)` | The shade; tap one |
@@ -147,4 +167,4 @@ Simulator: `set_device(online: false)` takes the phone offline; the app's offlin
 
 ## Using raw Expo modules
 
-Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication`, `expo-notifications`, `expo-clipboard`, `expo-contacts` or `expo-calendar` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.
+Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication`, `expo-notifications`, `expo-clipboard`, `expo-contacts`, `expo-calendar` or `expo-document-picker` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.
