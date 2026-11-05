@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Signs an iOS release pointer for the e2e server, the same wire format `shipvo publish --platform ios` writes.
 //   node make-release.mjs <root> <appId> <seed> <release> <bundle.hbc> [minShell]
-// With PATCH_FROM=<file> (for example the app's embedded main.jsbundle) it also lists a bsdiff patch from that file,
-// built with the Python bsdiff4 module, like `shipvo publish` does.
+// With PATCH_FROM=<file>[,<file>...] (for example the app's embedded main.jsbundle, and release 1's bundle when
+// building release 2) it also lists a bsdiff patch from each file, built with the Python bsdiff4 module, like
+// `shipvo publish` does.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -13,10 +14,10 @@ const release = Number(releaseS), bytes = new Uint8Array(readFileSync(file));
 mkdirSync(join(root, "b", app), { recursive: true });
 writeFileSync(join(root, "b", app, `ios-r${release}.hbc`), bytes);
 const patches = [];
-if (process.env.PATCH_FROM) {
-  const fromSha = sha256Hex(new Uint8Array(readFileSync(process.env.PATCH_FROM)));
+for (const from of (process.env.PATCH_FROM || "").split(",").filter(Boolean)) {
+  const fromSha = sha256Hex(new Uint8Array(readFileSync(from)));
   const url = `b/${app}/ios-d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
-  execFileSync("python3", ["-c", "import sys, bsdiff4; bsdiff4.file_diff(sys.argv[1], sys.argv[2], sys.argv[3])", process.env.PATCH_FROM, file, join(root, url)]);
+  execFileSync("python3", ["-c", "import sys, bsdiff4; bsdiff4.file_diff(sys.argv[1], sys.argv[2], sys.argv[3])", from, file, join(root, url)]);
   const patch = new Uint8Array(readFileSync(join(root, url)));
   patches.push({ from_sha256: fromSha, url, size: patch.length, sha256: sha256Hex(patch) });
   console.log(`patch from ${fromSha.slice(0, 12)}: ${patch.length} bytes`);
