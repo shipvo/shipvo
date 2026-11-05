@@ -7,6 +7,7 @@ import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
 import { promote } from "./promote.js";
 import { sim } from "./sim.js";
+import { preview } from "./preview.js";
 import { keys, login, mcp } from "./login.js";
 import { verifyPointer } from "./verify.js";
 import { signingKey } from "./signing.js";
@@ -20,6 +21,7 @@ try {
 switch (cmd) {
   case "init": await init(rest); break;
   case "sim": await sim(rest); break;
+  case "preview": await preview(rest); break;
   case "publish": await publish(rest); break;
   case "promote": await promote(rest); break;
   case "rollback": await rollback(rest); break;

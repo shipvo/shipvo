@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "publish", "promote", "rollback", "app", "login", "doctor", "status", "keys", "mcp",
+  "init", "sim", "preview", "publish", "promote", "rollback", "app", "login", "doctor", "status", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -9,6 +9,7 @@ Start
   init <dir>                  Create a new app wired to Shipvo
   sim [--port 4545]           Build the app and run it in the simulator
   sim --watch                 Rebuild on file changes and keep serving
+  preview [--json]            Publish a public 24-hour preview link (here.now, no account)
 
 Ship
   publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release
