@@ -33,7 +33,9 @@ jobs:
           R = os.environ["REPO"]
           def gh(*a): return subprocess.check_output(["gh", *a], text=True)
           out = open(os.environ["GITHUB_OUTPUT"], "a")
-          active = json.loads(gh("pr", "list", "-R", R, "--label", "agent:claude", "--state", "open", "--json", "number"))
+          # PRs that are approved only wait for checks and the merge bot; they do not need an engineer.
+          active = [p for p in json.loads(gh("pr", "list", "-R", R, "--label", "agent:claude", "--state", "open", "--json", "number,labels"))
+                    if "agent:approved" not in {l["name"] for l in p["labels"]}]
           busy = json.loads(gh("issue", "list", "-R", R, "--label", "agent:in-progress", "--label", "agent:claude", "--json", "number"))
           if len(active) + len(busy) >= int(os.environ["MAX_ACTIVE"]):
               print(f"at capacity ({len(active)} PRs, {len(busy)} in progress)"); raise SystemExit
