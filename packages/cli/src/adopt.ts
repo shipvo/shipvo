@@ -1,5 +1,6 @@
 // `shipvo init` inside an existing app ("adopt mode"): detect the project, show a plan, apply it only after
-// confirmation. Never overwrites a file, never touches ios/ or android/. Bare React Native is built in #201.
+// confirmation. Never overwrites a file. In an Expo app it never touches ios/ or android/. In a bare React Native app
+// it writes the Shipvo values into AndroidManifest.xml and Info.plist (adopt-bare.ts).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -7,6 +8,7 @@ import { createInterface } from "node:readline/promises";
 import { join, resolve } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { runDoctorChecks } from "./doctor.js";
+import { adoptNextSteps, applyAndroidConfig, checkExpoModules, findAndroidManifest, findIosInfoPlist, iosConfigChanged, writeAndroidConfig, writeIosConfig } from "./adopt-bare.js";
 
 const HOSTED = "https://api.shipvo.dev";
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
@@ -46,13 +48,17 @@ export function detectProject(dir: string): Project {
 
 const ADOPT_FLAGS = new Set(["yes", "dry-run", "device"]);
 type Step = { text: string; run: () => void };
-export type AdoptDeps = { install: (pm: PackageManager, pkgs: string[], dir: string, dev?: boolean) => void; confirm: (q: string) => Promise<boolean>; doctor: boolean };
+export type AdoptDeps = { install: (pm: PackageManager, pkgs: string[], dir: string, dev?: boolean) => void; installExpoModules: (dir: string) => void; confirm: (q: string) => Promise<boolean>; doctor: boolean };
 
 const defaultDeps: AdoptDeps = {
   install(pm, pkgs, dir, dev = false) {
     const devFlag = dev ? [pm === "npm" ? "--save-dev" : pm === "yarn" || pm === "bun" ? "--dev" : "-D"] : [];
     const r = spawnSync(pm, [pm === "npm" ? "install" : "add", ...devFlag, ...pkgs], { cwd: dir, stdio: "inherit" });
     if (r.status !== 0) throw new Error(`${pm} could not install ${pkgs.join(", ")}`);
+  },
+  installExpoModules(dir) {
+    const r = spawnSync("npx", ["install-expo-modules@latest", "--non-interactive"], { cwd: dir, stdio: "inherit" });
+    if (r.status !== 0) throw new Error("npx install-expo-modules@latest failed");
   },
   async confirm(q) {
     if (!process.stdin.isTTY) { console.error("shipvo: this is not a terminal, so I cannot ask. Re-run with --yes to apply the plan, or --dry-run to only read it."); process.exit(2); }
@@ -61,6 +67,13 @@ const defaultDeps: AdoptDeps = {
     return ans === "y" || ans === "yes";
   },
   doctor: true,
+};
+
+/** A package.json with committed ios/ and android/ folders and no Expo config plugins or config code: a bare React Native app. */
+export const isBareApp = (dir: string) => {
+  if (!existsSync(join(dir, "package.json")) || !existsSync(join(dir, "ios")) || !existsSync(join(dir, "android"))) return false;
+  const p = detectProject(dir);
+  return !p.isExpo || p.isBare;
 };
 
 /** Does argv ask for adopt mode: no folder, or ".". */
@@ -78,18 +91,21 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   const fail = (msg: string, code = 1): never => { console.error(msg); process.exit(code); };
   const p = detectProject(dir);
 
-  if (!existsSync(join(dir, "package.json")) || !p.isExpo) {
-    if (existsSync(join(dir, "package.json")) && existsSync(join(dir, "ios")) && existsSync(join(dir, "android")))
-      return fail(bareNote());
+  const bare = isBareApp(dir);
+  if (!bare && (!existsSync(join(dir, "package.json")) || !p.isExpo)) {
     return fail(`shipvo: ${dir} is not an Expo app. Adopt mode needs a package.json with "expo" and an app.json or app.config.js/ts.\nTo start a new app, run:  shipvo init myshop`);
   }
   if (p.expoUpdates || p.codePush) {
     const what = p.expoUpdates ? "expo-updates" : "react-native-code-push";
     return fail(`shipvo: this app uses ${what}. Two over-the-air systems would fight over the bundle, so I stopped and changed nothing.\nRemove ${what} first. Steps: docs/migrate-from-codepush.md`);
   }
-  if (p.isBare) return fail(bareNote());
+  let manifest: string | null = null, infoPlist: string | undefined;
+  if (bare) {
+    manifest = findAndroidManifest(dir); infoPlist = findIosInfoPlist(dir);
+    if (!manifest || !infoPlist) return fail(`shipvo: this looks like a bare React Native app, but I could not find ${[!manifest && "android/app/src/main/AndroidManifest.xml", !infoPlist && "ios/<app>/Info.plist"].filter(Boolean).join(" or ")}. I changed nothing.\nIf this is an Expo managed app, add any config plugin to app.json (or app.config.*), or remove the ios/ and android/ folders, and run this again.`);
+  }
 
-  if (p.configKind === "app.json" && !readJson(join(dir, "app.json"))) return fail("shipvo: app.json is not valid JSON, so I changed nothing. Fix it and run this again.");
+  if (!bare && p.configKind === "app.json" && !readJson(join(dir, "app.json"))) return fail("shipvo: app.json is not valid JSON, so I changed nothing. Fix it and run this again.");
   const pkg = readJson(join(dir, "package.json"));
   const have = (n: string) => !!(pkg.dependencies?.[n] ?? pkg.devDependencies?.[n]);
   const cfgPath = join(dir, "shipvo.json");
@@ -97,6 +113,7 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   const seedPath = join(dir, ".shipvo", "seed.txt");
   const appJson = p.configKind === "app.json" ? readJson(join(dir, "app.json")) : null;
   const expo = appJson ? (appJson.expo ?? appJson) : null;
+  if (bare && !readJson(cfgPath) && existsSync(cfgPath)) return fail("shipvo: shipvo.json is not valid JSON, so I changed nothing.");
   const appId = (existingCfg?.appId ?? expo?.slug ?? String(pkg.name ?? "app").replace(/^@[^/]+\//, "")).toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 32);
   const name = existingCfg?.name ?? expo?.name ?? appId;
   const controlPlane = (flag(argv, "control-plane") ?? existingCfg?.controlPlane ?? HOSTED).replace(/\/$/, "");
@@ -134,7 +151,14 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   if (newSeed) steps.push({ text: "Create a signing key in .shipvo/seed.txt (git-ignored)", run: () => { mkdirSync(join(dir, ".shipvo"), { recursive: true }); writeFileSync(seedPath, newSeed!, { mode: 0o600 }); } });
 
   let printLines = false;
-  if (p.configKind === "app.json") {
+  if (bare) {
+    const check = checkExpoModules(dir);
+    if (!check.installed) steps.push({ text: "Run npx install-expo-modules@latest (adds Expo Modules to the native projects)", run: () => deps.installExpoModules(dir) });
+    if (applyAndroidConfig(readFileSync(manifest!, "utf8"), pluginProps) !== readFileSync(manifest!, "utf8"))
+      steps.push({ text: "Write the Shipvo values into android/app/src/main/AndroidManifest.xml", run: () => { writeAndroidConfig(manifest!, pluginProps); } });
+    if (iosConfigChanged(infoPlist!, pluginProps))
+      steps.push({ text: `Write the Shipvo values into ${infoPlist!.slice(dir.length + 1)}`, run: () => { writeIosConfig(infoPlist!, pluginProps); } });
+  } else if (p.configKind === "app.json") {
     const list: unknown[] = expo.plugins ?? [];
     if (!list.some((x) => (Array.isArray(x) ? x[0] : x) === "@shipvo/runtime"))
       steps.push({ text: "Add the @shipvo/runtime config plugin to app.json (with your public key)", run: () => {
@@ -159,7 +183,7 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   const wf = join(dir, ".github", "workflows", "publish.yml");
   if (!existsSync(wf)) steps.push({ text: "Add .github/workflows/publish.yml", run: () => { mkdirSync(join(dir, ".github", "workflows"), { recursive: true }); writeFileSync(wf, PUBLISH_WORKFLOW(p.packageManager)); } });
 
-  console.log(`Shipvo found an Expo app${p.expoSdk ? ` (SDK ${p.expoSdk})` : ""} in ${dir}\n  package manager: ${p.packageManager}   config: ${p.configFile}   expo-updates: ${p.expoUpdates ? "yes" : "no"}   CodePush: ${p.codePush ? "yes" : "no"}\n`);
+  console.log(`Shipvo found ${bare ? "a bare React Native app" : `an Expo app${p.expoSdk ? ` (SDK ${p.expoSdk})` : ""}`} in ${dir}\n  package manager: ${p.packageManager}   config: ${p.configFile}   expo-updates: ${p.expoUpdates ? "yes" : "no"}   CodePush: ${p.codePush ? "yes" : "no"}\n`);
   if (!steps.length) { console.log("Nothing to change: this app is already set up for Shipvo."); }
   else {
     console.log("Plan:");
@@ -167,7 +191,7 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   }
   if (printLines && newSeed) console.log(`\n(The public key below is new and is only written when you apply the plan. Do not paste it before then.)`);
   if (printLines) console.log(`\n${p.configFile} is code, so I will not rewrite it. Add this to its "plugins" list:\n\n  ["@shipvo/runtime", ${JSON.stringify(pluginProps)}],\n`);
-  console.log("\nI will not touch ios/ or android/, and I will not overwrite any file.");
+  console.log(bare ? "\nI only add or update the Shipvo keys in AndroidManifest.xml and Info.plist, and I will not overwrite any other file." : "\nI will not touch ios/ or android/, and I will not overwrite any file.");
   if (dry) { console.log("\n--dry-run: nothing was changed."); return; }
   if (!steps.length) return;
   if (!yes && !(await deps.confirm("\nApply this plan? [y/N] "))) { console.log("Nothing was changed."); return; }
@@ -186,14 +210,11 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
     console.log("\nshipvo doctor:");
     for (const r of await runDoctorChecks({ cwd: dir })) console.log(r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`);
   }
+  if (bare) { console.log(`\n${adoptNextSteps()}`); return; }
   console.log(`\nNext steps:
   1. Rebuild the native app once so the runtime is in the shell: npx expo prebuild, then npx expo run:android (or run:ios)
   2. npx shipvo publish --dry-run   # see what a release would contain`);
 }
-
-const bareNote = () => `shipvo: this looks like a bare React Native app (ios/ and android/ are committed, no Expo config plugins).
-Bare support will add the native config for the runtime and check that Expo modules are present. It is not available yet (see issue #201), so I changed nothing.
-If this is an Expo managed app, add any config plugin to app.json (or app.config.*), or remove the ios/ and android/ folders, and run this again.`;
 
 const isPublicKey = (k: string) => /^[A-Za-z0-9+/]+={0,2}$/.test(k) && Buffer.from(k, "base64").length === 32;
 
