@@ -120,7 +120,7 @@ export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/releas
     w("App.tsx", SHOP_APP_TSX(name));
     w("src/cart.tsx", SHOP_CART_STATE);
     w("src/money.ts", SHOP_MONEY);
-    w("src/data/shop.json", SHOP_CONFIG);
+    w("src/data/shop.json", SHOP_CONFIG(name));
     w("src/screens/List.tsx", SHOP_LIST);
     w("src/screens/Detail.tsx", SHOP_DETAIL);
     w("src/screens/Cart.tsx", SHOP_CART);
@@ -483,7 +483,7 @@ const SHOP_DATA = JSON.stringify([
   { id: "steel-bottle", name: "Steel bottle", price: 2900, description: "A one litre bottle with a screw cap." },
 ], null, 2) + "\n";
 
-const SHOP_CONFIG = JSON.stringify({ currency: "$", code: "USD", position: "before", decimals: 2, locale: "en-US" }, null, 2) + "\n";
+const SHOP_CONFIG = (name: string) => JSON.stringify({ name, currency: "$", code: "USD", position: "before", decimals: 2, locale: "en-US" }, null, 2) + "\n";
 
 const SHOP_MONEY = `// Prices are whole minor units (cents) in src/data/products.json. This is the one place that turns them into text.
 // To change the currency, edit src/data/shop.json. "code" is the ISO 4217 code sent to the payment provider ("$" is only a symbol). For FCFA: { "currency": "FCFA", "code": "XAF", "position": "after", "decimals": 0, "locale": "fr-FR" }
@@ -497,6 +497,9 @@ export const formatPrice = (minor: number) => {
   const num = n.replace(/[\u00a0\u202f]/g, " ");
   return position === "after" ? num + " " + currency : currency + num;
 };
+
+// The payee shown on the payment sheet and the receipt. It is "name" in shop.json.
+export const shopName = (shop as { name?: string }).name ?? "Shop";
 
 // What device.pay.charge takes: "amount" is in whole currency units (10710 for 10710 FCFA, 12.5 for $12.50), as in the device docs.
 // Prices are minor units, so divide by 10 ** decimals. "currency" is the ISO code from shop.json.
@@ -542,6 +545,15 @@ import products from "./src/data/products.json";
 
 type Route = { name: "list" } | { name: "detail"; id: string } | { name: "cart" };
 
+// Send a placed order to the backend. The simulator records it, so end_session lists it. Add your own backend call here.
+async function sendOrder(order: Record<string, unknown>) {
+  try {
+    const st = Runtime.getState();
+    if (!st?.baseUrl) return;
+    await fetch(st.baseUrl + "/o/" + st.appId, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ order, release: st.runningRelease ?? 0 }) });
+  } catch {}
+}
+
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: "list" });
   // Tell the runtime the first screen rendered, so this release is kept.
@@ -564,7 +576,7 @@ export default function App() {
     <CartProvider>
       <View style={s.root}>
         <StatusBar style="dark" />
-        {route.name === "cart" ? <Cart onBack={toList} />
+        {route.name === "cart" ? <Cart onBack={toList} onOrder={sendOrder} />
           : product ? <Detail product={product} onBack={toList} onCart={toCart} />
           : <List title="${name}" products={products} onOpen={(id) => setRoute({ name: "detail", id })} onCart={toCart} />}
       </View>
@@ -644,10 +656,10 @@ const SHOP_CART = `import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { device } from "@shipvo/device";
 import { useCart } from "../cart";
-import { chargeRequest, formatPrice } from "../money";
+import { chargeRequest, formatPrice, shopName } from "../money";
 import products from "../data/products.json";
 
-export function Cart({ onBack }: { onBack: () => void }) {
+export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order: Record<string, unknown>) => void | Promise<void> }) {
   const { lines, remove, clear, totalCents } = useCart();
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -657,8 +669,13 @@ export function Cart({ onBack }: { onBack: () => void }) {
     setBusy(true);
     setStatus("Paying...");
     try {
-      const r = await device.pay.charge({ provider: "mobile_money", ...chargeRequest(totalCents), to: "My Shop", reference: "order-" + Date.now() }, "1234");
-      if (r.ok) { clear(); setStatus("Order placed"); } else setStatus("Payment failed: " + r.reason);
+      const reference = "order-" + Date.now();
+      const r = await device.pay.charge({ provider: "mobile_money", ...chargeRequest(totalCents), to: shopName, reference }, "1234");
+      if (r.ok) {
+        // Only a paid order is sent to the backend.
+        await onOrder?.({ id: reference, total: totalCents, payment: "mobile_money", receipt: r.receipt, lines: lines.map((l) => ({ product_id: l.id, quantity: l.qty })) });
+        clear(); setStatus("Order placed");
+      } else setStatus("Payment failed: " + r.reason);
     } catch (e: any) { setStatus("Payment failed: " + String(e?.message ?? e)); }
     finally { setBusy(false); }
   };

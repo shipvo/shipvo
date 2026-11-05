@@ -7,7 +7,7 @@ import { spawnSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { generateKeyPairSync } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { table } from "./measure.mjs";
+import { table, applyRow } from "./measure.mjs";
 
 const script = fileURLToPath(new URL("./measure.mjs", import.meta.url));
 const fake = (body) => {
@@ -354,6 +354,40 @@ test("--control-log: a successful publish does not print the log", async () => {
   } finally { s.close(); }
 });
 
+test("applyRow maps the emulator figure and drops missing values", () => {
+  assert.deepEqual(applyRow({ firstRun: { publishToHealthyMs: 4200.4, downloadMs: 800 } }), { step: "publish to healthy (full-bundle update scenario, emulator)", ms: 4200, exit: 0, downloadMs: 800 });
+  assert.equal(applyRow({ firstRun: { publishToHealthyMs: 0 } }), null);
+  assert.equal(applyRow({}), null);
+});
+
+const OK_CLI = `import {mkdirSync} from "node:fs"; if (process.argv[2]==="init") mkdirSync(process.argv[3],{recursive:true});`;
+const withReport = (path) => { const f = fake(OK_CLI); const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--apply-report", path], { encoding: "utf8" }); return { f, r }; };
+
+test("--apply-report appends the emulator row after total, outside the total", () => {
+  const rep = join(mkdtempSync(join(tmpdir(), "rep-")), "report.json");
+  writeFileSync(rep, JSON.stringify({ firstRun: { publishToHealthyMs: 4200, downloadMs: 800, applyMs: 150 } }));
+  const { f, r } = withReport(rep);
+  assert.equal(r.status, 0, r.stderr);
+  const j = JSON.parse(readFileSync(f.out, "utf8"));
+  assert.deepEqual(j.slice(-2).map((x) => x.step), ["total", "publish to healthy (full-bundle update scenario, emulator)"]);
+  assert.deepEqual(j.at(-1), { step: "publish to healthy (full-bundle update scenario, emulator)", ms: 4200, exit: 0, downloadMs: 800, applyMs: 150 });
+  assert.ok(j.find((x) => x.step === "total").ms < 4200);
+  assert.match(r.stdout, /publish to healthy \(full-bundle update scenario, emulator\): 4\.20 s/);
+});
+
+test("--apply-report with a missing or invalid file says why on stderr and prints not measured", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rep-"));
+  const bad = join(dir, "bad.json"); writeFileSync(bad, "{nope");
+  for (const [path, why] of [[join(dir, "missing.json"), /file not found/], [bad, /JSON/i]]) {
+    const { f, r } = withReport(path);
+    assert.equal(r.status, 0);
+    assert.match(r.stderr, new RegExp("--apply-report .*" + path.split("/").pop()));
+    assert.match(r.stderr, why);
+    assert.match(r.stdout, /publish to healthy \(full-bundle update scenario, emulator\): not measured/);
+    assert.equal(JSON.parse(readFileSync(f.out, "utf8")).at(-1).step, "total");
+  }
+});
+
 test("--control-url: a tampered bundle fails the bundle step with a clear message", async () => {
   const s = await stub({ tamper: true }); const f = fakeCp();
   try {
@@ -380,4 +414,13 @@ test("bundleStep: same size but a different hash fails on sha256", async () => {
     assert.equal(r.exit, 1);
     assert.match(r.stderr, /has sha256 .*, the signed pointer says/);
   } finally { srv.close(); }
+});
+
+test("--apply-report with a valid report but no firstRun timing says why on stderr", () => {
+  const rep = join(mkdtempSync(join(tmpdir(), "rep-")), "report.json");
+  writeFileSync(rep, JSON.stringify({ firstRun: null }));
+  const { r } = withReport(rep);
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /no firstRun timing/);
+  assert.match(r.stdout, /not measured/);
 });

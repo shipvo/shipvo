@@ -23,7 +23,7 @@ jobs:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
       REPO: ${{ github.repository }}
       WANT: ${{ github.event.issue.number || inputs.issue || '' }}
-      MAX_ACTIVE: 6   # Claude does nearly all code work now (Mistral and Aider: docs and tests only)
+      MAX_ACTIVE: 10   # Claude does nearly all code work now (Mistral and Aider: docs and tests only)
     steps:
       - id: pick
         run: |
@@ -67,6 +67,7 @@ jobs:
     uses: ./.github/workflows/_agent-claude.yml
     secrets: inherit
     with:
+      upload_media: true   # PR screenshots: /tmp/agent/media/pr-shots/** -> https://shipvo.dev/media/pr-shots/**
       role: engineer
       mode: branch
       branch: agent/claude/issue-${{ needs.pick.outputs.issue }}-${{ github.run_number }}

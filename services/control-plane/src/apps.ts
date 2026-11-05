@@ -3,9 +3,9 @@
 // that app's own key prefixes, with every release pointer verified against the app's registered public key. The private
 // signing key never leaves the developer's machine or CI.
 import { Hono } from "hono";
-import { ReleasePointerBody } from "@shipvo/schema";
+import { BAND_PERCENT, ReleasePointerBody, checkPolicy } from "@shipvo/schema";
 import { recordAudit } from "./audit";
-import { checkReleasePolicy, loadReleasePolicy } from "./owner";
+import { loadReleasePolicy } from "./owner";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; OWNER_TOKEN?: string };
 export const apps = new Hono<{ Bindings: Env }>();
@@ -212,21 +212,53 @@ async function auditPublish(db: any, id: string, key: string, buf: ArrayBuffer, 
   } catch { console.warn(`audit write failed: app=${id} action=publish`); }
 }
 
+/** Server-side record of when a b0/b1 pointer for a release was accepted. Publishers cannot write the `s/` prefix. */
+const stageKey = (id: string, release: number, band: string) => `s/${id}/${release}/${band}`;
+
+/** Hours the same release has sat on a narrower band that reaches at least `percent` of devices (longest wins), or null if it has not.
+ *  The time is the server clock when the pointer was accepted, never the `issued_at` the publisher signed. */
+async function hoursStaged(kv: KVNamespace, id: string, release: number, percent: number, now: Date): Promise<number | null> {
+  let best: number | null = null;
+  for (const band of ["b0", "b1"] as const) {
+    if (BAND_PERCENT[band] < percent) continue;
+    try {
+      const t = Number(await kv.get(stageKey(id, release, band)));
+      if (Number.isFinite(t) && t > 0) best = Math.max(best ?? 0, (now.getTime() - t) / 3600_000);
+    } catch { /* unreadable record: not staged */ }
+  }
+  return best;
+}
+
 /**
- * Enforces the stored release policy (maxBand, agentMaxBand) on one release pointer. Returns the refusal, or null.
+ * Enforces the stored release policy on one release pointer: maxBand, agentMaxBand, blockedWeekdays (UTC unless the policy has a timeZone)
+ * and requireStageBeforeFull. The shared `checkPolicy` from @shipvo/schema does the checking, as in the CLI. Returns the refusal, or null.
  * The caller counts as an agent when it sends `x-shipvo-actor: agent` (the CLI does when SHIPVO_ACTOR=agent).
  * A refused publish writes one audit row. Never throws on the audit write.
  */
 async function policyRefusal(c: any, id: string, buf: ArrayBuffer, key: string) {
   const body = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body); // pointerProblem already parsed it
   const agent = (c.req.header("x-shipvo-actor") ?? "").trim().toLowerCase() === "agent";
-  const verdict = checkReleasePolicy(await loadReleasePolicy({ kv: c.env.POINTERS, appId: id }), body.band, agent);
+  const policy = await loadReleasePolicy({ kv: c.env.POINTERS, appId: id });
+  const at = new Date();
+  let hoursAtStage: number | null | undefined;
+  if (policy.requireStageBeforeFull && body.band === "b2") hoursAtStage = await hoursStaged(c.env.POINTERS, id, body.release, policy.requireStageBeforeFull.percent, at);
+  const verdict = checkPolicy(policy, { band: body.band, actorKind: agent ? "agent" : "human", now: at, defaultTimeZone: "UTC", hoursAtStage });
   if (verdict.ok) return null;
   await recordAudit(c.env.DB, {
     app_id: id, actor: agent ? "agent (publish token)" : id, actor_kind: agent ? "agent" : "person", action: "publish", release: body.release, release_id: key,
     after: JSON.stringify({ refused: true, rule: verdict.rule, band: body.band, platform: body.platform ?? "android", release: body.release }),
   });
   return verdict;
+}
+
+/** Remembers (server time, first acceptance wins) when a b0/b1 pointer was stored, for requireStageBeforeFull. */
+async function recordStaged(kv: KVNamespace, id: string, buf: ArrayBuffer) {
+  try {
+    const b = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body);
+    if (b.band !== "b0" && b.band !== "b1") return;
+    const k = stageKey(id, b.release, b.band);
+    if (!(await kv.get(k))) await kv.put(k, String(Date.now()));
+  } catch { console.warn(`stage record failed: app=${id}`); }
 }
 
 apps.put("/:id/kv/*", async (c) => {
@@ -241,6 +273,7 @@ apps.put("/:id/kv/*", async (c) => {
   let prev: string | null = null;
   if (isPtr) { try { prev = (await c.env.POINTERS.get(k)) ?? null; } catch { /* before is optional */ } }
   await c.env.POINTERS.put(k, buf);
+  if (isPtr) await recordStaged(c.env.POINTERS, id, buf);
   if (isPtr) await auditPublish(c.env.DB, id, k, buf, prev);
   await c.env.DB.prepare("UPDATE apps SET bytes_used = bytes_used + ? WHERE app_id = ?").bind(buf.byteLength, id).run();
   if (k === `w/${id}/releases`) { try { const idx = JSON.parse(new TextDecoder().decode(buf)); if (Number.isInteger(idx.latest)) await c.env.DB.prepare("UPDATE apps SET latest_release = ?, published_at = ? WHERE app_id = ?").bind(idx.latest, now(), id).run(); } catch {} }

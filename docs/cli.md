@@ -124,7 +124,8 @@ shipvo publish --dry-run-policy --bands b0,b1,b2
 | --- | --- |
 | `maxBand` | Widest band any publish may reach: `b0`, `b1` or `b2`. The widest band in `--bands` counts. |
 | `agentMaxBand` | Same, for a publish run by an agent. Set `SHIPVO_ACTOR=agent` in the agent's environment. Without it the publish counts as human. |
-| `blockedWeekdays` | Days with no publish: `mon` to `sun`, in local time. |
+| `blockedWeekdays` | Days with no publish: `mon` to `sun`, in the policy's time zone (see `timeZone`). |
+| `timeZone` | IANA name such as `Europe/Paris`. Sets the zone for `blockedWeekdays` and `blockedAfterHour`. Without it the CLI uses the machine's local time and the control plane uses UTC. |
 | `blockedAfterHour` | Hour 0-23, local time. Publishes on `blockedWeekdays` are refused from this hour on (12 means from 12:00). Without it, the whole day is blocked. Needs `blockedWeekdays`. |
 
 Without a `policy` section nothing is checked. A bad section (unknown field, wrong value) stops the dry run and names the field, for example `policy.maxBand`.
@@ -159,3 +160,42 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 - CSV has a header row, every field in double quotes, and columns in this order: `id`, `app_id`, `at`, `actor`, `actor_kind`, `action`, `release`, `release_id`, `before`, `after`. Objects are written as JSON text.
 - A value that starts with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet does not run it as a formula.
 - It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. A non-2xx answer prints the status and exits 1. The token is never printed.
+
+## shipvo run
+
+`shipvo run android` or `shipvo run ios` builds the web export with the simulated device (the same build as `shipvo sim`), serves it on a local port and opens your default browser at a phone frame page. It does not use Playwright.
+
+- Android frame: 412x915, status bar, punch-hole camera, gesture bar. A "Show Android system sheet" button (or a `postMessage` of `{ type: "shipvo:system-sheet" }` from the app, `open: false` to close) opens an overlay with Android permission wording.
+- iOS frame: 393x852, Dynamic Island, home indicator. A "Show iOS system sheet" button or the same `postMessage` opens an overlay with iOS permission wording.
+- Reloading on a client-side route under `/app/` (no file extension) serves the app shell.
+- The page shows a "Simulated" label and scales the phone to fit the window.
+- `--no-open` prints the URL and does not open a browser. `--port <n>` picks the port (default: any free port).
+- `--native` runs `npx expo run:android` or `npx expo run:ios` instead and says so.
+- If the app cannot build for web, the command exits with code 1 and names the module or file that failed.
+- Ctrl+C stops the server.
+
+## `shipvo promote`
+
+Widens a staged release to more bands. It reads a test report and refuses to widen a release whose flows failed.
+
+```bash
+shipvo test flows/ --release 3 --report shipvo-test-report.json
+shipvo promote                         # reads shipvo-test-report.json if it exists
+shipvo promote --report out/report.json
+shipvo promote --force                 # promote anyway; prints that it overrode a failing report
+```
+
+- A report whose `release` matches the release being promoted and has any failed flow stops promote with a non-zero exit. The message lists the failing flows. `--dry-run` stops the same way.
+- A report for a different release is stale. Promote prints a warning and goes on.
+- With no report file, promote behaves as before.
+
+## First run of the simulator
+
+`shipvo sim`, `shipvo explore`, `shipvo test` and `shipvo store screenshots` check the browser setup before they start:
+
+1. If `playwright` is not installed, the CLI installs it as a dev dependency with your package manager (pnpm, yarn, bun or npm, chosen from the lockfile).
+2. The simulator uses system Chrome or Edge when it finds one. Otherwise it uses Playwright's Chromium, and downloads it once with `npx playwright install chromium` if it is missing.
+
+`shipvo doctor` shows which browser it found. With no Chrome, Edge or Chromium it still passes, and notes that the first run downloads Chromium once.
+
+Set `SHIPVO_NO_AUTO_INSTALL=1` to turn both installs off. The command then stops and prints what to run yourself, and `shipvo doctor` fails the browser check when nothing is installed.

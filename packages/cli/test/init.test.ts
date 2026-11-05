@@ -136,6 +136,21 @@ it("--template shop writes list, detail, cart, five products and a test that rea
   expect(readFileSync(join(dir, "App.tsx"), "utf8")).toContain("markHealthy");
 });
 
+it("--template shop posts a paid order to the backend the simulator records, and only then", async () => {
+  const dir = join(tmp, "store-orders");
+  await init([dir, "--template", "shop", "--public-key", "AAAA"]);
+  const app = readFileSync(join(dir, "App.tsx"), "utf8");
+  expect(app).toContain('"/o/" + st.appId');
+  expect(app).toContain("onOrder={sendOrder}");
+  const cart = readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8");
+  const paid = cart.indexOf("if (r.ok) {");
+  const send = cart.indexOf("await onOrder?.(");
+  const placed = cart.indexOf('setStatus("Order placed")');
+  expect(paid).toBeGreaterThan(-1);
+  expect(send).toBeGreaterThan(paid);
+  expect(placed).toBeGreaterThan(send);
+});
+
 it("--template shop shows prices in the currency set in src/data/shop.json", async () => {
   const dir = join(tmp, "store-fcfa");
   await init([dir, "--template", "shop", "--public-key", "AAAA"]);
@@ -150,6 +165,18 @@ it("--template shop shows prices in the currency set in src/data/shop.json", asy
   expect(fcfa.formatPrice(6500)).toBe("6 500 FCFA");
   for (const f of ["List", "Detail", "Cart"])
     expect(readFileSync(join(dir, `src/screens/${f}.tsx`), "utf8")).toContain("formatPrice(");
+});
+
+it("--template shop sends the payment to the shop name given with --name", async () => {
+  const dir = join(tmp, "named-shop");
+  await init([dir, "--template", "shop", "--name", "Sandbar Shop", "--public-key", "AAAA"]);
+  rmSync(join(dir, "tsconfig.json"));
+  expect(JSON.parse(readFileSync(join(dir, "src/data/shop.json"), "utf8")).name).toBe("Sandbar Shop");
+  const cart = readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8");
+  expect(cart).toContain("to: shopName");
+  expect(cart).not.toContain('to: "My Shop"');
+  const { shopName } = await import(join(dir, "src/money.ts"));
+  expect(shopName).toBe("Sandbar Shop");
 });
 
 it("the default and --template blank write the same files as before", async () => {
