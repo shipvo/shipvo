@@ -4,6 +4,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **@shipvo/cli**: `shipvo doctor` has two new checks. It fails when the signing key file is readable by group or others (skipped on Windows, and when the seed comes from an environment variable), and when `<controlPlane>/health` does not answer HTTP 200 with JSON (5 second timeout). Each failure prints a one-line fix. Migration: none; `shipvo doctor` can now exit non-zero for setups that passed before.
 - **@shipvo/runtime**: Android and iOS shells now refuse a release whose `hermes_bytecode_version` differs from the Hermes bytecode version of the shell's embedded bundle. The release is discarded and the current release keeps running. `consumeEvents()` returns `hermes_bytecode_mismatch:<release>:release=<n>:shell=<m>`, and `checkForUpdate` returns `{ status: "none", reason: "hermes_bytecode_mismatch" }`. A missing field on the release, or an embedded bundle that is not Hermes bytecode, means the release is applied as before. This runs in addition to the signature and hash checks. Migration: none; `CheckResult` gains an optional `reason`.
 
 ## 2026-11-04 (release)
