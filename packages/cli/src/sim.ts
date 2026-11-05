@@ -16,7 +16,7 @@ export function portFree(port: number): Promise<boolean> {
 }
 
 /** Resolves true once something accepts connections on the port, false if `stop` says to give up. */
-function waitListening(port: number, stop: () => boolean): Promise<boolean> {
+export function waitListening(port: number, stop: () => boolean): Promise<boolean> {
   return new Promise((resolve) => {
     const tryOnce = () => {
       if (stop()) return resolve(false);
