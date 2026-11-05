@@ -1,0 +1,2 @@
+- docs: `docs/testing.md` has a "Gate a rollout on tests" CI recipe (sim, test --report, publish to the first cohort), and a test checks its commands and flags against the CLI help.
+- Migration: none.

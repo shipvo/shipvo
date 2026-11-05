@@ -174,3 +174,23 @@ Writes one JSON file, whether the run passes or fails. The exit code is the same
 - Each flow is one `.steps` file. `status` is `passed` or `failed`. `failedStep` and `message` are `null` when it passed.
 - `parityLimits` is the same list the explore report prints.
 - The file holds no keys or tokens.
+
+## Gate a rollout on tests
+
+One CI job: build, test, publish to the first cohort. Each step stops the job if it fails, so a failing flow never reaches a phone.
+
+```bash
+# gate-recipe:start
+npx shipvo sim --port 4545 > sim.log 2>&1 &
+npx shipvo test --report shipvo-report.json
+npx shipvo publish --bands b0
+# gate-recipe:end
+```
+
+1. `shipvo sim` builds the app and serves it in the simulator. Wait for `localhost:4545/app/` before the next line, as in the workflow above.
+2. `shipvo test --report` runs every flow and writes the results file, pass or fail. A failing flow gives a non-zero exit, so the job stops here.
+3. `shipvo publish --bands b0` builds, signs and publishes to the first cohort only.
+
+Not in this recipe yet: the `promote` step that reads the report and refuses to widen when a flow failed. That needs #486. Until it lands, run `shipvo promote --to b1,b2` by hand after you check `shipvo status`.
+
+A drift test (`packages/cli/test/docs-gate-recipe.test.ts`) checks that every command and flag in the block above appears in `shipvo` help.
