@@ -6,6 +6,20 @@
   if(tog){var lab=tog.querySelector('span');function setOpen(o){side.classList.toggle('open',o);tog.setAttribute('aria-expanded',o);lab.textContent=o?'Close docs menu':'Docs menu'}
     tog.addEventListener('click',function(){setOpen(!side.classList.contains('open'))});
     document.addEventListener('keydown',function(e){if(e.key==='Escape'&&side.classList.contains('open')){setOpen(false);tog.focus()}})}
+  // video: play button on the poster, and hide the Docs menu button in fullscreen
+  var fsEl=function(){return document.fullscreenElement||document.webkitFullscreenElement};
+  function fsSync(){document.body.classList.toggle('vid-fs',!!(fsEl()&&fsEl().tagName==='VIDEO'))}
+  document.addEventListener('fullscreenchange',fsSync);document.addEventListener('webkitfullscreenchange',fsSync);
+  document.querySelectorAll('.prose video[poster]').forEach(function(v){
+    var wrap=document.createElement('div');wrap.className='vid';v.parentNode.insertBefore(wrap,v);wrap.appendChild(v);
+    v.addEventListener('webkitbeginfullscreen',function(){document.body.classList.add('vid-fs')});
+    v.addEventListener('webkitendfullscreen',function(){document.body.classList.remove('vid-fs')});
+    var b=document.createElement('button');b.type='button';b.className='vid-play';
+    b.setAttribute('aria-label','Play: '+(v.getAttribute('data-title')||'video')+(v.getAttribute('data-length')?' ('+v.getAttribute('data-length')+')':''));
+    b.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 3.5v17l14-8.5z"/></svg>';
+    b.addEventListener('click',function(){v.play();v.focus()});
+    v.addEventListener('play',function(){wrap.classList.add('played')});
+    wrap.appendChild(b)});
   // active heading in the outline
   var links=[].slice.call(document.querySelectorAll('.toc a')),hs=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))}).filter(Boolean);
   if(hs.length&&'IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){links.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id)})}})},{rootMargin:'-70px 0px -70% 0px'});hs.forEach(function(h){io.observe(h)})}

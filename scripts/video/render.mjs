@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Render a video script (scripts/<slug>.json) to MP4 + VTT + poster.
+// Render a video script (scripts/<slug>.json) to MP4 + VTT + poster (PNG).
 // Usage: node render.mjs <slug> --vo vo.wav --manifest vo.json --out outdir [--fps 15] [--only-frames t1,t2,...]
 // Needs: ffmpeg, a Chromium (CHROME_PATH, default /usr/bin/chromium), and playwright-core (PW_DIR = a folder with node_modules/playwright-core).
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -28,6 +28,8 @@ const plan = buildPlan(script, man);
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, slug + ".vtt"), vtt(plan));
 
+// Phones put the player controls over the bottom of the poster, so keep text above 70% of the height.
+export const POSTER_CSS = "#cap,#bar{display:none!important}.scene .abs.mute{top:430px!important}";
 const fill = (h) => h.replace(/\{\{SYMBOL:(#[0-9A-Fa-f]+)\}\}/g, (_, c) => symbol(c).replace(/width="\d+" height="\d+"/, 'width="100%"')).replace("{{MARK}}", mark("deck").replace(/width="512" height="512"/, 'width="100%"'));
 const body = script.scenes.map((s) => `<section class="scene" id="s-${s.id}">${fill(SCENES[s.visual]())}<svg class="logo" viewBox="0 0 10 10" style="display:none"></svg></section>`).join("\n");
 const html = readFileSync(join(here, "deck.html"), "utf8").replace("{{SCENES}}", body);
@@ -62,7 +64,7 @@ for (let k = 0; k < n; k++) {
 ff.stdin.end(); await done;
 const poster = plan.scenes[0].start + (script.posterAt ?? 6);
 await page.evaluate((t) => window.seek(t), poster);
-await page.screenshot({ path: join(out, ".poster.png") });
+await page.addStyleTag({ content: POSTER_CSS });   // no burned-in caption; text stays in the top 70%
+await page.screenshot({ path: join(out, slug + ".png") });
 await browser.close();
-execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", join(out, ".poster.png"), "-vf", "scale=960:-1", "-q:v", "6", join(out, slug + ".jpg")]);
 console.log(`wrote ${mp4} (${plan.total.toFixed(1)}s)`);
