@@ -415,7 +415,8 @@ footer.old{display:none}
 main p a:not(.btn):not(.card){text-decoration:underline;text-underline-offset:2px}
 
 .lede-more{font-size:16px;color:var(--dim);line-height:1.5;max-width:58ch;margin:12px 0 0}
-.lede-more a,.hero .facts a{display:inline-flex;align-items:center;min-height:44px;color:var(--sky-text);text-decoration:underline;text-underline-offset:3px}
+.hero .facts a{display:inline-flex;align-items:center;min-height:44px}
+.lede-more a,.hero .facts a{color:var(--sky-text);text-decoration:underline;text-underline-offset:3px}
 .lede-more a:hover,.hero .facts a:hover{color:var(--paper)}
 .lede-more a:focus-visible,.hero .facts a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
 

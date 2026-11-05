@@ -1,5 +1,5 @@
 // Issue #458. Every standalone link, button and <summary> on every sitemap page is at least 44x44 px
-// at 390x844 and 768x1024, and the page does not scroll sideways. Exempt: links inside p, td and pre, and links inside li outside nav, header and footer.
+// at 390x844 and 768x1024, and the page does not scroll sideways. Exempt: links inside p, td and pre, and links inside an li that also holds other text (prose), all outside nav, header and footer.
 // Uses Chromium over CDP (no extra dependency). Skipped with a note when no Chromium is found, unless CI=true.
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
@@ -36,8 +36,7 @@ const done = (c) => { chrome.kill(); server.close(); process.exit(c); };
 const probe = `(() => {
   const bad = [];
   for (const el of document.querySelectorAll('a[href], button, summary, [role=button]')) {
-    if (el.closest('p, li, td, pre') && el.matches('a') && !el.closest('nav, header, footer, .mobile-menu')) continue;
-    if (el.matches('a') && el.closest('p, td, pre')) continue;
+    if (el.matches('a') && (el.closest('p, td, pre') || (el.closest('li') && el.closest('li').textContent.trim() !== el.textContent.trim())) && !el.closest('nav, header, footer, .mobile-menu')) continue;
     if (el.matches('a.anchor') && el.closest('h1,h2,h3,h4,h5,h6')) continue; // heading permalinks sit inside the heading
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none' || el.closest('[hidden]') || el.closest('.skip') === el || el.classList.contains('skip')) continue;

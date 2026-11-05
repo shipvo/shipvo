@@ -41,6 +41,7 @@
 .prose ul,.prose ol{padding-left:24px;margin:0 0 14px}
 .prose li{margin:4px 0}
 .prose li>p{margin:0}
+.prose li>a:only-child{display:inline-flex;align-items:center;min-height:44px}
 .prose code{background:var(--ink-3);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:.88em;color:var(--code-inline)}
 .prose :not(pre)>code{overflow-wrap:anywhere}
 .prose strong{color:var(--paper)}
