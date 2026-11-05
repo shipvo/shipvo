@@ -2,7 +2,7 @@
 
 You will create a small shop app, open it on a simulated phone in your web browser, change the words on its front page, and check what a release would contain. You need no phone, no Android Studio and no Xcode, and you do not need to know how to code. You will copy and paste about ten short commands.
 
-**Level:** beginner. **Time:** the commands run in about a minute on our test machine (see "What we measured" at the end). Set aside an unhurried hour your first time, in case you need to install Node.
+**Level:** beginner. **Time:** the commands run in about a minute on our test machine (see "What we measured" at the end). Reading and editing take longer the first time, and installing Node adds more.
 
 Words in this page that may be new are explained once, and collected in the [glossary](../glossary.md).
 

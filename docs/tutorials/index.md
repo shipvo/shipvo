@@ -6,7 +6,7 @@ Step-by-step tutorials for people who have never used a terminal. Each one ends 
 
 | Tutorial | You will | Time | Level |
 | --- | --- | --- | --- |
-| [Create your first app](first-app.md) | Create an app, open it on a simulated phone, change its words and check a release | about an hour, the first time | Beginner |
+| [Create your first app](first-app.md) | Create an app, open it on a simulated phone, change its words and check a release | a few minutes of commands, plus reading | Beginner |
 
 ## Sell
 
