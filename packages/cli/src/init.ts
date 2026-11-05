@@ -77,18 +77,21 @@ export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/releas
   console.log(`
 Created ${name} in ${dirArg}
 
-  cd ${dirArg}
-  npm install                 # or pnpm / bun
-  npx playwright install chromium
-  npm run sim                 # the app in the simulator on http://localhost:4545
-  npx -y @shipvo/mcp          # point Claude / Cursor / ChatGPT at it and open_app("${appId}")
+${seedNote}
+Public key pinned in the shell: ${publicKey}
 
 Phones:  npx expo run:android   (needs Android Studio once). iOS: npx expo run:ios, then shipvo publish --platform all
 Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and SHIPVO_KV_ID (self-hosted); then npm run publish
          (self-hosting instead? see docs/self-hosting.md)
+AI agents: npx -y @shipvo/mcp points Claude / Cursor / ChatGPT at the simulator; then open_app("${appId}")
 
-${seedNote}
-Public key pinned in the shell: ${publicKey}
+Install first: npm install (or pnpm / bun), then npx playwright install chromium
+
+Next steps:
+  1. cd ${dirArg}
+  2. npx shipvo doctor             # setup checks
+  3. npm run sim                   # open the app in the simulator on http://localhost:4545
+  4. npx shipvo publish --dry-run  # see what a release would contain
 `);
 }
 
