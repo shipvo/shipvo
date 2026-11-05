@@ -228,3 +228,9 @@ export function adoptNextSteps(): string {
     "  3. shipvo publish --dry-run",
   ].join("\n");
 }
+
+/** True when writeIosConfig would change the file. Reads only. */
+export function iosConfigChanged(infoPlistPath: string, values: IosConfigValues): boolean {
+  const dict = plist.parse(readFileSync(infoPlistPath, "utf8")) as Record<string, plist.PlistValue>;
+  return !Object.entries(iosPlistEntries(values)).every(([k, v]) => dict[k] === v);
+}

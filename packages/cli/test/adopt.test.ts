@@ -98,11 +98,12 @@ it("refuses a folder without Expo", async () => {
   expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("not an Expo app");
 });
 
-it("stops on a bare app and says bare support is coming", async () => {
+it("stops on a bare app with no native config files, and changes nothing", async () => {
   w("package.json", pkg()); w("app.json", JSON.stringify({ expo: { slug: "x" } })); mkdirSync(join(tmp, "ios")); mkdirSync(join(tmp, "android"));
+  const before = snapshot();
   await expect(adopt(["--yes"], tmp, noop)).rejects.toThrow("exit 1");
-  expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("bare React Native");
-  expect(existsSync(join(tmp, "shipvo.json"))).toBe(false);
+  expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("AndroidManifest.xml");
+  expect(snapshot()).toEqual(before);
 });
 
 it("generated workflow is manual-only and honours [no-ota]", async () => {
@@ -137,7 +138,7 @@ it("fails with one line when app.json is not valid JSON", async () => {
   expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("app.json is not valid JSON");
 });
 
-it("the bare message says how to proceed if it is wrong", async () => {
+it("the bare failure says how to proceed if it is wrong", async () => {
   w("package.json", pkg()); w("app.json", JSON.stringify({ expo: { slug: "x" } })); mkdirSync(join(tmp, "ios")); mkdirSync(join(tmp, "android"));
   await expect(adopt(["--yes"], tmp, noop)).rejects.toThrow("exit 1");
   expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("remove the ios/ and android/ folders");
