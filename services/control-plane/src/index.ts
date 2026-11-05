@@ -4,6 +4,7 @@ import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort, checkNati
 import { adminPage, loginPage } from "./admin";
 import { describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
+import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps } from "./apps";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
@@ -121,6 +122,10 @@ app.post("/t", async (c) => {
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
     extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
+  if (REVERT_EVENTS.has(d.event)) {
+    const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
+    try { c.executionCtx.waitUntil(job); } catch { /* no execution context (tests, local): the job runs on its own */ }
+  }
   return c.json({ ok: true }, 202);
 });
 

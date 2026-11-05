@@ -47,6 +47,18 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 
 ## The hosted simulator (optional)
 
+### Revert alerts (webhook)
+
+An app owner can set one `https://` URL that is called when devices revert a release. With the owner token:
+
+```bash
+curl -X POST https://<your-worker>/app/<id>/api/command \
+  -H "authorization: Bearer $OWNER_TOKEN" -H "content-type: application/json" \
+  -d '{"name":"set_alert_webhook","args":{"url":"https://example.com/hooks/shipvo"}}'
+```
+
+Send an empty `url` to remove it. `http://` URLs and URLs with a user name or password are refused (`bad_webhook_url`). When a `rolled_back` or `crash_loop_revert` telemetry event arrives, the control plane sends one POST with `{"app":"tide","release":3,"event":"crash_loop_revert","time":"<ISO time>"}`. A release alerts at most once per hour. The call runs after the telemetry response, has a 5 second limit, is not retried, and a failure never affects telemetry. The payload holds no secrets, but the URL itself may, so the command answers with the host only. Apply migration `0014_alert_webhook.sql` first.
+
 `services/sim` is a second Worker that gives agents the simulator over HTTPS without a laptop: it checks an API key (D1 `api_keys`, created with the owner command `create_api_key`), starts or reuses an [E2B](https://e2b.dev) sandbox per key from the `shipvo-sim` template (`services/sim/Dockerfile`: Playwright + `@shipvo/sim` + `@shipvo/mcp --http`), and proxies `/mcp`. Deploy with the `deploy-sim` workflow; it needs `E2B_API_KEY`, `SIM_OWNER_TOKEN` and `SIM_SMOKE_KEY` secrets. A Cloudflare Containers backend is kept in `wrangler.containers.jsonc` for accounts with Workers Paid.
 
 ## Hermes bytecode version
