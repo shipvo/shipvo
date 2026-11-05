@@ -4,6 +4,8 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **@shipvo/runtime (iOS) and @shipvo/cli: the first iOS update can be a patch against the app's embedded bundle.** The iOS runtime hashes `main.jsbundle` and uses it as the patch base when the signed pointer lists a patch from that hash. The patch hash, the rebuilt bundle's size and hash are checked as before; any problem falls back to the full bundle. `shipvo publish --platform ios` builds a patch from each iOS shell base record under `base/<app>/` (records with `"platform": "ios"`; records without `platform` stay Android-only). Migration: none for apps; register an iOS shell's embedded bundle in KV the way `build-shell.yml` does for Android, with `platform: "ios"`.
+
 - **@shipvo/runtime**: Android and iOS shells now refuse a release whose `hermes_bytecode_version` differs from the Hermes bytecode version of the shell's embedded bundle. The release is discarded and the current release keeps running. `consumeEvents()` returns `hermes_bytecode_mismatch:<release>:release=<n>:shell=<m>`, and `checkForUpdate` returns `{ status: "none", reason: "hermes_bytecode_mismatch" }`. A missing field on the release, or an embedded bundle that is not Hermes bytecode, means the release is applied as before. This runs in addition to the signature and hash checks. Migration: none; `CheckResult` gains an optional `reason`.
 
 ## 2026-11-04 (release)
