@@ -1,0 +1,129 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:02.980
+Who tests your app before you ship it?
+
+2
+00:00:02.980 --> 00:00:05.460
+You can ask an A I assistant to do it.
+
+3
+00:00:05.460 --> 00:00:07.939
+It taps every button, like a customer.
+
+4
+00:00:07.939 --> 00:00:09.375
+And it needs no phone.
+
+5
+00:00:10.975 --> 00:00:11.591
+Step one.
+
+6
+00:00:11.591 --> 00:00:13.848
+Start your shop in the simulator.
+
+7
+00:00:13.848 --> 00:00:16.378
+Then give your assistant one setting.
+
+8
+00:00:16.378 --> 00:00:20.072
+It tells Claude, or Cursor, to start the Shipvo tools.
+
+9
+00:00:20.072 --> 00:00:21.850
+That plug is called MCP.
+
+10
+00:00:23.450 --> 00:00:24.015
+Step two.
+
+11
+00:00:24.015 --> 00:00:25.962
+Ask it to shop like a customer.
+
+12
+00:00:25.962 --> 00:00:26.779
+Buy the tote.
+
+13
+00:00:26.779 --> 00:00:29.354
+Make the payment fail, then make it work.
+
+14
+00:00:29.354 --> 00:00:33.750
+The assistant taps through the app and tells you what the screen said.
+
+15
+00:00:35.450 --> 00:00:36.167
+Step three.
+
+16
+00:00:36.167 --> 00:00:37.079
+Ask for proof.
+
+17
+00:00:37.079 --> 00:00:41.119
+The device log lists everything the app asked the phone to do.
+
+18
+00:00:41.119 --> 00:00:44.769
+In our run, the log showed the payment going to "My Shop".
+
+19
+00:00:44.769 --> 00:00:46.854
+But this shop is called Sandbar.
+
+20
+00:00:46.854 --> 00:00:49.200
+The assistant caught a real mistake.
+
+21
+00:00:50.800 --> 00:00:51.484
+Step four.
+
+22
+00:00:51.484 --> 00:00:53.192
+Turn its run into a test.
+
+23
+00:00:53.192 --> 00:00:55.858
+Ask for export test, and save the file.
+
+24
+00:00:55.858 --> 00:00:59.617
+Then write the words that should appear on each screen.
+
+25
+00:00:59.617 --> 00:01:02.625
+Now the check repeats by itself, in seconds.
+
+26
+00:01:04.225 --> 00:01:04.916
+Step five.
+
+27
+00:01:04.916 --> 00:01:06.022
+Make it a habit.
+
+28
+00:01:06.022 --> 00:01:09.064
+Run your tests, and then a practice release.
+
+29
+00:01:09.064 --> 00:01:11.276
+If a test fails, the line stops.
+
+30
+00:01:11.276 --> 00:01:13.350
+Nothing is sent to your users.
+
+31
+00:01:15.225 --> 00:01:18.986
+That is a safety check you can run before every release.
+
+32
+00:01:18.986 --> 00:01:24.225
+The full guide is at shipvo.dev/docs/test-with-an-assistant.

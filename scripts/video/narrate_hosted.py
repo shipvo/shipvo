@@ -12,7 +12,7 @@ def check(text, lang):
     with urllib.request.urlopen(f"{BASE}/check?{q}", timeout=60) as r:
         return json.load(r)
 
-def fetch(text, voice, speed, out, tries=3):
+def fetch(text, voice, speed, out, tries=6):
     q = urllib.parse.urlencode({"text": text, "voice": voice, "lang": lang_for(voice), "format": "wav", "speed": str(speed)})
     last = None
     for i in range(tries):
@@ -24,7 +24,7 @@ def fetch(text, voice, speed, out, tries=3):
             last = data[:200].decode(errors="replace")
         except Exception as e:
             last = str(e)
-        time.sleep(2 * (i + 1))
+        time.sleep(2 * (i + 1) * (5 if "429" in str(last) else 1))
     raise SystemExit(f"TTS failed after {tries} tries: {last}")
 
 def dur(path):

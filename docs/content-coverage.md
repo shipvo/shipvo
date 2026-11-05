@@ -10,8 +10,8 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 | Small patches (bsdiff) | [spike-results](spike-results.md) | | | [react-native-ota-update-size-bsdiff-patches](../blog/react-native-ota-update-size-bsdiff-patches.md) |
 | Staged rollout by cohort | [cli](cli.md) | | | [staged-rollouts](../blog/staged-rollouts.md) |
 | Rollback and crash-loop protection | [cli](cli.md) | | | [roll-back-a-bad-react-native-update](../blog/roll-back-a-bad-react-native-update.md) |
-| Agent simulator over MCP | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | [mcp-servers-for-mobile-app-testing](../blog/mcp-servers-for-mobile-app-testing.md) |
-| Test your app with Claude, ChatGPT or Cursor | [test-with-an-assistant](test-with-an-assistant.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | [your-assistant-can-test-your-app](../blog/your-assistant-can-test-your-app.md) |
+| Agent simulator over MCP | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [mcp-servers-for-mobile-app-testing](../blog/mcp-servers-for-mobile-app-testing.md) |
+| Test your app with Claude, ChatGPT or Cursor | [test-with-an-assistant](test-with-an-assistant.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [your-assistant-can-test-your-app](../blog/your-assistant-can-test-your-app.md) |
 | Typed tests (`@shipvo/test`) and `export_test` | [testing](testing.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | [the-bug-our-first-typed-test-found](../blog/the-bug-our-first-typed-test-found.md) |
 | `shipvo explore` (walk every button) | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | |
 | Measured simulator parity | [parity-results](parity-results.md) | | | |

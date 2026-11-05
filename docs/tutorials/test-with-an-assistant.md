@@ -1,5 +1,9 @@
 # Have an AI assistant test your shop before every release
 
+<video controls preload="metadata" playsinline tabindex="0" data-title="Have an AI assistant test your shop before every release" data-length="1 min 30 s" poster="/videos/test-with-an-assistant.jpg" src="/media/videos/test-with-an-assistant-e368a4d3.mp4"><track kind="captions" src="/videos/test-with-an-assistant.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
+
+Prefer to watch first? This 1 minute 30 second video covers the same steps. [Captions and transcript](../videos.md).
+
 You will connect an assistant (Claude, ChatGPT-style tools, Cursor) to a shop app on your computer, ask it to shop like a customer, check a declined payment and a good payment, turn what it did into a test that runs by itself, and run that test before a release. You need no phone and you do not write code.
 
 **Level:** beginner. **Time:** the commands run in about two minutes on our test machine, and the assistant's shopping run took 4 seconds (see "What we measured"). Allow 20 minutes the first time to set up the assistant. If you have not made an app yet, do [Make a shop with your own products](your-own-shop.md) first. This page starts from the shop it makes.

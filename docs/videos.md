@@ -2,6 +2,37 @@
 
 Short videos for people who are new to Shipvo. Each one has captions and a written transcript.
 
+## Test your app
+
+### Have an AI assistant test your shop before every release
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="Have an AI assistant test your shop before every release" data-length="1 min 30 s" poster="/videos/test-with-an-assistant.jpg" src="/media/videos/test-with-an-assistant-e368a4d3.mp4"><track kind="captions" src="/videos/test-with-an-assistant.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the transcript below.</video>
+
+1 minute 30 seconds. Connect an assistant such as Claude or Cursor to your shop in the simulator, ask it to shop like a customer, check what really happened with the device log, turn its run into a test and run that test before a release. It follows [Have an AI assistant test your shop](tutorials/test-with-an-assistant.md).
+
+[Captions (.vtt)](/videos/test-with-an-assistant.vtt)
+
+Music: "Thrilled hands holding" by Tymphony (Jamendo, CC BY-SA 3.0) https://www.jamendo.com/track/341563
+
+<details>
+<summary>Transcript</summary>
+
+Who tests your app before you ship it? You can ask an A I assistant to do it. It taps every button, like a customer. And it needs no phone.
+
+Step one. Start your shop in the simulator. Then give your assistant one setting. It tells Claude, or Cursor, to start the Shipvo tools. That plug is called MCP.
+
+Step two. Ask it to shop like a customer. Buy the tote. Make the payment fail, then make it work. The assistant taps through the app and tells you what the screen said.
+
+Step three. Ask for proof. The device log lists everything the app asked the phone to do. In our run, the log showed the payment going to "My Shop". But this shop is called Sandbar. The assistant caught a real mistake.
+
+Step four. Turn its run into a test. Ask for export test, and save the file. Then write the words that should appear on each screen. Now the check repeats by itself, in seconds.
+
+Step five. Make it a habit. Run your tests, and then a practice release. If a test fails, the line stops. Nothing is sent to your users.
+
+That is a safety check you can run before every release. The full guide is at shipvo.dev/docs/test-with-an-assistant.
+
+</details>
+
 ## Get started
 
 ### Create your first app on a simulated phone
