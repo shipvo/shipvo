@@ -147,7 +147,7 @@ function runPanel(control: string, inputs: Record<string, string> = {}, device: 
   const fetchCalls: number[] = [];
   const win: any = { __pnDevice: dev, fetch: async () => { fetchCalls.push(1); return "ok"; } };
   const doc: any = {
-    getElementById: (id: string) => (id === "app" ? { contentWindow: win, style: {}, } : id === "panel-status" ? status : { onclick: null, setAttribute() {}, style: {}, dataset: {} }),
+    getElementById: (id: string) => (id === "app" ? { contentWindow: win, style: {}, addEventListener() {} } : id === "panel-status" ? status : { onclick: null, setAttribute() {}, addEventListener() {}, style: {}, dataset: {}, textContent: "" }),
     querySelectorAll: (sel: string) => (sel === "[data-control]" ? html.match(/data-control="[^"]+"/g)!.map((m) => ({ dataset: { control: m.slice(14, -1) }, set onclick(f: () => void) { handlers[this.dataset.control] = f; } })) : []),
     querySelector: (sel: string) => ctl(sel.match(/"(.+)"/)![1]), body: { classList: { contains: () => false, toggle() {} } },
   };

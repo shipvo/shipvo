@@ -66,12 +66,12 @@ describe("preview recorder", () => {
   it("keeps the honesty line and Record controls visible on phones", () => {
     const h = framePage("Shop");
     const m = /@media \(max-width:500px\)\{([^}]*)\}/.exec(h)![1]!;
-    expect(m).not.toContain(".panel");
-    expect(h).toContain("body.dark .panel a");
+    expect(m).not.toContain(".recp");
+    expect(h).toContain("body.dark .recp a");
   });
   it("styles the link and buttons for contrast and focus", () => {
     const h = framePage("Shop");
-    expect(h).toContain(".panel a{color:inherit;text-decoration:underline}");
+    expect(h).toContain(".recp a{color:inherit;text-decoration:underline}");
     expect(h).toContain(":focus-visible{outline");
   });
   it("makes unlabeled taps visible and says 1 step", () => {

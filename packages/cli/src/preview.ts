@@ -113,7 +113,7 @@ iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 .panel .row{display:flex;gap:6px;flex-wrap:wrap}.panel input,.panel select,.panel button{font:inherit;padding:5px 8px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;min-width:0}
 body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.panel button[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}.panel input{flex:1 1 80px}.panel button{cursor:pointer}.panel .sim{opacity:.7;font-size:12px;margin:0}
 @media (max-width:500px){.bar,.note{display:none}.stage{padding:0;display:block}.panel{width:auto;margin:10px;max-width:none}.device{padding:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}}
-/style></head><body>
+</style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-skin="android" aria-pressed="true">Android</button><button data-skin="iphone" aria-pressed="false">iPhone</button>
 <button data-size="phone" aria-pressed="true">Phone</button><button data-size="large" aria-pressed="false">Large phone</button><button data-size="tablet" aria-pressed="false">Tablet</button>
@@ -175,7 +175,7 @@ var A={
 };
 var pnGroups=[["bio-success","bio-fail"],["pay-approve","pay-decline"],["net-online","net-slow","net-offline"]];
 document.querySelectorAll("[data-control]").forEach(function(e){var c=e.dataset.control;if(A[c])e.onclick=function(){A[c]();pnGroups.forEach(function(g){if(g.indexOf(c)<0)return;g.forEach(function(k){var b=document.querySelector('[data-control="'+k+'"]');if(b.setAttribute)b.setAttribute("aria-pressed",k===c)})})}});
-pply();
+apply();
 </script></body></html>
 `;
 }
