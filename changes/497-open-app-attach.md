@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: `open_app` attaches to a live `shipvo run` phone when `.shipvo/run.json` points to a running session for the same app. New optional `attach` argument: `auto` (default), `never`, `always`. The result text says `attached to the live shipvo run phone` or `headless session`. In attached mode, screen, tap, type, scroll and back go through the run's agent channel.
+- Migration: none. Headless results now include a `mode: headless session` line.
