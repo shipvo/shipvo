@@ -98,4 +98,26 @@ describe("stateless HTTP", () => {
     expect((await fetch(base)).status).toBe(405);
     expect((await fetch(base, { method: "DELETE" })).status).toBe(405);
   });
+
+  it("declares annotations on every tool", async () => {
+    const list = await rpc("tools/list", {});
+    const byName = Object.fromEntries(list.body.result.tools.map((t: any) => [t.name, t.annotations ?? {}]));
+    const readOnly = ["list_apps", "list_sessions", "screen", "screenshot", "notifications", "device_log", "owner_describe"];
+    for (const name of readOnly) expect(byName[name].readOnlyHint).toBe(true);
+    const destructive = ["owner_command", "end_session"];
+    for (const name of destructive) expect(byName[name].destructiveHint).toBe(true);
+    const others = ["open_app", "tap", "type", "scroll", "back", "set_device", "push_notification", "open_notification", "device_reset"];
+    for (const name of others) expect(byName[name].readOnlyHint).toBe(false);
+  });
+
+  it("returns isError and structuredContent on simulator failure", async () => {
+    const session = "s1";
+    await rpc("tools/call", { name: "open_app", arguments: { app: "menu", session } });
+    const bad = await rpc("tools/call", { name: "open_url", arguments: { session, url: "myapp://other" } });
+    expect(bad.status).toBe(200);
+    expect(bad.body.result.isError).toBe(true);
+    expect(bad.body.result.structuredContent).toMatchObject({ ok: false, code: "no_url_listener" });
+    expect(bad.body.result.content[0].text).toContain("Error [no_url_listener]");
+  });
+});
 });
