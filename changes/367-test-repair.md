@@ -1,0 +1,3 @@
+- `@shipvo/test`: new `proposeRepair(step, tree)` returns `repaired` (one match by role and closest name, with a reason naming old and new label) or `unresolved` (with candidates). `tap` and `type` steps get an optional `role`.
+- `@shipvo/cli`: new `shipvo test [files] [--repair [--write]]` runs `tests/*.steps`; `--repair` prints a unified diff and writes only with `--write`.
+- Migration: none; this only adds.

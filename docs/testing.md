@@ -129,3 +129,14 @@ For open-ended exploration, point an AI assistant at the same simulator over [MC
 | `phone.screenshot()` | A PNG of the screen (same machine as the simulator). |
 
 Vitest adds the `phone` fixture (a new phone per test) and two matchers, `toSee(text | RegExp)` and `toHaveButton(name)`.
+
+## Repair broken steps
+
+Plain-language tests live in `tests/*.steps`. When a label changes, run:
+
+```bash
+npx shipvo test --repair          # shows a unified diff for each broken step
+npx shipvo test --repair --write  # saves the diff
+```
+
+A step is repaired only when one element with the same role has the closest name. The repair changes the target and keeps the rest of the step. If two elements are equally close, or the role changed, the step stays as written and the candidates are listed. Steps are never deleted, skipped or loosened. Without `--write` nothing on disk changes. In code: `proposeRepair(step, screen)` from `@shipvo/test`.
