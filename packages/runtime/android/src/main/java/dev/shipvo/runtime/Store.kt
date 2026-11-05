@@ -70,6 +70,7 @@ internal class Store(private val ctx: Context) : BootCounts {
     val list = p.getString("events", "")!!.split('\n').filter { it.isNotBlank() }.takeLast(49) + e
     p.edit().putString("events", list.joinToString("\n")).commit()
   }
+  fun lastEvent(): String? = p.getString("events", "")!!.split('\n').lastOrNull { it.isNotBlank() }
   fun consumeEvents(): List<String> {
     val list = p.getString("events", "")!!.split('\n').filter { it.isNotBlank() }
     p.edit().remove("events").commit(); return list

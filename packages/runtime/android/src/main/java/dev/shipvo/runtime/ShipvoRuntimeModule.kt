@@ -135,7 +135,7 @@ class ShipvoRuntimeModule : Module() {
       // The shell cannot run the newest release. Keep the current one and report why.
       val reason = PointerQuery.mismatchReason(try { conn.errorStream?.bufferedReader()?.use { it.readText() } } catch (_: Exception) { null })
       conn.disconnect()
-      if (reason != null) { s.addEvent(reason); return mapOf("status" to "none", "reason" to reason) }
+      if (reason != null) { if (PointerQuery.shouldQueue(s.lastEvent(), reason)) s.addEvent(reason); return mapOf("status" to "none", "reason" to reason) }
       return mapOf("status" to "none")
     }
     if (code == 304) { conn.disconnect(); return mapOf("status" to "none") }

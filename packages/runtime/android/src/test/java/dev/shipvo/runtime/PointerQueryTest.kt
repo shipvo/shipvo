@@ -22,4 +22,13 @@ class PointerQueryTest {
     assertNull(PointerQuery.mismatchReason("{\"error\":\"not_found\"}"))
     assertNull(PointerQuery.mismatchReason(null))
   }
+  @Test fun dropsInvalidItems() {
+    assertEquals("$base?hbc=96&nm=a%401", PointerQuery.url(base, "96,x,0,-1,9z", "a@1,noversion,@,@scope"))
+    assertEquals(base, PointerQuery.url(base, "abc", "nover"))
+  }
+  @Test fun sameReasonIsNotQueuedTwice() {
+    assertEquals(true, PointerQuery.shouldQueue(null, "native_module_missing"))
+    assertEquals(true, PointerQuery.shouldQueue("verify_failed:3", "native_module_missing"))
+    assertEquals(false, PointerQuery.shouldQueue("native_module_missing", "native_module_missing"))
+  }
 }
