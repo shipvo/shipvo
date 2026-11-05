@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "login", "doctor", "store", "ci", "status", "audit", "test", "keys", "mcp",
+  "init", "sim", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "audit", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -21,6 +21,8 @@ Ship
   rollback --to <release>     Republish an earlier release as a new release
   rollback --to <n> --dry-run Preview a rollback, write nothing
   app create | list | delete  Register, list or remove apps on the hosted control plane
+  eas setup [--dry-run] [--run]  Make a Capacitor repo ready for eas build and submit (your own Expo account)
+  eas build [args]            Link the iOS scheme, then run eas build
   login                       Sign in with GitHub and get a key for the hosted simulator
   store details --dry-run     Draft Play Data safety answers and a privacy policy from shipvo.json
   store setup [--company yes|no] [--android-now] [--play-account-before-2023-11-13]
