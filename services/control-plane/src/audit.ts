@@ -1,4 +1,6 @@
-// Append-only audit log. This file only inserts and selects; nothing updates or deletes audit rows.
+// Append-only audit log.
+// `release` is the OTA release number for pointer uploads and halts. Owner `publish` leaves it null:
+// the content version is in `before` and `after` as `content_version`. This file only inserts and selects; nothing updates or deletes audit rows.
 export type AuditEntry = {
   appId: string;
   actor: string;
@@ -23,6 +25,14 @@ export async function recordAudit(db: D1Database | undefined, e: AuditEntry): Pr
   }
 }
 
+/** True when the newest row for this app has the same action and release (one release uploaded to several band keys). */
+export async function isRepeatAudit(db: D1Database, appId: string, action: string, release: number): Promise<boolean> {
+  try {
+    const last = await db.prepare("SELECT action, release FROM audit_log WHERE app_id = ? ORDER BY id DESC LIMIT 1").bind(appId).first<{ action: string; release: number | null }>();
+    return !!last && last.action === action && last.release === release;
+  } catch { return false; }
+}
+
 export const AUDIT_DEFAULT_LIMIT = 50;
 export const AUDIT_MAX_LIMIT = 200;
 
@@ -33,8 +43,9 @@ export async function listAudit(db: D1Database, appId: string, limitRaw?: string
   const b = Number(beforeRaw);
   const before = beforeRaw !== undefined && Number.isInteger(b) && b > 0 ? b : null;
   const sql = "SELECT id, app_id, at, actor, actor_kind, action, release, before, after, release_id FROM audit_log WHERE app_id = ?" + (before ? " AND id < ?" : "") + " ORDER BY id DESC LIMIT ?";
-  const args: unknown[] = before ? [appId, before, limit] : [appId, limit];
+  const args: unknown[] = before ? [appId, before, limit + 1] : [appId, limit + 1];
   const { results } = await db.prepare(sql).bind(...args).all();
-  const rows = results ?? [];
-  return { rows, next_before: rows.length === limit ? (rows[rows.length - 1] as any).id : null };
+  const all = results ?? [];
+  const rows = all.slice(0, limit); // one extra row tells us whether another page exists
+  return { rows, next_before: all.length > limit ? (rows[rows.length - 1] as any).id : null };
 }

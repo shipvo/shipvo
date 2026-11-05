@@ -141,9 +141,10 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const key = `halt/${appId}`;
   // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
   const cur = await env.POINTERS.get(key);
-  if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
+  let prevHalted: number | null = null;
+  if (cur) { try { const p = JSON.parse(cur).release; if (p === release) return; if (typeof p === "number") prevHalted = p; } catch { /* overwrite bad value */ } }
   await env.POINTERS.put(key, JSON.stringify({ release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold }));
-  await recordAudit(env.DB, { appId, actor: "halt rule", kind: "system", action: "halt", release, before: null, after: { halted: release, reports: verdict.reports, failed: counts.failed, threshold } });
+  await recordAudit(env.DB, { appId, actor: "halt rule", kind: "system", action: "halt", release, before: prevHalted === null ? null : { halted: prevHalted }, after: { halted: release, reports: verdict.reports, failed: counts.failed, threshold } });
 }
 
 /** Device telemetry for the spike: applied / reverted / timings. */

@@ -4,7 +4,7 @@
 // signing key never leaves the developer's machine or CI.
 import { Hono } from "hono";
 import { ReleasePointerBody } from "@shipvo/schema";
-import { recordAudit } from "./audit";
+import { isRepeatAudit, recordAudit } from "./audit";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; OWNER_TOKEN?: string };
 export const apps = new Hono<{ Bindings: Env }>();
@@ -32,16 +32,14 @@ async function developer(c: any): Promise<{ account_id: number; login: string } 
 }
 
 /** The publish token of one app. */
-export async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number; actor: string } | null> {
+export async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number; token_id: number } | null> {
   const k = bearer(c); if (!k.startsWith("sv_publish_")) return null;
   const key = await c.env.DB.prepare("SELECT id, expires_at FROM publish_tokens WHERE key_hash = ? AND app_id = ? AND revoked_at IS NULL").bind(await sha256(k), appId).first();
   if (!key || (key.expires_at && key.expires_at < now())) return null;
   c.env.DB.prepare("UPDATE publish_tokens SET last_used_at = ? WHERE id = ?").bind(now(), key.id).run().catch(() => {});
   const app = await c.env.DB.prepare("SELECT public_key, bytes_used FROM apps WHERE app_id = ?").bind(appId).first();
   if (!app) return null;
-  // The actor is the account login that owns the token, never the token itself.
-  const who = await c.env.DB.prepare("SELECT a.github_login FROM publish_tokens t JOIN accounts a ON a.id = t.account_id WHERE t.id = ?").bind(key.id).first().catch(() => null);
-  return { ...app, actor: who?.github_login ?? "publish token" };
+  return { ...app, token_id: key.id };
 }
 
 function newPublishToken() {
@@ -212,8 +210,14 @@ apps.put("/:id/kv/*", async (c) => {
   }
   await c.env.POINTERS.put(k, buf);
   if (next) {
-    await recordAudit(c.env.DB, { appId: id, actor: app.actor, kind: "person", action: typeof prev?.release === "number" && next.release < prev.release ? "rollback" : "publish",
-      release: next.release, before: prev ? { key: k, release: prev.release } : null, after: { key: k, release: next.release }, releaseId: next.core?.sha256 ?? null });
+    const action = typeof prev?.release === "number" && next.release < prev.release ? "rollback" : "publish";
+    // One release goes to several band keys. Write one row per publish: skip when the newest row is the same action and release.
+    if (!(await isRepeatAudit(c.env.DB, id, action, next.release))) {
+      // The actor is the account login that owns the token, never the token itself.
+      const who = await c.env.DB.prepare("SELECT a.github_login FROM publish_tokens t JOIN accounts a ON a.id = t.account_id WHERE t.id = ?").bind(app.token_id).first().catch(() => null);
+      await recordAudit(c.env.DB, { appId: id, actor: who?.github_login ?? "publish token", kind: "person", action,
+        release: next.release, before: prev ? { key: k, release: prev.release } : null, after: { key: k, release: next.release }, releaseId: next.core?.sha256 ?? null });
+    }
   }
   await c.env.DB.prepare("UPDATE apps SET bytes_used = bytes_used + ? WHERE app_id = ?").bind(buf.byteLength, id).run();
   if (k === `w/${id}/releases`) { try { const idx = JSON.parse(new TextDecoder().decode(buf)); if (Number.isInteger(idx.latest)) await c.env.DB.prepare("UPDATE apps SET latest_release = ?, published_at = ? WHERE app_id = ?").bind(idx.latest, now(), id).run(); } catch {} }

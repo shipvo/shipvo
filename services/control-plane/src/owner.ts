@@ -150,7 +150,7 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
         .bind(env.appId, next.version, json, next.published_at, env.actor, String(a.note ?? "").slice(0, 200)).run();
       await env.kv.put(`c/${env.appId}/content.json`, json);
       await env.db.prepare("INSERT OR REPLACE INTO content_draft (app_id, json, updated_at) VALUES (?,?,?)").bind(env.appId, json, next.published_at).run();
-      await recordAudit(env.db, { appId: env.appId, actor: env.actor, kind: env.agent ? "agent" : "person", action: "publish", release: next.version,
+      await recordAudit(env.db, { appId: env.appId, actor: env.actor, kind: env.agent ? "agent" : "person", action: "publish",
         before: live ? { content_version: live.version } : null, after: { content_version: next.version } });
       return { version: next.version, published_at: next.published_at, bytes: json.length, changes: diffContent(live, ok.data!) };
     },

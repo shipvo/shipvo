@@ -23,6 +23,7 @@ function fakeDb(opts: { failAudit?: boolean } = {}) {
       if (sql.includes("FROM publish_tokens WHERE key_hash")) return a[0] === GOOD && a[1] === "tide" ? { id: 1, expires_at: null } : null;
       if (sql.includes("FROM publish_tokens t JOIN accounts")) return { github_login: "ada" };
       if (sql.includes("FROM apps WHERE app_id")) return { public_key: "A".repeat(43), bytes_used: 0 };
+      if (sql.includes("FROM audit_log WHERE app_id = ? ORDER BY id DESC LIMIT 1")) { const m = rows.filter((r) => r.app_id === a[0]); return m[m.length - 1] ?? null; }
       if (sql.includes("MAX(version)")) return { v: 1 };
       return null;
     },
@@ -76,7 +77,7 @@ describe("audit log", () => {
     expect(r.ok).toBe(true);
     const rows = sql.prepare("SELECT * FROM audit_log").all() as any[];
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ app_id: "tide", actor: "agent (owner token)", actor_kind: "agent", action: "publish", release: 2 });
+    expect(rows[0]).toMatchObject({ app_id: "tide", actor: "agent (owner token)", actor_kind: "agent", action: "publish", release: null });
     expect(JSON.parse(rows[0].before)).toEqual({ content_version: 1 }); expect(JSON.parse(rows[0].after)).toEqual({ content_version: 2 });
     sql.exec(readFileSync(new URL("../migrations/0015_audit_log.sql", import.meta.url), "utf8")); // safe to run twice
   });
@@ -105,6 +106,19 @@ describe("audit log", () => {
     expect(JSON.stringify(j)).not.toContain("secret123");
   });
 
+  it("one release uploaded to b0, b1 and b2 writes one row", async () => {
+    const { db, rows } = fakeDb(); const store: Record<string, string> = {};
+    const mk = (release: number, band: string) => JSON.stringify({ body: JSON.stringify({ schema_version: "1.0", app_id: "tide", shell_major: 1, band, release, issued_at: "2026-10-30T00:00:00Z",
+      core: { version: "1.0.0", sha256: "a".repeat(64), size: 10, url: "c" }, min_shell_version: "1.0.0" }), signature: "AAAA" });
+    vi.spyOn(crypto.subtle, "verify").mockResolvedValue(true); vi.spyOn(crypto.subtle, "importKey").mockResolvedValue({} as any);
+    const env = { DB: db, POINTERS: kv(store) } as any;
+    const put = (r: number, b: string) => app.request(`/apps/tide/kv/p/tide/1/${b}`, { method: "PUT", body: mk(r, b), headers: { authorization: "Bearer sv_publish_secret123" } }, env);
+    for (const b of ["b0", "b1", "b2"]) expect((await put(5, b)).status).toBe(200);
+    for (const b of ["b0", "b1", "b2"]) expect((await put(4, b)).status).toBe(200);
+    vi.restoreAllMocks();
+    expect(rows.map((r) => [r.action, r.release])).toEqual([["publish", 5], ["rollback", 4]]);
+  });
+
   it("halt writes a system row", async () => {
     const { db, rows } = fakeDb();
     const store: Record<string, string> = { "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 1 }) };
@@ -113,7 +127,12 @@ describe("audit log", () => {
     const r = await app.request("/t", { method: "POST", body: JSON.stringify({ schema_version: "1.0", app_id: "tide", release: 3, event: "crash_loop_revert" }) }, { DB: d2, POINTERS: kv(store) } as any);
     expect(r.status).toBe(202);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ app_id: "tide", actor_kind: "system", action: "halt", release: 3 });
+    expect(rows[0]).toMatchObject({ app_id: "tide", actor_kind: "system", action: "halt", release: 3, before: null });
+    // A second halt on another release records the earlier one as "before".
+    store["halt/tide"] = JSON.stringify({ release: 2 });
+    await app.request("/t", { method: "POST", body: JSON.stringify({ schema_version: "1.0", app_id: "tide", release: 3, event: "crash_loop_revert" }) }, { DB: d2, POINTERS: kv(store) } as any);
+    expect(rows).toHaveLength(2);
+    expect(JSON.parse(rows[1].before)).toEqual({ halted: 2 });
   });
 
   it("a failed audit write warns and does not throw", async () => {
