@@ -7,11 +7,11 @@ export const ALERT_WINDOW_MS = 3600_000;
 
 /** Accepts only https URLs without credentials. Throws OwnerError("bad_webhook_url"). */
 export function parseWebhookUrl(raw: string): string {
+  if (raw.length > 500) throw new OwnerError("bad_webhook_url", "alert_webhook is too long (500 characters at most)");
   let u: URL;
   try { u = new URL(raw); } catch { throw new OwnerError("bad_webhook_url", "alert_webhook must be a valid https:// URL"); }
   if (u.protocol !== "https:") throw new OwnerError("bad_webhook_url", "alert_webhook must start with https://");
   if (u.username || u.password) throw new OwnerError("bad_webhook_url", "alert_webhook must not contain a user name or password");
-  if (raw.length > 500) throw new OwnerError("bad_webhook_url", "alert_webhook is too long (500 characters at most)");
   return u.toString();
 }
 

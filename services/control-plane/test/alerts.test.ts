@@ -48,6 +48,17 @@ describe("revert webhook alert", () => {
     await send(d, ev("rolled_back", 4), x.c); await x.done();
     expect(f).toHaveBeenCalledTimes(2);
   });
+  it("sends again for the same release once the hour has passed", async () => {
+    const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
+    const { d } = fakeDb("https://hooks.example.com/x"); const x = ctx();
+    const t0 = Date.now(); const now = vi.spyOn(Date, "now");
+    now.mockReturnValue(t0); await send(d, ev("rolled_back"), x.c); await x.done();
+    now.mockReturnValue(t0 + 3600_000 - 1000); await send(d, ev("rolled_back"), x.c); await x.done();
+    expect(f).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(t0 + 3600_000 + 1000); await send(d, ev("rolled_back"), x.c); await x.done();
+    expect(f).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
   it("sends nothing without a webhook, or for events that are not reverts", async () => {
     const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
     const x = ctx();

@@ -154,7 +154,9 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
     run: async (_d, _a, env) => (await env.db.prepare("SELECT prefix, scope, label, created_at, last_used_at, revoked_at FROM api_keys WHERE app_id = ? ORDER BY id DESC").bind(env.appId).all()).results },
   revoke_api_key: { description: "Revoke an API key by its prefix (from list_api_keys).", params: { prefix: { type: "string", required: true, description: "Key prefix, e.g. sv_test_abc1" } }, mutates: false,
     run: async (_d, a, env) => { const r = await env.db.prepare("UPDATE api_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE app_id = ? AND prefix = ? AND revoked_at IS NULL").bind(env.appId, String(a.prefix)).run(); return { revoked: (r.meta?.changes ?? 0) > 0 }; } },
-  set_alert_webhook: { description: "Set the https URL that gets a small JSON POST (app, release, event, time) when a release is reverted on devices, at most once per release per hour. Empty url removes it.", mutates: false,
+  set_alert_webhook: { description: "Set the https URL that gets a small JSON POST (app, release, event, time) when a release is reverted on devices, at most once per release per hour. Empty url removes it.",
+    // mutates: false on purpose: the URL may hold a secret, and mutating commands write their args to audit.args_json.
+    mutates: false,
     params: { url: { type: "string", description: "https:// URL, or empty to remove" } },
     run: async (_d, a, env) => {
       const raw = String(a.url ?? "").trim();
