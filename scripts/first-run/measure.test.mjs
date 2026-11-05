@@ -154,9 +154,10 @@ async function stub({ putStatus = 200, badSig = false } = {}) {
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const pubB64 = publicKey.export({ format: "der", type: "spki" }).subarray(-32).toString("base64");
 const fakeCp = () => fake(`
-import {mkdirSync, writeFileSync, readFileSync} from "node:fs";
+import {mkdirSync, writeFileSync, readFileSync, appendFileSync} from "node:fs";
 import {createPrivateKey, sign} from "node:crypto";
 const a = process.argv;
+if (a[2]==="publish" && process.env.ARGS_LOG) appendFileSync(process.env.ARGS_LOG, JSON.stringify(a.slice(2))+"\\n");
 if (a[2]==="init") { mkdirSync(a[3],{recursive:true}); writeFileSync(a[3]+"/shipvo.json", JSON.stringify({appId:"demo", controlPlane:"https://x.invalid", publicKey:${JSON.stringify(pubB64)}})); }
 if (a[2]==="publish" && !a.includes("--dry-run")) {
   const cfg = JSON.parse(readFileSync("shipvo.json","utf8"));
@@ -166,8 +167,8 @@ if (a[2]==="publish" && !a.includes("--dry-run")) {
   if (!r.ok) { console.error("publish p/demo/1/b0: "+r.status+" "+(await r.json()).message); process.exit(1); }
   console.log(JSON.stringify({app:"demo", release:1}));
 }`);
-const runAsync = ({ cli, out }, extra) => new Promise((done) => {
-  const c = spawn(process.execPath, [script, "--cli", cli, "--out", out, ...extra], { env: { ...process.env, SHIPVO_LOCAL_DEV_KEY: "sv_test_localdev" } });
+const runAsync = ({ cli, out }, extra, env = {}) => new Promise((done) => {
+  const c = spawn(process.execPath, [script, "--cli", cli, "--out", out, ...extra], { env: { ...process.env, SHIPVO_LOCAL_DEV_KEY: "sv_test_localdev", ...env } });
   let so = "", se = "";
   c.stdout.on("data", (d) => (so += d)); c.stderr.on("data", (d) => (se += d));
   c.on("close", (status) => done({ status, stdout: so, stderr: se }));
@@ -204,5 +205,36 @@ test("--control-url: an unsigned pointer fails the pointer check", async () => {
     assert.equal(r.status, 1);
     assert.match(r.stderr, /not signed/);
     assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).slice(3).map((x) => [x.step, x.exit]), [["publish", 0], ["pointer", 1], ["total", 1]]);
+  } finally { s.close(); }
+});
+
+const fakePm = () => {
+  const bindir = mkdtempSync(join(tmpdir(), "fake-pm-"));
+  for (const n of ["pnpm", "npm"]) { writeFileSync(join(bindir, n), "#!/bin/sh\necho 9.9.9\nexit 0\n"); chmodSync(join(bindir, n), 0o755); }
+  return bindir + ":" + dirname(process.execPath);
+};
+const publishCalls = (log) => readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+
+test("--with-export runs the real publish without --skip-export and records a publish row", async () => {
+  const s = await stub(); const f = fakeCp(); const log = join(dirname(f.out), "args.log");
+  try {
+    const r = await runAsync(f, ["--with-install", "--with-export", "--control-url", s.url], { ARGS_LOG: log, PATH: fakePm() });
+    assert.equal(r.status, 0, r.stderr);
+    const j = JSON.parse(readFileSync(f.out, "utf8"));
+    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["publish (includes export)", 0], ["pointer", 0], ["total", 0]]);
+    const calls = publishCalls(log);
+    assert.equal(calls.length, 1);
+    assert.ok(!calls[0].includes("--skip-export"));
+    assert.match(r.stdout, /\| publish \(includes export\) \| \d+\.\d\d \|/);
+  } finally { s.close(); }
+});
+
+test("without --with-export, the real publish still passes --skip-export true", async () => {
+  const s = await stub(); const f = fakeCp(); const log = join(dirname(f.out), "args.log");
+  try {
+    const r = await runAsync(f, ["--control-url", s.url], { ARGS_LOG: log });
+    assert.equal(r.status, 0, r.stderr);
+    const calls = publishCalls(log);
+    assert.ok(calls.some((c) => !c.includes("--dry-run") && c.join(" ").includes("--skip-export true")));
   } finally { s.close(); }
 });

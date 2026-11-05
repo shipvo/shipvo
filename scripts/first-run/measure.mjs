@@ -63,7 +63,7 @@ async function realPublish(cli, app, controlUrl, withExport) {
   } catch (e) { return [fail("app create", 0, `create app: ${e.cause?.code ?? e.message}`)]; }
   try {
     writeFileSync(cfgPath, JSON.stringify({ ...cfg, controlPlane: base }, null, 2) + "\n");
-    const pub = await runStepAsync("publish", cli, ["publish", ...(withExport ? [] : ["--skip-export", "true"]), "--skip-web", "true", "--platform", "android", "--bands", "b0"], app, { SHIPVO_PUBLISH_TOKEN: token });
+    const pub = await runStepAsync(withExport ? "publish (includes export)" : "publish", cli, ["publish", ...(withExport ? [] : ["--skip-export", "true"]), "--skip-web", "true", "--platform", "android", "--bands", "b0"], app, { SHIPVO_PUBLISH_TOKEN: token });
     if (pub.exit !== 0) return [pub];
     const t0 = performance.now();
     const pointer = (exit, msg) => ({ step: "pointer", ms: Math.round(performance.now() - t0), exit, stderr: msg });
@@ -141,9 +141,11 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
       const js = join(app, "dist-ota/_expo/static/js/android");
       mkdirSync(js, { recursive: true });
       writeFileSync(join(js, "index.js"), "console.log('first run');\n");
-      results.push(runStep("publish --dry-run", cli, ["publish", "--dry-run", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app));
-      if (controlUrl && results[results.length - 1].exit === 0) results.push(...(await realPublish(cli, app, controlUrl, withExport)));
+      const dry = runStep("publish --dry-run", cli, ["publish", "--dry-run", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app);
+      results.push(dry);
+      ok = dry.exit === 0;
     }
+    if (ok && controlUrl) results.push(...(await realPublish(cli, app, controlUrl, withExport)));
   } finally { rmSync(root, { recursive: true, force: true }); }
   results.totalMs = Math.round(performance.now() - start);
   return results;
