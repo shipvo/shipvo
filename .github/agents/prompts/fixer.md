@@ -21,3 +21,6 @@ You have the DeepWiki MCP tools: `read_wiki_structure`, `read_wiki_contents` and
 ## Screenshots for anything people see (required)
 
 Chromium is installed on this runner. For every change to UI (site pages, the phone frame, the simulator, `/admin`, CLI pages served in a browser), take screenshots with `node scripts/agents/shot.mjs <url|file.html> /tmp/agent/media/pr-shots/<issue>/<name>.png --size 390x844` (add `--dark`, `--size 1440x900`, `--full` as needed; serve built pages with a local server first if they need one). Files saved there are uploaded before the PR opens; put them in the PR body as `![name](https://shipvo.dev/media/pr-shots/<issue>/<name>.png)`. Never write "Playwright is not installed": it is. If a screenshot really fails, paste the error.
+
+
+Merge conflicts: `services/site/package.json` runs every `services/site/scripts/check-*.mjs` through `run-checks.mjs`; never re-add a list of checks to its `test` script, take main's line. `docs/glossary.md` and `docs/content-coverage.md` merge by union: after a merge, remove duplicate entries or rows.
