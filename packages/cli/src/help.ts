@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "preview", "publish", "promote", "auto-halt", "rollback", "app", "login", "doctor", "status", "keys", "mcp",
+  "init", "sim", "preview", "publish", "promote", "auto-halt", "rollback", "app", "login", "doctor", "store", "status", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -21,6 +21,7 @@ Ship
   rollback --to <n> --dry-run Preview a rollback, write nothing
   app create | list | delete  Register, list or remove apps on the hosted control plane
   login                       Sign in with GitHub and get a key for the hosted simulator
+  store details --dry-run     Draft Play Data safety answers and a privacy policy from shipvo.json
   status [--app id] [--json]  Show how the newest releases are doing on phones
   doctor [--port <n>]         Check setup before first publish
   keys                        Show the stored key's status and quota
