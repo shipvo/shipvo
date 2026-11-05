@@ -267,6 +267,8 @@ export const ShipvoPolicy = z.object({
   blockedWeekdays: z.array(PolicyWeekday).min(1).optional(),
   /** Local hour 0-23. From this hour on, publishes on `blockedWeekdays` are refused. */
   blockedAfterHour: z.number().int().min(0).max(23).optional(),
+  /** IANA time zone (for example `Europe/Paris`) used for `blockedWeekdays` and `blockedAfterHour`. Without it the CLI uses the machine's local time and the control plane uses UTC. */
+  timeZone: z.string().refine((z) => { try { new Intl.DateTimeFormat("en", { timeZone: z }); return true; } catch { return false; } }, "not a known IANA time zone").optional(),
   /** Widest cohort a publish run by an agent may reach: a band name or a percent of devices (1-100). */
   maxCohortForAgents: z.union([Band, z.number().gt(0).max(100)]).optional(),
   /** A release must sit at `percent` of devices for at least `minHours` before it goes to everyone. */
@@ -280,6 +282,47 @@ export const ShipvoPolicy = z.object({
 export type ShipvoPolicy = z.infer<typeof ShipvoPolicy>;
 /** Same type as `ShipvoPolicy`. */
 export type Policy = ShipvoPolicy;
+
+export type PolicyResult = { ok: true } | { ok: false; rule: string; reason: string };
+const POLICY_ORDER: z.infer<typeof Band>[] = ["b0", "b1", "b2"];
+const POLICY_DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const; // Date#getDay order
+/** Share of devices each band reaches (cumulative). */
+export const BAND_PERCENT: Record<z.infer<typeof Band>, number> = { b0: 1, b1: 10, b2: 100 };
+
+/** Weekday and hour of `now` in `timeZone`, or in the machine's local time when none is given. */
+function policyClock(now: Date, timeZone?: string): { day: (typeof POLICY_DAYS)[number]; hour: number } {
+  if (!timeZone) return { day: POLICY_DAYS[now.getDay()]!, hour: now.getHours() };
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(now);
+  const get = (t: string) => parts.find((x) => x.type === t)?.value ?? "";
+  return { day: get("weekday").slice(0, 3).toLowerCase() as (typeof POLICY_DAYS)[number], hour: Number(get("hour")) };
+}
+
+/**
+ * Checks one publish against the policy. Pure. No policy means no rules.
+ * Weekday rules use `policy.timeZone`, else `ctx.defaultTimeZone` (the control plane passes "UTC"), else the machine's local time.
+ * `hoursAtStage` is for the stage rule: how long this release has sat on a band that reaches at least `requireStageBeforeFull.percent`
+ * (null: it never has). When it is `undefined` the stage rule is not checked.
+ */
+export function checkPolicy(policy: ShipvoPolicy | undefined, ctx: { band: z.infer<typeof Band>; actorKind: "human" | "agent"; now: Date; defaultTimeZone?: string; hoursAtStage?: number | null }): PolicyResult {
+  if (!policy) return { ok: true };
+  const { band, actorKind, now } = ctx;
+  if (policy.maxBand && POLICY_ORDER.indexOf(band) > POLICY_ORDER.indexOf(policy.maxBand))
+    return { ok: false, rule: "maxBand", reason: `this publish reaches ${band}, but policy.maxBand is ${policy.maxBand}` };
+  if (actorKind === "agent" && policy.agentMaxBand && POLICY_ORDER.indexOf(band) > POLICY_ORDER.indexOf(policy.agentMaxBand))
+    return { ok: false, rule: "agentMaxBand", reason: `an agent-run publish reaches ${band}, but policy.agentMaxBand is ${policy.agentMaxBand}` };
+  if (policy.blockedWeekdays) {
+    const tz = policy.timeZone ?? ctx.defaultTimeZone;
+    const { day, hour } = policyClock(now, tz), from = policy.blockedAfterHour ?? 0;
+    if (policy.blockedWeekdays.includes(day) && hour >= from)
+      return { ok: false, rule: "blockedWeekdays", reason: `publishing is blocked on ${day} from ${String(from).padStart(2, "0")}:00 ${tz ? tz : "local"} time (policy.blockedWeekdays${policy.blockedAfterHour !== undefined ? ", policy.blockedAfterHour" : ""})` };
+  }
+  const st = policy.requireStageBeforeFull;
+  if (st && band === "b2" && ctx.hoursAtStage !== undefined && (ctx.hoursAtStage === null || ctx.hoursAtStage < st.minHours))
+    return { ok: false, rule: "requireStageBeforeFull", reason: ctx.hoursAtStage === null
+      ? `this release has not been staged at ${st.percent}% yet; policy.requireStageBeforeFull needs ${st.minHours} h at ${st.percent}% before 100%`
+      : `this release has sat at ${st.percent}% for ${Math.floor(ctx.hoursAtStage * 10) / 10} h; policy.requireStageBeforeFull needs ${st.minHours} h before 100%` };
+  return { ok: true };
+}
 
 /** Validates the `policy` value from shipvo.json. Throws an Error whose message names each bad field (`policy.maxBand: ...`). */
 export function parsePolicy(value: unknown): ShipvoPolicy {
