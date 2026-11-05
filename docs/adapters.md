@@ -41,6 +41,10 @@ The JS API every adapter must back is the `Native` type in `packages/runtime/src
 
 Telemetry event names are in `packages/schema/src/index.ts` (`Telemetry.event`).
 
+## Capacitor (web bundles)
+
+`@shipvo/capacitor` (`packages/capacitor`) is a third implementation, in TypeScript, for a signed web bundle. A web pointer has `kind: "web"`. These rules are now implemented in `packages/capacitor/src/engine.ts` and tested in `packages/capacitor/test/capacitor.test.ts`: 1 (platform and kind), 2, 3 (uses `bandForCohort` from `@shipvo/schema`), 4, 5, 10, 11, 12, 13, 14 and 15 (events are `pointer_rejected:<why>`, queued once per distinct reason). Signature, size and sha-256 checks use WebCrypto. Not done: 6 (no bytecode in plain web assets), 7 and 8 (the control plane decides), 9 (no patches yet), and applying the bundle in the web view (next slice). These are one TypeScript copy that Android and iOS Capacitor shells both use, not a fourth copy per OS.
+
 ## What a Capacitor port would need to redo
 
 From the table, these are per platform today, so a Capacitor adapter on each OS would have to write them again or call into the existing Kotlin and Swift:

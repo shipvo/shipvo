@@ -1,0 +1,2 @@
+- `capacitor-sample` (private app, not published): new minimal Capacitor 8 sample app in `apps/capacitor-sample` for adapter work (#297).
+- Migration: none; no package API changes.

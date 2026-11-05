@@ -1,0 +1,3 @@
+- `@shipvo/capacitor` (new, 0.0.1): release decisions, Ed25519 pointer and sha-256/size verification, staging, trial boots, crash-loop rollback and events for signed web bundles. Native apply is not in this release.
+- `@shipvo/schema`: `ReleasePointer` has a new optional field `kind` (`"web"`). Absent means a React Native bundle, as before.
+- Migration: none; the field is additive.

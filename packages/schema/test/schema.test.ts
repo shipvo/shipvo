@@ -49,6 +49,17 @@ describe("release pointer", () => {
     expect(ReleasePointer.safeParse({ ...base, hermes_bytecode_version: 1.5 }).success).toBe(false);
   });
 });
+describe("release pointer kind", () => {
+  it("accepts kind web, leaves it absent by default and rejects other kinds", () => {
+    const base = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 1,
+      issued_at: "2026-10-29T21:00:00Z", core: { version: "1.0.0", sha256: "a".repeat(64), size: 10, url: "c" }, min_shell_version: "1.0.0", signature: sig };
+    const none = ReleasePointer.safeParse(base);
+    expect(none.success && none.data.kind).toBeUndefined();
+    const web = ReleasePointer.safeParse({ ...base, kind: "web" });
+    expect(web.success && web.data.kind).toBe("web");
+    expect(ReleasePointer.safeParse({ ...base, kind: "x" }).success).toBe(false);
+  });
+});
 describe("gate report", () => {
   const ids = ["manifest_valid","permissions_declared","purpose_classifier","modules_in_manifest","sim_verified_modules","size_budget","accessibility","store_policy","signature"];
   const mk = (failId?: string, result = "pass") => ({ schema_version: "1.0", subject: { kind: "addon", id: "a", version: "1.0.0" },
