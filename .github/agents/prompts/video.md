@@ -34,3 +34,6 @@ Every video gets a quiet music bed that ducks under the narration, mixed with `s
 ## App demos recorded by driving the app
 
 For product demos, record the real app instead of drawing it: drive the sample app (or a marketplace app) through `@shipvo/mcp` and use `record_start`, `record_marker` and `record_stop` (#501) to capture it in the Shipvo Phone frame with visible taps and captions, then add narration and the music bed. Until those tools are on main, record with Playwright from the simulator as you do now.
+
+
+Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (one line, the loop, comparisons as facts, parity as proof).
