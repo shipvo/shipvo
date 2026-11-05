@@ -66,7 +66,7 @@ exports[`shipvo eas setup > writes pinned profiles, build YAMLs, scheme and .git
 exports[`shipvo eas setup > writes pinned profiles, build YAMLs, scheme and .gitignore > ios.yml 1`] = `
 "# Written by \`shipvo eas setup\`. Safe to edit; setup will not overwrite this file.
 # Docs: https://docs.expo.dev/custom-builds/get-started/
-# Before the first build, run \`shipvo eas build\`: it creates the ios/App.xcodeproj link that EAS credential steps need.
+# Before the first build, run \`shipvo eas build\`: it creates the ios/App.xcodeproj link that the EAS CLI scheme check needs on your machine before upload.
 build:
   name: Capacitor iOS release
   steps:

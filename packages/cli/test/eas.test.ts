@@ -92,11 +92,35 @@ describe("shipvo eas setup", () => {
     expect(Object.keys(JSON.parse(readFileSync(join(d, "eas.json"), "utf8")).build)).toEqual(["shipvo-android"]);
   });
 
-  it.each([["build", "null"], ["build", '"x"'], ["submit", "[]"]])("rejects eas.json with %s = %s", async (k, v) => {
+  it.each([["build", "null"], ["build", '"x"'], ["submit", "[]"], ["cli", '"x"'], ["cli", "[]"], ["cli", "null"]])("rejects eas.json with %s = %s", async (k, v) => {
     const d = fixture();
     writeFileSync(join(d, "eas.json"), `{"${k}": ${v}}`);
     await expect(run(d, ["setup"])).rejects.toThrow(new RegExp(`"${k}" must be an object`));
     expect(existsSync(join(d, ".eas"))).toBe(false);
+  });
+
+  it("says the iOS signing steps are unproven when iOS is detected, and not otherwise", async () => {
+    const d = fixture();
+    expect((await run(d, ["setup"])).out).toContain("iOS signing steps in .eas/build/ios.yml are unproven");
+    expect((await run(d, ["setup", "--dry-run"])).out).toContain("are unproven");
+    const a = mkdtempSync(join(tmpdir(), "shipvo-eas-"));
+    writeFileSync(join(a, "capacitor.config.ts"), "export default {};\n");
+    mkdirSync(join(a, "android"));
+    expect((await run(a, ["setup"])).out).not.toContain("unproven");
+  });
+
+  it("--run --dry-run runs nothing", async () => {
+    const d = fixture();
+    const calls: string[] = [];
+    await run(d, ["setup", "--run", "--dry-run"], ((c: string, a: string[]) => { calls.push(a.join(" ")); return 0; }) as any);
+    expect(calls).toEqual([]);
+    expect(existsSync(join(d, "eas.json"))).toBe(false);
+  });
+
+  it("rejects unknown options and writes nothing", async () => {
+    const d = fixture();
+    await expect(run(d, ["setup", "--dryrun"])).rejects.toThrow(/Unknown option.*--dryrun/);
+    expect(existsSync(join(d, "eas.json"))).toBe(false);
   });
 
   it("refuses a non-Capacitor repo", async () => {

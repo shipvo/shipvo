@@ -51,7 +51,7 @@ build:
 
 const iosYaml = `# Written by \`shipvo eas setup\`. Safe to edit; setup will not overwrite this file.
 # Docs: https://docs.expo.dev/custom-builds/get-started/
-# Before the first build, run \`shipvo eas build\`: it creates the ios/App.xcodeproj link that EAS credential steps need.
+# Before the first build, run \`shipvo eas build\`: it creates the ios/App.xcodeproj link that the EAS CLI scheme check needs on your machine before upload.
 build:
   name: Capacitor iOS release
   steps:
@@ -135,15 +135,12 @@ function readJson(path: string): Record<string, any> {
 /** Merge our profiles into an existing eas.json without touching the customer's own settings. */
 function easJson(root: string, p: CapacitorProject): string {
   const j = readJson(join(root, "eas.json"));
-  j.cli = { appVersionSource: "remote", ...(j.cli ?? {}) };
-  for (const k of ["build", "submit"]) {
+  for (const k of ["cli", "build", "submit"]) {
     if (j[k] !== undefined && (j[k] === null || typeof j[k] !== "object" || Array.isArray(j[k]))) {
       throw new Error(`${join(root, "eas.json")} is not valid: "${k}" must be an object. Fix it and run the command again.`);
     }
   }
-  if (j.cli !== undefined && (j.cli === null || typeof j.cli !== "object" || Array.isArray(j.cli))) {
-    throw new Error(`${join(root, "eas.json")} is not valid: "cli" must be an object. Fix it and run the command again.`);
-  }
+  j.cli = { appVersionSource: "remote", ...(j.cli ?? {}) };
   j.build ??= {};
   if (p.android) j.build["shipvo-android"] ??= { android: { image: ANDROID_IMAGE, buildType: "app-bundle", config: "android.yml" }, distribution: "store" };
   if (p.ios) j.build["shipvo-ios"] ??= { ios: { image: IOS_IMAGE, node: NODE_VERSION, config: "ios.yml" }, distribution: "store", autoIncrement: true };
@@ -181,7 +178,7 @@ export function planEasSetup(root: string, p: CapacitorProject): PlannedFile[] {
   return out;
 }
 
-/** Create the `ios/App.xcodeproj -> App/App.xcodeproj` link EAS needs to find the scheme. Returns true if it made one. */
+/** Create the `ios/App.xcodeproj -> App/App.xcodeproj` link the EAS CLI scheme check needs. Returns true if it made one. */
 export function ensureSchemeShim(root: string): boolean {
   const link = join(root, SHIM);
   try { lstatSync(link); return false; } catch { /* missing: create it */ }
@@ -195,6 +192,8 @@ export const ONE_TIME_STEPS = [
   ["eas-cli", "init"],
   ["eas-cli", "build:version:set", "-p", "ios"],
 ] as const;
+
+export const IOS_UNPROVEN = "Note: the iOS signing steps in .eas/build/ios.yml are unproven. The step names were not checked against Expo's custom build functions (https://docs.expo.dev/custom-builds/schema/), so your first iOS build is the check.";
 
 export type Runner = (cmd: string, args: string[], cwd: string) => number;
 const defaultRunner: Runner = (cmd, args, cwd) => spawnSync(cmd, args, { cwd, stdio: "inherit" }).status ?? 1;
@@ -217,7 +216,11 @@ export async function easCmd(args: string[], o: EasOptions = {}): Promise<number
     return runner("npx", ["eas-cli", "build", ...rest], cwd);
   }
 
+  const known = ["--dry-run", "--run"];
+  const bad = rest.filter((a) => !known.includes(a));
+  if (bad.length) throw new Error(`Unknown option for shipvo eas setup: ${bad.join(" ")}. Use --dry-run or --run.`);
   const dry = rest.includes("--dry-run");
+  const runSteps = rest.includes("--run") && !dry;
   const plan = planEasSetup(cwd, project);
   for (const f of plan) {
     log(`${dry ? "Would " + f.action : f.action === "create" ? "Created" : "Updated"} ${f.path}`);
@@ -225,11 +228,12 @@ export async function easCmd(args: string[], o: EasOptions = {}): Promise<number
     else { mkdirSync(dirname(join(cwd, f.path)), { recursive: true }); writeFileSync(join(cwd, f.path), f.content); }
   }
   if (!plan.length) log("Nothing to change: this repo is already set up for EAS.");
+  if (project.ios) log(IOS_UNPROVEN);
   if (dry) return 0;
   log("\nRemaining one-time steps:");
   for (const s of ONE_TIME_STEPS) log(`  npx ${s.join(" ")}`);
   if (project.ios) log("Before an iOS build, build with `shipvo eas build -p ios --profile shipvo-ios`: it creates the git-ignored ios/App.xcodeproj link first.");
-  if (rest.includes("--run")) {
+  if (runSteps) {
     for (const s of ONE_TIME_STEPS) {
       if (s[1] === "build:version:set" && !project.ios) continue;
       const code = runner("npx", [...s], cwd);
