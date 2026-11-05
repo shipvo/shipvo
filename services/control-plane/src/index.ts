@@ -124,6 +124,40 @@ app.get("/t/:app", async (c) => {
   return c.json(results);
 });
 
+app.get("/t/:app/summary", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const { results } = await c.env.DB.prepare(
+    "SELECT release, event, COUNT(*) AS n, MAX(id) AS latest_id, group_concat(apply_ms) AS apply_ms_values, group_concat(cold_start_ms) AS cold_start_ms_values FROM telemetry WHERE app_id = ? GROUP BY release, event"
+  ).bind(appId).all();
+  const byRelease = new Map<number, { release: number; events: Record<string, number>; apply: number[]; cold: number[]; latestId: number }>();
+  for (const row of results as any[]) {
+    const release = Number(row.release);
+    if (!byRelease.has(release)) byRelease.set(release, { release, events: {}, apply: [], cold: [], latestId: Number(row.latest_id) });
+    const entry = byRelease.get(release)!;
+    entry.events[String(row.event)] = (entry.events[String(row.event)] ?? 0) + Number(row.n);
+    if (row.apply_ms_values) entry.apply.push(...String(row.apply_ms_values).split(",").map(Number).filter(Number.isFinite));
+    if (row.cold_start_ms_values) entry.cold.push(...String(row.cold_start_ms_values).split(",").map(Number).filter(Number.isFinite));
+    entry.latestId = Math.max(entry.latestId, Number(row.latest_id));
+  }
+  const median = (values: number[]): number | null => {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  const releases = [...byRelease.values()]
+    .sort((a, b) => b.latestId - a.latestId || b.release - a.release)
+    .slice(0, 20)
+    .map(({ release, events, apply, cold }) => ({
+      release,
+      events,
+      apply_ms_median: median(apply),
+      cold_start_ms_median: median(cold),
+    }));
+  return c.json({ releases });
+});
+
 app.get("/band/:cohort", (c) => {
   try { return c.json({ band: bandForCohort(Number(c.req.param("cohort"))) }); }
   catch { return c.json({ error: "cohort must be 0-999" }, 400); }
