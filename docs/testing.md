@@ -126,9 +126,35 @@ For open-ended exploration, point an AI assistant at the same simulator over [MC
 | `phone.openUrl(url)` | Open a deep link in the app. Throws `no_url_listener` if the app does not listen. |
 | `phone.notifications.receive({...})` / `tap(id?)` / `notifications()` | Push notifications and the shade. Grant `notifications` permission first, or nothing is delivered. `receive` returns whether it was delivered. |
 | `phone.deviceLog()` | What the app asked of the device. |
+| `secret(name)` | Read `SHIPVO_TEST_<NAME>`; throws if unset. Masked as `***` in errors. |
 | `phone.screenshot()` | A PNG of the screen (same machine as the simulator). |
 
 Vitest adds the `phone` fixture (a new phone per test) and two matchers, `toSee(text | RegExp)` and `toHaveButton(name)`.
+
+## Logins and other secrets
+
+Do not type a password into a test. Read it from the environment instead.
+
+```ts
+import { secret } from "@shipvo/test";
+await phone.type("Password", secret("PASSWORD"));
+```
+
+`secret("PASSWORD")` reads `SHIPVO_TEST_PASSWORD`. If it is not set, the test fails with an error that names the variable. In plain-language tests use a placeholder:
+
+```
+type "{secret:PASSWORD}" into "Password"
+```
+
+The placeholder is resolved only when the step runs. The step text, `--repair` diffs and compiled tests keep `{secret:PASSWORD}`. Error messages and `--report` files show `***` in place of any secret value that was read. Masking is by exact value, so a secret that the app shows in a changed form (for example upper-cased) is not masked. Values shorter than 4 characters are never masked, and masking lasts for the process that read the secret. `{secret:NAME}` is resolved only in `type` steps, not in `see` or `wait for`.
+
+In GitHub Actions, map a repository secret to the variable:
+
+```yaml
+- run: npx shipvo test
+  env:
+    SHIPVO_TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+```
 
 ## Repair broken steps
 
@@ -174,3 +200,38 @@ Writes one JSON file, whether the run passes or fails. The exit code is the same
 - Each flow is one `.steps` file. `status` is `passed` or `failed`. `failedStep` and `message` are `null` when it passed.
 - `parityLimits` is the same list the explore report prints.
 - The file holds no keys or tokens.
+
+## Gate a rollout on tests
+
+One CI job: build, test, publish to the first cohort, then promote only if the tests passed. Each step stops the job if it fails.
+
+```bash
+# gate-recipe:start
+RELEASE=43   # the next release number; `shipvo status` shows the current one
+npx shipvo sim --port 4545 > sim.log 2>&1 &
+for i in $(seq 1 180); do curl -sf localhost:4545/app/ >/dev/null && break; sleep 1; done
+npx shipvo test --report shipvo-report.json --release $RELEASE
+npx shipvo publish --bands b0 --release $RELEASE
+npx shipvo promote --to b1,b2 --report shipvo-report.json
+# gate-recipe:end
+```
+
+Install Chromium first: `npx playwright install --with-deps chromium`.
+
+1. `shipvo sim` builds the app and serves it in the simulator. The loop waits for `localhost:4545/app/` before the tests start.
+2. `shipvo test --report --release $RELEASE` runs every flow and writes the results file, pass or fail. A failing flow gives a non-zero exit, so the job stops here.
+3. `shipvo publish --bands b0 --release $RELEASE` builds, signs and publishes to the first cohort only. Use the same number as in step 2.
+4. `shipvo promote --report` refuses to widen the release when the report has a failing flow for that release. The report's `release` must match the release being promoted. Otherwise promote warns that the report is stale and goes on. See [`shipvo promote`](cli.md#shipvo-promote).
+
+Publish to b0 does reach the first cohort. Only `promote` is gated by the report.
+
+A drift test (`packages/cli/test/docs-gate-recipe.test.ts`) checks that every `npx shipvo` command and flag in the block above appears in `shipvo` help.
+
+## Markdown report for issues and PR comments
+
+```bash
+npx shipvo test --report-md shipvo-report.md --release 42
+gh issue create --title "Shipvo flows failed on release 42" --body-file shipvo-report.md
+```
+
+`--report-md` writes a Markdown file and nothing else; the CLI never calls GitHub. It can be used with `--report`. The file lists the release, the commit and the passed and failed counts. Each failing flow gets its steps, the failed step, the error and any screenshot file names, then the parity limits. A run where every flow passes gets a short "all flows passed" summary. Missing fields (no commit, no release, no screenshots) are shown as "unknown", "not set" or left out. Text is copied from the report as is, so values masked there stay masked.

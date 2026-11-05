@@ -62,9 +62,17 @@ function playwrightChromiumPath(cwd: string): string | null {
   return null;
 }
 
-/** Same wording as `shipvo sim` prints when the launch fails. */
-function chromiumFix(version: string | null): string {
-  return `run \`npx playwright install chromium\` in the app folder${version ? ` (playwright ${version})` : ""}. On Linux, if Chromium then fails to start, run \`npx playwright install --with-deps chromium\` or install the system packages it lists.`;
+/** Where system Chrome or Edge lives. Same places as the simulator's browser resolver (packages/sim/browser-resolver.mjs). */
+function systemBrowserPaths(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): Array<[string, string]> {
+  if (platform === "win32") {
+    const roots = [env.PROGRAMFILES, env["PROGRAMFILES(X86)"], env.LOCALAPPDATA].filter(Boolean) as string[];
+    return roots.flatMap((r): Array<[string, string]> => [["Chrome", r + "\\Google\\Chrome\\Application\\chrome.exe"], ["Edge", r + "\\Microsoft\\Edge\\Application\\msedge.exe"]]);
+  }
+  if (platform === "darwin") return [["Chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"], ["Edge", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]];
+  return [
+    ["Chrome", "/usr/bin/google-chrome"], ["Chrome", "/usr/bin/google-chrome-stable"], ["Chrome", "/opt/google/chrome/chrome"],
+    ["Edge", "/usr/bin/microsoft-edge"], ["Edge", "/usr/bin/microsoft-edge-stable"], ["Edge", "/opt/microsoft/msedge/msedge"],
+  ];
 }
 
 function hasSimScript(deps: DoctorDeps): boolean {
@@ -181,8 +189,13 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
 
   // Simulator checks only apply to projects that have a `sim` script.
   if (!deps.skipSim && hasSimScript(deps)) {
+    const system = systemBrowserPaths(deps.platform, deps.env).find(([, p]) => deps.fileExists(p));
     const exe = deps.chromiumPath(deps.cwd);
-    results.push({ name: "Playwright Chromium installed", ok: !!exe && deps.fileExists(exe), fix: chromiumFix(deps.playwrightVersion(deps.cwd)) });
+    const cached = !!exe && deps.fileExists(exe);
+    const noAuto = deps.env.SHIPVO_NO_AUTO_INSTALL === "1";
+    const ok = !!system || cached || !noAuto;
+    const note = system ? `system ${system[0]}` : cached ? "Playwright Chromium" : "none found yet; the first run downloads Chromium once";
+    results.push({ name: "Browser for the simulator", ok, fix: `SHIPVO_NO_AUTO_INSTALL=1 is set and no Chrome, Edge or Playwright Chromium was found; install Chrome or Edge, or run \`npx playwright install chromium\` in the app folder${deps.playwrightVersion(deps.cwd) ? ` (playwright ${deps.playwrightVersion(deps.cwd)})` : ""}. On Linux, if it then fails to start, run \`npx playwright install-deps chromium\``, note });
     results.push({ name: `sim port ${deps.port} is free`, ok: await deps.portFree(deps.port), fix: "Stop the other process or pass --port <n>" });
   }
 

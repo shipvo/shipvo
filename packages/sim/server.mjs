@@ -13,7 +13,9 @@ import { parseMockRules } from "./mock-rules.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
+import { resolveBrowser } from "./browser-resolver.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
+import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
 let pw, pwVersion;
@@ -47,9 +49,11 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".json": "applica
 const LAUNCH_TIMEOUT_MS = 60_000;
 let launchBrowser;
 const browserReady = new Promise((resolve, reject) => { launchBrowser = () => {
+  // Resolve first (it may download a browser, which can take longer than the launch timeout), then time the launch only.
+  let opts;
+  try { opts = resolveBrowser({ pw, executablePath: arg("chromium", undefined) }); } catch (e) { reject(e); return; }
   const timer = setTimeout(() => reject(new Error(`Chromium did not start within ${LAUNCH_TIMEOUT_MS / 1000} s`)), LAUNCH_TIMEOUT_MS);
-  const executablePath = arg("chromium", undefined);
-  chromium.launch(executablePath ? { executablePath } : {}).then(resolve, reject).finally(() => clearTimeout(timer));
+  chromium.launch(opts).then(resolve, reject).finally(() => clearTimeout(timer));
 }; });
 browserReady.catch((e) => { console.error(`sim: ${launchErrorMessage(e.message, pwVersion)}`); process.exit(1); });
 const sessions = new Map();
@@ -87,43 +91,14 @@ class SimError extends Error { constructor(code, message) { super(message); this
 async function screen(page) {
   await page.waitForTimeout(150);
   const epoch = await epochOf(page);
-  // Phones only expose the items of a horizontal list that are on screen; hide the rest, as a phone would,
-  // so an agent learns to swipe the rail ("scroll right <ref>") exactly as it must on a device.
-  await page.evaluate(() => {
-    for (const el of document.querySelectorAll("[data-pn-offscreen]")) { el.removeAttribute("aria-hidden"); el.removeAttribute("data-pn-offscreen"); }
-    // A modal sheet (accessibilityViewIsModal / aria-modal) hides everything behind it from assistive tech on phones.
-    const modal = [...document.querySelectorAll('[aria-modal="true"]')].pop();
-    if (modal) for (let node = modal; node && node !== document.body; node = node.parentElement)
-      for (const sib of node.parentElement?.children ?? []) if (sib !== node && !sib.hasAttribute("aria-hidden")) { sib.setAttribute("aria-hidden", "true"); sib.setAttribute("data-pn-offscreen", "1"); }
-    for (const sc of document.querySelectorAll("div")) {
-      const cs = getComputedStyle(sc);
-      if (!/(auto|scroll)/.test(cs.overflowX) || sc.scrollWidth <= sc.clientWidth + 1) continue;
-      const box = sc.getBoundingClientRect();
-      const row = sc.firstElementChild; if (!row) continue;
-      for (const item of row.children) {
-        const r = item.getBoundingClientRect();
-        if (r.right <= box.left + 1 || r.left >= box.right - 1) { item.setAttribute("aria-hidden", "true"); item.setAttribute("data-pn-offscreen", "1"); }
-      }
-    }
-  });
+  // Hide what a phone would not expose, so an agent learns to swipe a rail exactly as it must on a device.
+  await page.evaluate(`(${clearScreenRules})(document); (${applyScreenRules})(document)`);
   // What is hidden from assistive tech must not appear at all: this Playwright keeps aria-hidden nodes but strips
   // their names. `inert` removes them from the accessibility tree; it is set only for the snapshot and removed after.
   await page.evaluate(() => { for (const el of document.querySelectorAll('[aria-hidden="true"]')) { el.setAttribute("data-pn-prev-display", el.style.display || ""); el.style.setProperty("display", "none", "important"); } });
   const tree = await page.locator("body").ariaSnapshot({ mode: "ai" });
   await page.evaluate(() => { for (const el of document.querySelectorAll("[data-pn-prev-display]")) { const prev = el.getAttribute("data-pn-prev-display"); if (prev) el.style.display = prev; else el.style.removeProperty("display"); el.removeAttribute("data-pn-prev-display"); } });
-  const lines = tree.split("\n").filter((l) => !/^\s*- generic \[ref=e\d+\]:?\s*$/.test(l));
-  // A screen reader announces a control's label, not the words inside it (Android and iOS group a pressable's
-  // children into one element). Drop the inner text lines of labelled controls, as the phones do.
-  const out = []; let hideBelow = -1;
-  for (const l of lines) {
-    const indent = l.search(/\S/);
-    if (hideBelow >= 0 && indent > hideBelow) continue;
-    hideBelow = -1;
-    if (/\[aria-hidden\]/.test(l)) { hideBelow = indent; continue; }   // hidden from assistive tech: not on screen
-    out.push(l);
-    if (/^\s*- (button|radio|link|checkbox|switch|tab) "[^"]+"/.test(l) && /:\s*$/.test(l)) hideBelow = indent;
-  }
-  const text = out.join("\n");
+  const text = filterTree(tree);
   return epoch ? text.replace(/\[ref=(e\d+)\]/g, `[ref=p${epoch}$1]`) : text;
 }
 

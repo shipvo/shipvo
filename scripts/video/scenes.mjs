@@ -193,3 +193,78 @@ ${tcmd([{ t: "npx shipvo publish --dry-run --skip-web true", tt: 2.4, d: 1.2, ou
 <div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/docs/first-app</div>
 <div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">Next: put it on a real Android phone and send it updates.</div>`,
 });
+
+// --- test-with-an-assistant: real simulator screenshots from the tutorial ---
+const chat = (who, text, x, y, w, d, col = "var(--sky)") => `<div class="abs card in" style="left:${x}px;top:${y}px;width:${w}px;padding:18px 24px;--d:${d}s"><div class="mono" style="font-size:16px;color:${col}">${who}</div><div style="font-size:26px;line-height:1.35;margin-top:6px">${text}</div></div>`;
+const logLine = (t, d, y, hot = false) => `<div class="fade" style="--d:${d}s;${hot ? "background:#3a2a10;margin:0 -26px;padding:0 26px;" : ""}">${t}</div>`;
+
+Object.assign(SCENES, {
+  taHook: () => `
+${chip("Beginner tutorial")}
+<h1 class="abs in" style="left:72px;top:130px;width:700px;--d:.5s">Who tests your app<br><span class="or">before you ship?</span></h1>
+<div class="abs in mute" style="left:72px;top:440px;width:560px;font-size:30px;line-height:1.35;--d:2.4s">Ask an assistant. No phone needed.</div>
+${chat("YOU", "Shop like a customer in my app.", 700, 380, 480, 3.4, "var(--or)")}
+${chat("ASSISTANT", "Opening the shop. I see five products.", 700, 520, 480, 5.4)}
+<div class="abs flight" style="left:820px;top:120px;width:130px;--fx:-100px;--fy:120px;--tx:120px;--ty:-20px;--d:3s">${plane(130)}</div>`,
+
+  taConnect: () => `
+${chip("Step 1")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Connect your assistant</h2>
+${tcmd([{ t: "npm run sim", tt: 1, d: 1.2, out: "Simulator on http://localhost:4545/app/", od: 2.6 }], 72, 200, 720, .8, 28)}
+<div class="abs card in mono" style="left:72px;top:400px;width:1100px;padding:20px 28px;font-size:20px;line-height:1.6;white-space:nowrap;--d:4.6s">
+  <div class="sky" style="font-size:18px">ONE SETTING</div>
+  <div>{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }</div></div>
+<div class="abs pop" style="left:840px;top:220px;--d:7s"><span class="badge" style="background:#12382b;color:var(--green)">MCP: tools for assistants</span></div>
+<div class="abs in mute" style="left:840px;top:290px;width:340px;font-size:24px;line-height:1.35;--d:8.2s">Claude Desktop, Claude Code or Cursor.</div>`,
+
+  taShop: () => `
+${chip("Step 2")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Shop like a customer</h2>
+${chat("YOU", "Buy the Canvas tote. Make the payment fail, then make it work.", 72, 220, 640, 1.2, "var(--or)")}
+<div class="abs card in" style="left:72px;top:400px;width:640px;padding:20px 26px;--d:3.4s">
+  <div class="mono sky" style="font-size:16px">ASSISTANT TAPS</div>
+  ${["Canvas tote", "Add to cart", "Cart", "Pay (declined)", "Pay (approved)"].map((t, k) => `<span class="badge fade" style="--d:${3.8 + k * .8}s;background:#1a2540;color:var(--paper);font-size:20px;margin:10px 8px 0 0">${t}</span>`).join("")}</div>
+<div class="abs in mute" style="left:72px;top:560px;width:640px;font-size:24px;--d:8.4s">Nothing here is a real payment.</div>
+${shot("02-cart", 800, 30, 210, ["03-order-placed", 8.6], 1.4)}`,
+
+  taProof: () => `
+${chip("Step 3")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Ask for proof</h2>
+<div class="abs term mono in" style="left:72px;top:190px;width:1000px;font-size:26px;line-height:1.4;--d:.9s">
+  <div class="dots"><i></i><i></i><i></i></div>
+  ${logLine('<span class="sky">device_log</span> <span class="mute">simulated: true</span>', 1.6, 0)}
+  ${logLine('payment.request &nbsp;"amount": 18, "currency": "USD"', 2.6, 0)}
+  ${logLine('payment.result &nbsp;"reason": "declined"', 3.6, 0)}
+  ${logLine('payment.request &nbsp;<span class="or">"to": "My Shop"</span>', 4.8, 0, true)}
+</div>
+<div class="abs card in" style="left:72px;top:470px;width:1000px;padding:16px 28px;--d:7s;border-color:#6b4a1c">
+  <div style="font-size:30px;font-weight:700">This shop is called <span class="or">Sandbar Shop</span>. The code says <span class="or">My Shop</span>.</div>
+  <div class="mute" style="font-size:22px;margin-top:6px">A real mistake, caught by the log.</div></div>`,
+
+  taTest: () => `
+${chip("Step 4")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Turn its run into a test</h2>
+<div class="abs card in mono" style="left:72px;top:220px;width:820px;overflow:hidden;--d:1s">
+  <div style="padding:12px 24px;background:#141d33;color:var(--sky);font-size:22px">tests/checkout.test.ts</div>
+  <div style="padding:20px 24px;font-size:24px;line-height:1.65">
+    <div>await phone.tap("Canvas tote");</div>
+    <div>await phone.tap("Cart");</div>
+    <div class="fade" style="--d:3s;background:#3a1620;margin:0 -24px;padding:0 24px"><span style="color:var(--red)">-</span> await phone.waitFor(/\\S/);</div>
+    <div class="fade" style="--d:4.4s;background:#10301f;margin:0 -24px;padding:0 24px"><span style="color:var(--green)">+</span> await phone.waitFor("Total: $18.00");</div>
+    <div>await phone.tap("Pay");</div></div></div>
+<div class="abs in" style="left:72px;top:530px;font-size:28px;--d:2s"><span class="mono or">export_test</span> <span class="mute">gives you the file.</span></div>
+<div class="abs pop" style="left:930px;top:300px;--d:6.6s"><span class="badge" style="background:#12382b;color:var(--green);font-size:26px">Tests 5 passed</span></div>`,
+
+  taHabit: () => `
+${chip("Step 5")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Make it a habit</h2>
+${tcmd([{ t: "npm test && npx shipvo publish --dry-run --skip-web true", tt: 2.6, d: 1.2, out: "Dry run complete. Nothing was sent.", od: 4.6 }], 72, 230, 1130, .8, 28)}
+<div class="abs card in" style="left:72px;top:450px;width:520px;padding:20px 28px;--d:5.6s"><div class="mono sky" style="font-size:18px">TEST PASSES</div><div style="font-size:28px;margin-top:6px;color:var(--green)">Practice release runs</div></div>
+<div class="abs card in" style="left:640px;top:450px;width:520px;padding:20px 28px;--d:7s;border-color:#5a2230"><div class="mono" style="color:var(--red);font-size:18px">TEST FAILS</div><div style="font-size:28px;margin-top:6px">The line stops. Nothing ships.</div></div>`,
+
+  taCta: () => `
+<div class="abs pop" style="left:72px;top:140px;width:330px;--d:.3s">{{MARK}}</div>
+<h1 class="abs in" style="left:470px;top:130px;--d:.8s">Let an assistant<br><span class="or">try it first.</span></h1>
+<div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/docs/test-with-an-assistant</div>
+<div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">Tested on a simulator. Run it before every release.</div>`,
+});

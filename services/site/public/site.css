@@ -418,3 +418,20 @@ main p a:not(.btn):not(.card){text-decoration:underline;text-underline-offset:2p
 .lede-more a,.hero .facts a{display:inline-flex;align-items:center;min-height:44px;color:var(--sky-text);text-decoration:underline;text-underline-offset:3px}
 .lede-more a:hover,.hero .facts a:hover{color:var(--paper)}
 .lede-more a:focus-visible,.hero .facts a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+
+/* ===== phones: tap targets of at least 44px, and nothing wider than the screen (issue #455) =====
+   The `html body` prefix raises specificity so these rules win over component rules defined later in the file. */
+@media(max-width:980px){
+  html body .nav .logo{min-height:44px}
+  html body .cmd button,html body .code-bar .copy,html body .btn.small,html body .share button,html body .share a,html body .blog-top .tabs button{min-height:44px;min-width:44px}
+  html body .code-bar .copy{padding:4px 14px}
+  html body .legal-nav a{min-height:44px;display:inline-flex;align-items:center}
+}
+@media(max-width:520px){
+  .pager{grid-template-columns:minmax(0,1fr)}
+  .pager a{overflow-wrap:anywhere}
+  .pager .next{text-align:left}
+}
+:not(pre)>code{overflow-wrap:anywhere}
+.burger:focus-visible,.mobile-menu a:focus-visible,.mobile-menu button:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:8px}
+@media(max-width:980px){html body .mobile-menu a{min-height:44px;display:flex;align-items:center}}

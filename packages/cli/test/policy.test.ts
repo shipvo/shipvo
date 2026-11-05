@@ -53,3 +53,18 @@ describe("policy validation", () => {
     expect(() => checkPublishPolicy({ maxBand: "b1" }, ["b3"], thu(9), {})).toThrow('--bands: unknown band "b3"');
   });
 });
+
+describe("checkPolicy time zone and staging (shared with the control plane)", () => {
+  const p = { blockedWeekdays: ["thu" as const], blockedAfterHour: 16, timeZone: "Europe/Paris" };
+  it("uses the policy time zone", () => {
+    const now = new Date("2026-11-05T15:00:00Z"); // Thu 16:00 in Paris
+    expect(checkPolicy(p, { band: "b0", actorKind: "human", now })).toMatchObject({ ok: false, rule: "blockedWeekdays" });
+    expect(checkPolicy({ ...p, timeZone: "America/Los_Angeles" }, { band: "b0", actorKind: "human", now })).toEqual({ ok: true });
+  });
+  it("checks requireStageBeforeFull when given the hours at stage", () => {
+    const pol = { requireStageBeforeFull: { percent: 10, minHours: 24 } };
+    const ctx = { band: "b2" as const, actorKind: "human" as const, now: new Date() };
+    expect(checkPolicy(pol, { ...ctx, hoursAtStage: 3 })).toMatchObject({ ok: false, rule: "requireStageBeforeFull" });
+    expect(checkPolicy(pol, { ...ctx, hoursAtStage: 24 })).toEqual({ ok: true });
+  });
+});

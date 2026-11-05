@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, renameSync, rmSync, watch } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
+import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
@@ -76,22 +77,27 @@ export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>;
  * Builds into `<root>/.shipvo/sim-next` and swaps it into `<root>/sim-dist` only if the build succeeds.
  * The old build is moved aside first and moved back if the swap fails.
  * `command` is the shell command; it gets the output dir as its last argument.
+ * A failed build rejects with an Error whose `output` property holds the last 4000 characters of stdout and stderr.
  */
-export function rebuildInto(opts: { root?: string; command?: string } = {}): Promise<void> {
+export function rebuildInto(opts: { root?: string; command?: string; echo?: boolean } = {}): Promise<void> {
   const root = opts.root ?? process.cwd();
   const command = opts.command ?? "npx expo export --platform web --clear --output-dir";
   const next = join(root, ".shipvo", "sim-next"), live = join(root, "sim-dist"), prev = join(root, ".shipvo", "sim-prev");
   return new Promise((resolve, reject) => {
     mkdirSync(join(root, ".shipvo"), { recursive: true });
     rmSync(next, { recursive: true, force: true });
-    const p = spawn(`${command} "${next}"`, { cwd: root, shell: true, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "pipe"] });
+    const p = spawn(`${command} "${next}"`, { cwd: root, shell: true, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "pipe", "pipe"] });
     let tail = "";
-    p.stderr!.on("data", (d) => { tail = (tail + d).slice(-4000); });
+    // Metro and Expo print resolve errors to either stream, so keep both. `echo` also shows them.
+    for (const [stream, out] of [[p.stdout!, process.stdout], [p.stderr!, process.stderr]] as const) {
+      stream.on("data", (d) => { if (opts.echo) out.write(d); tail = (tail + d).slice(-4000); });
+    }
     p.on("error", (e) => { rmSync(next, { recursive: true, force: true }); reject(e); });
     p.on("close", (code) => {
       if (code !== 0) {
         rmSync(next, { recursive: true, force: true });
-        return reject(new Error(tail.trim().split("\n").slice(-5).join("\n") || `build exited with code ${code}`));
+        const err = new Error(tail.trim().split("\n").slice(-5).join("\n") || `build exited with code ${code}`);
+        return reject(Object.assign(err, { output: tail }));
       }
       let moved = false;
       try {
@@ -120,9 +126,11 @@ export async function sim(argv: string[]) {
     console.error(`Building ${cfg.name} for the simulator…`);
     execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
   }
+  try { ensurePlaywright({ cwd: process.cwd() }); }
+  catch (e) { console.error(e instanceof Error ? e.message : String(e)); process.exit(2); }
   let server: string;
   try { server = createRequire(process.cwd() + "/package.json").resolve("@shipvo/sim/server.mjs"); }
-  catch { console.error("Install @shipvo/sim (and playwright) in this app: npm i -D @shipvo/sim playwright && npx playwright install chromium"); process.exit(2); }
+  catch { console.error("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager)."); process.exit(2); }
   const p = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId, ...(a.dir ? ["--dir", a.dir] : [])], { stdio: "inherit", env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
   let exited = false;
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });

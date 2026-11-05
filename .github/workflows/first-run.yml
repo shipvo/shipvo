@@ -11,6 +11,7 @@ on:
     paths: ["packages/cli/**", "scripts/first-run/**", "services/control-plane/**", ".github/workflows/first-run.yml"]
 permissions:
   contents: read
+  actions: read
 concurrency: { group: first-run, cancel-in-progress: true }
 jobs:
   measure:
@@ -32,14 +33,25 @@ jobs:
           curl -sf localhost:8787/health
       - name: Install Chromium for the first agent session (shipvo sim)
         run: bash scripts/agents/install-chromium.sh
+      - name: Get the latest Android e2e report (android-e2e.yml)
+        # Gives measure.mjs the emulator's publish-to-healthy figure (#441, #446). Missing report: the row says not measured.
+        continue-on-error: true
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          ID=$(gh run list -R "${{ github.repository }}" -w android-e2e.yml -s success -L 1 --json databaseId --jq '.[0].databaseId // empty')
+          [ -n "$ID" ] || { echo "no successful android-e2e run yet"; exit 0; }
+          gh run download "$ID" -R "${{ github.repository }}" -n android-e2e-report -D "$RUNNER_TEMP/e2e" && echo "report from run $ID"
       - name: Measure the first run
         run: |
           # --with-session times a first agent session in the simulator (#348); only pass it once measure.mjs has it.
           # pipefail: without it the pipe into tee hid measure.mjs's exit 1 and failed runs showed green (#390).
           set -o pipefail
           SESSION=""; grep -q -- "--with-session" scripts/first-run/measure.mjs && SESSION="--with-session"
+          # --apply-report arrives with #441; pass it only once measure.mjs has it and a report was downloaded.
+          APPLY=(); R="$RUNNER_TEMP/e2e/android-e2e-report.json"
+          grep -q -- "--apply-report" scripts/first-run/measure.mjs && [ -f "$R" ] && APPLY=(--apply-report "$R")
           rc=0
-          node scripts/first-run/measure.mjs --with-install --with-export $SESSION --control-url http://localhost:8787 \
+          node scripts/first-run/measure.mjs --with-install --with-export $SESSION "${APPLY[@]}" --control-url http://localhost:8787 \
             --out "$RUNNER_TEMP/first-run.json" | tee "$RUNNER_TEMP/first-run.md" || rc=$?
           { echo "### First run on ubuntu-latest (clean runner, no secrets)"; echo; cat "$RUNNER_TEMP/first-run.md"; echo; \
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"

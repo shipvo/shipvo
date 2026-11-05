@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { startServer } from "./server.mjs";
 import { publishRelease } from "./release.mjs";
-import { hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
+import { FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const APK = resolve(arg("apk", "shell.apk")), BUNDLES = resolve(arg("bundles", "bundles")), KEY = JSON.parse(readFileSync(arg("key", "key.json"), "utf8"));
@@ -97,7 +97,7 @@ await scenario("first update after install: patch against the APK's own bundle",
   return { pass: t.ok && t.via === "patch", ...t, fullBundleBytes: t.bundleBytes };
 });
 
-await scenario("update: full bundle (no patches offered)", async () => {
+await scenario(FULL_BUNDLE_SCENARIO, async () => {
   const trials = []; for (let i = 0; i < TRIALS; i++) trials.push(await updateTrial(bundle("v" + (2 + i)), []));
   return { pass: trials.every((t) => t.ok && t.via === "full"), trials, median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"]) };
 });
@@ -211,6 +211,6 @@ for (const [kind, file, title, maxBadRuns] of [
 });
 
 writeFileSync(join(WORK, "logcat-crash.txt"), adb("logcat", "-d", "-b", "crash"));
-const report = { env, scenarios: results, allPassed: results.every((r) => r.pass), serverLog: LOG };
+const report = { env, scenarios: results, allPassed: results.every((r) => r.pass), firstRun: firstRunFrom(results), serverLog: LOG };
 writeFileSync(OUT, JSON.stringify(report, null, 2)); console.log(`wrote ${OUT}: ${results.filter((r) => r.pass).length}/${results.length} scenarios passed`);
 server.close(); process.exit(0);

@@ -98,3 +98,9 @@ body.vid-fs .side-toggle{display:none!important}
 .phone-shot img{max-width:min(100%,320px);height:auto;border-radius:12px}
 .phone-msg{color:var(--mute);margin:0 0 8px}
 details>summary{display:flex;align-items:center;min-height:44px;cursor:pointer}
+
+/* Learn sidebar (issue #456) */
+.side-empty{padding:8px 10px;color:var(--mute);font-size:14px}
+.side a[hidden],.side-group[hidden]{display:none}
+.side-group a{min-height:44px;display:flex;align-items:center}
+.prose video,.prose iframe,.prose img{max-width:100%;height:auto}
