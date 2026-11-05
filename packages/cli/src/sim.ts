@@ -39,7 +39,7 @@ export function friendlyBuildError(message: string, verbose = false): string {
   const m = /in file (\S+\.json) at (\d+):(\d+)/.exec(message);
   if (m && /Unexpected token|SyntaxError/.test(message)) {
     const comma = /expected punc [«"']?,/.test(message) || /Unexpected token string/.test(message);
-    const what = comma ? "a comma is missing or extra" : "a character is missing, extra or in the wrong place";
+    const what = comma ? "check for a missing or extra comma" : "a character is missing, extra or in the wrong place";
     return `Your file ${m[1]} has a mistake at line ${m[2]}, column ${m[3]}: ${what}. The page still shows your last good version.`;
   }
   return `build failed, still serving the last good build: ${message.split("\n")[0]} (run with --verbose for details)`;

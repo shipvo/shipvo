@@ -74,7 +74,7 @@ describe("friendlyBuildError", () => {
   it("names the file and line for broken JSON and hides the stack", async () => {
     const { friendlyBuildError } = await import("../src/sim");
     const out = friendlyBuildError(metro);
-    expect(out).toBe("Your file src/data/products.json has a mistake at line 23, column 4: a comma is missing or extra. The page still shows your last good version.");
+    expect(out).toBe("Your file src/data/products.json has a mistake at line 23, column 4: check for a missing or extra comma. The page still shows your last good version.");
     expect(out).not.toContain("transformJSON");
   });
   it("keeps the full message with --verbose", async () => {
