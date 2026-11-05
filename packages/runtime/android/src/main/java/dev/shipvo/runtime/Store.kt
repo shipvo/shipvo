@@ -77,6 +77,7 @@ internal class Store(private val ctx: Context) : BootCounts {
 
   private fun meta(key: String): String? = try {
     val ai = ctx.packageManager.getApplicationInfo(ctx.packageName, PackageManager.GET_META_DATA)
+    // Manifests can store numbers (such as 96) as integers, so convert any type to a string.
     ai.metaData?.get(key)?.toString()
   } catch (_: Exception) { null }
   val baseUrl: String get() = (meta("dev.shipvo.BASE_URL") ?: "").trimEnd('/')

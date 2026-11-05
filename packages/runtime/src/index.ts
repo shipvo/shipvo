@@ -11,6 +11,8 @@ export type CheckResult = {
   /** Shell 1.0.2+ (Android): "patch" when a bsdiff patch was applied, "full" otherwise. iOS always downloads "full". */
   via?: "patch" | "full"; bundleBytes?: number; patchError?: string | null;
   issuedAt?: string; error?: string;
+  /** Android only for now: why a "none" result happened when the control plane rejected the shell's bytecode or native modules. */
+  reason?: "hermes_bytecode_mismatch" | "native_module_missing" | "native_module_version";
 };
 export type HealthyResult = {
   release: number; coldStartMs: number; sinceLoadMs: number; promoted: boolean;
