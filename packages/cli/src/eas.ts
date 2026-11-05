@@ -73,6 +73,26 @@ build:
           project_dir: ios
     - eas/configure_ios_credentials
     - run:
+        name: Write ExportOptions.plist
+        # Nothing else creates this file. The team id comes from the EAS credentials step above;
+        # the profile name is read from the Xcode project that eas/configure_ios_credentials updated.
+        command: |
+          BUNDLE_ID="$(xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -showBuildSettings | awk -F' = ' '/ PRODUCT_BUNDLE_IDENTIFIER /{print $2; exit}')"
+          PROFILE="$(xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -showBuildSettings | awk -F' = ' '/ PROVISIONING_PROFILE_SPECIFIER /{print $2; exit}')"
+          cat > ios/App/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>\${{ steps.resolve_apple_team_id.outputs.apple_team_id }}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict><key>$BUNDLE_ID</key><string>$PROFILE</string></dict>
+          </dict>
+          </plist>
+          PLIST
+    - run:
         name: Archive with distribution signing
         command: |
           xcodebuild archive \\
@@ -116,6 +136,14 @@ function readJson(path: string): Record<string, any> {
 function easJson(root: string, p: CapacitorProject): string {
   const j = readJson(join(root, "eas.json"));
   j.cli = { appVersionSource: "remote", ...(j.cli ?? {}) };
+  for (const k of ["build", "submit"]) {
+    if (j[k] !== undefined && (j[k] === null || typeof j[k] !== "object" || Array.isArray(j[k]))) {
+      throw new Error(`${join(root, "eas.json")} is not valid: "${k}" must be an object. Fix it and run the command again.`);
+    }
+  }
+  if (j.cli !== undefined && (j.cli === null || typeof j.cli !== "object" || Array.isArray(j.cli))) {
+    throw new Error(`${join(root, "eas.json")} is not valid: "cli" must be an object. Fix it and run the command again.`);
+  }
   j.build ??= {};
   if (p.android) j.build["shipvo-android"] ??= { android: { image: ANDROID_IMAGE, buildType: "app-bundle", config: "android.yml" }, distribution: "store" };
   if (p.ios) j.build["shipvo-ios"] ??= { ios: { image: IOS_IMAGE, node: NODE_VERSION, config: "ios.yml" }, distribution: "store", autoIncrement: true };
@@ -157,13 +185,15 @@ export function planEasSetup(root: string, p: CapacitorProject): PlannedFile[] {
 export function ensureSchemeShim(root: string): boolean {
   const link = join(root, SHIM);
   try { lstatSync(link); return false; } catch { /* missing: create it */ }
-  symlinkSync(SHIM_TARGET, link, "dir");
+  try { symlinkSync(SHIM_TARGET, link, "dir"); } catch (e) {
+    throw new Error(`Could not create the link ${SHIM} -> ${SHIM_TARGET} (${(e as Error).message}). Create it yourself (on Windows, run as administrator or turn on Developer Mode), then run the command again.`);
+  }
   return true;
 }
 
 export const ONE_TIME_STEPS = [
-  ["eas", "init"],
-  ["eas", "build:version:set", "-p", "ios"],
+  ["eas-cli", "init"],
+  ["eas-cli", "build:version:set", "-p", "ios"],
 ] as const;
 
 export type Runner = (cmd: string, args: string[], cwd: string) => number;

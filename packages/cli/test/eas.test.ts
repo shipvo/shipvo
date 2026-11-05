@@ -29,7 +29,7 @@ describe("shipvo eas setup", () => {
     const android = readFileSync(join(d, ".eas/build/android.yml"), "utf8");
     for (const s of ["JDK 21", "npx cap sync android", "eas/inject_android_credentials", "eas/run_gradle", ":app:bundleRelease"]) expect(android).toContain(s);
     const ios = readFileSync(join(d, ".eas/build/ios.yml"), "utf8");
-    for (const s of ["npx cap sync ios", "xcodebuild archive"]) expect(ios).toContain(s);
+    for (const s of ["npx cap sync ios", "xcodebuild archive", "ios/App/ExportOptions.plist", "<string>app-store</string>"]) expect(ios).toContain(s);
     expect(existsSync(join(d, "ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme"))).toBe(true);
     expect(readFileSync(join(d, ".gitignore"), "utf8")).toContain("ios/App.xcodeproj\n");
     expect(android).toMatchSnapshot("android.yml");
@@ -68,7 +68,35 @@ describe("shipvo eas setup", () => {
     const d = fixture();
     const calls: string[] = [];
     await run(d, ["setup", "--run"], ((c: string, a: string[]) => { calls.push([c, ...a].join(" ")); return 0; }) as any);
-    expect(calls).toEqual(["npx eas init", "npx eas build:version:set -p ios"]);
+    expect(calls).toEqual(["npx eas-cli init", "npx eas-cli build:version:set -p ios"]);
+  });
+
+  it("--run stops at the first failing step", async () => {
+    const d = fixture();
+    const calls: string[] = [];
+    const { code } = await run(d, ["setup", "--run"], ((c: string, a: string[]) => { calls.push(a.join(" ")); return 3; }) as any);
+    expect(code).toBe(3);
+    expect(calls).toEqual(["eas-cli init"]);
+  });
+
+  it("Android-only repo: no scheme, no .gitignore change, no build:version:set", async () => {
+    const d = mkdtempSync(join(tmpdir(), "shipvo-eas-"));
+    writeFileSync(join(d, "capacitor.config.ts"), "export default {};\n");
+    mkdirSync(join(d, "android"));
+    const calls: string[] = [];
+    await run(d, ["setup", "--run"], ((c: string, a: string[]) => { calls.push(a.join(" ")); return 0; }) as any);
+    expect(calls).toEqual(["eas-cli init"]);
+    expect(existsSync(join(d, "ios"))).toBe(false);
+    expect(existsSync(join(d, ".gitignore"))).toBe(false);
+    expect(existsSync(join(d, ".eas/build/ios.yml"))).toBe(false);
+    expect(Object.keys(JSON.parse(readFileSync(join(d, "eas.json"), "utf8")).build)).toEqual(["shipvo-android"]);
+  });
+
+  it.each([["build", "null"], ["build", '"x"'], ["submit", "[]"]])("rejects eas.json with %s = %s", async (k, v) => {
+    const d = fixture();
+    writeFileSync(join(d, "eas.json"), `{"${k}": ${v}}`);
+    await expect(run(d, ["setup"])).rejects.toThrow(new RegExp(`"${k}" must be an object`));
+    expect(existsSync(join(d, ".eas"))).toBe(false);
   });
 
   it("refuses a non-Capacitor repo", async () => {

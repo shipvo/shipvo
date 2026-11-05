@@ -88,6 +88,26 @@ build:
           project_dir: ios
     - eas/configure_ios_credentials
     - run:
+        name: Write ExportOptions.plist
+        # Nothing else creates this file. The team id comes from the EAS credentials step above;
+        # the profile name is read from the Xcode project that eas/configure_ios_credentials updated.
+        command: |
+          BUNDLE_ID="$(xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -showBuildSettings | awk -F' = ' '/ PRODUCT_BUNDLE_IDENTIFIER /{print $2; exit}')"
+          PROFILE="$(xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -showBuildSettings | awk -F' = ' '/ PROVISIONING_PROFILE_SPECIFIER /{print $2; exit}')"
+          cat > ios/App/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>\${{ steps.resolve_apple_team_id.outputs.apple_team_id }}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict><key>$BUNDLE_ID</key><string>$PROFILE</string></dict>
+          </dict>
+          </plist>
+          PLIST
+    - run:
         name: Archive with distribution signing
         command: |
           xcodebuild archive \\
