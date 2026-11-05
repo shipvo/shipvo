@@ -108,6 +108,35 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
   }
 
+  func testOversizedPartialIsDiscardedAndFetchedFromZero() async throws {
+    let s = store("good")
+    let all = try bundleBytes()
+    _ = try writePartial(s, all + Data(repeating: 0, count: 5))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["bytes"] as? Int, all.count, "a partial larger than the bundle cannot be resumed")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+  }
+
+  func testCompletePartialNeedsNoDownload() async throws {
+    let s = store("good")
+    _ = try writePartial(s, try bundleBytes())
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["bytes"] as? Int, 0, "every byte was already on disk")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+  }
+
+  func testCorruptPartialOfFullSizeIsRejectedThenRefetchedFromZero() async throws {
+    let s = store("good")
+    let all = try bundleBytes()
+    let part = try writePartial(s, Data(repeating: 0xCD, count: all.count))
+    do { _ = try await Updater.check(s); XCTFail("corrupt partial must not verify") } catch let e as UpdateError { XCTAssertTrue(e.message.contains("mismatch")) }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: part.path))
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["bytes"] as? Int, all.count, "the retry starts from zero")
+    XCTAssertEqual(try Verify.sha256Hex(file: URL(fileURLWithPath: s.pendingPath!)), bundleSha)
+  }
+
   func testPartialForAnotherReleaseIsDeleted() async throws {
     let s = store("good")
     let other = s.dir.appendingPathComponent("dl-\(String(repeating: "1", count: 64)).part")
