@@ -126,9 +126,35 @@ For open-ended exploration, point an AI assistant at the same simulator over [MC
 | `phone.openUrl(url)` | Open a deep link in the app. Throws `no_url_listener` if the app does not listen. |
 | `phone.notifications.receive({...})` / `tap(id?)` / `notifications()` | Push notifications and the shade. Grant `notifications` permission first, or nothing is delivered. `receive` returns whether it was delivered. |
 | `phone.deviceLog()` | What the app asked of the device. |
+| `secret(name)` | Read `SHIPVO_TEST_<NAME>`; throws if unset. Masked as `***` in errors. |
 | `phone.screenshot()` | A PNG of the screen (same machine as the simulator). |
 
 Vitest adds the `phone` fixture (a new phone per test) and two matchers, `toSee(text | RegExp)` and `toHaveButton(name)`.
+
+## Logins and other secrets
+
+Do not type a password into a test. Read it from the environment instead.
+
+```ts
+import { secret } from "@shipvo/test";
+await phone.type("Password", secret("PASSWORD"));
+```
+
+`secret("PASSWORD")` reads `SHIPVO_TEST_PASSWORD`. If it is not set, the test fails with an error that names the variable. In plain-language tests use a placeholder:
+
+```
+type "{secret:PASSWORD}" into "Password"
+```
+
+The placeholder is resolved only when the step runs. The step text, `--repair` diffs and compiled tests keep `{secret:PASSWORD}`. Error messages and `--report` files show `***` in place of any secret value that was read. Masking is by exact value, so a secret that the app shows in a changed form (for example upper-cased) is not masked.
+
+In GitHub Actions, map a repository secret to the variable:
+
+```yaml
+- run: npx shipvo test
+  env:
+    SHIPVO_TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+```
 
 ## Repair broken steps
 

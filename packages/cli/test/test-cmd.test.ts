@@ -109,3 +109,23 @@ describe("shipvo test --report", () => {
     } finally { delete process.env.GITHUB_SHA; }
   });
 });
+
+describe("secrets in reports", () => {
+  it("keeps the placeholder and masks values in the report", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "shipvo-secret-"));
+    const f = join(dir, "login.steps"), out = join(dir, "r.json");
+    writeFileSync(f, 'type "{secret:PASSWORD}" into "Password"\n');
+    const base = kit();
+    const k: TestKit = {
+      ...base,
+      parseSteps: () => [{ kind: "type", target: "Password", text: "{secret:PASSWORD}", enter: false, line: 1 }],
+      runSteps: async () => { throw new Error("rejected hunter2-value"); },
+      redact: (t) => t.split("hunter2-value").join("***"),
+    };
+    expect(await testCmd([f, "--report", out], k, () => {})).toBe(1);
+    const text = readFileSync(out, "utf8");
+    expect(text).toContain("{secret:PASSWORD}");
+    expect(text).toContain("rejected ***");
+    expect(text).not.toContain("hunter2-value");
+  });
+});
