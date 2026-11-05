@@ -84,3 +84,14 @@ body.vid-fs .side-toggle{display:none!important}
   .doc{padding:28px 20px calc(44px + 16px + 16px + env(safe-area-inset-bottom,0px))}
   .doc-head{flex-direction:column}
 }
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.phone-embed{margin:24px 0;max-width:100%;text-align:center}
+.phone-embed[hidden],.phone-embed [hidden]{display:none}
+.phone-box{width:min(100%,390px);margin:0 auto;border:8px solid var(--line-2);border-radius:36px;overflow:hidden;background:#fff;box-sizing:content-box;max-width:calc(100% - 16px)}
+.phone-frame{width:390px;height:844px;transform-origin:0 0}
+.phone-frame iframe{width:390px;height:844px;border:0;display:block}
+.phone-embed figcaption{margin-top:10px;font-weight:600}
+.phone-links{margin:6px 0 0;display:flex;gap:18px;justify-content:center}
+.phone-failed .phone-box{display:none}
+.phone-shot img{max-width:min(100%,320px);height:auto;border-radius:12px}
+.phone-msg{color:var(--mute);margin:0 0 8px}

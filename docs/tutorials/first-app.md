@@ -73,9 +73,13 @@ Type the `/app/` at the end. Without it you see `{"error":"not found"}` ([we are
 
 You should see your app, with a dark teal box that says "Hello from Tide Shop." and four buttons.
 
+<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: add a product to the cart" data-fallback="/tutorials/first-app/01-first-screen.png"></div>
+
 ![The Tide Shop starter screen on a 390 by 844 phone: a heading "Tide Shop", a teal box saying "Hello from Tide Shop.", and four buttons: Scan a code, Use my location, Confirm with fingerprint and Send a notification.](/tutorials/first-app/01-first-screen.png)
 
 Click **Send a notification**. The log at the bottom now says "Notification sent". Nothing was really sent: the simulator labels everything it pretends to do.
+
+<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: tap through the sample shop" data-fallback="/tutorials/first-app/02-after-tap.png"></div>
 
 ![The same screen after clicking Send a notification. The log near the bottom now says "Notification sent".](/tutorials/first-app/02-after-tap.png)
 
