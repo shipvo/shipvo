@@ -1,0 +1,1 @@
+- `@shipvo/device`: optional Expo modules (contacts, calendar, document picker and the rest) no longer break `shipvo publish` when the app does not install them. Migration: none.

@@ -11,6 +11,9 @@
     "metro.cjs",
     "README.md"
   ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "peerDependencies": {
     "expo-camera": "*",
     "expo-location": "*",
