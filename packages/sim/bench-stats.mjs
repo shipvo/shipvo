@@ -25,7 +25,7 @@ export function treeRssMb(rootPid, procDir = "/proc") {
   try { names = readdirSync(procDir).filter((n) => /^\d+$/.test(n)); } catch { return null; }
   const info = new Map();
   for (const n of names) {
-    try { const t = readFileSync(`${procDir}/${n}/status`, "utf8"); info.set(Number(n), { ppid: parsePpid(t), kb: parseVmRssKb(t) }); } catch {}
+    try { const t = readFileSync(`${procDir}/${n}/status`, "utf8"); info.set(Number(n), { ppid: parsePpid(t), kb: parseVmRssKb(t) }); } catch { /* process exited or unreadable while we scan: skip it */ }
   }
   if (!info.has(rootPid)) return null;
   const keep = new Set([rootPid]);
