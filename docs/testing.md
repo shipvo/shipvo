@@ -200,3 +200,12 @@ Install Chromium first: `npx playwright install --with-deps chromium`.
 Publish to b0 does reach the first cohort. Only `promote` is gated by the report.
 
 A drift test (`packages/cli/test/docs-gate-recipe.test.ts`) checks that every `npx shipvo` command and flag in the block above appears in `shipvo` help.
+
+## Markdown report for issues and PR comments
+
+```bash
+npx shipvo test --report-md shipvo-report.md --release 42
+gh issue create --title "Shipvo flows failed on release 42" --body-file shipvo-report.md
+```
+
+`--report-md` writes a Markdown file and nothing else; the CLI never calls GitHub. It can be used with `--report`. The file lists the release, the commit and the passed and failed counts. Each failing flow gets its steps, the failed step, the error and any screenshot file names, then the parity limits. A run where every flow passes gets a short "all flows passed" summary. Missing fields (no commit, no release, no screenshots) are shown as "unknown", "not set" or left out. Text is copied from the report as is, so values masked there stay masked.
