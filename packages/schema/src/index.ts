@@ -218,7 +218,7 @@ export function satisfiesRange(version: string, range: string): boolean {
     const toks = norm.split(/\s+/).filter(Boolean);
     return toks.length > 0 && toks.every((t) => {
       if (t === "*" || t === "x" || t === "X") return true;
-      const m = /^(\^|~|>=|<=|>|<|=)?v?(\d+|[xX*])(?:\.(\d+|[xX*]))?(?:\.(\d+|[xX*]))?/.exec(t);
+      const m = /^(\^|~|>=|<=|>|<|=)?v?(\d+|[xX*])(?:\.(\d+|[xX*]))?(?:\.(\d+|[xX*]))?(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.exec(t);
       if (!m) return false;
       const op = m[1] ?? "=";
       const wild = (x?: string) => x === undefined || /[xX*]/.test(x);
