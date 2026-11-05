@@ -73,7 +73,7 @@ export function collectFiles(dir: string): PreviewFile[] {
   return out;
 }
 
-/** The page people open: the app in a phone-sized frame with a device and theme switcher. */
+/** The page people open: the app in an Android or iPhone frame, with skin, size and theme switches and a back control. */
 export function framePage(name: string): string {
   const title = name.replace(/[<>&"']/g, "");
   return `<!doctype html>
@@ -84,22 +84,49 @@ export function framePage(name: string): string {
 html,body{margin:0;height:100%;font:14px system-ui,sans-serif;background:#e8eaed;color:#111}
 body.dark{background:#15171a;color:#eee}
 .bar{display:flex;gap:8px;justify-content:center;align-items:center;padding:10px;flex-wrap:wrap}
-.bar button{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
+.bar button,.back{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
 .bar button[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}
 .stage{display:flex;justify-content:center;padding:0 10px 20px}
-iframe{border:0;background:#fff;border-radius:28px;box-shadow:0 8px 30px #0005;width:360px;height:760px;max-width:100%}
+.device{display:flex;flex-direction:column;background:#000;color:#fff;border-radius:28px;box-shadow:0 8px 30px #0005;overflow:hidden;width:360px;max-width:100%;box-sizing:border-box;padding:0 6px}
+.device[data-skin=iphone]{border-radius:44px;padding:0 10px}
+.status{display:flex;justify-content:space-between;align-items:center;height:28px;padding:0 14px;font-size:12px;flex:none}
+.device[data-skin=iphone] .status{height:44px;padding:0 24px}
+.device[data-skin=android] .status .notch{display:none}
+.device[data-skin=iphone] .status .icons{letter-spacing:2px}
+.notch{width:90px;height:24px;background:#000;border-radius:14px;position:absolute}
+.device[data-skin=iphone] .status{position:relative}
+.device[data-skin=iphone] .status .notch{left:50%;margin-left:-45px;top:8px;background:#111}
+iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
+.nav{flex:none;display:flex;justify-content:center;align-items:center;height:44px}
+.device[data-skin=iphone] .nav{height:28px}
+.back{color:#fff;border-color:#888;padding:4px 14px}
+.device[data-skin=iphone] .back{display:block;width:134px;height:5px;padding:0;border:0;border-radius:3px;background:#fff;font-size:0}
+.device[data-skin=android] .back{border:0}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
-@media (max-width:500px){.bar,.note{display:none}.stage{padding:0}iframe{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0;box-shadow:none}}
+@media (max-width:500px){.bar,.note{display:none}.stage{padding:0}.device{width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}}
 </style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
-<button data-device="phone" aria-pressed="true">Phone</button><button data-device="iphone" aria-pressed="false">iPhone</button><button data-device="tablet" aria-pressed="false">Tablet</button>
+<button data-skin="android" aria-pressed="true">Android</button><button data-skin="iphone" aria-pressed="false">iPhone</button>
+<button data-size="phone" aria-pressed="true">Phone</button><button data-size="large" aria-pressed="false">Large phone</button><button data-size="tablet" aria-pressed="false">Tablet</button>
 <button id="theme" aria-pressed="false">Dark</button></div>
-<div class="stage"><iframe id="app" src="app.html" title="${title}"></iframe></div>
+<div class="stage"><div class="device" id="device" data-skin="android" style="width:360px;height:760px">
+<div class="status" id="status"><span id="clock">9:41</span><span class="notch"></span><span class="icons" id="icons">&#9679;&#9679; 5G 100%</span></div>
+<iframe id="app" src="app.html" title="${title}"></iframe>
+<div class="nav"><button class="back" id="back" aria-label="Back" title="Back">&#9664; Back</button></div>
+</div></div>
 <p class="note">${title}: simulated device, public preview. System sheets such as permissions and payments are simulated.</p>
 <script>
-var S={phone:[360,760],iphone:[390,844],tablet:[820,1180]},f=document.getElementById("app");
-document.querySelectorAll("[data-device]").forEach(function(b){b.onclick=function(){var s=S[b.dataset.device];f.style.width=s[0]+"px";f.style.height=s[1]+"px";document.querySelectorAll("[data-device]").forEach(function(o){o.setAttribute("aria-pressed",o===b)})}});
-var t=document.getElementById("theme");t.onclick=function(){var d=!document.body.classList.contains("dark");document.body.classList.toggle("dark",d);t.setAttribute("aria-pressed",d);t.textContent=d?"Light":"Dark";f.style.colorScheme=d?"dark":"light"};
+var SIZES={phone:[360,760],large:[412,892],tablet:[820,1180]},IPHONE={phone:[390,844],large:[430,932],tablet:[820,1180]};
+var skin="android",size="phone",d=document.getElementById("device"),f=document.getElementById("app"),bk=document.getElementById("back");
+function pressed(sel,val,key){document.querySelectorAll(sel).forEach(function(o){o.setAttribute("aria-pressed",o.dataset[key]===val)})}
+function apply(){var s=(skin==="iphone"?IPHONE:SIZES)[size];d.dataset.skin=skin;d.style.width=s[0]+"px";d.style.height=s[1]+"px";bk.innerHTML=skin==="iphone"?"Back":"&#9664; Back";bk.setAttribute("aria-label","Back");document.getElementById("icons").innerHTML=skin==="iphone"?"5G &#9646; 100%":"&#9679;&#9679; 5G 100%";pressed("[data-skin]",skin,"skin");pressed("[data-size]",size,"size")}
+document.querySelectorAll("[data-skin]").forEach(function(b){b.onclick=function(){skin=b.dataset.skin;apply()}});
+document.querySelectorAll("[data-size]").forEach(function(b){b.onclick=function(){size=b.dataset.size;apply()}});
+// Back does what the simulator's back action does: press the screen's Back button, else go back in history.
+function goBack(){var w=f.contentWindow,doc=w&&w.document;if(!doc)return;var els=doc.querySelectorAll("button,[role=button],a");for(var i=0;i<els.length;i++){var e=els[i],t=(e.getAttribute("aria-label")||e.textContent||"").trim();if(t==="Back"){e.click();return}}w.history.back()}
+bk.onclick=goBack;
+var t=document.getElementById("theme");t.onclick=function(){var k=!document.body.classList.contains("dark");document.body.classList.toggle("dark",k);t.setAttribute("aria-pressed",k);t.textContent=k?"Light":"Dark";f.style.colorScheme=k?"dark":"light"};
+apply();
 </script></body></html>
 `;
 }

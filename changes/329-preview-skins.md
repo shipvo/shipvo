@@ -1,0 +1,1 @@
+- cli: `shipvo preview` frame page has Android and iPhone skins with status bars, a phone / large phone / tablet size switch (no reload) and a Back control that presses the app's Back button, like the simulator's back action.

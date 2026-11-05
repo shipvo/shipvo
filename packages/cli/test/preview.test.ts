@@ -87,9 +87,30 @@ describe("frame page", () => {
     const h = framePage("Shop");
     expect(h).toContain('name="viewport"');
     expect(h).toContain("max-width:500px");
-    for (const d of ["phone", "iphone", "tablet"]) expect(h).toContain(`data-device="${d}"`);
+    for (const d of ["android", "iphone"]) expect(h).toContain(`data-skin="${d}"`);
+    for (const d of ["phone", "large", "tablet"]) expect(h).toContain(`data-size="${d}"`);
+    expect(h).toContain("simulated device");
     expect(h).toContain('id="theme"');
     expect(h).toContain('src="app.html"');
+  });
+  it("switches skin and size in the page without reloading, and back presses the app's Back button", async () => {
+    const h = framePage("Shop");
+    expect(h).not.toMatch(/location\.(reload|href)/);
+    const script = h.match(/<script>([\s\S]*)<\/script>/)![1];
+    const mk = (extra: object = {}) => ({ style: {} as Record<string, string>, dataset: {} as Record<string, string>, setAttribute() {}, classList: { contains: () => false, toggle() {} }, ...extra });
+    const nodes: Record<string, any> = {};
+    const clicked: string[] = [];
+    const backBtn = { getAttribute: () => "Back", textContent: "", click: () => clicked.push("btn") };
+    const win = { document: { querySelectorAll: () => [backBtn] }, history: { back: () => clicked.push("history") } };
+    for (const id of ["device", "app", "back", "icons", "theme"]) nodes[id] = mk(id === "app" ? { contentWindow: win } : {});
+    const chips = [["skin", "iphone"], ["size", "tablet"]].map(([k, v]) => mk({ dataset: { [k]: v } }));
+    const doc = { getElementById: (id: string) => nodes[id], querySelectorAll: (s: string) => (s === "[data-skin]" ? [chips[0]] : s === "[data-size]" ? [chips[1]] : []), body: mk() };
+    new Function("document", script)(doc);
+    expect(nodes.device.style.width).toBe("360px");
+    (chips[0] as any).onclick(); expect(nodes.device.dataset.skin).toBe("iphone"); expect(nodes.device.style.width).toBe("390px");
+    (chips[1] as any).onclick(); expect(nodes.device.style.width).toBe("820px");
+    nodes.back.onclick(); expect(clicked).toEqual(["btn"]);
+    win.document.querySelectorAll = () => []; nodes.back.onclick(); expect(clicked).toEqual(["btn", "history"]);
   });
   it("wrapBuild moves the app entry to app.html and writes the frame as index.html", () => {
     const d = mkdtempSync(join(tmpdir(), "pv-"));
