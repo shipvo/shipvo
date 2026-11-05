@@ -20,7 +20,7 @@ Why they would still choose something else today:
 
 - **Expo EAS Update** is the default for Expo apps. It has per-update rollout percentages, rollback commands, end-to-end code signing (paid plans only, per DeepWiki on `expo/expo`) and bsdiff patch support. Shipvo has no polished dashboard and a much smaller community.
 - **No track record.** We have one sample app in the evidence. No outside team has told us they ship with Shipvo (all 8 issues to date were opened by one account).
-- **iOS is new.** The iOS runtime shipped on 2026-10-31. There are no bsdiff patches on iOS yet (#2), and iOS apply time is not yet published (#1).
+- **iOS is new.** The iOS runtime shipped on 2026-10-31. iOS bsdiff patch size and apply time are now measured in CI (see the metrics table).
 - **Bytecode safety is half done.** Publish now records the Hermes bytecode version (#10, #12), but shells do not check it yet.
 - **Maestro and mobile-mcp** already have users for agent-driven testing on real devices and emulators. Our simulator only covers what the app exposes in React Native Web.
 
@@ -35,6 +35,7 @@ Input metrics:
 | npm downloads, last week (2026-10-28 to 2026-11-03) | `@shipvo/mcp` 1,299; `@shipvo/cli` 830; `@shipvo/sim` 602; `@shipvo/device` 592; `@shipvo/runtime` 582; `@shipvo/schema` 474; `@shipvo/test` 238 | `https://api.npmjs.org/downloads/point/last-week/@shipvo/<pkg>`, read 2026-11-04. These include CI installs and mirrors; they are not unique users. |
 | Time from first `shipvo init` to first applied OTA | Partial: on a clean ubuntu-latest runner, 2026-11-05, [run 42060080281](https://github.com/shipvo/shipvo/actions/runs/42060080281): `init` 0.13 s, `pnpm install` 5.65 s, `doctor` 0.13 s, 7.49 s total. The job stopped at `app create` (HTTP 409, `"app"` is a reserved app id), so bundle export and a real publish were not timed. Store builds and a real applied OTA are not timed either, so this is not the full path. | Fix the `app create` step (use a non-reserved app id) so export and a real publish get timed (bet 3). |
 | Update safety on device (Android) | Publish to applied 16–36 s; patch 64 KB vs 1.57 MB full; crash-loop revert after 3 failed boots; cold start 847–931 ms on a Redmi 9A (Android only) | [spike results](../spike-results.md), 2026-10-30 |
+| Update size and apply time (iOS Simulator) | First update from the embedded bundle as a bsdiff patch: median 83,999 bytes vs 1,996,082 bytes full bundle; median patch apply time 573 ms (3 runs; Xcode 26.6, `macos-26-arm64`) | [run 42087991990](https://github.com/shipvo/shipvo/actions/runs/42087991990), 2026-11-05; [spike results](../spike-results.md#ios-patch-size-and-patch-apply-time) |
 | Simulator-vs-device parity | 100% actionable on 13 screens (Flows A and B) on Android and iOS; text 98.6% Android, 96.2% iOS | [parity results](../parity-results.md) |
 | Agent task success without screenshots | 5/5 Haiku, after 4/5 Sonnet on round 1 | [agent gate results](../agent-gate-results.md) |
 | GitHub stars and forks | Not read this week (the GitHub call was blocked in this run) | `gh api repos/shipvo/shipvo --jq '.stargazers_count,.forks_count'`; record next week |
