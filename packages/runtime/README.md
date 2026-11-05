@@ -8,8 +8,10 @@ The native half of Shipvo's over-the-air updates, as an Expo module.
 - Android and iOS. iOS applies patches from the bundle it is running (not yet from the app's embedded bundle) and downloads the full bundle otherwise. It is verified on the iOS Simulator in CI; in the web simulator the app runs the same release as the web build.
 
 ```json
-{ "expo": { "plugins": [["@shipvo/runtime", { "baseUrl": "https://<your control plane>", "publicKey": "<base64 Ed25519 public key>", "appId": "myshop" }]] } }
+{ "expo": { "plugins": [["@shipvo/runtime", { "baseUrl": "https://<your control plane>", "publicKey": "<base64 Ed25519 public key>", "appId": "myshop", "hermesBytecodeVersions": [96, 98], "nativeModules": { "react-native-mmkv": "1.0.0", "@scope/pkg": "2.1.0" } }]] } }
 ```
+
+The plugin writes `hermesBytecodeVersions` as a comma-joined list (e.g. `96,98`) to `dev.shipvo.HERMES_BYTECODE_VERSIONS` (Android manifest) and `ShipvoHermesBytecodeVersions` (Info.plist), and `nativeModules` as `name@version` entries joined by commas (e.g. `react-native-mmkv@1.0.0,@scope/pkg@2.1.0`) to `dev.shipvo.NATIVE_MODULES` and `ShipvoNativeModules`. Neither is written when the prop is omitted. The runtime does not read these values yet.
 
 ```ts
 import { Runtime } from "@shipvo/runtime";

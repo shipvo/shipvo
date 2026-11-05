@@ -6,10 +6,11 @@ const { withAndroidManifest, withInfoPlist, AndroidConfig } = require("expo/conf
 function validateHermesBytecodeVersions(versions) {
   if (versions == null) return null;
   if (!Array.isArray(versions)) throw new Error("@shipvo/runtime: hermesBytecodeVersions must be an array of integers");
+  if (versions.length === 0) throw new Error("@shipvo/runtime: hermesBytecodeVersions must not be empty");
   for (const v of versions) {
-    if (!Number.isInteger(v)) throw new Error("@shipvo/runtime: hermesBytecodeVersions must contain integers only");
+    if (!Number.isInteger(v) || v <= 0) throw new Error("@shipvo/runtime: hermesBytecodeVersions must contain positive integers only");
   }
-  return versions.join(",");
+  return [...new Set(versions)].join(",");
 }
 
 function validateNativeModules(mods) {
@@ -17,7 +18,8 @@ function validateNativeModules(mods) {
   if (typeof mods !== "object" || Array.isArray(mods)) throw new Error("@shipvo/runtime: nativeModules must be an object");
   const entries = [];
   for (const [name, version] of Object.entries(mods)) {
-    if (!name) throw new Error("@shipvo/runtime: nativeModules package name must not be empty");
+    if (!name || /\s/.test(name) || name.includes(",")) throw new Error("@shipvo/runtime: nativeModules package name must be a non-empty string without whitespace or commas");
+    if (typeof version !== "string" || !version || /\s/.test(version) || version.includes(",")) throw new Error("@shipvo/runtime: nativeModules version must be a non-empty string without whitespace or commas");
     entries.push(`${name}@${version}`);
   }
   return entries.join(",");
