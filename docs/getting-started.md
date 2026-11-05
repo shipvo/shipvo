@@ -6,7 +6,9 @@ Also in: [Français](fr/getting-started.md)
 
 Video: [Ship an update to phones in minutes](videos.md), 1 min 30 s, with captions and a transcript.
 
-Twenty minutes from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
+This guide takes you from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
+
+What we measured: on 2026-11-05, on a GitHub Actions Linux runner (4 vCPU, AMD EPYC 7763, Node 22), `shipvo init` took 100 ms and `shipvo publish --dry-run` took 107 ms, run offline. We did not time install, bundle export or store builds, so this is not the full path. See [`scripts/first-run/`](../scripts/first-run/) to re-run it.
 
 ## 0. What you need
 
@@ -14,7 +16,7 @@ Twenty minutes from nothing to an app that AI agents can open in a simulator, th
   Check with `node --version`. It must print `v22` or higher. If not, run `nvm use 22` or install Node 22 from nodejs.org.
 - For the simulator: Chromium via Playwright (one command below). No Android Studio, no Xcode, no phone.
 - For phones: Android Studio once (`npx expo run:android`), or EAS Build.
-- For publishing: a control plane. Use the hosted one (`shipvo login`, then `shipvo app create`, both below) or self-host yours on Cloudflare in ten minutes ([self-hosting.md](self-hosting.md)).
+- For publishing: a control plane. Use the hosted one (`shipvo login`, then `shipvo app create`, both below) or self-host yours on Cloudflare ([self-hosting.md](self-hosting.md)).
 
 ## 1. Create the app
 
