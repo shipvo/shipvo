@@ -5,9 +5,16 @@ export type ScanResult = { type: string; data: string };
 export type AuthResult = { ok: true } | { ok: false; reason: "cancelled" | "failed" | "unavailable" | "not_enrolled" };
 export type PaymentRequest = { provider: "mobile_money" | "card"; amount: number; currency: string; to: string; reference: string; phone?: string };
 export type PaymentResult = { ok: true; receipt: string } | { ok: false; reason: "declined" | "cancelled" | "timeout" | "insufficient_funds" };
+/** One address-book entry. */
+export type Contact = { id: string; name: string; phoneNumbers?: string[]; emails?: string[] };
+/** One calendar event. `start` and `end` are ISO 8601 strings. */
+export type CalendarEvent = { id: string; title: string; start: string; end: string; allDay?: boolean; location?: string; notes?: string };
+/** A time range for reading events. Events that overlap it are returned. */
+export type DateRange = { start: string | Date; end: string | Date };
+export type PermissionName = "camera" | "location" | "notifications" | "contacts" | "calendar";
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 
-export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network";
+export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "contacts" | "calendar";
 /** How a capability is provided here: by the real OS/SDK, by the simulated device, or not at all. Never a silent fallback. */
 export type Support = "real" | "simulated" | "unavailable";
 export interface Device {
@@ -15,7 +22,7 @@ export interface Device {
   kind: "native" | "simulated";
   /** Declared support per capability on this device, so tests and agents know what was actually exercised. */
   capabilities(): Record<Capability, Support>;
-  permissions: { get(name: "camera" | "location" | "notifications"): Promise<PermissionStatus>; request(name: "camera" | "location" | "notifications"): Promise<PermissionStatus> };
+  permissions: { get(name: PermissionName): Promise<PermissionStatus>; request(name: PermissionName): Promise<PermissionStatus> };
   location: { current(): Promise<Coords> };
   /** Opens the camera to scan one barcode or QR code. Resolves with the code, or null if the person cancels. */
   camera: { scan(opts?: { prompt?: string }): Promise<ScanResult | null> };
@@ -24,6 +31,10 @@ export interface Device {
   pay: { charge(req: PaymentRequest, pin: string): Promise<PaymentResult> };
   notifications: { show(n: Omit<Notification, "id">): Promise<string>; onOpen(cb: (n: Notification) => void): () => void };
   share: { text(text: string, title?: string): Promise<boolean> };
+  /** Reads the address book. Asks for permission first; throws `Contacts permission denied` when refused. Read-only. */
+  contacts: { getAll(): Promise<Contact[]> };
+  /** Reads calendar events that overlap `range`, ordered by start. Asks for permission first; throws `Calendar permission denied` when refused. Read-only. */
+  calendar: { getEvents(range: DateRange): Promise<CalendarEvent[]> };
   clipboard: { set(text: string): Promise<void>; get(): Promise<string> };
   net: { online(): boolean; onChange(cb: (online: boolean) => void): () => void };
 }

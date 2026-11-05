@@ -10,7 +10,7 @@ import { device } from "@shipvo/device";
 
 ```ts
 device.kind                 // "native" | "simulated"
-device.capabilities()       // { camera: "real" | "simulated" | "unavailable", location: …, biometrics, payments, notifications, share, clipboard, network }
+device.capabilities()       // { camera: "real" | "simulated" | "unavailable", location: …, biometrics, payments, notifications, share, clipboard, contacts, calendar, network }
 ```
 
 Every capability declares how it is provided *here*. There is no silent fallback: on a phone without `expo-camera` installed, `camera` is `unavailable` and `scan()` throws; in the simulator every capability is `simulated`. Tests and agents read this to know what was actually exercised. Simulated results are also marked in what they return: receipts start with `SIMULATED-` (simulator) or `SANDBOX-` (the built-in sandbox provider on phones until a gateway is configured), and every entry in the simulator's device log carries `simulated: true`.
@@ -18,8 +18,8 @@ Every capability declares how it is provided *here*. There is no silent fallback
 ## Permissions
 
 ```ts
-await device.permissions.get("camera" | "location" | "notifications")      // "granted" | "denied" | "undetermined"
-await device.permissions.request("camera" | "location" | "notifications")
+await device.permissions.get("camera" | "location" | "notifications" | "contacts" | "calendar")      // "granted" | "denied" | "undetermined"
+await device.permissions.request("camera" | "location" | "notifications" | "contacts" | "calendar")
 ```
 
 On phones: the Expo permission calls. In the simulator: the platform's own dialog, worded as Android ("Allow My Shop to take pictures and record video?" with *While using the app / Only this time / Deny*) or iOS ("“My Shop” Would Like to Access the Camera" with *Allow / Don't Allow*) words it, depending on the simulated device's `platform`. Android below API 33 grants notifications without asking, as the OS does. The answer is remembered for the session.
@@ -79,6 +79,48 @@ await device.clipboard.set(text); await device.clipboard.get();
 
 Simulator: a share sheet with WhatsApp / Messages / Copy; Copy writes the simulated clipboard.
 
+## Contacts
+
+Support level: **simulated** in the simulator, **real** on a phone when `expo-contacts` is installed (`unavailable` otherwise). Read-only: writing contacts is not supported.
+
+```ts
+const people = await device.contacts.getAll();   // [{ id, name, phoneNumbers?, emails? }]
+```
+
+Asks for contacts permission first (the system dialog appears on first use). Throws `Contacts permission denied` when refused, on phones and in the simulator. Apps that import `expo-contacts` directly work too: `getContactsAsync` returns `{ data, hasNextPage, hasPreviousPage, total }` in the simulator.
+
+Test it with `@shipvo/test`:
+
+```ts
+import { openApp } from "@shipvo/test";
+const phone = await openApp();
+await phone.contacts.set([{ id: "1", name: "Amina Njoya", phoneNumbers: ["+237 6 55 00 11 22"] }]);
+await phone.device.set({ permissions: { contacts: "granted" } });   // or "denied", or leave it to tap the dialog
+// …open the invite screen: the app now lists "Amina Njoya"
+```
+
+Agents use `set_device(contacts: [...], permissions: { contacts })` over MCP.
+
+## Calendar
+
+Support level: **simulated** in the simulator, **real** on a phone when `expo-calendar` is installed (`unavailable` otherwise). Read-only: writing or deleting events is not supported, and recurring events are not expanded.
+
+```ts
+const events = await device.calendar.getEvents({ start: "2026-11-01", end: "2026-12-01" });
+// [{ id, title, start, end, allDay?, location?, notes? }], start and end are ISO 8601 strings
+```
+
+Returns events that overlap the range, ordered by start. Asks for calendar permission first. Throws `Calendar permission denied` when refused, on phones and in the simulator. Apps that import `expo-calendar` directly work too: in the simulator `getCalendarsAsync` returns one calendar and `getEventsAsync` returns the seeded events.
+
+Test it with `@shipvo/test`:
+
+```ts
+await phone.calendar.set([{ id: "e1", title: "Dentist", start: "2026-11-10T09:00:00Z", end: "2026-11-10T10:00:00Z" }]);
+await phone.device.set({ permissions: { calendar: "granted" } });   // or "denied", or tap the dialog
+```
+
+Agents use `set_device(calendar: [...], permissions: { calendar })` over MCP.
+
 ## Network
 
 ```ts
@@ -92,7 +134,7 @@ Simulator: `set_device(online: false)` takes the phone offline; the app's offlin
 
 | MCP tool | Effect |
 | --- | --- |
-| `set_device(session, platform?, api?, permissions?, location?, camera?, biometrics?, payment?, online?)` | Change any part of the device state mid-session |
+| `set_device(session, platform?, api?, permissions?, contacts?, calendar?, location?, camera?, biometrics?, payment?, online?)` | Change any part of the device state mid-session |
 | `device_reset(session, profile?)` | Back to a known state: permissions undetermined, default location, nothing in view, log cleared |
 | `push_notification(session, title, body, data?)` | Deliver a notification to the phone |
 | `notifications(session)` / `open_notification(session, id?)` | The shade; tap one |
@@ -100,4 +142,4 @@ Simulator: `set_device(online: false)` takes the phone offline; the app's offlin
 
 ## Using raw Expo modules
 
-Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication` or `expo-notifications` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.
+Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication`, `expo-notifications`, `expo-clipboard`, `expo-contacts` or `expo-calendar` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.

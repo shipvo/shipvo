@@ -2,10 +2,11 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort, checkNativeModules } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
-import { describeOwner, runOwnerCommand } from "./owner";
+import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps } from "./apps";
+import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
 const app = new Hono<{ Bindings: Env }>();
@@ -19,7 +20,7 @@ async function hmac(secret: string, msg: string) {
 function safeEqual(a: string, b: string) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
 async function owner(c: any, appId: string): Promise<string | null> {
   const auth = c.req.header("authorization") ?? "";
-  if (c.env.OWNER_TOKEN && auth.startsWith("Bearer ") && safeEqual(auth.slice(7), c.env.OWNER_TOKEN)) return "agent (owner token)";
+  if (c.env.OWNER_TOKEN && auth.startsWith("Bearer ") && safeEqual(auth.slice(7), c.env.OWNER_TOKEN)) return AGENT_ACTOR;
   const cookie = getCookie(c, "pn_admin");
   if (!cookie || !c.env.ADMIN_PASSWORD) return null;
   const [app_, exp, sig] = cookie.split(".");
@@ -59,6 +60,13 @@ async function servePointer(c: any, platform: "android" | "ios") {
       if (bad) return c.json({ error: bad.reason, module: bad.module, required: bad.required, ...(bad.have ? { have: bad.have } : {}) }, 404, { "cache-control": "public, max-age=5" });
     }
   } catch { return c.json({ error: "corrupt_pointer" }, 500); }
+  // A halted release is not offered. A halt for another release, or a corrupt value, is ignored.
+  const halted = await c.env.POINTERS.get(`halt/${appId}`);
+  if (halted) {
+    let haltedRelease: unknown;
+    try { haltedRelease = JSON.parse(halted)?.release; } catch { /* corrupt: ignore */ }
+    if (haltedRelease === release) return c.json({ error: "release_halted", release }, 404, { "cache-control": "public, max-age=5" });
+  }
   const etag = `"${release}"`;
   if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
   return new Response(raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
@@ -108,6 +116,34 @@ app.get("/b/:app/:file", async (c) => {
   return new Response(buf, { headers });
 });
 
+/**
+ * Write KV `halt/<app>` when a release fails on too many devices. Settings live in KV `halt-config/<app>`:
+ * {"threshold": number, "min_reports": number}. No config key means halting is off.
+ */
+async function maybeHalt(env: Env, appId: string, release: number): Promise<void> {
+  if (!env.POINTERS) return;
+  const raw = await env.POINTERS.get(`halt-config/${appId}`);
+  if (!raw) return;
+  let cfg: { threshold?: unknown; min_reports?: unknown };
+  try { cfg = JSON.parse(raw); } catch { return; }
+  if (!cfg || typeof cfg !== "object") return;
+  const threshold = typeof cfg.threshold === "number" ? cfg.threshold : undefined;
+  const minReports = typeof cfg.min_reports === "number" ? cfg.min_reports : 20;
+  const { results } = await env.DB.prepare("SELECT event, COUNT(*) AS n FROM telemetry WHERE app_id = ? AND release = ? GROUP BY event").bind(appId, release).all<{ event: string; n: number }>();
+  const counts = { healthy: 0, failed: 0 };
+  for (const r of results ?? []) {
+    if (HEALTHY_EVENTS.includes(r.event)) counts.healthy += r.n;
+    else if (FAILED_EVENTS.includes(r.event)) counts.failed += r.n;
+  }
+  const verdict = shouldHalt(counts, { threshold, minReports });
+  if (!verdict.halt) return;
+  const key = `halt/${appId}`;
+  // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
+  const cur = await env.POINTERS.get(key);
+  if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
+  await env.POINTERS.put(key, JSON.stringify({ release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold }));
+}
+
 /** Device telemetry for the spike: applied / reverted / timings. */
 app.post("/t", async (c) => {
   let body: any;
@@ -122,6 +158,8 @@ app.post("/t", async (c) => {
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
     extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
+  // Halting is a best-effort side effect: the event is stored, so never fail the response.
+  if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release); } catch (e) { console.error("halt check failed", e); } }
   if (REVERT_EVENTS.has(d.event)) {
     const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
     try { c.executionCtx.waitUntil(job); } catch { /* no execution context (tests, local): the job runs on its own */ }
@@ -157,7 +195,11 @@ app.get("/t/:app/summary", async (c) => {
   const a = med(apply.results), k = med(cold.results);
   const releases = [...byRelease.values()].sort((x, y) => y.last - x.last)
     .map((e) => ({ release: e.release, events: e.events, apply_ms_median: a.get(e.release) ?? null, cold_start_ms_median: k.get(e.release) ?? null }));
-  return c.json({ releases });
+  // The halt object for this app, or null. A missing or corrupt value is null.
+  let halted: unknown = null;
+  const haltRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt/${appId}`) : null;
+  if (haltRaw) { try { const v = JSON.parse(haltRaw); if (v && typeof v === "object") halted = v; } catch { /* corrupt: null */ } }
+  return c.json({ releases, halted });
 });
 
 app.get("/band/:cohort", (c) => {
@@ -218,7 +260,11 @@ app.post("/app/:id/api/command", async (c) => {
   const actor = await owner(c, appId);
   if (!actor) return c.json({ ok: false, error: { code: "unauthorized", message: "Sign in or send the owner token" } }, 401);
   let body: any; try { body = await c.req.json(); } catch { return c.json({ ok: false, error: { code: "bad_json", message: "JSON body required" } }, 400); }
-  return c.json(await runOwnerCommand({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, String(body?.name ?? ""), body?.args ?? {}));
+  // A bearer owner token means an AI agent; a signed-in admin is the owner at the keyboard. Agents get the confirm gate.
+  const agent = actor === AGENT_ACTOR;
+  const list = (c.req.header("x-shipvo-agent-deny") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const local = agent ? { agentPolicy: c.req.header("x-shipvo-agent-policy") ?? undefined, agentDeny: list } : undefined;
+  return c.json(await runOwnerCommand({ db: c.env.DB, kv: c.env.POINTERS, appId, actor, agent, local }, String(body?.name ?? ""), body?.args ?? {}));
 });
 
 app.route("/auth", auth);

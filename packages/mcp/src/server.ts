@@ -10,6 +10,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import http from "node:http";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { z } from "zod";
 import { classify, compactDiff, fieldValue } from "./change.js";
 
@@ -111,7 +112,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   dark: z.boolean().optional().describe("Dark mode"),
 }, WR, async ({ app, session, seed_cart, dark }) => {
   const id = app.split("@")[0];
-  if (!(await allowed(id))) throw new Error(keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}`);
+  if (!(await allowed(id))) return result("", { ok: false, code: "unknown_app", error: keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
@@ -140,16 +141,18 @@ server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/lef
 server.tool("back", "Go back one screen." + CH, { session: sid, compact }, WR, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
-  if (!r.ok && r.code === "sim_timeout") return result(session, r);
-  if (!r.ok || !r.path) throw new Error(r.error ?? "no screenshot");
+  if (!r.ok) return result(session, r);
+  if (!r.path) throw new Error("no screenshot");
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
 });
 // The simulated device: what the phone has, and what happens to it.
-server.tool("set_device", "Change what the simulated phone has: location, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
+server.tool("set_device", "Change what the simulated phone has: location, the address book (contacts), calendar events, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
   session: sid,
   location: z.object({ latitude: z.number(), longitude: z.number(), accuracy: z.number().optional() }).optional(),
   camera: z.object({ barcode: z.object({ type: z.string(), data: z.string() }).nullable().optional(), delayMs: z.number().optional() }).optional(),
-  permissions: z.object({ camera: z.enum(["granted", "denied", "undetermined"]).optional(), location: z.enum(["granted", "denied", "undetermined"]).optional(), notifications: z.enum(["granted", "denied", "undetermined"]).optional() }).optional(),
+  permissions: z.object({ camera: z.enum(["granted", "denied", "undetermined"]).optional(), location: z.enum(["granted", "denied", "undetermined"]).optional(), notifications: z.enum(["granted", "denied", "undetermined"]).optional(), contacts: z.enum(["granted", "denied", "undetermined"]).optional(), calendar: z.enum(["granted", "denied", "undetermined"]).optional() }).optional(),
+  contacts: z.array(z.object({ id: z.string(), name: z.string(), phoneNumbers: z.array(z.string()).optional(), emails: z.array(z.string()).optional() })).optional().describe("Replace the address book the app can read (needs contacts permission)"),
+  calendar: z.array(z.object({ id: z.string(), title: z.string(), start: z.string().describe("ISO 8601"), end: z.string().describe("ISO 8601"), allDay: z.boolean().optional(), location: z.string().optional(), notes: z.string().optional() })).optional().describe("Replace the calendar events the app can read (needs calendar permission)"),
   biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
   payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),
@@ -157,7 +160,7 @@ server.tool("set_device", "Change what the simulated phone has: location, a barc
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
   async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,
-  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "notifications" }) as Act & { notifications?: unknown }; if (r.code === "sim_timeout") return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
+  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() }, WR,
   async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
 server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -169,7 +172,12 @@ server.tool("device_reset", "Put the simulated phone back to a known state (perm
   async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
 
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, DEST, async ({ session }) => {
-  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session);
+  need(session);
+  // The simulator is the source of truth: end a session it lists even if this server did not open it; otherwise no_session.
+  const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string }[] };
+  if (!listed.ok) return result(session, listed);
+  if (!(listed.sessions ?? []).some((x) => x.session === session)) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
+  const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
@@ -179,13 +187,23 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
 server.tool("owner_describe", "List the owner commands of an app (content, prices, offers, orders, publish). Needs PN_OWNER_TOKEN.", { app: z.string() }, RO, async ({ app }) => {
   const r = await fetch(`${CONTROL}/app/${app}/api/describe`); return text(await r.text());
 });
-server.tool("owner_command", "Run an owner command against the live app (changes are audited; `publish` makes them live on every phone within seconds).", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional() }, DEST,
-  async ({ app, command, args }) => {
+// The owner's agent rules from shipvo.json (agentPolicy, agentDeny) in PN_APP_DIR or the current folder. Sent to the control plane, which only lets them tighten its own rules.
+function agentRules(): Record<string, string> {
+  try {
+    const c = JSON.parse(readFileSync(join(process.env.PN_APP_DIR || process.cwd(), "shipvo.json"), "utf8"));
+    const h: Record<string, string> = {};
+    if (["ask", "deny", "allow"].includes(c.agentPolicy)) h["x-shipvo-agent-policy"] = c.agentPolicy;
+    if (Array.isArray(c.agentDeny) && c.agentDeny.length) h["x-shipvo-agent-deny"] = c.agentDeny.map(String).join(",");
+    return h;
+  } catch { return {}; }
+}
+server.tool("owner_command", "Run an owner command against the live app (changes are audited). Commands that cannot be undone or reach users (publish, prices, offers, deletes, API keys) do nothing and return { code: \"needs_confirm\", plan } first: show the plan to the owner, then call again with the same args and confirm: true.", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional(), confirm: z.boolean().optional().describe("true to run a command that returned needs_confirm; pass the same args") }, DEST,
+  async ({ app, command, args, confirm }) => {
     if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": owner commands need an owner key`);
     if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
     const token = ctx.ownerToken || OWNER_TOKEN;
     if (!token) throw new Error("owner commands are not enabled on this server.");
-    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ name: command, args: args ?? {} }) });
+    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...agentRules() }, body: JSON.stringify({ name: command, args: { ...Object.fromEntries(Object.entries(args ?? {}).filter(([k]) => k !== "confirm")), ...(confirm === true ? { confirm: true } : {}) } }) });
     return text(await r.text());
   });
 
