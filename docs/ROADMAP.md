@@ -47,19 +47,19 @@ The planner keeps this list to the 5–10 most valuable items in flight. Each li
 
 Bet 1, a bundle never reaches a shell that cannot run it (epic #14):
 - [x] #17 Shells declare their Hermes bytecode version; control plane skips mismatched releases (merged)
-- [ ] #18 Runtime refuses a mismatched release (after #17)
+- [x] #18 Runtime refuses a mismatched release (after #17)
 
 Bet 2, iOS reaches Android update quality (epic #15):
-- [ ] #2 bsdiff patches on iOS
-- [ ] #1 Measure OTA apply time on the iOS Simulator in CI
+- [x] #2 bsdiff patches on iOS
+- [x] #1 Measure OTA apply time on the iOS Simulator in CI
 
 Bet 3, first run in under 10 minutes, and measured (epic #16):
-- [ ] #19 `shipvo doctor`
-- [ ] #20 Script counting weekly healthy releases per app
-- [ ] #26 `shipvo publish --dry-run` (first slice merged in #36; `rollback --dry-run` is done; it reads the bundle, so it is not offline)
+- [x] #19 `shipvo doctor`
+- [x] #20 Script counting weekly healthy releases per app
+- [x] #26 `shipvo publish --dry-run` (first slice merged in #36; `rollback --dry-run` is done; it reads the bundle, so it is not offline)
 
 Other:
-- [ ] #3 More typed-test examples for `@shipvo/test`
+- [x] #3 More typed-test examples for `@shipvo/test`
 
 Review of 2026-11-04: priority order is unchanged (update safety first). Bets 1 and 2 are update safety. Bet 3 is developer experience, chosen because we cannot yet measure activation. See `docs/product/strategy.md`.
 
