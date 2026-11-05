@@ -131,7 +131,17 @@ class ShipvoRuntimeModule : Module() {
     val known = maxOf(s.currentRelease, s.pendingRelease, s.blockedRelease)
     val conn = http("${s.baseUrl}/p/${s.appId}/${s.shellMajor}/${s.band}.json", if (known > 0) "\"$known\"" else null)
     val code = conn.responseCode
-    if (code == 304 || code == 404) { conn.disconnect(); return mapOf("status" to "none") }
+    if (code == 304) { conn.disconnect(); return mapOf("status" to "none") }
+    if (code == 404) {
+      conn.disconnect()
+      val bodyStr = try { conn.inputStream.bufferedReader().use { it.readText() } } catch (_: Exception) { "" }
+      conn.disconnect()
+      var mismatchReason: String? = null
+      if (bodyStr.contains("hermes_bytecode_mismatch")) mismatchReason = "hermes_bytecode_mismatch"
+      else if (bodyStr.contains("native_module_missing")) mismatchReason = "native_module_missing"
+      else if (bodyStr.contains("native_module_version")) mismatchReason = "native_module_version"
+      return mapOf("status" to "none", "mismatchReason" to mismatchReason)
+    }
     require(code == 200) { "pointer HTTP $code" }
     val envelope = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
     conn.disconnect()
@@ -140,11 +150,16 @@ class ShipvoRuntimeModule : Module() {
     val bodyStr = envelope.getString("body")
     require(Verify.ed25519(bodyStr.toByteArray(Charsets.UTF_8), envelope.getString("signature"), s.publicKey)) { "pointer signature invalid" }
     val body = JSONObject(bodyStr)
-    require(body.getString("app_id") == s.appId && body.getInt("shell_major") == s.shellMajor) { "pointer for another app/shell" }
+    if (body.getString("app_id") != s.appId || body.getInt("shell_major") != s.shellMajor) {
+      val mismatchReason = if (body.getString("app_id") != s.appId) "native_module_missing" else "hermes_bytecode_mismatch"
+      return mapOf("status" to "none", "mismatchReason" to mismatchReason)
+    }
     val release = body.getInt("release")
     if (release <= known) return mapOf("status" to "none")
     val shellVersion = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "0.0.0"
-    require(!Verify.semverLess(shellVersion, body.getString("min_shell_version"))) { "shell too old for release $release" }
+    if (Verify.semverLess(shellVersion, body.getString("min_shell_version"))) {
+      return mapOf("status" to "none", "mismatchReason" to "shell_too_old")
+    }
     val verifyPointerMs = SystemClock.elapsedRealtime() - t0
 
     val core = body.getJSONObject("core")
@@ -197,13 +212,14 @@ class ShipvoRuntimeModule : Module() {
     require(tmp.renameTo(dest)) { "could not stage bundle" }
     synchronized(ShipvoHostHandler.LOCK) {
       if (!BootRules.mayStage(release, s.currentRelease, s.pendingRelease, s.blockedRelease)) return mapOf("status" to "none")
+      if (mismatchReason != null) return mapOf("status" to "none", "mismatchReason" to mismatchReason)
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
       if (s.binaryVersion == null) s.binaryVersion = s.installedBinaryVersion
       s.pendingIssuedAt = body.optString("issued_at")
     }
     return mapOf("status" to "staged", "release" to release, "bytes" to bytesDownloaded, "via" to via, "bundleBytes" to dest.length(),
-      "patchError" to patchError,
+      "patchError" to patchError, "mismatchReason" to mismatchReason,
       "downloadMs" to downloadMs, "verifyMs" to verifyMs, "issuedAt" to body.optString("issued_at"))
   }
 }

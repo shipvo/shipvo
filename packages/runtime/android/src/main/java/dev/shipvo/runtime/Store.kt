@@ -83,6 +83,8 @@ internal class Store(private val ctx: Context) : BootCounts {
   val publicKey: String get() = meta("dev.shipvo.PUBLIC_KEY") ?: ""
   val appId: String get() = meta("dev.shipvo.APP_ID") ?: ""
   val shellMajor: Int get() = (meta("dev.shipvo.SHELL_MAJOR") ?: "1").toIntOrNull() ?: 1
+  val hermesBytecodeVersions: String? get() = meta("dev.shipvo.HERMES_BYTECODE_VERSIONS")
+  val nativeModules: String? get() = meta("dev.shipvo.NATIVE_MODULES")
 
   companion object {
     /** Which release the JS that is running right now came from (set at bundle-selection time). */

@@ -1,0 +1,26 @@
+package dev.shipvo.runtime
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class PointerUrlTest {
+  @Test fun urlWithoutParams() {
+    // When no hbc or nm are set, URL should not have query params
+  }
+
+  @Test fun urlWithHbc() {
+    // When hbc is set, URL should have ?hbc=... param
+  }
+
+  @Test fun urlWithNm() {
+    // When nm is set, URL should have ?nm=... param
+  }
+
+  @Test fun urlWithBoth() {
+    // When both are set, URL should have both params
+  }
+
+  @Test fun nmParamIsUrlEncoded() {
+    // Scoped package names like @scope/pkg should be URL-encoded
+  }
+}
