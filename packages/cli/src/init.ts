@@ -489,7 +489,7 @@ const SHOP_CART_STATE = `import { createContext, useContext, useState, type Reac
 import products from "./data/products.json";
 
 export type Line = { id: string; qty: number };
-type Cart = { lines: Line[]; add: (id: string) => void; remove: (id: string) => void; totalCents: number };
+type Cart = { lines: Line[]; add: (id: string) => void; remove: (id: string) => void; clear: () => void; totalCents: number };
 
 const Ctx = createContext<Cart | null>(null);
 
@@ -497,8 +497,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<Line[]>([]);
   const add = (id: string) => setLines((l) => l.some((x) => x.id === id) ? l.map((x) => x.id === id ? { ...x, qty: x.qty + 1 } : x) : [...l, { id, qty: 1 }]);
   const remove = (id: string) => setLines((l) => l.filter((x) => x.id !== id));
+  const clear = () => setLines([]);
   const totalCents = lines.reduce((sum, x) => sum + x.qty * (products.find((p) => p.id === x.id)?.price ?? 0), 0);
-  return <Ctx.Provider value={{ lines, add, remove, totalCents }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ lines, add, remove, clear, totalCents }}>{children}</Ctx.Provider>;
 }
 
 export function useCart() {
@@ -618,13 +619,24 @@ const s = StyleSheet.create({
 });
 `;
 
-const SHOP_CART = `import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+const SHOP_CART = `import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { device } from "@shipvo/device";
 import { useCart } from "../cart";
 import { formatPrice } from "../money";
 import products from "../data/products.json";
 
 export function Cart({ onBack }: { onBack: () => void }) {
-  const { lines, remove, totalCents } = useCart();
+  const { lines, remove, clear, totalCents } = useCart();
+  const [status, setStatus] = useState<string | null>(null);
+  // Replace "to" with your own mobile money number. The PIN here is the sandbox PIN; ask the customer for theirs in a real app.
+  const pay = async () => {
+    setStatus("Paying...");
+    try {
+      const r = await device.pay.charge({ provider: "mobile_money", amount: totalCents, currency: "USD", to: "shop", reference: "order-" + Date.now() }, "1234");
+      if (r.ok) { clear(); setStatus("Order placed"); } else setStatus("Payment failed: " + r.reason);
+    } catch (e: any) { setStatus("Payment failed: " + String(e?.message ?? e)); }
+  };
   return (
     <ScrollView contentContainerStyle={s.page}>
       <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={s.back}><Text style={s.backText}>Back</Text></Pressable>
@@ -641,6 +653,8 @@ export function Cart({ onBack }: { onBack: () => void }) {
         );
       })}
       <Text style={s.total}>{"Total: " + formatPrice(totalCents)}</Text>
+      {lines.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Pay" onPress={pay} style={s.pay}><Text style={s.payText}>Pay</Text></Pressable> : null}
+      {status ? <Text style={s.body} accessibilityRole="alert">{status}</Text> : null}
     </ScrollView>
   );
 }
@@ -653,6 +667,7 @@ const s = StyleSheet.create({
   remove: { minHeight: 48, justifyContent: "center" },
   body: { fontSize: 16, color: "#111" },
   total: { fontSize: 20, fontWeight: "800", color: "#111" },
+  pay: { minHeight: 48, justifyContent: "center", alignItems: "center", borderRadius: 8, backgroundColor: "#1F4E5F" }, payText: { fontSize: 16, fontWeight: "700", color: "#fff" },
 });
 `;
 
@@ -682,5 +697,26 @@ test("adding two products puts their total in the cart, and Remove takes one out
   await phone.waitFor("Total: " + formatPrice(a.price + b.price));
   await phone.tap("Remove " + b.name);
   await phone.waitFor("Total: " + formatPrice(a.price));
+});
+
+test("paying with mobile money places the order and empties the cart", async ({ phone }) => {
+  await phone.device.set({ payment: { nextResult: "approve", pin: "1234" } });
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Pay");
+  await phone.waitFor("Order placed");
+  expect(phone).toSee("Your cart is empty");
+});
+
+test("a declined payment says why and keeps the cart", async ({ phone }) => {
+  await phone.device.set({ payment: { nextResult: "decline", pin: "1234" } });
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Pay");
+  await phone.waitFor("Payment failed: declined");
+  expect(phone).toSee("Total: " + formatPrice(products[0].price));
+  expect(phone.sees("Order placed")).toBe(false);
 });
 `;

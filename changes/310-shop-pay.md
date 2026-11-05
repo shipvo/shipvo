@@ -1,0 +1,2 @@
+- `@shipvo/cli`: the `shop` template of `shipvo init` has a Pay button on the cart. It calls `device.pay.charge`, shows "Order placed" or "Payment failed: <reason>", and ships a paid and a declined test.
+- Migration: none; applies to newly created apps only.

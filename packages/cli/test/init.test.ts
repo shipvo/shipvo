@@ -117,6 +117,12 @@ it("--template shop writes list, detail, cart, five products and a test that rea
   expect(test).not.toMatch(/\$\d/);
   expect(readFileSync(join(dir, "src/screens/Detail.tsx"), "utf8")).toContain('accessibilityLabel="Add to cart"');
   expect(readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8")).toContain('"Remove " + p.name');
+  const cart = readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8");
+  expect(cart).toContain("device.pay.charge");
+  expect(cart).toContain("Order placed");
+  expect(cart).toContain("Payment failed: ");
+  expect(test).toContain('nextResult: "decline"');
+  expect(test).toContain('waitFor("Order placed")');
   const readme = readFileSync(join(dir, "README.md"), "utf8");
   expect(readme).toContain("src/data/products.json");
   expect(readme).not.toContain("src/release.ts");
