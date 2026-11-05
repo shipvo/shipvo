@@ -138,9 +138,24 @@ async function act(id, body) {
     if ((await l.count()) !== 1) throw stale();
     return l;
   };
+  const extra = {};
+  // Before an input is sent: is the element there, shown and enabled? If not, nothing reaches the app (safe to retry).
+  const ready = async (l, ref, verb) => {
+    if (!(await l.isVisible())) throw new SimError("not_visible", `${ref} is not visible on screen, so ${verb} was not sent. Scroll it into view or take a new snapshot.`);
+    if (await l.isDisabled()) throw new SimError("disabled", `${ref} is disabled, so ${verb} was not sent.`);
+  };
+  // A click that Playwright could not deliver in time: covered by another element, or just too slow (unknown what happened).
+  const clickTarget = async (l, ref) => {
+    try { await l.click({ timeout: 3000 }); }
+    catch (e) {
+      if (/intercepts pointer events/.test(String(e.message))) throw new SimError("covered", `${ref} is covered by another element, so the tap was not sent.`);
+      if (e.name === "TimeoutError") throw new SimError("timeout", `the tap on ${ref} did not complete in 3 s. Call screen to see whether it landed.`);
+      throw e;
+    }
+  };
   switch (body.action) {
     case "screen": break;
-    case "tap": await (await resolve(body.ref)).click({ timeout: 3000 }); break;
+    case "tap": { const l = await resolve(body.ref); await ready(l, body.ref, "the tap"); await clickTarget(l, body.ref); break; }
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
       let t = await resolve(body.ref);
@@ -152,10 +167,16 @@ async function act(id, body) {
         if ((await named.count()) !== 1) throw new Error(`${body.ref} is not a text field. Type into a "textbox" ref.`);
         t = named;
       }
-      await t.fill(String(body.text ?? ""), { timeout: 3000 }); if (body.enter) await t.press("Enter"); break;
+      await ready(t, body.ref, "the text");
+      try { await t.fill(String(body.text ?? ""), { timeout: 3000 }); }
+      catch (e) { if (e.name === "TimeoutError") throw new SimError("timeout", `typing into ${body.ref} did not complete in 3 s. Call screen to see what the field holds.`); throw e; }
+      if (body.enter) await t.press("Enter");
+      extra.value = await t.inputValue().catch(() => null);
+      break;
     }
     case "scroll": {
       const target = body.ref ? await resolve(body.ref) : page.locator("body");
+      if (body.ref) await ready(target, body.ref, "the scroll");
       const box = await target.boundingBox().catch(() => null);
       if (box) await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 400));
       await page.mouse.wheel(body.direction === "right" ? 300 : body.direction === "left" ? -300 : 0, body.direction === "up" ? -600 : body.direction === "down" ? 600 : 0);
@@ -183,11 +204,44 @@ async function act(id, body) {
       return { diag: r, screen: await screen(page) };
     }
     case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
-    case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) await b.first().click(); else throw new Error("no Back button on this screen"); break; }
+    case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) await clickTarget(b.first(), "the Back button"); else throw new SimError("not_visible", "no Back button on this screen"); break; }
     case "screenshot": { const p = join(DIR, `${id}-${Date.now()}.png`); await page.screenshot({ path: p }); return { path: p, screen: await screen(page) }; }
     default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, device_log, device_reset`);
   }
+  if (INPUTS.has(body.action)) {
+    const t0 = Date.now();
+    if (body.wait_for) { const w = await waitFor(page, body.wait_for); extra.wait_for = { ...w, waited_ms: Date.now() - t0 }; }
+    if (body.settle) extra.settled = await settle(page);
+    return { screen: await screen(page), delivery: "delivered", safe_to_retry: false, ...extra };
+  }
   return { screen: await screen(page) };
+}
+
+const INPUTS = new Set(["tap", "type", "scroll", "back"]);
+// Reasons where the input never reached the app. A timeout is unknown, so it is not safe to retry.
+const NOT_SENT = new Set(["stale_ref", "not_visible", "disabled", "covered"]);
+const deliveryOf = (action, e) => !INPUTS.has(action) ? {} : { delivery: "not_delivered", reason: e.code ?? "timeout", safe_to_retry: NOT_SENT.has(e.code) };
+
+// wait_for: { ref | text | role + name, gone?, timeout_ms? }. Polls until the target is shown (or gone).
+async function waitFor(page, w) {
+  const end = Date.now() + Math.min(Math.max(Number(w.timeout_ms) || 5000, 100), 60_000);
+  const present = async () => {
+    if (w.ref) { await screen(page); const l = page.locator(`aria-ref=${String(w.ref).replace(/^p\d+/, "")}`); return (await l.count()) === 1 && await l.isVisible(); }
+    const l = w.role ? page.getByRole(w.role, w.name ? { name: w.name } : {}) : page.getByText(String(w.text), { exact: false });
+    return (await l.count()) > 0 && await l.first().isVisible();
+  };
+  for (;;) {
+    const here = await present();
+    if (here !== !!w.gone) return { matched: true };
+    if (Date.now() >= end) return { matched: false };
+    await page.waitForTimeout(100);
+  }
+}
+// settle: wait until two snapshots 200 ms apart are equal (at most 5 s).
+async function settle(page) {
+  const end = Date.now() + 5000; let prev = await screen(page);
+  while (Date.now() < end) { await page.waitForTimeout(200); const now = await screen(page); if (now === prev) return true; prev = now; }
+  return false;
 }
 
 const WCACHE = new Map();
@@ -241,7 +295,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
-      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), screen: s ? await screen(s.page) : null }); }
+      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...deliveryOf(body.action, e), screen: s ? await screen(s.page) : null }); }
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }

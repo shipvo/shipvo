@@ -211,3 +211,50 @@ describe("change line", () => {
     expect(await call()).toMatch(/^Change: none\n/);
   });
 });
+
+describe("delivery", () => {
+  let c: Awaited<ReturnType<typeof connect>>;
+  let reply: Record<string, unknown> = {};
+  let last: any = null;
+  beforeAll(async () => {
+    fake.removeAllListeners("request");
+    fake.on("request", async (req, res) => {
+      let raw = ""; for await (const ch of req) raw += ch;
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu" }] }));
+      if (req.url === "/act") last = JSON.parse(raw);
+      res.end(JSON.stringify(req.url === "/session" ? { ok: true, screen: '- button "Buy" [ref=e1]' } : { screen: '- button "Buy" [ref=e1]', ...reply }));
+    });
+    c = await connect();
+  });
+  afterAll(async () => { await c?.close(); });
+
+  it("reports delivered with safe_to_retry false, the field value and the wait result", async () => {
+    reply = { ok: true, delivery: "delivered", safe_to_retry: false, value: "Ana", wait_for: { matched: true, waited_ms: 120 }, settled: true };
+    const r: any = await c.callTool({ name: "type", arguments: { session: "d", ref: "e3", text: "Ana", wait_for: { text: "Hi", timeout_ms: 900 }, settle: true } });
+    expect(last).toMatchObject({ action: "type", wait_for: { text: "Hi", timeout_ms: 900 }, settle: true });
+    expect(r.structuredContent).toEqual({ ok: true, delivery: "delivered", safe_to_retry: false, value: "Ana", wait_for: { matched: true, waited_ms: 120 }, settled: true });
+    expect(textOf(r)).toContain("Delivery: delivered, safe_to_retry: false");
+    expect(textOf(r)).toContain("Wait: happened after 120 ms");
+    expect(textOf(r)).toContain('Value of e3: "Ana"');
+  });
+  it("reports a timed-out wait without an error", async () => {
+    reply = { ok: true, delivery: "delivered", safe_to_retry: false, wait_for: { matched: false, waited_ms: 900 } };
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "d", ref: "e1", wait_for: { text: "Never" } } });
+    expect(r.isError).toBeUndefined();
+    expect(textOf(r)).toContain("Wait: did not happen after 900 ms");
+  });
+  for (const [reason, safe] of [["stale_ref", true], ["not_visible", true], ["disabled", true], ["covered", true], ["timeout", false]] as const) {
+    it(`reports not_delivered (${reason}) with safe_to_retry ${safe}`, async () => {
+      reply = { ok: false, code: reason, error: `no: ${reason}`, delivery: "not_delivered", reason, safe_to_retry: safe };
+      const r: any = await c.callTool({ name: "tap", arguments: { session: "d", ref: "e1" } });
+      expect(r.isError).toBe(true);
+      expect(r.structuredContent).toMatchObject({ ok: false, code: reason, delivery: "not_delivered", reason, safe_to_retry: safe });
+      expect(textOf(r)).toContain(`Delivery: not_delivered (${reason}), safe_to_retry: ${safe}`);
+    });
+  }
+  it("rejects a wait_for with two targets", async () => {
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "d", ref: "e1", wait_for: { text: "a", ref: "e2" } } });
+    expect(r.isError).toBe(true);
+  });
+});

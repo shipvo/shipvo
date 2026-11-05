@@ -27,8 +27,11 @@ export type OpenOptions = {
 };
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 /** An action the simulator refused. `code` is set for typed failures such as `no_url_listener` or `stale_ref`. */
-export class PhoneError extends Error { constructor(message: string, readonly code?: string) { super(message); this.name = "PhoneError"; } }
-type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number };
+export class PhoneError extends Error {
+  /** `safeToRetry` is true only when the input never reached the app (`stale_ref`, `not_visible`, `disabled`, `covered`). */
+  constructor(message: string, readonly code?: string, readonly safeToRetry?: boolean) { super(message); this.name = "PhoneError"; }
+}
+type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number; delivery?: "delivered" | "not_delivered"; safe_to_retry?: boolean };
 
 /** A simulated phone running your app. Every action returns once the screen has settled, and updates `screen`. */
 export class Phone {
@@ -53,7 +56,7 @@ export class Phone {
       const again = await this.call("/act", { session: this.session, action: "screen" });
       if (typeof again.screen === "string") this.screen = again.screen;
     }
-    if (!r.ok) throw new PhoneError(`${action} failed: ${r.error}\n\nScreen now:\n${this.screen}`, r.code);
+    if (!r.ok) throw new PhoneError(`${action} failed: ${r.error}\n\nScreen now:\n${this.screen}`, r.code, r.safe_to_retry);
     return r;
   }
 

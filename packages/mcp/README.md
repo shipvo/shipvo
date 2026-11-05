@@ -14,6 +14,24 @@ Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none 
 
 **Time limit.** Every call to the simulator stops after 30 s; set `SHIPVO_SIM_TIMEOUT_MS` to change it. A call that gets no answer returns an error result (`isError: true`, code `sim_timeout`, also in `structuredContent`). The action may still have run and the session may still be alive, so call `screen` to see where it is. Timed-out actions are not retried.
 
+### Delivery, `wait_for` and `settle`
+
+`tap`, `type`, `scroll` and `back` say whether the input reached the app, so you do not have to guess from the screen diff. The result has a `Delivery:` line and the same fields in `structuredContent`:
+
+- `delivery`: `delivered` or `not_delivered`.
+- `reason` (only when `not_delivered`): `stale_ref` (the ref is from an older screen), `not_visible` (the element is not shown, or there is no Back button), `disabled`, `covered` (another element is on top) or `timeout` (the input did not finish in 3 s).
+- `safe_to_retry`: `true` only when nothing reached the app (`stale_ref`, `not_visible`, `disabled`, `covered`). It is `false` for `delivered` and for `timeout`, because after a timeout it is not known what happened: call `screen` first.
+- `value` (`type` only): what the field holds after typing, read back from the field.
+
+A `not_delivered` result is also an error (`isError: true`) with `code` set to the reason.
+
+Optional arguments on all four tools:
+
+- `wait_for`: `{ ref | text | role + name, gone?, timeout_ms? }`. After the action, wait for that element to appear (or, with `gone: true`, disappear). Default limit 5000 ms, at most 60000. The result gets `wait_for: { matched, waited_ms }`. A wait that times out has `matched: false`; the action itself still counts as `delivered`.
+- `settle: true`: after the action (and the wait), wait until the screen stops changing, at most 5 s. The result gets `settled: true | false`.
+
+These fields come from `packages/sim/server.mjs`; with an older simulator they are missing and the tools behave as before.
+
 Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `end_session`, `owner_describe`, `owner_command`.
 
 Native features work with no phone: the simulated device (see `@shipvo/device`) shows permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners and the share sheet as real dialogs in the tree; `set_device` decides what the phone has (location, a barcode in view, whether the fingerprint matches, whether a payment is approved, network off).

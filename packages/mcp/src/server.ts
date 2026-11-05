@@ -35,7 +35,8 @@ async function localApps(): Promise<AppInfo> {
   return TIDE;
 }
 
-type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string };
+type Delivery = { delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null; wait_for?: { matched: boolean; waited_ms: number }; settled?: boolean };
+type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string } & Delivery;
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
@@ -63,19 +64,37 @@ const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
 const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string } = {}) => {
   if (!r.ok || r.screen == null) return result(sid, r);
+  const info = deliveryInfo(r);
   const prev = trees.get(sid);
   trees.set(sid, r.screen);
   const change = prev === undefined ? "unknown (no earlier screen to compare)" : classify(prev, r.screen, action);
   const head = [`Change: ${change}`];
-  if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
+  if (action === "type" && o.ref) { const v = typeof r.value === "string" ? r.value : fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
+  const dl = deliveryLine(r); if (dl) head.push(dl);
   const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
-  return result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
+  return { ...result(sid, { ...r, screen: head.join("\n") + "\n\n" + body }), structuredContent: { ok: true, ...info } };
+};
+// What the agent can branch on: did the input reach the app, may it be sent again, what the field holds, did the wait succeed.
+const deliveryInfo = (r: Act) => ({
+  ...(r.delivery ? { delivery: r.delivery, safe_to_retry: r.safe_to_retry ?? false } : {}),
+  ...(r.reason ? { reason: r.reason } : {}),
+  ...(r.value !== undefined ? { value: r.value } : {}),
+  ...(r.wait_for ? { wait_for: r.wait_for } : {}),
+  ...(r.settled !== undefined ? { settled: r.settled } : {}),
+});
+const deliveryLine = (r: Act) => {
+  if (!r.delivery) return "";
+  const parts = [`Delivery: ${r.delivery}${r.reason ? ` (${r.reason})` : ""}, safe_to_retry: ${r.safe_to_retry ?? false}`];
+  if (r.wait_for) parts.push(`Wait: ${r.wait_for.matched ? "happened" : "did not happen"} after ${r.wait_for.waited_ms} ms`);
+  if (r.settled !== undefined) parts.push(`Settled: ${r.settled}`);
+  return parts.join("\n");
 };
 const result = (sid: string, r: Act) => {
   const s = sessions.get(sid); if (s) s.steps++;
   if (r.ok) return text(r.screen ?? "");
-  const t = `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}${r.screen ? `\n\nScreen now:\n${r.screen}` : ""}`;
-  return { ...text(t), isError: true as const, structuredContent: { ok: false, code: r.code ?? null, error: r.error ?? null } };
+  const dl = deliveryLine(r);
+  const t = `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}${dl ? `\n${dl}` : ""}${r.screen ? `\n\nScreen now:\n${r.screen}` : ""}`;
+  return { ...text(t), isError: true as const, structuredContent: { ok: false, code: r.code ?? null, error: r.error ?? null, ...deliveryInfo(r) } };
 };
 // Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
@@ -129,15 +148,19 @@ server.tool("list_sessions", "Open simulator sessions (phones) on this server: i
 });
 const sid = z.string().describe("Session from open_app");
 const compact = z.boolean().optional().describe("When the change is 'content changed', return only the added/removed lines, not the whole screen");
-const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
+const waitFor = z.object({ ref: z.string().regex(/^(p\d+)?e\d+$/).optional(), text: z.string().optional(), role: z.string().optional(), name: z.string().optional(), gone: z.boolean().optional().describe("Wait for it to disappear instead"), timeout_ms: z.number().int().positive().max(60000).optional().describe("Default 5000") })
+  .refine((w) => [w.ref, w.text, w.role].filter((x) => x !== undefined).length === 1, "give exactly one of ref, text, or role (with name)").optional()
+  .describe("After the action, wait for this to appear (or, with gone, disappear): a ref, a text, or a role + name. The result says whether it happened and how long it took. A wait that times out does not undo the action.");
+const settle = z.boolean().optional().describe("After the action, wait until the screen stops changing (at most 5 s)");
+const CH = " The result starts with 'Change: none | content changed | new screen | scrolled', then 'Delivery: delivered | not_delivered (stale_ref | not_visible | disabled | covered | timeout)'. Retry only when safe_to_retry is true.";
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
 server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, WR, async ({ session, ref, compact }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact }); });
-server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact }, WR,
-  async ({ session, ref, text: t, enter, compact }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref }); });
-server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact }, WR,
-  async ({ session, direction, ref, compact }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref }), { compact }); });
-server.tool("back", "Go back one screen." + CH, { session: sid, compact }, WR, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact, wait_for: waitFor, settle }, WR, async ({ session, ref, compact, wait_for, settle }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref, wait_for, settle }), { compact }); });
+server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact, wait_for: waitFor, settle }, WR,
+  async ({ session, ref, text: t, enter, compact, wait_for, settle }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter, wait_for, settle }), { compact, ref }); });
+server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact, wait_for: waitFor, settle }, WR,
+  async ({ session, direction, ref, compact, wait_for, settle }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref, wait_for, settle }), { compact }); });
+server.tool("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, settle }, WR, async ({ session, compact, wait_for, settle }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back", wait_for, settle }), { compact }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
   if (!r.ok && r.code === "sim_timeout") return result(session, r);
