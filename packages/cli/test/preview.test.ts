@@ -105,12 +105,12 @@ describe("frame page", () => {
     const h = framePage("Shop");
     expect(h).not.toMatch(/location\.(reload|href)/);
     const script = h.match(/<script>([\s\S]*)<\/script>/)![1];
-    const mk = (extra: object = {}) => ({ style: {} as Record<string, string>, dataset: {} as Record<string, string>, setAttribute(k: string, v: unknown) { (this as any).attrs[k] = v; }, attrs: {} as Record<string, unknown>, classList: { contains: () => false, toggle() {} }, ...extra });
+    const mk = (extra: object = {}) => ({ style: {} as Record<string, string>, addEventListener() {}, dataset: {} as Record<string, string>, setAttribute(k: string, v: unknown) { (this as any).attrs[k] = v; }, attrs: {} as Record<string, unknown>, classList: { contains: () => false, toggle() {} }, ...extra });
     const nodes: Record<string, any> = {};
     const clicked: string[] = [];
     const backBtn = { getAttribute: () => "Back", textContent: "", click: () => clicked.push("btn") };
     const win = { document: { querySelectorAll: () => [backBtn] }, history: { back: () => clicked.push("history") } };
-    for (const id of ["device", "app", "back", "icons", "theme"]) nodes[id] = mk(id === "app" ? { contentWindow: win } : {});
+    for (const id of ["device", "app", "back", "icons", "theme", "rec", "dl", "count"]) nodes[id] = mk(id === "app" ? { contentWindow: win } : {});
     const chips = [["skin", "iphone"], ["size", "tablet"]].map(([k, v]) => mk({ dataset: { [k]: v } }));
     const doc = { getElementById: (id: string) => nodes[id], querySelectorAll: (s: string) => (s === "[data-skin]" ? [chips[0]] : s === "[data-size]" ? [chips[1]] : []), body: mk() };
     new Function("document", script)(doc);
