@@ -25,3 +25,16 @@ it("the starter does not claim a release before one exists", () => {
   expect(app).not.toMatch(/runningRelease \?\? 0/);
   expect(test).toContain('toSee("Hello from My Shop.")');
 });
+
+it("ends with the four next steps, in order, using the directory given", async () => {
+  const logs: string[] = [];
+  vi.mocked(console.log).mockImplementation((m?: unknown) => { logs.push(String(m)); });
+  const dir = join(tmp, "second-app");
+  await init([dir, "--public-key", "AAAA"]);
+  const out = logs.join("\n").trimEnd();
+  const steps = [`1. cd ${dir}`, "2. npx shipvo doctor", "3. npm run sim", "4. npx shipvo publish --dry-run"];
+  const at = steps.map((x) => out.indexOf(x));
+  expect(at.every((i) => i >= 0)).toBe(true);
+  expect([...at].sort((x, y) => x - y)).toEqual(at);
+  expect(out.split("\n").pop()).toContain("4. npx shipvo publish --dry-run");
+});
