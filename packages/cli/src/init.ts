@@ -542,6 +542,15 @@ import products from "./src/data/products.json";
 
 type Route = { name: "list" } | { name: "detail"; id: string } | { name: "cart" };
 
+// Send a placed order to the backend. The simulator records it, so end_session lists it. Add your own backend call here.
+async function sendOrder(order: Record<string, unknown>) {
+  try {
+    const st = Runtime.getState();
+    if (!st?.baseUrl) return;
+    await fetch(st.baseUrl + "/o/" + st.appId, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ order, release: st.runningRelease ?? 0 }) });
+  } catch {}
+}
+
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: "list" });
   // Tell the runtime the first screen rendered, so this release is kept.
@@ -564,7 +573,7 @@ export default function App() {
     <CartProvider>
       <View style={s.root}>
         <StatusBar style="dark" />
-        {route.name === "cart" ? <Cart onBack={toList} />
+        {route.name === "cart" ? <Cart onBack={toList} onOrder={sendOrder} />
           : product ? <Detail product={product} onBack={toList} onCart={toCart} />
           : <List title="${name}" products={products} onOpen={(id) => setRoute({ name: "detail", id })} onCart={toCart} />}
       </View>
@@ -647,7 +656,7 @@ import { useCart } from "../cart";
 import { chargeRequest, formatPrice } from "../money";
 import products from "../data/products.json";
 
-export function Cart({ onBack }: { onBack: () => void }) {
+export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order: Record<string, unknown>) => void | Promise<void> }) {
   const { lines, remove, clear, totalCents } = useCart();
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -657,8 +666,13 @@ export function Cart({ onBack }: { onBack: () => void }) {
     setBusy(true);
     setStatus("Paying...");
     try {
-      const r = await device.pay.charge({ provider: "mobile_money", ...chargeRequest(totalCents), to: "My Shop", reference: "order-" + Date.now() }, "1234");
-      if (r.ok) { clear(); setStatus("Order placed"); } else setStatus("Payment failed: " + r.reason);
+      const reference = "order-" + Date.now();
+      const r = await device.pay.charge({ provider: "mobile_money", ...chargeRequest(totalCents), to: "My Shop", reference }, "1234");
+      if (r.ok) {
+        // Only a paid order is sent to the backend.
+        await onOrder?.({ id: reference, total: totalCents, payment: "mobile_money", receipt: r.receipt, lines: lines.map((l) => ({ product_id: l.id, quantity: l.qty })) });
+        clear(); setStatus("Order placed");
+      } else setStatus("Payment failed: " + r.reason);
     } catch (e: any) { setStatus("Payment failed: " + String(e?.message ?? e)); }
     finally { setBusy(false); }
   };
