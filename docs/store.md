@@ -1,5 +1,7 @@
 # Store details
 
+This page is for developers and founders getting ready to submit to Google Play and the App Store. You will draft the answers the stores ask for and check your screenshot sizes. Nothing is uploaded and no store account is touched.
+
 `shipvo store details --dry-run [--out dir]` drafts what Google Play and the App Store will ask, from `shipvo.json`. This is slice 1 of the store work (#249): it only writes files. Nothing is uploaded and no store credentials are read. Without `--dry-run` the command exits 2 with "upload is not available yet; use --dry-run".
 
 ## What it reads
@@ -70,3 +72,15 @@ Store mode (native capture on an emulator or simulator) is a later slice. Nothin
 The size numbers come from the table in `@shipvo/store` and issue #249. They were not re-checked against the Apple and Play pages when this command was added. Check them before you submit.
 
 See the package: [`packages/store`](../packages/store/README.md).
+
+## Troubleshooting
+
+**`upload is not available yet; use --dry-run`** (exit 2). Upload is not built. Add `--dry-run`.
+
+**A screenshot fails the checker (exit 1).** The command lists the files that failed. Fix those files, then run it again. Check the sizes against the store pages before you submit.
+
+## Next steps
+
+- [CLI guide](cli.md)
+- [Frameworks and adapters](adapters.md)
+- [Glossary](glossary.md)

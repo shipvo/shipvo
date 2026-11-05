@@ -1,5 +1,9 @@
 # CLI
 
+This guide is for developers who use the `shipvo` command. It lists each command with an example and the output to expect, and ends with fixes for errors people have hit. If you are new to the terminal, start with [Create your first app](tutorials/first-app.md) instead.
+
+Run `npx -y @shipvo/cli --help` to see the commands your installed version has.
+
 ## `shipvo init`
 
 Two modes.
@@ -159,3 +163,26 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 - CSV has a header row, every field in double quotes, and columns in this order: `id`, `app_id`, `at`, `actor`, `actor_kind`, `action`, `release`, `release_id`, `before`, `after`. Objects are written as JSON text.
 - A value that starts with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet does not run it as a formula.
 - It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. A non-2xx answer prints the status and exits 1. The token is never printed.
+
+## Troubleshooting
+
+These come from fixed issues in this repository.
+
+**`Executable doesn't exist` when you run `shipvo sim` or `shipvo doctor`.** The simulator's browser is not installed. Run `npx playwright install chromium` in the app folder. On Linux, add the system packages the message names.
+
+**`ERR_PNPM_NO_MATCHING_VERSION` for `playwright` after `shipvo init`.** Apps made by an old CLI had a Playwright range that the registry could not satisfy. Update the CLI. New apps pin `playwright` to `>=1.63.0 <1.65.0`.
+
+**`shipvo publish` fails with `ECONNRESET` or a similar network error.** The CLI shows the real error and the key it was writing, and retries network failures twice. If it still fails, check your connection and the control plane address. HTTP errors such as 401 are not retried: check your token.
+
+**`shipvo publish --dry-run` says `Refused by policy rule ...`.** Your `policy` section in `shipvo.json` forbids this publish. Change the cohort bands you publish to, or change the rule. Use `--dry-run-policy` to test the rule without building.
+
+**`shipvo audit` exits 1 with a status code.** The token is missing or wrong. Set `SHIPVO_OWNER_TOKEN`, or use the publish token from `shipvo app create`.
+
+**`shipvo sim --watch` prints one line about a broken JSON file.** Fix the comma or quote it names and save. Add `--verbose` for the full build error.
+
+## Next steps
+
+- [Test your app in CI](testing.md), including `shipvo test --repair` and `--report`.
+- [Store details and screenshots](store.md).
+- [Self-host the control plane](self-hosting.md).
+- [Glossary](glossary.md) for the words used here.
