@@ -187,8 +187,9 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
   revoke_api_key: { description: "Revoke an API key by its prefix (from list_api_keys).", plan: (_d, a) => [`Revoke API key ${a.prefix}. Whoever uses it is locked out (cannot be undone). Does not reach phones.`], params: { prefix: { type: "string", required: true, description: "Key prefix, e.g. sv_test_abc1" } }, mutates: false,
     run: async (_d, a, env) => { const r = await env.db.prepare("UPDATE api_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE app_id = ? AND prefix = ? AND revoked_at IS NULL").bind(env.appId, String(a.prefix)).run(); return { revoked: (r.meta?.changes ?? 0) > 0 }; } },
   set_alert_webhook: { description: "Set the https URL that gets a small JSON POST (app, release, event, time) when a release is reverted on devices, at most once per release per hour. Empty url removes it.",
-    // mutates: false on purpose: the URL may hold a secret, and mutating commands write their args to audit.args_json.
+    // mutates: false (it does not change the content draft). It is audited by name below, with the URL cut down to its host.
     mutates: false,
+    plan: (_d, a) => { const raw = String(a.url ?? "").trim(); return [raw ? `Send revert alerts to ${hostOf(raw)}. Does not reach phones.` : "Stop sending revert alerts. Does not reach phones."]; },
     params: { url: { type: "string", description: "https:// URL, or empty to remove" } },
     run: async (_d, a, env) => {
       const raw = String(a.url ?? "").trim();
@@ -238,6 +239,10 @@ export function diffContent(a: Content | null, b: Content): string[] {
   return out;
 }
 
+// The URL may hold a token, so logs and plans show only the host.
+const hostOf = (raw: string): string => { try { return new URL(raw).host || "the given URL"; } catch { return "the given URL"; } };
+const auditArgs = (name: string, args: Record<string, unknown>) => name === "set_alert_webhook" ? { url: String(args.url ?? "").trim() ? hostOf(String(args.url)) : "" } : args;
+
 export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<string, unknown>): Promise<any> {
   const cmd = OWNER_COMMANDS[name];
   if (!cmd) return { ok: false, error: { code: "unknown_command", message: `Unknown command '${name}'` } };
@@ -277,9 +282,9 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   } catch (e) {
     res = e instanceof OwnerError ? { ok: false, error: { code: e.code, message: e.message } } : { ok: false, error: { code: "internal", message: String(e) } };
   }
-  if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy")
+  if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy" || name === "set_alert_webhook")
     await env.db.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
-      .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(denied ? { ...args, denied: true } : confirmed ? { ...args, confirmed: true } : args).slice(0, 2000), res.ok && !denied ? 1 : 0).run();
+      .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(denied ? { ...auditArgs(name, args), denied: true } : confirmed ? { ...auditArgs(name, args), confirmed: true } : auditArgs(name, args)).slice(0, 2000), res.ok && !denied ? 1 : 0).run();
   return res;
 }
 

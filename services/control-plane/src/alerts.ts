@@ -25,7 +25,8 @@ export async function sendRevertAlert(db: D1Database, appId: string, release: nu
     if (!row?.webhook) return;
     const nowMs = Date.now(), time = new Date(nowMs).toISOString();
     const cutoff = new Date(nowMs - ALERT_WINDOW_MS).toISOString();
-    // Drop rows older than the window, then enforce the per-app cap.
+    // Drop rows older than the window, then enforce the per-app cap. The delete, count and claim are separate
+    // statements, so concurrent reverts can slightly exceed the cap. That is fine for a flood guard.
     await db.prepare("DELETE FROM alert_sent WHERE app_id = ? AND sent_at <= ?").bind(appId, cutoff).run();
     const n = await db.prepare("SELECT COUNT(*) AS n FROM alert_sent WHERE app_id = ?").bind(appId).first<{ n: number }>();
     if ((n?.n ?? 0) >= MAX_ALERTS_PER_APP) return;
