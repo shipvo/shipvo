@@ -61,7 +61,7 @@ const RETRIES = 2;
 /** Publishing through the hosted control plane: the same get/put/keys, scoped to this app and signed-pointer checked server side. */
 function hostedKv(cfg: ShipvoConfig, token: string) {
   const base = `${cfg.controlPlane.replace(/\/$/, "")}/apps/${cfg.appId}/kv`;
-  const auth = { Authorization: `Bearer ${token}` };
+  const auth: Record<string, string> = { Authorization: `Bearer ${token}`, ...(process.env.SHIPVO_ACTOR === "agent" ? { "x-shipvo-actor": "agent" } : {}) };
   const path = (k: string) => `${base}/${k.split("/").map(encodeURIComponent).join("/")}`;
   const host = cfg.controlPlane.replace(/\/$/, "");
   /** One place for the two first-run failures: the server is not there, or it does not accept the token. */
@@ -74,6 +74,10 @@ function hostedKv(cfg: ShipvoConfig, token: string) {
         const cause = err?.cause?.code ?? err?.code ?? err?.cause?.message ?? err?.message ?? "unknown error";
         throw new Error(`Cannot reach the control plane at ${host} (${cause}) while ${init.method ?? "GET"} ${what}. Check "controlPlane" in shipvo.json, then run \`shipvo doctor\`.`);
       }
+    }
+    if (r.status === 403) { // a typed policy refusal is not a bad token
+      const j: any = await r.clone().json().catch(() => null);
+      if (j?.code === "policy_refused") throw new Error(`Refused by policy rule ${j.rule}: ${j.reason}`);
     }
     if (r.status === 401 || r.status === 403) throw new Error(`The control plane at ${host} rejected your publish token (${r.status}). Run \`shipvo login\`, then \`shipvo app create\` for a new token.`);
     return r;

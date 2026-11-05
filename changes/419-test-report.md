@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo test --report <file> [--release <id>]` writes JSON results keyed by app, commit and release, with the failing step per flow.
+- Migration: none; new flag.
