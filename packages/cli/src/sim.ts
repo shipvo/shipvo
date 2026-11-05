@@ -113,7 +113,11 @@ export async function sim(argv: string[]) {
 
   if (!watchMode) return;
 
-  // module-level exports below
+  const { watcher, rebuild: watchRebuild } = startWatch(cfg, a);
+  p.on("exit", () => {
+    watcher.close();
+    watchRebuild.cancel();
+  });
 }
 
 export function rebuildAndReport(cfg: Record<string, unknown>, a: Record<string, unknown>, build: typeof buildBundle = buildBundle) {
