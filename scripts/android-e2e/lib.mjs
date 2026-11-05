@@ -17,11 +17,11 @@ export const median = (xs) => {
  *  - hash: the pointer is validly signed but names the wrong sha256 for the bundle.
  *  - size: the pointer is validly signed but names the wrong size.
  */
-export function buildPointer({ app, seed, release, band, bytes, url, patches = [], minShell = "1.0.0", tamper, issuedAt = new Date().toISOString() }) {
+export function buildPointer({ app, seed, release, band, bytes, url, patches = [], minShell = "1.0.0", tamper, hermesBytecodeVersion, issuedAt = new Date().toISOString() }) {
   const core = { version: `1.0.${release}`, sha256: sha256(bytes), size: bytes.length, url, patches };
   if (tamper === "hash") core.sha256 = sha256(Buffer.concat([Buffer.from(bytes), Buffer.from("x")]));
   if (tamper === "size") core.size = bytes.length + 7;
-  const body = JSON.stringify({ schema_version: "1.0", app_id: app, shell_major: 1, band, release, issued_at: issuedAt, core, addons: [], screens: [], min_shell_version: minShell });
+  const body = JSON.stringify({ schema_version: "1.0", app_id: app, shell_major: 1, band, release, issued_at: issuedAt, core, addons: [], screens: [], min_shell_version: minShell, ...(hermesBytecodeVersion ? { hermes_bytecode_version: hermesBytecodeVersion } : {}) });
   const signature = signBytes(new TextEncoder().encode(body), seed);
   if (tamper === "signature") return { body: body.replace('"issued_at":"', '"issued_at":"0'), signature };
   return { body, signature };
@@ -70,3 +70,28 @@ export function steadyTrials(trials, pollMissMs = 3000) {
   const miss = trials.map((t) => t.timeline?.pointerSeenMs == null || t.timeline.pointerSeenMs > pollMissMs);
   return trials.filter((_, i) => !miss[i] && !(i > 0 && miss[i - 1]));
 }
+
+const HBC_MAGIC = [0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f];
+
+/** Hermes bytecode version in a bundle header (8-byte magic, then a 32-bit little-endian version), or null for plain JS. Same rule as `HermesGuard.versionOf`. */
+export function hermesVersionOf(bytes) {
+  if (bytes.length < 12 || HBC_MAGIC.some((m, i) => bytes[i] !== m)) return null;
+  const v = bytes[8] + bytes[9] * 2 ** 8 + bytes[10] * 2 ** 16 + bytes[11] * 2 ** 24;
+  return v >= 1 && v <= 0x7fffffff ? v : null;
+}
+
+/** A copy of a Hermes bundle with its header version set to `version`. */
+export function withHermesVersion(bytes, version) {
+  if (hermesVersionOf(bytes) == null) throw new Error("not a Hermes bytecode bundle");
+  const out = Uint8Array.from(bytes); new DataView(out.buffer).setUint32(8, version, true);
+  return out;
+}
+
+/** A release with a different bytecode version than the shell's. */
+export const otherHermesVersion = (shell) => (shell === 1 ? 2 : shell - 1);
+
+/**
+ * The refusal reason in telemetry for `release` since `since`, or null. The event name is the reason
+ * (`hermes_bytecode_mismatch`), sent under the refused release's id.
+ */
+export const refusalReason = (tele, release, since) => tele.find((e) => e.release === release && e.at >= since && e.event === "hermes_bytecode_mismatch")?.event ?? null;
