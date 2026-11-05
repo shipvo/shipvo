@@ -47,3 +47,13 @@ it("step ids are unique within a store", () => {
     for (const s of [r.play, r.apple]) expect(new Set(s.steps.map((x) => x.id)).size).toBe(s.steps.length);
   }
 });
+
+import { SHIPVO_TESTERS_GROUP as G } from "../src/index";
+it("only personal non-exempt Play accounts mention Shipvo Testers", () => {
+  const text = (r: ReturnType<typeof routeStore>) => JSON.stringify([r.play, r.apple]);
+  expect(text(routeStore({ company: false }))).toContain(G);
+  expect(text(routeStore({ company: false }))).toContain("everyone tests");
+  expect(text(routeStore({ company: true }))).not.toContain(G);
+  expect(text(routeStore({ company: false, playAccountBefore20231113: true }))).not.toContain(G);
+  expect(JSON.stringify(routeStore({ company: false }).apple)).not.toContain(G);
+});

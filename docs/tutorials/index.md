@@ -13,6 +13,7 @@ Step-by-step tutorials for people who have never used a terminal. Each one ends 
 | Tutorial | You will | Time | Level |
 | --- | --- | --- | --- |
 | [Make a shop with your own products](your-own-shop.md) | Create a shop from the template, put in your products and prices, check the cart and run a practice release | about two minutes of commands, plus time to write your products | Beginner |
+| [Get your 12 testers](get-your-12-testers.md) | Join Shipvo Testers, add the group to your Play closed test and share your opt-in link | about 15 minutes, then 14 days of waiting | Beginner |
 
 Taking payments is not a tutorial yet: the shop template has no payment step.
 

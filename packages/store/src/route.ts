@@ -33,6 +33,11 @@ export interface StoreRoutes {
   notes: string[];
 }
 
+/** The community Google Group for the tester rule. Anyone can join; members cannot see each other's emails; only managers post. */
+export const SHIPVO_TESTERS_GROUP = "shipvo-testers@googlegroups.com";
+export const SHIPVO_TESTERS_JOIN_URL = "https://groups.google.com/g/shipvo-testers";
+export const SHIPVO_TESTERS_SHORT_URL = "https://shipvo.dev/testers";
+
 export const TESTER_RULE = "Google Play needs at least 12 testers opted in to a closed test for 14 days in a row before you can apply for production.";
 
 function play(a: Required<RouteAnswers>): StoreRoute {
@@ -67,7 +72,7 @@ function play(a: Required<RouteAnswers>): StoreRoute {
     accountNote: "Personal account (25 USD once). " + TESTER_RULE,
     steps: [
       { id: "play-account", title: "Open a Google Play personal account", action: "Register at play.google.com/console and pay the 25 USD fee.", wait: "Identity verification." },
-      { id: "play-closed-test", title: "Start the closed test with 12 testers", action: "Upload a build to the closed track and get 12 real people to opt in. Start on day one.", wait: "14 days in a row with at least 12 testers. If the count drops below 12 the clock resets." },
+      { id: "play-closed-test", title: "Start the closed test with 12 testers", action: `Upload a build to the closed track and get 12 real people to opt in. Start on day one. Add your own testers and the Shipvo Testers group (${SHIPVO_TESTERS_GROUP}) as Google Groups on the closed track, and share your opt-in link. Join Shipvo Testers yourself (${SHIPVO_TESTERS_SHORT_URL}) to test other founders' apps: the community works because everyone tests.`, wait: "14 days in a row with at least 12 testers. If the count drops below 12 the clock resets." },
       { id: "play-apply", title: "Apply for production access", action: "Answer Google's questions about your test and apply." },
       { id: "play-review", title: "Production review", action: "Wait for Google to approve production, then release.", wait: "Google review, up to about 7 days." },
       { id: "play-live", title: "Live on Google Play", action: "Check the listing is public." },

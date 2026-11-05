@@ -4,5 +4,5 @@ export { renderPrivacyPolicy } from "./policy.js";
 export { renderDataSafetyCsv } from "./csv.js";
 export { checkScreenshot, checkSet, SCREENSHOT_SETS } from "./screenshots.js";
 export type { ScreenshotSetId, ScreenshotSetSpec, ScreenshotFile, CheckResult } from "./screenshots.js";
-export { routeStore, TESTER_RULE } from "./route.js";
+export { routeStore, TESTER_RULE, SHIPVO_TESTERS_GROUP, SHIPVO_TESTERS_JOIN_URL, SHIPVO_TESTERS_SHORT_URL } from "./route.js";
 export type { RouteAnswers, RouteStep, StoreRoute, StoreRoutes, AccountType } from "./route.js";
