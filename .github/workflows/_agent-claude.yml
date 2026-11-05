@@ -79,6 +79,10 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - if: steps.chk.outputs.ok == 'true' && (inputs.mode != 'read' || (inputs.role == 'reviewer' || inputs.role == 'contract'))
         run: pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
+      - name: Install Chromium for the simulator
+        # Code roles run @shipvo/sim, the sim tests and scripts that start it; without this, Playwright has no browser.
+        if: steps.chk.outputs.ok == 'true' && inputs.mode != 'read' && inputs.engine == 'claude'
+        run: pnpm --filter @shipvo/sim exec playwright install --with-deps chromium || echo "::warning::Chromium install failed; simulator runs will not work in this job"
 
       - name: Prepare branch
         if: steps.chk.outputs.ok == 'true'
@@ -263,7 +267,13 @@ jobs:
             gh label create agent:escalate -R "$REPO" --color b60205 --description "For the steward: the team's setup needs a fix" --force > /dev/null 2>&1 || true
             T="$ISSUE"; [ "$PR" != "0" ] && T="$PR"
             { cat /tmp/agent/escalate.md; echo; echo "From: ${{ inputs.role }} on #$T. Run: $RUN_URL"; } > /tmp/agent/e.md
-            gh issue create -R "$REPO" --title "Escalation: $(head -n1 /tmp/agent/escalate.md | sed 's/^#* *//' | cut -c1-80)" --label agent:escalate --body-file /tmp/agent/e.md || true
+            # One open escalation per issue or PR: a repeat from the same work becomes a comment, not a new issue.
+            DUP=$(gh issue list -R "$REPO" --label agent:escalate --state open --limit 100 --json number,body --jq "[.[] | select(.body | contains(\"on #$T. Run:\"))][0].number // empty" 2>/dev/null || true)
+            if [ -n "$DUP" ] && [ "$T" != "0" ]; then
+              gh issue comment "$DUP" -R "$REPO" --body-file /tmp/agent/e.md || true
+            else
+              gh issue create -R "$REPO" --title "Escalation: $(head -n1 /tmp/agent/escalate.md | sed 's/^#* *//' | cut -c1-80)" --label agent:escalate --body-file /tmp/agent/e.md || true
+            fi
           fi
           if [ -f /tmp/agent/blocked.md ]; then
             echo "blocked=true" >> "$GITHUB_OUTPUT"
