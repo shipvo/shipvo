@@ -1,6 +1,6 @@
 # Spike results
 
-Real-device numbers only. Nothing here is simulated. Raw rows come from the control plane's `telemetry` table (D1).
+Measured numbers only. The Android sections come from a real phone, with raw rows from the control plane's `telemetry` table (D1). The iOS section comes from the iOS Simulator in CI, measured on every change to the iOS runtime.
 
 ## Device
 
@@ -62,6 +62,22 @@ Real-device numbers only. Nothing here is simulated. Raw rows come from the cont
 | Release 6 applied via patch from the APK's own bundle | 07:52:38 | 291 KB (vs 1,530 KB full) |
 | Release 7 published | 07:53:44 | |
 | Release 7 applied via patch from release 6 (download, patch and verify: 913 ms; apply: 263 ms) | 07:54:00 | **64 KB** |
+
+## iOS Simulator (CI)
+
+Measured on 5 Nov 2026 by the `ios-runtime` workflow, [run 41979433300](https://github.com/shipvo/shipvo/actions/runs/41979433300): iPhone simulator on a GitHub macOS runner, Xcode 26.6, the Tide sample app built in Release with `@shipvo/runtime`, and a local control plane on the same machine (`scripts/ios-e2e/server.mjs`). Each run reinstalls the app, so it starts on its embedded bundle and downloads the full release 1 bundle; medians of 3 runs, computed by `scripts/ios-e2e/analyze.mjs`.
+
+| Measure | Median | Runs |
+| --- | --- | --- |
+| Launch to new release running and healthy | **4.2 s** | 8.1, 4.2, 1.9 s |
+| Bundle download (full, 1.87 MB) | 157 ms | |
+| Apply (last bundle byte to healthy) | 266 ms | |
+
+How to read these numbers:
+- The signed pointer is already published when the app launches, so "launch to healthy" covers app start, pointer fetch and verification, download, staging and reload. It does not include waiting for the app's next check after a publish.
+- The control plane runs on the same machine, so the download time shows the runtime's own cost, not a mobile network. The Android numbers above were measured over 4G and Wi-Fi.
+- The first run is the slowest (8.1 s): it is the first launch of a freshly booted simulator.
+- Every run of the workflow repeats this and prints the table in its job summary, so these numbers are re-measured on each iOS runtime change.
 
 ## Gaps found and next actions
 
