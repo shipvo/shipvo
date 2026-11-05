@@ -1,0 +1,2 @@
+- `control-plane`: new `audit_log` table, `recordAudit(db, row)` and `GET /audit/:app` (slice 1 of #305). The endpoint returns that app's rows newest first, with `?limit=` (default 50, max 200) and `?before=<id>`. It takes the owner token or the app's publish token. Nothing calls `recordAudit` yet.
+- Migration: `0016_audit_log.sql` adds one table and one index. It is additive and safe to run twice.
