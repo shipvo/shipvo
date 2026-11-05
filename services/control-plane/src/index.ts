@@ -5,7 +5,7 @@ import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
-import { apps } from "./apps";
+import { apps, publisher } from "./apps";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
@@ -199,7 +199,11 @@ app.get("/t/:app/summary", async (c) => {
   let halted: unknown = null;
   const haltRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt/${appId}`) : null;
   if (haltRaw) { try { const v = JSON.parse(haltRaw); if (v && typeof v === "object") halted = v; } catch { /* corrupt: null */ } }
-  return c.json({ releases, halted });
+  // The auto-halt setting, so `shipvo status` can show it. Not secret. Null means off.
+  let auto_halt: { threshold: number; min_reports: number } | null = null;
+  const cfgRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt-config/${appId}`) : null;
+  if (cfgRaw) { try { const v = JSON.parse(cfgRaw); if (v && typeof v.threshold === "number" && v.threshold > 0 && v.threshold <= 1) auto_halt = { threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : 20 }; } catch { /* corrupt: off */ } }
+  return c.json({ releases, halted, auto_halt });
 });
 
 app.get("/band/:cohort", (c) => {
@@ -265,6 +269,45 @@ app.post("/app/:id/api/command", async (c) => {
   const list = (c.req.header("x-shipvo-agent-deny") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const local = agent ? { agentPolicy: c.req.header("x-shipvo-agent-policy") ?? undefined, agentDeny: list } : undefined;
   return c.json(await runOwnerCommand({ db: c.env.DB, kv: c.env.POINTERS, appId, actor, agent, local }, String(body?.name ?? ""), body?.args ?? {}));
+});
+
+/**
+ * Auto-halt settings for one app, stored in KV `halt-config/<app>`. Allowed for the owner (admin session or owner token)
+ * or the app's publish token, which is what `shipvo auto-halt` sends. GET returns {enabled, threshold?, min_reports?}.
+ * PUT {threshold, min_reports?} turns it on; DELETE turns it off.
+ */
+async function haltConfigAuth(c: any, appId: string) { return (await owner(c, appId)) || (await publisher(c, appId)); }
+const bad = (c: any, message: string) => c.json({ error: "bad_halt_config", message }, 400);
+app.get("/app/:id/api/halt-config", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const raw = await c.env.POINTERS.get(`halt-config/${appId}`);
+  if (raw) {
+    try {
+      const v = JSON.parse(raw);
+      if (v && typeof v.threshold === "number") return c.json({ enabled: true, threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : 20 });
+    } catch { /* corrupt: treated as off */ }
+  }
+  return c.json({ enabled: false });
+});
+app.put("/app/:id/api/halt-config", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  let body: any; try { body = await c.req.json(); } catch { return bad(c, "body must be JSON like {\"threshold\": 0.2}"); }
+  const t = body?.threshold, m = body?.min_reports === undefined ? 20 : body.min_reports;
+  if (typeof t !== "number" || !Number.isFinite(t) || t <= 0 || t > 1) return bad(c, "threshold must be a number above 0 and at most 1");
+  if (typeof m !== "number" || !Number.isInteger(m) || m < 1 || m > 10000) return bad(c, "min_reports must be an integer from 1 to 10000");
+  await c.env.POINTERS.put(`halt-config/${appId}`, JSON.stringify({ threshold: t, min_reports: m }));
+  return c.json({ enabled: true, threshold: t, min_reports: m });
+});
+app.delete("/app/:id/api/halt-config", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  await c.env.POINTERS.delete(`halt-config/${appId}`);
+  return c.json({ enabled: false });
 });
 
 app.route("/auth", auth);

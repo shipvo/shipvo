@@ -12,6 +12,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Dry run.** A practice run. Shipvo does all the work of a release but sends nothing to anyone.
 
+**JSON.** A plain way to write a list of things in a text file, with curly brackets, quote marks and commas. Shop products live in a JSON file. A missing comma is the usual mistake.
+
 **MCP.** The way an assistant connects to tools such as the Shipvo simulator. You will see the word in settings; you do not need to understand it to use it.
 
 **Node.** A free program that runs the tools behind Shipvo. You install it once. Shipvo needs version 22 or newer.
@@ -26,4 +28,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Simulator.** A copy of a phone that runs on your computer and opens in your web browser. It shows your app without a real phone.
 
+**Template.** A ready-made app you change into your own, such as the shop template.
+
 **Terminal.** A window where you type commands instead of clicking. On a Mac it is called Terminal. On Windows use "Windows Terminal" or "PowerShell". On Linux it is also called Terminal.
+

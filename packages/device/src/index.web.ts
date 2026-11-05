@@ -44,7 +44,7 @@ const state: DeviceState = {
 // Every entry is marked simulated: a simulated fingerprint or payment is for testing and is never a real verification or money movement.
 const log = (kind: string, detail?: unknown) => state.log.push({ at: Date.now(), kind, detail, simulated: true } as any);
 const urlSubs = new Set<(url: string) => void>();
-const netSubs = new Set<(o: boolean) => void>(); const openSubs = new Set<(n: Notification) => void>();
+const netSubs = new Set<(o: boolean) => void>(); const openSubs = new Set<(n: Notification) => void>(); const recvSubs = new Set<(n: Notification) => void>();
 
 // ---- system sheets (plain DOM so they sit above the app and read as dialogs) ----
 function sheet(label: string, build: (root: HTMLElement, close: () => void) => void): Promise<void> {
@@ -135,9 +135,11 @@ export const device: Device = {
   notifications: {
     async show(n) {
       if ((await askPermission("notifications")) !== "granted") return "";
-      const id = `n${Date.now().toString(36)}`; showBanner({ id, ...n }); log("notification", { id, ...n }); return id;
+      return deliver(n) ?? "";
     },
     onOpen(cb) { openSubs.add(cb); return () => { openSubs.delete(cb); }; },
+    onTapped(cb) { openSubs.add(cb); return () => { openSubs.delete(cb); }; },
+    onReceived(cb) { recvSubs.add(cb); return () => { recvSubs.delete(cb); }; },
   },
   share: {
     async text(text, title) {
@@ -189,6 +191,13 @@ export const device: Device = {
 
 // A notification banner at the top, like a heads-up notification: tapping it opens the app's handler.
 const recent: Notification[] = [];
+let seq = 0;
+/** Deliver a notification to the app. Returns its id, or null when notification permission is not granted (nothing reaches the app). */
+function deliver(n: Omit<Notification, "id">): string | null {
+  if (state.permissions.notifications !== "granted") { log("notification_blocked", { title: n.title, permission: state.permissions.notifications }); return null; }
+  const full: Notification = { id: `n${Date.now().toString(36)}${(seq++).toString(36)}`, ...n };
+  showBanner(full); log("notification", { ...full }); recvSubs.forEach((f) => f(full)); return full.id;
+}
 function showBanner(n: Notification) {
   recent.push(n); if (recent.length > 20) recent.shift();
   const b = document.createElement("div"); b.setAttribute("role", "button"); b.setAttribute("aria-label", `Notification: ${n.title}. ${n.body}`); b.tabIndex = 0; b.setAttribute("data-pn-banner", "1");
@@ -203,7 +212,8 @@ function showBanner(n: Notification) {
 g.__pnDevice = {
   state,
   set(patch: Partial<DeviceState>) { Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (patch.online !== undefined) netSubs.forEach((f) => f(state.online)); },
-  push(n: Omit<Notification, "id">) { const id = `n${Date.now().toString(36)}`; showBanner({ id, ...n }); },
+  /** Push a notification to the app. Returns its id, or null when permission is not granted. */
+  push(n: Omit<Notification, "id">) { return deliver(n); },
   log: () => state.log,
   /** Notifications delivered so far (the banner is gone after 5 s, like a heads-up on a phone; this is the notification shade). */
   notifications: () => recent.map((n) => ({ id: n.id, title: n.title, body: n.body })),
@@ -216,7 +226,7 @@ g.__pnDevice = {
   reset(profile?: Partial<DeviceState>) {
     Object.assign(state, { permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
       location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
-    recent.length = 0;
+    recent.length = 0; seq = 0;
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
 };

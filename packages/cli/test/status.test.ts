@@ -78,3 +78,18 @@ describe("shipvo status", () => {
     expect(formatStatus([{ release: 1, events: { a: 1 }, apply_ms_median: null, cold_start_ms_median: null }])).toContain("release");
   });
 });
+
+describe("shipvo status auto-halt line", () => {
+  it("prints the setting when the control plane sends it, and nothing when it does not", async () => {
+    inApp();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await status([], (async () => resp({ ...payload, auto_halt: { threshold: 0.2, min_reports: 20 } })) as any);
+    expect(log.mock.calls[0][0]).toBe("auto-halt: on at 20% after 20 reports");
+    log.mockClear();
+    await status([], (async () => resp({ ...payload, auto_halt: null })) as any);
+    expect(log.mock.calls[0][0]).toBe("auto-halt: off");
+    log.mockClear();
+    await status([], (async () => resp(payload)) as any);
+    expect(String(log.mock.calls[0][0])).not.toContain("auto-halt");
+  });
+});
