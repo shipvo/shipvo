@@ -23,3 +23,6 @@ public/security/
 *.webm
 *.mkv
 .gradle/
+
+# Sim bench output
+.shipvo/

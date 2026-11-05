@@ -38,7 +38,7 @@ async function main() {
   try {
     for (let i = 0; i < 60; i++) {
       if (exited) throw new Error(`sim exited early:\n${simLog}`);
-      try { if ((await fetch(`${base}/app/`)).ok) break; } catch {}
+      try { if ((await fetch(`${base}/app/`)).ok) break; } catch { /* sim not listening yet: retry */ }
       await new Promise((r) => setTimeout(r, 1000));
     }
     const post = async (path, body) => { const r = await fetch(base + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); return r.json(); };
