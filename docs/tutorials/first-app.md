@@ -1,8 +1,10 @@
 # Create your first app and see it on a phone screen
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 39 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-18b32972.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 39 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-18b32972.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English">Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
 
 Prefer to watch first? This 1 minute 39 second video covers the same steps. [Captions and transcript](../videos.md).
+
+Music: "Epic Adventure" by Akashic Records (Jamendo, CC BY-NC-ND 3.0) https://www.jamendo.com/track/1150771
 
 You will create a small shop app, open it on a simulated phone in your web browser, change the words on its front page, and check what a release would contain. You need no phone, no Android Studio and no Xcode, and you do not need to know how to code. You will copy and paste about ten short commands.
 

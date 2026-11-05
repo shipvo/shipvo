@@ -37,7 +37,7 @@ That is a safety check you can run before every release. The full guide is at sh
 
 ### Create your first app on a simulated phone
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 39 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-18b32972.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 39 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-18b32972.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
 1 minute 39 seconds. Make an app, open it on a simulated phone in your browser, tap a button, change the words on the front page and check a release with a dry run. It follows [Create your first app](tutorials/first-app.md).
 
