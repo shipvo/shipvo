@@ -1,0 +1,3 @@
+- `@shipvo/cli`: the `shipvo preview` page has a Record button and a "Download test" button. Taps, typed text and panel changes become a `@shipvo/test` script (same output as the MCP export). Password fields use an environment variable, never the typed value.
+- `@shipvo/cli`: the preview page says it is the app's web build on the simulated device, measured against Android and iOS in `docs/parity-results.md`, and that native-only UI can differ.
+- Migration: none.

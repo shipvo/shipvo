@@ -63,6 +63,25 @@ end_session → { steps: 18, orders: [{ id: "TT-1001", total: 4200, payment: "mo
 
 18 steps, 76 seconds, no phone. The same flow runs on a real Android emulator with identical screens and the same order ([parity-results.md](parity-results.md)).
 
+## Walk an app with `shipvo explore`
+
+`shipvo explore` is a walker with no LLM inside. It starts the simulator on your app, opens the start screen and each deep link in `routes` in `shipvo.json`, and taps every actionable element once, going back after each. It stops at `--max-steps` (default 100) and `--max-depth` (default 3) and says so in the report.
+
+```bash
+shipvo explore --max-steps 100 --max-depth 3
+shipvo explore --sim http://localhost:4545   # use a simulator that is already running
+shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
+```
+
+It writes `explore-report.md` and `explore-report.json`. The report has four kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `back`):
+
+- an uncaught error or a red screen;
+- a tap that was `not_delivered`;
+- a dead end: a screen with no actionable element;
+- an actionable element with no accessible name.
+
+The header lists what the simulator cannot show. A clean run says "No findings in N steps", never that a screen is fine. Exit code 1 also means the walk itself failed (for example the simulator could not start or a step failed). If it fails mid-walk, the report is still written with the findings so far and `stoppedEarly` says why; the error is also printed to stderr. If it fails before the walk starts, no report is written.
+
 ## Owner API: agents that run the shop
 
 With an owner token, the same MCP server exposes the app's typed owner commands: change content, prices and offers, read orders, publish to every phone. Every change is audited with who made it. `owner_describe("tide")` lists the commands with their arguments; the admin at `/app/<id>/admin` is the same API with a form on top.
