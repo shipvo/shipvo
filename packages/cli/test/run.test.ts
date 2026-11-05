@@ -142,6 +142,7 @@ describe("no playwright (source grep guard)", () => {
   it("run.ts and what it imports never reference playwright", () => {
     for (const f of ["run.ts", "config.ts"]) expect(readFileSync(join(__dirname, "../src", f), "utf8")).not.toMatch(/playwright/i);
     const sim = readFileSync(join(__dirname, "../src/sim.ts"), "utf8");
-    expect(sim).not.toMatch(/import[^\n]*playwright|require\(["']playwright/);
+    // sim.ts may import our own ensure step ("./ensure-playwright.js"), never the playwright package.
+    expect(sim.replace(/from "\.\/ensure-playwright\.js"/g, "")).not.toMatch(/import[^\n]*playwright|require\(["']playwright/);
   });
 });

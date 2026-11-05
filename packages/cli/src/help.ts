@@ -9,6 +9,8 @@ Start
   init <dir>                  Create a new app wired to Shipvo
   sim [--port 4545]           Build the app and run it in the simulator
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
+                              First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
+                              Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.
   run android|ios [--no-open] [--port n]  Open the app in a phone frame in your browser (no Playwright)
   run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
   explore [--max-depth 3] [--max-steps 100] [--fail-on-findings]  Walk the app in the simulator, write explore-report.md and .json

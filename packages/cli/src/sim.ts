@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, renameSync, rmSync, watch } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
+import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
@@ -125,9 +126,11 @@ export async function sim(argv: string[]) {
     console.error(`Building ${cfg.name} for the simulator…`);
     execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
   }
+  try { ensurePlaywright({ cwd: process.cwd() }); }
+  catch (e) { console.error(e instanceof Error ? e.message : String(e)); process.exit(2); }
   let server: string;
   try { server = createRequire(process.cwd() + "/package.json").resolve("@shipvo/sim/server.mjs"); }
-  catch { console.error("Install @shipvo/sim (and playwright) in this app: npm i -D @shipvo/sim playwright && npx playwright install chromium"); process.exit(2); }
+  catch { console.error("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager)."); process.exit(2); }
   const p = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId, ...(a.dir ? ["--dir", a.dir] : [])], { stdio: "inherit", env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
   let exited = false;
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });
