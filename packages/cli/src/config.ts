@@ -12,8 +12,14 @@ export type ShipvoConfig = {
   publicKey: string;
   /** Hermes bytecode version(s) the app's shells run. If set, `shipvo publish` refuses bundles that differ. */
   hermesBytecodeVersion?: number | number[];
+  /** What AI agents may do through `@shipvo/mcp` owner commands. "ask" (default): irreversible commands need confirm: true. "deny": they are refused. "allow": no confirm step (the owner must set it). */
+  agentPolicy?: "ask" | "deny" | "allow";
+  /** Owner commands agents may never run. */
+  agentDeny?: string[];
   /** Where `shipvo publish` writes: the control plane's Cloudflare KV namespace. */
   kv?: { namespaceId: string };
+  /** Where `shipvo preview` publishes: "here.now" (default, no account) or "control-plane" (not built yet). */
+  preview?: "here.now" | "control-plane";
   /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */
   listing?: { public?: boolean; description?: string; category?: string; tagline?: string; icon?: string; screenshots?: string[]; website?: string; capabilities?: string[] };
 };
@@ -36,7 +42,7 @@ export function seed(): string {
     || ((e.SHIPVO_SIGNING_SEED_FILE || e.PURENATIVE_SIGNING_SEED_FILE) && readFileSync((e.SHIPVO_SIGNING_SEED_FILE || e.PURENATIVE_SIGNING_SEED_FILE)!, "utf8").trim());
   const local = (() => { try { return readFileSync(join(process.cwd(), ".shipvo", "seed.txt"), "utf8").trim(); } catch { return ""; } })();   // what `shipvo init` wrote
   if (!s && local) return local;
-  if (!s) { console.error("Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE (the seed `shipvo keygen` printed), or keep it at .shipvo/seed.txt."); process.exit(2); }
+  if (!s) { console.error("Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE (the seed `shipvo keygen` printed), or keep it at .shipvo/seed.txt. No key yet? Run `shipvo keygen`."); process.exit(1); }
   return s;
 }
 
@@ -51,12 +57,20 @@ function hostedKv(cfg: ShipvoConfig, token: string) {
   const base = `${cfg.controlPlane.replace(/\/$/, "")}/apps/${cfg.appId}/kv`;
   const auth = { Authorization: `Bearer ${token}` };
   const path = (k: string) => `${base}/${k.split("/").map(encodeURIComponent).join("/")}`;
+  const host = cfg.controlPlane.replace(/\/$/, "");
+  /** One place for the two first-run failures: the server is not there, or it does not accept the token. */
+  const call = async (url: string, init: RequestInit) => {
+    let r: Response;
+    try { r = await fetch(url, init); } catch { throw new Error(`Cannot reach the control plane at ${host}. Check "controlPlane" in shipvo.json, then run \`shipvo doctor\`.`); }
+    if (r.status === 401 || r.status === 403) throw new Error(`The control plane at ${host} rejected your publish token (${r.status}). Run \`shipvo login\`, then \`shipvo app create\` for a new token.`);
+    return r;
+  };
   return {
-    async get(k: string) { const r = await fetch(path(k), { headers: auth }); if (r.status === 401) throw new Error("publish token rejected: run `shipvo app create` for a new one"); return r.ok ? r.text() : null; },
-    async getBytes(k: string) { const r = await fetch(path(k), { headers: auth }); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; },
-    async keys(prefix: string) { const r = await fetch(`${base}?prefix=${encodeURIComponent(prefix)}`, { headers: auth }); return r.ok ? ((await r.json()) as any).keys as string[] : []; },
+    async get(k: string) { const r = await call(path(k), { headers: auth }); return r.ok ? r.text() : null; },
+    async getBytes(k: string) { const r = await call(path(k), { headers: auth }); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; },
+    async keys(prefix: string) { const r = await call(`${base}?prefix=${encodeURIComponent(prefix)}`, { headers: auth }); return r.ok ? ((await r.json()) as any).keys as string[] : []; },
     async put(k: string, body: BodyInit, type: string) {
-      const r = await fetch(path(k), { method: "PUT", headers: { ...auth, "content-type": type }, body });
+      const r = await call(path(k), { method: "PUT", headers: { ...auth, "content-type": type }, body });
       if (!r.ok) { let m = ""; try { const j: any = await r.json(); m = j.message ?? j.error; } catch {} throw new Error(`publish ${k}: ${r.status} ${m}`); }
     },
   };
@@ -68,7 +82,7 @@ export function kv(cfg: ShipvoConfig) {
   const NS = process.env.SHIPVO_KV_ID || process.env.PURENATIVE_KV_ID || cfg.kv?.namespaceId;
   if (!(ACC && TOKEN && NS)) {
     const pt = publishToken(); if (pt) return hostedKv(cfg, pt);
-    console.error("Nothing to publish with. Hosted: run `shipvo login`, then `shipvo app create` (or set SHIPVO_PUBLISH_TOKEN). Self-hosted: set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and SHIPVO_KV_ID."); process.exit(2);
+    console.error("Nothing to publish with. Hosted: run `shipvo login`, then `shipvo app create` (or set SHIPVO_PUBLISH_TOKEN). Self-hosted: set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and SHIPVO_KV_ID."); process.exit(1);
   }
   const url = (k: string) => `https://api.cloudflare.com/client/v4/accounts/${ACC}/storage/kv/namespaces/${NS}/values/${encodeURIComponent(k)}`;
   const auth = { Authorization: `Bearer ${TOKEN}` };

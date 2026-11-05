@@ -3,7 +3,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
 import { checkBundle, parseDeclared } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
@@ -39,6 +39,14 @@ function checkFlags(argv: string[], known: string[]) {
   }
 }
 
+/** An on/off flag: bare or "true" is on, "false" is off. Anything else is an error, so a typo never flips it silently. */
+function switchFlag(a: Record<string, string | undefined>, name: string): boolean {
+  const v = a[name];
+  if (v === undefined || v === "false") return false;
+  if (v === "true") return true;
+  throw new Error(`--${name} is an on/off flag: use --${name}, --${name} true or --${name} false (got "${v}")`);
+}
+
 /** A store that only writes files under `dir` (key `p/app/1/b0` becomes `dir/p/app/1/b0`). It reads back only what this run wrote (kept in memory), never old files, so the iOS pass can find the web artifact and a dry run never needs a control plane. */
 function localKv(dir: string) {
   const root = resolve(dir);
@@ -65,15 +73,15 @@ export const PUBLISH_HELP = `Usage: shipvo publish [flags]
 
 Build, sign and publish an over-the-air release.
 
-Flags (write a value after a space, not =):
+Flags (write a value after a space, not =; on/off flags can be bare, or true/false):
   --bands b0,b1,b2             Cohorts to publish to (default b0,b1,b2)
   --platform android|ios|all   Platform to publish (default android)
   --release N                  Release number (default: the next one)
   --min-shell X.Y.Z            Oldest app shell that can run this release (default: version in app.json)
   --hermes-bytecode-version V  Refuse bundles built for another Hermes version, for example 96 or 96,98
   --max-bases N                How many older releases to build patches from (default 6)
-  --skip-export true           Reuse the last build in dist-ota/
-  --skip-web true              Do not publish the web copy for the simulator
+  --skip-export               Reuse the last build in dist-ota/
+  --skip-web                  Do not publish the web copy for the simulator
   --dry-run                    Build and sign, write files locally, send nothing
   --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)
   --help                       Show this help
@@ -83,7 +91,7 @@ export async function publish(argv: string[]) {
   if (argv.includes("--help") || argv.includes("-h")) { console.log(PUBLISH_HELP); return; }
   checkFlags(argv, PUBLISH_FLAGS);
   const a = parse(argv), cfg = loadConfig(), SEED = seed();
-  const dry = a["dry-run"] !== undefined; // a plain switch: any use turns it on
+  const dry = switchFlag(a, "dry-run"), skipExport = switchFlag(a, "skip-export"), skipWeb = switchFlag(a, "skip-web");
   if (a.out !== undefined && !dry) throw new Error("--out only works with --dry-run");
   if (a.out === "true") throw new Error("--out needs a directory: pass --out <dir>");
   const outDir = a.out || ".shipvo/dry-run";
@@ -107,7 +115,7 @@ export async function publish(argv: string[]) {
   for (const pf of platforms) {
     // Android published alone keeps the original dist-ota/ layout, so existing CI keeps working.
     const root = platforms.length === 1 && pf === "android" ? "dist-ota" : `dist-ota/${pf}`;
-    if (a["skip-export"] !== "true") execSync(`npx expo export --platform ${pf} --output-dir ${root} --clear`, { stdio: "inherit" });
+    if (!skipExport) execSync(`npx expo export --platform ${pf} --output-dir ${root} --clear`, { stdio: "inherit" });
     const jsDir = `${root}/_expo/static/js/${pf}`;
     const file = readdirSync(jsDir).find((f) => f.endsWith(".hbc")) || readdirSync(jsDir).find((f) => f.endsWith(".js"));
     if (!file) throw new Error("no bundle in " + jsDir);
@@ -116,8 +124,8 @@ export async function publish(argv: string[]) {
     const name = bundleName(release, pf), newSha = sha256Hex(bytes);
     await kv.put(`b/${APP}/${name}`, bytes, "application/octet-stream");
 
-    // Patches: from recent releases (and, on Android, each shell's embedded bundle); devices verify the patched result against the signed sha256.
-    // iOS patches only from earlier iOS releases: the iOS runtime has no embedded-bundle baseline yet.
+    // Patches: from recent releases and each shell's embedded bundle; devices verify the patched result against the signed sha256.
+    // Releases are per platform. Embedded-bundle records are shared under base/<app>/ and tagged with a platform (no tag means Android).
     const patches: { from_sha256: string; url: string; size: number; sha256: string }[] = [];
     {
       const MAX_BASES = Number(a["max-bases"] || 6);
@@ -125,7 +133,7 @@ export async function publish(argv: string[]) {
       const hist = (await Promise.all((await kv.keys(pf === "ios" ? `h/${APP}/ios-r` : `h/${APP}/r`)).map(async (k: string) => { try { return JSON.parse((await kv.get(k))!); } catch { return null; } })))
         .filter((h) => h && h.release < release).sort((x, y) => y.release - x.release).slice(0, MAX_BASES - 2);
       for (const h of hist) bases.set(h.sha256, `b/${APP}/${bundleName(h.release, pf)}`);
-      if (pf === "android") for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); bases.set(b.sha256, b.key); } catch {} }
+      for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); if ((b.platform ?? "android") === pf) bases.set(b.sha256, b.key); } catch {} }
       // Only look for bsdiff4 when there is an older bundle to patch from; a first release needs no patches.
       let bsdiff = false;
       if (bases.size > 0) { try { execSync("python3 -c 'import bsdiff4'", { stdio: "ignore" }); bsdiff = true; } catch { console.error("Small patches are off because the Python tool bsdiff4 is not installed (pip install bsdiff4). Full bundles are published instead. Updates still work, they are just bigger."); } }
@@ -149,9 +157,9 @@ export async function publish(argv: string[]) {
 
     // The agent-facing web artifact of the same commit, served at /w/<app>/r<N>/ for the simulator (built once, with the first platform).
     let web: { base: string; entry: string; sha256: string; files: number } | null = null;
-    if (a["skip-web"] !== "true" && pf === platforms[0]) {
-      web = await publishWeb(kv, cfg, APP, release);
-    } else if (a["skip-web"] !== "true") {
+    if (!skipWeb && pf === platforms[0]) {
+      web = await publishWeb(kv, cfg, APP, release, dry ? outDir : undefined);
+    } else if (!skipWeb) {
       try { web = JSON.parse((await kv.get(`h/${APP}/r${release}`))!)?.web ?? null; } catch {}
     }
 
@@ -194,7 +202,7 @@ export function dryRunSummary(release: number, bytes: number, outDir: string, in
   return lines.join("\n");
 }
 
-async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number) {
+async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number, outDir?: string) {
   execSync("PN_SIM=1 npx expo export --platform web --output-dir dist-web --clear", { stdio: "inherit" });
   const base = `w/${APP}/r${release}`; const files: string[] = []; let indexSha = "";
   for (const f of walk("dist-web")) {
@@ -208,7 +216,9 @@ async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof l
   try { idx = JSON.parse((await kv.get(idxKey))!) ?? idx; } catch {}
   idx.releases = [...new Set([...idx.releases, release])].sort((x, y) => x - y); idx.latest = Math.max(...idx.releases);
   await kv.put(idxKey, JSON.stringify(idx), "application/json");
-  console.error(`web artifact: ${files.length} files at /${base}/`);
+  // Show where the files are on disk, relative to this folder: the URL path (/w/...) is not a folder.
+  const where = outDir ? (relative(process.cwd(), resolve(outDir, base)) || ".") + "/" : `/${base}/`;
+  console.error(`web artifact: ${files.length} files at ${where}`);
   // Store listing assets (icon, screenshots) and the release note, read by shipvo.dev/apps and list_apps.
   const L = cfg.listing ?? {}; const store = `w/${APP}/store`;
   const up = async (file: string, name: string) => { if (!existsSync(file)) { console.error(`listing: ${file} not found, skipped`); return null; } const ext = file.slice(file.lastIndexOf(".")).toLowerCase(); await kv.put(`${store}/${name}${ext}`, new Uint8Array(readFileSync(file)), MIME[ext] ?? "application/octet-stream"); return `${name}${ext}`; };

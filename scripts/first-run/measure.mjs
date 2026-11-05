@@ -1,13 +1,25 @@
 // Times a new developer's first run: `shipvo init`, `shipvo doctor --offline --skip-sim`, then `shipvo publish --dry-run`.
-// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install]
+// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install] [--control-url <url>]
+// Against a local control plane (docker compose up, or wrangler dev):
+//   node scripts/first-run/measure.mjs --control-url http://localhost:8787
+// With --control-url, after the dry run it registers the scaffolded app with the local dev key
+// (SHIPVO_LOCAL_DEV_KEY, default sv_test_localdev), points shipvo.json "controlPlane" at the URL, runs a real
+// `shipvo publish`, then GETs the pointer and checks it is signed and names the release just published.
+// Steps recorded: "publish" (real) and "pointer". A non-2xx publish exits 1 and prints the server's message.
 // The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets.
 // Default run uses no network. With --with-install, also times an install in the scaffolded app,
 // which downloads packages (network). init prints `npm install (or pnpm / bun)`; we prefer pnpm
 // when it is on PATH, so the recorded number is quoted honestly.
-// The bundle export (`expo export`) needs an install and network, so it is not timed: a small
-// plain-JS bundle is staged where the export would write it, and publish runs with --skip-export.
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+// Prints one table (step, seconds) and a total (wall time). The JSON keeps milliseconds and ends with a "total" row.
+// A failed step prints its output and exits 1. Nothing is recorded as 0 s for a step that did not run.
+// Full path on a clean Linux runner (no secrets), after `pnpm --filter @shipvo/cli build`:
+//   node scripts/first-run/measure.mjs --with-install --with-export --control-url http://localhost:8787
+// --with-export (needs --with-install and --control-url) runs the real bundle export (`expo export`) inside the
+// real `shipvo publish`, so "publish" includes the export. Without it, a small plain-JS bundle is staged where
+// the export would write it, and publish runs with --skip-export.
+import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { createPublicKey, verify } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +30,60 @@ export function runStep(name, cli, args, cwd) {
   const ms = Math.round(performance.now() - t0);
   const exit = r.status ?? (r.error ? 127 : 1);
   return { step: name, ms, exit, stderr: [r.stdout, r.stderr, r.error ? String(r.error) : ""].filter(Boolean).join("\n") };
+}
+
+function runStepAsync(name, cli, args, cwd, extraEnv) {
+  return new Promise((done) => {
+    const t0 = performance.now();
+    const out = [];
+    const c = spawn(process.execPath, [cli, ...args], { cwd, env: { ...cleanEnv(), ...extraEnv } });
+    c.stdout.on("data", (d) => out.push(String(d)));
+    c.stderr.on("data", (d) => out.push(String(d)));
+    c.on("error", (e) => { out.push(String(e)); done({ step: name, ms: Math.round(performance.now() - t0), exit: 127, stderr: out.join("\n") }); });
+    c.on("close", (code) => done({ step: name, ms: Math.round(performance.now() - t0), exit: code ?? 1, stderr: out.join("") }));
+  });
+}
+
+const devKey = () => process.env.SHIPVO_LOCAL_DEV_KEY ?? "sv_test_localdev";
+
+/** Real publish against a control plane, then check the pointer it serves. Returns the steps to record. */
+async function realPublish(cli, app, controlUrl, withExport) {
+  const base = controlUrl.replace(/\/$/, "");
+  const cfgPath = join(app, "shipvo.json");
+  const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
+  const fail = (step, ms, stderr) => ({ step, ms, exit: 1, stderr });
+  let token;
+  try {
+    const r = await fetch(`${base}/apps`, { method: "POST", headers: { authorization: `Bearer ${devKey()}`, "content-type": "application/json" },
+      body: JSON.stringify({ app_id: cfg.appId, name: cfg.appId, public_key: cfg.publicKey }) });
+    const text = await r.text();
+    let j; try { j = JSON.parse(text); } catch {}
+    if (r.status !== 201 || !j?.publish_token) return [fail("app create", 0, `create app: HTTP ${r.status} ${text}`)];
+    token = j.publish_token;
+  } catch (e) { return [fail("app create", 0, `create app: ${e.cause?.code ?? e.message}`)]; }
+  try {
+    writeFileSync(cfgPath, JSON.stringify({ ...cfg, controlPlane: base }, null, 2) + "\n");
+    const pub = await runStepAsync(withExport ? "publish (includes export)" : "publish", cli, ["publish", ...(withExport ? [] : ["--skip-export", "true"]), "--skip-web", "true", "--platform", "android", "--bands", "b0"], app, { SHIPVO_PUBLISH_TOKEN: token });
+    if (pub.exit !== 0) return [pub];
+    const t0 = performance.now();
+    const pointer = (exit, msg) => ({ step: "pointer", ms: Math.round(performance.now() - t0), exit, stderr: msg });
+    let released;
+    try { released = JSON.parse(pub.stderr.trim().split("\n").filter((l) => l.startsWith("{")).pop()).release; } catch {}
+    try {
+      const r = await fetch(`${base}/p/${cfg.appId}/${cfg.shellMajor ?? 1}/b0`);
+      const text = await r.text();
+      if (!r.ok) return [pub, pointer(1, `pointer: HTTP ${r.status} ${text}`)];
+      const env = JSON.parse(text);
+      const raw = Buffer.from(cfg.publicKey, "base64");
+      const key = createPublicKey({ key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), raw]), format: "der", type: "spki" });
+      if (typeof env.body !== "string" || typeof env.signature !== "string" || !verify(null, Buffer.from(env.body), key, Buffer.from(env.signature, "base64"))) return [pub, pointer(1, "pointer: response is not signed with the app's key")];
+      const body = JSON.parse(env.body);
+      if (body.app_id !== cfg.appId || released === undefined || body.release !== released) return [pub, pointer(1, `pointer names release ${body.release} of ${body.app_id}, expected release ${released} of ${cfg.appId}`)];
+      return [pub, pointer(0, "")];
+    } catch (e) { return [pub, pointer(1, `pointer: ${e.message}`)]; }
+  } finally {
+    await fetch(`${base}/apps/${cfg.appId}`, { method: "DELETE", headers: { authorization: `Bearer ${devKey()}` } }).catch(() => {});
+  }
 }
 
 // No secrets in, nothing to log in to: the seed comes from the .shipvo/seed.txt that init writes.
@@ -44,11 +110,17 @@ function runInstallStep(cwd) {
   return { step: "install", ms, exit, stderr: r.stderr || (r.error ? String(r.error) : ""), pm, version };
 }
 
-export function table(results) {
-  return ["| step | ms | exit |", "| --- | ---: | ---: |", ...results.map((r) => `| ${r.step} | ${r.ms} | ${r.exit} |`)].join("\n");
+const secs = (ms) => (ms / 1000).toFixed(2);
+
+/** One table: step and seconds, then the total. `totalMs` is wall time; it defaults to the sum of the steps. */
+export function table(results, totalMs = results.reduce((n, r) => n + r.ms, 0)) {
+  return ["| step | seconds |", "| --- | ---: |", ...results.map((r) => `| ${r.step} | ${secs(r.ms)} |`), `| total | ${secs(totalMs)} |`].join("\n");
 }
 
-export function measure(cli, withInstall = false) {
+// withExport: run the real bundle export inside `shipvo publish` (needs install and network).
+export async function measure(cli, withInstall = false, controlUrl, withExport = false) {
+  if (withExport && !(withInstall && controlUrl)) throw new Error("--with-export needs --with-install and --control-url");
+  const start = performance.now();
   const root = mkdtempSync(join(tmpdir(), "shipvo-first-run-"));
   const app = join(root, "app");
   const results = [];
@@ -65,25 +137,32 @@ export function measure(cli, withInstall = false) {
       results.push(doc);
       ok = doc.exit === 0;
     }
-    if (ok) {
+    if (ok && !withExport) {
       const js = join(app, "dist-ota/_expo/static/js/android");
       mkdirSync(js, { recursive: true });
       writeFileSync(join(js, "index.js"), "console.log('first run');\n");
-      results.push(runStep("publish --dry-run", cli, ["publish", "--dry-run", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app));
+      const dry = runStep("publish --dry-run", cli, ["publish", "--dry-run", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app);
+      results.push(dry);
+      ok = dry.exit === 0;
     }
+    if (ok && controlUrl) results.push(...(await realPublish(cli, app, controlUrl, withExport)));
   } finally { rmSync(root, { recursive: true, force: true }); }
+  results.totalMs = Math.round(performance.now() - start);
   return results;
 }
 
-export function main(argv) {
+export async function main(argv) {
   const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
   const here = dirname(fileURLToPath(import.meta.url));
   const cli = resolve(opt("--cli", join(here, "../../packages/cli/dist/cli.js")));
   const out = resolve(opt("--out", "first-run.json"));
   const withInstall = argv.includes("--with-install");
-  const results = measure(cli, withInstall);
-  writeFileSync(out, JSON.stringify(results.map(({ step, ms, exit }) => ({ step, ms, exit })), null, 2) + "\n");
-  console.log(table(results));
+  const controlUrl = opt("--control-url", undefined);
+  let results;
+  try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export")); }
+  catch (e) { console.error(e.message); return 1; }
+  writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }], null, 2) + "\n");
+  console.log(table(results, results.totalMs));
   if (withInstall) {
     const inst = results.find((r) => r.step === "install");
     const pm = inst?.pm;
@@ -95,4 +174,4 @@ export function main(argv) {
   return bad.length ? 1 : 0;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(main(process.argv.slice(2)));
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(await main(process.argv.slice(2)));

@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`exportTest > sample script snapshot 1`] = `
+"import { test } from "@shipvo/test/vitest";
+import { openApp } from "@shipvo/test";
+
+test("recorded session for menu", async () => {
+  const phone = await openApp({ app: "menu" });
+  await phone.device.set({"dark":true});
+  await phone.tap("Sign in");
+  await phone.waitFor(/\\S/); // TODO: name the text that should appear
+  await phone.type("Email", "me@example.com");
+  await phone.type("Password", process.env.SHIPVO_TEST_PASSWORD!);
+  // TODO: ambiguous target "Continue"
+  await phone.scroll("down");
+  await phone.back();
+  await phone.waitFor(/\\S/); // TODO: name the text that should appear
+});
+"
+`;

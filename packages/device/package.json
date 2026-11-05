@@ -18,6 +18,7 @@
     "expo-notifications": "*",
     "expo-clipboard": "*",
     "expo-contacts": "*",
+    "expo-calendar": "*",
     "react-native": "*",
     "react": "*"
   },
@@ -38,6 +39,9 @@
       "optional": true
     },
     "expo-contacts": {
+      "optional": true
+    },
+    "expo-calendar": {
       "optional": true
     }
   },
