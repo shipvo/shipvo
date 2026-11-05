@@ -6,7 +6,7 @@
 #      If the repository secret STEWARD_FIRE_TOKEN is set, it is also called right away.
 name: agent-steward-call
 on:
-  issues: { types: [opened, labeled] }
+  issues: { types: [labeled] }   # an issue created with the label also sends 'labeled'
   workflow_run: { workflows: [ci, ios-runtime, android-runtime], types: [completed], branches: [main] }
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
 concurrency: { group: "steward-call-${{ github.event.issue.number || github.event.workflow_run.head_sha }}" }
@@ -16,9 +16,7 @@ jobs:
   route:
     if: >-
       vars.AGENTS_PAUSED != 'true' && (
-        (github.event_name == 'issues' && (
-          (github.event.action == 'labeled' && github.event.label.name == 'agent:escalate') ||
-          (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent:escalate')))) ||
+        (github.event_name == 'issues' && github.event.label.name == 'agent:escalate') ||
         (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure'))
     runs-on: ubuntu-latest
     outputs:
