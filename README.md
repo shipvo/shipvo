@@ -19,7 +19,7 @@ Three pillars:
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Status: pre-launch](https://img.shields.io/badge/status-pre--launch-orange)
 
-> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on Android; iOS is next. The iOS OTA runtime is verified on the iOS Simulator in CI on every change (fetch, verify, stage, reload, cold start).
+> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on the Android emulator and the iPhone simulator in CI. The iOS OTA runtime is verified on the iOS Simulator in CI on every change to it (fetch, verify, stage, reload, cold start). Measured there on 5 Nov 2026 (`docs/spike-results.md`, [run 41979433300](https://github.com/shipvo/shipvo/actions/runs/41979433300), median of 3, local control plane): launch to new release running and healthy 4.2 s, full 1.87 MB bundle download 157 ms, apply 266 ms. A first-update bsdiff patch from the embedded bundle was 83,999 bytes against a 1,996,082-byte bundle, 573 ms from last byte to healthy ([run 42087991990](https://github.com/shipvo/shipvo/actions/runs/42087991990)).
 
 ## Why Shipvo
 
@@ -54,7 +54,7 @@ npm run sim                      # the app in the simulator; agents: open_app("m
 npx expo run:android             # the native shell; `shipvo publish` ships changes over the air
 ```
 
-Guides: [Build your first app](docs/getting-started.md) · [Migrate from CodePush](docs/migrate-from-codepush.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
+Guides: [Build your first app](docs/getting-started.md) · [Tutorials](docs/tutorials/index.md) · [CLI](docs/cli.md) · [Test your app in CI](docs/testing.md) · [Test with an assistant](docs/test-with-an-assistant.md) · [Store release](docs/store.md) · [Frameworks and adapters](docs/adapters.md) · [Migrate from CodePush](docs/migrate-from-codepush.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
 
 ## Use an app as an AI agent (no phone)
 
@@ -81,7 +81,7 @@ Cloudflare edge             /p/{app}/{shell_major}/{band}.json   (signed envelop
         │                   /w/{app}/r{release}/                 (the same release for agents)
         ├──────────────────────────────┐
         ▼                              ▼
-Device runtime (Kotlin)        Simulator / sim.shipvo.dev
+Device runtime (Kotlin, Swift) Simulator / sim.shipvo.dev
 verify → download → verify     open_app("tide@r13") → accessibility tree
 → stage → reload → healthy     → tap/type/scroll → device sheets → report
 or revert after 3 failed boots
@@ -94,18 +94,28 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 | Path | What it is |
 | --- | --- |
 | `packages/schema` | Contracts: shell manifest, add-on manifest, release pointer, signed envelope, gate report, change log, telemetry (Zod) |
-| `packages/cli` | `shipvo` CLI: `init` a new app, `sim` it, `publish` / `rollback` signed releases, signing keys |
-| `packages/runtime` | `@shipvo/runtime`: the native OTA runtime (verify, patch, stage, apply, crash-loop rollback) and the config plugin that pins the trust root |
+| `packages/cli` | `shipvo` CLI: `init` a new app or adopt an existing one, `sim` it, `publish` / `rollback` signed releases, `store` help, signing keys (`docs/cli.md`) |
+| `packages/runtime` | `@shipvo/runtime`: the native OTA runtime for Android (Kotlin) and iOS (Swift): verify, patch, stage, apply, crash-loop rollback and the config plugin that pins the trust root |
 | `packages/sim` | `@shipvo/sim`: the simulator (phone-sized headless browser, accessibility tree, simulated device, mock backend) |
 | `packages/mcp` | `@shipvo/mcp`: the MCP server agents use to open, see and operate apps, control the simulated device, and run owner commands |
+| `packages/test` | `@shipvo/test`: typed end-to-end tests that run your app in the simulator, in Vitest or any runner, headless in CI (`docs/testing.md`) |
 | `packages/device` | `@shipvo/device`: one device API (camera, location, biometrics, payments, notifications, share, network), real on phones, simulated in the simulator, plus Metro aliases for raw Expo imports |
-| `packages/store` | `@shipvo/store`: drafts Play Data safety answers and a privacy policy from `shipvo.json` (`shipvo store details --dry-run`) |
+| `packages/store` | `@shipvo/store`: drafts Play Data safety answers and a privacy policy from `shipvo.json`, and checks store screenshot sizes (`docs/store.md`) |
 | `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
 | `services/sim` | Hosted simulator Worker: one sandbox per API key, the same MCP tools over HTTPS (sim.shipvo.dev) |
 | `services/site` | shipvo.dev: landing page and the public app marketplace |
 | `apps/tide-and-tackle` | Sample shop app built on the packages above, plus the device drivers and the parity harness (`sim/`) |
-| `docs/` | Measured results: spike, agent gate, parity |
+| `docs/` | Guides, tutorials, roadmap and measured results (spike, agent gate, parity) |
+| `scripts/` | CI helpers: first-run, Android and iOS end-to-end runs, simulator bench |
 | `skills/shipvo-design` | Design skill with runnable checks |
+
+## Store release
+
+For a first store release, `shipvo store setup` and `shipvo store status` say which Google Play and Apple accounts to open and what to do next. `shipvo store details --dry-run` drafts Data safety answers and a privacy policy from `shipvo.json`. `shipvo store screenshots` renders store-sized screenshots in the simulator (fast mode, not the native UI). Nothing is uploaded and no store credentials are read. Details: [docs/store.md](docs/store.md).
+
+## Frameworks
+
+Today: React Native with Expo, and bare React Native apps (`shipvo init` inside the app; it writes the Android manifest and `Info.plist` values after you confirm). It does not accept apps that use expo-updates or CodePush. Capacitor is planned (epic #297) and is not built: `docs/adapters.md` lists what a new runtime must do.
 
 ## Try the sample app
 
@@ -113,7 +123,7 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 2. Edit `apps/tide-and-tackle/src/release.ts` and run `shipvo publish` (or push to `main` and let the `publish-ota` workflow do it). It signs and publishes the release.
 3. The app checks every 10 seconds while open, verifies the update, applies it, and logs the timings on screen.
 4. Change prices or the home screen at `/app/tide/admin` on your control plane; the phone shows it in about 10 seconds.
-5. Open the same release as an agent: `cd apps/tide-and-tackle && pnpm sim`, then `open_app("tide@latest")` through `@shipvo/mcp`, or `scripts/ui screen` from a terminal.
+5. Open the same release as an agent: `cd apps/tide-and-tackle && pnpm sim`, then `open_app("tide@latest")` through `@shipvo/mcp`, or `apps/tide-and-tackle/scripts/ui screen` from a terminal.
 
 ## Develop
 

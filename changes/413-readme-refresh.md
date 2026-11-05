@@ -1,0 +1,1 @@
+- Docs: README brought up to date (package table, iOS measurements, store path, frameworks, guide links). No API change.
