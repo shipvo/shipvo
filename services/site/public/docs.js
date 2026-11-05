@@ -3,7 +3,7 @@
   document.querySelectorAll('.code .copy').forEach(function(b){b.addEventListener('click',function(){var t=b.closest('.code').querySelector('code').textContent;navigator.clipboard&&navigator.clipboard.writeText(t).then(function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1400)})})});
   // sidebar on phones
   var side=document.getElementById('side'),tog=document.querySelector('.side-toggle');
-  if(tog){var lab=tog.querySelector('span');function setOpen(o){side.classList.toggle('open',o);tog.setAttribute('aria-expanded',o);lab.textContent=o?'Close docs menu':'Docs menu'}
+  if(tog){var lab=tog.querySelector('span');function setOpen(o){side.classList.toggle('open',o);tog.setAttribute('aria-expanded',o);var nm=/^\/learn\//.test(location.pathname)?'Learn':'docs';lab.textContent=o?'Close '+nm.toLowerCase()+' menu':(nm==='Learn'?'Learn menu':'Docs menu')}
     tog.addEventListener('click',function(){setOpen(!side.classList.contains('open'))});
     document.addEventListener('keydown',function(e){if(e.key==='Escape'&&side.classList.contains('open')){setOpen(false);tog.focus()}})}
   // video: play button on the poster, and hide the Docs menu button in fullscreen
