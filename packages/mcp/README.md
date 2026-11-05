@@ -14,6 +14,19 @@ Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none 
 
 **Time limit.** Every call to the simulator stops after 30 s; set `SHIPVO_SIM_TIMEOUT_MS` to change it. A call that gets no answer returns an error result (`isError: true`, code `sim_timeout`, also in `structuredContent`). The action may still have run and the session may still be alive, so call `screen` to see where it is. Timed-out actions are not retried.
 
+**Error codes.** A failed call has `isError: true` and `structuredContent: { ok: false, code, error }`. Some failures from other causes (for example a read-only key) have `code: null`; read `error`.
+
+| Code | Meaning | What the agent should do |
+| --- | --- | --- |
+| `no_session` | The simulator has no session with that id (it expired or was never opened). | Call `list_sessions`, or `open_app` again. |
+| `stale_ref` | The ref is not on the current screen, or the screen changed since it was read. | Call `screen` and use a ref from the new tree. |
+| `unknown_app` | The app id is not one this server or key can open. | Call `list_apps` and use an id from it. |
+| `sim_timeout` | The simulator did not answer in time. The action may have run. | Call `screen` to see where the app is. Do not repeat the action blindly. |
+| `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan. | Show the plan to the owner, then call again with `confirm: true`. |
+| `bad_url` | `open_url` got a URL the app cannot take. | Fix the URL and call again. |
+| `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
+| `mock_invalid` | A network mock rule is not valid. | Fix the rule. |
+
 Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `export_test`, `end_session`, `owner_describe`, `owner_command`.
 
 **Owner commands that cannot be undone need `confirm: true`.** `owner_command` takes an optional `confirm`. `publish`, price changes, offers, deletes and API keys first return `{ code: "needs_confirm", plan }` and do nothing; call again with the same `args` and `confirm: true` to run. `agentPolicy` (`ask` default, `deny`, `allow`) and `agentDeny` in `shipvo.json` (read from `PN_APP_DIR` or the current folder) can only tighten the control plane's rules. Details: `docs/agents.md`.
