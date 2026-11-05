@@ -89,7 +89,7 @@ test("with --with-install, install step is included", () => {
   writeFileSync(npm, "#!/bin/sh\nexit 0\n");
   chmodSync(npm, 0o755);
   const f = fake(INIT + SIM);
-  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], {
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install", "--with-session"], {
     encoding: "utf8",
     env: { ...process.env, PATH: bindir + ":" + dirname(process.execPath) },
   });
@@ -104,10 +104,32 @@ test("with --with-install, install step is included", () => {
 
 test("a first agent session that cannot start the simulator fails the run with its output", () => {
   const f = fake(INIT + `if (process.argv[2]==="sim") { console.error("sim broke: no chromium"); process.exit(2); }`);
-  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], { encoding: "utf8", env: { ...process.env, PATH: fakePm() } });
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install", "--with-session"], { encoding: "utf8", env: { ...process.env, PATH: fakePm() } });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /sim broke: no chromium/);
   assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => [x.step, x.exit]).slice(-2), [["first agent session", 1], ["total", 1]]);
+});
+
+test("--with-install without --with-session does not start the simulator", () => {
+  const f = fake(INIT + `if (process.argv[2]==="sim") { console.error("sim must not run"); process.exit(2); }`);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], { encoding: "utf8", env: { ...process.env, PATH: fakePm() } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(!JSON.parse(readFileSync(f.out, "utf8")).some((x) => x.step === "first agent session"));
+});
+
+test("--with-session without --with-install is an error", () => {
+  const f = fake(INIT);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-session"], { encoding: "utf8" });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /--with-session needs --with-install/);
+});
+
+test("a simulator that never listens times out and fails the session step", async () => {
+  const { firstAgentSession } = await import("./measure.mjs");
+  const f = fake(`if (process.argv[2]==="sim") setInterval(()=>{},1000);`);
+  const r = await firstAgentSession(f.cli, dirname(f.cli), 1500);
+  assert.equal(r.exit, 1);
+  assert.match(r.stderr, /did not start in time/);
 });
 
 test("a failing install stops the run and shows its stderr", () => {
@@ -235,7 +257,7 @@ const publishCalls = (log) => readFileSync(log, "utf8").trim().split("\n").map((
 test("--with-export runs the real publish without --skip-export and records a publish row", async () => {
   const s = await stub(); const f = fakeCp(); const log = join(dirname(f.out), "args.log");
   try {
-    const r = await runAsync(f, ["--with-install", "--with-export", "--control-url", s.url], { ARGS_LOG: log, PATH: fakePm() });
+    const r = await runAsync(f, ["--with-install", "--with-session", "--with-export", "--control-url", s.url], { ARGS_LOG: log, PATH: fakePm() });
     assert.equal(r.status, 0, r.stderr);
     const j = JSON.parse(readFileSync(f.out, "utf8"));
     assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["first agent session", 0], ["publish (includes export)", 0], ["pointer", 0], ["total", 0]]);

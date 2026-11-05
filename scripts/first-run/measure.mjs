@@ -1,12 +1,12 @@
 // Times a new developer's first run: `shipvo init`, `shipvo doctor --offline --skip-sim`, then `shipvo publish --dry-run`.
-// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install] [--control-url <url>]
+// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install] [--with-session] [--control-url <url>]
 // Against a local control plane (docker compose up, or wrangler dev):
 //   node scripts/first-run/measure.mjs --control-url http://localhost:8787
 // With --control-url, after the dry run it registers the scaffolded app with the local dev key
 // (SHIPVO_LOCAL_DEV_KEY, default sv_test_localdev), points shipvo.json "controlPlane" at the URL, runs a real
 // `shipvo publish`, then GETs the pointer and checks it is signed and names the release just published.
 // Steps recorded: "publish" (real) and "pointer". A non-2xx publish exits 1 and prints the server's message.
-// With --with-install, a "first agent session" step then starts `shipvo sim` for the scaffolded app (its web build
+// With --with-install --with-session, a "first agent session" step then starts `shipvo sim` for the scaffolded app (its web build
 // counts), opens the app with @shipvo/test, reads the screen and stops the simulator. Needs playwright's chromium.
 // The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets.
 // Default run uses no network. With --with-install, also times an install in the scaffolded app,
@@ -139,7 +139,7 @@ export async function firstAgentSession(cli, app, timeoutMs = 300000) {
   try { port = await freePort(); } catch (e) { return done(1, `no free port: ${e.message}`); }
   const url = `http://127.0.0.1:${port}`;
   const out = [];
-  const simProc = spawn(process.execPath, [cli, "sim", "--port", String(port)], { cwd: app, env: cleanEnv() });
+  const simProc = spawn(process.execPath, [cli, "sim", "--port", String(port)], { cwd: app, env: cleanEnv(), detached: true });
   let exited = false;
   simProc.stdout.on("data", (d) => out.push(String(d)));
   simProc.stderr.on("data", (d) => out.push(String(d)));
@@ -155,7 +155,13 @@ export async function firstAgentSession(cli, app, timeoutMs = 300000) {
     const fallback = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/test/dist/index.js")).href;
     const r = await runNode(["--input-type=module", "-e", sessionScript(fallback)], app, { FIRST_RUN_SIM: url }, timeoutMs - (performance.now() - t0));
     return done(r.exit, r.exit === 0 ? "" : `${r.out}\n${out.join("")}`);
-  } finally { simProc.kill("SIGTERM"); }
+  } finally {
+    if (!exited) {
+      const gone = new Promise((r) => simProc.once("exit", r));
+      try { process.kill(-simProc.pid, "SIGTERM"); } catch { simProc.kill("SIGTERM"); }
+      await Promise.race([gone, sleep(5000)]);
+    }
+  }
 }
 
 // No secrets in, nothing to log in to: the seed comes from the .shipvo/seed.txt that init writes.
@@ -190,7 +196,8 @@ export function table(results, totalMs = results.reduce((n, r) => n + r.ms, 0)) 
 }
 
 // withExport: run the real bundle export inside `shipvo publish` (needs install and network).
-export async function measure(cli, withInstall = false, controlUrl, withExport = false) {
+export async function measure(cli, withInstall = false, controlUrl, withExport = false, withSession = false) {
+  if (withSession && !withInstall) throw new Error("--with-session needs --with-install");
   if (withExport && !(withInstall && controlUrl)) throw new Error("--with-export needs --with-install and --control-url");
   const start = performance.now();
   const root = mkdtempSync(join(tmpdir(), "shipvo-first-run-"));
@@ -217,7 +224,7 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
       results.push(dry);
       ok = dry.exit === 0;
     }
-    if (ok && withInstall) {
+    if (ok && withSession) {
       const sess = await firstAgentSession(cli, app);
       results.push(sess);
       ok = sess.exit === 0;
@@ -236,7 +243,7 @@ export async function main(argv) {
   const withInstall = argv.includes("--with-install");
   const controlUrl = opt("--control-url", undefined);
   let results;
-  try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export")); }
+  try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export"), argv.includes("--with-session")); }
   catch (e) { console.error(e.message); return 1; }
   writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }], null, 2) + "\n");
   console.log(table(results, results.totalMs));
