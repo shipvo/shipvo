@@ -606,6 +606,8 @@ const s = StyleSheet.create({
 
 const SHOP_TEST = `// Runs the app in the Shipvo simulator. Start it first: npm run sim.
 // Names and prices come from src/data/products.json, so editing that file does not break this test.
+// Keep product names unique and not a substring of each other: tap(name) fails if two elements match.
+// The total is computed with formatPrice from the app, so this test does not check that function.
 import { test, expect } from "@shipvo/test/vitest";
 import products from "../src/data/products.json";
 import { formatPrice } from "../src/money";
@@ -621,6 +623,7 @@ test("adding two products puts their total in the cart, and Remove takes one out
   await phone.waitFor(a.description);
   await phone.tap("Add to cart");
   await phone.tap("Back");
+  await phone.waitFor(b.name);
   await phone.tap(b.name);
   await phone.tap("Add to cart");
   await phone.tap("Cart");
