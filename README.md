@@ -124,6 +124,16 @@ pnpm --filter @shipvo/control-plane dev
 
 Requires Node 22 and pnpm 10.
 
+### Weekly healthy releases script
+
+A read-only script counts distinct apps with at least one healthy telemetry row per week, using the control plane's D1 `telemetry` table. It prints counts only (no device identifiers) and marks the sample app (`tide-and-tackle`).
+
+```bash
+D1_DATABASE_ID=<your-database-id> npx tsx scripts/weekly-healthy.ts
+```
+
+The database ID comes from your `wrangler.toml`. The script never prints secrets.
+
 ## Compared with other OTA tools
 
 Shipvo sits alongside tools like Expo Updates (EAS Update) and self-hosted CodePush servers, which replaced Microsoft App Center CodePush after it was retired in 2025. What Shipvo adds: a declared-capability shell manifest, signed add-ons, a per-app admin, cohort rollouts from static edge files, and apps that AI agents can operate.
