@@ -93,7 +93,7 @@ test("recorded session for tide", async () => {
 What Vitest printed when it ran that file, with no agent and no MCP server:
 
 ```
- RUN  v2.1.9 /home/runner/work/shipvo/shipvo/packages/mcp/replay-HG1DiR
+ RUN  v2.1.9
 
  ✓ recorded.replay.ts > recorded session for tide 2647ms
 
@@ -101,7 +101,7 @@ What Vitest printed when it ran that file, with no agent and no MCP server:
       Tests  1 passed (1)
 ```
 
-The `waitFor(/\S/)` lines only wait for the screen to have some text. Replace each with the text you expect, so the test checks something. The test run above used the simulator and a headless Chromium; it did not use a phone or an emulator.
+The `waitFor(/\S/)` lines only wait for the screen to have some text. Replace each with the text you expect, so the test checks something. The test ran Vitest against the simulator in headless Chromium.
 
 ## Walk an app with `shipvo explore`
 
