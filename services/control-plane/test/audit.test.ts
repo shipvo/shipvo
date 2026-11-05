@@ -96,3 +96,57 @@ describe("GET /audit/:app", () => {
     expect((await app.request("/audit/tide?before=x", { headers: H }, env)).status).toBe(400);
   });
 });
+
+describe("audit on publish", () => {
+  const pub = Buffer.alloc(32, 7).toString("base64");
+  async function pointer(band = "b0") {
+    const kp: any = await crypto.subtle.generateKey({ name: "Ed25519" } as any, true, ["sign", "verify"]);
+    const pk = Buffer.from(await crypto.subtle.exportKey("raw", kp.publicKey)).toString("base64");
+    const h = "a".repeat(64);
+    const body = JSON.stringify({ schema_version: "1.0", app_id: "tide", shell_major: 1, band, release: 7, issued_at: "2026-01-01T00:00:00Z", core: { version: "1.0.0", sha256: h, size: 1, url: "x" }, min_shell_version: "1.0.0" });
+    const sig = Buffer.from(await crypto.subtle.sign({ name: "Ed25519" } as any, kp.privateKey, new TextEncoder().encode(body))).toString("base64");
+    return { pk, buf: JSON.stringify({ body, signature: sig }) };
+  }
+  async function run(pk: string, bodyText: string, failAudit = false) {
+    const key = "sv_publish_tide";
+    const calls: any[] = [];
+    const DB = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
+      run: async () => { if (failAudit && sql.includes("audit_log")) throw new Error("boom"); calls.push({ sql, args }); return {}; },
+      first: async () => {
+        if (sql.includes("FROM publish_tokens")) return args[0] === (await sha(key)) ? { id: 1, expires_at: null } : null;
+        if (sql.includes("JOIN accounts")) return { login: "ann" };
+        if (sql.includes("FROM apps")) return { public_key: pk, bytes_used: 0 };
+        return null;
+      },
+    }) }) } as any;
+    const put = vi.fn(async () => {});
+    const r = await app.request("/apps/tide/kv/p/tide/1/b0", { method: "PUT", headers: { authorization: `Bearer ${key}` }, body: bodyText }, { DB, POINTERS: { put } } as any);
+    return { r, calls: calls.filter((x) => x.sql.includes("INSERT INTO audit_log")), put };
+  }
+  it("records one row with owner, release and short after, and no token", async () => {
+    const { pk, buf } = await pointer();
+    const { r, calls } = await run(pk, buf);
+    expect(r.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args[2]).toBe("ann");
+    expect(calls[0].args[4]).toBe("publish");
+    expect(calls[0].args[5]).toBe(7);
+    expect(JSON.parse(calls[0].args[8] as string)).toEqual({ release: 7, band: "b0", platform: "android" });
+    expect(JSON.stringify(calls[0].args)).not.toContain("sv_publish_");
+  });
+  it("records nothing for a rejected publish", async () => {
+    const { pk, buf } = await pointer();
+    const bad = JSON.stringify({ ...JSON.parse(buf), signature: Buffer.alloc(64).toString("base64") });
+    const { r, calls, put } = await run(pk, bad);
+    expect(r.status).toBe(422);
+    expect(put).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+  it("still succeeds when the audit write fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { pk, buf } = await pointer();
+    const { r } = await run(pk, buf, true);
+    expect(r.status).toBe(200);
+    warn.mockRestore();
+  });
+});

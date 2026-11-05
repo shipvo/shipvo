@@ -86,7 +86,7 @@ body.dark{background:#15171a;color:#eee}
 .bar{display:flex;gap:8px;justify-content:center;align-items:center;padding:10px;flex-wrap:wrap}
 .bar button,.back{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
 .bar button[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}
-.stage{display:flex;justify-content:center;padding:0 10px 20px}
+.stage{display:flex;justify-content:center;align-items:flex-start;gap:16px;padding:0 10px 20px;flex-wrap:wrap}
 .device{display:flex;flex-direction:column;background:#000;color:#fff;border-radius:28px;box-shadow:0 8px 30px #0005;overflow:hidden;width:360px;max-width:100%;box-sizing:border-box;padding:0 6px}
 .device[data-skin=iphone]{border-radius:44px;padding:0 10px}
 .status{display:flex;justify-content:space-between;align-items:center;height:28px;padding:0 14px;font-size:12px;flex:none}
@@ -111,7 +111,11 @@ iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 #pin{position:absolute;inset:0;display:none;cursor:crosshair;background:#2563eb22;z-index:5}
 #pin.on{display:block}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
-@media (max-width:500px){.bar,.note{display:none}.stage{padding:0}.device{padding:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}}
+.panel{width:280px;max-width:100%;box-sizing:border-box;display:grid;gap:10px;padding:12px;border:1px solid #8886;border-radius:12px}
+.panel h2{font-size:15px;margin:0}.panel fieldset{border:0;margin:0;padding:0;display:grid;gap:6px}.panel legend{font-weight:600;padding:0 0 4px}
+.panel .row{display:flex;gap:6px;flex-wrap:wrap}.panel input,.panel select,.panel button{font:inherit;padding:5px 8px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;min-width:0}
+body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.panel button[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}.panel input{flex:1 1 80px}.panel button{cursor:pointer}.panel .sim{opacity:.7;font-size:12px;margin:0}
+@media (max-width:500px){.bar,.note{display:none}.stage{padding:0;display:block}.panel{width:auto;margin:10px;max-width:none}.device{padding:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}}
 </style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-skin="android" aria-pressed="true">Android</button><button data-skin="iphone" aria-pressed="false">iPhone</button>
@@ -122,7 +126,17 @@ iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 <div class="status" id="status"><span id="clock">9:41</span><span class="notch"></span><span class="icons" id="icons">&#9679;&#9679; 5G 100%</span></div>
 <iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" aria-label="Tap where the problem is"></div>
 <div class="nav"><button class="back" id="back" aria-label="Back" title="Back">&#9664; Back</button></div>
-</div></div>
+</div>
+<aside class="panel" id="device-panel" aria-label="Device controls"><h2>Device</h2>
+<fieldset><legend>Location</legend><div class="row"><select data-control="location-list" aria-label="Place"><option value="4.0511,9.7679">Douala</option><option value="48.8566,2.3522">Paris</option><option value="40.7128,-74.006">New York</option><option value="-1.2921,36.8219">Nairobi</option></select><button data-control="location-set">Set</button></div>
+<div class="row"><input data-control="lat" placeholder="Latitude" inputmode="decimal" aria-label="Latitude"><input data-control="lng" placeholder="Longitude" inputmode="decimal" aria-label="Longitude"><button data-control="coords-set">Go</button></div></fieldset>
+<fieldset><legend>Camera</legend><div class="row"><select data-control="camera-list" aria-label="Barcode"><option value="ean13|6181234567890">EAN-13 6181234567890</option><option value="qr|https://example.com">QR https://example.com</option><option value="none|">Nothing in view</option></select><button data-control="camera-set">Show</button></div></fieldset>
+<fieldset><legend>Fingerprint / Face ID</legend><div class="row"><button data-control="bio-success">Match</button><button data-control="bio-fail">No match</button></div></fieldset>
+<fieldset><legend>Payment</legend><div class="row"><button data-control="pay-approve">Approve</button><button data-control="pay-decline">Decline</button></div></fieldset>
+<fieldset><legend>Network</legend><div class="row"><button data-control="net-online">Online</button><button data-control="net-slow">Slow</button><button data-control="net-offline">Offline</button></div></fieldset>
+<fieldset><legend>Push notification</legend><input data-control="push-title" placeholder="Title" aria-label="Title"><input data-control="push-body" placeholder="Body" aria-label="Body"><button data-control="push-send">Send</button></fieldset>
+<p class="sim" id="panel-status" role="status">All device events here are simulated.</p></aside>
+</div>
 <div class="side" id="side"><h2>Comments (<span id="count">0</span>)</h2>
 <form id="noteform" hidden><label for="notetext">Note for the point you tapped</label><br><input id="notetext" size="30"> <button type="submit">Save</button></form>
 <ol id="notelist"></ol>
@@ -166,6 +180,29 @@ document.querySelectorAll("[data-size]").forEach(function(b){b.onclick=function(
 function goBack(){var w=f.contentWindow;try{var doc=w&&w.document;if(!doc)return;var els=doc.querySelectorAll("button,[role=button],a");for(var i=0;i<els.length;i++){var e=els[i],t=(e.getAttribute("aria-label")||e.textContent||"").trim();if(t==="Back"){e.click();return}}w.history.back()}catch(x){}}
 bk.onclick=goBack;
 var t=document.getElementById("theme");t.onclick=function(){var k=!document.body.classList.contains("dark");document.body.classList.toggle("dark",k);t.setAttribute("aria-pressed",k);t.textContent=k?"Light":"Dark";f.style.colorScheme=k?"dark":"light"};
+var P=document.getElementById("panel-status");
+function pnSay(m){P.textContent=m+" (simulated)"}
+function pnDev(){var d=f.contentWindow&&f.contentWindow.__pnDevice;if(!d){pnSay("The app is still loading");return null}return d}
+function pnNum(c){var v=pnVal(c).trim();return v===""?NaN:Number(v)}
+function pnVal(c){return document.querySelector('[data-control="'+c+'"]').value}
+function pnSet(patch,msg){var d=pnDev();if(d){d.set(patch);pnSay(msg)}}
+var pnDelay=0;
+function pnSlow(){var w=f.contentWindow;if(!w||w.__pnSlow||!w.fetch)return;w.__pnSlow=1;var o=w.fetch.bind(w);w.fetch=function(){var a=arguments;return new Promise(function(r){setTimeout(r,pnDelay)}).then(function(){return o.apply(null,a)})}}
+var A={
+"location-set":function(){var v=pnVal("location-list").split(",");pnSet({location:{latitude:+v[0],longitude:+v[1],accuracy:20}},"Location set")},
+"coords-set":function(){var a=pnNum("lat"),o=pnNum("lng");if(!(a>=-90&&a<=90&&o>=-180&&o<=180)){pnSay("Enter latitude -90 to 90 and longitude -180 to 180");return}pnSet({location:{latitude:a,longitude:o,accuracy:20}},"Location set")},
+"camera-set":function(){var v=pnVal("camera-list").split("|");pnSet({camera:{barcode:v[0]==="none"?null:{type:v[0],data:v.slice(1).join("|")}}},"Camera shows "+(v[0]==="none"?"nothing":v[0]))},
+"bio-success":function(){pnSet({biometrics:{nextResult:"success"}},"Fingerprint and Face ID match from now on")},
+"bio-fail":function(){pnSet({biometrics:{nextResult:"fail"}},"Fingerprint and Face ID do not match from now on")},
+"pay-approve":function(){pnSet({payment:{nextResult:"approve"}},"Payments are approved from now on")},
+"pay-decline":function(){pnSet({payment:{nextResult:"decline"}},"Payments are declined from now on")},
+"net-online":function(){pnDelay=0;pnSet({online:true},"Network online")},
+"net-slow":function(){if(!pnDev())return;pnDelay=1500;pnSlow();pnSet({online:true},"Network slow (requests wait 1.5 s)")},
+"net-offline":function(){pnDelay=0;pnSet({online:false},"Network offline")},
+"push-send":function(){var d=pnDev();if(!d)return;var t=pnVal("push-title")||"Notification",b=pnVal("push-body");pnSay(d.push({title:t,body:b})===null?"Not delivered: the app has not been granted notification permission":"Push sent")}
+};
+var pnGroups=[["bio-success","bio-fail"],["pay-approve","pay-decline"],["net-online","net-slow","net-offline"]];
+document.querySelectorAll("[data-control]").forEach(function(e){var c=e.dataset.control;if(A[c])e.onclick=function(){A[c]();pnGroups.forEach(function(g){if(g.indexOf(c)<0)return;g.forEach(function(k){var b=document.querySelector('[data-control="'+k+'"]');if(b.setAttribute)b.setAttribute("aria-pressed",k===c)})})}});
 apply();
 </script></body></html>
 `;

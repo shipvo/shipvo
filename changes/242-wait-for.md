@@ -1,2 +1,0 @@
-- `@shipvo/mcp`: `tap`, `type`, `scroll` and `back` take optional `wait_for` (ref, text, or role+name, with `gone: true` to wait for it to disappear), `settle` and `timeout_ms`. The result reports `waited: { matched, ms }`.
-- Migration: none; the fields are optional and results without them are unchanged.

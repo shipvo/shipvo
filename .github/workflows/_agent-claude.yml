@@ -92,14 +92,13 @@ jobs:
           pnpm -r --filter "./packages/**" build || echo "::warning::Some packages did not build; see the log above"
       - name: Install Chromium for the simulator
         # Code roles run @shipvo/sim, the sim tests and scripts that start it; without this, Playwright has no browser.
+        # The script installs apt packages once itself: `playwright install --with-deps` runs apt-get twice at once
+        # on these runners and always lost the lock (engineer run 42082643120, all 4 tries failed).
         if: steps.chk.outputs.ok == 'true' && inputs.mode != 'read' && inputs.engine == 'claude'
-        # Playwright's --with-deps runs apt-get, which fails at once if another apt process holds the lock
-        # (seen on the fixer for #293). Retry instead of giving up on the first try.
+        # A PR branch cut before the script existed falls back to the plain Playwright install.
         run: |
-          for a in 1 2 3 4; do
-            pnpm --filter @shipvo/sim exec playwright install --with-deps chromium && exit 0
-            echo "Chromium install failed (try $a), retrying in $(( a * 15 ))s"; sleep $(( a * 15 ))
-          done
+          if [ -f scripts/agents/install-chromium.sh ]; then bash scripts/agents/install-chromium.sh && exit 0
+          else pnpm --filter @shipvo/sim exec playwright-core install --with-deps chromium && exit 0; fi
           echo "::warning::Chromium install failed; simulator runs will not work in this job"
 
       - name: Prepare branch

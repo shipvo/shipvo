@@ -7,6 +7,7 @@ import { auth } from "./auth";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
+import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
@@ -133,7 +134,10 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
   const cur = await env.POINTERS.get(key);
   if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
-  await env.POINTERS.put(key, JSON.stringify({ release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold }));
+  const halted = { release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold };
+  await env.POINTERS.put(key, JSON.stringify(halted));
+  // recordAudit never throws, so a failed audit write cannot undo or block the halt.
+  await recordAudit(env.DB, { app_id: appId, actor: "halt-rule", actor_kind: "system", action: "halt", release, before: null, after: JSON.stringify({ release, reports: verdict.reports, failed: counts.failed, threshold }) });
 }
 
 /** Device telemetry for the spike: applied / reverted / timings. */
