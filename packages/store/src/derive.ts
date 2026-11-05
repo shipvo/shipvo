@@ -45,6 +45,7 @@ export const DATA_CAPABILITIES: Record<string, Mapping> = {
   calendar: { category: "Calendar", dataType: "Calendar events", playType: "PSL_CALENDAR", purpose: "App functionality" },
   files: { category: "Files and docs", dataType: "Files and docs", playType: "PSL_FILES_AND_DOCS", purpose: "App functionality" },
   payments: { category: "Financial info", dataType: "Payment info", playType: "PSL_PAYMENT_INFO", purpose: "App functionality" },
+  // Push needs a device token (an FCM or APNs id), which Play counts as a device ID. The permission alone collects nothing.
   notifications: { category: "Device or other IDs", dataType: "Device or other IDs", playType: "PSL_DEVICE_ID", purpose: "App functionality" },
 };
 
