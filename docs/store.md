@@ -52,6 +52,28 @@ The tester rule is shown only for personal Play accounts that are not exempt. Ap
 
 `status` reads `store-plan.json` and prints one timeline per store. Each step is `todo`, `waiting` or `done`, followed by what you do next. `--mark <step>` sets a step to `done`; add `--as waiting` for a wait. With no plan file it says to run `setup`.
 
+## Get your 12 testers
+
+A new personal Google Play account must have at least 12 testers opted in to a closed test for 14 days in a row before you can apply for production. Read [Google's help page](https://support.google.com/googleplay/android-developer/answer/14151465) for the current rule. Organization accounts and personal accounts made before 13 Nov 2023 skip it.
+
+`shipvo store testers [--package id] [--track alpha] [--json]` prints the steps for your app. `store setup` and `store status` show the same advice on the `play-closed-test` step.
+
+1. In Play Console, make a closed testing track and upload your first build **by hand**. Play does not let the API do the first upload of a new app.
+2. Add testers as Google Groups on the track: your own group, and `shipvo-testers@googlegroups.com` (the Shipvo Testers group).
+3. Share your opt-in link: `https://play.google.com/apps/testing/<package>`.
+4. Join Shipvo Testers at [shipvo.dev/testers](https://shipvo.dev/testers/) and test other founders' apps. The community works because everyone tests.
+5. Keep 12 or more testers opted in for 14 days in a row. If the count drops below 12 the clock resets.
+
+Anyone can join Shipvo Testers. Members cannot see each other's emails, and only managers post. We cannot say how many testers will opt in.
+
+To add the group through the API, pass your own Play service account key (it needs access to the app in Play Console):
+
+```bash
+shipvo store testers --package com.example.shop --play-key play-key.json
+```
+
+The command opens a Play edit, reads the groups already on the track, adds Shipvo Testers to them, and commits. It never removes a group. The key is read once and not stored. Without `--play-key` no network call is made.
+
 ## Screenshots (fast mode)
 
 `shipvo store screenshots` renders your app in the simulator and writes store-sized files. It prints "fast mode: simulator render, not the native UI". The simulator runs your web build in headless Chromium, so fonts, safe areas and native widgets can differ from a phone.

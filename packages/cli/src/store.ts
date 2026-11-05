@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { join } from "node:path";
-import { checkScreenshot, checkSet, SCREENSHOT_SETS, deriveStoreDetails, renderDataSafetyCsv, renderPrivacyPolicy, routeStore } from "@shipvo/store";
+import { createSign } from "node:crypto";
+import { checkScreenshot, checkSet, SCREENSHOT_SETS, deriveStoreDetails, renderDataSafetyCsv, renderPrivacyPolicy, routeStore, SHIPVO_TESTERS_GROUP, SHIPVO_TESTERS_JOIN_URL } from "@shipvo/store";
 import type { RouteAnswers, ScreenshotSetId, StoreRoute } from "@shipvo/store";
 import { args, loadConfig } from "./config.js";
 import { startSim } from "./explore.js";
@@ -11,8 +12,9 @@ export async function store(argv: string[]): Promise<void> {
   const [sub, ...rest] = argv;
   if (sub === "setup") return setup(rest);
   if (sub === "status") return status(rest);
+  if (sub === "testers") return testers(rest);
   if (sub === "screenshots") return screenshots(rest);
-  if (sub !== "details") { console.error("Usage: shipvo store details --dry-run [--out dir] | store setup | store status | store screenshots"); process.exit(2); }
+  if (sub !== "details") { console.error("Usage: shipvo store details --dry-run [--out dir] | store setup | store status | store screenshots | store testers"); process.exit(2); }
   const a = args(rest);
   if (a["dry-run"] === undefined || a["dry-run"] === "false") { console.error("shipvo store details: upload is not available yet; use --dry-run"); process.exit(2); }
   const cfg = loadConfig();
@@ -182,4 +184,76 @@ async function screenshots(argv: string[]): Promise<void> {
     }, out);
   } finally { sim.stop(); }
   process.exitCode = code;
+}
+
+const PLAY_API = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications";
+const b64u = (b: Buffer | string) => Buffer.from(b).toString("base64url");
+
+/** Trade a Play service account key for an access token. The key stays in memory; it is never stored. */
+async function playToken(key: { client_email: string; private_key: string }, f: typeof fetch): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const head = `${b64u(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64u(JSON.stringify({ iss: key.client_email, scope: "https://www.googleapis.com/auth/androidpublisher", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }))}`;
+  const sig = createSign("RSA-SHA256").update(head).sign(key.private_key).toString("base64url");
+  const r = await f("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${head}.${sig}` }) });
+  const j = (await r.json().catch(() => ({}))) as { access_token?: string };
+  if (!r.ok || !j.access_token) throw new Error(`Google sign-in with the service account key failed (${r.status})`);
+  return j.access_token;
+}
+
+/** Add the group to a track's Google Groups through one Play edit, keeping groups already there. Returns the final list. */
+export async function addTesterGroup(opts: { pkg: string; token: string; group: string; track?: string; fetch?: typeof fetch }): Promise<{ groups: string[]; added: boolean }> {
+  const f = opts.fetch ?? fetch, track = opts.track ?? "alpha", base = `${PLAY_API}/${encodeURIComponent(opts.pkg)}/edits`;
+  const call = async (url: string, method: string, body?: unknown) => {
+    const r = await f(url, { method, headers: { authorization: `Bearer ${opts.token}`, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const j = (await r.json().catch(() => ({}))) as Record<string, any>;
+    if (!r.ok) throw new Error(`Play API ${method} ${url.replace(PLAY_API, "")} -> ${r.status}${j.error?.message ? `: ${j.error.message}` : ""}`);
+    return j;
+  };
+  const edit = await call(base, "POST", {});
+  const cur = await call(`${base}/${edit.id}/testers/${track}`, "GET");
+  const groups: string[] = Array.isArray(cur.googleGroups) ? cur.googleGroups : [];
+  if (groups.includes(opts.group)) { await call(`${base}/${edit.id}`, "DELETE").catch(() => {}); return { groups, added: false }; }
+  const next = [...groups, opts.group];
+  await call(`${base}/${edit.id}/testers/${track}`, "PUT", { googleGroups: next });
+  await call(`${base}/${edit.id}:commit`, "POST");
+  return { groups: next, added: true };
+}
+
+export function testersGuide(pkg: string, track = "alpha") {
+  return {
+    package: pkg, track,
+    group: SHIPVO_TESTERS_GROUP, joinUrl: SHIPVO_TESTERS_JOIN_URL,
+    optInUrl: `https://play.google.com/apps/testing/${pkg}`,
+    firstUploadByHand: "Play requires the first upload of a new app to be made by hand in Play Console. This command cannot do that.",
+    steps: [
+      "In Play Console, open Testing > Closed testing and create a track (or use the default one).",
+      "Upload your first build by hand. Play does not allow the API to do the first upload.",
+      `Add testers as Google Groups: ${SHIPVO_TESTERS_GROUP}, plus a group of your own people. Or run \`shipvo store testers --play-key <file>\` to add it through the API.`,
+      `Share your opt-in link: https://play.google.com/apps/testing/${pkg}`,
+      `Join Shipvo Testers yourself (${SHIPVO_TESTERS_JOIN_URL}) and test other founders' apps. The community works because everyone tests.`,
+      "Keep at least 12 testers opted in for 14 days in a row. The clock starts when 12 have opted in; if the count drops below 12 it resets.",
+    ],
+  };
+}
+
+/** `shipvo store testers [--package id] [--track alpha] [--play-key file] [--json]`: print the steps. Calls Play only with --play-key. */
+async function testers(argv: string[]): Promise<void> {
+  const a = args(argv);
+  const pkg = a.package && a.package !== "true" ? a.package : loadConfig().appId;
+  const track = a.track && a.track !== "true" ? a.track : "alpha";
+  const guide = testersGuide(pkg, track);
+  let api: { added: boolean; groups: string[] } | { error: string } | undefined;
+  if (a["play-key"] !== undefined) {
+    if (a["play-key"] === "true") fail("shipvo store testers: --play-key needs a file path.");
+    try {
+      const key = JSON.parse(readFileSync(a["play-key"], "utf8"));
+      api = await addTesterGroup({ pkg, track, group: SHIPVO_TESTERS_GROUP, token: await playToken(key, fetch) });
+    } catch (e) { api = { error: (e as Error).message }; process.exitCode = 1; }
+  }
+  if (a.json !== undefined && a.json !== "false") { console.log(JSON.stringify({ ...guide, ...(api ? { api } : {}) }, null, 2)); return; }
+  console.log(`Get your 12 testers for ${pkg} (closed track "${track}"):\n`);
+  guide.steps.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
+  console.log(`\n${guide.firstUploadByHand}`);
+  if (api) console.log("error" in api ? `\nCould not update the track: ${api.error}` : api.added ? `\nAdded ${SHIPVO_TESTERS_GROUP} to the "${track}" track. Groups now: ${api.groups.join(", ")}.` : `\n${SHIPVO_TESTERS_GROUP} was already on the "${track}" track. Nothing changed.`);
+  else console.log("\nNo Play call was made. Pass --play-key <service-account.json> to add the group through the API; the key is read once and never stored.");
 }
