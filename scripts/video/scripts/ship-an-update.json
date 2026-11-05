@@ -1,5 +1,6 @@
 {
   "slug": "ship-an-update",
+  "posterAt": 4.2,
   "title": "Ship an update to phones in minutes",
   "tutorial": "docs/getting-started.md#5-publish-over-the-air",
   "voice": "af_heart",
