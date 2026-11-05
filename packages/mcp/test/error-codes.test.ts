@@ -41,7 +41,7 @@ async function connect() {
 const CALLS: [string, Record<string, unknown>][] = [
   ["screen", {}], ["tap", { ref: "e1" }], ["type", { ref: "e1", text: "x" }], ["scroll", { direction: "down" }], ["back", {}],
   ["screenshot", {}], ["set_device", { online: false }], ["push_notification", { title: "t", body: "b" }], ["notifications", {}],
-  ["open_notification", {}], ["open_url", { url: "myapp://x" }], ["device_log", {}], ["device_reset", {}], ["end_session", {}],
+  ["open_notification", {}], ["open_url", { url: "myapp://x" }], ["device_log", {}], ["device_reset", {}], ["end_session", {}], ["export_test", {}],
 ];
 
 describe("unknown session", () => {
