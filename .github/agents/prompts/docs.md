@@ -23,3 +23,5 @@ Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (on
 
 
 A new site check is a new file `services/site/scripts/check-<name>.mjs`; `run-checks.mjs` picks it up. Do not edit the `test` script in `services/site/package.json`.
+
+The ledger must list **every** shipped user-visible feature (owner goal: each one gets a video and a tutorial). Each run, compare it with `CHANGELOG.md`, `changes/` and merged PRs and add every missing row.
