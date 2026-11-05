@@ -124,6 +124,29 @@ app.get("/t/:app", async (c) => {
   return c.json(results);
 });
 
+/** Per-release summary: event counts and median apply_ms / cold_start_ms for the 20 newest releases. */
+const TOP_RELEASES = "SELECT release FROM telemetry WHERE app_id = ? GROUP BY release ORDER BY MAX(id) DESC LIMIT 20";
+const medianSql = (col: string) =>
+  `SELECT release, AVG(v) AS m FROM (SELECT release, ${col} AS v, ROW_NUMBER() OVER (PARTITION BY release ORDER BY ${col}) AS rn, COUNT(*) OVER (PARTITION BY release) AS cnt FROM telemetry WHERE app_id = ? AND ${col} IS NOT NULL AND release IN (${TOP_RELEASES})) WHERE rn IN ((cnt + 1) / 2, (cnt + 2) / 2) GROUP BY release`;
+app.get("/t/:app/summary", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const counts = await c.env.DB.prepare(`SELECT release, event, COUNT(*) AS n, MAX(id) AS last_id FROM telemetry WHERE app_id = ? AND release IN (${TOP_RELEASES}) GROUP BY release, event`).bind(appId, appId).all<{ release: number; event: string; n: number; last_id: number }>();
+  const apply = await c.env.DB.prepare(medianSql("apply_ms")).bind(appId, appId).all<{ release: number; m: number }>();
+  const cold = await c.env.DB.prepare(medianSql("cold_start_ms")).bind(appId, appId).all<{ release: number; m: number }>();
+  const byRelease = new Map<number, { release: number; events: Record<string, number>; last: number }>();
+  for (const r of counts.results) {
+    const e = byRelease.get(r.release) ?? { release: r.release, events: {}, last: 0 };
+    e.events[r.event] = r.n; e.last = Math.max(e.last, r.last_id);
+    byRelease.set(r.release, e);
+  }
+  const med = (rows: { release: number; m: number }[]) => new Map(rows.map((r) => [r.release, r.m]));
+  const a = med(apply.results), k = med(cold.results);
+  const releases = [...byRelease.values()].sort((x, y) => y.last - x.last)
+    .map((e) => ({ release: e.release, events: e.events, apply_ms_median: a.get(e.release) ?? null, cold_start_ms_median: k.get(e.release) ?? null }));
+  return c.json({ releases });
+});
+
 app.get("/band/:cohort", (c) => {
   try { return c.json({ band: bandForCohort(Number(c.req.param("cohort"))) }); }
   catch { return c.json({ error: "cohort must be 0-999" }, 400); }
