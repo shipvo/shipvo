@@ -1,4 +1,4 @@
-// Times a new developer's first run: `shipvo init`, then `shipvo publish --dry-run`.
+// Times a new developer's first run: `shipvo init`, `shipvo doctor --offline --skip-sim`, then `shipvo publish --dry-run`.
 // Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install]
 // The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets.
 // Default run uses no network. With --with-install, also times an install in the scaffolded app,
@@ -17,7 +17,7 @@ export function runStep(name, cli, args, cwd) {
   const r = spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", env: cleanEnv() });
   const ms = Math.round(performance.now() - t0);
   const exit = r.status ?? (r.error ? 127 : 1);
-  return { step: name, ms, exit, stderr: r.stderr || (r.error ? String(r.error) : "") };
+  return { step: name, ms, exit, stderr: [r.stdout, r.stderr, r.error ? String(r.error) : ""].filter(Boolean).join("\n") };
 }
 
 // No secrets in, nothing to log in to: the seed comes from the .shipvo/seed.txt that init writes.
@@ -59,6 +59,11 @@ export function measure(cli, withInstall = false) {
       const inst = runInstallStep(app);
       results.push(inst);
       ok = inst.exit === 0;
+    }
+    if (ok) {
+      const doc = runStep("doctor", cli, ["doctor", "--offline", "--skip-sim"], app);
+      results.push(doc);
+      ok = doc.exit === 0;
     }
     if (ok) {
       const js = join(app, "dist-ota/_expo/static/js/android");
