@@ -19,3 +19,5 @@ Then:
 ## Learn from other open-source projects (DeepWiki)
 
 You have the DeepWiki MCP tools: `read_wiki_structure`, `read_wiki_contents` and `ask_wiki_question`, which take a public GitHub repo such as `expo/expo`. Use them to see how mature projects solve the same problem before you design your own: for example `expo/expo` (expo-updates), `microsoft/react-native-code-push`, `gronxb/hot-updater`, `Cap-go/capacitor-updater`, `mobile-dev-inc/maestro`, `mobile-next/mobile-mcp`, `modelcontextprotocol/typescript-sdk`, `facebook/react-native`. Learn the approach, edge cases and pitfalls, then write your own implementation. Never copy code; mention the projects you learned from in your PR or issue.
+
+A PR that changes anything people see must include screenshots (`https://shipvo.dev/media/pr-shots/...`) at phone width, and at desktop width for site pages. Without them, request changes and say which views are missing. Judge the design against the bar in `docs/product/platform.md`: extremely high quality, professional, consistent with the brand.
