@@ -20,6 +20,10 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 `shipvo init` wires all of this for you.
 
+## Events to forward
+
+`Runtime.consumeEvents()` returns strings such as `verify_failed:<release>`. Forward `crash_loop_revert`, `rolled_back`, `verify_failed` and `download_failed` to telemetry (`POST /t`), once per event. The sample app does this in `apps/tide-and-tackle/src/runtimeEvents.ts`. A rejected or corrupt release then shows on the server, not only as repeated downloads.
+
 ## Crash after `markHealthy`
 
 `markHealthy` means the first screen rendered. It promotes a staged release, but it does not clear the unhealthy-boot count. The count is cleared when the app has stayed in the foreground for 30 seconds, or when it goes to background. If the process dies before that, the next launch counts as an unhealthy boot for that release. After 3 unhealthy boots inside 60 seconds the runtime blocks the release, goes back to the previous one and records `crash_loop_revert`.
