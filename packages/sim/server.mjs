@@ -124,7 +124,7 @@ async function screen(page) {
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
 
 async function act(id, body) {
-  const s = sessions.get(id); if (!s) throw new Error(`no session '${id}': call /session first`);
+  const s = sessions.get(id); if (!s) throw new SimError("no_session", `no session '${id}': call /session first`);
   const { page } = s;
   // A ref is valid only for the page it came from and while its element is unchanged. Re-snapshot first, so a node that
   // was re-rendered with new content has lost its old ref, then fail with a typed error instead of acting on anything else.
