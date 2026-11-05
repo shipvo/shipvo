@@ -27,3 +27,16 @@ Coming soon. Until then, see [Test with an assistant](../test-with-an-assistant.
 ## Ship updates
 
 Coming soon. Until then, see [Build your first app](../getting-started.md), step 5.
+
+## For contributors: live phones
+
+Put a live phone where the reader looks at the app. Keep the screenshot after it, for print and slow connections:
+
+```html
+<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: add a product to the cart" data-fallback="/tutorials/first-app/home.png"></div>
+```
+
+- `data-release` is `latest` (read once from `releases.json`) or a number such as `28`.
+- `data-fallback` is the screenshot shown if the release cannot load. Always set it.
+- Use a blank line before and after the line. Write a short "Try it" caption that says what to tap.
+- Details: `services/site/phone-embed.mjs` and `services/site/public/phone.js`.

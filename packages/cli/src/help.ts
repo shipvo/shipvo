@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "status", "audit", "test", "keys", "mcp",
+  "init", "sim", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "audit", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -33,6 +33,8 @@ Ship
                               Render each route at store sizes (fast mode: simulator, not the native UI)
   store status [--mark <step> [--as waiting|done]]
                               Show each store's steps and what to do next
+  ci init --framework capacitor [--dry-run] [--force]
+                              Write .github/workflows/shipvo-build.yml (signed Android and iOS builds)
   status [--app id] [--json]  Show how the newest releases are doing on phones
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
   test [files] [--repair [--write]] [--report <file> [--release <id>]]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
