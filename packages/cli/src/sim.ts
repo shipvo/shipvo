@@ -33,20 +33,32 @@ const IGNORED = new Set(["node_modules", "sim-dist", ".shipvo", ".git", ".expo",
 /** True if a path (relative to the project) is inside a folder that never triggers a rebuild. */
 export const ignoredPath = (rel: string) => rel.split(/[\\/]/).some((seg) => IGNORED.has(seg));
 
+/** Turns a build error into a short plain message. Unknown errors keep their first line only. */
+export function friendlyBuildError(message: string, verbose = false): string {
+  if (verbose) return `build failed, still serving the last good build: ${message}`;
+  const m = /in file (\S+\.json) at (\d+):(\d+)/.exec(message);
+  if (m && /Unexpected token|SyntaxError|JSON/.test(message)) {
+    const comma = /expected punc [«"']?,/.test(message) || /Unexpected token string/.test(message);
+    const what = comma ? "a comma is missing or extra" : "a character is missing, extra or in the wrong place";
+    return `Your file ${m[1]} has a mistake at line ${m[2]}, column ${m[3]}: ${what}. The page still shows your last good version.`;
+  }
+  return `build failed, still serving the last good build: ${message.split("\n")[0]} (run with --verbose for details)`;
+}
+
 /**
  * Calls `build` once after changes settle for `debounceMs`. A change during a build queues one more build.
  * `build` rejects with the build error; it is printed and the caller keeps serving the last good build.
  * Returns a function that stops watching.
  */
-export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>; debounceMs?: number; log?: (line: string) => void }): () => void {
-  const { dir, build, debounceMs = 300, log = (l) => console.error(l) } = opts;
+export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>; debounceMs?: number; log?: (line: string) => void; verbose?: boolean }): () => void {
+  const { dir, build, debounceMs = 300, log = (l) => console.error(l), verbose = false } = opts;
   let timer: NodeJS.Timeout | undefined; let running = false; let again = false; let closed = false;
   const run = async () => {
     if (running) { again = true; return; }
     running = true;
     const t0 = Date.now();
     try { await build(); log(`rebuilt in ${((Date.now() - t0) / 1000).toFixed(1)} s`); }
-    catch (e) { log(`build failed, still serving the last good build: ${(e as Error).message}`); }
+    catch (e) { log(friendlyBuildError((e as Error).message, verbose)); }
     running = false;
     if (again && !closed) { again = false; void run(); }
   };
@@ -117,7 +129,7 @@ export async function sim(argv: string[]) {
   if (await waitListening(Number(port), () => exited)) {
     console.error(`Simulator on http://localhost:${port}/app/  (open_app("${cfg.appId}") from @shipvo/mcp; Ctrl-C to stop)`);
     if (a.watch === "true") {
-      watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto() });
+      watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto(), verbose: a.verbose === "true" });
       console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");
     }
   }

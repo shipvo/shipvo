@@ -34,11 +34,25 @@ describe("watchAndRebuild", () => {
     const { dir, log, stop } = await setup(build);
     writeFileSync(join(dir, "src", "a.ts"), "bad");
     await wait(500);
-    expect(log).toEqual(["build failed, still serving the last good build: Unexpected token"]);
+    expect(log).toEqual(["build failed, still serving the last good build: Unexpected token (run with --verbose for details)"]);
     writeFileSync(join(dir, "src", "a.ts"), "good");
     await wait(500);
     expect(log[1]).toMatch(/^rebuilt in/);
     stop();
+  });
+});
+
+describe("friendlyBuildError", () => {
+  const metro = "SyntaxError: Error: Unexpected token string «name», expected punc «,» in file src/data/products.json at 23:4\n    at async transformJSON (x.js:1:1)";
+  it("names the file and line for broken JSON and hides the stack", async () => {
+    const { friendlyBuildError } = await import("../src/sim");
+    const out = friendlyBuildError(metro);
+    expect(out).toBe("Your file src/data/products.json has a mistake at line 23, column 4: a comma is missing or extra. The page still shows your last good version.");
+    expect(out).not.toContain("transformJSON");
+  });
+  it("keeps the full message with --verbose", async () => {
+    const { friendlyBuildError } = await import("../src/sim");
+    expect(friendlyBuildError(metro, true)).toContain("transformJSON");
   });
 });
 
