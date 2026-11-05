@@ -1,0 +1,3 @@
+- `@shipvo/schema`: adds `TELEMETRY_EXPORT_VERSION`, `TELEMETRY_EXPORT_COLUMNS` and `TelemetryExportRow` for the Parquet telemetry export.
+- control plane: an hourly cron exports telemetry to an R2 bucket as Parquet, partitioned by app and day. Off until you bind `EXPORT_BUCKET`; see `docs/telemetry-export.md`. Run migration `0015_telemetry_export.sql`.
+- Migration: none for existing setups; new additive exports and a new D1 table.

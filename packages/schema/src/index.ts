@@ -276,3 +276,31 @@ export function parsePolicy(value: unknown): ShipvoPolicy {
   if (r.success) return r.data;
   throw new Error(r.error.issues.map((i) => `policy${i.path.length ? "." + i.path.join(".") : ""}: ${i.message}`).join("; "));
 }
+
+/* ---------- release telemetry export (Parquet on the owner's R2 bucket) ---------- */
+/** Version of the exported file layout. Bump it when a column is renamed, removed or changes type; adding a nullable column at the end keeps the version. */
+export const TELEMETRY_EXPORT_VERSION = "1";
+export type TelemetryExportColumnType = "int64" | "double" | "string";
+/** The columns of every exported Parquet file, in order. `app` and `day` are not columns: they are in the file path (`app=<id>/day=YYYY-MM-DD`). There is no device id, so the export holds no personal data. */
+export const TELEMETRY_EXPORT_COLUMNS: ReadonlyArray<{ name: string; type: TelemetryExportColumnType; nullable: boolean; doc: string }> = [
+  { name: "id", type: "int64", nullable: false, doc: "Row id in the control plane, increasing" },
+  { name: "received_at", type: "string", nullable: false, doc: "UTC time the control plane got the event, ISO 8601" },
+  { name: "app_id", type: "string", nullable: false, doc: "App id" },
+  { name: "release", type: "int64", nullable: false, doc: "Release number" },
+  { name: "event", type: "string", nullable: false, doc: "applied, rolled_back, crash_loop_revert, download_failed, verify_failed, content_applied, ..." },
+  { name: "cold_start_ms", type: "double", nullable: true, doc: "Cold start time in milliseconds" },
+  { name: "bytes_downloaded", type: "int64", nullable: true, doc: "Bytes downloaded for the update" },
+  { name: "apply_ms", type: "double", nullable: true, doc: "Time to apply the update in milliseconds" },
+  { name: "device_class", type: "string", nullable: true, doc: "low, mid or high" },
+  { name: "published_at", type: "string", nullable: true, doc: "When the release was published, ISO 8601" },
+  { name: "device_model", type: "string", nullable: true, doc: "Device model name" },
+  { name: "android_api", type: "int64", nullable: true, doc: "Android API level" },
+  { name: "via", type: "string", nullable: true, doc: "patch or full" },
+];
+export const TelemetryExportRow = z.object({
+  id: z.number().int(), received_at: z.string(), app_id: z.string(), release: z.number().int(), event: z.string(),
+  cold_start_ms: z.number().nullable(), bytes_downloaded: z.number().int().nullable(), apply_ms: z.number().nullable(),
+  device_class: z.string().nullable(), published_at: z.string().nullable(), device_model: z.string().nullable(),
+  android_api: z.number().int().nullable(), via: z.string().nullable(),
+});
+export type TelemetryExportRow = z.infer<typeof TelemetryExportRow>;
