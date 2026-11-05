@@ -11,6 +11,14 @@ The native half of Shipvo's over-the-air updates, as an Expo module.
 { "expo": { "plugins": [["@shipvo/runtime", { "baseUrl": "https://<your control plane>", "publicKey": "<base64 Ed25519 public key>", "appId": "myshop" }]] } }
 ```
 
+Optional plugin props declare what the shell can run, so the control plane can skip releases it cannot use:
+
+```json
+{ "hermesBytecodeVersions": [96], "nativeModules": { "react-native-mmkv": "3.1.0" } }
+```
+
+They are written as Android meta-data `dev.shipvo.HERMES_BYTECODE_VERSIONS` (`96`) and `dev.shipvo.NATIVE_MODULES` (`react-native-mmkv@3.1.0`), and as Info.plist keys `ShipvoHermesBytecodeVersions` and `ShipvoNativeModules`. Leave them out and nothing is written. A non-integer version or an empty package name fails the build. The runtime does not read them yet.
+
 ```ts
 import { Runtime } from "@shipvo/runtime";
 const s = Runtime.getState();            // running / pending / previous release, band, baseUrl, appId
