@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { b64, keyFromSeed } from "../src/index";
@@ -27,8 +27,8 @@ describe("shipvo doctor checks", () => {
     const chromiumPath = () => null;
     const withSim = await runDoctorChecks({ cwd, offline: true, chromiumPath });
     const skipped = await runDoctorChecks({ cwd, offline: true, chromiumPath, skipSim: true });
-    expect(nameOf(withSim, "Playwright Chromium installed").ok).toBe(false);
-    expect(skipped.some((r) => r.name === "Playwright Chromium installed" || r.name.startsWith("sim port"))).toBe(false);
+    expect(withSim.some((r) => r.name === "Browser for the simulator")).toBe(true);
+    expect(skipped.some((r) => r.name === "Browser for the simulator" || r.name.startsWith("sim port"))).toBe(false);
   });
 
   it("--offline makes no network call and passes the two network checks", async () => {
@@ -242,17 +242,24 @@ describe("shipvo doctor sim checks", () => {
   };
   const run = (cwd: string, o: object = {}) => runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch, ...o });
 
-  it("Chromium check passes when the binary exists and fails with the fix when not", async () => {
+  it("browser check passes with system Chrome or Edge, notes the one-time download, and fails only with SHIPVO_NO_AUTO_INSTALL=1", async () => {
     const cwd = withSim(true);
+    const name = "Browser for the simulator";
+    const chrome = nameOf(await run(cwd, { platform: "linux", chromiumPath: () => null, fileExists: (p: string) => p === "/usr/bin/google-chrome" }), name);
+    expect(chrome).toMatchObject({ ok: true, note: "system Chrome" });
+    const edge = nameOf(await run(cwd, { platform: "linux", chromiumPath: () => null, fileExists: (p: string) => p === "/usr/bin/microsoft-edge" }), name);
+    expect(edge).toMatchObject({ ok: true, note: "system Edge" });
     const bin = join(cwd, "chrome");
     writeFileSync(bin, "");
-    expect(nameOf(await run(cwd, { chromiumPath: () => bin }), "Playwright Chromium installed").ok).toBe(true);
-    const missing = nameOf(await run(cwd, { chromiumPath: () => join(cwd, "nope"), playwrightVersion: () => "1.63.0" }), "Playwright Chromium installed");
-    expect(missing.ok).toBe(false);
-    expect(missing.fix).toContain("`npx playwright install chromium` in the app folder");
-    expect(missing.fix).toContain("playwright 1.63.0");
-    expect(missing.fix).toContain("Linux");
-    expect(nameOf(await run(cwd, { chromiumPath: () => null }), "Playwright Chromium installed").ok).toBe(false);
+    expect(nameOf(await run(cwd, { chromiumPath: () => bin, platform: "linux", fileExists: (p: string) => p === bin }), name).note).toBe("Playwright Chromium");
+    const none = { chromiumPath: () => null, fileExists: (p: string) => existsSync(p) && !p.startsWith("/usr") && !p.startsWith("/opt") };
+    const first = nameOf(await run(cwd, { ...none, platform: "linux", env: {} }), name);
+    expect(first.ok).toBe(true);
+    expect(first.note).toContain("first run downloads Chromium once");
+    const off = nameOf(await run(cwd, { ...none, platform: "linux", env: { SHIPVO_NO_AUTO_INSTALL: "1" }, playwrightVersion: () => "1.63.0" }), name);
+    expect(off.ok).toBe(false);
+    expect(off.fix).toContain("`npx playwright install chromium` in the app folder");
+    expect(off.fix).toContain("playwright 1.63.0");
   });
 
   it("port check passes on a free port and fails on a real busy one", async () => {

@@ -187,3 +187,14 @@ shipvo promote --force                 # promote anyway; prints that it overrode
 - A report whose `release` matches the release being promoted and has any failed flow stops promote with a non-zero exit. The message lists the failing flows. `--dry-run` stops the same way.
 - A report for a different release is stale. Promote prints a warning and goes on.
 - With no report file, promote behaves as before.
+
+## First run of the simulator
+
+`shipvo sim`, `shipvo explore`, `shipvo test` and `shipvo store screenshots` check the browser setup before they start:
+
+1. If `playwright` is not installed, the CLI installs it as a dev dependency with your package manager (pnpm, yarn, bun or npm, chosen from the lockfile).
+2. The simulator uses system Chrome or Edge when it finds one. Otherwise it uses Playwright's Chromium, and downloads it once with `npx playwright install chromium` if it is missing.
+
+`shipvo doctor` shows which browser it found. With no Chrome, Edge or Chromium it still passes, and notes that the first run downloads Chromium once.
+
+Set `SHIPVO_NO_AUTO_INSTALL=1` to turn both installs off. The command then stops and prints what to run yourself, and `shipvo doctor` fails the browser check when nothing is installed.
