@@ -2,9 +2,10 @@
 // Team health check (no AI). Runs after every merge-bot pass. It fixes what plain rules can fix, and
 // writes everything else to one open issue labelled `agent:health`, which the steward reads every hour.
 // When the team is healthy again the issue is closed.
-//   Fixes itself: stale `agent:in-progress` labels, an idle team with work waiting.
+//   Fixes itself: stale `agent:in-progress` labels, `agent:waiting` issues whose dependencies are done,
+//                 an idle team with work waiting.
 //   Reports: main CI red, many failed agent runs, PRs stuck for hours, no merges for hours with work waiting,
-//            items labelled needs-human, agent:blocked or agent:escalate.
+//            the daily merge cap with approved PRs waiting, items labelled needs-human, agent:blocked or agent:escalate.
 import { execFileSync } from "node:child_process";
 
 const REPO = process.env.GITHUB_REPOSITORY;
@@ -35,6 +36,20 @@ for (const i of issues.filter((i) => has(i, "agent:in-progress") && mins(i.updat
     act(`clear stale agent:in-progress on #${i.number}`, () => gh("api", "-X", "DELETE", `repos/${REPO}/issues/${i.number}/labels/agent:in-progress`));
     fixed.push(`Cleared a stale in-progress label on ${link(i.number)} so an engineer can pick it up.`);
   }
+}
+
+// 2b. Issues parked behind another PR or issue (`agent:waiting`, body line "Waits for #N"): once every
+// #N is merged or closed, put the issue back in the queue.
+for (const i of issues.filter((i) => has(i, "agent:waiting"))) {
+  const deps = [...(i.body || "").matchAll(/waits for ((?:#\d+[ ,and]*)+)/gi)].flatMap((m) => m[1].match(/\d+/g));
+  if (!deps.length) continue;
+  const open = deps.filter((n) => { try { return api(`repos/${REPO}/issues/${n}`).state === "open"; } catch { return true; } });
+  if (open.length) continue;
+  act(`release #${i.number}: ${deps.map(link).join(", ")} done`, () => {
+    gh("api", "-X", "DELETE", `repos/${REPO}/issues/${i.number}/labels/agent:waiting`);
+    gh("api", "-X", "POST", `repos/${REPO}/issues/${i.number}/labels`, "-f", "labels[]=agent:ready");
+  });
+  fixed.push(`${link(i.number)} was waiting for ${deps.map(link).join(", ")}, which are done; it is back in the queue.`);
 }
 
 // 3. Idle team with work waiting.
@@ -71,6 +86,17 @@ for (const p of prs.filter((p) => mins(p.updated_at) > 180 && !p.labels.some((l)
 const merged = api(`repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=30`).filter((p) => p.merged_at);
 const lastMerge = merged.map((p) => p.merged_at).sort().pop();
 if ((ready.length || prs.length) && lastMerge && mins(lastMerge) > 360) problems.push(`Nothing merged for ${Math.round(mins(lastMerge) / 60)} h while work is waiting.`);
+
+// 6b. Daily merge cap reached while approved PRs wait (they sit until 00:00 UTC unless the cap is raised).
+const approved = prs.filter((p) => has(p, "agent:approved"));
+if (approved.length) {
+  const cap = Number(process.env.AGENT_MAX_MERGES_PER_DAY || 40);
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const n = api(`search/issues?q=${encodeURIComponent(`repo:${REPO} is:pr is:merged label:agent-pr merged:>=${today}`)}&per_page=1`).total_count;
+    if (n >= cap) problems.push(`Daily merge cap reached (${n}/${cap}); ${approved.length} approved PRs wait until 00:00 UTC (repo variable AGENT_MAX_MERGES_PER_DAY).`);
+  } catch (e) { console.log("skip merge-cap check:", e.message); }
+}
 
 // 7. Items waiting for a person or the steward.
 for (const [l, who] of [["agent:escalate", "the steward"], ["needs-human", "the owner"], ["agent:blocked", "re-slicing"]]) {
