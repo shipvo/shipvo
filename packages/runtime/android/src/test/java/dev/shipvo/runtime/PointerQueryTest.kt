@@ -14,7 +14,7 @@ class PointerQueryTest {
 
   @Test fun queryWhenDeclared() {
     assertEquals("https://x.dev/p/app/1/b2.json?hbc=96,98", url("96,98", null))
-    assertEquals("https://x.dev/p/app/1/b2.json?hbc=96&nm=a@1.0.0", url("96", "a@1.0.0"))
+    assertEquals("https://x.dev/p/app/1/b2.json?hbc=96&nm=a%401.0.0", url("96", "a@1.0.0"))
   }
 
   @Test fun scopedNamesAreEncoded() {
