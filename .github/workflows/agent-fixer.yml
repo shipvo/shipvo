@@ -4,7 +4,7 @@
 # A red CI on main becomes an urgent issue for the Claude engineer.
 name: agent-fixer
 on:
-  workflow_run: { workflows: [ci, ios-runtime], types: [completed] }
+  workflow_run: { workflows: [ci, ios-runtime, android-runtime], types: [completed] }
   pull_request: { types: [labeled] }
   # GitHub sends no pull_request events for a PR with merge conflicts, so the merge bot calls this directly.
   workflow_dispatch:
