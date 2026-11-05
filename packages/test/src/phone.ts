@@ -47,7 +47,7 @@ export class PhoneError extends Error {
 export type MockResponse = { status: number; body?: string | Record<string, unknown> | unknown[] | null; headers?: Record<string, string>; delayMs?: number };
 /** A string `url` must equal the full request URL. A RegExp is tested against it. Without `method`, any method matches. The first matching rule wins. */
 export type MockRule = { url: string | RegExp; method?: string } & MockResponse;
-type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number; delivery?: "delivered" | "not_delivered"; safe_to_retry?: boolean };
+type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number; delivery?: "delivered" | "not_delivered"; safe_to_retry?: boolean; delivered?: boolean; id?: string };
 
 /** A simulated phone running your app. Every action returns once the screen has settled, and updates `screen`. */
 export class Phone {
@@ -57,9 +57,11 @@ export class Phone {
   /** The simulated address book. */
   readonly contacts: Contacts;
   readonly calendar: Calendar;
+  /** The notification shade. Call it to list notifications; `receive` and `tap` deliver and open one. */
+  readonly notifications: Notifications;
   /** The simulated file picker. */
   readonly files: Files;
-  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); this.calendar = new Calendar(this); this.files = new Files(this); }
+  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); this.calendar = new Calendar(this); this.files = new Files(this); this.notifications = makeNotifications(this); }
 
   /** @internal */
   async call(path: string, body: Record<string, unknown>): Promise<Reply> {
@@ -124,10 +126,8 @@ export class Phone {
     }
   }
 
-  /** Deliver a push notification: it shows as a banner the app can be opened from. */
+  /** Deliver a push notification: it shows as a banner the app can be opened from. It reaches the app only if notification permission is granted (`phone.device.set({ permissions: { notifications: "granted" } })`); otherwise nothing is delivered and this still resolves. Use `phone.notifications.receive()` to learn whether it was delivered. */
   async notify(n: { title: string; body: string; data?: Record<string, unknown> }): Promise<this> { await this.act("push_notification", n); return this; }
-  /** The notification shade (banners vanish after about 5 s, the shade keeps them). */
-  async notifications(): Promise<Notification[]> { return (await this.act("notifications")).notifications ?? []; }
   /** Tap a notification from the shade (the newest if no id). */
   async openNotification(id?: string): Promise<this> { await this.act("open_notification", { id }); return this; }
   /** Open a deep link in the app, as a push tap or share link would. Throws a `PhoneError` with code `no_url_listener` if the app has no `onUrl` listener. */
@@ -176,6 +176,22 @@ export class Contacts {
   constructor(private readonly phone: Phone) {}
   /** Seed the address book (replaces what was there). The app still asks for permission; answer with `phone.device.set({ permissions: { contacts } })` or tap the dialog. */
   async set(contacts: Contact[]): Promise<Phone> { await this.phone.act("set_device", { device: { contacts } }); return this.phone; }
+}
+
+/** `phone.notifications()` lists the shade (banners vanish after about 5 s, the shade keeps them). */
+export interface Notifications {
+  (): Promise<Notification[]>;
+  /** Push a notification to the app. It reaches the app only if notification permission is granted; resolves `false` (and the app sees nothing) when it is not. */
+  receive(n: { title: string; body: string; data?: Record<string, unknown> }): Promise<boolean>;
+  /** Tap a notification in the shade (the newest if no id): the app's tap handler runs with its `data`. */
+  tap(id?: string): Promise<Phone>;
+}
+function makeNotifications(phone: Phone): Notifications {
+  const list = async () => ((await phone.act("notifications")).notifications ?? []);
+  return Object.assign(list, {
+    async receive(n: { title: string; body: string; data?: Record<string, unknown> }) { return (await phone.act("push_notification", n)).delivered === true; },
+    async tap(id?: string) { await phone.act("open_notification", { id }); return phone; },
+  });
 }
 
 /** The simulated file picker. The app opens it with `expo-document-picker` or `device.files.pick()`; you answer it here. */

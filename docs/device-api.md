@@ -65,8 +65,13 @@ The amount/PIN prompt is your app's own sheet, identical on every platform (Tide
 
 ```ts
 const id = await device.notifications.show({ title, body, data? });
-const off = device.notifications.onOpen((n) => { /* n.data */ });
+const off = device.notifications.onTapped((n) => { /* n.data */ });   // onOpen is the same
+const stop = device.notifications.onReceived((n) => { /* n.title, n.body, n.data */ });
 ```
+
+Support level for `notifications`: `real` with `expo-notifications`, `simulated` in the simulator, `unavailable` otherwise. Permission is `"notifications"`: if it is not granted, no notification reaches the app and `getPermissionsAsync` reports `denied` (or `undetermined` if never asked). Simulated pushes are payloads only: no push token, APNs or FCM delivery, scheduling or badges.
+
+In tests: `await phone.device.set({ permissions: { notifications: "granted" } })`, then `await phone.notifications.receive({ title, body, data })` (resolves `false` when permission blocked it) and `await phone.notifications.tap()`. Agents use the `push_notification` and `open_notification` MCP tools.
 
 Phones: a local notification through `expo-notifications`; tapping it fires `onOpen`. Simulator: a heads-up banner over the status bar for 5 seconds (as on a phone), then it lives in the notification shade: agents list it with the `notifications` MCP tool and tap it with `open_notification`, which fires `onOpen` exactly as a banner tap would.
 
@@ -156,7 +161,7 @@ Simulator: `set_device(online: false)` takes the phone offline; the app's offlin
 | --- | --- |
 | `set_device(session, platform?, api?, permissions?, contacts?, calendar?, files?, location?, camera?, biometrics?, payment?, online?)` | Change any part of the device state mid-session |
 | `device_reset(session, profile?)` | Back to a known state: permissions undetermined, default location, nothing in view, log cleared |
-| `push_notification(session, title, body, data?)` | Deliver a notification to the phone |
+| `push_notification(session, title, body, data?)` | Deliver a notification to the phone (needs notification permission) |
 | `notifications(session)` / `open_notification(session, id?)` | The shade; tap one |
 | `device_log(session)` | Every device event in the session (permission prompts and answers, location reads, scans, auth, payments, notifications, shares), each `simulated: true`, plus `capabilities()` |
 

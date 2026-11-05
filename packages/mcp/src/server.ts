@@ -40,7 +40,7 @@ async function localApps(): Promise<AppInfo> {
 }
 
 type Delivery = { delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null; wait_for?: { matched: boolean; waited_ms: number; error?: string }; settled?: boolean };
-type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string } & Delivery;
+type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; delivered?: boolean } & Delivery;
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
@@ -189,8 +189,13 @@ server.tool("set_device", "Change what the simulated phone has: location, the ad
   payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),
 }, WR, async ({ session, ...device }) => { need(session); const r = await sim("/act", { session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
-server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
-  async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
+server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap. The app receives it only if notification permission is granted; otherwise nothing is delivered.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
+  async ({ session, title, body, data }) => {
+    need(session); const r = await sim("/act", { session, action: "push_notification", title, body, data });
+    // The simulator answers ok when permission blocks the push, so say so: otherwise it looks like a delivery.
+    if (r.ok && r.delivered === false) return result(session, { ...r, screen: `Not delivered: notification permission is not granted (use set_device permissions.notifications).\n\n${r.screen ?? ""}` });
+    return result(session, r);
+  });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await sim("/act", { session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() }, WR,
