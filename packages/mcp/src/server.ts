@@ -73,8 +73,6 @@ Finish a task by checking the final screen says what you expected (for example "
 const keyApps = ctx.app ? ctx.app.split(",").map((s) => s.trim()).filter(Boolean) : null;
 const allowed = async (id: string) => (keyApps ? keyApps.includes(id) : !!(await localApps())[id]);
 server.tool("list_apps", "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').", { query: z.string().optional() }, async ({ query }) => {
-  return { content: [{ type: "text" as const, text: "" }], isError: false, annotations: { readOnlyHint: true } };
-}, { annotations: { readOnlyHint: true } });
   const APPS = await localApps(); const ids = keyApps ?? Object.keys(APPS); const q = (query ?? "").toLowerCase();
   let dir: Record<string, { name: string; description: string; category: string }> = {};
   try { const r = await fetch(`${CONTROL}/apps/public${q ? `?q=${encodeURIComponent(q)}` : ""}`); if (r.ok) for (const a of ((await r.json()) as any).apps) dir[a.app_id] = a; } catch {}
