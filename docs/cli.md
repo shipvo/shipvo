@@ -78,6 +78,17 @@ Agents can call the MCP tool `publish_preview`; it runs `shipvo preview --json` 
 
 `shipvo init` adds `.github/workflows/preview.yml`, which publishes each pull request's web build and comments the link on the pull request. Pull requests from forks are skipped.
 
+### Device panel
+
+The preview page has a **Device** panel beside the phone (under it at phone width). It sets the same simulated device state as the MCP `set_device` and `push_notification` tools. Every event is simulated.
+
+- **Location**: pick a place, or type latitude and longitude.
+- **Camera**: put an EAN-13 or QR code in front of the camera, or nothing. Images are left for later.
+- **Fingerprint / Face ID**: matches or does not match every check until you change it.
+- **Payment**: every payment is approved or declined until you change it.
+- **Network**: online, slow (the app's `fetch` calls wait 1.5 s) or offline.
+- **Push notification**: send a title and body; it shows as a banner. Nothing is delivered if the app has not been granted notification permission, and the panel says so.
+
 ## `policy` in `shipvo.json`
 
 An optional `policy` section writes release rules down. `shipvo publish --dry-run` checks them. If a rule refuses, it prints the rule and the reason and exits with code 1. The real upload is not checked yet; that comes in a later slice.

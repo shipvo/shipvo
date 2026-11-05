@@ -1,0 +1,2 @@
+- `@shipvo/cli`: the `shipvo preview` page has a Device panel (location, camera, fingerprint or Face ID, payment, network, push notification) that drives the simulated device. It sits under the phone at phone width. Camera, biometrics and payment controls set the result of every later check or payment until you change it.
+- Migration: none; re-run `shipvo preview` to get the panel.
