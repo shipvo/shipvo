@@ -171,13 +171,13 @@ export function checkExpoModules(dir: string): ExpoModulesCheck {
     hasExpo = Boolean(pkg.dependencies?.expo || pkg.devDependencies?.expo);
   } catch { /* no package.json: expo is missing */ }
   if (!hasExpo) missing.push("the expo package");
+  const stripComments = (t: string) => t.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
   const mains = walk(join(dir, "android/app/src/main"), /^MainApplication\.(kt|java)$/);
-  if (!mains.some((f) => /ApplicationLifecycleDispatcher|ReactNativeHostWrapper|expo\.modules/.test(readFileSync(f, "utf8")))) {
+  if (!mains.some((f) => /ApplicationLifecycleDispatcher|ReactNativeHostWrapper|expo\.modules/.test(stripComments(readFileSync(f, "utf8"))))) {
     missing.push("the Expo setup in MainApplication");
   }
   const delegates = walk(join(dir, "ios"), /^AppDelegate\.(swift|mm?|h)$/);
-  const stripLineComments = (t: string) => t.replace(/^\s*\/\/.*$/gm, "");
-  if (!delegates.some((f) => /ExpoAppDelegate|ExpoReactNativeFactory|import Expo|<Expo\//.test(stripLineComments(readFileSync(f, "utf8"))))) missing.push("the Expo setup in AppDelegate");
+  if (!delegates.some((f) => /ExpoAppDelegate|ExpoReactNativeFactory|import Expo|<Expo\//.test(stripComments(readFileSync(f, "utf8"))))) missing.push("the Expo setup in AppDelegate");
   return missing.length === 0 ? { installed: true, missing } : { installed: false, missing, planStep: INSTALL_EXPO_MODULES };
 }
 

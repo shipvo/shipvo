@@ -224,3 +224,15 @@ it("updates a multi-line <meta-data> and adds android:value to one without it", 
   expect(xml2).toMatch(new RegExp(`android:name="${name}" android:value="[^"]+"/>`));
   expect(xml2.match(new RegExp(`android:name="${name}"`, "g"))).toHaveLength(1);
 });
+
+it("does not treat commented-out Android Expo lines or block comments as Expo setup", () => {
+  makeApp({ expo: true });
+  const main = join(tmp, "android/app/src/main/java/com/hello/MainApplication.kt");
+  writeFileSync(main, "// import expo.modules.ApplicationLifecycleDispatcher\n/* ReactNativeHostWrapper */\nclass MainApplication {}");
+  writeFileSync(join(tmp, "ios/Hello/AppDelegate.swift"), "/* import Expo\n ExpoAppDelegate */\nclass AppDelegate {}");
+  const r = checkExpoModules(tmp);
+  expect(r.missing).toContain("the Expo setup in MainApplication");
+  expect(r.missing).toContain("the Expo setup in AppDelegate");
+  writeFileSync(main, "import expo.modules.ApplicationLifecycleDispatcher\nclass MainApplication {}");
+  expect(checkExpoModules(tmp).missing).not.toContain("the Expo setup in MainApplication");
+});
