@@ -9,6 +9,7 @@ Pieces:
 - `server.mjs`: static release server that logs every request, including telemetry, as JSON lines.
 - `release.mjs`: signs and publishes one release (bundle, bsdiff patches, pointer per band), with `--tamper signature|hash|size`.
 - `run.mjs`: starts the server in-process, runs the scenarios, and writes the report.
+  Before the staged-rollout scenario it publishes a known good release and waits for it to be healthy. If that fails, it records a failed scenario instead of running staged rollout on a bad device.
 
 Run (needs `pnpm --filter @shipvo/cli build`, `pip install bsdiff4`, and `adb` with one emulator):
 
