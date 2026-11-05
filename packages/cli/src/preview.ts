@@ -104,19 +104,57 @@ iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 .device[data-skin=iphone] .back::after{content:"";position:absolute;left:0;right:0;top:50%;height:5px;margin-top:-2px;border-radius:3px;background:#fff}
 .back:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .device[data-skin=android] .back{border:0}
+.side{max-width:360px;margin:0 auto 20px;padding:0 10px;box-sizing:border-box}
+.side h2{font-size:14px;margin:0 0 6px}.side ol{padding-left:20px;margin:6px 0}.side li{margin-bottom:6px}.side small{opacity:.7}
+.side button,.side input{font:inherit}
+.device{position:relative}
+#pin{position:absolute;inset:0;display:none;cursor:crosshair;background:#2563eb22;z-index:5}
+#pin.on{display:block}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
 @media (max-width:500px){.bar,.note{display:none}.stage{padding:0}.device{padding:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;box-shadow:none}}
 </style></head><body>
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-skin="android" aria-pressed="true">Android</button><button data-skin="iphone" aria-pressed="false">iPhone</button>
 <button data-size="phone" aria-pressed="true">Phone</button><button data-size="large" aria-pressed="false">Large phone</button><button data-size="tablet" aria-pressed="false">Tablet</button>
-<button id="theme" aria-pressed="false">Dark</button></div>
+<button id="theme" aria-pressed="false">Dark</button>
+<button id="comment" aria-pressed="false">Comment</button></div>
 <div class="stage"><div class="device" id="device" data-skin="android" style="width:360px;height:760px">
 <div class="status" id="status"><span id="clock">9:41</span><span class="notch"></span><span class="icons" id="icons">&#9679;&#9679; 5G 100%</span></div>
-<iframe id="app" src="app.html" title="${title}"></iframe>
+<iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" aria-label="Tap where the problem is"></div>
 <div class="nav"><button class="back" id="back" aria-label="Back" title="Back">&#9664; Back</button></div>
 </div></div>
+<div class="side" id="side"><h2>Comments (<span id="count">0</span>)</h2>
+<form id="noteform" hidden><label for="notetext">Note for the point you tapped</label><br><input id="notetext" size="30"> <button type="submit">Save</button></form>
+<ol id="notelist"></ol>
+<button id="export">Export comments.json</button>
+<p><small>Notes live in this browser until you export them. Nothing is uploaded.</small></p></div>
 <p class="note">${title}: simulated device, public preview. System sheets such as permissions and payments are simulated.</p>
+<script data-notes>
+(function(){
+var KEY="shipvo-preview-comments",steps=[],pending=null,notes=[];
+function $(id){return document.getElementById(id)}
+try{notes=JSON.parse(localStorage.getItem(KEY)||"[]");if(!Array.isArray(notes))notes=[]}catch(e){notes=[]}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(notes))}catch(e){}}
+function esc(t){return String(t).replace(/[&<>"']/g,function(c){return"&#"+c.charCodeAt(0)+";"})}
+function screenName(){try{var w=$("app").contentWindow,t=w.document.title;return t||w.location.pathname+(w.location.hash||"")}catch(e){return"unknown"}}
+function step(text){steps.push(text)}
+function add(note,x,y){var n={note:String(note),x:Math.round(x),y:Math.round(y),screen:screenName(),steps:steps.slice()};notes.push(n);save();render();return n}
+function exportJson(){return JSON.stringify(notes,null,2)}
+function render(){var l=$("notelist"),c=$("count");if(c)c.textContent=notes.length;if(l)l.innerHTML=notes.map(function(n){return"<li>"+esc(n.note)+"<br><small>"+esc(n.screen)+" at "+n.x+","+n.y+", "+n.steps.length+" steps</small></li>"}).join("")}
+function download(){var b=new Blob([exportJson()],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="comments.json";document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}
+function label(e){var t=e.getAttribute&&(e.getAttribute("aria-label")||e.textContent)||"";return String(t).trim().slice(0,40)}
+function watch(){try{var d=$("app").contentWindow.document;d.addEventListener("click",function(ev){var e=ev.target,k=e&&e.closest&&e.closest("button,[role=button],a,input");step("tap "+(k?label(k)||"control":"screen"))},true)}catch(e){}}
+function setMode(on){var p=$("pin"),b=$("comment");if(p)p.className=on?"on":"";if(b)b.setAttribute("aria-pressed",on)}
+var cb=$("comment");if(cb)cb.onclick=function(){setMode($("pin").className!=="on")};
+var pin=$("pin");if(pin)pin.onclick=function(ev){var r=pin.getBoundingClientRect?pin.getBoundingClientRect():{left:0,top:0};pending={x:ev.clientX-r.left,y:ev.clientY-r.top};setMode(false);$("noteform").hidden=false;if($("notetext").focus)$("notetext").focus()};
+var fm=$("noteform");if(fm)fm.onsubmit=function(ev){if(ev&&ev.preventDefault)ev.preventDefault();var t=$("notetext");if(pending&&t.value.trim()){add(t.value.trim(),pending.x,pending.y)}t.value="";pending=null;fm.hidden=true;return false};
+var ex=$("export");if(ex)ex.onclick=download;
+var bk=$("back");if(bk&&bk.addEventListener)bk.addEventListener("click",function(){step("back")});
+var ap=$("app");if(ap){if(ap.addEventListener)ap.addEventListener("load",watch);watch()}
+window.shipvoNotes={add:add,step:step,list:function(){return notes.slice()},exportJson:exportJson,download:download};
+render();
+})();
+</script>
 <script>
 var SIZES={phone:[360,760],large:[412,892],tablet:[820,1180]},IPHONE={phone:[390,844],large:[430,932],tablet:[820,1180]};
 var skin="android",size="phone",d=document.getElementById("device"),f=document.getElementById("app"),bk=document.getElementById("back");

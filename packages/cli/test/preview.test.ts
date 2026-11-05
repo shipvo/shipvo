@@ -135,3 +135,59 @@ describe("frame page", () => {
     expect(Buffer.from(out.find((f) => f.path === "index.html")!.bytes).toString()).toContain("app.html");
   });
 });
+
+describe("frame page comments", () => {
+  function boot(store: Record<string, string> = {}) {
+    const script = framePage("Shop").match(/<script data-notes>([\s\S]*?)<\/script>/)![1];
+    const mk = (extra: object = {}) => ({ attrs: {} as Record<string, unknown>, setAttribute(k: string, v: unknown) { this.attrs[k] = v; }, className: "", textContent: "", innerHTML: "", value: "", hidden: true, ...extra });
+    const appDoc = { title: "Cart", listeners: {} as Record<string, any>, addEventListener(t: string, fn: any) { this.listeners[t] = fn; } };
+    const nodes: Record<string, any> = {};
+    for (const id of ["comment", "pin", "noteform", "notetext", "export", "notelist", "count", "back"]) nodes[id] = mk();
+    nodes.app = mk({ contentWindow: { document: appDoc, location: { pathname: "/", hash: "" } } });
+    const downloaded: string[] = [];
+    const doc = { getElementById: (id: string) => nodes[id], createElement: () => ({ click() { downloaded.push((this as any).download); } }), body: { appendChild() {}, removeChild() {} } };
+    const ls = { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; } };
+    const win: any = {};
+    const blobs: string[] = [];
+    new Function("document", "localStorage", "window", "Blob", "URL", script)(doc, ls, win, class { constructor(p: string[]) { blobs.push(p[0]); } }, { createObjectURL: () => "blob:x", revokeObjectURL() {} });
+    return { win, nodes, appDoc, store, downloaded, blobs };
+  }
+  it("shows the Comment button, side list, export button and the browser-only notice", () => {
+    const h = framePage("Shop");
+    expect(h).toContain('id="comment"');
+    expect(h).toContain('id="notelist"');
+    expect(h).toContain("Export comments.json");
+    expect(h).toContain("Notes live in this browser until you export them");
+  });
+  it("records note, point, screen and the steps taken", () => {
+    const { win, appDoc, nodes } = boot();
+    appDoc.listeners.click({ target: { closest: () => ({ getAttribute: () => "Add to cart", textContent: "" }) } });
+    win.shipvoNotes.step("back");
+    const n = win.shipvoNotes.add("Price is cut off", 10.4, 20.6);
+    expect(n).toEqual({ note: "Price is cut off", x: 10, y: 21, screen: "Cart", steps: ["tap Add to cart", "back"] });
+    expect(nodes.count.textContent).toBe(1);
+    expect(nodes.notelist.innerHTML).toContain("Cart");
+  });
+  it("exports valid JSON with every note, and downloads comments.json", () => {
+    const { win, nodes, downloaded, blobs } = boot();
+    win.shipvoNotes.add("one", 1, 2); win.shipvoNotes.add("two", 3, 4);
+    expect(JSON.parse(win.shipvoNotes.exportJson()).map((n: any) => n.note)).toEqual(["one", "two"]);
+    nodes.export.onclick();
+    expect(downloaded).toEqual(["comments.json"]);
+    expect(JSON.parse(blobs[0])).toHaveLength(2);
+  });
+  it("keeps notes after a reload via localStorage", () => {
+    const first = boot();
+    first.win.shipvoNotes.add("kept", 5, 6);
+    const second = boot(first.store);
+    expect(second.win.shipvoNotes.list().map((n: any) => n.note)).toEqual(["kept"]);
+    expect(second.nodes.count.textContent).toBe(1);
+  });
+  it("saves a note through the form after a tap on the pin overlay", () => {
+    const { win, nodes } = boot();
+    nodes.comment.onclick(); expect(nodes.pin.className).toBe("on");
+    nodes.pin.onclick({ clientX: 30, clientY: 40 });
+    nodes.notetext.value = "Looks wrong"; nodes.noteform.onsubmit({ preventDefault() {} });
+    expect(win.shipvoNotes.list()[0]).toMatchObject({ note: "Looks wrong", x: 30, y: 40, screen: "Cart" });
+  });
+});
