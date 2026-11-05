@@ -78,7 +78,7 @@ async function epochOf(page) {
 class SimError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
 // Network mocks: rules are { url: string | { regex, flags }, method?, response: { status, body, headers?, delayMs? } }.
-// A string url must equal the full request URL. Unmatched requests go on to the network. The first matching rule wins.
+// A string url must equal the full request URL, query string included. Unmatched requests go on to the network. The first matching rule wins.
 function parseMockRules(rules) {
   const bad = (m) => new SimError("mock_invalid", `mockNetwork: ${m}`);
   if (!Array.isArray(rules)) throw bad("rules must be an array");
@@ -105,14 +105,26 @@ async function setNetworkMocks(s, rules) {
   s.mockRouted = true;
   await s.ctx.route("**/*", async (route) => {
     const req = route.request();
-    const hit = (s.mocks ?? []).find((m) => (m.method ? m.method === req.method() : true) && (typeof m.url === "string" ? m.url === req.url() : m.url.test(req.url())));
+    const matches = (m, method) => (m.method ? m.method === method : true) && (typeof m.url === "string" ? m.url === req.url() : m.url.test(req.url()));
+    const reqHeaders = req.headers();
+    // A CORS preflight asks about the method it will use, so match the rules against that method.
+    if (req.method() === "OPTIONS" && reqHeaders["access-control-request-method"]) {
+      const asked = reqHeaders["access-control-request-method"].toUpperCase();
+      if (!(s.mocks ?? []).some((m) => matches(m, asked))) return route.fallback();
+      const allow = { "access-control-allow-origin": reqHeaders.origin ?? "*", "access-control-allow-methods": asked, "access-control-max-age": "0", vary: "Origin" };
+      if (reqHeaders["access-control-request-headers"]) allow["access-control-allow-headers"] = reqHeaders["access-control-request-headers"];
+      if (reqHeaders.origin) allow["access-control-allow-credentials"] = "true";
+      return route.fulfill({ status: 204, headers: allow }).catch(() => {});
+    }
+    const hit = (s.mocks ?? []).find((m) => matches(m, req.method()));
     if (!hit) return route.fallback();
     const { status, body, headers, delayMs } = hit.response;
     if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
     const isText = typeof body === "string";
-    const h = { "access-control-allow-origin": "*", ...(isText || body == null ? {} : { "content-type": "application/json" }), ...(headers ?? {}) };
-    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
-    return route.fulfill({ status, headers: h, body: body == null ? "" : isText ? body : JSON.stringify(body) });
+    const origin = reqHeaders.origin;
+    const h = { "access-control-allow-origin": origin ?? "*", ...(origin ? { "access-control-allow-credentials": "true", vary: "Origin" } : {}), ...(isText || body == null ? {} : { "content-type": "application/json" }), ...(headers ?? {}) };
+    // The page may have navigated away during the delay; then there is nothing to answer.
+    return route.fulfill({ status, headers: h, body: body == null ? "" : isText ? body : JSON.stringify(body) }).catch(() => {});
   });
 }
 

@@ -27,6 +27,8 @@ it.each([
   [{ url: "http://a" }],
   [{ url: "http://a", response: { status: 99 } }],
   [{ url: "http://a", response: { status: 200, delayMs: -1 } }],
+  [{ url: "http://a", response: { status: 200, headers: { a: 1 } } }],
+  [{ url: "http://a", response: { status: 200, body: 5 } }],
   [{ url: "http://a", method: "G ET", response: { status: 200 } }],
 ])("rejects a bad rule with mock_invalid", async (rule) => {
   const phone = await openApp({ app: "demo", sim });

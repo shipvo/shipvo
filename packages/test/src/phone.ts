@@ -46,6 +46,8 @@ export function encodeMockRules(rules: MockRule[]): unknown[] {
     if (!res || typeof res !== "object") throw bad(`rule ${i} needs a response: { status, body }`);
     if (!Number.isInteger(res.status) || res.status < 100 || res.status > 599) throw bad(`rule ${i} response.status must be an integer from 100 to 599`);
     if (res.delayMs !== undefined && (typeof res.delayMs !== "number" || !(res.delayMs >= 0) || res.delayMs > 60000)) throw bad(`rule ${i} response.delayMs must be a number from 0 to 60000`);
+    if (res.headers !== undefined && (!res.headers || typeof res.headers !== "object" || Object.values(res.headers).some((v) => typeof v !== "string"))) throw bad(`rule ${i} response.headers must map names to strings`);
+    if (res.body !== undefined && res.body !== null && typeof res.body !== "string" && typeof res.body !== "object") throw bad(`rule ${i} response.body must be a string or JSON value`);
     return { ...r, url: r.url instanceof RegExp ? { regex: r.url.source, flags: r.url.flags.replace(/[gy]/g, "") } : r.url };
   });
 }

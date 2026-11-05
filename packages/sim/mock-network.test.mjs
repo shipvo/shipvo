@@ -21,12 +21,16 @@ window.go = async () => {
   try { const r = await fetch(window.__api + "/items"); const b = await r.text(); document.getElementById("h").textContent = "Got " + r.status + " " + b + " in " + (Date.now() - t); }
   catch (e) { document.getElementById("h").textContent = "Failed " + e; }
 };
-</script><button onclick="go()">Load</button></body></html>`;
+window.post = async () => {
+  try { const r = await fetch(window.__api + "/items", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ a: 1 }) }); document.getElementById("h").textContent = "Got " + r.status + " " + await r.text(); }
+  catch (e) { document.getElementById("h").textContent = "Failed " + e; }
+};
+</script><button onclick="go()">Load</button><button onclick="post()">Save</button></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
-const tapLoad = async (s) => {
+const tapLoad = async (s, label = "Load") => {
   const first = await act(s, { action: "screen" });
-  const m = /Load[^\n]*\[ref=(\w+)\]/.exec(first.screen); assert.ok(m, first.screen);
+  const m = new RegExp(label + "[^\\n]*\\[ref=(\\w+)\\]").exec(first.screen); assert.ok(m, first.screen);
   await act(s, { action: "tap", ref: m[1] });
   for (let i = 0; i < 40; i++) { const r = await act(s, { action: "screen" }); if (/Got|Failed/.test(r.screen)) return r.screen; await new Promise((r) => setTimeout(r, 100)); }
   throw new Error("page never finished");
@@ -66,6 +70,13 @@ test("unmatched requests pass through; a matching rule returns the mocked 500; c
   assert.match(await tapLoad("m"), /Got 200 real/, "a different method is not matched");
   assert.ok((await act("m", { action: "clear_network_mocks" })).ok);
   assert.match(await tapLoad("m"), /Got 200 real/);
+});
+
+test("a mocked cross-origin JSON POST gets past the CORS preflight", async () => {
+  assert.ok((await call("/session", { session: "p" })).ok);
+  const r = await act("p", { action: "mock_network", rules: [{ url: `${apiUrl}/items`, method: "POST", response: { status: 500, body: { error: "boom" } } }] });
+  assert.equal(r.ok, true, r.error);
+  assert.match(await tapLoad("p", "Save"), /Got 500 /);
 });
 
 test("delayMs delays the response", async () => {
