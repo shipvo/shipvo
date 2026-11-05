@@ -17,6 +17,7 @@
   "files": [
     "server.mjs",
     "app-name.mjs",
+    "mock-rules.mjs",
     "README.md"
   ],
   "peerDependencies": {
