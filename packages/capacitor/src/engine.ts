@@ -40,10 +40,25 @@ export class ShipvoCapacitor implements ShipvoCapacitorPlugin {
   constructor(private c: ShipvoConfig) { this.t0 = this.loadedAt = this.now(); }
 
   private now() { return (this.c.now ?? Date.now)(); }
-  private async load(): Promise<Saved> {
-    if (this.s) return this.s;
-    let s: Saved | undefined;
-    try { const raw = await this.c.store.get(KEY); if (raw) s = JSON.parse(raw); } catch { s = undefined; }
+  private loading?: Promise<Saved>;
+  private lock: Promise<unknown> = Promise.resolve();
+  /** Runs `fn` after every earlier locked call has finished, so check, markHealthy and rollback never overlap. */
+  private locked<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.lock.then(fn, fn);
+    this.lock = run.catch(() => undefined);
+    return run;
+  }
+  /** One load for all callers: concurrent first calls share the same state object. */
+  private load(): Promise<Saved> {
+    if (!this.loading) {
+      this.loading = this.doLoad().catch((e) => { this.loading = undefined; throw e; });
+    }
+    return this.loading;
+  }
+  private async doLoad(): Promise<Saved> {
+    let s: Saved | undefined; let corrupt = false;
+    try { const raw = await this.c.store.get(KEY); if (raw) s = JSON.parse(raw); } catch { s = undefined; corrupt = true; }
+    if (corrupt) await this.c.files.clear();
     if (!s) {
       const cohort = Math.min(999, Math.floor((this.c.random ?? Math.random)() * 1000));
       s = { shellVersion: this.c.shellVersion, cohort, current: 0, pending: 0, previous: 0, blocked: 0, pendingBoots: 0, bootTimes: [], events: [], hashes: {} };
@@ -101,7 +116,8 @@ export class ShipvoCapacitor implements ShipvoCapacitorPlugin {
       shellVersion: s.shellVersion, baseUrl: this.c.baseUrl, appId: this.c.appId, shellMajor: this.c.shellMajor };
   }
 
-  async checkForUpdate({ apply }: { apply: boolean }): Promise<CheckResult> {
+  checkForUpdate(a: { apply: boolean }): Promise<CheckResult> { return this.locked(() => this.doCheck(a)); }
+  private async doCheck({ apply }: { apply: boolean }): Promise<CheckResult> {
     const s = await this.load(); const f = this.c.fetch ?? fetch;
     const band = bandForCohort(s.cohort);
     const path = `/p/${encodeURIComponent(this.c.appId)}/${this.c.shellMajor}${this.c.platform === "ios" ? "/ios" : ""}/${band}`;
@@ -157,7 +173,8 @@ export class ShipvoCapacitor implements ShipvoCapacitorPlugin {
   }
 
   /** Rule 12: promote the pending release only if it is the one running. */
-  async markHealthy(): Promise<HealthyResult> {
+  markHealthy(): Promise<HealthyResult> { return this.locked(() => this.doHealthy()); }
+  private async doHealthy(): Promise<HealthyResult> {
     const s = await this.load(); const now = this.now(); let promoted = false;
     if (s.pending && s.pending === this.running) {
       await this.drop(s.previous);
@@ -169,7 +186,8 @@ export class ShipvoCapacitor implements ShipvoCapacitorPlugin {
   }
 
   /** Rule 14: drop pending, block the current release, go back to the previous one. */
-  async rollback(): Promise<void> {
+  rollback(): Promise<void> { return this.locked(() => this.doRollback()); }
+  private async doRollback(): Promise<void> {
     const s = await this.load();
     if (s.pending) { await this.drop(s.pending); s.pending = 0; s.pendingBoots = 0; }
     if (s.current) { this.block(s, s.current); await this.drop(s.current); }

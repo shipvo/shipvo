@@ -169,6 +169,36 @@ describe("staging, trial boots, promotion", () => {
   });
 });
 
+describe("concurrent first calls", () => {
+  it("getState and checkForUpdate on an empty store share one load; cohort and staged release survive a restart", async () => {
+    const cur = { v: await pointer(1) as Served };
+    let n = 0;
+    const store = new MemoryStore(), files = new MemoryFiles();
+    const f = (async (url: string) => String(url).includes("/p/") ? Response.json(cur.v!.env) : new Response(cur.v!.bytes)) as unknown as typeof fetch;
+    const mk = () => new ShipvoCapacitor({ appId: "tide", shellMajor: 1, shellVersion: "1.2.0", platform: "android", publicKey: pub,
+      baseUrl: BASE, store, files, fetch: f, random: () => (++n % 2 ? 0.5 : 0.1) });
+    const sc = mk();
+    const [st, res] = await Promise.all([sc.getState(), sc.checkForUpdate({ apply: false })]);
+    expect(res.status).toBe("staged");
+    const again = await mk().getState();
+    expect(again.cohort).toBe(st.cohort);
+    expect(again.pendingRelease).toBe(1);
+    expect(files.files.has("release-1.bundle")).toBe(true);
+  });
+  it("overlapping checks stage once", async () => {
+    const cur = { v: await pointer(1) as Served }; const t = setup(() => cur.v);
+    const r = await Promise.all([t.sc.checkForUpdate({ apply: false }), t.sc.checkForUpdate({ apply: false })]);
+    expect(r.map((x) => x.status).sort()).toEqual(["none", "staged"]);
+  });
+  it("a corrupt state file clears stored bundles", async () => {
+    const cur = { v: undefined as Served }; const t = setup(() => cur.v);
+    await stage(t, 1, cur);
+    await t.store.set("shipvo.state", "{not json");
+    const t2 = t.again(); await t2.sc.getState();
+    expect(t.files.files.size).toBe(0);
+  });
+});
+
 describe("crash loop, rollback, new shell", () => {
   async function withCurrent(clock: { t: number }) {
     const cur = { v: undefined as Served }; let t = setup(() => cur.v, { now: () => clock.t });
