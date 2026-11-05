@@ -224,13 +224,15 @@ final class RuntimeTests: XCTestCase {
 
   func testCheckStagesWhenTheReleaseHasNoHermesField() async throws {
     let s = store("good", bundle: try appBundle(hbc(96)))
-    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
   }
 
   func testCheckStagesWhenTheShellBundleIsNotHermesOrMissing() async throws {
     for head in [Data("var a = 1;".utf8), nil] {
       let s = store("hbc-mismatch", bundle: try appBundle(head))
-      XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+      let r = try await Updater.check(s)
+      XCTAssertEqual(r["status"] as? String, "staged")
     }
   }
 
