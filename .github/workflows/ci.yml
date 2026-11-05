@@ -2,7 +2,9 @@ name: ci
 on:
   push: { branches: [main, "agent/**", "copilot/**"] }   # agent branches too: GitHub runs no pull_request CI while a PR has conflicts
   pull_request:
-concurrency: { group: "ci-${{ github.ref }}-${{ github.event_name }}", cancel-in-progress: true }
+concurrency:
+  group: "ci-${{ github.ref }}-${{ github.event_name }}"
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}   # never cancel CI on main
 jobs:
   test:
     runs-on: ubuntu-latest
