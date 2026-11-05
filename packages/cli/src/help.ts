@@ -25,6 +25,8 @@ Ship
   store details --dry-run     Draft Play Data safety answers and a privacy policy from shipvo.json
   store setup [--company yes|no] [--android-now] [--play-account-before-2023-11-13]
                               Pick the store accounts to open and write store-plan.json
+  store screenshots [--out dir] [--sim url]
+                              Render each route at store sizes (fast mode: simulator, not the native UI)
   store status [--mark <step> [--as waiting|done]]
                               Show each store's steps and what to do next
   status [--app id] [--json]  Show how the newest releases are doing on phones
