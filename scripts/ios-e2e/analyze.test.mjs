@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { analyze, median, parseLog } from "./analyze.mjs";
+import { analyze, analyzePatch, median, parseLog } from "./analyze.mjs";
 
 const L = (t, path, bytes) => JSON.stringify({ t, path, bytes });
 // Run windows: [1000,2000], [3000,4000], [5000,6500], [7000,8000]
@@ -61,4 +61,52 @@ test("server writes valid JSON lines with t, path, bytes", async () => {
   assert.deepEqual(lines.map((e) => [e.path, e.bytes]), [["/a.bin", 5], ["/nope", '{"error":"not_found"}'.length]]);
   assert.ok(lines.every((e) => Math.abs(e.t - Date.now()) < 60000));
   assert.match(readFileSync(logFile, "utf8"), /^GET \/a\.bin 200/);
+});
+
+test("patch rows: median patch size, full size and last-byte-to-healthy", () => {
+  const pl = parseLog([
+    L(1100, "/p/e2e/1/ios/b0.json", 300), L(1300, "/b/e2e/ios-d-aa-r2.bsdiff", 60000),
+    L(3100, "/p/e2e/1/ios/b0.json", 300), L(3400, "/b/e2e/ios-d-aa-r2.bsdiff", 64000),
+    L(5100, "/b/e2e/ios-d-aa-r2.bsdiff", 70000),
+  ].join("\n"));
+  const pm = (a, h) => ({ app_launched: a, healthy: h, full_bytes: 1570000 });
+  assert.equal(analyzePatch(pl, [pm(1000, 1800), pm(3000, 3900), pm(5000, 5200)]),
+`| Patch runs | Median patch bytes | Median full-bundle bytes | Median patch apply time (ms) |
+| --- | --- | --- | --- |
+| 3 | 64000 | 1570000 | 500 |
+`);
+});
+
+test("patch rows reject a run that did not use a patch", () => {
+  const pl = parseLog([L(1300, "/b/e2e/ios-r2.hbc", 1000), L(3300, "/b/e2e/ios-d-aa-r2.bsdiff", 10), L(3350, "/b/e2e/ios-r2.hbc", 1000)].join("\n"));
+  const pm = (a, h) => ({ app_launched: a, healthy: h, full_bytes: 1000 });
+  assert.throws(() => analyzePatch(pl, [pm(1000, 2000)]), /no patch download/);
+  assert.throws(() => analyzePatch(pl, [pm(3000, 4000)]), /full bundle/);
+  assert.throws(() => analyzePatch(pl, [{ app_launched: 1, healthy: 2 }]), /missing mark full_bytes/);
+});
+
+test("make-release builds release 2 with patches from the embedded bundle and from release 1", (t) => {
+  if (spawnSync("python3", ["-c", "import bsdiff4"]).status !== 0) return t.skip("python bsdiff4 not installed");
+  const dir = mkdtempSync(join(tmpdir(), "mk-")), root = join(dir, "cp");
+  const base = Buffer.alloc(20000); for (let i = 0; i < base.length; i++) base[i] = (i * 31 + (i >> 8)) & 255;
+  const r1 = Buffer.from(base); r1.write("release-one-headline", 5000);
+  const r2 = Buffer.from(base); r2.write("release-two-headline", 5000);
+  const [emb, f1, f2] = ["emb.bin", "r1.bin", "r2.bin"].map((n) => join(dir, n));
+  writeFileSync(emb, base); writeFileSync(f1, r1); writeFileSync(f2, r2);
+  const seed = JSON.parse(execFileSync(process.execPath, [new URL("./keygen.mjs", import.meta.url).pathname])).seed;
+  const script = new URL("./make-release.mjs", import.meta.url).pathname;
+  execFileSync(process.execPath, [script, root, "e2e", seed, "1", f1]);
+  execFileSync(process.execPath, [script, root, "e2e", seed, "2", f2], { env: { ...process.env, PATCH_FROM: `${emb},${f1}` } });
+  const { body } = JSON.parse(readFileSync(join(root, "p/e2e/1/ios/b0.json"), "utf8"));
+  const parsed = JSON.parse(body), core = parsed.core;
+  assert.equal(parsed.release, 2);
+  assert.equal(core.size, r2.length);
+  assert.equal(core.patches.length, 2);
+  for (const p of core.patches) assert.ok(p.size > 0 && p.size < core.size / 2, `patch ${p.size} is small`);
+  // The same file listed twice gives one patch.
+  const root2 = join(dir, "cp2");
+  execFileSync(process.execPath, [script, root2, "e2e", seed, "1", f1]);
+  execFileSync(process.execPath, [script, root2, "e2e", seed, "2", f2], { env: { ...process.env, PATCH_FROM: `${f1},${f1}` } });
+  const dup = JSON.parse(JSON.parse(readFileSync(join(root2, "p/e2e/1/ios/b0.json"), "utf8")).body);
+  assert.equal(dup.core.patches.length, 1);
 });
