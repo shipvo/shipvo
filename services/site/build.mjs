@@ -73,7 +73,7 @@ const tutorials = readdirSync(join(ROOT, "docs/tutorials")).filter((f) => f.ends
   return { slug, src, base: "learn", group: m.group || "More", kind: "tutorial", title: md.match(/^# (.*)/)?.[1] ?? slug, desc: clipText(plain(firstPara || "")), time: m.time || ownTime?.[1] || "", level: m.level || (own ? own[1][0].toUpperCase() + own[1].slice(1) : ""), date: lastmod(src) };
 }).sort((a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug));
 const videosMd = readFileSync(join(ROOT, "docs/videos.md"), "utf8");
-const videos = [...videosMd.matchAll(/^## (.+)\n+<video\b([^>]*)>/gm)].map((m) => { const a = (n) => m[2].match(new RegExp(`${n}="([^"]*)"`))?.[1] ?? ""; return { title: m[1].trim(), id: slugify(m[1]), poster: a("poster"), length: a("data-length") }; });
+const videos = [...videosMd.matchAll(/^###? (.+)\n+<video\b([^>]*)>/gm)].map((m) => { const a = (n) => m[2].match(new RegExp(`${n}="([^"]*)"`))?.[1] ?? ""; return { title: m[1].trim(), id: slugify(m[1]), poster: a("poster"), length: a("data-length") }; });
 const GROUP_ORDER = ["Start", "Sell", "Run your app", "Test", "Ship updates"];
 const learnPages = [
   { slug: "videos", src: "docs/videos.md", title: "Videos", desc: "Short captioned videos that show how Shipvo works: over-the-air updates, signing, staged rollout and rollback, in plain words." },
