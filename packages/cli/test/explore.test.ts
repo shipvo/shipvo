@@ -78,6 +78,39 @@ describe("walk", () => {
   });
 });
 
+describe("walk errors", () => {
+  it("reports errors raised while the app loads", async () => {
+    const { driver } = fixture();
+    const open = driver.open; let first = true;
+    driver.open = async () => { const r = await open(); if (first) { first = false; loadErr = true; } return r; };
+    let loadErr = false; const errs = driver.errors;
+    driver.errors = async () => { if (loadErr) { loadErr = false; return ["start boom"]; } return errs(); };
+    const r = await walk(driver);
+    const f = r.findings.find((x) => x.message.includes("start boom"));
+    expect(f?.kind).toBe("error");
+    expect(f?.steps).toEqual([{ action: "open" }]);
+  });
+
+  it("reports errors raised by a route deep link", async () => {
+    const { driver } = fixture();
+    const openUrl = driver.openUrl; let queued = false; const errs = driver.errors;
+    driver.openUrl = async (u) => { queued = true; return openUrl(u); };
+    driver.errors = async () => { if (queued) { queued = false; return ["route boom"]; } return errs(); };
+    const r = await walk(driver, { routes: ["app://settings"] });
+    expect(r.findings.find((x) => x.message.includes("route boom"))?.steps).toEqual([{ action: "open" }, { action: "open_url", url: "app://settings" }]);
+  });
+
+  it("keeps earlier findings when a step throws", async () => {
+    const { driver } = fixture();
+    const tap = driver.tap; let n = 0;
+    driver.tap = async (ref) => { if (++n === 3) throw new Error("simulator /act -> 500"); return tap(ref); };
+    const r = await walk(driver);
+    expect(r.error).toContain("500");
+    expect(r.stoppedEarly).toContain("the walk failed");
+    expect(r.findings.length).toBeGreaterThan(0);
+  });
+});
+
 describe("renderMarkdown", () => {
   it("lists the limits, and never says a screen is fine", async () => {
     const empty = renderMarkdown(await walk({ ...fixture().driver, async open() { return { ok: true, screen: `- button "Back" [ref=e1]` }; } }, { maxSteps: 5 }));

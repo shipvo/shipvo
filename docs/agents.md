@@ -77,10 +77,10 @@ It writes `explore-report.md` and `explore-report.json`. The report has four kin
 
 - an uncaught error or a red screen;
 - a tap that was `not_delivered`;
-- a dead end: a screen with no actionable element and no back path;
+- a dead end: a screen with no actionable element;
 - an actionable element with no accessible name.
 
-The header lists what the simulator cannot show. A clean run says "No findings in N steps", never that a screen is fine. Exit code 1 also means the walk itself failed (for example the simulator could not start or a step could not be replayed); the error is printed to stderr and no report is written.
+The header lists what the simulator cannot show. A clean run says "No findings in N steps", never that a screen is fine. Exit code 1 also means the walk itself failed (for example the simulator could not start or a step failed). If it fails mid-walk, the report is still written with the findings so far and `stoppedEarly` says why; the error is also printed to stderr. If it fails before the walk starts, no report is written.
 
 ## Owner API: agents that run the shop
 

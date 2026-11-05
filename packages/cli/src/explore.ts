@@ -26,7 +26,7 @@ export type Kind = "error" | "not_delivered" | "action_failed" | "dead_end" | "u
 export type Finding = { kind: Kind; message: string; screen: string; steps: Step[] };
 export type Report = {
   app: string; generatedAt: string; steps: number; screens: number; maxSteps: number; maxDepth: number;
-  stoppedEarly: string | null; findings: Finding[]; parityLimits: string[];
+  stoppedEarly: string | null; error: string | null; findings: Finding[]; parityLimits: string[];
 };
 
 export const PARITY_LIMITS = [
@@ -73,15 +73,16 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
   const need = (r: Reply, what: string) => { if (!r.ok || r.screen == null) throw new Error(`explore: ${what} failed: ${r.error ?? "no screen"}`); return r.screen; };
 
   /** Put the phone back on the screen reached by `path`. Replays are not counted as steps. */
-  async function replay(path: Step[]): Promise<string> {
+  async function replay(path: Step[]): Promise<{ screen: string; errors: string[] }> {
     let screen = "";
     for (const s of path) {
       const r = s.action === "open" ? await driver.open() : s.action === "open_url" ? await driver.openUrl(s.url) : s.action === "back" ? await driver.back()
         : await driver.tap(find(screen, s)?.ref ?? "missing");
       screen = need(r, `replaying "${describeStep(s)}"`);
     }
-    await driver.errors();
-    return screen;
+    // Errors raised while replaying are drained here. On a later replay they would repeat an earlier finding.
+    // The caller of the first replay of a start path keeps them.
+    return { screen, errors: await driver.errors() };
   }
   const find = (tree: string, s: { role: string; name: string; nth: number }) => elements(tree).find((e) => e.role === s.role && e.name === s.name && e.nth === s.nth);
 
@@ -97,14 +98,14 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
     seenScreens.add(sig);
     await checkErrors(screen, path);
     const els = elements(screen);
-    if (!els.length) add({ kind: "dead_end", message: "Dead end: no actionable element and no back path", screen, steps: path });
+    if (!els.length) add({ kind: "dead_end", message: "Dead end: the screen has no actionable element", screen, steps: path });
     for (const e of els) if (!e.name) add({ kind: "unnamed", message: `Unnamed ${e.role}: it has no accessible name`, screen, steps: path });
     let current = screen;
     for (const e of els) {
       if (!e.name || /^(back|go back)$/i.test(e.name)) continue;
       if (steps >= maxSteps) { stopped ??= `max-steps (${maxSteps}) reached`; return; }
       const target = find(current, e);
-      if (!target) { current = await replay(path); if (!find(current, e)) continue; }
+      if (!target) { current = (await replay(path)).screen; if (!find(current, e)) continue; }
       const step: Step = { action: "tap", role: e.role, name: e.name, nth: e.nth };
       const here = [...path, step]; steps++;
       const r = await driver.tap(find(current, e)!.ref);
@@ -125,19 +126,27 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
       if (next !== signature(current) || crashed) {
         let b: Reply | undefined;
         if (!crashed && hasBack(elements(after))) b = await driver.back();
-        current = b?.ok && b.screen != null && signature(b.screen) === sig ? b.screen : await replay(path);
+        current = b?.ok && b.screen != null && signature(b.screen) === sig ? b.screen : (await replay(path)).screen;
       } else current = after;
     }
   }
 
   const starts: (Step[])[] = [[{ action: "open" }], ...(o.routes ?? []).map((url): Step[] => [{ action: "open" }, { action: "open_url", url }])];
-  for (const path of starts) {
-    if (stopped) break;
-    const screen = await replay(path);
-    await visit(screen, path, 1);
+  let error: string | null = null;
+  try {
+    for (const path of starts) {
+      if (stopped) break;
+      const { screen, errors } = await replay(path);
+      // The first replay of a start path is the only time load-time errors are seen.
+      for (const e of errors) add({ kind: "error", message: `Uncaught error: ${e}`, screen, steps: path });
+      await visit(screen, path, 1);
+    }
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+    stopped = `the walk failed: ${error}`;
   }
   if (!stopped && cut) stopped = `max-depth (${maxDepth}) reached: ${cut} screen${cut === 1 ? "" : "s"} were not walked`;
-  return { app: o.app ?? "", generatedAt: new Date().toISOString(), steps, screens: seenScreens.size, maxSteps, maxDepth, stoppedEarly: stopped, findings, parityLimits: PARITY_LIMITS };
+  return { app: o.app ?? "", generatedAt: new Date().toISOString(), steps, screens: seenScreens.size, maxSteps, maxDepth, stoppedEarly: stopped, error, findings, parityLimits: PARITY_LIMITS };
 }
 
 export function renderMarkdown(r: Report): string {
@@ -196,6 +205,7 @@ export async function explore(argv: string[]): Promise<number> {
     const out = a.out ?? "explore-report";
     writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
     console.log(`${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`);
+    if (report.error) { console.error(report.error); return 1; }
     return report.findings.length && a["fail-on-findings"] === "true" ? 1 : 0;
   } finally { child?.kill(); }
 }
