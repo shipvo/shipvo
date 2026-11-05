@@ -80,7 +80,7 @@ export function buildBundle(cfg: Record<string, unknown>, a: Record<string, unkn
     const prev = ".shipvo/sim-prev";
     if (existsSync(prev) && !existsSync("sim-dist")) renameSync(prev, "sim-dist");
     rmSync(prev, { recursive: true, force: true });
-    const out = [e.stdout?.toString?.(), e.stderr?.toString?.(), e.message].filter(Boolean).join("\n");
+    const out = [ (e as any).stdout?.toString?.(), (e as any).stderr?.toString?.(), (e as any).message ].filter(Boolean).join("\n");
     return { ok: false, ms: Date.now() - start, error: out };
   }
 }
@@ -113,31 +113,23 @@ export async function sim(argv: string[]) {
 
   if (!watchMode) return;
 
-  const rebuildAndReport = (build: typeof buildBundle = buildBundle) => {
-    console.error("rebuilding…");
-    const r = build(cfg, a, true, true);
-    if (r.ok) console.log(`rebuilt in ${(r.ms / 1000).toFixed(1)} s`);
-    else console.error(`Build failed, still serving the last good build:\n${r.error}`);
-  };
-
-  const rebuild = debounce(() => { rebuildAndReport(); }, 300);
-
-  const startWatch = (build: typeof buildBundle = buildBundle) => {
-    const wrappedRebuild = debounce(() => { rebuildAndReport(build); }, 300);
-    const handler = (_event: string, filename: string | null) => {
-      if (!filename || isIgnoredPath(String(filename))) return;
-      wrappedRebuild();
-    };
-    const watcher = watch(process.cwd(), { recursive: true }, handler);
-    watcher.on("error", (e: unknown) => { console.error(`File watcher error: ${e instanceof Error ? e.message : String(e)}`); });
-    return { watcher, rebuild: wrappedRebuild, trigger: (filename: string) => handler("change", filename) };
-  };
-
-  const { watcher, rebuild: watchRebuild } = startWatch();
-  p.on("exit", () => {
-    watcher.close();
-    watchRebuild.cancel();
-  });
+  // module-level exports below
 }
 
-export { rebuildAndReport, startWatch };
+export function rebuildAndReport(cfg: Record<string, unknown>, a: Record<string, unknown>, build: typeof buildBundle = buildBundle) {
+  console.error("rebuilding…");
+  const r = build(cfg, a, true, true);
+  if (r.ok) console.log(`rebuilt in ${(r.ms / 1000).toFixed(1)} s`);
+  else console.error(`Build failed, still serving the last good build:\n${r.error}`);
+}
+
+export function startWatch(cfg: Record<string, unknown>, a: Record<string, unknown>, build: typeof buildBundle = buildBundle) {
+  const wrappedRebuild = debounce(() => { rebuildAndReport(cfg, a, build); }, 300);
+  const handler = (_event: string, filename: string | null) => {
+    if (!filename || isIgnoredPath(String(filename))) return;
+    wrappedRebuild();
+  };
+  const watcher = watch(process.cwd(), { recursive: true }, handler);
+  watcher.on("error", (e: unknown) => { console.error(`File watcher error: ${e instanceof Error ? e.message : String(e)}`); });
+  return { watcher, rebuild: wrappedRebuild, trigger: (filename: string) => handler("change", filename) };
+}
