@@ -25,6 +25,9 @@ const NAV = [
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
   { group: "Learn", pages: [
+    { slug: "learn", src: "docs/tutorials/index.md", title: "Learn", desc: "Step-by-step Shipvo tutorials for people who have never used a terminal, grouped by goal, with the time each one takes and its level." },
+    { slug: "first-app", src: "docs/tutorials/first-app.md", title: "Create your first app", desc: "Create a shop app, open it on a simulated phone in your browser, change its words and check a release. No phone and no coding needed." },
+    { slug: "glossary", src: "docs/glossary.md", title: "Glossary", desc: "Plain-English meanings for the words Shipvo docs and tutorials use, such as terminal, simulator, release and over the air." },
     { slug: "videos", src: "docs/videos.md", title: "Videos", desc: "Short captioned videos that show how Shipvo works: over-the-air updates, signing, staged rollout and rollback, in plain words." },
   ]},
   { group: "Test", pages: [
@@ -58,7 +61,9 @@ const bySrc = Object.fromEntries(all.map((p) => [p.src.replace(/^docs\//, "").re
 // Links between docs → site paths; relative repo links → GitHub.
 function rewriteHref(href, src) {
   if (/^(https?:|mailto:|#)/.test(href) || /^\/(docs|apps|brand|changelog|terms|privacy|security|acceptable-use|llms\.txt|llms-full\.txt)(\/|$|#)|^\/(docs\.md|\.well-known\/security\.txt)$/.test(href)) return href;
-  const clean = href.replace(/^\.\//, "");
+  let clean = href.replace(/^\.\//, "");
+  if (src.includes("/") && /^\.\.\//.test(clean)) clean = join(src.slice(0, src.lastIndexOf("/")), clean).replace(/\\/g, "/");   // ../x.md from docs/tutorials/ → docs/x.md
+  else if (src.startsWith("docs/tutorials/") && /^[\w-]+\.md/.test(clean)) clean = "docs/tutorials/" + clean;
   const [path, hash = ""] = clean.split("#");
   const key = path.replace(/^docs\//, "").replace(/\.md$/, "");
   if (bySrc[key]) return `/docs/${bySrc[key]}/${hash ? "#" + hash : ""}`;
