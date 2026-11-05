@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startRunServer, ensureShipvoIgnored } from "../src/run";
 import { isLoopback } from "../src/run-protocol";
+import { renderFrame } from "../../sim/frame.mjs";
 
 const setup = async () => {
   const dir = mkdtempSync(join(tmpdir(), "shipvo-agent-"));
-  const s = await startRunServer({ dir, platform: "ios", name: "Tide", projectDir: dir });
+  const s = await startRunServer({ dir, platform: "ios", name: "Tide", projectDir: dir, render: renderFrame });
   return { dir, s, url: (role: string, token = s.token) => `ws://127.0.0.1:${s.port}/__shipvo/agent?role=${role}&token=${token}` };
 };
 const open = (url: string) => new Promise<WebSocket>((ok, fail) => { const w = new WebSocket(url); w.onopen = () => ok(w); w.onerror = () => fail(new Error("refused")); });
