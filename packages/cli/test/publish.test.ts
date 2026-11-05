@@ -328,4 +328,22 @@ describe("publish and the Hermes bytecode check", () => {
     expect(android.patches[0].url).toBe(`b/demo/d-${sha(1).slice(0, 16)}-r2.bsdiff`);
     expect(puts).toContain(ios.patches[0].url);
   });
+
+  it("iOS also patches from a shell's embedded bundle; Android ignores iOS bases", async () => {
+    exec.fn = (c) => { const m = c.match(/'([^']*p\.bsdiff)'/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
+    const make = (tag: number) => { const b = fakeHbc(96); b[20] = tag; return b; };
+    const sha = (tag: number) => createHash("sha256").update(make(tag)).digest("hex");
+    for (const pf of ["android", "ios"]) {
+      mkdirSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}`), { recursive: true });
+      writeFileSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}/index.hbc`), make(pf === "ios" ? 6 : 5));
+    }
+    // Shells registered their embedded bundles (build-shell does this): one per platform.
+    blobs.set("b/demo/base-ios.hbc", make(8)); blobs.set("b/demo/base-and.hbc", make(9));
+    values.set("base/demo/ios-1.0.0-a", JSON.stringify({ platform: "ios", sha256: sha(8), key: "b/demo/base-ios.hbc" }));
+    values.set("base/demo/1.0.0-b", JSON.stringify({ sha256: sha(9), key: "b/demo/base-and.hbc" }));
+    await publish(["--skip-export", "true", "--skip-web", "true", "--bands", "b0", "--platform", "all", "--release", "1"]);
+    const core = (key: string) => JSON.parse(JSON.parse(values.get(key)!).body).core;
+    expect(core("p/demo/1/ios/b0").patches.map((p: any) => p.from_sha256)).toEqual([sha(8)]);
+    expect(core("p/demo/1/b0").patches.map((p: any) => p.from_sha256)).toEqual([sha(9)]);
+  });
 });

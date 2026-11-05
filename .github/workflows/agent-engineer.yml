@@ -46,7 +46,7 @@ jobs:
               cands = json.loads(gh("issue", "list", "-R", R, "--label", "agent:ready", "--label", "agent:claude", "--state", "open",
                                     "--json", "number,title,body,labels,state,author", "--limit", "50"))
               cands.sort(key=lambda i: (not any(l["name"] in ("priority:urgent", "priority:high") for l in i["labels"]), i["number"]))
-          skip = {"agent:in-progress", "agent:pr-open", "agent:blocked", "needs-human"}
+          skip = {"agent:in-progress", "agent:pr-open", "agent:blocked", "agent:waiting", "needs-human"}
           for i in cands:
               names = {l["name"] for l in i["labels"]}
               if i["state"] != "OPEN" or "agent:claude" not in names or names & skip: continue
