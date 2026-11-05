@@ -30,3 +30,7 @@ Every video gets a quiet music bed that ducks under the narration, mixed with `s
    `<details class="credits"><summary>ⓘ Copyright credits</summary>` + the `credit_line` with the source and licence as links + `</details>`.
    Style it as a small, muted info box (`services/site/site.css`, class `credits`) that matches the transcript box. In descriptions where the video is posted elsewhere, put the `credit_line` at the end. Add `"credits": "/videos/<slug>.credits.json"` to the video's entry in `services/site/media.json`. Record the track id in `scripts/video/scripts/<slug>.json` so the mix can be rebuilt. Never commit MP3 files.
 5. Backfill: when a published video has no music, remix and republish it with a bed (new R2 key, update `docs/videos.md`).
+
+## App demos recorded by driving the app
+
+For product demos, record the real app instead of drawing it: drive the sample app (or a marketplace app) through `@shipvo/mcp` and use `record_start`, `record_marker` and `record_stop` (#501) to capture it in the Shipvo Phone frame with visible taps and captions, then add narration and the music bed. Until those tools are on main, record with Playwright from the simulator as you do now.
