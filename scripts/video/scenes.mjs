@@ -124,3 +124,72 @@ ${chip("Safety net")}
 <div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:30px;--d:2.4s"><span class="sky">shipvo.dev</span>/docs/getting-started</div>
 <div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">First: back up <span class="mono or">.shipvo/seed.txt</span>.<br>Lose it, and phones will never accept another update.</div>`,
 };
+
+// --- first-app: real simulator screenshots ({{IMG:name}} is filled with a data URI by the renderer) ---
+const shot = (name, x, y, w, over = null, d = 0) => `<div class="abs in" style="left:${x}px;top:${y}px;width:${w}px;--d:${d}s"><div style="position:relative;border:6px solid #2b3a5c;border-radius:36px;overflow:hidden;background:#05080f;line-height:0"><img src="{{IMG:${name}}}" style="width:100%;display:block">${over ? `<img class="fade" src="{{IMG:${over[0]}}}" style="position:absolute;left:0;top:0;width:100%;--d:${over[1]}s">` : ""}</div></div>`;
+const tcmd = (cmds, x, y, w, d0, fs = 32) => `<div class="abs term mono in" style="left:${x}px;top:${y}px;width:${w}px;font-size:${fs}px;--d:${d0}s"><div class="dots"><i></i><i></i><i></i></div>${cmds.map((c, k) => `<div><span class="or">$</span> <span class="type" style="--n:${c.t.length};--tt:${c.tt || 1.4}s;--d:${c.d}s">${c.t}</span></div>${c.out ? `<div class="mute fade" style="font-size:${fs - 8}px;--d:${c.od}s">${c.out}</div>` : ""}`).join("")}</div>`;
+
+Object.assign(SCENES, {
+  faHook: () => `
+${chip("Beginner tutorial")}
+<h1 class="abs in" style="left:72px;top:130px;width:640px;--d:.5s">No phone needed.<br><span class="or">Your app, in a browser.</span></h1>
+<div class="abs in mute" style="left:72px;top:430px;width:560px;font-size:28px;line-height:1.35;--d:2.2s">No Android Studio. No Xcode.</div>
+${shot("01-first-screen", 900, 36, 230, null, 1)}
+<div class="abs flight" style="left:640px;top:250px;width:130px;--fx:-200px;--fy:100px;--tx:60px;--ty:-30px;--d:3.4s">${plane(130)}</div>`,
+
+  faCreate: () => `
+${chip("Step 1")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Make your app</h2>
+${tcmd([{ t: 'npx shipvo init tideshop --name "Tide Shop"', tt: 2.2, d: 1.2, out: "Created Tide Shop in tideshop", od: 3.8 }], 72, 230, 1000, .8, 30)}
+<div class="abs card in" style="left:72px;top:440px;width:760px;padding:22px 28px;--d:5s">
+  <div class="mono sky" style="font-size:18px">SIGNING KEY</div>
+  <div class="mono" style="font-size:28px;margin:8px 0">tideshop/.shipvo/seed.txt</div>
+  <div class="mute" style="font-size:24px">Secret. Do not share it. Back it up.</div></div>`,
+
+  faInstall: () => `
+${chip("Step 2")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Download the pieces</h2>
+${tcmd([{ t: "cd tideshop", tt: .9, d: 1.2 }, { t: "npm install", tt: 1, d: 2.6 }, { t: "npx playwright install chromium", tt: 1.8, d: 4.2 }], 72, 230, 960, .8, 34)}
+<div class="abs in mute" style="left:72px;top:540px;font-size:28px;--d:6.4s">The last one takes the longest. It is a small browser for the simulator.</div>`,
+
+  faSim: () => `
+${chip("Step 3")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Open the simulator</h2>
+${tcmd([{ t: "npm run sim", tt: 1, d: 1.2, out: "Simulator on http://localhost:4545", od: 2.8 }], 72, 230, 700, .8, 30)}
+<div class="abs card in mono" style="left:72px;top:440px;padding:18px 26px;font-size:28px;--d:6s"><span class="mute">browser</span>&nbsp; <span class="sky">localhost:4545</span><span class="or">/app/</span></div>
+<div class="abs in mute" style="left:72px;top:540px;font-size:24px;--d:7.4s">Do not forget the <span class="mono or">/app/</span> at the end.</div>
+${shot("01-first-screen", 900, 36, 230, null, 7)}`,
+
+  faTap: () => `
+${chip("Try it")}
+<h2 class="abs in" style="left:72px;top:100px;width:600px;--d:.3s">Tap a button</h2>
+<div class="abs in mute" style="left:72px;top:260px;width:560px;font-size:30px;line-height:1.4;--d:1.2s">Click <span class="or">Send a notification</span>.</div>
+<div class="abs card in" style="left:72px;top:400px;width:560px;padding:22px 28px;--d:3.4s"><div class="mono sky" style="font-size:18px">LOG</div><div style="font-size:30px;margin-top:6px">Notification sent</div></div>
+<div class="abs in mute" style="left:72px;top:540px;width:560px;font-size:24px;--d:5s">Pretend only. The simulator labels it.</div>
+${shot("01-first-screen", 800, 36, 230, ["02-after-tap", 3], .6)}`,
+
+  faEdit: () => `
+${chip("Step 4")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Change the words</h2>
+<div class="abs card in mono" style="left:72px;top:230px;width:700px;overflow:hidden;--d:1s">
+  <div style="padding:12px 24px;background:#141d33;color:var(--sky);font-size:22px">src/release.ts</div>
+  <div style="padding:22px 24px;font-size:24px;line-height:1.6">
+    <div class="fade" style="--d:1.8s;background:#3a1620;margin:0 -24px;padding:0 24px"><span style="color:var(--red)">-</span> headline: "Hello from Tide Shop."</div>
+    <div class="fade" style="--d:3.2s;background:#10301f;margin:0 -24px;padding:0 24px"><span style="color:var(--green)">+</span> headline: "Fresh fish, delivered today."</div></div></div>
+<div class="abs in mono mute" style="left:72px;top:470px;font-size:26px;--d:5.2s">rebuilt in 7 s</div>
+<div class="abs in mute" style="left:72px;top:540px;font-size:26px;--d:6.4s">Then reload the page.</div>
+${shot("01-first-screen", 880, 36, 230, ["03-after-edit", 7.2], .6)}`,
+
+  faDry: () => `
+${chip("Step 5")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Check a release</h2>
+${tcmd([{ t: "npx shipvo publish --dry-run --skip-web true", tt: 2.4, d: 1.2, out: "Dry run complete. Nothing was sent.", od: 4.2 }], 72, 230, 1100, .8, 30)}
+<div class="abs card in" style="left:72px;top:440px;width:520px;padding:20px 28px;--d:5.6s"><div class="mono sky" style="font-size:18px">BUILT AND SIGNED</div><div style="font-size:28px;margin-top:6px">A release, ready to check</div></div>
+<div class="abs card in" style="left:640px;top:440px;width:520px;padding:20px 28px;--d:7s"><div class="mono sky" style="font-size:18px">SENT</div><div style="font-size:28px;margin-top:6px;color:var(--green)">Nothing. Safe to try.</div></div>`,
+
+  faCta: () => `
+<div class="abs pop" style="left:72px;top:140px;width:330px;--d:.3s">{{MARK}}</div>
+<h1 class="abs in" style="left:470px;top:130px;--d:.8s">You made<br><span class="or">your first app.</span></h1>
+<div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/docs/first-app</div>
+<div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">Next: put it on a real Android phone and send it updates.</div>`,
+});

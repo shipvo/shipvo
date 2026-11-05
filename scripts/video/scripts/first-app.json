@@ -1,0 +1,31 @@
+{
+  "slug": "first-app",
+  "posterAt": 4.5,
+  "title": "Your first app on a simulated phone, in five minutes",
+  "tutorial": "docs/tutorials/first-app.md",
+  "voice": "af_heart",
+  "scenes": [
+    {"id": "hook", "visual": "faHook", "min": 7,
+     "narration": "You do not need a phone, or Android Studio, or Xcode. In a few minutes, you can have a real app running on a simulated phone, in your browser."},
+    {"id": "create", "visual": "faCreate", "min": 8,
+     "narration": "Step one. Open a terminal and make your app. Type npx shipvo init, then a name. Shipvo also makes a signing key. Keep it safe, and never share it.",
+     "caption": "Step one. Open a terminal and make your app. Type npx shipvo init, then a name. Shipvo also makes a signing key. Keep it safe, and never share it."},
+    {"id": "install", "visual": "faInstall", "min": 8,
+     "narration": "Step two. Go into the new folder. Run npm install, and then install the small browser the simulator uses. The second one takes the longest.",
+     "caption": "Step two. Go into the new folder. Run npm install, and then install the small browser the simulator uses. The second one takes the longest."},
+    {"id": "sim", "visual": "faSim", "min": 9,
+     "narration": "Step three. Run npm run sim. Wait for the line that says Simulator on localhost 4545. Then open your browser at localhost 4545 slash app. Your app is on the screen.",
+     "caption": "Step three. Run npm run sim. Wait for the line that says Simulator on localhost:4545. Then open your browser at localhost:4545/app/. Your app is on the screen."},
+    {"id": "tap", "visual": "faTap", "min": 7,
+     "narration": "Click Send a notification. The log says it was sent. Nothing really went out. The simulator labels everything it pretends to do."},
+    {"id": "edit", "visual": "faEdit", "min": 9,
+     "narration": "Step four. Change the words. Open source, release, dot T S, and edit the headline. Save the file, wait for rebuilt, and reload the page. Your new words are on the screen.",
+     "caption": "Step four. Change the words. Open src/release.ts, and edit the headline. Save the file, wait for \"rebuilt\", and reload the page. Your new words are on the screen."},
+    {"id": "dry", "visual": "faDry", "min": 9,
+     "narration": "Step five. Check a release. Run shipvo publish with dash dash dry run. Shipvo builds and signs your app, but sends nothing. So it is safe to try.",
+     "caption": "Step five. Check a release. Run shipvo publish --dry-run. Shipvo builds and signs your app, but sends nothing. So it is safe to try."},
+    {"id": "cta", "visual": "faCta", "min": 8,
+     "narration": "That is your first app. The full guide, with every command, is at shipvo dot dev, slash docs, slash first app.",
+     "caption": "That is your first app. The full guide, with every command, is at shipvo.dev/docs/first-app."}
+  ]
+}

@@ -1,3 +1,4 @@
 [
+  {"slug":"first-app","file":"videos/first-app-c7c64eb7.mp4","bytes":1417094,"sha256":"c7c64eb7ee6e095994c3f171f126dceede76d5671e2bb0133ba4626310e6066a","duration_s":97.2,"title":"Create your first app on a simulated phone","created":"2026-11-05"},
   {"slug":"ship-an-update","file":"videos/ship-an-update-988335b3.mp4","bytes":1337668,"sha256":"988335b3c6e2b8ae57befa6aa15eda3b1c2b9c1e69f040bcf6c7d14d27bcb0ce","duration_s":90.1,"title":"Ship an update to phones in minutes","created":"2026-11-04"}
 ]
