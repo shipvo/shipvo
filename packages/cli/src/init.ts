@@ -482,10 +482,10 @@ const SHOP_DATA = JSON.stringify([
   { id: "steel-bottle", name: "Steel bottle", price: 2900, description: "A one litre bottle with a screw cap." },
 ], null, 2) + "\n";
 
-const SHOP_CONFIG = JSON.stringify({ currency: "$", position: "before", decimals: 2, locale: "en-US" }, null, 2) + "\n";
+const SHOP_CONFIG = JSON.stringify({ currency: "$", code: "USD", position: "before", decimals: 2, locale: "en-US" }, null, 2) + "\n";
 
 const SHOP_MONEY = `// Prices are whole minor units (cents) in src/data/products.json. This is the one place that turns them into text.
-// To change the currency, edit src/data/shop.json. For FCFA: { "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }
+// To change the currency, edit src/data/shop.json. "code" is the ISO 4217 code sent to the payment provider ("$" is only a symbol). For FCFA: { "currency": "FCFA", "code": "XAF", "position": "after", "decimals": 0, "locale": "fr-FR" }
 import shop from "./data/shop.json";
 
 export const formatPrice = (minor: number) => {
@@ -496,13 +496,20 @@ export const formatPrice = (minor: number) => {
   const num = n.replace(/[\u00a0\u202f]/g, " ");
   return position === "after" ? num + " " + currency : currency + num;
 };
+
+// What device.pay.charge takes: "amount" is in whole currency units (10710 for 10710 FCFA, 12.5 for $12.50), as in the device docs.
+// Prices are minor units, so divide by 10 ** decimals. "currency" is the ISO code from shop.json.
+export const chargeRequest = (minor: number) => {
+  const { currency, code, decimals } = shop as { currency: string; code?: string; decimals?: number };
+  return { amount: minor / 10 ** (decimals ?? 2), currency: code ?? currency };
+};
 `;
 
 const SHOP_CART_STATE = `import { createContext, useContext, useState, type ReactNode } from "react";
 import products from "./data/products.json";
 
 export type Line = { id: string; qty: number };
-type Cart = { lines: Line[]; add: (id: string) => void; remove: (id: string) => void; totalCents: number };
+type Cart = { lines: Line[]; add: (id: string) => void; remove: (id: string) => void; clear: () => void; totalCents: number };
 
 const Ctx = createContext<Cart | null>(null);
 
@@ -510,8 +517,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<Line[]>([]);
   const add = (id: string) => setLines((l) => l.some((x) => x.id === id) ? l.map((x) => x.id === id ? { ...x, qty: x.qty + 1 } : x) : [...l, { id, qty: 1 }]);
   const remove = (id: string) => setLines((l) => l.filter((x) => x.id !== id));
+  const clear = () => setLines([]);
   const totalCents = lines.reduce((sum, x) => sum + x.qty * (products.find((p) => p.id === x.id)?.price ?? 0), 0);
-  return <Ctx.Provider value={{ lines, add, remove, totalCents }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ lines, add, remove, clear, totalCents }}>{children}</Ctx.Provider>;
 }
 
 export function useCart() {
@@ -631,13 +639,28 @@ const s = StyleSheet.create({
 });
 `;
 
-const SHOP_CART = `import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+const SHOP_CART = `import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { device } from "@shipvo/device";
 import { useCart } from "../cart";
-import { formatPrice } from "../money";
+import { chargeRequest, formatPrice } from "../money";
 import products from "../data/products.json";
 
 export function Cart({ onBack }: { onBack: () => void }) {
-  const { lines, remove, totalCents } = useCart();
+  const { lines, remove, clear, totalCents } = useCart();
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Replace "to" with your own mobile money number. The PIN here is the sandbox PIN; ask the customer for theirs in a real app.
+  const pay = async () => {
+    if (busy) return;
+    setBusy(true);
+    setStatus("Paying...");
+    try {
+      const r = await device.pay.charge({ provider: "mobile_money", ...chargeRequest(totalCents), to: "My Shop", reference: "order-" + Date.now() }, "1234");
+      if (r.ok) { clear(); setStatus("Order placed"); } else setStatus("Payment failed: " + r.reason);
+    } catch (e: any) { setStatus("Payment failed: " + String(e?.message ?? e)); }
+    finally { setBusy(false); }
+  };
   return (
     <ScrollView contentContainerStyle={s.page}>
       <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={s.back}><Text style={s.backText}>Back</Text></Pressable>
@@ -654,6 +677,8 @@ export function Cart({ onBack }: { onBack: () => void }) {
         );
       })}
       <Text style={s.total}>{"Total: " + formatPrice(totalCents)}</Text>
+      {lines.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Pay" accessibilityState={{ disabled: busy }} onPress={pay} style={s.pay}><Text style={s.payText}>Pay</Text></Pressable> : null}
+      {status ? <Text style={s.body} accessibilityRole="alert">{status}</Text> : null}
     </ScrollView>
   );
 }
@@ -666,6 +691,7 @@ const s = StyleSheet.create({
   remove: { minHeight: 48, justifyContent: "center" },
   body: { fontSize: 16, color: "#111" },
   total: { fontSize: 20, fontWeight: "800", color: "#111" },
+  pay: { minHeight: 48, justifyContent: "center", alignItems: "center", borderRadius: 8, backgroundColor: "#1F4E5F" }, payText: { fontSize: 16, fontWeight: "700", color: "#fff" },
 });
 `;
 
@@ -695,5 +721,26 @@ test("adding two products puts their total in the cart, and Remove takes one out
   await phone.waitFor("Total: " + formatPrice(a.price + b.price));
   await phone.tap("Remove " + b.name);
   await phone.waitFor("Total: " + formatPrice(a.price));
+});
+
+test("paying with mobile money places the order and empties the cart", async ({ phone }) => {
+  await phone.device.set({ payment: { nextResult: "approve", pin: "1234" } });
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Pay");
+  await phone.waitFor("Order placed");
+  expect(phone).toSee("Your cart is empty");
+});
+
+test("a declined payment says why and keeps the cart", async ({ phone }) => {
+  await phone.device.set({ payment: { nextResult: "decline", pin: "1234" } });
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Pay");
+  await phone.waitFor("Payment failed: declined");
+  expect(phone).toSee("Total: " + formatPrice(products[0].price));
+  expect(phone.sees("Order placed")).toBe(false);
 });
 `;
