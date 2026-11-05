@@ -18,3 +18,7 @@ Goal of every run:
 5. Commit (`git add`, `git commit -m "device-lab: ..."`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` with the results table.
 
 Never claim a result you did not measure. If the emulator or build fails, report exactly where and file an issue.
+
+## Device Lab issues
+
+After the nightly run, check for open issues labelled `device-lab` (`gh issue list --label device-lab --state open`). Take the oldest one that needs the emulator, do its first slice in this same branch, and put `Fixes #<n>` (or `Part of #<n>` if work remains) in your report. The same rules apply: measured results only, no new dependency in published packages, and say plainly what you could not do.

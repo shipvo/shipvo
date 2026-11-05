@@ -11,8 +11,8 @@
   <div class="wrap">
     <div class="eyebrow">Compare</div>
     <h1>Shipvo and Expo, side by side.</h1>
-    <p class="lede">Shipvo is built on Expo, not against it: <code>shipvo init</code> writes a complete Expo app. The overlap is in two places, simulating the app so it can be tested, and updating it over the air. This page sets them next to each other, including where Expo is the better choice.</p>
-    <p class="src">Checked 31 October 2026 against <a href="https://expo.dev/pricing" rel="noopener">Expo's pricing page</a> and <a href="https://expo.dev/blog/introducing-expo-agent-cli" rel="noopener">their agent CLI announcement</a>. Expo changes often; if something here is out of date, <a href="mailto:hans@pipilot.dev">tell us</a> and we will fix it.</p>
+    <p class="lede">Shipvo is built on Expo, not against it: <code>shipvo init</code> writes a complete Expo app. The overlap is in two places, simulating the app so it can be tested, and updating it over the air. This page sets them next to each other, including where Expo is the better choice. There is also a <a href="#phone-harness">section on Phone Harness</a>, a tool for agents that use any app on a phone.</p>
+    <p class="src">Expo sections checked 31 October 2026 against <a href="https://expo.dev/pricing" rel="noopener">Expo's pricing page</a> and <a href="https://expo.dev/blog/introducing-expo-agent-cli" rel="noopener">their agent CLI announcement</a>. Expo changes often; if something here is out of date, <a href="mailto:hans@pipilot.dev">tell us</a> and we will fix it.</p>
   </div>
 </section>
 
@@ -63,6 +63,33 @@
         <tr><th>Cost model</th><td>Plan fee plus per monthly active user above the included amount. See <a href="/pricing/">pricing</a>.</td><td class="win">No per-user fee in the software. Hosted is free in the beta; self-hosted costs whatever Cloudflare charges you.</td></tr>
       </tbody>
     </table></div>
+  </div>
+</section>
+
+<section class="cmp-sec" id="phone-harness">
+  <div class="wrap">
+    <h2>Shipvo and Phone Harness</h2>
+    <p class="lede">The two tools do different jobs. <a href="https://github.com/phone-harness/phone-harness" rel="noopener">Phone Harness</a> lets an agent use any app on a phone. Shipvo lets an agent build, test and ship your own app. They do not compete for the same task, and a team can use both.</p>
+    <p class="src">Phone Harness facts below come from its <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md" rel="noopener">README</a> as read on 5 November 2026. Shipvo facts link to our docs. If something is out of date, <a href="mailto:hans@pipilot.dev">tell us</a>.</p>
+    <div class="tbl-scroll"><table class="cmp-table">
+      <thead><tr><th></th><th>Phone Harness</th><th>Shipvo</th></tr></thead>
+      <tbody>
+        <tr><th>Job</th><td>Its README says it lets Claude Code, Codex or any agent <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md" rel="noopener">use a real phone</a>: scroll, tap, type and read the screen.</td><td>Build, test and ship your own app: a <a href="/docs/agents/">simulator agents drive over MCP</a>, <a href="/docs/testing/">typed tests for CI</a>, and signed over-the-air updates.</td></tr>
+        <tr><th>What the agent sees</th><td>On iPhone, the Mirroring window read with Apple's Vision OCR. On Android, adb screenshots and the accessibility tree for text. Its <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md#limits" rel="noopener">limits</a> say OCR sees text, not icons.</td><td>Your app's screen as an <a href="/docs/agents/">accessibility tree with refs</a>, plus screenshots.</td></tr>
+        <tr><th>Needs a phone</th><td class="win">Yes, and that is the point: a real iPhone or Android, or a <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md#phone-harness-cloud" rel="noopener">Phone Harness Cloud</a> phone. <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md#limits" rel="noopener">Connecting the phone is the user's job.</a></td><td>No. The simulator runs headless in Chromium on a plain Linux runner or your laptop.</td></tr>
+        <tr><th>Runs in CI</th><td>Its README does not describe a CI setup. Cloud phones are driven by a CLI or an <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md#setup" rel="noopener">MCP endpoint</a>.</td><td class="win">Yes. <a href="/docs/testing/">Test your app in CI</a> with <code>@shipvo/test</code>.</td></tr>
+        <tr><th>Device features</th><td>Real hardware. The README lists <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md#limits" rel="noopener">no multi-touch and no camera or Face ID flows</a>.</td><td>Simulated and labelled: <a href="/docs/agents/">camera, location, biometrics, payments</a>. Receipts start with <code>SIMULATED-</code>. No real money moves.</td></tr>
+        <tr><th>Which apps</th><td class="win">Any app on the phone, including apps you did not write.</td><td>Your own React Native app, or an app listed on <a href="/apps">the marketplace</a>.</td></tr>
+        <tr><th>Updates</th><td>Not part of what it does.</td><td>Signed over-the-air updates: <a href="/docs/getting-started/#5-publish-over-the-air">publish</a>, staged cohorts, rollback.</td></tr>
+        <tr><th>License</th><td>MIT (<a href="https://github.com/phone-harness/phone-harness/blob/main/LICENSE" rel="noopener">LICENSE</a>).</td><td>Apache-2.0 (<a href="https://github.com/shipvo/shipvo/blob/main/LICENSE" rel="noopener">LICENSE</a>).</td></tr>
+        <tr><th>Cost</th><td>The CLI is open source. Phone Harness Cloud is a <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md#phone-harness-cloud" rel="noopener">hosted service</a>; see their site for prices.</td><td>Free software. Hosted services are free during the beta; see <a href="/pricing/">pricing</a>.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="pick" style="margin-top:22px">
+      <div><h3>Phone Harness is the better choice when</h3><ul><li>You need a <b>real device</b>, not a simulated one.</li><li>The app is a <b>third-party app</b> you did not build.</li><li>The task needs a <b>login</b> that already lives on the phone.</li><li>The task involves <b>real phone numbers or 2FA</b>. Its README lists <a href="https://github.com/phone-harness/phone-harness/blob/main/README.md" rel="noopener">real numbers and 2FA</a> for its cloud phones.</li></ul></div>
+      <div><h3>Shipvo is the better choice when</h3><ul><li>You are testing <b>your own app</b> on every pull request, with no phone.</li><li>You want tests that run in CI and fail the build.</li><li>You want to ship fixes to users with signed updates.</li></ul></div>
+    </div>
+    <p class="src">Not affiliated with Phone Harness.</p>
   </div>
 </section>
 
