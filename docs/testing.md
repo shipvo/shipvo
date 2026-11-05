@@ -140,3 +140,37 @@ npx shipvo test --repair --write  # saves the diff
 ```
 
 A step is repaired only when one element with the same role has the closest name. The repair changes the target and keeps the rest of the step. If two elements are equally close, or the role changed, the step stays as written and the candidates are listed. Steps are never deleted, skipped or loosened. Without `--write` nothing on disk changes. In code: `proposeRepair(step, screen)` from `@shipvo/test`.
+
+## Results file for CI agents
+
+```bash
+npx shipvo test --report shipvo-report.json --release 42
+```
+
+Writes one JSON file, whether the run passes or fails. The exit code is the same as without `--report`.
+
+```json
+{
+  "app": "tide-and-tackle",
+  "commit": "9262005…",
+  "release": "42",
+  "time": "2026-11-05T10:00:00.000Z",
+  "parityLimits": ["The simulator runs the app's web build …"],
+  "flows": [
+    {
+      "name": "tests/cart.steps",
+      "status": "failed",
+      "steps": [{ "kind": "tap", "target": "Add to cart", "line": 2 }],
+      "failedStep": { "kind": "tap", "target": "Add to cart", "line": 2 },
+      "message": "nothing on screen matches \"Add to cart\""
+    }
+  ]
+}
+```
+
+- `app` is `appId` from `shipvo.json`, or `null`.
+- `commit` is `GITHUB_SHA`, else `git rev-parse HEAD`, else `null`.
+- `release` is the value of `--release`, else `null`. The CLI does not record the last publish yet.
+- Each flow is one `.steps` file. `status` is `passed` or `failed`. `failedStep` and `message` are `null` when it passed.
+- `parityLimits` is the same list the explore report prints.
+- The file holds no keys or tokens.
