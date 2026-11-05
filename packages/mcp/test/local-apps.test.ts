@@ -31,7 +31,7 @@ beforeAll(async () => {
 afterAll(() => { fake?.close(); if (out) rmSync(out, { recursive: true, force: true }); });
 
 async function connect(extra: Record<string, string> = {}) {
-  const env: Record<string, string> = { ...(process.env as Record<string, string>), ...extra, PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1" };
+  const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1", ...extra };
   delete env.PN_APPS;
   const c = new Client({ name: "test", version: "0" });
   await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
