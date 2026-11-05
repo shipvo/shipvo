@@ -13,6 +13,8 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **GET /t/:app/summary.** New control-plane route returning per-release telemetry counts and medians of `apply_ms` and `cold_start_ms`, newest 20 releases. Same public access as `GET /t/:app`.
+
 - **Android: a release that throws after `markHealthy` is now reverted.** React destroys the host after an uncaught JS error, and the activity pause that follows was counted as a clean trip to the background, which cleared the unhealthy-boot count. `markHealthy` now installs a JS error hook that tells the native runtime first, and that load can no longer become stable. No JS API change. Migration: rebuild the shell to get the native `noteCrash` function; older shells keep the old behaviour.
 
 - **MCP actions say what changed.** `tap`, `type`, `scroll` and `back` now start their result with `Change: none`, `content changed`, `new screen`, `scrolled` or `unknown` (no earlier screen for that session id), computed by comparing the new tree with the session's previous one. `type` also adds `Value of <ref>: "..."`, the field's value after typing. The full tree is still returned. New optional `compact: true` on these four tools: when the change is `content changed`, the result lists only added (`+`) and removed (`-`) lines; refs are the ones on the new screen. Migration: none needed. Clients that parse the result now see the extra lines first.
