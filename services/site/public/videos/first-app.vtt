@@ -9,121 +9,121 @@ You do not need a phone, or Android Studio, or Xcode.
 In a few minutes, you can have a real app running on a simulated phone, in your browser.
 
 3
-00:00:11.425 --> 00:00:12.056
+00:00:11.425 --> 00:00:12.073
 Step one.
 
 4
-00:00:12.056 --> 00:00:14.438
+00:00:12.073 --> 00:00:14.520
 Open a terminal and make your app.
 
 5
-00:00:14.438 --> 00:00:16.820
-Type npx shipvo init, then a name.
+00:00:14.520 --> 00:00:18.622
+Type npx -y @shipvo/cli init, then a name.
 
 6
-00:00:16.820 --> 00:00:19.063
+00:00:18.622 --> 00:00:20.925
 Shipvo also makes a signing key.
 
 7
-00:00:19.063 --> 00:00:21.375
+00:00:20.925 --> 00:00:23.300
 Keep it safe, and never share it.
 
 8
-00:00:22.975 --> 00:00:23.645
+00:00:24.900 --> 00:00:25.570
 Step two.
 
 9
-00:00:23.645 --> 00:00:25.357
+00:00:25.570 --> 00:00:27.282
 Go into the new folder.
 
 10
-00:00:25.357 --> 00:00:30.643
+00:00:27.282 --> 00:00:32.568
 Run npm install, and then install the small browser the simulator uses.
 
 11
-00:00:30.643 --> 00:00:33.100
+00:00:32.568 --> 00:00:35.025
 The second one takes the longest.
 
 12
-00:00:34.700 --> 00:00:35.697
+00:00:36.625 --> 00:00:37.622
 Step three.
 
 13
-00:00:35.697 --> 00:00:37.147
+00:00:37.622 --> 00:00:39.072
 Run npm run sim.
 
 14
-00:00:37.147 --> 00:00:42.222
+00:00:39.072 --> 00:00:44.147
 Wait for the line that says Simulator on localhost:4545.
 
 15
-00:00:42.222 --> 00:00:46.844
+00:00:44.147 --> 00:00:48.769
 Then open your browser at localhost:4545/app/.
 
 16
-00:00:46.844 --> 00:00:49.200
+00:00:48.769 --> 00:00:51.125
 Your app is on the screen.
 
 17
-00:00:50.800 --> 00:00:52.584
+00:00:52.725 --> 00:00:54.509
 Click Send a notification.
 
 18
-00:00:52.584 --> 00:00:54.299
+00:00:54.509 --> 00:00:56.224
 The log says it was sent.
 
 19
-00:00:54.299 --> 00:00:55.945
+00:00:56.224 --> 00:00:57.870
 Nothing really went out.
 
 20
-00:00:55.945 --> 00:00:59.375
+00:00:57.870 --> 00:01:01.300
 The simulator labels everything it pretends to do.
 
 21
-00:01:00.975 --> 00:01:01.656
+00:01:02.900 --> 00:01:03.581
 Step four.
 
 22
-00:01:01.656 --> 00:01:02.813
+00:01:03.581 --> 00:01:04.738
 Change the words.
 
 23
-00:01:02.813 --> 00:01:06.421
+00:01:04.738 --> 00:01:08.346
 Open src/release.ts, and edit the headline.
 
 24
-00:01:06.421 --> 00:01:10.029
+00:01:08.346 --> 00:01:11.954
 Save the file, wait for "rebuilt", and reload the page.
 
 25
-00:01:10.029 --> 00:01:12.275
+00:01:11.954 --> 00:01:14.200
 Your new words are on the screen.
 
 26
-00:01:13.875 --> 00:01:14.584
+00:01:15.800 --> 00:01:16.509
 Step five.
 
 27
-00:01:14.584 --> 00:01:15.719
+00:01:16.509 --> 00:01:17.644
 Check a release.
 
 28
-00:01:15.719 --> 00:01:18.698
+00:01:17.644 --> 00:01:20.623
 Run shipvo publish --dry-run.
 
 29
-00:01:18.698 --> 00:01:22.386
+00:01:20.623 --> 00:01:24.311
 Shipvo builds and signs your app, but sends nothing.
 
 30
-00:01:22.386 --> 00:01:23.875
+00:01:24.311 --> 00:01:25.800
 So it is safe to try.
 
 31
-00:01:25.475 --> 00:01:26.973
+00:01:27.400 --> 00:01:28.898
 That is your first app.
 
 32
-00:01:26.973 --> 00:01:32.575
+00:01:28.898 --> 00:01:34.500
 The full guide, with every command, is at shipvo.dev/docs/first-app.

@@ -140,7 +140,7 @@ ${shot("01-first-screen", 900, 36, 230, null, 1)}
   faCreate: () => `
 ${chip("Step 1")}
 <h2 class="abs in" style="left:72px;top:100px;--d:.3s">Make your app</h2>
-${tcmd([{ t: 'npx shipvo init tideshop --name "Tide Shop"', tt: 2.2, d: 1.2, out: "Created Tide Shop in tideshop", od: 3.8 }], 72, 230, 1000, .8, 30)}
+${tcmd([{ t: 'npx -y @shipvo/cli init tideshop --name "Tide Shop"', tt: 2.2, d: 1.2, out: "Created Tide Shop in tideshop", od: 3.8 }], 72, 230, 1000, .8, 30)}
 <div class="abs card in" style="left:72px;top:440px;width:760px;padding:22px 28px;--d:5s">
   <div class="mono sky" style="font-size:18px">SIGNING KEY</div>
   <div class="mono" style="font-size:28px;margin:8px 0">tideshop/.shipvo/seed.txt</div>

@@ -6,9 +6,9 @@ Short videos for people who are new to Shipvo. Each one has captions and a writt
 
 ### Create your first app on a simulated phone
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 37 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-c7c64eb7.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 39 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-03fb5281.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English" default>Your browser cannot play this video. Read the transcript below.</video>
 
-1 minute 37 seconds. Make an app, open it on a simulated phone in your browser, tap a button, change the words on the front page and check a release with a dry run. It follows [Create your first app](tutorials/first-app.md).
+1 minute 39 seconds. Make an app, open it on a simulated phone in your browser, tap a button, change the words on the front page and check a release with a dry run. It follows [Create your first app](tutorials/first-app.md).
 
 [Captions (.vtt)](/videos/first-app.vtt)
 
@@ -17,7 +17,7 @@ Short videos for people who are new to Shipvo. Each one has captions and a writt
 
 You do not need a phone, or Android Studio, or Xcode. In a few minutes, you can have a real app running on a simulated phone, in your browser.
 
-Step one. Open a terminal and make your app. Type npx shipvo init, then a name. Shipvo also makes a signing key. Keep it safe, and never share it.
+Step one. Open a terminal and make your app. Type npx -y @shipvo/cli init, then a name. Shipvo also makes a signing key. Keep it safe, and never share it.
 
 Step two. Go into the new folder. Run npm install, and then install the small browser the simulator uses. The second one takes the longest.
 
