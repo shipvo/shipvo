@@ -19,3 +19,12 @@ This runs three times a day and builds a growing library: many videos, one per r
 ## Content follows code (shared with docs, blog, tutorials and videos)
 
 `docs/content-coverage.md` is the team's content ledger: one row per user-visible feature or advantage (from `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs), with columns **Docs**, **Tutorial**, **Video**, **Blog**, each a link or empty. Before picking a topic, read it and pick the biggest gap in your column, newest and most important features first (what makes Shipvo stronger than the alternatives: signed OTA with rollback, the agent simulator over MCP, measured parity, the store path, `shipvo run`, framework adapters, self-hosting). After your work, add your link to the ledger in the same commit, and add any feature you found missing from it. Create the file if it does not exist, backfilled from everything shipped so far.
+
+## Background music (every video)
+
+Every video gets a quiet music bed that ducks under the narration, mixed with `scripts/video/bgmusic.py` (loudness-matched, sidechain-ducked by the voice, fades in and out; the picture is untouched):
+1. Pick the mood from the video (explainer or tech: `--want tech,documentary,ambient --avoid upbeat`; calm tutorial: `ambient,acoustic`; launch teaser: `upbeat,cinematic`).
+2. **Tracks.** Owner decision (5 Nov 2026): any Jamendo track from the corpus may be used, always credited. Prefer tracks you have not used yet so videos do not all sound the same.
+3. `python3 scripts/video/bgmusic.py analyze --ids ...` and pick the flattest (lowest LRA, 3 to 7 LU), then `mix --video ... --narration <full-length narration wav> --music music/<id>.mp3 --out ... --credits services/site/public/videos/<slug>.credits.json`. Default `--bed 0.5`; 0.35 for dense narration.
+4. **Credits ship with every video.** `--credits` writes `services/site/public/videos/<slug>.credits.json` (track id, title, artist, licence, licence link, source link and a ready `credit_line`), read from the track's own tags. Commit it with the video. Show its `credit_line` under the video in `docs/videos.md`, on the transcript, and in any description where the video is posted. Add `"credits": "/videos/<slug>.credits.json"` to the video's entry in `services/site/media.json`. Record the track id in `scripts/video/scripts/<slug>.json` so the mix can be rebuilt. Never commit MP3 files.
+5. Backfill: when a published video has no music, remix and republish it with a bed (new R2 key, update `docs/videos.md`).
