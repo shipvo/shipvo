@@ -39,7 +39,7 @@ async function localApps(): Promise<AppInfo> {
   return TIDE;
 }
 
-type Delivery = { delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null; wait_for?: { matched: boolean; waited_ms: number }; settled?: boolean };
+type Delivery = { delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null; wait_for?: { matched: boolean; waited_ms: number; error?: string }; settled?: boolean };
 type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string } & Delivery;
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
@@ -160,7 +160,7 @@ const waitFor = z.object({ ref: z.string().regex(/^(p\d+)?e\d+$/).optional(), te
   .refine((w) => [w.ref, w.text, w.role].filter((x) => x !== undefined).length === 1, "give exactly one of ref, text, or role (with name)").optional()
   .describe("After the action, wait for this to appear (or, with gone, disappear): a ref, a text, or a role + name. The result says whether it happened and how long it took. A wait that times out does not undo the action.");
 const settle = z.boolean().optional().describe("After the action, wait until the screen stops changing (at most 5 s)");
-const CH = " The result starts with 'Change: none | content changed | new screen | scrolled', then 'Delivery: delivered | not_delivered (stale_ref | not_visible | disabled | covered | timeout)'. Retry only when safe_to_retry is true.";
+const CH = " The result starts with 'Change: none | content changed | new screen | scrolled', then 'Delivery: delivered | not_delivered (stale_ref | not_visible | disabled | covered | not_text_field | bad_wait_for | timeout | enter_failed | error)'. Retry only when safe_to_retry is true.";
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
 server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
 server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact, wait_for: waitFor, settle }, WR, async ({ session, ref, compact, wait_for, settle }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref, wait_for, settle }), { compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });

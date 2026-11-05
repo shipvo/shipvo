@@ -25,6 +25,9 @@ const ONE = `<!doctype html><html><head><title>fx</title></head><body>
 <input aria-label="Name" />
 <button onclick="setTimeout(()=>{document.getElementById('out').textContent='Later'},700)">Slow</button>
 <button onclick="let n=0;const t=setInterval(()=>{document.getElementById('out').textContent='tick '+(++n);if(n>5)clearInterval(t)},150)">Tick</button>
+<style>@keyframes mv{from{margin-left:0}to{margin-left:300px}}</style>
+<button style="animation:mv .5s linear infinite alternate">Moving</button>
+<input aria-label="Slow key" onkeydown="if(event.key==='Enter'){const t=Date.now();while(Date.now()-t<2500);}" />
 <div id="out">none</div></body></html>`;
 
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
@@ -46,7 +49,7 @@ before(async () => {
   ensureChromium();
   const { mkdirSync } = await import("node:fs"); mkdirSync(dist, { recursive: true });
   writeFileSync(join(dist, "index.html"), ONE);
-  proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", dir, "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
+  proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", dir, "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here, env: { ...process.env, SIM_ACTION_TIMEOUT_MS: "1000" } });
   let err = ""; proc.stderr.on("data", (d) => { err += d; });
   // A loaded CI runner can take a while to start Chromium, so wait up to 90 s and fail loudly instead of falling through.
   let up = false;
@@ -118,4 +121,34 @@ test("settle: returns after the screen stops changing", async () => {
   const s = await open("d10");
   const r = await act("d10", { action: "tap", ref: refOf(s, 'button "Tick"'), settle: true });
   assert.equal(r.settled, true); assert.match(r.screen, /tick 6/);
+});
+
+test("timeout: a button that never holds still is not safe to retry", async () => {
+  const s = await open("d11");
+  const r = await act("d11", { action: "tap", ref: refOf(s, 'button "Moving"') });
+  assert.deepEqual([r.delivery, r.reason, r.safe_to_retry], ["not_delivered", "timeout", false]);
+});
+test("not_text_field: typing into a button is not sent and is safe to retry", async () => {
+  const s = await open("d12");
+  const r = await act("d12", { action: "type", ref: refOf(s, 'button "Go"'), text: "x" });
+  assert.deepEqual([r.ok, r.delivery, r.reason, r.safe_to_retry, r.code], [false, "not_delivered", "not_text_field", true, "not_text_field"]);
+});
+test("enter_failed: the text landed but Enter did not finish", async () => {
+  const s = await open("d13");
+  const r = await act("d13", { action: "type", ref: refOf(s, 'textbox "Slow key"'), text: "hi", enter: true });
+  assert.deepEqual([r.delivery, r.reason, r.safe_to_retry], ["not_delivered", "enter_failed", false]);
+  assert.match(r.error, /text was typed/);
+  assert.match(r.screen, /Slow key[^\n]*hi/);
+});
+test("a failure while waiting does not undo a delivered tap", async () => {
+  const s = await open("d14");
+  const r = await act("d14", { action: "tap", ref: refOf(s, 'button "Go"'), wait_for: { role: "button", name: { bad: 1 }, timeout_ms: 500 }, settle: true });
+  assert.equal(r.delivery, "delivered"); assert.equal(r.wait_for.matched, false); assert.ok(r.wait_for.error, JSON.stringify(r.wait_for));
+  assert.match(r.screen, /ok clicked/);
+});
+test("wait_for with no target is rejected before the tap is sent", async () => {
+  const s = await open("d15");
+  const r = await act("d15", { action: "tap", ref: refOf(s, 'button "Go"'), wait_for: {} });
+  assert.deepEqual([r.delivery, r.reason, r.safe_to_retry, r.code], ["not_delivered", "bad_wait_for", true, "bad_wait_for"]);
+  assert.doesNotMatch(r.screen, /ok clicked/);
 });

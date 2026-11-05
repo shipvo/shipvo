@@ -140,6 +140,7 @@ async function act(id, body) {
     return l;
   };
   const extra = {};
+  if (INPUTS.has(body.action) && body.wait_for) checkWaitFor(body.wait_for);   // before anything is sent
   // Before an input is sent: is the element there, shown and enabled? If not, nothing reaches the app (safe to retry).
   const ready = async (l, ref, verb) => {
     if (!(await l.isVisible())) throw new SimError("not_visible", `${ref} is not visible on screen, so ${verb} was not sent. Scroll it into view or take a new snapshot.`);
@@ -147,10 +148,10 @@ async function act(id, body) {
   };
   // A click that Playwright could not deliver in time: covered by another element, or just too slow (unknown what happened).
   const clickTarget = async (l, ref) => {
-    try { await l.click({ timeout: 3000 }); }
+    try { await l.click({ timeout: ACT_TIMEOUT }); }
     catch (e) {
       if (/intercepts pointer events/.test(String(e.message))) throw new SimError("covered", `${ref} is covered by another element, so the tap was not sent.`);
-      if (e.name === "TimeoutError") throw new SimError("timeout", `the tap on ${ref} did not complete in 3 s. Call screen to see whether it landed.`);
+      if (e.name === "TimeoutError") throw new SimError("timeout", `the tap on ${ref} did not complete in time. Call screen to see whether it landed.`);
       throw e;
     }
   };
@@ -165,13 +166,14 @@ async function act(id, body) {
       else if (kind !== "field") {
         // Typing "on" a label or heading: a person would go to the field of that name. One match, or a clear error.
         const named = page.getByRole("textbox", { name: kind, exact: true });
-        if ((await named.count()) !== 1) throw new Error(`${body.ref} is not a text field. Type into a "textbox" ref.`);
+        if ((await named.count()) !== 1) throw new SimError("not_text_field", `${body.ref} is not a text field, so the text was not sent. Type into a "textbox" ref.`);
         t = named;
       }
       await ready(t, body.ref, "the text");
-      try { await t.fill(String(body.text ?? ""), { timeout: 3000 }); }
-      catch (e) { if (e.name === "TimeoutError") throw new SimError("timeout", `typing into ${body.ref} did not complete in 3 s. Call screen to see what the field holds.`); throw e; }
-      if (body.enter) await t.press("Enter");
+      try { await t.fill(String(body.text ?? ""), { timeout: ACT_TIMEOUT }); }
+      catch (e) { if (e.name === "TimeoutError") throw new SimError("timeout", `typing into ${body.ref} did not complete in time. Call screen to see what the field holds.`); throw e; }
+      // The text has landed by now, so a failure here is its own reason.
+      if (body.enter) { try { await t.press("Enter", { timeout: ACT_TIMEOUT }); } catch (e) { throw new SimError("enter_failed", `the text was typed into ${body.ref} but pressing Enter failed: ${String(e.message).split("\n")[0]}`); } }
       extra.value = await t.inputValue().catch(() => null);
       break;
     }
@@ -229,8 +231,9 @@ async function act(id, body) {
   }
   if (INPUTS.has(body.action)) {
     const t0 = Date.now();
-    if (body.wait_for) { const w = await waitFor(page, body.wait_for); extra.wait_for = { ...w, waited_ms: Date.now() - t0 }; }
-    if (body.settle) extra.settled = await settle(page);
+    // The input has landed. A failure while waiting must not turn the reply into not_delivered.
+    if (body.wait_for) { try { extra.wait_for = { ...(await waitFor(page, body.wait_for)), waited_ms: Date.now() - t0 }; } catch (e) { extra.wait_for = { matched: false, error: String(e.message).split("\n")[0], waited_ms: Date.now() - t0 }; } }
+    if (body.settle) { try { extra.settled = await settle(page); } catch { extra.settled = false; } }
     return { screen: await screen(page), delivery: "delivered", safe_to_retry: false, ...extra };
   }
   return { screen: await screen(page) };
@@ -238,8 +241,14 @@ async function act(id, body) {
 
 const INPUTS = new Set(["tap", "type", "scroll", "back"]);
 // Reasons where the input never reached the app. A timeout is unknown, so it is not safe to retry.
-const NOT_SENT = new Set(["stale_ref", "not_visible", "disabled", "covered"]);
-const deliveryOf = (action, e) => !INPUTS.has(action) ? {} : { delivery: "not_delivered", reason: e.code ?? "timeout", safe_to_retry: NOT_SENT.has(e.code) };
+const NOT_SENT = new Set(["stale_ref", "not_visible", "disabled", "covered", "not_text_field", "bad_wait_for"]);
+// Reasons with an unknown outcome: timeout, enter_failed (text landed, Enter did not) and error (any other failure).
+const UNKNOWN = new Set(["timeout", "enter_failed"]);
+const deliveryOf = (action, e) => !INPUTS.has(action) || e.code === "no_session" ? {}
+  : { delivery: "not_delivered", reason: NOT_SENT.has(e.code) || UNKNOWN.has(e.code) ? e.code : "error", safe_to_retry: NOT_SENT.has(e.code) };
+// Per-action time limit (3 s). SIM_ACTION_TIMEOUT_MS lets a test force a timeout quickly.
+const ACT_TIMEOUT = Number(process.env.SIM_ACTION_TIMEOUT_MS) || 3000;
+const checkWaitFor = (w) => { if (!w || typeof w !== "object" || !(w.ref || w.text || w.role)) throw new SimError("bad_wait_for", "wait_for needs a ref, text or role. The action was not sent."); };
 
 // wait_for: { ref | text | role + name, gone?, timeout_ms? }. Polls until the target is shown (or gone).
 async function waitFor(page, w) {

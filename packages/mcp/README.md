@@ -19,8 +19,8 @@ Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none 
 `tap`, `type`, `scroll` and `back` say whether the input reached the app, so you do not have to guess from the screen diff. The result has a `Delivery:` line and the same fields in `structuredContent`:
 
 - `delivery`: `delivered` or `not_delivered`.
-- `reason` (only when `not_delivered`): `stale_ref` (the ref is from an older screen), `not_visible` (the element is not shown, or there is no Back button), `disabled`, `covered` (another element is on top) or `timeout` (the input did not finish in 3 s).
-- `safe_to_retry`: `true` only when nothing reached the app (`stale_ref`, `not_visible`, `disabled`, `covered`). It is `false` for `delivered` and for `timeout`, because after a timeout it is not known what happened: call `screen` first.
+- `reason` (only when `not_delivered`): `stale_ref` (the ref is from an older screen), `not_visible` (the element is not shown, or there is no Back button), `disabled`, `covered` (another element is on top), `not_text_field` (a `type` ref that is not a text field), `bad_wait_for` (`wait_for` has no ref, text or role; nothing was sent), `timeout` (the input did not finish in 3 s), `enter_failed` (the text was typed but pressing Enter failed) or `error` (any other failure).
+- `safe_to_retry`: `true` only when nothing reached the app (`stale_ref`, `not_visible`, `disabled`, `covered`, `not_text_field`, `bad_wait_for`). It is `false` for `delivered`, `timeout`, `enter_failed` and `error`, because then it is not known what reached the app: call `screen` first.
 - `value` (`type` only): what the field holds after typing, read back from the field.
 
 A `not_delivered` result is also an error (`isError: true`) with `code` set to the reason.
