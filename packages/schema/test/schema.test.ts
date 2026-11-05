@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, GateReport, bandForCohort, canonicalize } from "../src/index";
+import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
 
 const sig = "AAAA".repeat(16);
 const manifest = {
@@ -134,5 +134,16 @@ describe("native modules", () => {
     expect(checkNativeModules({ x: "^1.0.0" }, { x: "1.4.0" })).toBeNull();
     expect(checkNativeModules(undefined, { x: "1.0.0" })).toBeNull();
     expect(checkNativeModules({ x: "^1.0.0" }, undefined)).toBeNull();
+  });
+});
+
+describe("parsePolicy", () => {
+  it("accepts a full policy and an empty one", () => {
+    expect(parsePolicy({})).toEqual({});
+    expect(parsePolicy({ maxBand: "b1", agentMaxBand: "b0", blockedWeekdays: ["fri"], blockedAfterHour: 12 })).toMatchObject({ maxBand: "b1" });
+  });
+  it("names the bad field", () => {
+    expect(() => parsePolicy({ maxBand: "b9" })).toThrow(/policy\.maxBand/);
+    expect(() => parsePolicy({ blockedAfterHour: 5 })).toThrow(/policy\.blockedAfterHour/);
   });
 });
