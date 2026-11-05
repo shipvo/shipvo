@@ -1,0 +1,3 @@
+- `@shipvo/store`: `checkScreenshot`, `checkCount`, `checkScreenshotSet` and the `SCREENSHOT_SETS` size table for App Store and Google Play screenshots, feature graphic and icon.
+- `@shipvo/cli`: `shipvo store screenshots` (fast mode, simulator render) writes `store-assets/raw/<set>/` and checks size, alpha and counts. New optional `routes` in `shipvo.json`.
+- Migration: none; new command and new exports.
