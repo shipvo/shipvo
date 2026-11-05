@@ -59,6 +59,13 @@ async function servePointer(c: any, platform: "android" | "ios") {
       if (bad) return c.json({ error: bad.reason, module: bad.module, required: bad.required, ...(bad.have ? { have: bad.have } : {}) }, 404, { "cache-control": "public, max-age=5" });
     }
   } catch { return c.json({ error: "corrupt_pointer" }, 500); }
+  // A halted release is not offered. A halt for another release, or a corrupt value, is ignored.
+  const halted = await c.env.POINTERS.get(`halt/${appId}`);
+  if (halted) {
+    let haltedRelease: unknown;
+    try { haltedRelease = JSON.parse(halted)?.release; } catch { /* corrupt: ignore */ }
+    if (haltedRelease === release) return c.json({ error: "release_halted", release }, 404, { "cache-control": "public, max-age=5" });
+  }
   const etag = `"${release}"`;
   if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
   return new Response(raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
