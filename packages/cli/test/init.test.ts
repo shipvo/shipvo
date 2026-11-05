@@ -207,3 +207,10 @@ it("init --help mentions adopt mode and --dry-run", async () => {
   expect(r.out).toContain("adopt mode");
   expect(r.out).toContain("--dry-run");
 });
+
+it("writes a preview workflow that comments the link and skips forks", () => {
+  const w = readFileSync(join(tmp, "my-shop", ".github/workflows/preview.yml"), "utf8");
+  expect(w).toContain("shipvo preview --json");
+  expect(w).toContain("gh pr comment");
+  expect(w).toContain("head.repo.full_name == github.repository");
+});
