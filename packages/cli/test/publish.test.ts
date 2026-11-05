@@ -199,6 +199,38 @@ describe("publish and the Hermes bytecode check", () => {
     expect(JSON.parse(JSON.parse(readFileSync(join(out, "p/demo/1/b0"), "utf8")).body).web).toMatchObject({ base: "/w/demo/r1/", files: 2 });
   });
 
+  it("dry run prints the web artifact folder relative to the current folder, and it exists", async () => {
+    withBundle(96);
+    exec.fn = (c) => { if (c.includes("--platform web")) { mkdirSync(join(cwd, "dist-web"), { recursive: true }); writeFileSync(join(cwd, "dist-web/index.html"), "<p>hi</p>"); } };
+    await publish(["--skip-export", "--bands", "b0", "--dry-run", "--out", "o2"]);
+    const err = (console.error as any).mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+    const m = err.match(/web artifact: 1 files at (\S+)/);
+    expect(m![1]).toBe("o2/w/demo/r1/");
+    expect(existsSync(join(cwd, m![1]))).toBe(true);
+  });
+
+  it("bare --skip-web and --skip-export behave like true", async () => {
+    withBundle(96);
+    exec.fn = (c) => { if (c.includes("expo export")) throw new Error("should not run: " + c); };
+    await publish(["--dry-run", "--skip-export", "--skip-web", "--bands", "b0"]);
+    expect(existsSync(join(cwd, ".shipvo/dry-run/p/demo/1/b0"))).toBe(true);
+    expect(existsSync(join(cwd, ".shipvo/dry-run/w"))).toBe(false);
+  });
+
+  it("--skip-web false still publishes the web copy", async () => {
+    withBundle(96);
+    exec.fn = (c) => { if (c.includes("--platform web")) { mkdirSync(join(cwd, "dist-web"), { recursive: true }); writeFileSync(join(cwd, "dist-web/index.html"), "<p>hi</p>"); } };
+    await publish(["--skip-export", "true", "--skip-web", "false", "--bands", "b0", "--dry-run"]);
+    expect(existsSync(join(cwd, ".shipvo/dry-run/w/demo/r1/index.html"))).toBe(true);
+  });
+
+  it("--dry-run false is a real publish; a bad value is an error", async () => {
+    withBundle(96);
+    await publish([...flags, "--dry-run", "false"]);
+    expect(puts.length).toBeGreaterThan(0);
+    await expect(publish([...flags, "--dry-run", "yes"])).rejects.toThrow(/on\/off flag/);
+  });
+
   it("--platform all: the iOS pointer carries the same web as the Android one", async () => {
     for (const pf of ["android", "ios"]) {
       mkdirSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}`), { recursive: true });

@@ -17,6 +17,13 @@ beforeAll(async () => {
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
+it("the scaffolded test file starts with a note about the starter screen", () => {
+  const top = test.split("\n").slice(0, 3).join("\n");
+  expect(top).toContain("starter screen");
+  expect(top).toContain("replace these tests");
+  expect(test.split("\n").slice(0, 3).every((l) => l.startsWith("//"))).toBe(true);
+});
+
 it("the starter does not claim a release before one exists", () => {
   expect(release).not.toMatch(/Release \d/);
   expect(release).toContain("Hello from My Shop.");
