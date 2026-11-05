@@ -9,5 +9,10 @@
     "source": "https://www.jamendo.com/track/341563",
     "provider": "Jamendo"
   },
-  "credit_line": "Music: \"Thrilled hands holding\" by Tymphony (Jamendo, CC BY-SA 3.0) https://www.jamendo.com/track/341563"
+  "credit_line": "Music: \"Thrilled hands holding\" by Tymphony (Jamendo, CC BY-SA 3.0) https://www.jamendo.com/track/341563",
+  "video_license": {
+    "name": "CC BY-SA 3.0",
+    "url": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "note": "This video, including its soundtrack, is shared under CC BY-SA 3.0 because the music is synchronised with the images (an Adaptation under the licence)."
+  }
 }

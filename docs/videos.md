@@ -43,7 +43,9 @@ That is a safety check you can run before every release. The full guide is at sh
 
 [Captions (.vtt)](/videos/first-app.vtt)
 
-Music: [Thrilled hands holding by Tymphony (Jamendo, CC BY-SA 3.0)](https://www.jamendo.com/track/341563)
+Music: "Thrilled hands holding" by Tymphony (Jamendo, CC BY-SA 3.0) https://www.jamendo.com/track/341563
+
+This video, including its soundtrack, is shared under [CC BY-SA 3.0](http://creativecommons.org/licenses/by-sa/3.0/).
 
 <details>
 <summary>Transcript</summary>

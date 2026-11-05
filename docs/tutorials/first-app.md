@@ -2,7 +2,9 @@
 
 <video controls preload="metadata" playsinline tabindex="0" data-title="Create your first app on a simulated phone" data-length="1 min 39 s" poster="/videos/first-app.jpg" src="/media/videos/first-app-eb0eb0b3.mp4"><track kind="captions" src="/videos/first-app.vtt" srclang="en" label="English">Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
 
-Music: [Thrilled hands holding by Tymphony (Jamendo, CC BY-SA 3.0)](https://www.jamendo.com/track/341563)
+Music: "Thrilled hands holding" by Tymphony (Jamendo, CC BY-SA 3.0) https://www.jamendo.com/track/341563
+
+This video, including its soundtrack, is shared under [CC BY-SA 3.0](http://creativecommons.org/licenses/by-sa/3.0/).
 
 Prefer to watch first? This 1 minute 39 second video covers the same steps. [Captions and transcript](../videos.md).
 

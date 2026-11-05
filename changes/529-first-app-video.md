@@ -1,1 +1,2 @@
 - Create your first app video: re-rendered with a CC BY-SA music track (was CC BY-NC-ND).
+- The first-app video page and credits now state that the video, including its soundtrack, is shared under CC BY-SA 3.0.
