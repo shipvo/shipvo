@@ -32,6 +32,7 @@ function readFrames(sock: Socket, onText: (t: string) => void) {
       else if (len === 127) { if (buf.length < 10) return; const big = buf.readBigUInt64BE(2); if (big > BigInt(MAX_MESSAGE)) return close(1009); len = Number(big); off = 10; }
       if (len > MAX_MESSAGE) return close(1009);
       if (!masked) return close(1002);
+      if (op >= 8 && (len > 125 || !fin)) return close(1002);
       if (buf.length < off + 4 + len) return;
       const mask = buf.subarray(off, off + 4);
       const data = Buffer.from(buf.subarray(off + 4, off + 4 + len));
@@ -97,6 +98,7 @@ export function attachAgentSession(server: Server, getPort: () => number, token 
       try { m = JSON.parse(text); } catch { return; }
       if (!m || typeof m !== "object") return;
       if (role === "screen") {
+        if (screen !== sock) return;
         if (m.type === "takeover") { paused = true; send(driver, { type: "paused", reason: "the person took over" }); }
         else if (m.type === "handback") { paused = false; send(driver, { type: "resumed" }); }
         else send(driver, m);

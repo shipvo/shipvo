@@ -95,3 +95,40 @@ describe("run.json", () => {
     expect(existsSync(join(root, ".shipvo/run.json"))).toBe(false);
   });
 });
+
+describe("agent session hardening", () => {
+  it("closes with 1002 on a ping over 125 bytes", async () => {
+    const s = await host();
+    const { connect: netConnect } = await import("node:net");
+    const code = await new Promise<number>((ok, bad) => {
+      const sock = netConnect(s.port, "127.0.0.1", () => {
+        sock.write(`GET /__shipvo/agent?token=${s.token}&role=driver HTTP/1.1\r\nHost: 127.0.0.1:${s.port}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n`);
+      });
+      let upgraded = false; let got = Buffer.alloc(0);
+      sock.on("data", (d) => {
+        if (!upgraded) {
+          upgraded = true;
+          const payload = Buffer.alloc(126, 1);
+          sock.write(Buffer.concat([Buffer.from([0x89, 0x80 | 126, 0, 126, 0, 0, 0, 0]), payload]));
+          return;
+        }
+        got = Buffer.concat([got, d]);
+        const i = got.findIndex((b, k) => b === 0x88 && got[k + 1] === 2);
+        if (i >= 0 && got.length >= i + 4) ok((got[i + 2] << 8) | got[i + 3]);
+      });
+      sock.on("error", bad);
+      closers.push(() => { sock.destroy(); });
+    });
+    expect(code).toBe(1002);
+  });
+  it("ignores takeover from a replaced screen", async () => {
+    const s = await host();
+    const old = connect(s.port, s.token, "screen"); await old.open;
+    const drv = connect(s.port, s.token, "driver"); await drv.open;
+    const fresh = connect(s.port, s.token, "screen"); await fresh.open;
+    await old.next((m) => m.type === "replaced");
+    old.ws.send(JSON.stringify({ type: "takeover" }));
+    await new Promise((r) => setTimeout(r, 150));
+    expect(drv.msgs.some((m) => m.type === "paused")).toBe(false);
+  });
+});
