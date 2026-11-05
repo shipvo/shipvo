@@ -83,9 +83,11 @@ How to read these numbers:
 
 Measured on 5 Nov 2026 by the `ios-runtime` workflow, [run 42087991990](https://github.com/shipvo/shipvo/actions/runs/42087991990) (job `simulator-e2e`): `macos-26-arm64` runner image, Xcode 26.6, iPhone simulator, Release build, local control plane. The app is freshly installed, so its first update is a bsdiff patch against its embedded bundle. This is the "iOS patch from the embedded bundle" table from the job summary, as printed:
 
-| Patch runs | Median patch bytes | Median full-bundle bytes | Median patch apply time (ms) |
+| Patch runs | Median patch bytes | Median full-bundle bytes | Median patch apply time, last byte to healthy (ms) |
 | --- | --- | --- | --- |
 | 3 | 83999 | 1996082 | 573 |
+
+Patch apply time (last byte to healthy) is measured by `scripts/ios-e2e/analyze.mjs` from the last `/b/` request to the app reporting healthy. It includes the reload, so it is larger than the runtime's own `apply_ms` telemetry in the same log (51 to 64 ms).
 
 The run's log also prints: "patch 83999 bytes, full bundle 1996082 bytes, embedded bundle 1996119 bytes". The patch is the first-download size from the embedded bundle, not a steady-state patch from the previous release. The full-bundle table above comes from an earlier run, so the two tables are from different runs.
 
