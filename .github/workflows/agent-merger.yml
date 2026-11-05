@@ -27,3 +27,9 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
           AGENT_MAX_MERGES_PER_DAY: ${{ vars.AGENT_MAX_MERGES_PER_DAY || 40 }}
           AGENT_STALE_DAYS: ${{ vars.AGENT_STALE_DAYS || 4 }}
+      - name: Team health check (fixes simple problems, reports the rest on the agent:health issue)
+        if: always()
+        run: '[ -z "$GH_TOKEN" ] || node scripts/agents/health.mjs'
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
