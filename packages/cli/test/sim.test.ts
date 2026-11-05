@@ -52,6 +52,7 @@ describe("shipvo sim helpers", () => {
     exec.mockImplementation(() => { throw new Error("boom"); });
     const r = buildBundle({ name: "demo" }, {}, false, false);
     expect(r.ok).toBe(false);
+    expect(r.error).toContain("boom");
     expect(readFileSync(join(dir, "sim-dist", "index.html"), "utf8")).toBe("old");
     expect(existsSync(join(dir, ".shipvo", "sim-next"))).toBe(false);
   });

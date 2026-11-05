@@ -13,7 +13,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
-- **cli: `shipvo sim --watch` keeps the last good build on a failed rebuild.** Builds now export to `.shipvo/sim-next` and swap into `sim-dist` only on success, so a compile error leaves the previous bundle serving. Watch mode prints `Build failed, still serving the last good build:` before the raw expo output. Rebuilds coalesce edits during a build into one follow-up build. `.expo` is now ignored by the watcher.
+- **cli: `shipvo sim --watch` keeps the last good build on a failed rebuild.** Builds now export to `.shipvo/sim-next` and swap into `sim-dist` only on success, so a compile error leaves the previous bundle serving. Watch mode prints `Build failed, still serving the last good build:` before the raw expo output. Because `execSync` blocks the event loop, edits that arrive while a build is running are handled after it finishes. `.expo`, `ios/Pods`, `ios/build`, `android/build`, `android/.gradle`, `dist` and `coverage` are now ignored by the watcher.
 
 - **MCP: tool annotations and `isError`.** Every tool now declares annotations. `list_apps`, `list_sessions`, `screen`, `screenshot`, `notifications`, `device_log` and `owner_describe` set `readOnlyHint: true`; `owner_command` and `end_session` set `destructiveHint: true`; the rest are not read-only. When the simulator reports `ok: false`, the result now has `isError: true` and `structuredContent` `{ ok, code, error }`. The text (`Error [code]: ...`) is unchanged. Tool names and arguments are unchanged. Migration: none needed. Clients that branched on the text can now branch on `isError`.
 

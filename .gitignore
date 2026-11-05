@@ -5,6 +5,7 @@ dist
 *.keystore
 .env*
 __pycache__/
+.shipvo/
 
 public/llms.txt
 public/llms-full.txt

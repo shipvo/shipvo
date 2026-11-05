@@ -5,15 +5,15 @@ import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
 import { args as parse, loadConfig } from "./config.js";
 
-const IGNORED = new Set(["node_modules", "sim-dist", ".shipvo", ".git", ".expo"]);
+const IGNORED = new Set(["node_modules", "sim-dist", ".shipvo", ".git", ".expo", "Pods", "build", ".gradle", "dist", "coverage"]);
 
 export function isIgnoredPath(p: string): boolean {
   return p.split(/[\\/]/).some((part) => IGNORED.has(part));
 }
 
-export function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T & { cancel(): void } {
+export function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T & { cancel(): void } {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const wrapped = ((...args: any[]) => {
+  const wrapped = ((...args: unknown[]) => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = undefined;
@@ -75,7 +75,7 @@ export function buildBundle(cfg: Record<string, unknown>, a: Record<string, unkn
       throw swapErr;
     }
     return { ok: true, ms: Date.now() - start };
-  } catch (e: any) {
+  } catch (e: unknown) {
     rmSync(tmp, { recursive: true, force: true });
     const prev = ".shipvo/sim-prev";
     if (existsSync(prev) && !existsSync("sim-dist")) renameSync(prev, "sim-dist");
@@ -96,9 +96,9 @@ export async function sim(argv: string[]) {
 
   const initial = buildBundle(cfg, a, false, false);
   if (!initial.ok) {
+    if (watchMode && existsSync("sim-dist/index.html")) console.error("Build failed, still serving the last good build:");
     console.error(initial.error);
     if (!watchMode || !existsSync("sim-dist/index.html")) process.exit(1);
-    if (watchMode && existsSync("sim-dist/index.html")) console.error("Build failed, still serving the last good build");
   }
 
   let server: string;
@@ -113,22 +113,31 @@ export async function sim(argv: string[]) {
 
   if (!watchMode) return;
 
-  const runBuild = () => {
-    const r = buildBundle(cfg, a, true, true);
+  const rebuildAndReport = (build: typeof buildBundle = buildBundle) => {
+    console.error("rebuilding…");
+    const r = build(cfg, a, true, true);
     if (r.ok) console.log(`rebuilt in ${(r.ms / 1000).toFixed(1)} s`);
     else console.error(`Build failed, still serving the last good build:\n${r.error}`);
   };
 
-  const rebuild = debounce(() => { runBuild(); }, 300);
+  const rebuild = debounce(() => { rebuildAndReport(); }, 300);
 
-  const watcher = watch(process.cwd(), { recursive: true }, (_event, filename) => {
-    if (!filename || isIgnoredPath(String(filename))) return;
-    rebuild();
-  });
-  watcher.on("error", (e: any) => { console.error(`File watcher error: ${e?.message ?? e}`); });
+  const startWatch = (build: typeof buildBundle = buildBundle) => {
+    const wrappedRebuild = debounce(() => { rebuildAndReport(build); }, 300);
+    const handler = (_event: string, filename: string | null) => {
+      if (!filename || isIgnoredPath(String(filename))) return;
+      wrappedRebuild();
+    };
+    const watcher = watch(process.cwd(), { recursive: true }, handler);
+    watcher.on("error", (e: unknown) => { console.error(`File watcher error: ${e instanceof Error ? e.message : String(e)}`); });
+    return { watcher, rebuild: wrappedRebuild, trigger: (filename: string) => handler("change", filename) };
+  };
 
+  const { watcher, rebuild: watchRebuild } = startWatch();
   p.on("exit", () => {
     watcher.close();
-    rebuild.cancel();
+    watchRebuild.cancel();
   });
 }
+
+export { rebuildAndReport, startWatch };
