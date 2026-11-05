@@ -89,6 +89,12 @@ Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TO
 
 ${seedNote}
 Public key pinned in the shell: ${publicKey}
+
+Next steps:
+1. cd ${dirArg}
+2. npx shipvo doctor
+3. npm run sim
+4. npx shipvo publish --dry-run
 `);
 }
 
