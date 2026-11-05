@@ -120,6 +120,7 @@ export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/releas
     w("App.tsx", SHOP_APP_TSX(name));
     w("src/cart.tsx", SHOP_CART_STATE);
     w("src/money.ts", SHOP_MONEY);
+    w("src/data/shop.json", SHOP_CONFIG);
     w("src/screens/List.tsx", SHOP_LIST);
     w("src/screens/Detail.tsx", SHOP_DETAIL);
     w("src/screens/Cart.tsx", SHOP_CART);
@@ -481,8 +482,20 @@ const SHOP_DATA = JSON.stringify([
   { id: "steel-bottle", name: "Steel bottle", price: 2900, description: "A one litre bottle with a screw cap." },
 ], null, 2) + "\n";
 
-const SHOP_MONEY = `// Prices are whole cents in src/data/products.json. This is the one place that turns them into text.
-export const formatPrice = (cents: number) => "$" + (cents / 100).toFixed(2);
+const SHOP_CONFIG = JSON.stringify({ currency: "$", position: "before", decimals: 2, locale: "en-US" }, null, 2) + "\n";
+
+const SHOP_MONEY = `// Prices are whole minor units (cents) in src/data/products.json. This is the one place that turns them into text.
+// To change the currency, edit src/data/shop.json. For FCFA: { "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }
+import shop from "./data/shop.json";
+
+export const formatPrice = (minor: number) => {
+  const { currency, position, decimals, locale } = shop as { currency: string; position?: string; decimals?: number; locale?: string };
+  const d = decimals ?? 2;
+  const n = (minor / 10 ** d).toLocaleString(locale, { minimumFractionDigits: d, maximumFractionDigits: d });
+  // Some locales use a narrow no-break space between digit groups. Plain spaces read the same and match everywhere.
+  const num = n.replace(/[\u00a0\u202f]/g, " ");
+  return position === "after" ? num + " " + currency : currency + num;
+};
 `;
 
 const SHOP_CART_STATE = `import { createContext, useContext, useState, type ReactNode } from "react";

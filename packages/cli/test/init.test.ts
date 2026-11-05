@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { init } from "../src/init";
@@ -127,6 +127,22 @@ it("--template shop writes list, detail, cart, five products and a test that rea
   expect(readme).toContain("src/data/products.json");
   expect(readme).not.toContain("src/release.ts");
   expect(readFileSync(join(dir, "App.tsx"), "utf8")).toContain("markHealthy");
+});
+
+it("--template shop shows prices in the currency set in src/data/shop.json", async () => {
+  const dir = join(tmp, "store-fcfa");
+  await init([dir, "--template", "shop", "--public-key", "AAAA"]);
+  rmSync(join(dir, "tsconfig.json")); // it extends expo, which is not installed here
+  const { formatPrice } = await import(join(dir, "src/money.ts"));
+  expect(formatPrice(650)).toBe("$6.50");
+  const dir2 = join(tmp, "store-fcfa2");
+  await init([dir2, "--template", "shop", "--public-key", "AAAA"]);
+  rmSync(join(dir2, "tsconfig.json"));
+  writeFileSync(join(dir2, "src/data/shop.json"), JSON.stringify({ currency: "FCFA", position: "after", decimals: 0, locale: "fr-FR" }));
+  const fcfa = await import(join(dir2, "src/money.ts"));
+  expect(fcfa.formatPrice(6500)).toBe("6 500 FCFA");
+  for (const f of ["List", "Detail", "Cart"])
+    expect(readFileSync(join(dir, `src/screens/${f}.tsx`), "utf8")).toContain("formatPrice(");
 });
 
 it("the default and --template blank write the same files as before", async () => {

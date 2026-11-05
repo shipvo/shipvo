@@ -1,0 +1,2 @@
+- `@shipvo/schema`, `@shipvo/cli`: optional `policy` section in `shipvo.json` (slice 2 of #295). New schema exports `ShipvoPolicy`, `PolicyWeekday` and `parsePolicy`. Three rules: `maxBand`, `agentMaxBand`, and `blockedWeekdays` with `blockedAfterHour`. `shipvo publish --dry-run` checks them and, on a refusal, prints the rule and reason and exits 1. The real upload path is unchanged. A bad section names the field. See [docs/cli.md](docs/cli.md).
+- Migration: none; without `policy` nothing changes.
