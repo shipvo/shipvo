@@ -178,7 +178,7 @@ describe("GET /t/:app/summary", () => {
       [{ release: 2, m: 120 }], [{ release: 2, m: 800 }, { release: 1, m: 900 }]);
     const r = await app.request("/t/tide/summary", {}, { DB: d } as any);
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ halted: null, releases: [
+    expect(await r.json()).toEqual({ halted: null, auto_halt: null, releases: [
       { release: 2, events: { applied: 3, reverted: 1 }, apply_ms_median: 120, cold_start_ms_median: 800 },
       { release: 1, events: { applied: 2 }, apply_ms_median: null, cold_start_ms_median: 900 },
     ] });
@@ -190,7 +190,7 @@ describe("GET /t/:app/summary", () => {
   });
   it("returns an empty list for an app with no rows", async () => {
     const r = await app.request("/t/tide/summary", {}, { DB: fake([], [], []) } as any);
-    expect(await r.json()).toEqual({ releases: [], halted: null });
+    expect(await r.json()).toEqual({ releases: [], halted: null, auto_halt: null });
   });
   it("returns the halt object when halt/<app> exists, null when corrupt", async () => {
     const halt = { release: 4, halted_at: "2026-11-05T00:00:00.000Z", reports: 40, failed: 12, threshold: 0.2 };
