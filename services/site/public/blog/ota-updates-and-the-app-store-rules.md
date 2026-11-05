@@ -38,5 +38,3 @@ This is a reading of public policies, not legal advice, and policies change. Rea
 
 - Expo, [Updates and rollouts: over-the-air updates](https://expo.dev/articles/updates-and-rollouts/over-the-air-updates), quoting Apple guideline 2.5.2, the Developer Program License Agreement section 3.3.2 and Google Play's Device and Network Abuse policy.
 - Shipvo, [spike results](https://shipvo.dev/docs/spike-results/) and [publishing](https://shipvo.dev/docs/getting-started/#5-publish-over-the-air).
-
-Not a developer? See [how to build a mobile app without coding](https://shipvo.dev/blog/build-a-mobile-app-without-coding/) for what to plan for after version one.
