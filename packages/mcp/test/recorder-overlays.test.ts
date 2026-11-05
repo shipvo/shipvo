@@ -43,6 +43,27 @@ describe.skipIf(!ok)("recorder overlays", () => {
     expect(Math.abs(mean(pixels(on.res.file, on.t - 0.15, 480, 480, 120, 120)) - mean(pixels(off.res.file, on.t - 0.15, 480, 480, 120, 120)))).toBeLessThan(1);
   }, 60000);
 
+  it("draws no dot for a ref the page does not know, and a dot at the element when it does", async () => {
+    const run = async (html: string, ref: string) => {
+      const srv = http.createServer((_, res) => { res.writeHead(200, { "content-type": "text/html" }); res.end(html); });
+      await new Promise<void>((r) => srv.listen(0, r));
+      try {
+        const r = new Recorder(); await r.start({ url: `http://127.0.0.1:${(srv.address() as { port: number }).port}/`, format: "1:1", dir: out });
+        await sleep(300); const t = (await r.tap({ ref }))!; await sleep(250);
+        return { res: await r.stop(), t };
+      } finally { srv.close(); }
+    };
+    const bare = "<body style='margin:0;background:#136'></body>";
+    const known = "<body style='margin:0;background:#136'><div data-ref='e1' style='position:fixed;left:5%;top:5%;width:5%;height:5%'></div></body>";
+    const none = await run(bare, "e1");
+    const diff = (r: { res: { file: string }; t: number }, x: number, y: number) =>
+      Math.abs(mean(pixels(r.res.file, r.t + 0.15, x, y, 120, 120)) - mean(pixels(r.res.file, r.t - 0.15, x, y, 120, 120)));
+    expect(diff(none, 480, 480)).toBeLessThan(1); // unknown ref: no dot at the centre
+    const hit = await run(known, "e1");
+    expect(diff(hit, 30, 30)).toBeGreaterThan(5); // known ref: dot at the element
+    expect(diff(hit, 480, 480)).toBeLessThan(1);
+  }, 90000);
+
   it("trims a 5 s wait and keeps chapter times on the trimmed timeline", async () => {
     const r = new Recorder(); await r.start({ url, format: "1:1", dir: out });
     const w0 = Date.now(); await sleep(300); r.marker("before");

@@ -42,9 +42,11 @@ const paint = (c: Cmd): { ok: boolean; at?: [number, number] } => {
   const dot = (x: number, y: number, delay = 0) => { const e = put(x, y, 44, "background:rgba(255,255,255,.75);box-shadow:0 0 0 2px rgba(0,0,0,.25),0 2px 10px rgba(0,0,0,.35);animation-name:__dot", 700); e.style.animationDelay = `${delay}ms`; return e; };
   let at: [number, number] | undefined;
   if (c.tap || c.ref) {
-    let x = (c.tap?.x ?? 0.5) * W, y = (c.tap?.y ?? 0.5) * H;
     const el = c.ref ? d.querySelector(`[data-ref="${c.ref}"]`) : null;
+    let x = NaN, y = NaN;
     if (el) { const r = el.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; }
+    else if (c.tap) { x = c.tap.x * W; y = c.tap.y * H; }
+    if (isNaN(x)) return { ok: true }; // position unknown: draw nothing rather than a wrong spot
     dot(x, y); put(x, y, 90, "border:3px solid rgba(255,255,255,.85);animation-name:__rip", 700); at = [x / W, y / H];
   }
   if (c.trail) for (let i = 0; i <= 8; i++) { const f = i / 8; const e = dot((c.trail.a[0] + (c.trail.b[0] - c.trail.a[0]) * f) * W, (c.trail.a[1] + (c.trail.b[1] - c.trail.a[1]) * f) * H, i * 40); e.style.width = e.style.height = `${22 + 22 * f}px`; }
@@ -116,7 +118,9 @@ export class Recorder {
   /** A tap at a point (0..1 of the frame) or on an element with `data-ref` in the page. Returns the video time, or undefined when not recording. */
   async tap(t: { x?: number; y?: number; ref?: string }): Promise<number | undefined> {
     if (!this.running) return undefined;
-    const at = this.touch(); if (this.taps) await this.paint({ tap: { x: t.x ?? 0.5, y: t.y ?? 0.5 }, ref: t.ref }); return at;
+    const at = this.touch();
+    // A point needs both x and y. With only a ref, the frame page must know the element; if not, no dot is drawn.
+    if (this.taps) await this.paint({ tap: t.x !== undefined && t.y !== undefined ? { x: t.x, y: t.y } : undefined, ref: t.ref }); return at;
   }
   /** A swipe or scroll trail between two points (0..1). */
   async swipe(a: [number, number], b: [number, number]): Promise<number | undefined> {
