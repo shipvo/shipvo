@@ -22,6 +22,8 @@ export type ShipvoConfig = {
   preview?: "here.now" | "control-plane";
   /** Release rules checked by `shipvo publish --dry-run`. Validated there, not at load, so a bad section never breaks other commands. */
   policy?: unknown;
+  /** Deep links `shipvo explore` opens after the start screen (for example "tide://cart"). Needs an onUrl listener in the app. */
+  routes?: string[];
   /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */
   listing?: { public?: boolean; description?: string; category?: string; tagline?: string; icon?: string; screenshots?: string[]; website?: string; capabilities?: string[] };
 };
