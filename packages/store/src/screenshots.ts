@@ -70,6 +70,8 @@ export interface ScreenshotFile {
 
 export interface CheckResult {
   ok: boolean;
+  /** What the bytes are, when they are a PNG or JPEG. */
+  format?: "png" | "jpeg";
   /** Reasons the stores would reject the file. */
   problems: string[];
   /** Advice that does not block upload. */
@@ -158,7 +160,7 @@ export function checkScreenshot(file: ScreenshotFile, set: ScreenshotSetId): Che
     problems.push(`${file.name}: is ${file.bytes.length} bytes; ${spec.label} allows at most ${spec.maxBytes}.`);
   }
   if (info.alpha && !spec.allowAlpha) problems.push(`${file.name}: has an alpha channel (transparency); flatten it onto a solid background.`);
-  return { ok: problems.length === 0, problems };
+  return { ok: problems.length === 0, problems, format: info.format };
 }
 
 /** Check the file count for a set, then every file in it. */

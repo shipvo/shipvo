@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "login", "doctor", "store", "status", "audit", "keys", "mcp",
+  "init", "sim", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "login", "doctor", "store", "status", "audit", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -25,10 +25,13 @@ Ship
   store details --dry-run     Draft Play Data safety answers and a privacy policy from shipvo.json
   store setup [--company yes|no] [--android-now] [--play-account-before-2023-11-13]
                               Pick the store accounts to open and write store-plan.json
+  store screenshots [--out dir] [--sim url]
+                              Render each route at store sizes (fast mode: simulator, not the native UI)
   store status [--mark <step> [--as waiting|done]]
                               Show each store's steps and what to do next
   status [--app id] [--json]  Show how the newest releases are doing on phones
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
+  test [files] [--repair [--write]]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it
   doctor [--port <n>]         Check setup before first publish
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up

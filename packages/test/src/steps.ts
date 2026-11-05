@@ -1,10 +1,10 @@
 import { PhoneError } from "./phone.js";
 import type { Phone } from "./phone.js";
 
-/** One parsed line. `target` is the quoted text: an accessibility name or visible text, as in the typed API. `line` is the 1-based line number in the source text. */
+/** One parsed line. `target` is the quoted text: an accessibility name or visible text, as in the typed API. `role` is optional and narrows which elements a repair may pick. `line` is the 1-based line number in the source text. */
 export type Step =
-  | { kind: "tap"; target: string; line: number }
-  | { kind: "type"; target: string; text: string; enter: boolean; line: number }
+  | { kind: "tap"; target: string; role?: string; line: number }
+  | { kind: "type"; target: string; text: string; enter: boolean; role?: string; line: number }
   | { kind: "scroll"; direction: "down"; line: number }
   | { kind: "back"; line: number }
   | { kind: "see"; text: string; line: number }

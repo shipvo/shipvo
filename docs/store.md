@@ -52,4 +52,21 @@ The tester rule is shown only for personal Play accounts that are not exempt. Ap
 
 `status` reads `store-plan.json` and prints one timeline per store. Each step is `todo`, `waiting` or `done`, followed by what you do next. `--mark <step>` sets a step to `done`; add `--as waiting` for a wait. With no plan file it says to run `setup`.
 
+## Screenshots (fast mode)
+
+`shipvo store screenshots` renders your app in the simulator and writes store-sized files. It prints "fast mode: simulator render, not the native UI". The simulator runs your web build in headless Chromium, so fonts, safe areas and native widgets can differ from a phone.
+
+```bash
+shipvo store screenshots            # builds the app, starts the simulator, renders
+shipvo store screenshots --sim http://localhost:4546 --out store-assets/raw
+```
+
+It renders the start screen and every entry in `routes` in `shipvo.json` (deep links, as for `shipvo explore`). It does this for each set: iPhone (1290x2796), iPad 13-inch (2064x2752), Play phone (1080x1920), Play 7-inch tablet and Play 10-inch tablet (both 1200x1920). Files go to `store-assets/raw/<set>/NN-<screen>.jpg`, in JPEG so there is no alpha channel. The extension comes from the checker's format result, not from the first byte. A file that is not a PNG or JPEG is kept as `.bin` and reported as failed.
+
+Each file gets the checker result from `@shipvo/store`, then each set gets a count check. If a set takes fewer files than you have screens, the extra screens are skipped and the command says so. The exit code is 1 if any file fails. The Play feature graphic and icon are not app screens and are not made here.
+
+Store mode (native capture on an emulator or simulator) is a later slice. Nothing is uploaded.
+
+The size numbers come from the table in `@shipvo/store` and issue #249. They were not re-checked against the Apple and Play pages when this command was added. Check them before you submit.
+
 See the package: [`packages/store`](../packages/store/README.md).
