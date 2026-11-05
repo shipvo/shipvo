@@ -13,6 +13,8 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **MCP: tool annotations and `isError`.** Every tool now declares annotations. `list_apps`, `list_sessions`, `screen`, `screenshot`, `notifications`, `device_log` and `owner_describe` set `readOnlyHint: true`; `owner_command` and `end_session` set `destructiveHint: true`; the rest are not read-only. When the simulator reports `ok: false`, the result now has `isError: true` and `structuredContent` `{ ok, code, error }`. The text (`Error [code]: ...`) is unchanged. Tool names and arguments are unchanged. Migration: none needed. Clients that branched on the text can now branch on `isError`.
+
 - **Control plane: `GET /t/:app/summary`.** Returns `{ releases: [{ release, events: { <event>: n }, apply_ms_median, cold_start_ms_median }] }` for the 20 newest releases (by latest row), so you can see applied, healthy and reverted counts without reading raw rows. Same access as `GET /t/:app`. A median is `null` when no row has that value. No migration. Migration: none needed.
 
 - **Android: a release that throws after `markHealthy` is now reverted.** React destroys the host after an uncaught JS error, and the activity pause that follows was counted as a clean trip to the background, which cleared the unhealthy-boot count. `markHealthy` now installs a JS error hook that tells the native runtime first, and that load can no longer become stable. No JS API change. Migration: rebuild the shell to get the native `noteCrash` function; older shells keep the old behaviour.
