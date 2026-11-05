@@ -45,6 +45,15 @@ if (ready.length && (!lastEngineer || mins(lastEngineer.created_at) > 60) && !li
   fixed.push(`The team was idle with ${ready.length} issues waiting; started the engineers.`);
 }
 
+// 3b. Empty queue: nothing ready and nobody working. Ask the Head of Product for the next slices
+// (at most once an hour), instead of waiting for its next scheduled run.
+const working = issues.filter((i) => has(i, "agent:in-progress"));
+const lastPlanner = runs.find((r) => r.name === "agent-planner");
+if (!ready.length && !working.length && !live.some((r) => r.name === "agent-planner") && (!lastPlanner || mins(lastPlanner.created_at) > 60)) {
+  dispatch("agent-planner.yml");
+  fixed.push("The issue queue was empty; asked the Head of Product to plan the next slices.");
+}
+
 // 4. Failed agent runs in the last 3 hours.
 const recent = runs.filter((r) => r.status === "completed" && mins(r.created_at) < 180 && r.conclusion !== "skipped");
 const failed = recent.filter((r) => r.conclusion === "failure" && r.name !== "ci");

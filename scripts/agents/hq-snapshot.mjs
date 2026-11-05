@@ -37,7 +37,8 @@ const failed24 = done24.filter((r) => r.conclusion === "failure");
 const mainCI = runs.find((r) => r.name === "ci" && r.head_branch === "main" && r.status === "completed");
 const mainIOS = runs.find((r) => r.name === "ios-runtime" && r.head_branch === "main" && r.status === "completed")
   || (api(`repos/${REPO}/actions/workflows/ios-runtime.yml/runs?branch=main&status=completed&per_page=1`)?.workflow_runs || [])[0];
-const tags = (api(`repos/${REPO}/tags?per_page=30`) || []).filter((t) => t.name.startsWith("release-"));
+// Shell build tags outnumber release tags, so ask for release tags by prefix; the newest sorts last.
+const tags = (api(`repos/${REPO}/git/matching-refs/tags/release-`) || []).map((r) => ({ name: r.ref.replace("refs/tags/", "") })).sort((a, b) => b.name.localeCompare(a.name));
 const has = (i, l) => L(i).includes(l);
 const ready = issues.filter((i) => has(i, "agent:ready") && !["agent:in-progress", "agent:pr-open", "agent:blocked", "needs-human"].some((l) => has(i, l)));
 const working = issues.filter((i) => has(i, "agent:in-progress"));
