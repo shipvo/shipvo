@@ -50,3 +50,5 @@ For the comparison with Expo in detail, see [Shipvo vs Expo](/compare/).
 
 - [How to replace App Center and CodePush](https://expo.dev/blog/how-to-replace-app-center-and-codepush), Expo
 - [Microsoft is retiring App Center: here's what React Native developers should use instead](https://shift.infinite.red/microsoft-is-retiring-app-center-heres-what-react-native-developers-should-use-instead-c2a8786f971e), Infinite Red
+
+Related: [React Native OTA update size, measured](/blog/react-native-ota-update-size-bsdiff-patches/), on how small patches cut download size.
