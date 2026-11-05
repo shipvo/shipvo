@@ -13,9 +13,11 @@ const [root, app, seed, releaseS, file, min = "1.0.0"] = process.argv.slice(2);
 const release = Number(releaseS), bytes = new Uint8Array(readFileSync(file));
 mkdirSync(join(root, "b", app), { recursive: true });
 writeFileSync(join(root, "b", app, `ios-r${release}.hbc`), bytes);
-const patches = [];
+const patches = [], seen = new Set();
 for (const from of (process.env.PATCH_FROM || "").split(",").filter(Boolean)) {
   const fromSha = sha256Hex(new Uint8Array(readFileSync(from)));
+  if (seen.has(fromSha)) continue;
+  seen.add(fromSha);
   const url = `b/${app}/ios-d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
   execFileSync("python3", ["-c", "import sys, bsdiff4; bsdiff4.file_diff(sys.argv[1], sys.argv[2], sys.argv[3])", from, file, join(root, url)]);
   const patch = new Uint8Array(readFileSync(join(root, url)));

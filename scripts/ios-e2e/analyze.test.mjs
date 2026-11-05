@@ -1,10 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFileSync } from "node:child_process";
 import { analyze, analyzePatch, median, parseLog } from "./analyze.mjs";
 
 const L = (t, path, bytes) => JSON.stringify({ t, path, bytes });
@@ -86,7 +85,8 @@ test("patch rows reject a run that did not use a patch", () => {
   assert.throws(() => analyzePatch(pl, [{ app_launched: 1, healthy: 2 }]), /missing mark full_bytes/);
 });
 
-test("make-release builds release 2 with patches from the embedded bundle and from release 1", () => {
+test("make-release builds release 2 with patches from the embedded bundle and from release 1", (t) => {
+  if (spawnSync("python3", ["-c", "import bsdiff4"]).status !== 0) return t.skip("python bsdiff4 not installed");
   const dir = mkdtempSync(join(tmpdir(), "mk-")), root = join(dir, "cp");
   const base = Buffer.alloc(20000); for (let i = 0; i < base.length; i++) base[i] = (i * 31 + (i >> 8)) & 255;
   const r1 = Buffer.from(base); r1.write("release-one-headline", 5000);
@@ -103,4 +103,10 @@ test("make-release builds release 2 with patches from the embedded bundle and fr
   assert.equal(core.size, r2.length);
   assert.equal(core.patches.length, 2);
   for (const p of core.patches) assert.ok(p.size > 0 && p.size < core.size / 2, `patch ${p.size} is small`);
+  // The same file listed twice gives one patch.
+  const root2 = join(dir, "cp2");
+  execFileSync(process.execPath, [script, root2, "e2e", seed, "1", f1]);
+  execFileSync(process.execPath, [script, root2, "e2e", seed, "2", f2], { env: { ...process.env, PATCH_FROM: `${f1},${f1}` } });
+  const dup = JSON.parse(JSON.parse(readFileSync(join(root2, "p/e2e/1/ios/b0.json"), "utf8")).body);
+  assert.equal(dup.core.patches.length, 1);
 });
