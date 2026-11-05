@@ -41,6 +41,19 @@ describe("checkScreenshot", () => {
     expect(checkScreenshot(png(1080, 2340), "play-phone").problems.join()).toContain("9:16");
     expect(checkScreenshot(png(720, 1280), "play-phone").problems.join()).toContain("at least 1080x1920");
   });
+  it("Play phone: each side is at most 3840 px", () => {
+    expect(checkScreenshot(png(2160, 3840), "play-phone").ok).toBe(true);
+    expect(checkScreenshot(png(2161, 3841), "play-phone").problems.join()).toContain("320 to 3840");
+  });
+  it("Play tablet: 9:16 or 16:9, each side 1080 to 7680", () => {
+    expect(checkScreenshot(png(1080, 1920), "play-tablet-7").ok).toBe(true);
+    expect(checkScreenshot(png(1920, 1080), "play-tablet-7").ok).toBe(true);
+    expect(checkScreenshot(png(1440, 2560), "play-tablet-10").ok).toBe(true);
+    expect(checkScreenshot(png(1200, 1920), "play-tablet-7").problems.join()).toContain("9:16 or 16:9");
+    expect(checkScreenshot(png(1080, 1079), "play-tablet-7").problems.join()).toContain("1080 to 7680");
+    expect(checkScreenshot(png(4320, 7680), "play-tablet-10").ok).toBe(true);
+    expect(checkScreenshot(png(4321, 7681), "play-tablet-10").problems.join()).toContain("1080 to 7680");
+  });
   it("rejects files that are not PNG or JPEG", () => {
     expect(checkScreenshot(new TextEncoder().encode("GIF89a........"), "play-icon").problems[0]).toContain("not a PNG or JPEG");
   });
@@ -62,6 +75,6 @@ describe("counts", () => {
   });
 });
 
-it("Play tablets: long side at most 2x the short side", () => {
-  expect(checkScreenshot(png(1000, 2100), "play-tablet-7").problems.join()).toContain("2x");
+it("Play tablets: a 1:2 shape is not 9:16 or 16:9", () => {
+  expect(checkScreenshot(png(1080, 2160), "play-tablet-7").problems.join()).toContain("9:16 or 16:9");
 });

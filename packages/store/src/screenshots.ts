@@ -4,8 +4,8 @@
 //  - Apple, "Screenshot specifications": https://developer.apple.com/help/app-store-connect/reference/screenshot-specifications
 //    Screenshots must be .jpeg, .jpg or .png, no alpha, 1 to 10 per size.
 //  - Google Play, "Add preview assets": https://support.google.com/googleplay/android-developer/answer/9866151
-//    Screenshots are JPEG or 24-bit PNG (no alpha), each side 320 to 3840 px, long side at most 2x the short side;
-//    2 to 8 per device type. Feature graphic 1024x500. App icon 512x512 PNG, at most 1024 KB.
+//    Screenshots are JPEG or 24-bit PNG (no alpha). Phone: each side 320 to 3840 px, 9:16, 1080x1920 or more to be eligible for promotion.
+//    7-inch and 10-inch tablets: each side 1080 to 7680 px, 9:16 or 16:9 (issue #249, section 5). 2 to 8 per device type. Feature graphic 1024x500. App icon 512x512 PNG, at most 1024 KB.
 // The numbers below are the ones in the issue (#362). They were not re-checked against the live pages by the author.
 
 export type ScreenshotSetId =
@@ -21,7 +21,7 @@ export interface ScreenshotSet {
   height: number;
   /** Device pixel ratio used when rendering, so the CSS viewport is width/scale by height/scale. */
   scale: number;
-  /** "exact": width and height must match. "phone": at least width x height, 9:16 portrait. "tablet": at least width x height, long side at most 2x the short side. Play sides are 320 to 3840 px. */
+  /** "exact": width and height must match. "phone": at least width x height, 9:16 portrait. "tablet": each side 1080 to 7680 px, 9:16 or 16:9 (portrait or landscape); width x height is the size we render. Play phone sides are 320 to 3840 px. */
   rule: "exact" | "phone" | "tablet";
   min: number;
   max: number;
@@ -35,8 +35,8 @@ export const SCREENSHOT_SETS: ScreenshotSet[] = [
   { id: "ipad-2064x2752", store: "apple", label: "iPad 13-inch", width: 2064, height: 2752, scale: 2, rule: "exact", min: 1, max: 10 },
   { id: "ipad-2048x2732", store: "apple", label: "iPad 13-inch (older size)", width: 2048, height: 2732, scale: 2, rule: "exact", min: 1, max: 10 },
   { id: "play-phone", store: "play", label: "Play phone", width: 1080, height: 1920, scale: 3, rule: "phone", min: 2, max: 8 },
-  { id: "play-tablet-7", store: "play", label: "Play 7-inch tablet", width: 1200, height: 1920, scale: 2, rule: "tablet", min: 2, max: 8 },
-  { id: "play-tablet-10", store: "play", label: "Play 10-inch tablet", width: 1600, height: 2560, scale: 2, rule: "tablet", min: 2, max: 8 },
+  { id: "play-tablet-7", store: "play", label: "Play 7-inch tablet", width: 1080, height: 1920, scale: 2, rule: "tablet", min: 2, max: 8 },
+  { id: "play-tablet-10", store: "play", label: "Play 10-inch tablet", width: 1440, height: 2560, scale: 2, rule: "tablet", min: 2, max: 8 },
   { id: "play-feature", store: "play", label: "Play feature graphic", width: 1024, height: 500, scale: 1, rule: "exact", min: 1, max: 1 },
   { id: "play-icon", store: "play", label: "Play icon", width: 512, height: 512, scale: 1, rule: "exact", min: 1, max: 1, alphaAllowed: true },
 ];
@@ -88,11 +88,15 @@ export function checkScreenshot(file: Uint8Array, setId: ScreenshotSetId): Check
   if (set.rule === "exact") {
     if (w !== set.width || h !== set.height) problems.push(`size is ${w}x${h}, ${set.label} needs exactly ${set.width}x${set.height}`);
   } else {
-    const side = (n: number) => n >= 320 && n <= 3840;
-    if (w < set.width || h < set.height) problems.push(`size is ${w}x${h}, ${set.label} needs at least ${set.width}x${set.height}`);
-    if (set.rule === "phone" && Math.abs(w * 16 - h * 9) > 16) problems.push(`size is ${w}x${h}, ${set.label} needs a 9:16 portrait shape`);
-    if (set.rule === "tablet" && Math.max(w, h) > 2 * Math.min(w, h)) problems.push(`size is ${w}x${h}, the long side may be at most 2x the short side`);
-    if (!side(w) || !side(h)) problems.push(`each side must be 320 to 3840 px, got ${w}x${h}`);
+    const shape = (a: number, b: number) => Math.abs(a * 16 - b * 9) <= 16;   // a:b is 9:16, within a pixel or so
+    if (set.rule === "phone") {
+      if (w < set.width || h < set.height) problems.push(`size is ${w}x${h}, ${set.label} needs at least ${set.width}x${set.height}`);
+      if (!shape(w, h)) problems.push(`size is ${w}x${h}, ${set.label} needs a 9:16 portrait shape`);
+      if (w < 320 || h < 320 || w > 3840 || h > 3840) problems.push(`each side must be 320 to 3840 px, got ${w}x${h}`);
+    } else {
+      if (w < 1080 || h < 1080 || w > 7680 || h > 7680) problems.push(`each side must be 1080 to 7680 px, got ${w}x${h}`);
+      if (!shape(w, h) && !shape(h, w)) problems.push(`size is ${w}x${h}, ${set.label} needs a 9:16 or 16:9 shape`);
+    }
   }
   if (info.alpha && !set.alphaAllowed) problems.push("has an alpha channel; the store rejects it. Export without transparency");
   return { ok: problems.length === 0, problems, info };

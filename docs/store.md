@@ -43,13 +43,13 @@ Needs `sim-dist` (run `shipvo sim` once) and `playwright` installed in the app, 
 |---|---|---|
 | `iphone-1206x2622`, `iphone-1179x2556` | exact | 1 to 10 |
 | `ipad-2064x2752`, `ipad-2048x2732` | exact | 1 to 10 |
-| `play-phone` | at least 1080x1920, 9:16 | 2 to 8 |
-| `play-tablet-7`, `play-tablet-10` | at least 1200x1920 / 1600x2560, long side at most 2x short | 2 to 8 |
+| `play-phone` | at least 1080x1920, 9:16, each side up to 3840 px | 2 to 8 |
+| `play-tablet-7`, `play-tablet-10` | each side 1080 to 7680 px, 9:16 or 16:9 (we render 1080x1920 and 1440x2560) | 2 to 8 |
 | `play-feature` | exactly 1024x500 | 1 (first route) |
 | `play-icon` | exactly 512x512 | 1 |
 
 The checker (`checkScreenshot` in `@shipvo/store`) fails a file with the wrong size, an alpha channel, or a type other than PNG or JPEG, and fails a set with the wrong count. The Play icon is your own file: it is checked at `listing.icon` if present, never drawn. Exit code is 1 if any check fails.
 
-The sizes come from the Apple and Google Play spec pages named in `packages/store/src/screenshots.ts`. Check them before you submit; the stores change them. The Play tablet sizes are Shipvo's chosen minimums. The feature graphic is a placeholder render of the first route; replace it with your own artwork.
+The sizes come from the Apple and Google Play spec pages named in `packages/store/src/screenshots.ts`. Check them before you submit; the stores change them. The Play tablet rule (1,080 to 7,680 px, 9:16 or 16:9) and the phone rule (9:16, 1080x1920 or more, sides 320 to 3840 px) follow the Play page. Not checked yet: text outside the app on tablet shots, which Google may crop. The feature graphic is a placeholder render of the first route; replace it with your own artwork.
 
 See the package: [`packages/store`](../packages/store/README.md).
