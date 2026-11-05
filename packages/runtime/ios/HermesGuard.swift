@@ -32,6 +32,9 @@ enum HermesGuard {
   }
 
   /// The version of the bundle embedded in the app, read from its header.
+  /// The embedded bundle header is the source of truth here, not `ShipvoHermesBytecodeVersions` in Info.plist
+  /// (that list is only sent to the control plane to filter releases).
+  /// Read by file path with `FileHandle`, not through `Bundle(path:)` on a plain folder.
   static func shellVersion(_ bundle: Bundle) -> Int? {
     guard let url = bundle.url(forResource: "main", withExtension: "jsbundle"), let h = try? FileHandle(forReadingFrom: url) else { return nil }
     defer { try? h.close() }
