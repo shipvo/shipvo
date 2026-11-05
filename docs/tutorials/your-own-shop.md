@@ -201,7 +201,7 @@ You:
 ## What this shop does not do yet
 
 - **It does not take payments.** The cart shows a total and nothing else.
-- **Prices show in dollars.** The `$` sign and the two decimals are built in. Showing another currency means editing `src/money.ts`.
+- **Prices show in dollars until you change `src/data/shop.json`.** Set `currency`, `position` (`before` or `after`), `decimals` and `locale`. For FCFA: `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole minor units (6500 with `decimals` 0).
 - **It has no pictures.** Products show a name, a price and a description.
 
 ## What we measured
