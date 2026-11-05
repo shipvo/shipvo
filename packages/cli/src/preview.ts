@@ -134,7 +134,7 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 <button id="comment" class="fab" aria-pressed="false">Comment</button>
 <div class="stage"><div class="device" id="device" data-skin="android" style="width:360px;height:760px">
 <div class="status" id="status"><span id="clock">9:41</span><span class="notch"></span><span class="icons" id="icons">&#9679;&#9679; 5G 100%</span></div>
-<iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" aria-label="Tap where the problem is"><span class="hint">Tap where the problem is. Press Escape to cancel.</span></div>
+<iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" role="button" tabindex="0" aria-label="Tap where the problem is, or press Enter to mark the centre of the device"><span class="hint">Tap where the problem is. Press Escape to cancel.</span></div>
 <div class="nav"><button class="back" id="back" aria-label="Back" title="Back">&#9664; Back</button></div>
 </div>
 <aside class="panel" id="device-panel" aria-label="Device controls"><h2>Device</h2>
@@ -148,7 +148,7 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 <p class="sim" id="panel-status" role="status">All device events here are simulated.</p></aside>
 </div>
 <div class="side" id="side"><h2>Comments (<span id="count">0</span>)</h2>
-<form id="noteform" hidden><label for="notetext">Note for the point you tapped</label><br><input id="notetext"> <button type="submit">Save</button></form>
+<form id="noteform" hidden><label for="notetext">Note for the point you tapped</label><br><input id="notetext"> <button type="submit">Save</button></form><span id="notesaved" role="status"></span>
 <ol id="notelist"></ol>
 <button id="export">Export comments.json</button>
 <p><small>Notes live in this browser until you export them. Nothing is uploaded.</small></p></div>
@@ -167,12 +167,15 @@ function exportJson(){return JSON.stringify(notes,null,2)}
 function render(){var l=$("notelist"),c=$("count");if(c)c.textContent=notes.length;if(l)l.innerHTML=notes.map(function(n){return"<li>"+esc(n.note)+"<br><small>"+esc(n.screen)+" at "+Number(n.x)+","+Number(n.y)+", "+(n.steps||[]).length+" steps</small></li>"}).join("")}
 function download(){var b=new Blob([exportJson()],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="comments.json";document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}
 function label(e){var t=e.getAttribute&&(e.getAttribute("aria-label")||e.textContent)||"";return String(t).trim().slice(0,40)}
-function watch(){try{var d=$("app").contentWindow.document;d.addEventListener("click",function(ev){var e=ev.target,k=e&&e.closest&&e.closest("button,[role=button],a,input");step("tap "+(k?label(k)||"control":"screen"))},true)}catch(e){}}
-function setMode(on){var p=$("pin"),b=$("comment");if(p)p.className=on?"on":"";if(b)b.setAttribute("aria-pressed",on)}
+var seen=typeof WeakSet==="function"?new WeakSet():null;
+function watch(){try{var d=$("app").contentWindow.document;if(seen){if(seen.has(d))return;seen.add(d)}d.addEventListener("click",function(ev){var e=ev.target,k=e&&e.closest&&e.closest("button,[role=button],a,input");step("tap "+(k?label(k)||"control":"screen"))},true)}catch(e){}}
+function setMode(on,refocus){var p=$("pin"),b=$("comment");if(p)p.className=on?"on":"";if(b){b.setAttribute("aria-pressed",on);if(refocus&&b.focus)b.focus()}if(on&&p&&p.focus)p.focus()}
 var cb=$("comment");if(cb)cb.onclick=function(){setMode($("pin").className!=="on")};
-var pin=$("pin");if(pin)pin.onclick=function(ev){var r=pin.getBoundingClientRect?pin.getBoundingClientRect():{left:0,top:0};pending={x:ev.clientX-r.left,y:ev.clientY-r.top};setMode(false);$("noteform").hidden=false;if($("notetext").focus)$("notetext").focus()};
-var fm=$("noteform");if(fm)fm.onsubmit=function(ev){if(ev&&ev.preventDefault)ev.preventDefault();var t=$("notetext");if(pending&&t.value.trim()){add(t.value.trim(),pending.x,pending.y)}t.value="";pending=null;fm.hidden=true;return false};
-if(document.addEventListener)document.addEventListener("keydown",function(ev){if(ev.key==="Escape")setMode(false)});
+function place(x,y){pending={x:x,y:y};setMode(false);$("noteform").hidden=false;if($("notetext").focus)$("notetext").focus()}
+var pin=$("pin");if(pin){pin.onclick=function(ev){var r=pin.getBoundingClientRect?pin.getBoundingClientRect():{left:0,top:0};place(ev.clientX-r.left,ev.clientY-r.top)};
+pin.onkeydown=function(ev){if(ev.key==="Enter"||ev.key===" "){if(ev.preventDefault)ev.preventDefault();var r=pin.getBoundingClientRect?pin.getBoundingClientRect():{width:0,height:0};place((r.width||0)/2,(r.height||0)/2)}}}
+var fm=$("noteform");if(fm)fm.onsubmit=function(ev){if(ev&&ev.preventDefault)ev.preventDefault();var t=$("notetext");if(pending&&t.value.trim()){add(t.value.trim(),pending.x,pending.y)}t.value="";pending=null;fm.hidden=true;var st=$("notesaved");if(st)st.textContent="Saved";setMode(false,true);return false};
+if(document.addEventListener)document.addEventListener("keydown",function(ev){if(ev.key==="Escape"){var was=$("pin")&&$("pin").className==="on",f=$("noteform");if(was||(f&&!f.hidden)){if(f)f.hidden=true;pending=null;setMode(false,true)}}});
 var ex=$("export");if(ex)ex.onclick=download;
 var bk=$("back");if(bk&&bk.addEventListener)bk.addEventListener("click",function(){step("back")});
 var ap=$("app");if(ap){if(ap.addEventListener)ap.addEventListener("load",watch);watch()}

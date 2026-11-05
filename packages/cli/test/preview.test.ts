@@ -217,6 +217,28 @@ describe("frame page comments", () => {
     expect(nodes.pin.className).toBe("");
     expect(framePage("Shop")).toContain("Tap where the problem is. Press Escape");
   });
+  it("lets a keyboard user place a point with Enter, save, and get focus back", () => {
+    const { win, nodes } = boot();
+    const focused: string[] = [];
+    for (const k of ["comment", "pin", "notetext"]) nodes[k].focus = () => focused.push(k);
+    nodes.pin.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 200 });
+    const h = framePage("Shop");
+    expect(h).toMatch(/id="pin" role="button" tabindex="0"/);
+    nodes.comment.onclick(); expect(focused.pop()).toBe("pin");
+    nodes.pin.onkeydown({ key: "Enter", preventDefault() {} });
+    expect(nodes.noteform.hidden).toBe(false);
+    nodes.notetext.value = "kbd"; nodes.noteform.onsubmit({ preventDefault() {} });
+    expect(win.shipvoNotes.list()[0]).toMatchObject({ note: "kbd", x: 50, y: 100 });
+    expect(focused.pop()).toBe("comment");
+  });
+  it("returns focus to the Comment button on Escape", () => {
+    const { nodes, doc } = boot();
+    const focused: string[] = [];
+    nodes.comment.focus = () => focused.push("comment");
+    nodes.comment.onclick();
+    (doc as any).l.keydown({ key: "Escape" });
+    expect(focused).toEqual(["comment"]);
+  });
   it("keeps notes after a reload via localStorage", () => {
     const first = boot();
     first.win.shipvoNotes.add("kept", 5, 6);
