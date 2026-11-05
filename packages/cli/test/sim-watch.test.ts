@@ -42,7 +42,34 @@ describe("watchAndRebuild", () => {
   });
 });
 
+describe("watchAndRebuild verbose", () => {
+  it("passes verbose through, so the logged line has the full multi-line message", async () => {
+    const { watchAndRebuild } = await import("../src/sim");
+    const dir = mkdtempSync(join(tmpdir(), "watch-v-"));
+    mkdirSync(join(dir, "src"));
+    const log: string[] = [];
+    const build = async () => { throw new Error("Unexpected token\n    at transformJSON (x.js:1:1)"); };
+    const stop = watchAndRebuild({ dir, build, debounceMs: 100, log: (l) => log.push(l), verbose: true });
+    await new Promise((r) => setTimeout(r, 100));
+    writeFileSync(join(dir, "src", "a.ts"), "x");
+    await new Promise((r) => setTimeout(r, 500));
+    stop();
+    expect(log).toEqual(["build failed, still serving the last good build: Unexpected token\n    at transformJSON (x.js:1:1)"]);
+  });
+});
+
 describe("friendlyBuildError", () => {
+  it("describes a non-comma JSON error", async () => {
+    const { friendlyBuildError } = await import("../src/sim");
+    const out = friendlyBuildError("SyntaxError: Unexpected token } in file a/b.json at 3:7\n  at x");
+    expect(out).toContain("a/b.json has a mistake at line 3, column 7: a character is missing, extra or in the wrong place.");
+  });
+  it("does not blame JSON for a resolve error that only names a .json file", async () => {
+    const { friendlyBuildError } = await import("../src/sim");
+    const out = friendlyBuildError("Unable to resolve module ./x in file a.json at 1:2");
+    expect(out).toContain("--verbose");
+    expect(out).not.toContain("mistake");
+  });
   const metro = "SyntaxError: Error: Unexpected token string «name», expected punc «,» in file src/data/products.json at 23:4\n    at async transformJSON (x.js:1:1)";
   it("names the file and line for broken JSON and hides the stack", async () => {
     const { friendlyBuildError } = await import("../src/sim");

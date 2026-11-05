@@ -37,7 +37,7 @@ export const ignoredPath = (rel: string) => rel.split(/[\\/]/).some((seg) => IGN
 export function friendlyBuildError(message: string, verbose = false): string {
   if (verbose) return `build failed, still serving the last good build: ${message}`;
   const m = /in file (\S+\.json) at (\d+):(\d+)/.exec(message);
-  if (m && /Unexpected token|SyntaxError|JSON/.test(message)) {
+  if (m && /Unexpected token|SyntaxError/.test(message)) {
     const comma = /expected punc [«"']?,/.test(message) || /Unexpected token string/.test(message);
     const what = comma ? "a comma is missing or extra" : "a character is missing, extra or in the wrong place";
     return `Your file ${m[1]} has a mistake at line ${m[2]}, column ${m[3]}: ${what}. The page still shows your last good version.`;
