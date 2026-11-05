@@ -49,23 +49,37 @@ function waitListening(port: number, stop: () => boolean): Promise<boolean> {
   });
 }
 
-export function buildBundle(cfg: any, a: any, force = false, watchMode = false): { ok: boolean; ms: number; error?: string } {
+export function buildBundle(cfg: Record<string, unknown>, a: Record<string, unknown>, force = false, watchMode = false): { ok: boolean; ms: number; error?: string } {
   const start = Date.now();
   if (!force && a["skip-build"] === "true" && existsSync("sim-dist/index.html")) {
     return { ok: true, ms: 0 };
   }
-  console.error(`Building ${cfg.name} for the simulator…`);
+  console.error(`Building ${String(cfg.name)} for the simulator…`);
   const tmp = ".shipvo/sim-next";
   rmSync(tmp, { recursive: true, force: true });
-  mkdirSync(tmp, { recursive: true, force: true } as any);
+  mkdirSync(tmp, { recursive: true });
   const stdio = watchMode ? "pipe" : "inherit";
   try {
-    execSync("npx expo export --platform web --output-dir " + tmp + " --clear", { stdio, env: { ...process.env, PN_SIM: "1" } });
-    rmSync("sim-dist", { recursive: true, force: true });
-    renameSync(tmp, "sim-dist");
+    execSync("npx expo export --platform web --output-dir " + tmp + " --clear", { stdio, env: { ...process.env, PN_SIM: "1" }, maxBuffer: 100 * 1024 * 1024 });
+    const prev = ".shipvo/sim-prev";
+    rmSync(prev, { recursive: true, force: true });
+    const hadOld = existsSync("sim-dist");
+    if (hadOld) renameSync("sim-dist", prev);
+    try {
+      renameSync(tmp, "sim-dist");
+      rmSync(prev, { recursive: true, force: true });
+    } catch (swapErr) {
+      if (hadOld && existsSync(prev) && !existsSync("sim-dist")) renameSync(prev, "sim-dist");
+      rmSync(tmp, { recursive: true, force: true });
+      rmSync(prev, { recursive: true, force: true });
+      throw swapErr;
+    }
     return { ok: true, ms: Date.now() - start };
   } catch (e: any) {
     rmSync(tmp, { recursive: true, force: true });
+    const prev = ".shipvo/sim-prev";
+    if (existsSync(prev) && !existsSync("sim-dist")) renameSync(prev, "sim-dist");
+    rmSync(prev, { recursive: true, force: true });
     const out = [e.stdout?.toString?.(), e.stderr?.toString?.(), e.message].filter(Boolean).join("\n");
     return { ok: false, ms: Date.now() - start, error: out };
   }
@@ -73,7 +87,7 @@ export function buildBundle(cfg: any, a: any, force = false, watchMode = false):
 
 export async function sim(argv: string[]) {
   const a = parse(argv); const cfg = loadConfig();
-  const watchMode = argv.includes("--watch");
+  const watchMode = a.watch === "true";
   const port = a.port || "4545";
   if (!(await portFree(Number(port)))) {
     console.error(`Port ${port} is in use. Stop the other \`shipvo sim\` or pass --port <n>.`);
@@ -84,6 +98,7 @@ export async function sim(argv: string[]) {
   if (!initial.ok) {
     console.error(initial.error);
     if (!watchMode || !existsSync("sim-dist/index.html")) process.exit(1);
+    if (watchMode && existsSync("sim-dist/index.html")) console.error("Build failed, still serving the last good build");
   }
 
   let server: string;
@@ -98,17 +113,10 @@ export async function sim(argv: string[]) {
 
   if (!watchMode) return;
 
-  let building = false;
-  let dirty = false;
-
   const runBuild = () => {
-    if (building) { dirty = true; return; }
-    building = true;
     const r = buildBundle(cfg, a, true, true);
-    building = false;
     if (r.ok) console.log(`rebuilt in ${(r.ms / 1000).toFixed(1)} s`);
     else console.error(`Build failed, still serving the last good build:\n${r.error}`);
-    if (dirty) { dirty = false; runBuild(); }
   };
 
   const rebuild = debounce(() => { runBuild(); }, 300);
@@ -117,7 +125,7 @@ export async function sim(argv: string[]) {
     if (!filename || isIgnoredPath(String(filename))) return;
     rebuild();
   });
-  watcher.on("error", () => {});
+  watcher.on("error", (e: any) => { console.error(`File watcher error: ${e?.message ?? e}`); });
 
   p.on("exit", () => {
     watcher.close();

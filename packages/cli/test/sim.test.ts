@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,11 +10,68 @@ vi.mock("../src/config.js", async (orig) => ({
 }));
 const exec = vi.hoisted(() => vi.fn());
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: exec }));
-import { sim } from "../src/sim";
+import { sim, isIgnoredPath, debounce, buildBundle } from "../src/sim";
 
 let srv: Server | undefined;
 const prev = process.cwd();
 afterEach(() => { srv?.close(); srv = undefined; process.chdir(prev); vi.restoreAllMocks(); exec.mockClear(); });
+
+describe("shipvo sim helpers", () => {
+  it("isIgnoredPath", () => {
+    expect(isIgnoredPath("src/foo.ts")).toBe(false);
+    expect(isIgnoredPath("node_modules/x")).toBe(true);
+    expect(isIgnoredPath("a/sim-dist/index.html")).toBe(true);
+    expect(isIgnoredPath(".shipvo/sim-next")).toBe(true);
+  });
+
+  it("debounce calls once and cancels", () => {
+    vi.useFakeTimers();
+    const fn = vi.fn();
+    const d = debounce(fn, 100);
+    d("a"); d("b");
+    vi.advanceTimersByTime(100);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenCalledWith("b");
+
+    const fn2 = vi.fn();
+    const d2 = debounce(fn2, 100);
+    d2();
+    d2.cancel();
+    vi.advanceTimersByTime(100);
+    expect(fn2).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("buildBundle failure keeps old bundle and cleans temp", () => {
+    const dir = mkdtempSync(join(tmpdir(), "sim-"));
+    mkdirSync(join(dir, "sim-dist"));
+    writeFileSync(join(dir, "sim-dist", "index.html"), "old");
+    mkdirSync(join(dir, ".shipvo", "sim-next"), { recursive: true });
+    writeFileSync(join(dir, ".shipvo", "sim-next", "junk"), "x");
+    process.chdir(dir);
+    exec.mockImplementation(() => { throw new Error("boom"); });
+    const r = buildBundle({ name: "demo" }, {}, false, false);
+    expect(r.ok).toBe(false);
+    expect(readFileSync(join(dir, "sim-dist", "index.html"), "utf8")).toBe("old");
+    expect(existsSync(join(dir, ".shipvo", "sim-next"))).toBe(false);
+  });
+
+  it("buildBundle success replaces sim-dist", () => {
+    const dir = mkdtempSync(join(tmpdir(), "sim-"));
+    mkdirSync(join(dir, "sim-dist"));
+    writeFileSync(join(dir, "sim-dist", "index.html"), "old");
+    process.chdir(dir);
+    exec.mockImplementation(() => {
+      mkdirSync(join(dir, ".shipvo", "sim-next"), { recursive: true });
+      writeFileSync(join(dir, ".shipvo", "sim-next", "index.html"), "new");
+    });
+    const r = buildBundle({ name: "demo" }, {}, false, false);
+    expect(r.ok).toBe(true);
+    expect(readFileSync(join(dir, "sim-dist", "index.html"), "utf8")).toBe("new");
+    expect(existsSync(join(dir, ".shipvo", "sim-next"))).toBe(false);
+    expect(existsSync(join(dir, ".shipvo", "sim-prev"))).toBe(false);
+  });
+});
 
 describe("shipvo sim", () => {
   it("prints one line and exits 1 when the port is taken, without rebuilding sim-dist", async () => {
