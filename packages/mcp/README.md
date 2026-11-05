@@ -10,7 +10,7 @@ Lets AI agents (Claude, Cursor, Claude Code, PiPilot…) **use a Shipvo app with
 
 Start the simulator first (`shipvo sim` in the app). The server asks the simulator which app it serves, so `open_app("<your app id>")` works; set `PN_APPS` (JSON) to override. If the simulator cannot be reached, only the sample app opens. The hosted version needs no local setup: `{ "url": "https://<host>/mcp/<key>" }`.
 
-Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none | content changed | new screen | scrolled`, then the screen. `type` also adds `Value of <ref>: "..."`. Pass `compact: true` to get only the added (`+`) and removed (`-`) lines when the change is `content changed`; refs match the full screen.
+Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none | content changed | new screen | scrolled`, then the screen. `type` also adds `Value of <ref>: "..."`. Pass `compact: true` to get only the added (`+`) and removed (`-`) lines when the change is `content changed`; refs match the full screen. If the server has no earlier screen for the session (for example after a reconnect), the first line is `Change: unknown`. The `content changed` / `new screen` split is a heuristic (under half the lines kept means a new screen), so on a short screen one change can read as `new screen`.
 
 Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `end_session`, `owner_describe`, `owner_command`.
 

@@ -39,15 +39,17 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
   if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}. Is it running at ${SIM}?`);
   return r.json() as Promise<Act>;
 }
-const sessions = new Map<string, { app: string; steps: number; startedAt: number; tree?: string }>();
+const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
+// Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
+const trees = new Map<string, string>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
 const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string } = {}) => {
-  const s = sessions.get(sid);
   if (!r.ok || r.screen == null) return result(sid, r);
-  const prev = s?.tree; if (s) s.tree = r.screen;
-  const change = classify(prev, r.screen, action);
+  const prev = trees.get(sid);
+  trees.set(sid, r.screen);
+  const change = prev === undefined ? "unknown (no earlier screen to compare)" : classify(prev, r.screen, action);
   const head = [`Change: ${change}`];
   if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
   const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
@@ -92,7 +94,8 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
-  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), tree: r.screen ?? undefined });
+  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
+  if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
 });
 
@@ -105,7 +108,7 @@ const sid = z.string().describe("Session from open_app");
 const compact = z.boolean().optional().describe("When the change is 'content changed', return only the added/removed lines, not the whole screen");
 const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
-server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); const s = sessions.get(session); if (s && r.ok && r.screen != null) s.tree = r.screen; return result(session, r); });
+server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
 server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, async ({ session, ref, compact }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact }); });
 server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact },
   async ({ session, ref, text: t, enter, compact }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref }); });
@@ -142,7 +145,7 @@ server.tool("device_reset", "Put the simulated phone back to a known state (perm
   async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
 
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, async ({ session }) => {
-  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session);
+  need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));

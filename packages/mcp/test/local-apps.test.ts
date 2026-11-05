@@ -139,4 +139,12 @@ describe("change line", () => {
     const r = await act("tap", "reordered", { ref: "e1", compact: true });
     expect(r).toContain("(same lines, new order)");
   });
+  it("does not claim new screen for a session this server never opened", async () => {
+    step = "home";
+    const call = async () => textOf(await c.callTool({ name: "tap", arguments: { session: "stranger", ref: "e2" } }));
+    const first = await call();
+    expect(first).not.toMatch(/new screen/);
+    expect(first).toMatch(/^Change: unknown/);
+    expect(await call()).toMatch(/^Change: none\n/);
+  });
 });
