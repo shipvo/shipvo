@@ -106,12 +106,12 @@ describe("frame page", () => {
     const h = framePage("Shop");
     expect(h).not.toMatch(/location\.(reload|href)/);
     const script = h.match(/<script>([\s\S]*)<\/script>/)![1];
-    const mk = (extra: object = {}) => ({ style: {} as Record<string, string>, dataset: {} as Record<string, string>, setAttribute(k: string, v: unknown) { (this as any).attrs[k] = v; }, attrs: {} as Record<string, unknown>, classList: { contains: () => false, toggle() {} }, ...extra });
+    const mk = (extra: object = {}) => ({ style: {} as Record<string, string>, addEventListener() {}, dataset: {} as Record<string, string>, setAttribute(k: string, v: unknown) { (this as any).attrs[k] = v; }, attrs: {} as Record<string, unknown>, classList: { contains: () => false, toggle() {} }, ...extra });
     const nodes: Record<string, any> = {};
     const clicked: string[] = [];
     const backBtn = { getAttribute: () => "Back", textContent: "", click: () => clicked.push("btn") };
     const win = { document: { querySelectorAll: () => [backBtn] }, history: { back: () => clicked.push("history") } };
-    for (const id of ["device", "app", "back", "icons", "theme"]) nodes[id] = mk(id === "app" ? { contentWindow: win } : {});
+    for (const id of ["device", "app", "back", "icons", "theme", "rec", "dl", "count"]) nodes[id] = mk(id === "app" ? { contentWindow: win } : {});
     const chips = [["skin", "iphone"], ["size", "tablet"]].map(([k, v]) => mk({ dataset: { [k]: v } }));
     const doc = { getElementById: (id: string) => nodes[id], querySelectorAll: (s: string) => (s === "[data-skin]" ? [chips[0]] : s === "[data-size]" ? [chips[1]] : []), body: mk() };
     new Function("document", script)(doc);
@@ -142,20 +142,40 @@ function runPanel(control: string, inputs: Record<string, string> = {}, device: 
   const html = framePage("Shop");
   const script = html.slice(html.lastIndexOf("<script>") + 8, html.lastIndexOf("</script>"));
   const dev = device ?? { sets: [] as any[], pushes: [] as any[], set(p: any) { this.sets.push(p); }, push(n: any) { this.pushes.push(n); return "n1"; } };
-  const status = { textContent: "" }; const handlers: Record<string, () => void> = {};
+  const status = { textContent: "" }; const els: Record<string, any> = {}; const handlers: Record<string, () => void> = {};
   const ctl = (c: string) => ({ value: inputs[c] ?? (c === "location-list" ? "4.0511,9.7679" : c === "camera-list" ? "ean13|6181234567890" : "") });
   const fetchCalls: number[] = [];
   const win: any = { __pnDevice: dev, fetch: async () => { fetchCalls.push(1); return "ok"; } };
   const doc: any = {
-    getElementById: (id: string) => (id === "app" ? { contentWindow: win, style: {}, } : id === "panel-status" ? status : { onclick: null, setAttribute() {}, style: {}, dataset: {} }),
+    getElementById: (id: string) => (id === "app" ? { contentWindow: win, style: {}, addEventListener() {} } : id === "panel-status" ? status : (els[id] ??= { onclick: null, setAttribute() {}, addEventListener() {}, style: {}, dataset: {}, textContent: "" })),
     querySelectorAll: (sel: string) => (sel === "[data-control]" ? html.match(/data-control="[^"]+"/g)!.map((m) => ({ dataset: { control: m.slice(14, -1) }, set onclick(f: () => void) { handlers[this.dataset.control] = f; } })) : []),
     querySelector: (sel: string) => ctl(sel.match(/"(.+)"/)![1]), body: { classList: { contains: () => false, toggle() {} } },
   };
-  vm.runInNewContext(script, { document: doc, setTimeout: (f: () => void) => f(), Promise });
-  return { dev, status, win, fetchCalls, click: (c: string) => handlers[c]?.(), handlers };
+  const ctx: any = { document: doc, setTimeout: (f: () => void) => f(), Promise };
+  vm.runInNewContext(script, ctx);
+  return { ctx, rec: () => els.rec.onclick(), dev, status, win, fetchCalls, click: (c: string) => handlers[c]?.(), handlers };
 }
 
 describe("device panel", () => {
+  it("records panel events as steps only while recording", () => {
+    const r = runPanel("", { lat: "-1.5", lng: "36.8", "push-title": "Hi" });
+    r.click("net-offline"); expect(r.ctx.shipvoSteps).toEqual([]);
+    r.rec();
+    r.click("coords-set"); r.click("net-offline"); r.click("push-send");
+    expect(r.ctx.shipvoSteps).toEqual([
+      { action: "set_device", device: { location: { latitude: -1.5, longitude: 36.8, accuracy: 20 } } },
+      { action: "set_device", device: { online: false } },
+      { action: "note", text: "panel: push sent" },
+    ]);
+    const none = runPanel("", {}, { set() {}, push: () => null }); none.rec(); none.click("push-send");
+    expect(none.ctx.shipvoSteps).toEqual([]);
+    const loading = runPanel(""); loading.win.__pnDevice = null; loading.rec(); loading.click("bio-fail");
+    expect(loading.ctx.shipvoSteps).toEqual([]);
+  });
+  it("attaches the recorder when the app frame is already loaded", () => {
+    const h = framePage("Shop");
+    expect(h).toContain('readyState==="complete")shipvoAttach(a,step)');
+  });
   it("lists every control and says events are simulated", () => {
     const html = framePage("Shop");
     for (const c of ["location-set", "coords-set", "camera-set", "bio-success", "bio-fail", "pay-approve", "pay-decline", "net-online", "net-slow", "net-offline", "push-send"]) expect(html).toContain(`data-control="${c}"`);

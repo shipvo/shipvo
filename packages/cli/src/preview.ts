@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep, extname } from "node:path";
 import { args as parse, loadConfig } from "./config.js";
+import { RECORDER_JS } from "./preview-recorder.js";
 
 const API = "https://here.now/api/v1";
 const CLIENT = "shipvo/cli";
@@ -73,8 +74,8 @@ export function collectFiles(dir: string): PreviewFile[] {
   return out;
 }
 
-/** The page people open: the app in an Android or iPhone frame, with skin, size and theme switches and a back control. */
-export function framePage(name: string): string {
+/** The page people open: the app in an Android or iPhone frame, with skin, size and theme switches, a back control and a recorder panel. */
+export function framePage(name: string, appId: string = name): string {
   const title = name.replace(/[<>&"']/g, "");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -105,6 +106,8 @@ iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 .back:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .device[data-skin=android] .back{border:0}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
+.recp a{color:inherit;text-decoration:underline}body.dark .recp a{color:#93c5fd}.recp button:focus-visible,.bar button:focus-visible,.recp a:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
+.recp{max-width:520px;margin:0 auto;padding:0 12px 24px;text-align:center}.recp p{opacity:.8}.recp button{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
 .panel{width:280px;max-width:100%;box-sizing:border-box;display:grid;gap:10px;padding:12px;border:1px solid #8886;border-radius:12px}
 .panel h2{font-size:15px;margin:0}.panel fieldset{border:0;margin:0;padding:0;display:grid;gap:6px}.panel legend{font-weight:600;padding:0 0 4px}
 .panel .row{display:flex;gap:6px;flex-wrap:wrap}.panel input,.panel select,.panel button{font:inherit;padding:5px 8px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;min-width:0}
@@ -131,23 +134,31 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 <p class="sim" id="panel-status" role="status">All device events here are simulated.</p></aside>
 </div>
 <p class="note">${title}: simulated device, public preview. System sheets such as permissions and payments are simulated.</p>
-<script>
+<section class="recp" aria-label="Recorder"><p id="honesty">This is the app's web build on Shipvo's simulated device, measured against Android and iOS in <a href="https://github.com/shipvo/shipvo/blob/main/docs/parity-results.md">docs/parity-results.md</a>. Native-only UI can differ.</p>
+<button id="rec" aria-pressed="false">Record</button> <button id="dl" disabled>Download test</button> <span id="count" aria-live="polite">0 steps</span></section>
+<script>${RECORDER_JS}
+var APP=${JSON.stringify(appId).replace(/</g, "\\u003c")},TITLE=${JSON.stringify(title).replace(/</g, "\\u003c")},recording=false;
+function step(s){if(recording){shipvoSteps.push(s);document.getElementById("count").textContent=shipvoSteps.length+(shipvoSteps.length===1?" step":" steps");document.getElementById("dl").disabled=false}}
+document.getElementById("app").addEventListener("load",function(){shipvoAttach(this,step)});
+(function(a){if(a.contentDocument&&a.contentDocument.readyState==="complete")shipvoAttach(a,step)})(document.getElementById("app"));
+document.getElementById("rec").onclick=function(){recording=!recording;if(recording){shipvoSteps.length=0;document.getElementById("count").textContent="0 steps";document.getElementById("dl").disabled=true}this.setAttribute("aria-pressed",recording)};
+document.getElementById("dl").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([shipvoExport(APP,shipvoSteps,TITLE)],{type:"text/typescript"}));a.download="recorded-session.test.ts";a.click()};
 var SIZES={phone:[360,760],large:[412,892],tablet:[820,1180]},IPHONE={phone:[390,844],large:[430,932],tablet:[820,1180]};
 var skin="android",size="phone",d=document.getElementById("device"),f=document.getElementById("app"),bk=document.getElementById("back");
 function pressed(sel,val,key){document.querySelectorAll(sel).forEach(function(o){o.setAttribute("aria-pressed",o.dataset[key]===val)})}
 function apply(){var s=(skin==="iphone"?IPHONE:SIZES)[size];d.dataset.skin=skin;d.style.width=s[0]+"px";d.style.height=s[1]+"px";bk.innerHTML=skin==="iphone"?"Back":"&#9664; Back";bk.setAttribute("aria-label","Back");document.getElementById("icons").innerHTML=skin==="iphone"?"5G &#9646; 100%":"&#9679;&#9679; 5G 100%";pressed("[data-skin]",skin,"skin");pressed("[data-size]",size,"size")}
-document.querySelectorAll("[data-skin]").forEach(function(b){b.onclick=function(){skin=b.dataset.skin;apply()}});
-document.querySelectorAll("[data-size]").forEach(function(b){b.onclick=function(){size=b.dataset.size;apply()}});
+document.querySelectorAll("[data-skin]").forEach(function(b){b.onclick=function(){step({action:"note",text:"panel: skin set to "+b.dataset.skin});skin=b.dataset.skin;apply()}});
+document.querySelectorAll("[data-size]").forEach(function(b){b.onclick=function(){step({action:"note",text:"panel: size set to "+b.dataset.size});size=b.dataset.size;apply()}});
 // Back does what the simulator's back action does: press the screen's Back button, else go back in history.
 function goBack(){var w=f.contentWindow;try{var doc=w&&w.document;if(!doc)return;var els=doc.querySelectorAll("button,[role=button],a");for(var i=0;i<els.length;i++){var e=els[i],t=(e.getAttribute("aria-label")||e.textContent||"").trim();if(t==="Back"){e.click();return}}w.history.back()}catch(x){}}
 bk.onclick=goBack;
-var t=document.getElementById("theme");t.onclick=function(){var k=!document.body.classList.contains("dark");document.body.classList.toggle("dark",k);t.setAttribute("aria-pressed",k);t.textContent=k?"Light":"Dark";f.style.colorScheme=k?"dark":"light"};
+var t=document.getElementById("theme");t.onclick=function(){step({action:"note",text:"panel: theme toggled"});var k=!document.body.classList.contains("dark");document.body.classList.toggle("dark",k);t.setAttribute("aria-pressed",k);t.textContent=k?"Light":"Dark";f.style.colorScheme=k?"dark":"light"};
 var P=document.getElementById("panel-status");
 function pnSay(m){P.textContent=m+" (simulated)"}
 function pnDev(){var d=f.contentWindow&&f.contentWindow.__pnDevice;if(!d){pnSay("The app is still loading");return null}return d}
 function pnNum(c){var v=pnVal(c).trim();return v===""?NaN:Number(v)}
 function pnVal(c){return document.querySelector('[data-control="'+c+'"]').value}
-function pnSet(patch,msg){var d=pnDev();if(d){d.set(patch);pnSay(msg)}}
+function pnSet(patch,msg){var d=pnDev();if(d){d.set(patch);step({action:"set_device",device:patch});pnSay(msg)}}
 var pnDelay=0;
 function pnSlow(){var w=f.contentWindow;if(!w||w.__pnSlow||!w.fetch)return;w.__pnSlow=1;var o=w.fetch.bind(w);w.fetch=function(){var a=arguments;return new Promise(function(r){setTimeout(r,pnDelay)}).then(function(){return o.apply(null,a)})}}
 var A={
@@ -161,7 +172,7 @@ var A={
 "net-online":function(){pnDelay=0;pnSet({online:true},"Network online")},
 "net-slow":function(){if(!pnDev())return;pnDelay=1500;pnSlow();pnSet({online:true},"Network slow (requests wait 1.5 s)")},
 "net-offline":function(){pnDelay=0;pnSet({online:false},"Network offline")},
-"push-send":function(){var d=pnDev();if(!d)return;var t=pnVal("push-title")||"Notification",b=pnVal("push-body");pnSay(d.push({title:t,body:b})===null?"Not delivered: the app has not been granted notification permission":"Push sent")}
+"push-send":function(){var d=pnDev();if(!d)return;var t=pnVal("push-title")||"Notification",b=pnVal("push-body");var ok=d.push({title:t,body:b})!==null;if(ok)step({action:"note",text:"panel: push sent"});pnSay(ok?"Push sent":"Not delivered: the app has not been granted notification permission")}
 };
 var pnGroups=[["bio-success","bio-fail"],["pay-approve","pay-decline"],["net-online","net-slow","net-offline"]];
 document.querySelectorAll("[data-control]").forEach(function(e){var c=e.dataset.control;if(A[c])e.onclick=function(){A[c]();pnGroups.forEach(function(g){if(g.indexOf(c)<0)return;g.forEach(function(k){var b=document.querySelector('[data-control="'+k+'"]');if(b.setAttribute)b.setAttribute("aria-pressed",k===c)})})}});
@@ -171,12 +182,12 @@ apply();
 }
 
 /** Puts the frame page at index.html and the app's own entry at app.html (its asset paths are absolute, so it stays at the site root). */
-export function wrapBuild(buildDir: string, name: string): PreviewFile[] {
+export function wrapBuild(buildDir: string, name: string, appId: string = name): PreviewFile[] {
   const files = collectFiles(buildDir).filter((f) => f.path !== "index.html");
   const entry = join(buildDir, "index.html");
   if (!existsSync(entry)) throw new Error("The web build has no index.html. Run `npx expo export --platform web` and check it works.");
   files.push({ path: "app.html", bytes: new Uint8Array(readFileSync(entry)), contentType: typeOf("x.html") });
-  files.push({ path: "index.html", bytes: new TextEncoder().encode(framePage(name)), contentType: typeOf("x.html") });
+  files.push({ path: "index.html", bytes: new TextEncoder().encode(framePage(name, appId)), contentType: typeOf("x.html") });
   return files;
 }
 
@@ -254,7 +265,7 @@ export async function runPreview(root: string, o: PreviewOpts & { skipBuild?: bo
   if (provider !== "here.now") throw new Error(`shipvo.json: "preview" must be "here.now" or "control-plane", not "${provider}".`);
   const dir = o.buildDir ?? join(root, ".shipvo", "preview-build");
   if (!o.skipBuild) await build(root, dir);
-  return publishToHereNow(wrapBuild(dir, cfg.name), o);
+  return publishToHereNow(wrapBuild(dir, cfg.name, cfg.appId), o);
 }
 
 export async function preview(argv: string[]) {
