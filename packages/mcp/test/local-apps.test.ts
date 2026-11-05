@@ -22,6 +22,9 @@ beforeAll(async () => {
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, app: "menu", release: "local", screen: "heading Table Menu" }));
+    if (req.url === "/act" && JSON.parse(raw).action === "browser_screenshot") return res.end(JSON.stringify({ ok: true, web: { source: "web", data: "iVBORw0KGgo=" }, screen: "{ (12 base64 chars) }" }));
+    if (req.url === "/act" && JSON.parse(raw).action === "browser_open") return res.end(JSON.stringify({ ok: false, code: "host_not_allowed", error: "evil.test is not in this phone's allowed hosts", screen: null }));
+    if (req.url === "/sessions") return res.end(JSON.stringify({ ok: true, sessions: [{ session: "ended1", app: "menu" }] }));
     if (req.url === "/act" && JSON.parse(raw).session === "m1") return res.end(JSON.stringify({ ok: false, error: "no session 'm1': call /session first", screen: null }));
     if (req.url === "/act" && JSON.parse(raw).ref === "e5") return res.end(JSON.stringify({ ok: false, code: "stale_ref", error: 'stale ref e5: the screen changed. Take a new snapshot (action "screen") and use a ref from it.', screen: "- button \"Item 9\" [ref=e7]" }));
     res.end(JSON.stringify({ ok: true }));
@@ -124,6 +127,50 @@ describe("local mcp", () => {
     for (const n of ["list_apps", "list_sessions", "screen", "screenshot", "notifications", "device_log", "owner_describe"]) expect(by[n]?.readOnlyHint, n).toBe(true);
     for (const n of ["owner_command", "end_session"]) expect(by[n]?.destructiveHint, n).toBe(true);
     for (const n of ["open_app", "tap", "type", "scroll", "back", "set_device", "push_notification", "open_notification", "open_url", "device_reset"]) expect(by[n]?.readOnlyHint, n).toBe(false);
+    await c.close();
+  });
+});
+
+describe("Browser app tools", () => {
+  const BROWSER = ["browser_open", "browser_tabs", "browser_close_tab", "browser_snapshot", "browser_click", "browser_type", "browser_scroll", "browser_back", "browser_screenshot", "browser_wait_for"];
+  it("registers the ten browser_* tools with annotations", async () => {
+    const c = await connect();
+    const by = Object.fromEntries((await c.listTools()).tools.map((t) => [t.name, t.annotations]));
+    for (const n of BROWSER) expect(by[n], n).toBeDefined();
+    for (const n of ["browser_tabs", "browser_snapshot", "browser_screenshot", "browser_wait_for"]) expect(by[n]?.readOnlyHint, n).toBe(true);
+    for (const n of ["browser_close_tab", "browser_click", "browser_type", "browser_scroll", "browser_back"]) expect(by[n], n).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(by.browser_open).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: true });
+    await c.close();
+  });
+  it("returns the screenshot as an image content block", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "browser_screenshot", arguments: { session: "s" } });
+    expect(r.isError).toBeFalsy();
+    expect(r.content.find((x: any) => x.type === "image")).toEqual({ type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" });
+    await c.close();
+  });
+  it("maps a browser error code into the error result", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "browser_open", arguments: { session: "s", url: "https://evil.test/" } });
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent).toMatchObject({ ok: false, code: "host_not_allowed" });
+    await c.close();
+  });
+  it("passes allow_hosts and platform from open_app to the simulator", async () => {
+    const c = await connect();
+    await c.callTool({ name: "open_app", arguments: { app: "menu", session: "ah", allow_hosts: ["example.com"], platform: "ios" } });
+    const sent = JSON.parse(bodies[posts.map((p, i) => (p === "/session" && bodies[i].includes('"ah"') ? i : -1)).filter((i) => i >= 0).pop()!]);
+    expect(sent.allow_hosts).toEqual(["example.com"]);
+    expect(sent.platform).toBe("ios");
+    await c.close();
+  });
+  it("end_session tells the simulator to close the phone", async () => {
+    const c = await connect();
+    const n = posts.length;
+    await c.callTool({ name: "end_session", arguments: { session: "ended1" } });
+    const i = posts.indexOf("/end", n);
+    expect(i).toBeGreaterThan(-1);
+    expect(JSON.parse(bodies[i])).toEqual({ session: "ended1" });
     await c.close();
   });
 });

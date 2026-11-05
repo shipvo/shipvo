@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { PhoneBrowser, hostAllowed, UA_MARK } from "./phone-browser.mjs";
@@ -18,10 +17,6 @@ const PAGES = {
 };
 let srv, base, base2, browser;
 before(async () => {
-  if (!existsSync(pw.chromium.executablePath())) {
-    // system Chrome/Edge or the Playwright cache is fine; install only when neither is there
-    const opts = resolveBrowser({ pw, log: () => {} }); void opts;
-  }
   srv = http.createServer((req, res) => { res.writeHead(PAGES[req.url] ? 200 : 404, { "content-type": "text/html" }); res.end(PAGES[req.url] ?? "no"); });
   await new Promise((r) => srv.listen(0, "127.0.0.1", r));
   base = `http://127.0.0.1:${srv.address().port}`; base2 = `http://localhost:${srv.address().port}`;

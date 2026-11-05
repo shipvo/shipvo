@@ -61,8 +61,17 @@ const sessions = new Map();
 
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
 
+// Close everything a session holds: the Browser app's Chromium context first, then the app's own context.
+async function endSession(id) {
+  const s = sessions.get(id); if (!s) return false;
+  sessions.delete(id);
+  await s.browserApp?.close().catch(() => {});
+  await s.ctx.close().catch(() => {});
+  return true;
+}
+
 async function newSession(id, opts = {}) {
-  if (sessions.has(id)) { await sessions.get(id).browserApp?.close(); await sessions.get(id).ctx.close(); }
+  await endSession(id);
   const target = await resolveApp(opts.app);
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
   const browser = await browserReady;
@@ -281,6 +290,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
     if (url.pathname === "/sessions") return send(200, { ok: true, sessions: [...sessions.entries()].map(([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, url: s.page.url() })) });
     if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
+    if (url.pathname === "/end") return send(200, { ok: true, ended: await endSession(body.session) });
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
