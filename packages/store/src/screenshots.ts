@@ -9,6 +9,11 @@
  *   7680 px; 2 to 8 screenshots; feature graphic 1024x500 JPEG or PNG without alpha;
  *   icon 512x512 PNG, alpha allowed, at most 1024 KB)
  * Google recommends 9:16 and 16:9 but only enforces the 2x limit, so we do too.
+ * Google says apps need 4 or more screenshots, at least 1080x1920 (or 1920x1080), to be
+ * promoted. We report that as a note for phones, never as a failure. Tablet sets are
+ * not enforced beyond 1 file; Google gives no separate 7-inch and 10-inch limits, so
+ * those two sets are identical. Play phone min is 1: the "two screenshots" rule on the
+ * page counts across device types, so one set cannot check it (differs from #384).
  * Recheck these pages when either store changes its rules.
  */
 
@@ -67,6 +72,8 @@ export interface CheckResult {
   ok: boolean;
   /** Reasons the stores would reject the file. */
   problems: string[];
+  /** Advice that does not block upload. */
+  notes?: string[];
 }
 
 interface Info {
@@ -76,6 +83,7 @@ interface Info {
   alpha: boolean;
 }
 
+const PROMOTION_MIN = 4;
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 function readInfo(b: Uint8Array): Info | undefined {
@@ -163,5 +171,15 @@ export function checkSet(files: ScreenshotFile[], set: ScreenshotSetId): CheckRe
     const r = checkScreenshot(f, set);
     problems.push(...r.problems);
   }
-  return { ok: problems.length === 0, problems };
+  const notes: string[] = [];
+  if (set === "play-phone" && files.length <= spec.max) {
+    const big = files.filter((f) => {
+      const info = readInfo(f.bytes);
+      return info && Math.min(info.width, info.height) >= 1080 && Math.max(info.width, info.height) >= 1920;
+    }).length;
+    if (big < PROMOTION_MIN) {
+      notes.push(`Play promotes apps with at least ${PROMOTION_MIN} screenshots of 1080x1920 or larger; you have ${big}.`);
+    }
+  }
+  return { ok: problems.length === 0, problems, notes };
 }

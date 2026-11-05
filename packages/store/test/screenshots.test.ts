@@ -96,4 +96,25 @@ describe("checkSet", () => {
     expect(checkSet([], "iphone").ok).toBe(false);
     expect(checkSet([], "play-phone").ok).toBe(false);
   });
+  it("accepts one Play phone file (min 1; the page's two-shot rule spans device types)", () => {
+    expect(checkSet([f("a.png", png(1080, 1920))], "play-phone").ok).toBe(true);
+  });
+  it("notes, without failing, a Play phone set under 4 promotable shots", () => {
+    const pp = (n: number) => Array.from({ length: n }, (_, i) => f(`${i}.png`, png(1080, 1920)));
+    const three = checkSet(pp(3), "play-phone");
+    expect(three.ok).toBe(true);
+    expect(three.notes).toHaveLength(1);
+    expect(three.notes![0]).toContain("you have 3");
+    expect(checkSet(pp(4), "play-phone").notes).toEqual([]);
+    const small = Array.from({ length: 4 }, (_, i) => f(`${i}.png`, png(720, 1280)));
+    expect(checkSet(small, "play-phone").notes).toHaveLength(1);
+  });
+});
+describe("jpeg parsing", () => {
+  it("skips 0xFF fill bytes before the SOF marker", () => {
+    // height 0x0780 = 1920, width 0x0438 = 1080
+    const j = Uint8Array.from([0xff, 0xd8, 0xff, 0xff, 0xff, 0xc0, 0, 11, 8, 0x07, 0x80, 0x04, 0x38, 1, 1, 0x11, 0]);
+    expect(checkScreenshot(f("a.jpg", j), "play-phone").ok).toBe(true);
+    expect(checkScreenshot(f("a.jpg", j), "iphone").problems[0]).toContain("1080x1920");
+  });
 });
