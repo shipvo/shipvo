@@ -14,4 +14,8 @@ House style (from the owner): visuals are **handcrafted from scratch in code**, 
 
 Commit (`git add`, `git commit -m "video: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (topic, length, size, how you checked it).
 
-This runs every day and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
+This runs three times a day and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
+
+## Content follows code (shared with docs, blog, tutorials and videos)
+
+`docs/content-coverage.md` is the team's content ledger: one row per user-visible feature or advantage (from `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs), with columns **Docs**, **Tutorial**, **Video**, **Blog**, each a link or empty. Before picking a topic, read it and pick the biggest gap in your column, newest and most important features first (what makes Shipvo stronger than the alternatives: signed OTA with rollback, the agent simulator over MCP, measured parity, the store path, `shipvo run`, framework adapters, self-hosting). After your work, add your link to the ledger in the same commit, and add any feature you found missing from it. Create the file if it does not exist, backfilled from everything shipped so far.

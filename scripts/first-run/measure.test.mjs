@@ -203,7 +203,7 @@ test("with --with-install, a failing init runs no install", () => {
 });
 
 // A tiny control plane: POST /apps, PUT /apps/:id/kv/*, GET /p/*, DELETE /apps/:id.
-async function stub({ putStatus = 200, badSig = false } = {}) {
+async function stub({ putStatus = 200, badSig = false, tamper = false } = {}) {
   const kv = new Map(), log = [];
   const srv = createServer((req, res) => {
     let b = ""; req.on("data", (d) => (b += d)); req.on("end", () => {
@@ -217,6 +217,7 @@ async function stub({ putStatus = 200, badSig = false } = {}) {
         kv.set(decodeURIComponent(req.url.split("/kv/")[1]), b); return send(200, { ok: true });
       }
       if (req.method === "GET" && req.url.startsWith("/p/")) { const v = kv.get(req.url.slice(1)); return v ? send(200, badSig ? v.replace(/"signature":"[^"]*"/, '"signature":"AAAA"') : v) : send(404, { error: "none" }); }
+      if (req.method === "GET" && req.url.startsWith("/b/")) { const v = kv.get(req.url.slice(1)); if (v === undefined) return send(404, { error: "none" }); res.writeHead(200); return res.end(tamper ? v + "x" : v); }
       if (req.method === "GET" && req.url.startsWith("/apps/")) return send(404, {});
       send(200, {});
     });
@@ -234,7 +235,9 @@ if (a[2]==="publish" && process.env.ARGS_LOG) appendFileSync(process.env.ARGS_LO
 if (a[2]==="init") { mkdirSync(a[3],{recursive:true}); writeFileSync(a[3]+"/shipvo.json", JSON.stringify({appId:"demo", controlPlane:"https://x.invalid", publicKey:${JSON.stringify(pubB64)}})); }
 if (a[2]==="publish" && !a.includes("--dry-run")) {
   const cfg = JSON.parse(readFileSync("shipvo.json","utf8"));
-  const body = JSON.stringify({app_id:cfg.appId, release:1});
+  const js = "console.log('first run');\\n";
+  const bundle = await fetch(cfg.controlPlane+"/apps/"+cfg.appId+"/kv/b/"+cfg.appId+"/r1.js", {method:"PUT", headers:{authorization:"Bearer "+process.env.SHIPVO_PUBLISH_TOKEN}, body: js});
+  const body = JSON.stringify({app_id:cfg.appId, release:1, core:{sha256: (await import("node:crypto")).createHash("sha256").update(js).digest("hex"), size: Buffer.byteLength(js), url:"b/"+cfg.appId+"/r1.js"}});
   const key = createPrivateKey(${JSON.stringify(privateKey.export({ format: "pem", type: "pkcs8" }))});
   const r = await fetch(cfg.controlPlane+"/apps/"+cfg.appId+"/kv/p/"+cfg.appId+"/1/b0", {method:"PUT", headers:{authorization:"Bearer "+process.env.SHIPVO_PUBLISH_TOKEN}, body: JSON.stringify({body, signature: sign(null, Buffer.from(body), key).toString("base64")})});
   if (!r.ok) { console.error("publish p/"+cfg.appId+"/1/b0: "+r.status+" "+(await r.json()).message); process.exit(1); }
@@ -253,7 +256,7 @@ test("--control-url runs a real publish and checks the signed pointer", async ()
     const r = await runAsync(f, ["--control-url", s.url]);
     assert.equal(r.status, 0, r.stderr);
     const j = JSON.parse(readFileSync(f.out, "utf8"));
-    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 0], ["publish --dry-run", 0], ["publish", 0], ["pointer", 0], ["total", 0]]);
+    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 0], ["publish --dry-run", 0], ["publish", 0], ["pointer", 0], ["bundle", 0], ["total", 0]]);
     assert.ok(j.every((x) => Number.isInteger(x.ms)));
     assert.match(r.stdout, /\| publish \| \d+\.\d\d \|/);
     const id = s.log.find((l) => l.startsWith("APPID ")).slice(6);
@@ -297,7 +300,7 @@ test("--with-export runs the real publish without --skip-export and records a pu
     const r = await runAsync(f, ["--with-install", "--with-session", "--with-export", "--control-url", s.url], { ARGS_LOG: log, PATH: fakePm() });
     assert.equal(r.status, 0, r.stderr);
     const j = JSON.parse(readFileSync(f.out, "utf8"));
-    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["browser install", 0], ["first agent session", 0], ["publish (includes export)", 0], ["pointer", 0], ["total", 0]]);
+    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["browser install", 0], ["first agent session", 0], ["publish (includes export)", 0], ["pointer", 0], ["bundle", 0], ["total", 0]]);
     const calls = publishCalls(log);
     assert.equal(calls.length, 1);
     assert.ok(!calls[0].includes("--skip-export"));
@@ -349,4 +352,32 @@ test("--control-log: a successful publish does not print the log", async () => {
     assert.equal(r.status, 0, r.stderr);
     assert.doesNotMatch(r.stderr, /server line/);
   } finally { s.close(); }
+});
+
+test("--control-url: a tampered bundle fails the bundle step with a clear message", async () => {
+  const s = await stub({ tamper: true }); const f = fakeCp();
+  try {
+    const r = await runAsync(f, ["--control-url", s.url]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /step "bundle" failed with exit 1:\nbundle: b\/first-run-[a-z0-9]{6}\/r1\.js is \d+ bytes, the signed pointer says \d+/);
+    const j = JSON.parse(readFileSync(f.out, "utf8"));
+    assert.deepEqual(j.slice(3).map((x) => [x.step, x.exit]), [["publish", 0], ["pointer", 0], ["bundle", 1], ["total", 1]]);
+    assert.ok(Number.isInteger(j.find((x) => x.step === "bundle").ms));
+  } finally { s.close(); }
+});
+
+test("bundleStep: same size but a different hash fails on sha256", async () => {
+  const { bundleStep } = await import("./measure.mjs");
+  const { createHash, createPublicKey, sign } = await import("node:crypto");
+  const good = "aaaa";
+  const srv = createServer((q, r) => r.end("bbbb"));
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  try {
+    const body = { core: { url: "b/x/r1.js", size: 4, sha256: createHash("sha256").update(good).digest("hex") } };
+    const text = JSON.stringify(body);
+    const env = { body: text, signature: sign(null, Buffer.from(text), privateKey).toString("base64") };
+    const r = await bundleStep(`http://127.0.0.1:${srv.address().port}`, env, body, createPublicKey(publicKey.export({ format: "pem", type: "spki" })));
+    assert.equal(r.exit, 1);
+    assert.match(r.stderr, /has sha256 .*, the signed pointer says/);
+  } finally { srv.close(); }
 });
