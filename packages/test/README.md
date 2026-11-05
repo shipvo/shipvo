@@ -43,7 +43,7 @@ await phone.waitFor("You're offline");
 
 **Mock the network**
 
-`phone.mockNetwork(rules)` stubs the app's `fetch` calls. The first matching rule answers. Requests that match no rule go to the network as usual. A new call replaces the earlier rules; `phone.clearNetworkMocks()` removes them all.
+`phone.mockNetwork(rules)` stubs the app's `fetch` calls. The first matching rule answers. Requests that match no rule go to the network as usual. A new call replaces the earlier rules; `phone.clearNetworkMocks()` removes them all. Mocks stay on for the whole session until you clear them.
 
 A rule has `url` (a string that must equal the full request URL, query string included, or a RegExp; use a RegExp to ignore the query), an optional `method`, and a `response` of `{ status, body, headers?, delayMs? }`. An object `body` is sent as JSON. A bad rule throws a `PhoneError` with code `mock_invalid`. Change the URL and labels to match your app.
 

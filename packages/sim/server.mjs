@@ -87,7 +87,7 @@ function parseMockRules(rules) {
     if (!r || typeof r !== "object") throw bad(`${at} must be an object`);
     let url = r.url;
     if (typeof url === "string" && url) { /* exact match */ }
-    else if (url && typeof url === "object" && typeof url.regex === "string") { try { url = new RegExp(url.regex, url.flags ?? ""); } catch (e) { throw bad(`${at} has an invalid url pattern: ${e.message}`); } }
+    else if (url && typeof url === "object" && typeof url.regex === "string") { try { url = new RegExp(url.regex, (url.flags ?? "").replace(/[gy]/g, "")); } catch (e) { throw bad(`${at} has an invalid url pattern: ${e.message}`); } }
     else throw bad(`${at} needs a url: a non-empty string or a RegExp`);
     if (r.method !== undefined && (typeof r.method !== "string" || !/^[A-Za-z]+$/.test(r.method))) throw bad(`${at} has an invalid method`);
     const res = r.response;
@@ -102,7 +102,6 @@ function parseMockRules(rules) {
 async function setNetworkMocks(s, rules) {
   s.mocks = rules;
   if (s.mockRouted) return;
-  s.mockRouted = true;
   await s.ctx.route("**/*", async (route) => {
     const req = route.request();
     const matches = (m, method) => (m.method ? m.method === method : true) && (typeof m.url === "string" ? m.url === req.url() : m.url.test(req.url()));
@@ -126,6 +125,7 @@ async function setNetworkMocks(s, rules) {
     // The page may have navigated away during the delay; then there is nothing to answer.
     return route.fulfill({ status, headers: h, body: body == null ? "" : isText ? body : JSON.stringify(body) }).catch(() => {});
   });
+  s.mockRouted = true;
 }
 
 async function screen(page) {
