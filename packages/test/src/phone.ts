@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { find, parseScreen, type Node, type Target } from "./tree.js";
 
 /** One address-book entry. */
+export type CalendarEvent = { id: string; title: string; start: string; end: string; allDay?: boolean; location?: string; notes?: string };
 export type Contact = { id: string; name: string; phoneNumbers?: string[]; emails?: string[] };
 type Grant = "granted" | "denied" | "undetermined";
 /** What the simulated phone has. Takes effect for the next action. */
@@ -9,9 +10,11 @@ export type DeviceSettings = {
   location?: { latitude: number; longitude: number; accuracy?: number };
   /** What is in front of the camera: a barcode or QR code, or null for nothing. */
   camera?: { barcode?: { type: string; data: string } | null; delayMs?: number };
-  permissions?: { camera?: Grant; location?: Grant; notifications?: Grant; contacts?: Grant };
+  permissions?: { camera?: Grant; location?: Grant; notifications?: Grant; contacts?: Grant; calendar?: Grant };
   /** The address book the app can read once contacts permission is granted. Replaces the current one. */
   contacts?: Contact[];
+  /** The calendar events the app can read once calendar permission is granted. Replaces the current ones. */
+  calendar?: CalendarEvent[];
   biometrics?: { enrolled?: boolean; nextResult?: "success" | "fail" | "cancel" };
   payment?: { nextResult?: "approve" | "decline" | "timeout" | "insufficient_funds"; pin?: string };
   online?: boolean;
@@ -45,7 +48,8 @@ export class Phone {
   readonly device: Device;
   /** The simulated address book. */
   readonly contacts: Contacts;
-  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); }
+  readonly calendar: Calendar;
+  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); this.calendar = new Calendar(this); }
 
   /** @internal */
   async call(path: string, body: Record<string, unknown>): Promise<Reply> {
@@ -162,6 +166,13 @@ export class Contacts {
   constructor(private readonly phone: Phone) {}
   /** Seed the address book (replaces what was there). The app still asks for permission; answer with `phone.device.set({ permissions: { contacts } })` or tap the dialog. */
   async set(contacts: Contact[]): Promise<Phone> { await this.phone.act("set_device", { device: { contacts } }); return this.phone; }
+}
+
+/** The simulated calendar. Apps read it with `expo-calendar` or `device.calendar.getEvents()`; writing back is not simulated. */
+export class Calendar {
+  constructor(private readonly phone: Phone) {}
+  /** Seed the calendar (replaces what was there). The app still asks for permission; answer with `phone.device.set({ permissions: { calendar } })` or tap the dialog. */
+  async set(events: CalendarEvent[]): Promise<Phone> { await this.phone.act("set_device", { device: { calendar: events } }); return this.phone; }
 }
 
 /** The simulated phone's hardware and settings. */

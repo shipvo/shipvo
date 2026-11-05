@@ -51,6 +51,16 @@ describe("local mcp", () => {
     await c.close();
   });
 
+  it("set_device accepts calendar events and passes them to the simulator", async () => {
+    const c = await connect();
+    const calendar = [{ id: "e1", title: "Dentist", start: "2026-11-10T09:00:00Z", end: "2026-11-10T10:00:00Z" }];
+    const r: any = await c.callTool({ name: "set_device", arguments: { session: "menu-1", calendar, permissions: { calendar: "granted" } } });
+    expect(r.isError).toBeFalsy();
+    const sent = JSON.parse(bodies.filter((b) => b.includes('"set_device"')).at(-1)!);
+    expect(sent.device).toEqual({ calendar, permissions: { calendar: "granted" } });
+    await c.close();
+  });
+
   it("opens the app the simulator serves, with no PN_APPS", async () => {
     const c = await connect();
     expect(textOf(await c.callTool({ name: "list_apps", arguments: {} }))).toContain('menu: Table Menu');

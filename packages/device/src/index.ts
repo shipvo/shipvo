@@ -1,6 +1,6 @@
 // Phone implementation: thin wrappers over Expo modules. Each module is optional so an app only pays for what it uses.
 import { Platform, Share, Linking } from "react-native";
-import type { Device, PermissionStatus, Notification, Contact } from "./types";
+import type { Device, PermissionStatus, Notification, Contact, CalendarEvent } from "./types";
 export * from "./types";
 
 // Metro needs static requires; each module is optional so an app only pays for what it installs.
@@ -12,6 +12,7 @@ const MODS: Record<string, any> = {
   "expo-notifications": tryReq(() => require("expo-notifications")),
   "expo-clipboard": tryReq(() => require("expo-clipboard")),
   "expo-contacts": tryReq(() => require("expo-contacts")),
+  "expo-calendar": tryReq(() => require("expo-calendar")),
 };
 function opt<T>(name: string): T | null { return (MODS[name] as T) ?? null; }
 const map = (s: string): PermissionStatus => (s === "granted" ? "granted" : s === "denied" ? "denied" : "undetermined");
@@ -22,7 +23,7 @@ export const device: Device = {
   capabilities: () => ({
     camera: MODS["expo-camera"] ? "real" : "unavailable", location: MODS["expo-location"] ? "real" : "unavailable",
     biometrics: MODS["expo-local-authentication"] ? "real" : "unavailable", notifications: MODS["expo-notifications"] ? "real" : "unavailable",
-    clipboard: MODS["expo-clipboard"] ? "real" : "unavailable", contacts: MODS["expo-contacts"] ? "real" : "unavailable", share: "real", network: "real",
+    clipboard: MODS["expo-clipboard"] ? "real" : "unavailable", contacts: MODS["expo-contacts"] ? "real" : "unavailable", calendar: MODS["expo-calendar"] ? "real" : "unavailable", share: "real", network: "real",
     payments: "simulated", // sandbox provider until a gateway is configured: receipts are prefixed SANDBOX-
   }),
   permissions: {
@@ -30,12 +31,14 @@ export const device: Device = {
       if (name === "camera") { const C = opt<any>("expo-camera"); return C ? map((await C.Camera.getCameraPermissionsAsync()).status) : "denied"; }
       if (name === "location") { const L = opt<any>("expo-location"); return L ? map((await L.getForegroundPermissionsAsync()).status) : "denied"; }
       if (name === "contacts") { const K = opt<any>("expo-contacts"); return K ? map((await K.getPermissionsAsync()).status) : "denied"; }
+      if (name === "calendar") { const K = opt<any>("expo-calendar"); return K ? map((await K.getCalendarPermissionsAsync()).status) : "denied"; }
       const N = opt<any>("expo-notifications"); return N ? map((await N.getPermissionsAsync()).status) : "denied";
     },
     async request(name) {
       if (name === "camera") { const C = opt<any>("expo-camera"); return C ? map((await C.Camera.requestCameraPermissionsAsync()).status) : "denied"; }
       if (name === "location") { const L = opt<any>("expo-location"); return L ? map((await L.requestForegroundPermissionsAsync()).status) : "denied"; }
       if (name === "contacts") { const K = opt<any>("expo-contacts"); return K ? map((await K.requestPermissionsAsync()).status) : "denied"; }
+      if (name === "calendar") { const K = opt<any>("expo-calendar"); return K ? map((await K.requestCalendarPermissionsAsync()).status) : "denied"; }
       const N = opt<any>("expo-notifications"); return N ? map((await N.requestPermissionsAsync()).status) : "denied";
     },
   },
@@ -88,6 +91,19 @@ export const device: Device = {
       if (st !== "granted") throw new Error("Contacts permission denied");
       const r = await K.getContactsAsync({ fields: [K.Fields.PhoneNumbers, K.Fields.Emails] });
       return (r.data as any[]).map((c): Contact => ({ id: String(c.id), name: c.name ?? "", phoneNumbers: (c.phoneNumbers ?? []).map((p: any) => p.number), emails: (c.emails ?? []).map((e: any) => e.email) }));
+    },
+  },
+  calendar: {
+    async getEvents(range) {
+      const K = opt<any>("expo-calendar"); if (!K) throw new Error("expo-calendar is not installed");
+      let st = (await K.getCalendarPermissionsAsync()).status;
+      if (st !== "granted") st = (await K.requestCalendarPermissionsAsync()).status;
+      if (st !== "granted") throw new Error("Calendar permission denied");
+      const cals = (await K.getCalendarsAsync(K.EntityTypes.EVENT)) as any[];
+      const evs = (await K.getEventsAsync(cals.map((c) => c.id), new Date(range.start), new Date(range.end))) as any[];
+      const iso = (v: any) => new Date(v).toISOString();
+      return evs.map((e): CalendarEvent => ({ id: String(e.id), title: e.title ?? "", start: iso(e.startDate), end: iso(e.endDate), allDay: !!e.allDay, location: e.location ?? undefined, notes: e.notes ?? undefined }))
+        .sort((a, b) => a.start.localeCompare(b.start));
     },
   },
   clipboard: {
