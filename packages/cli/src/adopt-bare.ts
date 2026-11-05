@@ -55,7 +55,7 @@ function entries(values: ShipvoNativeValues, prefix: "ios" | "android"): [string
   return out;
 }
 
-/** Sets the Shipvo keys in an Info.plist. Other keys keep their values and order. Returns true if the file changed. */
+/** Sets the Shipvo keys in an Info.plist. Other keys keep their values and order; XML comments and the original whitespace are lost on the first write. Returns true if the file changed. */
 export function writeIosConfig(infoPlistPath: string, values: ShipvoNativeValues): boolean {
   const want = entries(values, "ios");
   const original = readFileSync(infoPlistPath, "utf8");
@@ -75,6 +75,7 @@ export function writeAndroidConfig(manifestPath: string, values: ShipvoNativeVal
   const want = entries(values, "android");
   const original = readFileSync(manifestPath, "utf8");
   let xml = original;
+  // Assumes stock React Native manifests: each <meta-data> is one tag with no ">" inside attribute values.
   for (const [name, value] of want) {
     const existing = new RegExp(`<meta-data\\b[^>]*android:name\\s*=\\s*"${escapeRe(name)}"[^>]*?/?>`);
     const m = existing.exec(xml);
@@ -118,7 +119,17 @@ export function findIosInfoPlist(dir: string): string | undefined {
       if (!rel.includes("$") && !skip(rel) && existsSync(join(ios, rel))) found.add(join(ios, rel));
     }
   }
-  if (found.size > 0) return [...found][0];
+  if (found.size > 0) {
+    // Several targets (extensions, widgets, watch app) can list a plist. Prefer the one in the folder named like the .xcodeproj, then like the package name.
+    const names = listDirs(ios).filter((n) => n.endsWith(".xcodeproj")).map((n) => n.replace(/\.xcodeproj$/, ""));
+    try { names.push(String(JSON.parse(readFileSync(join(dir, "app.json"), "utf8")).name ?? "")); } catch { /* no app.json */ }
+    const list = [...found];
+    for (const name of names.filter(Boolean)) {
+      const hit = list.find((f) => f.startsWith(join(ios, name) + "/"));
+      if (hit) return hit;
+    }
+    return list[0];
+  }
   for (const n of listDirs(ios)) {
     const p = join(ios, n, "Info.plist");
     if (!skip(n) && existsSync(p)) return p;
@@ -165,7 +176,7 @@ export function checkExpoModules(dir: string): ExpoModulesCheck {
     missing.push("the Expo setup in MainApplication");
   }
   const delegates = walk(join(dir, "ios"), /^AppDelegate\.(swift|mm?|h)$/);
-  if (!delegates.some((f) => /Expo/.test(readFileSync(f, "utf8")))) missing.push("the Expo setup in AppDelegate");
+  if (!delegates.some((f) => /ExpoAppDelegate|ExpoReactNativeFactory|import Expo|<Expo\//.test(readFileSync(f, "utf8")))) missing.push("the Expo setup in AppDelegate");
   return missing.length === 0 ? { installed: true, missing } : { installed: false, missing, planStep: INSTALL_EXPO_MODULES };
 }
 

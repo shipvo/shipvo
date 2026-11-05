@@ -158,3 +158,18 @@ it("installs nothing without confirmation; runs with --yes or a yes answer", asy
   expect(await installExpoModules(tmp, { run, yes: true })).toBe(true);
   expect(ran).toEqual([INSTALL_EXPO_MODULES, INSTALL_EXPO_MODULES]);
 });
+
+it("prefers the app target's Info.plist over an extension listed first", () => {
+  makeApp({ expo: true });
+  mkdirSync(join(tmp, "ios/ShareExt"), { recursive: true });
+  copyFileSync(join(fx, "Info.plist"), join(tmp, "ios/ShareExt/Info.plist"));
+  writeFileSync(join(tmp, "ios/Hello.xcodeproj/project.pbxproj"),
+    "INFOPLIST_FILE = ShareExt/Info.plist;\nINFOPLIST_FILE = Hello/Info.plist;\n");
+  expect(findIosInfoPlist(tmp)).toBe(join(tmp, "ios/Hello/Info.plist"));
+});
+
+it("does not treat the word Expo in a comment as Expo setup", () => {
+  makeApp({ expo: false });
+  writeFileSync(join(tmp, "ios/Hello/AppDelegate.swift"), "// TODO: add Expo later\nclass AppDelegate: RCTAppDelegate {}");
+  expect(checkExpoModules(tmp).missing).toContain("the Expo setup in AppDelegate");
+});
