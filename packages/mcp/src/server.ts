@@ -55,6 +55,8 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
   const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
   return result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
 };
+// Returns a tool result with optional isError and structuredContent for typed errors.
+// structuredContent shape: { ok: false, code?: string, error?: string }
 const result = (sid: string, r: Act) => { const s = sessions.get(sid); if (s) s.steps++; if (!r.ok) return { content: [{ type: "text" as const, text: `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}` }], isError: true, structuredContent: { ok: false, code: r.code, error: r.error } }; return text(r.screen ?? ""); };
 // Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
@@ -88,7 +90,7 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   session: z.string().optional().describe("Session name (default: generated). One session is one phone."),
   seed_cart: z.array(z.object({ product_id: z.string().optional(), id: z.string().optional(), quantity: z.number().int().positive().optional(), qty: z.number().int().positive().optional() }).refine((l) => (l.product_id ?? l.id) && (l.quantity ?? l.qty), "each line needs product_id (or id) and quantity (or qty)")).optional().describe("Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."),
   dark: z.boolean().optional().describe("Dark mode"),
-}, async ({ app, session, seed_cart, dark }) => {
+}, { readOnlyHint: true }, async ({ app, session, seed_cart, dark }: { app: string; session?: string; seed_cart?: { product_id?: string; id?: string; quantity?: number; qty?: number }[]; dark?: boolean }) => {
   const id = app.split("@")[0];
   if (!(await allowed(id))) throw new Error(keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}`);
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
@@ -109,17 +111,17 @@ const compact = z.boolean().optional().describe("When the change is 'content cha
 const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
 server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); }, { annotations: { readOnlyHint: true } });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, async ({ session, ref, compact }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact }); }, { annotations: { readOnlyHint: false } });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH, { session: sid, ref, compact }, { readOnlyHint: false }, async ({ session, ref, compact }: { session: string; ref: string; compact?: boolean }) => { need(session); return acted(session, "tap", await sim("/act", { session, action: "tap", ref }), { compact }); });
 server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact },
-  async ({ session, ref, text: t, enter, compact }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref }); }, { annotations: { readOnlyHint: false } });
+  { readOnlyHint: false }, async ({ session, ref, text: t, enter, compact }: { session: string; ref: string; text: string; enter?: boolean; compact?: boolean }) => { need(session); return acted(session, "type", await sim("/act", { session, action: "type", ref, text: t, enter }), { compact, ref }); });
 server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact },
-  async ({ session, direction, ref, compact }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref }), { compact }); }, { annotations: { readOnlyHint: false } });
-server.tool("back", "Go back one screen." + CH, { session: sid, compact }, async ({ session, compact }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); }, { annotations: { readOnlyHint: false } });
-server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, async ({ session }) => {
+  { readOnlyHint: false }, async ({ session, direction, ref, compact }: { session: string; direction: "down" | "up" | "left" | "right"; ref?: string; compact?: boolean }) => { need(session); return acted(session, "scroll", await sim("/act", { session, action: "scroll", direction, ref }), { compact }); });
+server.tool("back", "Go back one screen." + CH, { session: sid, compact }, { readOnlyHint: false }, async ({ session, compact }: { session: string; compact?: boolean }) => { need(session); return acted(session, "back", await sim("/act", { session, action: "back" }), { compact }); });
+server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, { readOnlyHint: true }, async ({ session }: { session: string }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
-  if (!r.ok || !r.path) throw new Error(r.error ?? "no screenshot");
+  if (!r.ok || !r.path) return { content: [{ type: "text" as const, text: `Error: ${r.error ?? "no screenshot"}` }], isError: true, structuredContent: { ok: false, code: r.error ?? "no_screenshot", error: r.error ?? "no screenshot" } };
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
-}, { annotations: { readOnlyHint: true } });
+});
 // The simulated device: what the phone has, and what happens to it.
 server.tool("set_device", "Change what the simulated phone has: location, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
   session: sid,
@@ -129,41 +131,41 @@ server.tool("set_device", "Change what the simulated phone has: location, a barc
   biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
   payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),
-}, async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "set_device", device })); }, { annotations: { readOnlyHint: false } });
+}, { readOnlyHint: false }, async ({ session, ...device }: { session: string; [key: string]: unknown }) => { need(session); return result(session, await sim("/act", { session, action: "set_device", device })); });
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() },
-  async ({ session, title, body, data }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); }, { annotations: { readOnlyHint: false } });
+  { readOnlyHint: false }, async ({ session, title, body, data }: { session: string; title: string; body: string; data?: Record<string, unknown> }) => { need(session); return result(session, await sim("/act", { session, action: "push_notification", title, body, data })); });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid },
-  async ({ session }) => { need(session); return text(JSON.stringify((await sim("/act", { session, action: "notifications" }) as { notifications?: unknown }).notifications ?? [], null, 2)); }, { annotations: { readOnlyHint: true } });
+  { readOnlyHint: true }, async ({ session }: { session: string }) => { need(session); return text(JSON.stringify((await sim("/act", { session, action: "notifications" }) as { notifications?: unknown }).notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() },
-  async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); }, { annotations: { readOnlyHint: false } });
+  { readOnlyHint: false }, async ({ session, id }: { session: string; id?: string }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
 server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-  async ({ session, url }) => { need(session); return result(session, await sim("/act", { session, action: "open_url", url })); }, { annotations: { readOnlyHint: false } });
+  async ({ session, url }: { session: string; url: string }) => { need(session); return result(session, await sim("/act", { session, action: "open_url", url })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid },
-  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; return text(JSON.stringify({ note: "Everything here is simulated: no real biometric check or money movement took place.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); }, { annotations: { readOnlyHint: true } });
+  { readOnlyHint: true }, async ({ session }: { session: string }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; return text(JSON.stringify({ note: "Everything here is simulated: no real biometric check or money movement took place.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
 server.tool("device_reset", "Put the simulated phone back to a known state (permissions undetermined, default location, nothing in front of the camera, log cleared), optionally with a new profile.", { session: sid, platform: z.enum(["android", "ios"]).optional(), api: z.number().optional() },
-  async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); }, { annotations: { readOnlyHint: false } });
+  { readOnlyHint: false }, async ({ session, ...device }: { session: string; [key: string]: unknown }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
 
-server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, async ({ session }) => {
+server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, { readOnlyHint: false, destructiveHint: false }, async ({ session }: { session: string }) => {
   need(session); const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
-}, { annotations: { readOnlyHint: false, destructiveHint: true } });
+});
 
 // Owner side: the same typed commands the admin at /app/<id>/admin uses.
-server.tool("owner_describe", "List the owner commands of an app (content, prices, offers, orders, publish). Needs PN_OWNER_TOKEN.", { app: z.string() }, async ({ app }) => {
+server.tool("owner_describe", "List the owner commands of an app (content, prices, offers, orders, publish). Needs PN_OWNER_TOKEN.", { app: z.string() }, { readOnlyHint: true }, async ({ app }: { app: string }) => {
   const r = await fetch(`${CONTROL}/app/${app}/api/describe`); return text(await r.text());
-}, { annotations: { readOnlyHint: true } });
+});
 server.tool("owner_command", "Run an owner command against the live app (changes are audited; `publish` makes them live on every phone within seconds).", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional() },
-  async ({ app, command, args }) => {
+  { readOnlyHint: false, destructiveHint: false }, async ({ app, command, args }: { app: string; command: string; args?: Record<string, unknown> }) => {
     if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": owner commands need an owner key`);
     if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
     const token = ctx.ownerToken || OWNER_TOKEN;
     if (!token) throw new Error("owner commands are not enabled on this server.");
     const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ name: command, args: args ?? {} }) });
     return text(await r.text());
-  }, { annotations: { readOnlyHint: false, destructiveHint: true } });
+  });
 
 return server;
 }
