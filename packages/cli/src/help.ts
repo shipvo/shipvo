@@ -17,7 +17,7 @@ Ship
   rollback --to <n> --dry-run Preview a rollback, write nothing
   app create | list | delete  Register, list or remove apps on the hosted control plane
   login                       Sign in with GitHub and get a key for the hosted simulator
-  doctor                      Check setup before first publish
+  doctor [--port <n>]         Check setup before first publish
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine
