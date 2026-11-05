@@ -61,6 +61,9 @@ class ShipvoRuntimeModule : Module() {
       mapOf("release" to Store.runningRelease, "coldStartMs" to coldStart, "sinceLoadMs" to sinceLoad, "promoted" to promoted, "kind" to kind)
     }
 
+    // Called by the JS error handler before React destroys the host, so the pause that follows is not read as "stable".
+    Function("noteCrash") { synchronized(ShipvoHostHandler.LOCK) { BootRules.noteCrash(Store.loadsInProcess) } }
+
     OnActivityEntersBackground { stableNow() }
 
     Function("consumeEvents") { Store(ctx).consumeEvents() }

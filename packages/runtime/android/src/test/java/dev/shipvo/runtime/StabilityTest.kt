@@ -11,7 +11,7 @@ class StabilityTest {
   private val max = ShipvoHostHandler.MAX_BOOTS
   private val win = ShipvoHostHandler.WINDOW_MS
 
-  @Before fun reset() { BootRules.healthyLoad = 0 }
+  @Before fun reset() { BootRules.healthyLoad = 0; BootRules.crashedLoad = 0 }
 
   /** One launch of a promoted release: count it, then report healthy. Returns true if the launch reverts. */
   private fun launch(c: Counts, now: Long, load: Int): Boolean {
@@ -42,6 +42,22 @@ class StabilityTest {
     BootRules.countBoot(c, 1_000, max, win)    // load 2 starts
     assertFalse(BootRules.markStableIfHealthy(c, 2))
     assertEquals(2, c.unhealthyBoots)
+  }
+
+  @Test fun crashAfterMarkHealthyIsNotStableWhenHostIsDestroyed() {
+    val c = Counts()
+    BootRules.onHealthy(c, 1, 0, promoted = true)
+    BootRules.noteCrash(1)                      // JS error, then the host pause calls markStableIfHealthy
+    assertFalse(BootRules.markStableIfHealthy(c, 1))
+    assertEquals(1, c.unhealthyBoots)
+  }
+
+  @Test fun crashInOneLoadDoesNotBlockTheNextLoad() {
+    val c = Counts()
+    BootRules.onHealthy(c, 1, 0, promoted = true)
+    BootRules.noteCrash(1)
+    BootRules.onHealthy(c, 2, 1_000, promoted = false)
+    assertTrue(BootRules.markStableIfHealthy(c, 2))
   }
 
   @Test fun countsExpireOutsideTheWindow() {

@@ -25,6 +25,12 @@ internal object BootRules {
 
   fun noteHealthy(load: Int) { healthyLoad = load }
 
+  /** The load that handled an uncaught JS error (0 = none). React destroys the host after such an error, which pauses the
+   *  activity. That pause must not count as a clean trip to the background. */
+  @Volatile var crashedLoad = 0
+
+  fun noteCrash(load: Int) { crashedLoad = load }
+
   /** What `markHealthy` does to the counts: the promoting boot (if any) is counted, and `load` is recorded as healthy.
    *  The module and the tests both call this, so they cannot drift apart. */
   fun onHealthy(c: BootCounts, load: Int, now: Long, promoted: Boolean) {
@@ -32,10 +38,10 @@ internal object BootRules {
     noteHealthy(load)
   }
 
-  /** Clears the counts only if `load` is the one that reported healthy. A reloaded load that has not called
+  /** Clears the counts only if `load` is the one that reported healthy and has not hit an uncaught JS error. A reloaded load that has not called
    *  markHealthy yet keeps its count, so a crash before markHealthy still adds up. Returns whether it cleared. */
   fun markStableIfHealthy(c: BootCounts, load: Int): Boolean {
-    if (healthyLoad == 0 || healthyLoad != load) return false
+    if (healthyLoad == 0 || healthyLoad != load || crashedLoad == load) return false
     clear(c); return true
   }
 }

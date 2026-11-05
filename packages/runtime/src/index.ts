@@ -39,4 +39,30 @@ const fallback: Native = {
   markHealthy: () => ({ release: 0, coldStartMs: Date.now() - t0, sinceLoadMs: 0, promoted: false, kind: "cold" }),
   consumeEvents: () => [], rollback: () => {}, reload: () => {},
 };
-export const Runtime: Native = requireOptionalNativeModule<Native>("ShipvoRuntime") ?? fallback;
+const native = requireOptionalNativeModule<Native & { noteCrash?(): void }>("ShipvoRuntime");
+
+// After markHealthy, tell the native side about an uncaught JS error before React destroys the host. Destroying the host
+// pauses the activity, and that pause must not count as "stable". Needs a shell with `noteCrash`; older shells skip it.
+let crashHookInstalled = false;
+function installCrashHook() {
+  if (crashHookInstalled || typeof native?.noteCrash !== "function") return;
+  const eu = (globalThis as any).ErrorUtils;
+  if (!eu?.setGlobalHandler || !eu.getGlobalHandler) return;
+  crashHookInstalled = true;
+  const prev = eu.getGlobalHandler();
+  eu.setGlobalHandler((e: unknown, isFatal?: boolean) => {
+    try { native.noteCrash!(); } catch {}
+    prev?.(e, isFatal);
+  });
+}
+
+export const Runtime: Native = native
+  ? {
+      getState: () => native.getState(),
+      checkForUpdate: (apply) => native.checkForUpdate(apply),
+      markHealthy: () => { const r = native.markHealthy(); installCrashHook(); return r; },
+      consumeEvents: () => native.consumeEvents(),
+      rollback: () => native.rollback(),
+      reload: () => native.reload(),
+    }
+  : fallback;
