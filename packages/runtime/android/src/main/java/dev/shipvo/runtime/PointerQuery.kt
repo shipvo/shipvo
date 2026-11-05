@@ -12,9 +12,9 @@ internal object PointerQuery {
   fun url(base: String, hbc: String?, nm: String?): String {
     val q = ArrayList<String>()
     // The server answers 400 for bad items, so keep only positive integers for hbc and name@version for nm.
-    val h = hbc?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() && it.all { c -> c in '0'..'9' } && it.toLong() > 0 }
+    val h = hbc?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() && it.all { c -> c in '0'..'9' } && (it.toLongOrNull() ?: 0L) > 0 }
     if (!h.isNullOrEmpty()) q += "hbc=" + h.joinToString(",") { enc(it) }
-    val n = nm?.split(',')?.map { it.trim() }?.filter { it.indexOf('@', 1) > 0 }
+    val n = nm?.split(',')?.map { it.trim() }?.filter { it.indexOf('@', 1).let { i -> i > 0 && i < it.length - 1 } }
     // Encode each item and keep the commas, so the server splits the list as before. '@' is encoded too.
     if (!n.isNullOrEmpty()) q += "nm=" + n.joinToString(",") { enc(it) }
     return if (q.isEmpty()) base else base + "?" + q.joinToString("&")
