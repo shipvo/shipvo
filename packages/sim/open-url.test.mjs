@@ -37,7 +37,7 @@ before(async () => {
   // A loaded CI runner can take a while to start Chromium, so wait up to 90 s and fail loudly instead of falling through.
   let up = false;
   for (let i = 0; i < 450 && !up; i++) { try { await fetch(`http://localhost:${PORT}/`); up = true; } catch { if (proc.exitCode !== null) throw new Error(`sim exited: ${err}`); await new Promise((r) => setTimeout(r, 200)); } }
-  if (!up) throw new Error(`sim did not start listening on port ${PORT} within 90 s: ${err}`);
+  if (!up) throw new Error(`sim did not start listening on port ${PORT} within 90 s. Server stderr: ${err || "(empty)"}`);
 });
 after(async () => {
   if (proc && proc.exitCode === null) { const done = new Promise((r) => proc.once("exit", r)); proc.kill("SIGKILL"); await done; }
@@ -69,4 +69,27 @@ test("empty or missing url: bad_url", async () => {
     assert.equal(r.ok, false);
     assert.equal(r.code, "bad_url");
   }
+});
+
+test("answers GET / without waiting for Chromium, and exits with a message if Chromium cannot start", async () => {
+  const port = PORT + 400;
+  const p = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(port), "--dir", join(root, "bad"), "--dist", dist, "--chromium", join(root, "no-such-chromium")], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
+  let err = ""; p.stderr.on("data", (d) => { err += d; });
+  const exited = new Promise((r) => p.once("exit", (code) => r(code)));
+  const code = await Promise.race([exited, new Promise((r) => setTimeout(() => r("timeout"), 30_000))]);
+  if (code === "timeout") p.kill("SIGKILL");
+  assert.equal(code, 1, err);
+  assert.match(err, /could not launch Chromium/);
+});
+
+test("listens before Chromium has started", async () => {
+  const port = PORT + 500;
+  // A launcher that never finishes: the port must still open.
+  const hang = join(root, "hang.sh"); writeFileSync(hang, "#!/bin/sh\nexec sleep 60\n", { mode: 0o755 });
+  const p = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(port), "--dir", join(root, "slow"), "--dist", dist, "--chromium", hang], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
+  try {
+    let up = false;
+    for (let i = 0; i < 100 && !up; i++) { try { await fetch(`http://localhost:${port}/`); up = true; } catch { await new Promise((r) => setTimeout(r, 100)); } }
+    assert.ok(up, "GET / should be answered while Chromium is still starting");
+  } finally { p.kill("SIGKILL"); p.stderr.destroy(); }
 });
