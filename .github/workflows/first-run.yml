@@ -31,8 +31,7 @@ jobs:
           for i in $(seq 1 120); do curl -sf localhost:8787/health > /dev/null && break; sleep 2; done
           curl -sf localhost:8787/health
       - name: Install Chromium for the first agent session (shipvo sim)
-        working-directory: packages/sim
-        run: pnpm exec playwright-core install --with-deps chromium
+        run: bash scripts/agents/install-chromium.sh
       - name: Measure the first run
         run: |
           # --with-session times a first agent session in the simulator (#348); only pass it once measure.mjs has it.
