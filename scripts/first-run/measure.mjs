@@ -1,6 +1,7 @@
 // Times a new developer's first run offline: `shipvo init`, then `shipvo publish --dry-run`.
-// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json]
+// Usage: node scripts/first-run/measure.mjs [--cli path/to/cli.js] [--out first-run.json] [--with-install]
 // The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets, no network.
+// With --with-install, also times `pnpm install` (or `npm install`) in the scaffolded app.
 // The bundle export (`expo export`) needs an install and network, so it is not timed: a small
 // plain-JS bundle is staged where the export would write it, and publish runs with --skip-export.
 import { spawnSync } from "node:child_process";
@@ -24,17 +25,37 @@ function cleanEnv() {
   return e;
 }
 
+function detectPackageManager() {
+  try {
+    const v = spawnSync("pnpm", ["--version"], { encoding: "utf8" });
+    if (v.status === 0) return "pnpm";
+  } catch {}
+  return "npm";
+}
+
+function runInstallStep(cwd) {
+  const pm = detectPackageManager();
+  const t0 = performance.now();
+  const r = spawnSync(pm, ["install"], { cwd, encoding: "utf8", env: cleanEnv() });
+  const ms = Math.round(performance.now() - t0);
+  const exit = r.status ?? (r.error ? 127 : 1);
+  return { step: "install", ms, exit, stderr: r.stderr || (r.error ? String(r.error) : ""), pm };
+}
+
 export function table(results) {
   return ["| step | ms | exit |", "| --- | ---: | ---: |", ...results.map((r) => `| ${r.step} | ${r.ms} | ${r.exit} |`)].join("\n");
 }
 
-export function measure(cli) {
+export function measure(cli, withInstall = false) {
   const root = mkdtempSync(join(tmpdir(), "shipvo-first-run-"));
   const app = join(root, "app");
   const results = [];
   try {
     results.push(runStep("init", cli, ["init", app], root));
     if (results[0].exit === 0) {
+      if (withInstall) {
+        results.push(runInstallStep(app));
+      }
       const js = join(app, "dist-ota/_expo/static/js/android");
       mkdirSync(js, { recursive: true });
       writeFileSync(join(js, "index.js"), "console.log('first run');\n");
@@ -49,9 +70,15 @@ export function main(argv) {
   const here = dirname(fileURLToPath(import.meta.url));
   const cli = resolve(opt("--cli", join(here, "../../packages/cli/dist/cli.js")));
   const out = resolve(opt("--out", "first-run.json"));
-  const results = measure(cli);
+  const withInstall = argv.includes("--with-install");
+  const results = measure(cli, withInstall);
   writeFileSync(out, JSON.stringify(results.map(({ step, ms, exit }) => ({ step, ms, exit })), null, 2) + "\n");
   console.log(table(results));
+  if (withInstall) {
+    const pm = detectPackageManager();
+    const ver = spawnSync(pm, ["--version"], { encoding: "utf8" }).stdout.trim();
+    console.log(`package manager: ${pm} ${ver}`);
+  }
   const bad = results.filter((r) => r.exit !== 0);
   for (const r of bad) console.error(`\nstep "${r.step}" failed with exit ${r.exit}:\n${r.stderr}`);
   return bad.length ? 1 : 0;
