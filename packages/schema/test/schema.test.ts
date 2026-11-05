@@ -95,6 +95,18 @@ describe("native modules", () => {
     expect(satisfiesRange("1.9.0", "1.x")).toBe(true);
     expect(satisfiesRange("1.2.3", "*")).toBe(true);
     expect(satisfiesRange("1.2.3", "banana")).toBe(false);
+    expect(satisfiesRange("1.5.0", "1.2.3 - 2.0.0")).toBe(true);
+    expect(satisfiesRange("2.0.1", "1.2.3 - 2.0.0")).toBe(false);
+    expect(satisfiesRange("1.0.0", "1.2.3 - 2.0.0")).toBe(false);
+    expect(satisfiesRange("1.5.0", ">= 1.0.0")).toBe(true);
+    expect(satisfiesRange("0.5.0", ">= 1.0.0")).toBe(false);
+    expect(satisfiesRange("1.5.0", ">= 1.2.0 < 2.0.0")).toBe(true);
+    expect(satisfiesRange("1.2.5", "^ 1.2.0")).toBe(true);
+    expect(satisfiesRange("1.2.5", "<=1.2")).toBe(true);
+    expect(satisfiesRange("1.3.0", "<=1.2")).toBe(false);
+    expect(satisfiesRange("1.9.9", "<=1")).toBe(true);
+    expect(satisfiesRange("2.0.0", "<=1")).toBe(false);
+    expect(satisfiesRange("1.2.4", "<=1.2.3")).toBe(false);
   });
   it("checkNativeModules gives typed reasons", () => {
     expect(checkNativeModules({ x: "^1.0.0" }, { y: "1.0.0" })).toEqual({ reason: "native_module_missing", module: "x", required: "^1.0.0" });

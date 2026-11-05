@@ -63,6 +63,16 @@ describe("publish and native modules", () => {
     const err = (console.error as any).mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(err).toContain("@scope/maps@~2.1.0, react-native-camera-kit@^14.0.0");
   });
+  it("reports native dependencies it skips, such as pre-release ranges", async () => {
+    writeFileSync(join(cwd, "package.json"), JSON.stringify({ dependencies: { "react-native-beta": "^1.0.0-beta.1", "react-native-ok": "^1.0.0" } }));
+    for (const n of ["react-native-beta", "react-native-ok"]) mkdirSync(join(cwd, "node_modules", n, "ios"), { recursive: true });
+    withBundle(96);
+    await publish([...flags, "--dry-run"]);
+    const err = (console.error as any).mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+    expect(err).toContain("not recorded");
+    expect(err).toContain("react-native-beta@^1.0.0-beta.1");
+    expect(err).toContain("requires: react-native-ok@^1.0.0");
+  });
   it("omits the field when no dependency is native", async () => {
     withBundle(96);
     await publish([...flags]);

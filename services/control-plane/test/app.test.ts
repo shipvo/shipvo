@@ -45,6 +45,8 @@ describe("control plane", () => {
     expect((await app.request("/p/tide/1/b0.json?nm=@scope/maps@2.3.0,other@1.0.0", {}, env)).status).toBe(200);
     expect((await app.request("/p/tide/1/b0.json", {}, env)).status).toBe(200); // shell side unknown
     expect((await app.request("/p/tide/1/b0.json?nm=other@1.0.0", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(200); // release side unknown
+    const pre = await app.request("/p/tide/1/b0.json?nm=@scope/maps@2.0.0-rc.1", {}, env);
+    expect(pre.status).toBe(200);
     expect((await app.request("/p/tide/1/b0.json?nm=junk", {}, env)).status).toBe(400);
   });
   it("404, 400 and corrupt", async () => {

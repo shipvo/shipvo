@@ -209,12 +209,13 @@ export type AppContent = z.infer<typeof AppContent>;
 const parseV = (v: string) => { const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v.trim().replace(/^[=v]+/, "")); return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null; };
 const cmpV = (a: number[], b: number[]) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 
-/** Does `version` satisfy `range`? Supports exact, ^, ~, >, >=, <, <=, x-ranges, `*`, AND (spaces) and OR (`||`). Pre-release tags are ignored. Unreadable ranges return false. */
+/** Does `version` satisfy `range`? Supports exact, ^, ~, >, >=, <, <= (also with a space after the operator), hyphen ranges, x-ranges, `*`, AND (spaces) and OR (`||`). Pre-release tags are ignored. Unreadable ranges return false. */
 export function satisfiesRange(version: string, range: string): boolean {
   const v = parseV(version);
   if (!v) return false;
   return range.split("||").some((part) => {
-    const toks = part.trim().split(/\s+/).filter(Boolean);
+    const norm = part.trim().replace(/^(\S+)\s+-\s+(\S+)$/, ">=$1 <=$2").replace(/(\^|~|>=|<=|>|<|=)\s+/g, "$1");
+    const toks = norm.split(/\s+/).filter(Boolean);
     return toks.length > 0 && toks.every((t) => {
       if (t === "*" || t === "x" || t === "X") return true;
       const m = /^(\^|~|>=|<=|>|<|=)?v?(\d+|[xX*])(?:\.(\d+|[xX*]))?(?:\.(\d+|[xX*]))?/.exec(t);
@@ -230,7 +231,7 @@ export function satisfiesRange(version: string, range: string): boolean {
       }
       if (op === ">=") return cmpV(v, n) >= 0;
       if (op === ">") return wild(m[3]) ? v[0] > n[0] : wild(m[4]) ? v[0] > n[0] || (v[0] === n[0] && v[1] > n[1]) : cmpV(v, n) > 0;
-      if (op === "<=") return cmpV(v, n) <= 0;
+      if (op === "<=") return wild(m[3]) ? v[0] <= n[0] : wild(m[4]) ? v[0] < n[0] || (v[0] === n[0] && v[1] <= n[1]) : cmpV(v, n) <= 0;
       if (op === "<") return cmpV(v, n) < 0;
       let hi: number[];
       if (op === "~") hi = wild(m[3]) ? [n[0] + 1, 0, 0] : [n[0], n[1] + 1, 0];

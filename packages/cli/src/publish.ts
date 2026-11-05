@@ -92,7 +92,9 @@ export async function publish(argv: string[]) {
   const MIN_SHELL = a["min-shell"] || JSON.parse(readFileSync("app.json", "utf8")).expo.version; // a bundle needs the shell it was built against
   if (a["hermes-bytecode-version"] === "true") throw new Error("--hermes-bytecode-version needs a value: pass a value like 96 (or 96,98)");
   const declaredHermes = parseDeclared(a["hermes-bytecode-version"] ?? cfg.hermesBytecodeVersion);
-  const nativeModules = requiredNativeModules();
+  const skippedNative: string[] = [];
+  const nativeModules = requiredNativeModules(".", skippedNative);
+  if (skippedNative.length) console.error(`native modules not recorded (the range is not a plain numeric semver range, so the control plane cannot check it): ${skippedNative.join(", ")}`);
   if (dry) console.error(`native modules this release requires: ${nativeModules ? Object.entries(nativeModules).map(([n, r]) => `${n}@${r}`).join(", ") : "none found"}`);
   const bands = (a.bands || "b0,b1,b2").split(",");
   const platforms = platformsOf(a);
