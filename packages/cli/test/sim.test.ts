@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from "node:fs";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, watch, unwatchFile } from "node:fs";
 import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -79,5 +79,77 @@ setTimeout(() => process.exit(0), 3000);`);
     await sim(["--port", port, "--skip-build", "true"]);
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(1));
     expect(logs.some((l) => l.startsWith("Simulator on"))).toBe(false);
+  });
+
+  describe("--watch", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("rebuilds once after multiple rapid file changes (debounce)", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "sim-watch-"));
+      mkdirSync(join(dir, "src"), { recursive: true });
+      mkdirSync(join(dir, "sim-dist"), { recursive: true });
+      writeFileSync(join(dir, "sim-dist", "index.html"), "<html></html>");
+      mkdirSync(join(dir, "node_modules", "@shipvo", "sim"), { recursive: true });
+      writeFileSync(join(dir, "node_modules", "@shipvo", "sim", "server.mjs"), "process.exit(0);");
+      process.chdir(dir);
+
+      const logs: string[] = [];
+      vi.spyOn(console, "error").mockImplementation((m) => { logs.push(String(m)); });
+
+      const done = sim(["--watch", "--skip-build", "true", "--port", "0"]);
+      // Trigger multiple changes rapidly
+      writeFileSync(join(dir, "src", "App.tsx"), "change 1");
+      writeFileSync(join(dir, "src", "App.tsx"), "change 2");
+      writeFileSync(join(dir, "app.json"), "change 3");
+
+      // Advance timers past debounce
+      await vi.advanceTimersByTimeAsync(400);
+
+      await done;
+      // Should only have one rebuild message, not three
+      const rebuildLines = logs.filter((l) => l.startsWith("rebuilt in") || l.includes("Change detected"));
+      expect(rebuildLines.length).toBe(2); // one "Change detected" + one "rebuilt in"
+    });
+
+    it("keeps serving after a failed build", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "sim-watch-fail-"));
+      mkdirSync(join(dir, "src"), { recursive: true });
+      mkdirSync(join(dir, "sim-dist"), { recursive: true });
+      writeFileSync(join(dir, "sim-dist", "index.html"), "<html></html>");
+      mkdirSync(join(dir, "node_modules", "@shipvo", "sim"), { recursive: true });
+      writeFileSync(join(dir, "node_modules", "@shipvo", "sim", "server.mjs"), "process.exit(0);");
+      process.chdir(dir);
+
+      const logs: string[] = [];
+      vi.spyOn(console, "error").mockImplementation((m) => { logs.push(String(m)); });
+      vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+
+      // First build succeeds
+      exec.mockReturnValueOnce(undefined);
+      const done = sim(["--watch", "--skip-build", "true", "--port", "0"]);
+
+      // Advance past initial build
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Now make build fail
+      exec.mockImplementationOnce(() => { throw new Error("build error"); });
+
+      // Trigger a file change
+      writeFileSync(join(dir, "src", "App.tsx"), "bad");
+
+      // Advance past debounce
+      await vi.advanceTimersByTimeAsync(400);
+
+      await done;
+      const rebuildLines = logs.filter((l) => l.includes("rebuilt in") || l.includes("Build failed") || l.includes("serving last good build"));
+      expect(rebuildLines.some((l) => l.includes("Build failed"))).toBe(true);
+      expect(rebuildLines.some((l) => l.includes("serving last good build"))).toBe(true);
+      expect(rebuildLines.filter((l) => l.includes("rebuilt in"))).toHaveLength(0);
+    });
   });
 });
