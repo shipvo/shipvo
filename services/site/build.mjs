@@ -3,6 +3,7 @@
 // with a grouped sidebar, a client-side search index, an on-page outline and "edit on GitHub" links.
 //   node build-docs.mjs            → public/docs/<slug>/index.html + public/docs/index.json
 import { marked } from "marked";
+import { transformPhones } from "./phone-embed.mjs";
 import { head as headTag, nav as navTag, footer as footTag, crumbs } from "./shell.mjs";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { corona } from "./corona.mjs";
@@ -107,6 +108,7 @@ function render(page) {
   renderer.table = function ({ header, rows }) { const cell = (c) => `<${c.header ? "th" : "td"}${c.align ? ` style="text-align:${c.align}"` : ""}>${this.parser.parseInline(c.tokens)}</${c.header ? "th" : "td"}>`; return `<div class="table-wrap"><table><thead><tr>${header.map(cell).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("")}</tbody></table></div>\n`; };
   marked.use({ renderer, gfm: true });
   let html = marked.parse(md.replace(/^# .*\n/, "")).replace(/src="\.github\/assets\/brand\/banner\.png"/g, 'src="/img/brand/banner.webp"');   // the page title comes from NAV; drop the file's H1
+  html = transformPhones(html);   // live phone embeds (issue #420)
   // Admonitions: a blockquote starting with **Note** / **Warning** becomes a callout.
   html = html.replace(/<blockquote>\s*<p><strong>(Note|Warning|Tip)<\/strong>:?/g, (_, k) => `<blockquote class="callout ${k.toLowerCase()}"><p><strong>${k}</strong>`);
   const text = md.replace(/```[\s\S]*?```/g, " ").replace(/[#*`>|\[\]()]/g, " ").replace(/\s+/g, " ").trim();
@@ -145,6 +147,7 @@ ${navTag(section[2])}
 </div>
 ${footTag()}
 <script src="/docs.js" defer></script>
+<script src="/phone.js" defer></script>
 </body>
 </html>`;
 }

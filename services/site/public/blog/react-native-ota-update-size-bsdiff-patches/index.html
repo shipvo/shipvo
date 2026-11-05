@@ -1,0 +1,137 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>React Native OTA update size: bsdiff patches measured | Shipvo</title>
+<meta name="description" content="A full Hermes bundle is 1.5 to 2 MB. A bsdiff patch was 64 KB in our Android run. Measured sizes, why the first update is bigger, and what to check.">
+<link rel="canonical" href="https://shipvo.dev/blog/react-native-ota-update-size-bsdiff-patches/">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="author" content="Hans Ade">
+<meta property="og:site_name" content="Shipvo"><meta property="og:locale" content="en_US">
+<meta property="og:title" content="React Native OTA update size: bsdiff patches measured | Shipvo"><meta property="og:description" content="A full Hermes bundle is 1.5 to 2 MB. A bsdiff patch was 64 KB in our Android run. Measured sizes, why the first update is bigger, and what to check."><meta property="og:url" content="https://shipvo.dev/blog/react-native-ota-update-size-bsdiff-patches/"><meta property="og:type" content="article">
+<meta property="og:image" content="https://shipvo.dev/og/blog-react-native-ota-update-size-bsdiff-patches.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="How big is a React Native OTA update? Bundle diffing, measured">
+<meta property="article:published_time" content="2026-11-05"><meta property="article:modified_time" content="2026-11-05">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="React Native OTA update size: bsdiff patches measured | Shipvo"><meta name="twitter:description" content="A full Hermes bundle is 1.5 to 2 MB. A bsdiff patch was 64 KB in our Android run. Measured sizes, why the first update is bigger, and what to check."><meta name="twitter:image" content="https://shipvo.dev/og/blog-react-native-ota-update-size-bsdiff-patches.png"><meta name="twitter:image:alt" content="How big is a React Native OTA update? Bundle diffing, measured"><meta name="twitter:creator" content="@HansCadx">
+<meta name="theme-color" content="#090D16">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt"><link rel="alternate" type="application/rss+xml" title="Shipvo blog" href="/blog/rss.xml"><link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'"><noscript><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"></noscript>
+<script>try{var t=localStorage.getItem("shipvo.theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="/site.css"><link rel="stylesheet" href="/docs.css"><link rel="stylesheet" href="/blog.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"How big is a React Native OTA update? Bundle diffing, measured","description":"A full Hermes bundle is 1.5 to 2 MB. A bsdiff patch was 64 KB in our Android run. Measured sizes, why the first update is bigger, and what to check.","datePublished":"2026-11-05","dateModified":"2026-11-05","author":{"@type":"Person","name":"Shipvo team","url":"https://x.com/HansCadx"},"publisher":{"@type":"Organization","name":"Shipvo","url":"https://shipvo.dev","logo":{"@type":"ImageObject","url":"https://shipvo.dev/logo-256.png"}},"image":"https://shipvo.dev/og/blog-react-native-ota-update-size-bsdiff-patches.png","keywords":"Guides, OTA","wordCount":1087,"inLanguage":"en","mainEntityOfPage":"https://shipvo.dev/blog/react-native-ota-update-size-bsdiff-patches/"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shipvo.dev/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://shipvo.dev/blog/"},{"@type":"ListItem","position":3,"name":"How big is a React Native OTA update? Bundle diffing, measured","item":"https://shipvo.dev/blog/react-native-ota-update-size-bsdiff-patches/"}]}</script></head><body class="blogpage"><a class="skip" href="#main">Skip to content</a><header class="nav"><div class="wrap">
+  <a class="logo" href="/" aria-label="Shipvo home"><img src="/logo-56.png" alt="" width="28" height="28">Shipvo</a>
+  <nav class="primary" aria-label="Primary">
+    <a href="/docs/" class="">Docs</a>
+    <a href="/learn/" class="">Learn</a>
+    <div class="has-menu"><button type="button" aria-expanded="false" aria-haspopup="true">Product<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="menu"><div class="menu-grid"><a href="/docs/getting-started/#5-publish-over-the-air"><b>Publish</b><span>Signed OTA updates, cohorts, rollback</span></a><a href="/docs/agents/"><b>Simulate</b><span>A phone agents can see and operate over MCP</span></a><a href="/docs/testing/"><b>Test in CI</b><span>Typed simulator tests on every pull request</span></a><a href="/docs/parity-results/"><b>Verify</b><span>Simulator vs device parity, measured nightly</span></a><a href="/apps"><b>Marketplace</b><span>Apps any signed-in agent can open</span></a><a href="/docs/cli/"><b>CLI</b><span>init · sim · login · app · publish · rollback</span></a><a href="/docs/mcp/"><b>MCP server</b><span>Local over stdio, hosted with a key</span></a><a href="/docs/device-api/"><b>Device API</b><span>Camera, location, biometrics, payments, notifications</span></a><a href="/docs/runtime/"><b>Runtime</b><span>The OTA runtime and Expo plugin</span></a></div></div></div>
+    <div class="has-menu"><button type="button" aria-expanded="false" aria-haspopup="true">Solutions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="menu"><div class="menu-grid"><a href="/#how"><b>Test with the assistant you use</b><span>Claude, ChatGPT or Cursor drives your app end to end, no emulator</span></a><a href="/docs/getting-started/"><b>Ship updates without the store</b><span>One command; phones have it in seconds</span></a><a href="/docs/agents/#listing-your-app-for-every-agent"><b>Make your app agent-ready</b><span>List it so any agent can open it</span></a><a href="/compare/"><b>Shipvo vs Expo</b><span>Side by side, including where Expo is the better choice</span></a><a href="/docs/self-hosting/"><b>Self-host everything</b><span>Your Cloudflare account, your keys, ten minutes</span></a></div></div></div>
+    <a href="/pricing/" class="">Pricing</a>
+    <a href="/blog/" class="on">Blog</a>
+    <a href="/apps" class="">Apps</a>
+    <a href="/changelog/" class="">Changelog</a>
+  </nav>
+  <div class="nav-right">
+    <button class="theme-btn" type="button" data-theme-toggle data-mode="auto" aria-label="Colour theme: automatic. Click to change." title="Theme: automatic"><svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <a class="gh" href="https://github.com/shipvo/shipvo" rel="noopener" aria-label="Shipvo on GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2.1c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.05.78 2.12v3.14c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg><span data-stars>Star</span></a>
+    <a class="btn primary" href="/docs/getting-started/">Get started</a>
+  </div>
+  <button class="burger" type="button" aria-label="Menu" aria-expanded="false"><span></span></button>
+</div>
+<div class="mobile-menu" hidden>
+  <div class="mm-theme"><span>Theme</span><button class="theme-btn" type="button" data-theme-toggle data-mode="auto" aria-label="Colour theme: automatic. Click to change." title="Theme: automatic"><svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button></div>
+  <a href="/docs/">Docs</a><a href="/learn/">Learn</a><a href="/pricing/">Pricing</a><a href="/blog/">Blog</a><a href="/apps">Apps</a><a href="/changelog/">Changelog</a>
+  <div class="mm-title">Product</div><a href="/docs/getting-started/#5-publish-over-the-air">Publish</a><a href="/docs/agents/">Simulate</a><a href="/docs/testing/">Test in CI</a><a href="/docs/parity-results/">Verify</a><a href="/apps">Marketplace</a><a href="/docs/cli/">CLI</a><a href="/docs/mcp/">MCP server</a><a href="/docs/device-api/">Device API</a><a href="/docs/runtime/">Runtime</a>
+  <div class="mm-title">Solutions</div><a href="/#how">Test with the assistant you use</a><a href="/docs/getting-started/">Ship updates without the store</a><a href="/docs/agents/#listing-your-app-for-every-agent">Make your app agent-ready</a><a href="/compare/">Shipvo vs Expo</a><a href="/docs/self-hosting/">Self-host everything</a>
+  <a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a>
+</div></header><main id="main"><article class="post"><header class="post-head"><div class="wrap narrow"><a class="back" href="/blog/">← All posts</a><div class="tags"><span class="tag">Guides</span><span class="tag">OTA</span></div><h1>How big is a React Native OTA update? Bundle diffing, measured</h1><p class="lede">A full Hermes bundle is 1.5 to 2 MB. A bsdiff patch was 64 KB in our Android run. Measured sizes, why the first update is bigger, and what to check.</p><div class="meta"><span class="by"><img src="/logo-256.png" alt="" width="28" height="28"><b>Shipvo team</b></span><span>November 5, 2026</span><span>5 min read</span></div></div></header>
+<div class="wrap narrow"><figure class="hero-fig"><img src="/blog/react-native-ota-update-size-bsdiff-patches/cover.svg" alt="" width="1200" height="630"></figure>
+<nav class="contents" aria-label="In this article"><b>In this article</b><a href="#what-an-ota-update-actually-downloads">What an OTA update actually downloads</a><a href="#how-a-patch-works">How a patch works</a><a href="#what-shipvo-publish-does">What shipvo publish does</a><a href="#what-we-measured">What we measured</a><a href="#why-the-first-update-is-bigger">Why the first update is bigger</a><a href="#hermes-makes-diffing-harder">Hermes makes diffing harder</a><a href="#the-smallest-update-is-not-code">The smallest update is not code</a><a href="#a-checklist-for-any-ota-tool">A checklist for any OTA tool</a><a href="#next-step">Next step</a></nav>
+<div class="prose"><p>Every over-the-air (OTA) update has a size. On a 2 GB phone on a slow connection, that size decides whether the update arrives today or after the user closes the app. This post covers React Native OTA update size: what a full bundle weighs, what a binary patch saves, and what we measured in this repo.</p>
+<h2 id="what-an-ota-update-actually-downloads">What an OTA update actually downloads</h2>
+<p>An OTA update replaces the JavaScript part of your app. With Hermes, that part is a single bytecode file. For our sample app, Tide and Tackle, the file is between 1.5 and 2 MB:</p>
+<ul>
+<li>Android: 1.57 MB (<a href="/docs/spike-results/">spike results</a>).</li>
+<li>iOS Simulator: 1,996,082 bytes in the most recent run (<a href="/docs/spike-results/#ios-patch-size-and-patch-apply-time">spike results, iOS patch size</a>).</li>
+</ul>
+<p>A small app has a small bundle. A large app has a larger one. Either way, most releases change a few screens, so sending the whole file again wastes data.</p>
+<h2 id="how-a-patch-works">How a patch works</h2>
+<p>A binary diff tool compares the old bundle with the new bundle and writes down only the differences. The phone holds the old bundle, downloads the difference and rebuilds the new bundle. Shipvo uses <a href="https://www.daemonology.net/bsdiff/" rel="noopener">bsdiff</a>, a common tool for this.</p>
+<p>Rebuilding creates a risk: if the phone patches the wrong base, it gets a broken bundle. So the patch is guarded in three ways:</p>
+<ol>
+<li>A patch is used only if its <code>from_sha256</code> equals the hash of the bundle the phone runs now (or the bundle embedded in the app).</li>
+<li>The rebuilt bundle&#39;s size and hash are checked against the signed release pointer.</li>
+<li>If any check fails, the phone downloads the full bundle instead.</li>
+</ol>
+<p>The full rules are in step 9 of the <a href="https://github.com/shipvo/shipvo/blob/main/docs/adapters.md" rel="noopener">adapter contract</a>. The point is that a patch can only make an update smaller. It cannot make it less safe, because the result is verified like a full download.</p>
+<h2 id="what-shipvo-publish-does">What <code>shipvo publish</code> does</h2>
+<p>When you publish, the CLI builds patches from recent releases and from each app shell&#39;s embedded bundle:</p>
+<div class="code"><div class="code-bar"><span>bash</span><button type="button" class="copy" aria-label="Copy code">Copy</button></div><pre><code>pip install bsdiff4
+shipvo publish --max-bases 6</code></pre></div><p><code>--max-bases</code> sets how many older releases to patch from (the default is 6). The CLI prints the result, for example <code>patches: &lt;hash&gt;=64.0KB</code>. Two details are worth knowing:</p>
+<ul>
+<li>Patching needs the Python package <code>bsdiff4</code>. Without it, the CLI says so and publishes full bundles. Updates still work, they are just bigger.</li>
+<li>A patch is kept only if it is under 60% of the full bundle. Otherwise the phone gets the full file.</li>
+</ul>
+<p>A first release has nothing to patch from, so <code>shipvo publish --dry-run</code> reports full bundles only. See the <a href="/docs/getting-started/">getting started guide</a> for the dry-run layout.</p>
+<h2 id="what-we-measured">What we measured</h2>
+<p>These numbers come from our own runs. Nothing here is estimated.</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Patch</th>
+<th>Full bundle</th>
+<th>Where measured</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Android, release 7 from release 6 (content change)</td>
+<td>64 KB</td>
+<td>1.57 MB</td>
+<td><a href="/docs/spike-results/">spike results</a>, 30 Oct 2026</td>
+</tr>
+<tr>
+<td>Android, first update after a fresh install</td>
+<td>291 KB</td>
+<td>1,530 KB</td>
+<td><a href="/docs/spike-results/">spike results</a>, 30 Oct 2026</td>
+</tr>
+<tr>
+<td>iOS Simulator, first update from the embedded bundle (median of 3 runs)</td>
+<td>83,999 bytes</td>
+<td>1,996,082 bytes</td>
+<td><a href="https://github.com/shipvo/shipvo/actions/runs/42087991990" rel="noopener">Actions run 42087991990</a>, 5 Nov 2026</td>
+</tr>
+</tbody></table>
+<p>On Android, the 64 KB patch was downloaded, patched and verified in 913 ms. That is 96% smaller than the full bundle for that release. The same file also lists patch sizes of 17 to 112 KB across bench tests.</p>
+<p>On the iOS Simulator, the median time from the last byte to a healthy app was 573 ms. That includes the reload. The control plane ran on the same machine, so this shows the runtime&#39;s own cost and not a mobile network.</p>
+<p>Read these with care. They are one sample app, one Android phone (a Redmi 9A) and one simulator image. Your bundle will differ. The useful part is the method: publish two releases, read the patch size the CLI prints, and compare it with your full bundle.</p>
+<h2 id="why-the-first-update-is-bigger">Why the first update is bigger</h2>
+<p>The 291 KB figure is the one most guides skip. On a fresh install, the phone has only the bundle that shipped inside the app. That bundle was built separately from your OTA bundles, so more bytes differ. The patch against it is larger than a patch between two OTA releases.</p>
+<p>We track this as a known gap. The next step in the spike notes is to build the embedded bundle the same way as OTA bundles, so the first patch shrinks. The iOS run shows the same shape: the patch is the first download from the embedded bundle, not a steady-state patch.</p>
+<h2 id="hermes-makes-diffing-harder">Hermes makes diffing harder</h2>
+<p>Hermes bytecode is not like text. Other teams have written about this. The maintainer of react-native-update says that Hermes re-sorts its string table on each compile and stores absolute offsets, so a one-line change can move many bytes (<a href="https://dev.to/sunnylqm/why-hermes-bytecode-defeats-binary-diffing-and-how-we-got-a-one-line-ota-hotfix-down-to-34-kb-2cn2" rel="noopener">DEV Community</a>). That is their analysis and their benchmark, and we have not reproduced it. We mention it because it explains why a &quot;one-line&quot; change does not give a &quot;one-line&quot; patch.</p>
+<p>Expo added bundle diffing to EAS Update in SDK 55 and estimates smaller downloads (<a href="https://expo.dev/blog/ship-smaller-ota-updates-bundle-diffing-comes-to-ota-updates-in-sdk-55" rel="noopener">Expo blog</a>). We have not measured EAS Update, so we make no size comparison with it. If you compare tools, measure the same app, the same change and the same base.</p>
+<h2 id="the-smallest-update-is-not-code">The smallest update is not code</h2>
+<p>Our spike notes name one more lever. Copy, prices and images do not need a new bundle at all. If they are sent as data from a content system, an edit takes a few kilobytes. Shipvo&#39;s per-app <code>/admin</code> is aimed at this. We have not published a measurement for it yet, so treat it as direction, not a result.</p>
+<h2 id="a-checklist-for-any-ota-tool">A checklist for any OTA tool</h2>
+<ul>
+<li>Does it send patches, and against which base? The previous release only, or several?</li>
+<li>What does a fresh install download first?</li>
+<li>Is the patched result verified against a signed hash?</li>
+<li>What happens when the patch is missing or fails? You want a full-bundle fallback.</li>
+<li>Has the vendor published sizes with the device, the app and the date?</li>
+</ul>
+<h2 id="next-step">Next step</h2>
+<p>Try it on your own bundle. <a href="/docs/getting-started/">Build your first Shipvo app</a>, publish twice, and read the patch line. If you are moving from CodePush, the <a href="https://github.com/shipvo/shipvo/blob/main/docs/migrate-from-codepush.md" rel="noopener">migration guide</a> covers where patches fit. To see what happens when an update goes wrong, read <a href="/blog/roll-back-a-bad-react-native-update/">how to roll back a bad React Native OTA update</a>.</p>
+</div>
+<div class="share"><span>Share</span><a href="https://x.com/intent/post?text=How%20big%20is%20a%20React%20Native%20OTA%20update%3F%20Bundle%20diffing%2C%20measured&url=https%3A%2F%2Fshipvo.dev%2Fblog%2Freact-native-ota-update-size-bsdiff-patches%2F" rel="noopener">X</a><a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fshipvo.dev%2Fblog%2Freact-native-ota-update-size-bsdiff-patches%2F" rel="noopener">LinkedIn</a><button type="button" data-copy-url>Copy link</button></div>
+<aside class="related"><div class="related-head"><h2>Related articles</h2><a href="/blog/">All posts →</a></div><div class="grid two"><article class="pcard" data-tags="Guides|Founders"><a class="pcard-art" href="/blog/build-a-mobile-app-without-coding/" tabindex="-1" aria-hidden="true"><img src="/blog/build-a-mobile-app-without-coding/cover.svg" alt="" width="1200" height="630" loading="lazy"></a><div class="pcard-body"><div class="tags"><span class="tag">Guides</span><span class="tag">Founders</span></div><h2><a href="/blog/build-a-mobile-app-without-coding/">How to build a mobile app without coding, and what to plan for after version one</a></h2><p>Most guides to building a mobile app without coding end at the app store. A founder's guide to the part after: testing, changing content and fixing mistakes safely.</p><div class="meta"><span class="by"><img src="/logo-256.png" alt="" width="28" height="28"><b>Shipvo team</b></span><span>November 5, 2026</span><span>5 min read</span></div></div></article><article class="pcard" data-tags="Guides|OTA"><a class="pcard-art" href="/blog/roll-back-a-bad-react-native-update/" tabindex="-1" aria-hidden="true"><img src="/blog/roll-back-a-bad-react-native-update/cover.svg" alt="" width="1200" height="630" loading="lazy"></a><div class="pcard-body"><div class="tags"><span class="tag">Guides</span><span class="tag">OTA</span></div><h2><a href="/blog/roll-back-a-bad-react-native-update/">How to roll back a bad React Native over-the-air update</a></h2><p>A bad over-the-air bundle keeps loading on every launch until you replace it. Three ways to stop it: limit who gets it, let the phone revert itself, and republish the last good release.</p><div class="meta"><span class="by"><img src="/logo-256.png" alt="" width="28" height="28"><b>Shipvo team</b></span><span>November 4, 2026</span><span>5 min read</span></div></div></article></div></aside></div></article></main><footer class="foot"><div class="wrap">
+  <div class="foot-grid">
+    <div class="foot-brand"><a class="logo" href="/"><img src="/logo-56.png" alt="" width="28" height="28">Shipvo</a><p>Build once. Publish for people and AI agents.</p><p class="mono small">Apache-2.0 · made in Douala</p><div class="status" data-status><span class="dot"></span><span>checking services…</span></div><a class="listing-badge" href="https://aiagentslisting.com/shipvo" rel="noopener"><img src="https://aiagentslisting.com/shipvo/badge.svg?theme=dark" alt="Shipvo badge" width="200" height="50" loading="lazy"></a></div>
+    <div><div class="foot-title">Product</div><a href="/docs/getting-started/#5-publish-over-the-air">Publish</a><a href="/docs/agents/">Simulate</a><a href="/docs/parity-results/">Verify</a><a href="/apps">Marketplace</a><a href="/pricing/">Pricing</a><a href="/compare/">Shipvo vs Expo</a><a href="/blog/">Blog</a><a href="https://www.npmjs.com/org/shipvo" rel="noopener">npm packages</a></div>
+    <div><div class="foot-title">Learn</div><a href="/learn/">All tutorials</a><a href="/learn/first-app/">Create your first app</a><a href="/learn/your-own-shop/">Make a shop</a><a href="/learn/videos/">Videos</a><a href="/learn/glossary/">Glossary</a></div>
+    <div><div class="foot-title">Docs</div><a href="/docs/getting-started/">Build your first app</a><a href="/docs/test-with-an-assistant/">Test with an assistant</a><a href="/docs/testing/">Test in CI</a><a href="/docs/cli/">CLI reference</a><a href="/docs/mcp/">MCP server</a><a href="/docs/device-api/">Device API</a><a href="/docs/self-hosting/">Self-hosting</a><a href="/llms.txt">llms.txt</a></div>
+    <div><div class="foot-title">Proof</div><a href="/docs/parity-results/">Parity results</a><a href="/docs/spike-results/">OTA on a 2 GB phone</a><a href="/docs/agent-gate-results/">Agent gate</a><a href="/changelog/">Changelog</a></div>
+    <div><div class="foot-title">Company</div><a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a><a href="https://x.com/HansCadx" rel="noopener">X</a><a href="/brand">Brand</a><a href="mailto:hans@pipilot.dev">Contact</a><a href="https://github.com/shipvo/shipvo/blob/main/LICENSE" rel="noopener">License</a></div>
+  </div>
+  <div class="foot-bottom"><span>© 2026 Shipvo. Not affiliated with Expo, Apple, Google, OpenAI or Anthropic.</span><span class="legal-links"><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/security/">Security</a><a href="/acceptable-use/">Acceptable use</a></span></div>
+</div></footer>
+<script src="/shell.js" defer></script><script src="/blog.js" defer></script></body></html>

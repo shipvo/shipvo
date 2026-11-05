@@ -69,13 +69,13 @@ if (!ready.length && !working.length && !live.some((r) => r.name === "agent-plan
   fixed.push("The issue queue was empty; asked the Head of Product to plan the next slices.");
 }
 
-// 3c. Daily content roles: GitHub sometimes drops scheduled runs. Start any that has not run for 26 hours.
+// 3c. Daily content roles: GitHub sometimes drops scheduled runs. Start any that has not run for 14 hours.
 for (const wf of ["agent-blog.yml", "agent-tutorial.yml", "agent-video.yml"]) {
   try {
     const last = api(`repos/${REPO}/actions/workflows/${wf}/runs?per_page=1`).workflow_runs[0];
-    if (!last || (last.status === "completed" && mins(last.created_at) > 26 * 60)) {
+    if (!last || (last.status === "completed" && mins(last.created_at) > 14 * 60)) {
       dispatch(wf);
-      fixed.push(`${wf} had not run for over a day (missed schedule); started it.`);
+      fixed.push(`${wf} had not run for 14 hours (missed schedule); started it.`);
     }
   } catch (e) { console.log(`skip ${wf}:`, e.message); }
 }
