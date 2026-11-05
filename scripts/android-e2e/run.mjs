@@ -137,6 +137,24 @@ await scenario("rollback to the previous release", async () => {
   return { pass: trials.every((t) => t.ok && t.deviceBundleMatches), trials, median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "applyMs"]) };
 });
 
+// Runs before the crash-loop scenarios: a crash-loop failure can leave the app open but dead (see the late-crash notes), and
+// the staged-rollout check needs a device that is polling.
+await scenario("staged rollout: a device outside the cohort does not get the release", async () => {
+  if (!pid()) launch(); // the app only polls while it is open
+  const others = ["b0", "b1", "b2"].filter((b) => b !== BAND), cur = good().rel;
+  const p = await publish(bundle("v1"), { bands: others });
+  await sleep(35_000);
+  const e = entries().filter((x) => x.t >= p.at), after = prefs();
+  const ownPolls = e.filter((x) => x.path === `/p/${APP}/1/${BAND}.json`);
+  // The device's own band still serves the previous pointer (HTTP 200, an older release). Outside means it never
+  // fetches the new release's bundle or patch, never reports it, and keeps its current release.
+  const fetched = e.filter((x) => x.path.startsWith("/b/") && x.path.includes(`r${p.release}.`)).length;
+  const outsideOk = ownPolls.length >= 2 && fetched === 0 && after.current_release === cur && !after.pending_release && !tele().some((x) => x.release === p.release && x.at >= p.at);
+  const q = publishRelease({ root: TREE, app: APP, seed: KEY.seed, release: p.release, bytes: bundle("v1"), bands: [BAND] }); // widen the rollout to the device's band
+  const ev = await waitFor(() => healthy(p.release, q.at), 120_000);
+  return { pass: outsideOk && !!ev, deviceBand: BAND, cohort: prefs().cohort, publishedToBands: others, devicePollsWhileOutside: ownPolls.length, devicePollStatuses: [...new Set(ownPolls.map((x) => x.status))], downloadsOfNewRelease: fetched, currentWhileOutside: after.current_release, joinedAfterWideningMs: ev ? ev.at - q.at : null };
+});
+
 for (const [kind, file, title, maxBadRuns] of [
   ["start", "crash", "crash-loop: a release that crashes on start is discarded", 3],
   // Reports healthy, is promoted, then dies 5 s later. The stability window must keep counting these boots: the bad release runs 3 times (the promoting boot counts as the first), and the 4th launch is the revert. That is the same rule as crash-on-start. `maxBadRuns` is how many times the bad release may run (the issue's "within 3 launches"); the last launch is the revert to the previous release, so `badRuns = boots - 1`.
@@ -161,21 +179,6 @@ for (const [kind, file, title, maxBadRuns] of [
       revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 && badRuns <= maxBadRuns });
   }
   return { pass: trials.every((t) => t.pass), kind, maxBadRuns, trials, median: summarize(trials, ["restoredMs", "boots", "badRuns"]) };
-});
-
-await scenario("staged rollout: a device outside the cohort does not get the release", async () => {
-  const others = ["b0", "b1", "b2"].filter((b) => b !== BAND), cur = good().rel;
-  const p = await publish(bundle("v1"), { bands: others });
-  await sleep(35_000);
-  const e = entries().filter((x) => x.t >= p.at), after = prefs();
-  const ownPolls = e.filter((x) => x.path === `/p/${APP}/1/${BAND}.json`);
-  // The device's own band still serves the previous pointer (HTTP 200, an older release). Outside means it never
-  // fetches the new release's bundle or patch, never reports it, and keeps its current release.
-  const fetched = e.filter((x) => x.path.startsWith("/b/") && x.path.includes(`r${p.release}.`)).length;
-  const outsideOk = ownPolls.length >= 2 && fetched === 0 && after.current_release === cur && !after.pending_release && !tele().some((x) => x.release === p.release && x.at >= p.at);
-  const q = publishRelease({ root: TREE, app: APP, seed: KEY.seed, release: p.release, bytes: bundle("v1"), bands: [BAND] }); // widen the rollout to the device's band
-  const ev = await waitFor(() => healthy(p.release, q.at), 120_000);
-  return { pass: outsideOk && !!ev, deviceBand: BAND, cohort: prefs().cohort, publishedToBands: others, devicePollsWhileOutside: ownPolls.length, devicePollStatuses: [...new Set(ownPolls.map((x) => x.status))], downloadsOfNewRelease: fetched, currentWhileOutside: after.current_release, joinedAfterWideningMs: ev ? ev.at - q.at : null };
 });
 
 writeFileSync(join(WORK, "logcat-crash.txt"), adb("logcat", "-d", "-b", "crash"));
