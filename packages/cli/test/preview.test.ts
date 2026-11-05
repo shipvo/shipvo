@@ -173,9 +173,33 @@ describe("frame page comments", () => {
     const { win, nodes, downloaded, blobs } = boot();
     win.shipvoNotes.add("one", 1, 2); win.shipvoNotes.add("two", 3, 4);
     expect(JSON.parse(win.shipvoNotes.exportJson()).map((n: any) => n.note)).toEqual(["one", "two"]);
+    win.shipvoNotes.step("tap Buy");
+    win.shipvoNotes.add("three", 5, 6);
+    for (const n of JSON.parse(win.shipvoNotes.exportJson()).slice(2)) {
+      expect(n.screen).toBe("Cart");
+      expect(n.steps.length).toBeGreaterThan(0);
+    }
     nodes.export.onclick();
     expect(downloaded).toEqual(["comments.json"]);
-    expect(JSON.parse(blobs[0])).toHaveLength(2);
+    expect(JSON.parse(blobs[0])).toHaveLength(3);
+  });
+  it("keeps the Comment button outside the toolbar that the 500px rule hides", () => {
+    const h = framePage("Shop");
+    const bar = h.match(/<div class="bar"[\s\S]*?<\/div>/)![0];
+    expect(bar).not.toContain('id="comment"');
+    expect(h).toMatch(/\.fab\{position:fixed/);
+    expect(h).toMatch(/@media \(max-width:500px\)\{\.bar,\.note\{display:none\}/);
+    expect(h).not.toMatch(/@media \(max-width:500px\)\{[^\n]*\.fab\{[^}]*display:none/);
+    expect(h).toMatch(/\.fab\{[^}]*min-height:44px/);
+    expect(h).toContain("body.dark .side input");
+    expect(h).not.toContain('size="30"');
+  });
+  it("does not record a tap on the pin overlay as a step", () => {
+    const { win, nodes } = boot();
+    nodes.comment.onclick();
+    nodes.pin.onclick({ clientX: 1, clientY: 2 });
+    nodes.notetext.value = "x"; nodes.noteform.onsubmit({ preventDefault() {} });
+    expect(win.shipvoNotes.list()[0].steps).toEqual([]);
   });
   it("keeps notes after a reload via localStorage", () => {
     const first = boot();

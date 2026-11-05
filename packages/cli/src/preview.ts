@@ -107,6 +107,12 @@ iframe{border:0;background:#fff;width:100%;flex:1;min-height:0;display:block}
 .side{max-width:360px;margin:0 auto 20px;padding:0 10px;box-sizing:border-box}
 .side h2{font-size:14px;margin:0 0 6px}.side ol{padding-left:20px;margin:6px 0}.side li{margin-bottom:6px}.side small{opacity:.7}
 .side button,.side input{font:inherit}
+.side input{width:100%;box-sizing:border-box;min-height:36px;background:transparent;color:inherit;border:1px solid #888;border-radius:6px;padding:4px 8px;margin:4px 0}
+body.dark .side input{background:#15171a;color:#eee}body.dark .side small{opacity:.85}
+.fab{position:fixed;right:12px;bottom:12px;z-index:10;min-width:44px;min-height:44px;padding:8px 14px;font:inherit;border:1px solid #888;border-radius:22px;background:#fff;color:#111;cursor:pointer;box-shadow:0 2px 8px #0004}
+.fab[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}
+.fab:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+body.dark .fab{background:#2a2d31;color:#eee}body.dark .fab[aria-pressed=true]{background:#2563eb;color:#fff}
 .device{position:relative}
 #pin{position:absolute;inset:0;display:none;cursor:crosshair;background:#2563eb22;z-index:5}
 #pin.on{display:block}
@@ -120,8 +126,8 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 <div class="bar" role="toolbar" aria-label="Preview options">
 <button data-skin="android" aria-pressed="true">Android</button><button data-skin="iphone" aria-pressed="false">iPhone</button>
 <button data-size="phone" aria-pressed="true">Phone</button><button data-size="large" aria-pressed="false">Large phone</button><button data-size="tablet" aria-pressed="false">Tablet</button>
-<button id="theme" aria-pressed="false">Dark</button>
-<button id="comment" aria-pressed="false">Comment</button></div>
+<button id="theme" aria-pressed="false">Dark</button></div>
+<button id="comment" class="fab" aria-pressed="false">Comment</button>
 <div class="stage"><div class="device" id="device" data-skin="android" style="width:360px;height:760px">
 <div class="status" id="status"><span id="clock">9:41</span><span class="notch"></span><span class="icons" id="icons">&#9679;&#9679; 5G 100%</span></div>
 <iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" aria-label="Tap where the problem is"></div>
@@ -138,7 +144,7 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 <p class="sim" id="panel-status" role="status">All device events here are simulated.</p></aside>
 </div>
 <div class="side" id="side"><h2>Comments (<span id="count">0</span>)</h2>
-<form id="noteform" hidden><label for="notetext">Note for the point you tapped</label><br><input id="notetext" size="30"> <button type="submit">Save</button></form>
+<form id="noteform" hidden><label for="notetext">Note for the point you tapped</label><br><input id="notetext"> <button type="submit">Save</button></form>
 <ol id="notelist"></ol>
 <button id="export">Export comments.json</button>
 <p><small>Notes live in this browser until you export them. Nothing is uploaded.</small></p></div>
