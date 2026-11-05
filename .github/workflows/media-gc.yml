@@ -16,12 +16,13 @@ jobs:
         with: { sparse-checkout: services/site/media.json, persist-credentials: false }
       - run: |
           [ -f services/site/media.json ] || { echo "no media manifest yet"; exit 0; }
-          KEEP=$(node -p "JSON.parse(require('fs').readFileSync('services/site/media.json','utf8')).map(v=>'videos/'+v.file).join('\n')")
+          KEEP=$(node -p "JSON.parse(require('fs').readFileSync('services/site/media.json','utf8')).map(v=>v.file.startsWith('videos/')?v.file:'videos/'+v.file).join('\n')")
           CUTOFF=$(date -u -d '14 days ago' +%s)
           curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/shipvo-media/objects?per_page=1000" \
             | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{for(const o of JSON.parse(s).result||[])console.log(o.key+'\t'+Math.floor(new Date(o.last_modified)/1000))})" \
             | while IFS=$'\t' read -r key ts; do
+                case "$key" in videos/*) ;; *) continue ;; esac   # only videos are collected; hq/ and others are kept
                 echo "$KEEP" | grep -qxF "$key" && continue
                 [ "$ts" -lt "$CUTOFF" ] || continue
                 npx -y wrangler@4 r2 object delete "shipvo-media/$key" --remote && echo "deleted $key" | tee -a "$GITHUB_STEP_SUMMARY"
