@@ -93,6 +93,29 @@ it("--template content writes two screens, the data file and its own test", asyn
   expect(readFileSync(join(dir, "tests/app.test.ts"), "utf8")).toContain('phone.tap("Back")');
 });
 
+it("--template shop writes list, detail, cart, five products and a test that reads prices from the data file", async () => {
+  const dir = join(tmp, "store");
+  await init([dir, "--template", "shop", "--public-key", "AAAA"]);
+  for (const f of ["App.tsx", "src/cart.tsx", "src/money.ts", "src/screens/List.tsx", "src/screens/Detail.tsx", "src/screens/Cart.tsx", "src/data/products.json", "tests/app.test.ts"])
+    expect(existsSync(join(dir, f))).toBe(true);
+  const data = JSON.parse(readFileSync(join(dir, "src/data/products.json"), "utf8"));
+  expect(data).toHaveLength(5);
+  for (const p of data) {
+    expect(Object.keys(p).sort()).toEqual(["description", "id", "name", "price"]);
+    expect(Number.isInteger(p.price)).toBe(true);
+  }
+  const test = readFileSync(join(dir, "tests/app.test.ts"), "utf8");
+  expect(test).toContain('from "../src/data/products.json"');
+  expect(test).toContain("a.price + b.price");
+  expect(test).not.toMatch(/\$\d/);
+  expect(readFileSync(join(dir, "src/screens/Detail.tsx"), "utf8")).toContain('accessibilityLabel="Add to cart"');
+  expect(readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8")).toContain('"Remove " + p.name');
+  const readme = readFileSync(join(dir, "README.md"), "utf8");
+  expect(readme).toContain("src/data/products.json");
+  expect(readme).not.toContain("src/release.ts");
+  expect(readFileSync(join(dir, "App.tsx"), "utf8")).toContain("markHealthy");
+});
+
 it("the default and --template blank write the same files as before", async () => {
   const a = join(tmp, "plain-a"), b = join(tmp, "plain-b");
   await init([a, "--name", "Same", "--public-key", "AAAA"]);
@@ -106,9 +129,9 @@ it("an unknown template lists the valid names, exits 2 and writes nothing", asyn
   const err = vi.spyOn(console, "error").mockImplementation(() => {});
   const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
   const dir = join(tmp, "nope");
-  await expect(init([dir, "--template", "shop"])).rejects.toThrow("exit");
+  await expect(init([dir, "--template", "nope"])).rejects.toThrow("exit");
   expect(exit).toHaveBeenCalledWith(2);
-  expect(String(err.mock.calls[0][0])).toContain("blank, content");
+  expect(String(err.mock.calls[0][0])).toContain("blank, content, shop");
   expect(existsSync(dir)).toBe(false);
   err.mockRestore(); exit.mockRestore();
 });
@@ -119,6 +142,7 @@ it("--help lists the templates", async () => {
   const out = String(log.mock.calls.at(-1)![0]);
   expect(out).toMatch(/blank\s+the starter/);
   expect(out).toMatch(/content\s+a list screen/);
+  expect(out).toMatch(/shop\s+a product list/);
 });
 
 it("--template with no value says it needs a name", async () => {
