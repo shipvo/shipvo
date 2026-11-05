@@ -36,6 +36,7 @@ export async function init(argv: string[]) {
   const a = parse(argv);
   if (argv.includes("--help") || argv.includes("-h")) { console.log(INIT_HELP); return; }
   if (!dirArg) { console.error(INIT_NEEDS_DIR); process.exit(2); }
+  if (a.template === "true") { console.error(`shipvo: --template needs a name. Valid templates: ${TEMPLATES.join(", ")}.`); process.exit(2); }
   const template = a.template ?? "blank";
   if (!TEMPLATES.includes(template)) { console.error(`shipvo: unknown template "${template}". Valid templates: ${TEMPLATES.join(", ")}.`); process.exit(2); }
   const dir = resolve(dirArg);
@@ -303,7 +304,7 @@ A [Shipvo](https://github.com/shipvo/shipvo) app: one React Native codebase that
 - \`npm run sim\` opens it in the simulator; \`npx -y @shipvo/mcp\` lets Claude, Cursor or ChatGPT use it (\`open_app("${appId}")\`).
 - \`npx expo run:android\` builds the native shell (the trust root and control plane \`${cp}\` are pinned in it).
 - Push to \`main\`: the publish workflow signs the new JavaScript and every phone and simulator gets it.
-- \`src/release.ts\` is the first thing to edit; ${template === "content" ? "`src/data/articles.json` holds the titles and text; `src/screens/` has the list and detail screens." : "`App.tsx` shows the device API (camera, location, biometrics, notifications)."}
+- ${template === "content" ? "`src/data/articles.json` is the first thing to edit: it holds the titles and text. `src/screens/` has the list and detail screens." : "`src/release.ts` is the first thing to edit; `App.tsx` shows the device API (camera, location, biometrics, notifications)."}
 `;
 
 const CONTENT_DATA = JSON.stringify([
@@ -312,8 +313,8 @@ const CONTENT_DATA = JSON.stringify([
   { id: "ship-it", title: "Ship it", body: "Run shipvo publish and every installed phone gets your new articles over the air." },
 ], null, 2) + "\n";
 
-const CONTENT_APP_TSX = (name: string) => `import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+const CONTENT_APP_TSX = (name: string) => `import { useEffect, useRef, useState } from "react";
+import { AppState, StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Runtime } from "@shipvo/runtime";
 import { List } from "./src/screens/List";
@@ -323,7 +324,18 @@ import articles from "./src/data/articles.json";
 export default function App() {
   const [openId, setOpenId] = useState<string | null>(null);
   // Tell the runtime the first screen rendered, so this release is kept.
-  useEffect(() => { try { Runtime.markHealthy(); } catch {} }, []);
+  // Then check for new releases now and while the app is open.
+  const busy = useRef(false);
+  useEffect(() => {
+    try { Runtime.markHealthy(); } catch {}
+    const check = async () => {
+      if (busy.current) return; busy.current = true;
+      try { await Runtime.checkForUpdate(true); } catch {}
+      finally { busy.current = false; }
+    };
+    check(); const id = setInterval(() => { if (AppState.currentState === "active") check(); }, 60000);
+    return () => clearInterval(id);
+  }, []);
   const open = articles.find((a) => a.id === openId);
   return (
     <View style={s.root}>

@@ -70,6 +70,14 @@ it("--template content writes two screens, the data file and its own test", asyn
   const readme = readFileSync(join(dir, "README.md"), "utf8");
   expect(readme).not.toContain("camera");
   expect(readme).toContain("src/data/articles.json");
+  expect(readme).not.toContain("src/release.ts");
+  const app = readFileSync(join(dir, "App.tsx"), "utf8");
+  expect(app).toContain("checkForUpdate");
+  expect(app).toContain("markHealthy");
+  // Every fixed tap/waitFor target in the generated test exists in the screens.
+  const detail = readFileSync(join(dir, "src/screens/Detail.tsx"), "utf8");
+  expect(detail).toContain('accessibilityLabel="Back"');
+  expect(readFileSync(join(dir, "tests/app.test.ts"), "utf8")).toContain('phone.tap("Back")');
 });
 
 it("the default and --template blank write the same files as before", async () => {
@@ -98,4 +106,13 @@ it("--help lists the templates", async () => {
   const out = String(log.mock.calls.at(-1)![0]);
   expect(out).toMatch(/blank\s+the starter/);
   expect(out).toMatch(/content\s+a list screen/);
+});
+
+it("--template with no value says it needs a name", async () => {
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+  await expect(init([join(tmp, "novalue"), "--template"])).rejects.toThrow("exit");
+  expect(exit).toHaveBeenCalledWith(2);
+  expect(String(err.mock.calls[0][0])).toContain("--template needs a name");
+  err.mockRestore(); exit.mockRestore();
 });
