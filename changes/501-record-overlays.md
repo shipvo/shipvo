@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: recordings draw a finger dot and ripple on taps and a trail on scrolls, cut waits to at most 0.6 s, and show `record_marker` captions as a lower third. `record_start` takes `show_taps` and `background` ("brand", "plain" or a CSS colour). Chapter times and `duration_s` now follow the trimmed video.
+- Migration: none; new optional inputs. Recordings are shorter than the wall-clock time when the agent paused.
