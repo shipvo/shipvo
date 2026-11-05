@@ -3,9 +3,9 @@
 // that app's own key prefixes, with every release pointer verified against the app's registered public key. The private
 // signing key never leaves the developer's machine or CI.
 import { Hono } from "hono";
-import { ReleasePointerBody } from "@shipvo/schema";
+import { BAND_PERCENT, ReleasePointerBody, checkPolicy } from "@shipvo/schema";
 import { recordAudit } from "./audit";
-import { checkReleasePolicy, loadReleasePolicy } from "./owner";
+import { loadReleasePolicy } from "./owner";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; OWNER_TOKEN?: string };
 export const apps = new Hono<{ Bindings: Env }>();
@@ -212,15 +212,35 @@ async function auditPublish(db: any, id: string, key: string, buf: ArrayBuffer, 
   } catch { console.warn(`audit write failed: app=${id} action=publish`); }
 }
 
+/** Hours the same release has sat on a narrower band that reaches at least `percent` of devices (longest wins), or null if it has not. */
+async function hoursStaged(kv: KVNamespace, key: string, release: number, percent: number, now: Date): Promise<number | null> {
+  const prefix = key.slice(0, key.lastIndexOf("/") + 1);
+  let best: number | null = null;
+  for (const band of ["b0", "b1"] as const) {
+    if (BAND_PERCENT[band] < percent) continue;
+    try {
+      const b = JSON.parse(JSON.parse((await kv.get(prefix + band)) ?? "null")?.body ?? "null");
+      const t = Date.parse(b?.issued_at);
+      if (b?.release === release && Number.isFinite(t)) best = Math.max(best ?? 0, (now.getTime() - t) / 3600_000);
+    } catch { /* unreadable pointer: not staged */ }
+  }
+  return best;
+}
+
 /**
- * Enforces the stored release policy (maxBand, agentMaxBand) on one release pointer. Returns the refusal, or null.
+ * Enforces the stored release policy on one release pointer: maxBand, agentMaxBand, blockedWeekdays (UTC unless the policy has a timeZone)
+ * and requireStageBeforeFull. The shared `checkPolicy` from @shipvo/schema does the checking, as in the CLI. Returns the refusal, or null.
  * The caller counts as an agent when it sends `x-shipvo-actor: agent` (the CLI does when SHIPVO_ACTOR=agent).
  * A refused publish writes one audit row. Never throws on the audit write.
  */
 async function policyRefusal(c: any, id: string, buf: ArrayBuffer, key: string) {
   const body = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body); // pointerProblem already parsed it
   const agent = (c.req.header("x-shipvo-actor") ?? "").trim().toLowerCase() === "agent";
-  const verdict = checkReleasePolicy(await loadReleasePolicy({ kv: c.env.POINTERS, appId: id }), body.band, agent);
+  const policy = await loadReleasePolicy({ kv: c.env.POINTERS, appId: id });
+  const at = new Date();
+  let hoursAtStage: number | null | undefined;
+  if (policy.requireStageBeforeFull && body.band === "b2") hoursAtStage = await hoursStaged(c.env.POINTERS, key, body.release, policy.requireStageBeforeFull.percent, at);
+  const verdict = checkPolicy(policy, { band: body.band, actorKind: agent ? "agent" : "human", now: at, defaultTimeZone: "UTC", hoursAtStage });
   if (verdict.ok) return null;
   await recordAudit(c.env.DB, {
     app_id: id, actor: agent ? "agent (publish token)" : id, actor_kind: agent ? "agent" : "person", action: "publish", release: body.release, release_id: key,
