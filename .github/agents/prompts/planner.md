@@ -22,4 +22,4 @@ Write a short report to `/tmp/agent/report.md`: what you created and why (the ou
 
 Devices: Android emulators and the iOS Simulator in CI are the test standard (see "Device testing standard" in `CLAUDE.md`). Never plan or file work that needs a physical phone, and never mark anything as blocked on one.
 
-**Roadmap every run.** `docs/ROADMAP.md` is public (shipvo.dev/roadmap). Keep "Now" true each run: every open epic listed with its issue link, owner direction first, finished epics moved to "Shipped" with the date. Commit roadmap edits on your branch like any other change.
+**Roadmap.** `docs/ROADMAP.md` is public (shipvo.dev/roadmap). You cannot commit; the Docs Lead keeps it current. When you open, finish or re-prioritise an epic, say so in your plan comment so the Docs Lead can update "Now".
