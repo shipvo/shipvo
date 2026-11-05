@@ -43,6 +43,56 @@ describe("androidMetaData", () => {
   });
 });
 
+const base = cases[0];
+const bad: Array<[string, object]> = [
+  ["negative bytecode version", { hermesBytecodeVersions: [-1] }],
+  ["fractional bytecode version", { hermesBytecodeVersions: [1.5] }],
+  ["non-array bytecode versions", { hermesBytecodeVersions: "96" }],
+  ["comma in module version", { nativeModules: { a: "1,2" } }],
+  ["space in module version", { nativeModules: { a: "1 2" } }],
+  ["space in module name", { nativeModules: { "a b": "1" } }],
+  ["empty module name", { nativeModules: { "": "1" } }],
+  ["empty module version", { nativeModules: { a: "" } }],
+  ["non-string module version", { nativeModules: { a: 1 } }],
+  ["array nativeModules", { nativeModules: ["a@1"] }],
+  ["null nativeModules", { nativeModules: null }],
+  ["string nativeModules", { nativeModules: "a@1" }],
+];
+
+describe("invalid input", () => {
+  it.each(bad)("%s throws here and in app.plugin.js", (_n, extra) => {
+    const props = { ...base, ...extra };
+    expect(() => androidMetaData(props as never)).toThrow(/adopt-bare/);
+    expect(() => applyAndroidConfig(readFileSync(fixture, "utf8"), props as never)).toThrow();
+    expect(() => pluginPairs(props)).toThrow(/@shipvo\/runtime/);
+  });
+});
+
+describe("manifest edge cases", () => {
+  it("throws on an unterminated <application", () => {
+    expect(() => applyAndroidConfig('<manifest><application android:name="a"', base)).toThrow(/unterminated/);
+  });
+  it("throws on a missing </application>", () => {
+    expect(() => applyAndroidConfig("<manifest><application>\n<activity/>\n</manifest>", base)).toThrow(/no <\/application>/);
+  });
+  it("adds android:value to an existing meta-data that has none", () => {
+    const xml = '<manifest><application>\n  <meta-data android:name="dev.shipvo.APP_ID"/>\n</application></manifest>';
+    const out = applyAndroidConfig(xml, base);
+    expect(out).toContain('<meta-data android:name="dev.shipvo.APP_ID" android:value="shop"/>');
+    expect(out.match(/dev\.shipvo\.APP_ID/g)).toHaveLength(1);
+    expect(applyAndroidConfig(out, base)).toBe(out);
+  });
+  it("escapes & \" < in values on add and update", () => {
+    const a = { ...base, baseUrl: "https://cp.test/?a=1&b=2" };
+    const added = applyAndroidConfig(readFileSync(fixture, "utf8"), a);
+    expect(added).toContain('android:value="https://cp.test/?a=1&amp;b=2"');
+    const b = { ...base, baseUrl: 'https://x.test/?q="<"&z=1' };
+    const updated = applyAndroidConfig(added, b);
+    expect(updated).toContain('android:value="https://x.test/?q=&quot;&lt;&quot;&amp;z=1"');
+    expect(applyAndroidConfig(updated, b)).toBe(updated);
+  });
+});
+
 describe("writeAndroidConfig", () => {
   const original = readFileSync(fixture, "utf8");
   it("adds values, keeps everything else, and is idempotent", () => {

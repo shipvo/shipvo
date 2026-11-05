@@ -21,11 +21,39 @@ export function androidMetaData(v: ShipvoNativeValues): Array<[string, string]> 
     ["dev.shipvo.APP_ID", v.appId],
     ["dev.shipvo.SHELL_MAJOR", String(v.shellMajor ?? 1)],
   ];
-  if (v.hermesBytecodeVersions !== undefined) out.push(["dev.shipvo.HERMES_BYTECODE_VERSIONS", v.hermesBytecodeVersions.join(",")]);
-  if (v.nativeModules !== undefined) {
-    out.push(["dev.shipvo.NATIVE_MODULES", Object.entries(v.nativeModules).map(([n, ver]) => `${n}@${ver}`).join(",")]);
-  }
+  if (v.hermesBytecodeVersions !== undefined) out.push(["dev.shipvo.HERMES_BYTECODE_VERSIONS", formatBytecodeVersions(v.hermesBytecodeVersions)]);
+  if (v.nativeModules !== undefined) out.push(["dev.shipvo.NATIVE_MODULES", formatNativeModules(v.nativeModules)]);
   return out;
+}
+
+// Same rules as formatBytecodeVersions in packages/runtime/app.plugin.js.
+function formatBytecodeVersions(value: unknown): string {
+  if (!Array.isArray(value)) throw new Error("adopt-bare: hermesBytecodeVersions must be an array of integers");
+  for (const v of value) {
+    if (!Number.isInteger(v) || v < 0) {
+      throw new Error(`adopt-bare: hermesBytecodeVersions must be non-negative integers, got ${JSON.stringify(v)}`);
+    }
+  }
+  return value.join(",");
+}
+
+// Same rules as formatNativeModules in packages/runtime/app.plugin.js.
+function formatNativeModules(value: unknown): string {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("adopt-bare: nativeModules must be an object of package name to version");
+  }
+  return Object.entries(value as Record<string, unknown>)
+    .map(([name, version]) => {
+      if (!name.trim()) throw new Error("adopt-bare: nativeModules has an empty package name");
+      if (typeof version !== "string" || !version.trim()) {
+        throw new Error(`adopt-bare: nativeModules version for "${name}" must be a non-empty string`);
+      }
+      if (/[,\s]/.test(version) || /[,\s]/.test(name)) {
+        throw new Error(`adopt-bare: nativeModules entry "${name}": "${version}" has a comma or space where it cannot`);
+      }
+      return `${name}@${version}`;
+    })
+    .join(",");
 }
 
 /** Returns the manifest path if `dir/android/app/src/main/AndroidManifest.xml` exists, else null. */
