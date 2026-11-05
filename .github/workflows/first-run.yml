@@ -1,0 +1,53 @@
+name: first-run
+# Times a new developer's first run on a clean Linux runner, with no secrets (issue #264):
+# shipvo init, install, doctor, the real bundle export and a real publish to a local control plane
+# (the self-host Docker image, as in selfhost-smoke.yml). Writes the table to the run summary and
+# uploads first-run.json, so an agent can quote the numbers with a link to this run.
+on:
+  workflow_dispatch:
+  schedule: [{ cron: "41 4 * * 1" }]
+  push:
+    branches: [main]
+    paths: ["packages/cli/**", "scripts/first-run/**", "services/control-plane/**", ".github/workflows/first-run.yml"]
+permissions:
+  contents: read
+concurrency: { group: first-run, cancel-in-progress: true }
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --filter "./packages/**" build
+      - name: Start the local control plane
+        working-directory: services/control-plane
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 120); do curl -sf localhost:8787/health > /dev/null && break; sleep 2; done
+          curl -sf localhost:8787/health
+      - name: Measure the first run
+        run: |
+          node scripts/first-run/measure.mjs --with-install --with-export --control-url http://localhost:8787 \
+            --out "$RUNNER_TEMP/first-run.json" | tee "$RUNNER_TEMP/first-run.md"
+          { echo "### First run on ubuntu-latest (clean runner, no secrets)"; echo; cat "$RUNNER_TEMP/first-run.md"; echo; \
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: first-run
+          path: |
+            ${{ runner.temp }}/first-run.json
+            ${{ runner.temp }}/first-run.md
+      - name: Control plane logs
+        if: failure()
+        working-directory: services/control-plane
+        run: docker compose logs --no-color | tail -200
+      - name: Stop
+        if: always()
+        working-directory: services/control-plane
+        run: docker compose down -v
