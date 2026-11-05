@@ -17,6 +17,13 @@ beforeAll(async () => {
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
+it("the scaffolded test file starts with a note about the starter screen", () => {
+  const top = test.split("\n").slice(0, 3).join("\n");
+  expect(top).toContain("starter screen");
+  expect(top).toContain("replace these tests");
+  expect(test.split("\n").slice(0, 3).every((l) => l.startsWith("//"))).toBe(true);
+});
+
 it("the starter does not claim a release before one exists", () => {
   expect(release).not.toMatch(/Release \d/);
   expect(release).toContain("Hello from My Shop.");
@@ -206,4 +213,11 @@ it("init --help mentions adopt mode and --dry-run", async () => {
   const r = await run(tmp, ["--help"]);
   expect(r.out).toContain("adopt mode");
   expect(r.out).toContain("--dry-run");
+});
+
+it("writes a preview workflow that comments the link and skips forks", () => {
+  const w = readFileSync(join(tmp, "my-shop", ".github/workflows/preview.yml"), "utf8");
+  expect(w).toContain("shipvo preview --json");
+  expect(w).toContain("gh pr comment");
+  expect(w).toContain("head.repo.full_name == github.repository");
 });

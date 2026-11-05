@@ -18,6 +18,8 @@ export type ShipvoConfig = {
   agentDeny?: string[];
   /** Where `shipvo publish` writes: the control plane's Cloudflare KV namespace. */
   kv?: { namespaceId: string };
+  /** Where `shipvo preview` publishes: "here.now" (default, no account) or "control-plane" (not built yet). */
+  preview?: "here.now" | "control-plane";
   /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */
   listing?: { public?: boolean; description?: string; category?: string; tagline?: string; icon?: string; screenshots?: string[]; website?: string; capabilities?: string[] };
 };
