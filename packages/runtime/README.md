@@ -34,6 +34,8 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 The runtime does not emit `download_failed` yet. The sample app and the control plane accept it, so it can be forwarded once the runtime raises it.
 
+`Runtime.consumeEvents()` can also return `pointer_rejected:<reason>` (`hermes_bytecode_mismatch`, `native_module_missing` or `native_module_version`) on Android when the control plane says this shell cannot run the newest release. It is queued once per reason and is not accepted by `/t`, so do not forward it yet.
+
 Events are read at launch. A `verify_failed` raised during `checkForUpdate` is reported on the next cold start.
 
 ## Crash after `markHealthy`

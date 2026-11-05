@@ -129,9 +129,17 @@ class ShipvoRuntimeModule : Module() {
     val s = Store(ctx)
     require(s.baseUrl.isNotEmpty() && s.publicKey.isNotEmpty() && s.appId.isNotEmpty()) { "runtime not configured" }
     val known = maxOf(s.currentRelease, s.pendingRelease, s.blockedRelease)
-    val conn = http("${s.baseUrl}/p/${s.appId}/${s.shellMajor}/${s.band}.json", if (known > 0) "\"$known\"" else null)
+    val conn = http(PointerQuery.url(s.baseUrl, s.appId, s.shellMajor, s.band, s.hermesBytecodeVersions, s.nativeModules), if (known > 0) "\"$known\"" else null)
     val code = conn.responseCode
-    if (code == 304 || code == 404) { conn.disconnect(); return mapOf("status" to "none") }
+    if (code == 404) {
+      // The shell cannot run the newest release. Keep the current one and say why.
+      val reason = PointerQuery.mismatchReason(try { conn.errorStream?.bufferedReader()?.use { it.readText() } } catch (_: Exception) { null })
+      conn.disconnect()
+      if (reason == null) return mapOf("status" to "none")
+      PointerQuery.rejectionEvent(s.pendingEvents(), reason)?.let { s.addEvent(it) }
+      return mapOf("status" to "none", "reason" to reason)
+    }
+    if (code == 304) { conn.disconnect(); return mapOf("status" to "none") }
     require(code == 200) { "pointer HTTP $code" }
     val envelope = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
     conn.disconnect()
