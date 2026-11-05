@@ -17,8 +17,9 @@
     var b=document.createElement('button');b.type='button';b.className='vid-play';
     b.setAttribute('aria-label','Play: '+(v.getAttribute('data-title')||'video')+(v.getAttribute('data-length')?' ('+v.getAttribute('data-length')+')':''));
     b.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 3.5v17l14-8.5z"/></svg>';
-    b.addEventListener('click',function(){v.play();v.focus()});
+    b.addEventListener('click',function(){var r=v.play();if(r&&r.catch)r.catch(function(){});v.focus()});
     v.addEventListener('play',function(){wrap.classList.add('played')});
+    v.addEventListener('ended',function(){wrap.classList.remove('played')});
     wrap.appendChild(b)});
   // active heading in the outline
   var links=[].slice.call(document.querySelectorAll('.toc a')),hs=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))}).filter(Boolean);
