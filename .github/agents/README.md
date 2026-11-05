@@ -98,7 +98,7 @@ Settings to turn on:
 | `AGENTS_PAUSED` | unset | `true` stops every agent at once. |
 | `AGENT_MODEL` | `claude-sonnet-5-5` | Model for every Claude role. |
 | `AGENT_MODEL_LEAD` | same as `AGENT_MODEL` | Optional override for the planner, reviewer and security roles (for example `claude-opus-5-5`). |
-| `AGENT_CLAUDE_MAX_ACTIVE` | 4 | Claude engineer tasks in flight. |
+| `AGENT_CLAUDE_MAX_ACTIVE` | 6 (fixed in `agent-engineer.yml`) | Claude engineer tasks in flight. |
 | `AGENT_MISTRAL_MAX_ACTIVE` | 4 | Mistral tasks in flight. |
 | `MISTRAL_MODEL` | `labs-leanstral-1-5` | Mistral model for the Mistral engineer. |
 | `AGENT_AIDER_MAX_ACTIVE` | 3 | Aider tasks in flight. |
