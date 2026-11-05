@@ -47,6 +47,16 @@ Native features work with no phone: the simulated device (see `@shipvo/device`) 
 
 The simulator shows only what a phone would: a horizontal rail lists the visible items, so agents swipe it (`scroll right` with the rail's ref) exactly as on a device. Measured against a real Android emulator and iPhone simulator, see `docs/parity-results.md`.
 
+## Did the action land?
+
+`tap`, `type`, `scroll` and `back` return `structuredContent` next to the usual text:
+
+- `delivery`: `"delivered"` or `"not_delivered"`.
+- On `not_delivered` (the result is also `isError`): `reason` is `stale_ref`, `not_visible`, `disabled` or `covered`, and `safe_to_retry` is `true` because nothing reached the app. Take a new `screen`, then retry.
+- `type` also returns `value`, the text the field holds after typing.
+
+`code`, `error` and the text result are unchanged. Other failures (for example `sim_timeout`) carry no `delivery` field: the action may have run, so call `screen` first.
+
 ## Remote (Streamable HTTP)
 
 Run the server where the simulator runs and put it behind HTTPS (a Cloudflare Tunnel is enough):
