@@ -71,6 +71,16 @@ test("empty or missing url: bad_url", async () => {
   }
 });
 
+test("typed codes: unknown session, unknown action, bad app spec, no Back button", async () => {
+  assert.equal((await act("nope", { action: "screen" })).code, "no_session");
+  assert.ok((await call("/session", { session: "d" })).ok);
+  assert.equal((await act("d", { action: "dance" })).code, "unknown_action");
+  assert.equal((await act("d", { action: "back" })).code, "no_back_button");
+  const r = await call("/session", { session: "e", app: "Bad App!" });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, "bad_app_spec");
+});
+
 test("answers GET / without waiting for Chromium, and exits with a message if Chromium cannot start", async () => {
   const port = PORT + 400;
   const p = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(port), "--dir", join(root, "bad"), "--dist", dist, "--chromium", join(root, "no-such-chromium")], { stdio: ["ignore", "ignore", "pipe"], cwd: here });

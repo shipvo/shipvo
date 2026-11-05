@@ -20,6 +20,29 @@ Native features work with no phone: the simulated device (see `@shipvo/device`) 
 
 The simulator shows only what a phone would: a horizontal rail lists the visible items, so agents swipe it (`scroll right` with the rail's ref) exactly as on a device. Measured against a real Android emulator and iPhone simulator, see `docs/parity-results.md`.
 
+## Error codes
+
+A failed tool call has `isError: true`. The text starts with `Error [code]: message`, and `structuredContent` is `{ ok: false, code, error }`. `code` is always a string. One test (`test/error-codes.test.ts`) checks this for every session tool.
+
+| Code | Meaning | What the agent should do |
+| --- | --- | --- |
+| `no_session` | The simulator has no session with that id (it expired or was never opened). | Call `open_app` again. |
+| `stale_ref` | The ref is from an earlier screen, or no longer exists. | Call `screen`, then use a ref from it. |
+| `not_a_text_field` | `type` was given a ref that is not a text field. | Pick a `textbox` ref from `screen`. |
+| `no_back_button` | `back` was called on a screen with no Back button. | Use `screen` and tap another control. |
+| `no_such_notification` | `open_notification` got an id that is not in the shade. | Call `notifications` and use an id from it. |
+| `bad_url` | `open_url` got an empty or non-string url. | Pass a url such as `myapp://item/3`. |
+| `no_url_listener` | The app has no URL listener. | The app must register one with `onUrl` from `@shipvo/device`. |
+| `unknown_action` | The simulator does not know the action. | Use one of the documented tools. |
+| `unknown_app` | `open_app` got an app this server or key does not open. | Call `list_apps` and use an id from it. |
+| `bad_app_spec` | The app spec is not `id`, `id@rN` or `id@latest`. | Fix the spec. |
+| `no_web_artifact` | The release has no published web build to simulate. | Open the local build, or publish first. |
+| `read_only_key` | The key is read-only and cannot open sessions. | Use a key with test scope. |
+| `no_screenshot` | The simulator returned no image. | Use `screen` instead. |
+| `sim_timeout` | The simulator did not answer in time. The action may have run. | Call `screen` to see where the session is. Do not retry blindly. |
+| `sim_unreachable` | The server could not connect to the simulator. | Check that the simulator is running. |
+| `sim_error` | The simulator failed without a more specific code (including a non-200 reply). | Call `screen`; if it keeps failing, restart the simulator. |
+
 ## Remote (Streamable HTTP)
 
 Run the server where the simulator runs and put it behind HTTPS (a Cloudflare Tunnel is enough):
