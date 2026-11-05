@@ -5,6 +5,7 @@
 import { Hono } from "hono";
 import { ReleasePointerBody } from "@shipvo/schema";
 import { recordAudit } from "./audit";
+import { checkReleasePolicy, loadReleasePolicy } from "./owner";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; OWNER_TOKEN?: string };
 export const apps = new Hono<{ Bindings: Env }>();
@@ -211,6 +212,23 @@ async function auditPublish(db: any, id: string, key: string, buf: ArrayBuffer, 
   } catch { console.warn(`audit write failed: app=${id} action=publish`); }
 }
 
+/**
+ * Enforces the stored release policy (maxBand, agentMaxBand) on one release pointer. Returns the refusal, or null.
+ * The caller counts as an agent when it sends `x-shipvo-actor: agent` (the CLI does when SHIPVO_ACTOR=agent).
+ * A refused publish writes one audit row. Never throws on the audit write.
+ */
+async function policyRefusal(c: any, id: string, buf: ArrayBuffer, key: string) {
+  const body = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body); // pointerProblem already parsed it
+  const agent = (c.req.header("x-shipvo-actor") ?? "").trim().toLowerCase() === "agent";
+  const verdict = checkReleasePolicy(await loadReleasePolicy({ kv: c.env.POINTERS, appId: id }), body.band, agent);
+  if (verdict.ok) return null;
+  await recordAudit(c.env.DB, {
+    app_id: id, actor: agent ? "agent (publish token)" : id, actor_kind: agent ? "agent" : "person", action: "publish", release: body.release, release_id: key,
+    after: JSON.stringify({ refused: true, rule: verdict.rule, band: body.band, platform: body.platform ?? "android", release: body.release }),
+  });
+  return verdict;
+}
+
 apps.put("/:id/kv/*", async (c) => {
   const id = c.req.param("id"); const app = await publisher(c, id); if (!app) return c.json({ error: "unauthorized" }, 401);
   const k = keyOf(c, id); if (!keyAllowed(id, k)) return c.json({ error: "forbidden_key", message: `Keys must start with one of ${PREFIXES.map((p) => `${p}/${id}/`).join(", ")}` }, 403);
@@ -219,6 +237,7 @@ apps.put("/:id/kv/*", async (c) => {
   if (app.bytes_used + buf.byteLength > MAX_APP_BYTES) return c.json({ error: "app_storage_exceeded", message: `This app has used its ${MAX_APP_BYTES / 1048576} MB beta storage.` }, 413);
   if (k.startsWith(`p/${id}/`)) { const why = await pointerProblem(id, k, app.public_key, buf); if (why) return c.json({ error: "bad_pointer", message: why }, 422); }
   const isPtr = k.startsWith(`p/${id}/`);
+  if (isPtr) { const no = await policyRefusal(c, id, buf, k); if (no) return c.json({ error: "policy_refused", code: "policy_refused", rule: no.rule, reason: no.reason }, 403); }
   let prev: string | null = null;
   if (isPtr) { try { prev = (await c.env.POINTERS.get(k)) ?? null; } catch { /* before is optional */ } }
   await c.env.POINTERS.put(k, buf);
