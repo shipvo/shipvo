@@ -20,6 +20,8 @@ export type ShipvoConfig = {
   kv?: { namespaceId: string };
   /** Where `shipvo preview` publishes: "here.now" (default, no account) or "control-plane" (not built yet). */
   preview?: "here.now" | "control-plane";
+  /** Release rules checked by `shipvo publish --dry-run`. Validated there, not at load, so a bad section never breaks other commands. */
+  policy?: unknown;
   /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */
   listing?: { public?: boolean; description?: string; category?: string; tagline?: string; icon?: string; screenshots?: string[]; website?: string; capabilities?: string[] };
 };

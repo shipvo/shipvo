@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 const exec = vi.hoisted(() => ({ fn: (_cmd: string) => {} }));
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string) => exec.fn(c) }));
 
+const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown }));
 const puts: string[] = [];
 const values = new Map<string, string>();
 const blobs = new Map<string, Uint8Array>();
@@ -18,7 +19,7 @@ const stub = {
 };
 vi.mock("../src/config.js", async (orig) => ({
   ...(await orig<typeof import("../src/config.js")>()),
-  loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k" }),
+  loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k", ...(cfgPolicy.value ? { policy: cfgPolicy.value } : {}) }),
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
 }));
@@ -33,7 +34,7 @@ const fakeHbc = (version: number) => {
 
 let cwd: string, prev: string;
 beforeEach(() => {
-  puts.length = 0; values.clear(); blobs.clear(); exec.fn = () => {};
+  cfgPolicy.value = undefined; process.exitCode = undefined; puts.length = 0; values.clear(); blobs.clear(); exec.fn = () => {};
   prev = process.cwd(); cwd = mkdtempSync(join(tmpdir(), "shipvo-pub-"));
   writeFileSync(join(cwd, "app.json"), JSON.stringify({ expo: { version: "1.0.0" } }));
   mkdirSync(join(cwd, "dist-ota/_expo/static/js/android"), { recursive: true });
@@ -104,6 +105,25 @@ describe("publish and the Hermes bytecode check", () => {
     withBundle(96);
     await expect(publish([...flags, "--dryrun"])).rejects.toThrow(/Unknown flag --dryrun/);
     expect(puts).toEqual([]);
+  });
+
+  it("--dry-run refuses by policy: exits non-zero, prints rule and reason, writes nothing", async () => {
+    withBundle(96);
+    cfgPolicy.value = { maxBand: "b0" };
+    await publish(["--skip-export", "true", "--skip-web", "true", "--bands", "b0,b1", "--dry-run"]);
+    expect(process.exitCode).toBe(1);
+    const msg = (console.error as any).mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+    expect(msg).toMatch(/Refused by policy rule maxBand: .*b1.*b0/);
+    expect(existsSync(join(cwd, ".shipvo/dry-run/p/demo/1/b0"))).toBe(false);
+    process.exitCode = undefined;
+  });
+
+  it("--dry-run passes a policy that allows the publish", async () => {
+    withBundle(96);
+    cfgPolicy.value = { maxBand: "b0" };
+    await publish([...flags, "--dry-run"]);
+    expect(process.exitCode).toBeUndefined();
+    expect(existsSync(join(cwd, ".shipvo/dry-run/p/demo/1/b0"))).toBe(true);
   });
 
   it("--dry-run signs and writes a release locally without touching the control plane", async () => {

@@ -7,6 +7,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
 import { checkBundle, parseDeclared } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
+import { checkPublishPolicy } from "./policy.js";
 import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
 
 const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".css": "text/css", ".ico": "image/x-icon", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ttf": "font/ttf", ".svg": "image/svg+xml" };
@@ -105,6 +106,10 @@ export async function publish(argv: string[]) {
   if (skippedNative.length) console.error(`native modules not recorded (the range is not a plain numeric semver range, so the control plane cannot check it): ${skippedNative.join(", ")}`);
   if (dry) console.error(`native modules this release requires: ${nativeModules ? Object.entries(nativeModules).map(([n, r]) => `${n}@${r}`).join(", ") : "none found"}`);
   const bands = (a.bands || "b0,b1,b2").split(",");
+  if (dry) {
+    const verdict = checkPublishPolicy(cfg.policy, bands);
+    if (!verdict.ok) { console.error(`Refused by policy rule ${verdict.rule}: ${verdict.reason}`); process.exitCode = 1; return; }
+  }
   const platforms = platformsOf(a);
   const release = Number(a.release || 0) || (await currentRelease(kv, APP, MAJOR)) + 1;
   const summary: Record<string, unknown> = { app: APP, release, bands, min_shell_version: MIN_SHELL, ...(nativeModules ? { required_native_modules: nativeModules } : {}), ...(dry ? { dry_run: true, out: outDir } : {}) };
