@@ -1,0 +1,3 @@
+- sim: the phone frame draws power, volume up and volume down buttons, with hidden lock screen, volume overlay, power menu and boot screen layers.
+- sim: new actions `lock`, `unlock` and `restart`. Restart reloads the app (cold start) and keeps storage. While locked, other actions fail with code `locked`. Each is logged as simulated in `device_log`.
+- mcp: new tools `lock`, `unlock` and `restart`, with typed errors `already_locked`, `not_locked` and `locked`. No migration needed.

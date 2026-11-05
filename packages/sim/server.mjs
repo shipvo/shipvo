@@ -15,6 +15,7 @@ import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
+import { createLifecycle, lockOverlay, removeLockOverlay, bootOverlay, OVERLAY_STYLE } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -74,7 +75,7 @@ async function newSession(id, opts = {}) {
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString() });
+  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -106,7 +107,8 @@ function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.
 
 async function act(id, body) {
   const s = sessions.get(id); if (!s) throw new SimError("no_session", `no session '${id}': call /session first`);
-  const { page } = s;
+  const { page, life } = s;
+  try { life.guard(body.action); } catch (e) { throw new SimError(e.code, e.message); }
   // A ref is valid only for the page it came from and while its element is unchanged. Re-snapshot first, so a node that
   // was re-rendered with new content has lost its old ref, then fail with a typed error instead of acting on anything else.
   const loc = (ref) => page.locator(`aria-ref=${ref}`);
@@ -191,7 +193,16 @@ async function act(id, body) {
       }
       break;
     }
-    case "device_log": return { log: await page.evaluate(() => globalThis.__pnDevice?.log() ?? []), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    // Lock screen and cold start. Simulated: the page gets an overlay, or a full reload with storage kept.
+    case "lock": try { life.lock(); } catch (e) { throw new SimError(e.code, e.message); } await page.evaluate(`(${lockOverlay})(${JSON.stringify(OVERLAY_STYLE)})`); break;
+    case "unlock": try { life.unlock(); } catch (e) { throw new SimError(e.code, e.message); } await page.evaluate(`(${removeLockOverlay})()`); break;
+    case "restart": {
+      await page.evaluate(`(${bootOverlay})(${JSON.stringify(OVERLAY_STYLE)})`).catch(() => {});
+      await page.waitForTimeout(300);
+      await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
+      life.restart(); break;
+    }
+    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...life.log()].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
@@ -211,13 +222,13 @@ async function act(id, body) {
       const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
 
 const DELIVERY = new Set(["tap", "type", "scroll", "back"]);
-const REASONS = new Set(["stale_ref", "not_visible", "disabled", "covered"]);
+const REASONS = new Set(["stale_ref", "not_visible", "disabled", "covered", "locked"]);
 const WCACHE = new Map();
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");

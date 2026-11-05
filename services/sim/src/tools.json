@@ -599,6 +599,69 @@
   }
  },
  {
+  "name": "lock",
+  "description": "Press the power button: the simulated phone locks and shows the lock screen with the time. Other actions fail with code \"locked\" until unlock. Fails with already_locked if it is locked.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "unlock",
+  "description": "Swipe up on the lock screen: the phone unlocks and returns to the same screen. Fails with not_locked if it is not locked.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "restart",
+  "description": "Restart the simulated phone: a boot screen shows, then the app loads fresh (cold start). Its storage is kept. Also leaves the lock screen.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
   "name": "device_log",
   "description": "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.",
   "inputSchema": {

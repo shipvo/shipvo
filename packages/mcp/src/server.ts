@@ -210,6 +210,13 @@ server.tool("open_notification", "Tap a notification from the shade (newest if n
   async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
 server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   async ({ session, url }) => { need(session); return result(session, await sim("/act", { session, action: "open_url", url })); });
+// Lock screen and cold start. Simulated: no real hardware. Errors are typed: already_locked, not_locked, locked.
+const LIFE: [string, string][] = [
+  ["lock", "Press the power button: the simulated phone locks and shows the lock screen with the time. Other actions fail with code \"locked\" until unlock. Fails with already_locked if it is locked."],
+  ["unlock", "Swipe up on the lock screen: the phone unlocks and returns to the same screen. Fails with not_locked if it is not locked."],
+  ["restart", "Restart the simulated phone: a boot screen shows, then the app loads fresh (cold start). Its storage is kept. Also leaves the lock screen."],
+];
+for (const [name, desc] of LIFE) server.tool(name, desc, { session: sid }, WR, async ({ session }) => { need(session); return result(session, await sim("/act", { session, action: name })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 

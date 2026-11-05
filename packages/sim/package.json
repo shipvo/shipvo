@@ -28,6 +28,7 @@
     "mock-rules.mjs",
     "screen-rules.mjs",
     "push-notification.mjs",
+    "lifecycle.mjs",
     "README.md"
   ],
   "peerDependencies": {

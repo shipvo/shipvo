@@ -46,6 +46,24 @@ function battery(b) {
   return svg(25, 12, `<rect x=".75" y=".75" width="21.5" height="10.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"/><rect x="3.5" y="3.5" width="${w}" height="5" rx="1.5" fill="currentColor"/><rect x="23" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".6"/>${bolt}`, `data-part="battery" data-level="${b.level}"${b.charging ? ' data-charging="true"' : ""}`);
 }
 
+// Side buttons sit on the frame edge: Android has them on the right, the iPhone has volume left and power right.
+// The page wires them up: power press locks, long press opens the power menu, volume shows the volume overlay.
+function buttons(skin) {
+  const b = (part, label, side) => `<button type="button" class="sf-btn sf-${side}" data-part="${part}" aria-label="${label}"></button>`;
+  return skin === "ios"
+    ? b("volume-up", "Volume up", "l1") + b("volume-down", "Volume down", "l2") + b("power", "Power", "r1")
+    : b("power", "Power", "r1") + b("volume-up", "Volume up", "r2") + b("volume-down", "Volume down", "r3");
+}
+
+// Hidden layers over the screen. The page shows one by removing its `hidden` attribute.
+function overlays(skin, st) {
+  const logo = `<svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><rect width="72" height="72" rx="18" fill="#2563eb"/><path d="M36 18 52 44H20z" fill="#fff"/></svg>`;
+  return `<div class="sf-ov sf-lock" data-part="lock-screen" hidden><div class="sf-clock">${st.time}</div><div>Swipe up to unlock</div></div>`
+    + `<div class="sf-ov sf-vol" data-part="volume-overlay" hidden><div class="sf-vol-bar"><i></i></div></div>`
+    + `<div class="sf-ov sf-menu" data-part="power-menu" hidden><button type="button" data-action="restart">Restart</button><button type="button" data-action="power-off">Power off</button></div>`
+    + `<div class="sf-ov sf-boot" data-part="boot-screen" hidden>${logo}<div>SHIPVO</div></div>`;
+}
+
 /**
  * Renders the phone body.
  * - skin: "android" (412x915, punch-hole camera) or "ios" (393x852, island cutout).
@@ -66,6 +84,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}<span class="sf-icons">${icons(st)}</span></div>`
     + `<div class="sf-content">${screen}</div>`
     + `<div class="sf-bar" data-part="${k.bottom}"><i></i></div></div>`
+    + buttons(skin) + overlays(skin, st)
     + `<span class="sf-label" data-part="simulated-label">Simulated</span></div>`;
   const css = [
     `.sf-body{--sf-bg:${dark ? "#000" : "#fff"};--sf-fg:${dark ? "#fff" : "#111"};position:relative;box-sizing:border-box;width:${outerWidth}px;height:${outerHeight}px;padding:${k.bezel}px ${k.bezel}px ${k.bezel + FOOT}px;`
@@ -80,6 +99,14 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-content iframe{border:0;background:#fff;width:100%;height:100%;display:block}`,
     `.sf-bar{flex:none;height:${k.bar}px;display:flex;justify-content:center;align-items:center;background:var(--sf-bg)}`,
     `.sf-bar i{display:block;width:${k.indicator}px;height:5px;border-radius:3px;background:var(--sf-fg);opacity:.85}`,
+    `.sf-btn{position:absolute;border:0;padding:0;width:4px;border-radius:2px;background:#2a2d31;cursor:pointer}`,
+    `.sf-r1{right:-3px;top:${Math.round(k.height * 0.2)}px;height:64px}.sf-r2{right:-3px;top:${Math.round(k.height * 0.2) + 84}px;height:48px}.sf-r3{right:-3px;top:${Math.round(k.height * 0.2) + 140}px;height:48px}`,
+    `.sf-l1{left:-3px;top:${Math.round(k.height * 0.16)}px;height:48px}.sf-l2{left:-3px;top:${Math.round(k.height * 0.16) + 60}px;height:48px}`,
+    `.sf-ov[hidden]{display:none}.sf-ov{position:absolute;z-index:5;color:#fff;font:500 15px system-ui,sans-serif;display:flex;flex-direction:column;align-items:center}`,
+    `.sf-lock{inset:0;background:linear-gradient(#10243a,#050b14);justify-content:space-between;padding:110px 0 50px}.sf-clock{font-size:72px;font-weight:300}`,
+    `.sf-vol{top:80px;right:14px}.sf-vol-bar{width:10px;height:120px;border-radius:5px;background:#0006;position:relative;overflow:hidden}.sf-vol-bar i{position:absolute;bottom:0;width:100%;height:50%;background:#fff}`,
+    `.sf-menu{inset:0;background:#000b;justify-content:center;gap:12px}.sf-menu button{width:200px;padding:12px;border:0;border-radius:14px;background:#2b2f36;color:#fff;font:inherit}`,
+    `.sf-boot{inset:0;background:#000;justify-content:center;gap:16px;font-weight:600;letter-spacing:.1em}`,
     `.sf-label{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:600 9px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa0a6}`,
   ].join("\n");
   return { skin, width: k.width, height: k.height, outerWidth, outerHeight, html, css };
