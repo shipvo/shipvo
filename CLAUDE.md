@@ -28,7 +28,8 @@ Node 22, pnpm 10. CI (`.github/workflows/ci.yml`, job `test`) must pass before a
 - **Small PRs.** Aim for under 400 changed lines. If the issue is bigger, do the first useful slice and say what remains in the PR body.
 - **Tests are not optional.** A PR without tests for new behaviour will be sent back.
 - **Evidence over claims.** Never write a number, benchmark or compatibility claim in docs or the README unless you measured it in this repo and link where. Do not invent users, customers, stars or quotes.
-- **Keep the public API stable.** Changes to exported APIs of `@shipvo/*` packages need a CHANGELOG.md entry under `## Unreleased` and a note on migration.
+- **Keep the public API stable.** Changes to exported APIs of `@shipvo/*` packages need a changelog entry with a note on migration.
+- **Changelog entries go in `changes/`, never in `CHANGELOG.md`.** Add one new file `changes/<issue>-<short-name>.md` with bullet lines (see `changes/README.md`). The release train moves them into `CHANGELOG.md`. Editing `CHANGELOG.md` directly makes every other open PR conflict.
 - **Match the code around you.** TypeScript strict, ES modules, no new dependencies unless the issue needs one (say why in the PR).
 - **Write plain English** in docs, comments and PR text: short sentences, no hype words.
 
