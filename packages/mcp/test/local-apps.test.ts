@@ -94,7 +94,7 @@ describe("simulator timeout", () => {
     let hang = true; const open: http.ServerResponse[] = [];
     const slow = http.createServer(async (req, res) => {
       let raw = ""; for await (const ch of req) raw += ch;
-      if (hang && req.url === "/act" && JSON.parse(raw).action === "tap") { open.push(res); return; }
+      if (hang && (req.url === "/session" || (req.url === "/act" && JSON.parse(raw).action === "tap"))) { open.push(res); return; }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true, screen: "heading Home" }));
     });
@@ -108,6 +108,10 @@ describe("simulator timeout", () => {
     expect(r.structuredContent).toMatchObject({ ok: false, code: "sim_timeout" });
     expect(textOf(r)).toContain('action "tap"');
     expect(textOf(r)).toContain("call screen");
+    const o: any = await c.callTool({ name: "open_app", arguments: { app: "tide", session: "fresh" } });
+    expect(o.isError).toBe(true);
+    expect(o.structuredContent).toMatchObject({ ok: false, code: "sim_timeout" });
+    expect(textOf(o)).not.toContain("release: local");
     hang = false;
     expect(textOf(await c.callTool({ name: "screen", arguments: { session: "s" } }))).toBe("heading Home");
     await c.close(); open.forEach((o) => o.destroy()); slow.close();
