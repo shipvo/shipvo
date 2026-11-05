@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort, checkNativeModules } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
-import { describeOwner, runOwnerCommand } from "./owner";
+import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { apps } from "./apps";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
@@ -19,7 +19,7 @@ async function hmac(secret: string, msg: string) {
 function safeEqual(a: string, b: string) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
 async function owner(c: any, appId: string): Promise<string | null> {
   const auth = c.req.header("authorization") ?? "";
-  if (c.env.OWNER_TOKEN && auth.startsWith("Bearer ") && safeEqual(auth.slice(7), c.env.OWNER_TOKEN)) return "agent (owner token)";
+  if (c.env.OWNER_TOKEN && auth.startsWith("Bearer ") && safeEqual(auth.slice(7), c.env.OWNER_TOKEN)) return AGENT_ACTOR;
   const cookie = getCookie(c, "pn_admin");
   if (!cookie || !c.env.ADMIN_PASSWORD) return null;
   const [app_, exp, sig] = cookie.split(".");
@@ -244,7 +244,11 @@ app.post("/app/:id/api/command", async (c) => {
   const actor = await owner(c, appId);
   if (!actor) return c.json({ ok: false, error: { code: "unauthorized", message: "Sign in or send the owner token" } }, 401);
   let body: any; try { body = await c.req.json(); } catch { return c.json({ ok: false, error: { code: "bad_json", message: "JSON body required" } }, 400); }
-  return c.json(await runOwnerCommand({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, String(body?.name ?? ""), body?.args ?? {}));
+  // A bearer owner token means an AI agent; a signed-in admin is the owner at the keyboard. Agents get the confirm gate.
+  const agent = actor === AGENT_ACTOR;
+  const list = (c.req.header("x-shipvo-agent-deny") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const local = agent ? { agentPolicy: c.req.header("x-shipvo-agent-policy") ?? undefined, agentDeny: list } : undefined;
+  return c.json(await runOwnerCommand({ db: c.env.DB, kv: c.env.POINTERS, appId, actor, agent, local }, String(body?.name ?? ""), body?.args ?? {}));
 });
 
 app.route("/auth", auth);
