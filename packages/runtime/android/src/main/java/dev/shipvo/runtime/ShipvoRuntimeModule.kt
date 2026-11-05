@@ -196,6 +196,7 @@ class ShipvoRuntimeModule : Module() {
     val dest = File(s.dir, "r$release.hbc")
     require(tmp.renameTo(dest)) { "could not stage bundle" }
     synchronized(ShipvoHostHandler.LOCK) {
+      if (!BootRules.mayStage(release, s.currentRelease, s.pendingRelease, s.blockedRelease)) return mapOf("status" to "none")
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
       if (s.binaryVersion == null) s.binaryVersion = s.installedBinaryVersion
