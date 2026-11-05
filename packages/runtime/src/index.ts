@@ -51,11 +51,12 @@ function installCrashHook() {
   crashHookInstalled = true;
   const prev = eu.getGlobalHandler();
   eu.setGlobalHandler((e: unknown, isFatal?: boolean) => {
-    try { native.noteCrash!(); } catch {}
+    if (isFatal) { try { native.noteCrash!(); } catch {} }
     prev?.(e, isFatal);
   });
 }
 
+// Every `Native` method must be listed here, or it is silently dropped from `Runtime`.
 export const Runtime: Native = native
   ? {
       getState: () => native.getState(),

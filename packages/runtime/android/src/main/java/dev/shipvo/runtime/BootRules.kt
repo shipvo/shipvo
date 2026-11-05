@@ -38,8 +38,9 @@ internal object BootRules {
     noteHealthy(load)
   }
 
-  /** Clears the counts only if `load` is the one that reported healthy and has not hit an uncaught JS error. A reloaded load that has not called
-   *  markHealthy yet keeps its count, so a crash before markHealthy still adds up. Returns whether it cleared. */
+  /** Clears the counts only if `load` is the one that reported healthy and has not hit an uncaught JS error. A reloaded
+   *  load that has not called markHealthy yet keeps its count, so a crash before markHealthy still adds up.
+   *  Returns whether it cleared. */
   fun markStableIfHealthy(c: BootCounts, load: Int): Boolean {
     if (healthyLoad == 0 || healthyLoad != load || crashedLoad == load) return false
     clear(c); return true
