@@ -117,6 +117,7 @@ body.dark .fab{background:#2a2d31;color:#eee}body.dark .fab[aria-pressed=true]{b
 .device{position:relative}
 #pin{position:absolute;inset:0;display:none;cursor:crosshair;background:#2563eb22;z-index:5}
 #pin.on{display:block}
+#pin .hint{position:absolute;left:8px;right:8px;top:8px;padding:6px 8px;border-radius:6px;background:#111;color:#fff;font-size:13px;text-align:center}
 .note{text-align:center;opacity:.7;padding:0 12px 16px}
 .recp a{color:inherit;text-decoration:underline}body.dark .recp a{color:#93c5fd}.recp button:focus-visible,.bar button:focus-visible,.recp a:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
 .recp{max-width:520px;margin:0 auto;padding:0 12px 24px;text-align:center}.recp p{opacity:.8}.recp button{font:inherit;padding:6px 12px;border:1px solid #888;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
@@ -133,7 +134,7 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 <button id="comment" class="fab" aria-pressed="false">Comment</button>
 <div class="stage"><div class="device" id="device" data-skin="android" style="width:360px;height:760px">
 <div class="status" id="status"><span id="clock">9:41</span><span class="notch"></span><span class="icons" id="icons">&#9679;&#9679; 5G 100%</span></div>
-<iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" aria-label="Tap where the problem is"></div>
+<iframe id="app" src="app.html" title="${title}"></iframe><div id="pin" aria-label="Tap where the problem is"><span class="hint">Tap where the problem is. Press Escape to cancel.</span></div>
 <div class="nav"><button class="back" id="back" aria-label="Back" title="Back">&#9664; Back</button></div>
 </div>
 <aside class="panel" id="device-panel" aria-label="Device controls"><h2>Device</h2>
@@ -159,11 +160,11 @@ function $(id){return document.getElementById(id)}
 try{notes=JSON.parse(localStorage.getItem(KEY)||"[]");if(!Array.isArray(notes))notes=[]}catch(e){notes=[]}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(notes))}catch(e){}}
 function esc(t){return String(t).replace(/[&<>"']/g,function(c){return"&#"+c.charCodeAt(0)+";"})}
-function screenName(){try{var w=$("app").contentWindow,t=w.document.title;return t||w.location.pathname+(w.location.hash||"")}catch(e){return"unknown"}}
+function screenName(){try{var w=$("app").contentWindow,t=w.document.title,r=w.location.pathname+(w.location.hash||"");return t?t+" ("+r+")":r}catch(e){return"unknown"}}
 function step(text){steps.push(text)}
 function add(note,x,y){var n={note:String(note),x:Math.round(x),y:Math.round(y),screen:screenName(),steps:steps.slice()};notes.push(n);save();render();return n}
 function exportJson(){return JSON.stringify(notes,null,2)}
-function render(){var l=$("notelist"),c=$("count");if(c)c.textContent=notes.length;if(l)l.innerHTML=notes.map(function(n){return"<li>"+esc(n.note)+"<br><small>"+esc(n.screen)+" at "+n.x+","+n.y+", "+n.steps.length+" steps</small></li>"}).join("")}
+function render(){var l=$("notelist"),c=$("count");if(c)c.textContent=notes.length;if(l)l.innerHTML=notes.map(function(n){return"<li>"+esc(n.note)+"<br><small>"+esc(n.screen)+" at "+Number(n.x)+","+Number(n.y)+", "+(n.steps||[]).length+" steps</small></li>"}).join("")}
 function download(){var b=new Blob([exportJson()],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="comments.json";document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}
 function label(e){var t=e.getAttribute&&(e.getAttribute("aria-label")||e.textContent)||"";return String(t).trim().slice(0,40)}
 function watch(){try{var d=$("app").contentWindow.document;d.addEventListener("click",function(ev){var e=ev.target,k=e&&e.closest&&e.closest("button,[role=button],a,input");step("tap "+(k?label(k)||"control":"screen"))},true)}catch(e){}}
@@ -171,6 +172,7 @@ function setMode(on){var p=$("pin"),b=$("comment");if(p)p.className=on?"on":"";i
 var cb=$("comment");if(cb)cb.onclick=function(){setMode($("pin").className!=="on")};
 var pin=$("pin");if(pin)pin.onclick=function(ev){var r=pin.getBoundingClientRect?pin.getBoundingClientRect():{left:0,top:0};pending={x:ev.clientX-r.left,y:ev.clientY-r.top};setMode(false);$("noteform").hidden=false;if($("notetext").focus)$("notetext").focus()};
 var fm=$("noteform");if(fm)fm.onsubmit=function(ev){if(ev&&ev.preventDefault)ev.preventDefault();var t=$("notetext");if(pending&&t.value.trim()){add(t.value.trim(),pending.x,pending.y)}t.value="";pending=null;fm.hidden=true;return false};
+if(document.addEventListener)document.addEventListener("keydown",function(ev){if(ev.key==="Escape")setMode(false)});
 var ex=$("export");if(ex)ex.onclick=download;
 var bk=$("back");if(bk&&bk.addEventListener)bk.addEventListener("click",function(){step("back")});
 var ap=$("app");if(ap){if(ap.addEventListener)ap.addEventListener("load",watch);watch()}

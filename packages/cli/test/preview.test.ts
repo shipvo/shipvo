@@ -144,14 +144,14 @@ describe("frame page comments", () => {
     const appDoc = { title: "Cart", listeners: {} as Record<string, any>, addEventListener(t: string, fn: any) { this.listeners[t] = fn; } };
     const nodes: Record<string, any> = {};
     for (const id of ["comment", "pin", "noteform", "notetext", "export", "notelist", "count", "back"]) nodes[id] = mk();
-    nodes.app = mk({ contentWindow: { document: appDoc, location: { pathname: "/", hash: "" } } });
+    nodes.app = mk({ contentWindow: { document: appDoc, location: { pathname: "/cart", hash: "" } } });
     const downloaded: string[] = [];
-    const doc = { getElementById: (id: string) => nodes[id], createElement: () => ({ click() { downloaded.push((this as any).download); } }), body: { appendChild() {}, removeChild() {} } };
+    const doc = { addEventListener(t: string, fn: any) { (doc as any).l = { ...(doc as any).l, [t]: fn }; }, getElementById: (id: string) => nodes[id], createElement: () => ({ click() { downloaded.push((this as any).download); } }), body: { appendChild() {}, removeChild() {} } };
     const ls = { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; } };
     const win: any = {};
     const blobs: string[] = [];
     new Function("document", "localStorage", "window", "Blob", "URL", script)(doc, ls, win, class { constructor(p: string[]) { blobs.push(p[0]); } }, { createObjectURL: () => "blob:x", revokeObjectURL() {} });
-    return { win, nodes, appDoc, store, downloaded, blobs };
+    return { win, nodes, appDoc, doc, store, downloaded, blobs };
   }
   it("shows the Comment button, side list, export button and the browser-only notice", () => {
     const h = framePage("Shop");
@@ -165,7 +165,7 @@ describe("frame page comments", () => {
     appDoc.listeners.click({ target: { closest: () => ({ getAttribute: () => "Add to cart", textContent: "" }) } });
     win.shipvoNotes.step("back");
     const n = win.shipvoNotes.add("Price is cut off", 10.4, 20.6);
-    expect(n).toEqual({ note: "Price is cut off", x: 10, y: 21, screen: "Cart", steps: ["tap Add to cart", "back"] });
+    expect(n).toEqual({ note: "Price is cut off", x: 10, y: 21, screen: "Cart (/cart)", steps: ["tap Add to cart", "back"] });
     expect(nodes.count.textContent).toBe(1);
     expect(nodes.notelist.innerHTML).toContain("Cart");
   });
@@ -176,7 +176,7 @@ describe("frame page comments", () => {
     win.shipvoNotes.step("tap Buy");
     win.shipvoNotes.add("three", 5, 6);
     for (const n of JSON.parse(win.shipvoNotes.exportJson()).slice(2)) {
-      expect(n.screen).toBe("Cart");
+      expect(n.screen).toBe("Cart (/cart)");
       expect(n.steps.length).toBeGreaterThan(0);
     }
     nodes.export.onclick();
@@ -201,6 +201,22 @@ describe("frame page comments", () => {
     nodes.notetext.value = "x"; nodes.noteform.onsubmit({ preventDefault() {} });
     expect(win.shipvoNotes.list()[0].steps).toEqual([]);
   });
+  it("gives different screens for a fixed title and a changing route", () => {
+    const { win, nodes } = boot();
+    win.shipvoNotes.add("a", 1, 1);
+    nodes.app.contentWindow.location.hash = "#/checkout";
+    win.shipvoNotes.add("b", 1, 1);
+    const [a, b] = win.shipvoNotes.list();
+    expect(a.screen).not.toBe(b.screen);
+    expect(b.screen).toBe("Cart (/cart#/checkout)");
+  });
+  it("cancels comment mode with Escape and shows visible hint text", () => {
+    const { nodes, doc } = boot();
+    nodes.comment.onclick(); expect(nodes.pin.className).toBe("on");
+    (doc as any).l.keydown({ key: "Escape" });
+    expect(nodes.pin.className).toBe("");
+    expect(framePage("Shop")).toContain("Tap where the problem is. Press Escape");
+  });
   it("keeps notes after a reload via localStorage", () => {
     const first = boot();
     first.win.shipvoNotes.add("kept", 5, 6);
@@ -213,7 +229,7 @@ describe("frame page comments", () => {
     nodes.comment.onclick(); expect(nodes.pin.className).toBe("on");
     nodes.pin.onclick({ clientX: 30, clientY: 40 });
     nodes.notetext.value = "Looks wrong"; nodes.noteform.onsubmit({ preventDefault() {} });
-    expect(win.shipvoNotes.list()[0]).toMatchObject({ note: "Looks wrong", x: 30, y: 40, screen: "Cart" });
+    expect(win.shipvoNotes.list()[0]).toMatchObject({ note: "Looks wrong", x: 30, y: 40, screen: "Cart (/cart)" });
   });
 });
 
