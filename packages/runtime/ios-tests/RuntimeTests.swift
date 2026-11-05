@@ -161,18 +161,21 @@ final class RuntimeTests: XCTestCase {
 
   func testBytecodeMatchStages() async throws {
     let s = store("hbc-match", hbc: 96)
-    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
     XCTAssertEqual(s.pendingRelease, 5)
   }
 
   func testMissingBytecodeFieldStages() async throws {
     let s = store("good", hbc: 96)   // pointer has no field: apply as before
-    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
   }
 
   func testShellWithoutBytecodeVersionStages() async throws {
     let s = store("hbc-mismatch")                                // shell version unknown: apply as before
-    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
   }
 
   func testRefusesWhatItCannotTrust() async throws {
