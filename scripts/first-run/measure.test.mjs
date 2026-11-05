@@ -16,6 +16,10 @@ const fake = (body) => {
   writeFileSync(f, body);
   return { cli: f, out: join(d, "first-run.json") };
 };
+
+// A fake `shipvo sim` that answers the two calls @shipvo/test makes to open an app.
+const SIM = `if (process.argv[2]==="sim") { const {createServer}=await import("node:http"); createServer((q,r)=>{ q.resume(); q.on("end",()=>{ r.writeHead(200,{"content-type":"application/json"}); r.end(JSON.stringify({ok:true,screen:"- text: Welcome",release:"local"})); }); }).listen(Number(process.argv[process.argv.indexOf("--port")+1]),"127.0.0.1"); }`;
+const INIT = `import {mkdirSync, writeFileSync} from "node:fs"; if (process.argv[2]==="init") { mkdirSync(process.argv[3],{recursive:true}); writeFileSync(process.argv[3]+"/shipvo.json", JSON.stringify({appId:"demo"})); }`;
 const run = ({ cli, out }) => spawnSync(process.execPath, [script, "--cli", cli, "--out", out], { encoding: "utf8" });
 
 test("passes when every step exits 0, writes json and a table", () => {
@@ -84,16 +88,26 @@ test("with --with-install, install step is included", () => {
   const npm = join(bindir, "npm");
   writeFileSync(npm, "#!/bin/sh\nexit 0\n");
   chmodSync(npm, 0o755);
-  const f = fake(`import {mkdirSync} from "node:fs"; if (process.argv[2]==="init") mkdirSync(process.argv[3],{recursive:true});`);
+  const f = fake(INIT + SIM);
   const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], {
     encoding: "utf8",
     env: { ...process.env, PATH: bindir + ":" + dirname(process.execPath) },
   });
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => x.step), ["init", "install", "doctor", "publish --dry-run", "total"]);
+  assert.deepEqual(j.map((x) => x.step), ["init", "install", "doctor", "publish --dry-run", "first agent session", "total"]);
   assert.match(r.stdout, /\| install \|/);
   assert.match(r.stdout, /package manager: pnpm 9\.9\.9/);
+  assert.match(r.stdout, /\| first agent session \| \d+\.\d\d \|/);
+  assert.ok(j.every((x) => Number.isInteger(x.ms)));
+});
+
+test("a first agent session that cannot start the simulator fails the run with its output", () => {
+  const f = fake(INIT + `if (process.argv[2]==="sim") { console.error("sim broke: no chromium"); process.exit(2); }`);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], { encoding: "utf8", env: { ...process.env, PATH: fakePm() } });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /sim broke: no chromium/);
+  assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => [x.step, x.exit]).slice(-2), [["first agent session", 1], ["total", 1]]);
 });
 
 test("a failing install stops the run and shows its stderr", () => {
@@ -154,7 +168,7 @@ async function stub({ putStatus = 200, badSig = false } = {}) {
 }
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const pubB64 = publicKey.export({ format: "der", type: "spki" }).subarray(-32).toString("base64");
-const fakeCp = () => fake(`
+const fakeCp = () => fake(SIM + `
 import {mkdirSync, writeFileSync, readFileSync, appendFileSync} from "node:fs";
 import {createPrivateKey, sign} from "node:crypto";
 const a = process.argv;
@@ -224,7 +238,7 @@ test("--with-export runs the real publish without --skip-export and records a pu
     const r = await runAsync(f, ["--with-install", "--with-export", "--control-url", s.url], { ARGS_LOG: log, PATH: fakePm() });
     assert.equal(r.status, 0, r.stderr);
     const j = JSON.parse(readFileSync(f.out, "utf8"));
-    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["publish (includes export)", 0], ["pointer", 0], ["total", 0]]);
+    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["first agent session", 0], ["publish (includes export)", 0], ["pointer", 0], ["total", 0]]);
     const calls = publishCalls(log);
     assert.equal(calls.length, 1);
     assert.ok(!calls[0].includes("--skip-export"));

@@ -6,6 +6,8 @@
 // (SHIPVO_LOCAL_DEV_KEY, default sv_test_localdev), points shipvo.json "controlPlane" at the URL, runs a real
 // `shipvo publish`, then GETs the pointer and checks it is signed and names the release just published.
 // Steps recorded: "publish" (real) and "pointer". A non-2xx publish exits 1 and prints the server's message.
+// With --with-install, a "first agent session" step then starts `shipvo sim` for the scaffolded app (its web build
+// counts), opens the app with @shipvo/test, reads the screen and stops the simulator. Needs playwright's chromium.
 // The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets.
 // Default run uses no network. With --with-install, also times an install in the scaffolded app,
 // which downloads packages (network). init prints `npm install (or pnpm / bun)`; we prefer pnpm
@@ -20,9 +22,10 @@
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { createPublicKey, verify } from "node:crypto";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export function runStep(name, cli, args, cwd) {
   const t0 = performance.now();
@@ -96,6 +99,65 @@ async function realPublish(cli, app, controlUrl, withExport) {
   }
 }
 
+const STEP_SESSION = "first agent session";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function freePort() {
+  return new Promise((res, rej) => { const s = createServer(); s.once("error", rej); s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => res(p)); }); });
+}
+
+// Runs in the scaffolded app: open the app through @shipvo/test and read the first screen.
+// Uses the app's own @shipvo/test; falls back to the one built in this repo.
+const sessionScript = (fallback) => `
+import { createRequire } from "node:module";
+const req = createRequire(process.cwd() + "/package.json");
+let mod; try { mod = await import(req.resolve("@shipvo/test")); } catch { mod = await import(${JSON.stringify(fallback)}); }
+const phone = await mod.openApp({ sim: process.env.FIRST_RUN_SIM });
+if (!phone.screen.trim()) { console.error("the simulator returned an empty screen"); process.exit(1); }
+console.log("screen: " + phone.screen.split("\\n").length + " lines");
+`;
+
+function runNode(args, cwd, env, timeout) {
+  return new Promise((done) => {
+    const out = [];
+    const c = spawn(process.execPath, args, { cwd, env: { ...cleanEnv(), ...env }, timeout: Math.max(Math.round(timeout), 1000) });
+    c.stdout.on("data", (d) => out.push(String(d)));
+    c.stderr.on("data", (d) => out.push(String(d)));
+    c.on("error", (e) => done({ exit: 127, out: String(e) }));
+    c.on("close", (code) => done({ exit: code ?? 1, out: out.join("") }));
+  });
+}
+
+/**
+ * Times a first agent session in the scaffolded app: start `shipvo sim` (its web build counts), open the app
+ * with @shipvo/test and read the screen. Needs the app's dependencies installed. Stops the simulator after.
+ */
+export async function firstAgentSession(cli, app, timeoutMs = 300000) {
+  const t0 = performance.now();
+  const done = (exit, stderr) => ({ step: STEP_SESSION, ms: Math.round(performance.now() - t0), exit, stderr });
+  let port;
+  try { port = await freePort(); } catch (e) { return done(1, `no free port: ${e.message}`); }
+  const url = `http://127.0.0.1:${port}`;
+  const out = [];
+  const simProc = spawn(process.execPath, [cli, "sim", "--port", String(port)], { cwd: app, env: cleanEnv() });
+  let exited = false;
+  simProc.stdout.on("data", (d) => out.push(String(d)));
+  simProc.stderr.on("data", (d) => out.push(String(d)));
+  simProc.on("error", (e) => { out.push(String(e)); exited = true; });
+  simProc.on("exit", () => { exited = true; });
+  try {
+    let up = false;
+    while (!up && !exited && performance.now() - t0 < timeoutMs) {
+      up = await fetch(url, { signal: AbortSignal.timeout(1000) }).then(() => true, () => false);
+      if (!up) await sleep(200);
+    }
+    if (!up) return done(1, `simulator did not start${exited ? " (it exited)" : " in time"}:\n${out.join("")}`);
+    const fallback = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/test/dist/index.js")).href;
+    const r = await runNode(["--input-type=module", "-e", sessionScript(fallback)], app, { FIRST_RUN_SIM: url }, timeoutMs - (performance.now() - t0));
+    return done(r.exit, r.exit === 0 ? "" : `${r.out}\n${out.join("")}`);
+  } finally { simProc.kill("SIGTERM"); }
+}
+
 // No secrets in, nothing to log in to: the seed comes from the .shipvo/seed.txt that init writes.
 function cleanEnv() {
   const e = { ...process.env };
@@ -154,6 +216,11 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
       const dry = runStep("publish --dry-run", cli, ["publish", "--dry-run", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app);
       results.push(dry);
       ok = dry.exit === 0;
+    }
+    if (ok && withInstall) {
+      const sess = await firstAgentSession(cli, app);
+      results.push(sess);
+      ok = sess.exit === 0;
     }
     if (ok && controlUrl) results.push(...(await realPublish(cli, app, controlUrl, withExport)));
   } finally { rmSync(root, { recursive: true, force: true }); }
