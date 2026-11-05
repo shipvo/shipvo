@@ -261,6 +261,10 @@ export const ShipvoPolicy = z.object({
   maxBand: Band.optional(),
   /** Widest cohort band a publish run by an agent may reach. */
   agentMaxBand: Band.optional(),
+  /** Widest cohort an agent-run publish may reach: a band name (`b0`, `b1`, `b2`) or a percent of devices (1-100). A band counts as its share: b0 1%, b1 10%, b2 100%. */
+  maxCohortForAgents: z.union([Band, z.number().int().min(1).max(100)]).optional(),
+  /** A publish that reaches 100% needs this stage first: the release must have been live at `percent` (1 or 10, the band edges) for `minHours`. */
+  requireStageBeforeFull: z.object({ percent: z.union([z.literal(1), z.literal(10)]), minHours: z.number().min(0) }).strict().optional(),
   /** No publish on these local weekdays (from `blockedAfterHour` on, or all day if that is not set). */
   blockedWeekdays: z.array(PolicyWeekday).min(1).optional(),
   /** Local hour 0-23. From this hour on, publishes on `blockedWeekdays` are refused. */

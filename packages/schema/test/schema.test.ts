@@ -141,6 +141,11 @@ describe("parsePolicy", () => {
   it("accepts a full policy and an empty one", () => {
     expect(parsePolicy({})).toEqual({});
     expect(parsePolicy({ maxBand: "b1", agentMaxBand: "b0", blockedWeekdays: ["fri"], blockedAfterHour: 12 })).toMatchObject({ maxBand: "b1" });
+    expect(parsePolicy({ maxCohortForAgents: "b0", requireStageBeforeFull: { percent: 10, minHours: 24 } })).toMatchObject({ maxCohortForAgents: "b0" });
+    expect(parsePolicy({ maxCohortForAgents: 5 })).toEqual({ maxCohortForAgents: 5 });
+    expect(() => parsePolicy({ maxCohortForAgents: 0 })).toThrow(/policy\.maxCohortForAgents/);
+    expect(() => parsePolicy({ requireStageBeforeFull: { percent: 10, minHours: 1, extra: 1 } })).toThrow(/requireStageBeforeFull/);
+    expect(() => parsePolicy({ requireStageBeforeFull: { percent: 50, minHours: 1 } })).toThrow(/requireStageBeforeFull/);
   });
   it("names the bad field", () => {
     expect(() => parsePolicy({ maxBand: "b9" })).toThrow(/policy\.maxBand/);

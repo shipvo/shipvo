@@ -7,7 +7,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
 import { checkBundle, parseDeclared } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
-import { checkPublishPolicy } from "./policy.js";
+import { checkPublishPolicy, stageBandOf } from "./policy.js";
 import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
 
 const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".css": "text/css", ".ico": "image/x-icon", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ttf": "font/ttf", ".svg": "image/svg+xml" };
@@ -68,7 +68,7 @@ function localKv(dir: string) {
   };
 }
 
-const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-bytecode-version", "max-bases", "skip-export", "skip-web", "dry-run", "out"];
+const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-bytecode-version", "max-bases", "skip-export", "skip-web", "dry-run", "dry-run-policy", "out"];
 
 export const PUBLISH_HELP = `Usage: shipvo publish [flags]
 
@@ -83,6 +83,7 @@ Flags (write a value after a space, not =; on/off flags can be bare, or true/fal
   --max-bases N                How many older releases to build patches from (default 6)
   --skip-export               Reuse the last build in dist-ota/
   --skip-web                  Do not publish the web copy for the simulator
+  --dry-run-policy             Check shipvo.json policy for this publish, build nothing, exit 1 if refused
   --dry-run                    Build and sign, write files locally, send nothing
   --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)
   --help                       Show this help
@@ -91,7 +92,19 @@ Flags (write a value after a space, not =; on/off flags can be bare, or true/fal
 export async function publish(argv: string[]) {
   if (argv.includes("--help") || argv.includes("-h")) { console.log(PUBLISH_HELP); return; }
   checkFlags(argv, PUBLISH_FLAGS);
-  const a = parse(argv), cfg = loadConfig(), SEED = seed();
+  const a = parse(argv), cfg = loadConfig();
+  if (switchFlag(a, "dry-run-policy")) {
+    const bands = (a.bands || "b0,b1,b2").split(",");
+    const sb = stageBandOf(cfg.policy);
+    let since: Date | undefined;
+    if (sb && bands.includes("b2")) { // the stage start is the signed pointer's issued_at; unreadable means unproven
+      try { since = new Date(JSON.parse(JSON.parse((await kvFor(cfg).get(`p/${cfg.appId}/${cfg.shellMajor}/${sb}`)) ?? "null").body).issued_at); if (isNaN(since.getTime())) since = undefined; } catch { since = undefined; }
+    }
+    const v = checkPublishPolicy(cfg.policy, bands, new Date(), process.env, since);
+    if (!v.ok) { console.error(`Refused by policy rule ${v.rule}: ${v.reason}`); process.exitCode = 1; return; }
+    console.log("Policy allows this publish."); return;
+  }
+  const SEED = seed();
   const dry = switchFlag(a, "dry-run"), skipExport = switchFlag(a, "skip-export"), skipWeb = switchFlag(a, "skip-web");
   if (a.out !== undefined && !dry) throw new Error("--out only works with --dry-run");
   if (a.out === "true") throw new Error("--out needs a directory: pass --out <dir>");

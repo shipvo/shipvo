@@ -126,6 +126,44 @@ describe("publish and the Hermes bytecode check", () => {
     expect(existsSync(join(cwd, ".shipvo/dry-run/p/demo/1/b0"))).toBe(true);
   });
 
+  describe("--dry-run-policy", () => {
+    const out = () => (console.error as any).mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+    it("allows: exit 0, prints a line, builds nothing", async () => {
+      cfgPolicy.value = { maxCohortForAgents: "b0" };
+      await publish(["--dry-run-policy", "--bands", "b0"]);
+      expect(process.exitCode).toBeUndefined();
+      expect(puts).toEqual([]);
+    });
+    it("no policy: allowed", async () => {
+      await publish(["--dry-run-policy"]);
+      expect(process.exitCode).toBeUndefined();
+    });
+    it("refuses an agent past maxCohortForAgents: exit 1 and names the rule", async () => {
+      cfgPolicy.value = { maxCohortForAgents: 10 };
+      process.env.SHIPVO_ACTOR = "agent";
+      try { await publish(["--dry-run-policy"]); } finally { delete process.env.SHIPVO_ACTOR; }
+      expect(process.exitCode).toBe(1);
+      expect(out()).toMatch(/Refused by policy rule maxCohortForAgents: .*100%.*10%/);
+    });
+    it("refuses full release with no stage live", async () => {
+      cfgPolicy.value = { requireStageBeforeFull: { percent: 10, minHours: 24 } };
+      await publish(["--dry-run-policy"]);
+      expect(process.exitCode).toBe(1);
+      expect(out()).toMatch(/Refused by policy rule requireStageBeforeFull: .*no release is live at 10%/);
+    });
+    it("allows full release once the stage pointer is old enough", async () => {
+      cfgPolicy.value = { requireStageBeforeFull: { percent: 10, minHours: 24 } };
+      const issued_at = new Date(Date.now() - 30 * 3_600_000).toISOString();
+      values.set("p/demo/1/b1", JSON.stringify({ body: JSON.stringify({ release: 3, issued_at }), signature: "x" }));
+      await publish(["--dry-run-policy"]);
+      expect(process.exitCode).toBeUndefined();
+    });
+    it("a bad policy section throws naming the field", async () => {
+      cfgPolicy.value = { maxCohortForAgents: "b9" };
+      await expect(publish(["--dry-run-policy"])).rejects.toThrow(/policy\.maxCohortForAgents/);
+    });
+  });
+
   it("--dry-run signs and writes a release locally without touching the control plane", async () => {
     withBundle(96);
     await publish([...flags, "--dry-run"]);

@@ -6,6 +6,26 @@ import { checkPolicy, checkPublishPolicy } from "../src/policy";
 const thu = (h: number) => new Date(2026, 10, 5, h, 0, 0);
 const fri = (h: number) => new Date(2026, 10, 6, h, 0, 0);
 
+describe("checkPolicy: cohort and stage rules", () => {
+  const h = (n: number) => new Date(thu(12).getTime() - n * 3_600_000);
+  it("maxCohortForAgents by band name and by percent, agents only", () => {
+    expect(checkPolicy({ maxCohortForAgents: "b1" }, { band: "b1", actorKind: "agent", now: thu(9) })).toEqual({ ok: true });
+    expect(checkPolicy({ maxCohortForAgents: "b1" }, { band: "b2", actorKind: "agent", now: thu(9) })).toMatchObject({ ok: false, rule: "maxCohortForAgents" });
+    expect(checkPolicy({ maxCohortForAgents: 5 }, { band: "b1", actorKind: "agent", now: thu(9) })).toMatchObject({ ok: false, rule: "maxCohortForAgents" });
+    expect(checkPolicy({ maxCohortForAgents: 5 }, { band: "b2", actorKind: "human", now: thu(9) })).toEqual({ ok: true });
+  });
+  it("requireStageBeforeFull", () => {
+    const p = { requireStageBeforeFull: { percent: 10 as const, minHours: 24 } };
+    const ctx = { actorKind: "human" as const, now: thu(12) };
+    expect(checkPolicy(p, { ...ctx, band: "b1" })).toEqual({ ok: true }); // not full
+    expect(checkPolicy(p, { ...ctx, band: "b2" })).toMatchObject({ ok: false, rule: "requireStageBeforeFull" });
+    const young = checkPolicy(p, { ...ctx, band: "b2", stageStartedAt: h(5) });
+    expect(young).toMatchObject({ ok: false, rule: "requireStageBeforeFull" });
+    expect((young as { reason: string }).reason).toMatch(/5h/);
+    expect(checkPolicy(p, { ...ctx, band: "b2", stageStartedAt: h(24) })).toEqual({ ok: true });
+  });
+});
+
 describe("checkPolicy", () => {
   it("no policy means no rules", () => {
     expect(checkPolicy(undefined, { band: "b2", actorKind: "agent", now: thu(23) })).toEqual({ ok: true });

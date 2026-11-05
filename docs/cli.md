@@ -105,8 +105,12 @@ shipvo publish --dry-run --bands b0,b1,b2
 | --- | --- |
 | `maxBand` | Widest band any publish may reach: `b0`, `b1` or `b2`. The widest band in `--bands` counts. |
 | `agentMaxBand` | Same, for a publish run by an agent. Set `SHIPVO_ACTOR=agent` in the agent's environment. Without it the publish counts as human. |
+| `maxCohortForAgents` | Widest cohort an agent-run publish may reach: a band (`b0` 1%, `b1` 10%, `b2` 100%) or a percent from 1 to 100. |
+| `requireStageBeforeFull` | `{ "percent": 10, "minHours": 24 }`. A publish that reaches `b2` needs the release live at `percent` (1 or 10) for `minHours`. The start is the `issued_at` of the signed pointer on `b0` (1%) or `b1` (10%). If it cannot be read, the publish is refused. |
 | `blockedWeekdays` | Days with no publish: `mon` to `sun`, in local time. |
 | `blockedAfterHour` | Hour 0-23, local time. Publishes on `blockedWeekdays` are refused from this hour on (12 means from 12:00). Without it, the whole day is blocked. Needs `blockedWeekdays`. |
+
+`shipvo publish --dry-run-policy [--bands ...]` runs only this check: it builds and writes nothing, prints `Policy allows this publish.` or the refusal, and exits 1 on refusal.
 
 Without a `policy` section nothing is checked. A bad section (unknown field, wrong value) stops the dry run and names the field, for example `policy.maxBand`.
 
