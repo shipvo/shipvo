@@ -196,17 +196,32 @@ jobs:
           HBC=$(ls dist-e2e2/_expo/static/js/ios/*.hbc | head -1)
           SEED=$(node -p "require(process.env.RUNNER_TEMP + '/key.json').seed")
           PATCH_FROM="$APP/main.jsbundle" node ../../scripts/ios-e2e/make-release.mjs "$RUNNER_TEMP/cp" e2e "$SEED" 2 "$HBC"
-          xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true
-          xcrun simctl uninstall "$UDID" "$BID"; xcrun simctl install "$UDID" "$APP"
-          : > "$RUNNER_TEMP/server.log"
-          xcrun simctl launch "$UDID" "$BID" > /dev/null
-          for i in $(seq 1 60); do grep -q '^POST /t .*"release":2' "$RUNNER_TEMP/server.log" && break; sleep 2; done
-          cut -c1-200 "$RUNNER_TEMP/server.log"
-          grep -q '^POST /t .*"release":2' "$RUNNER_TEMP/server.log" || { echo "FAIL: app never reported release 2"; exit 1; }
-          grep -q '^GET /b/e2e/ios-d-[0-9a-f]*-r2.bsdiff 200' "$RUNNER_TEMP/server.log" || { echo "FAIL: app did not download the patch"; exit 1; }
-          ! grep -q '^GET /b/e2e/ios-r2.hbc' "$RUNNER_TEMP/server.log" || { echo "FAIL: app downloaded the full bundle"; exit 1; }
-          P=$(stat -f %z "$RUNNER_TEMP"/cp/b/e2e/ios-d-*-r2.bsdiff); F=$(stat -f %z "$HBC"); E=$(stat -f %z "$APP/main.jsbundle")
+          # Three fresh installs, each timed from launch to the app reporting release 2 (issue #263).
+          # server.log is reset per run; server.log.jsonl is not, and analyze.mjs splits runs by time window.
+          ms() { python3 -c 'import time; print(int(time.time()*1000))'; }
+          F=$(stat -f %z "$HBC")
+          echo "[" > "$RUNNER_TEMP/patch-marks.json"
+          for run in 1 2 3; do
+            xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true
+            xcrun simctl uninstall "$UDID" "$BID"; xcrun simctl install "$UDID" "$APP"
+            : > "$RUNNER_TEMP/server.log"
+            T0=$(ms); xcrun simctl launch "$UDID" "$BID" > /dev/null
+            H=""
+            for i in $(seq 1 480); do
+              if grep -q '^POST /t .*"release":2' "$RUNNER_TEMP/server.log"; then H=$(ms); break; fi
+              sleep 0.25
+            done
+            cut -c1-200 "$RUNNER_TEMP/server.log"
+            [ -n "$H" ] || { echo "FAIL: app never reported release 2"; exit 1; }
+            grep -q '^GET /b/e2e/ios-d-[0-9a-f]*-r2.bsdiff 200' "$RUNNER_TEMP/server.log" || { echo "FAIL: app did not download the patch"; exit 1; }
+            ! grep -q '^GET /b/e2e/ios-r2.hbc' "$RUNNER_TEMP/server.log" || { echo "FAIL: app downloaded the full bundle"; exit 1; }
+            [ $run = 1 ] || echo "," >> "$RUNNER_TEMP/patch-marks.json"
+            echo "{\"app_launched\": $T0, \"healthy\": $H, \"full_bytes\": $F}" >> "$RUNNER_TEMP/patch-marks.json"
+          done
+          echo "]" >> "$RUNNER_TEMP/patch-marks.json"
+          P=$(stat -f %z "$RUNNER_TEMP"/cp/b/e2e/ios-d-*-r2.bsdiff); E=$(stat -f %z "$APP/main.jsbundle")
           echo "iOS first update from the embedded bundle: patch $P bytes, full bundle $F bytes, embedded bundle $E bytes. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          { echo; echo "### iOS patch from the embedded bundle"; echo; node ../../scripts/ios-e2e/analyze.mjs "$RUNNER_TEMP/server.log.jsonl" "$RUNNER_TEMP/marks.json" "$RUNNER_TEMP/patch-marks.json" | tail -3; } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -216,6 +231,7 @@ jobs:
             ${{ runner.temp }}/server.log
             ${{ runner.temp }}/server.log.jsonl
             ${{ runner.temp }}/marks.json
+            ${{ runner.temp }}/patch-marks.json
             ${{ runner.temp }}/ios-timings.md
             ${{ runner.temp }}/*.png
             ${{ runner.temp }}/xcodebuild.log
