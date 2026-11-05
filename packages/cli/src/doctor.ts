@@ -64,7 +64,7 @@ function playwrightChromiumPath(cwd: string): string | null {
 
 /** Same wording as `shipvo sim` prints when the launch fails. */
 function chromiumFix(version: string | null): string {
-  return `run \`npx playwright install chromium\` in the app folder${version ? ` (playwright ${version})` : ""}. On Linux, if Chromium then fails to start, run \`npx playwright install --with-deps chromium\` or install the system packages it lists.`;
+  return `Shipvo uses Chrome or Edge if installed, else installs Chromium on first run (unless SHIPVO_NO_AUTO_INSTALL=1). To do it now, run \`npx playwright install chromium\` in the app folder${version ? ` (playwright ${version})` : ""}. On Linux, if Chromium then fails to start, run \`npx playwright install-deps chromium\`.`;
 }
 
 function hasSimScript(deps: DoctorDeps): boolean {

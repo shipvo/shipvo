@@ -12,16 +12,12 @@ import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
-import { execSync } from "node:child_process";
 import { launchErrorMessage } from "./chromium-hint.mjs";
-// Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
-const require_ = createRequire(import.meta.url);
+import { resolvePlaywright, launchResolved } from "./browser.mjs";
+// Playwright: the app's own install first (its browsers match it), then this package's, then a global one; installed if missing.
 let pw, pwVersion;
-for (const from of [() => createRequire(join(process.cwd(), "package.json")), () => require_, () => { const root = execSync("npm root -g").toString().trim(); return (id) => require_(join(root, id)); }]) {
-  try { const r = from(); pw = r("playwright"); try { pwVersion = r("playwright/package.json").version; } catch {} break; } catch {}
-}
-if (!pw) { console.error("playwright is not installed: npm i -D playwright && npx playwright install chromium"); process.exit(2); }
-const { chromium, devices } = pw;
+try { ({ pw, version: pwVersion } = resolvePlaywright(process.cwd())); } catch (e) { console.error(`sim: ${e.message}`); process.exit(2); }
+const { devices } = pw;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
@@ -44,12 +40,12 @@ async function resolveApp(spec) {
 mkdirSync(DIR, { recursive: true });
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".ico": "image/x-icon", ".ttf": "font/ttf", ".css": "text/css" };
 // Chromium starts after the server is listening (see the end of this file). Handlers await this shared promise.
-const LAUNCH_TIMEOUT_MS = 60_000;
+const LAUNCH_TIMEOUT_MS = 300_000;   // includes the one-time Chromium download
 let launchBrowser;
 const browserReady = new Promise((resolve, reject) => { launchBrowser = () => {
   const timer = setTimeout(() => reject(new Error(`Chromium did not start within ${LAUNCH_TIMEOUT_MS / 1000} s`)), LAUNCH_TIMEOUT_MS);
   const executablePath = arg("chromium", undefined);
-  chromium.launch(executablePath ? { executablePath } : {}).then(resolve, reject).finally(() => clearTimeout(timer));
+  launchResolved(pw, { executablePath, version: pwVersion }).then(resolve, reject).finally(() => clearTimeout(timer));
 }; });
 browserReady.catch((e) => { console.error(`sim: ${launchErrorMessage(e.message, pwVersion)}`); process.exit(1); });
 const sessions = new Map();

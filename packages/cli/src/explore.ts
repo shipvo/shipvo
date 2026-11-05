@@ -2,7 +2,7 @@
 // The walker (`walk`) only needs a `Driver`, so tests run it against a fake app. `explore` wires it to the simulator.
 import { execSync, spawn } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { ensureSimServer } from "./sim-install.js";
 import { args as parse, loadConfig } from "./config.js";
 import { portFree, waitListening } from "./sim.js";
 
@@ -189,8 +189,7 @@ export async function startSim(a: Record<string, string | undefined>, cfg: { nam
       execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
     }
     let server: string;
-    try { server = createRequire(process.cwd() + "/package.json").resolve("@shipvo/sim/server.mjs"); }
-    catch { throw new Error("Install @shipvo/sim (and playwright) in this app: npm i -D @shipvo/sim playwright && npx playwright install chromium"); }
+    server = ensureSimServer();
     let exited = false;
     child = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId], { stdio: ["ignore", "ignore", "inherit"], env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
     child.on("exit", () => { exited = true; });

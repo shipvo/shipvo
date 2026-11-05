@@ -2,8 +2,8 @@
 import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync, watch } from "node:fs";
 import { join } from "node:path";
-import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
+import { ensureSimServer } from "./sim-install.js";
 import { args as parse, loadConfig } from "./config.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
@@ -121,8 +121,8 @@ export async function sim(argv: string[]) {
     execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
   }
   let server: string;
-  try { server = createRequire(process.cwd() + "/package.json").resolve("@shipvo/sim/server.mjs"); }
-  catch { console.error("Install @shipvo/sim (and playwright) in this app: npm i -D @shipvo/sim playwright && npx playwright install chromium"); process.exit(2); }
+  try { server = ensureSimServer(); }
+  catch (e) { console.error((e as Error).message); process.exit(2); }
   const p = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId, ...(a.dir ? ["--dir", a.dir] : [])], { stdio: "inherit", env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
   let exited = false;
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });
