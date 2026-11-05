@@ -28,4 +28,28 @@ The command prints "Filled without you: x of y fields". That counts only the der
 
 It also prints the questions it cannot answer: whether each data type is shared, third-party SDKs, sign-in, data deletion and a contact address.
 
+## Store setup and status
+
+`shipvo store setup` and `shipvo store status` (slice 2 of #249) tell you which accounts to open and what to do next. They make no store calls and read no credentials.
+
+```bash
+shipvo store setup --company no
+shipvo store status
+shipvo store status --mark play-account
+shipvo store status --mark apple-account --as waiting
+```
+
+`setup` asks if you have a registered company. In a terminal it asks questions. For agents and CI, pass flags: `--company yes|no`, `--android-now`, `--play-account-before-2023-11-13`. With no flags and no terminal it uses the default: no company. A bad flag value exits 2. It writes `store-plan.json`.
+
+| Situation | Google Play | App Store |
+|---|---|---|
+| Registered company | Organization account, no tester rule | Organization account (D-U-N-S) |
+| No company (default) | Personal account: 12 testers opted in for 14 days in a row before production | Individual account |
+| No company, needs Android now | Same as above. There is no faster route yet; the output says so | Same as above |
+| Play account made before 13 Nov 2023 | Exempt from the tester rule | Same as above |
+
+The tester rule is shown only for personal Play accounts that are not exempt. Apple has no such rule.
+
+`status` reads `store-plan.json` and prints one timeline per store. Each step is `todo`, `waiting` or `done`, followed by what you do next. `--mark <step>` sets a step to `done`; add `--as waiting` for a wait. With no plan file it says to run `setup`.
+
 See the package: [`packages/store`](../packages/store/README.md).

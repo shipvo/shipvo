@@ -1,0 +1,2 @@
+- `@shipvo/test`: new `parseSteps(text)` and `runSteps(phone, steps)` (and type `Step`) turn plain-English lines such as `tap "Add to cart"` into typed steps and run them. An unknown line throws a `PhoneError` with code `step_unparsed` and the line number.
+- Migration: none; this only adds exports.
