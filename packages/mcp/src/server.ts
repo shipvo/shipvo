@@ -10,6 +10,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import http from "node:http";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { z } from "zod";
 import { classify, compactDiff, fieldValue } from "./change.js";
 
@@ -145,11 +146,12 @@ server.tool("screenshot", "A PNG of the phone screen (for checking layout, colou
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
 });
 // The simulated device: what the phone has, and what happens to it.
-server.tool("set_device", "Change what the simulated phone has: location, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
+server.tool("set_device", "Change what the simulated phone has: location, the address book (contacts), a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
   session: sid,
   location: z.object({ latitude: z.number(), longitude: z.number(), accuracy: z.number().optional() }).optional(),
   camera: z.object({ barcode: z.object({ type: z.string(), data: z.string() }).nullable().optional(), delayMs: z.number().optional() }).optional(),
-  permissions: z.object({ camera: z.enum(["granted", "denied", "undetermined"]).optional(), location: z.enum(["granted", "denied", "undetermined"]).optional(), notifications: z.enum(["granted", "denied", "undetermined"]).optional() }).optional(),
+  permissions: z.object({ camera: z.enum(["granted", "denied", "undetermined"]).optional(), location: z.enum(["granted", "denied", "undetermined"]).optional(), notifications: z.enum(["granted", "denied", "undetermined"]).optional(), contacts: z.enum(["granted", "denied", "undetermined"]).optional() }).optional(),
+  contacts: z.array(z.object({ id: z.string(), name: z.string(), phoneNumbers: z.array(z.string()).optional(), emails: z.array(z.string()).optional() })).optional().describe("Replace the address book the app can read (needs contacts permission)"),
   biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
   payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),
@@ -179,13 +181,23 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
 server.tool("owner_describe", "List the owner commands of an app (content, prices, offers, orders, publish). Needs PN_OWNER_TOKEN.", { app: z.string() }, RO, async ({ app }) => {
   const r = await fetch(`${CONTROL}/app/${app}/api/describe`); return text(await r.text());
 });
-server.tool("owner_command", "Run an owner command against the live app (changes are audited; `publish` makes them live on every phone within seconds).", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional() }, DEST,
-  async ({ app, command, args }) => {
+// The owner's agent rules from shipvo.json (agentPolicy, agentDeny) in PN_APP_DIR or the current folder. Sent to the control plane, which only lets them tighten its own rules.
+function agentRules(): Record<string, string> {
+  try {
+    const c = JSON.parse(readFileSync(join(process.env.PN_APP_DIR || process.cwd(), "shipvo.json"), "utf8"));
+    const h: Record<string, string> = {};
+    if (["ask", "deny", "allow"].includes(c.agentPolicy)) h["x-shipvo-agent-policy"] = c.agentPolicy;
+    if (Array.isArray(c.agentDeny) && c.agentDeny.length) h["x-shipvo-agent-deny"] = c.agentDeny.map(String).join(",");
+    return h;
+  } catch { return {}; }
+}
+server.tool("owner_command", "Run an owner command against the live app (changes are audited). Commands that cannot be undone or reach users (publish, prices, offers, deletes, API keys) do nothing and return { code: \"needs_confirm\", plan } first: show the plan to the owner, then call again with the same args and confirm: true.", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional(), confirm: z.boolean().optional().describe("true to run a command that returned needs_confirm; pass the same args") }, DEST,
+  async ({ app, command, args, confirm }) => {
     if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": owner commands need an owner key`);
     if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
     const token = ctx.ownerToken || OWNER_TOKEN;
     if (!token) throw new Error("owner commands are not enabled on this server.");
-    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ name: command, args: args ?? {} }) });
+    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...agentRules() }, body: JSON.stringify({ name: command, args: { ...Object.fromEntries(Object.entries(args ?? {}).filter(([k]) => k !== "confirm")), ...(confirm === true ? { confirm: true } : {}) } }) });
     return text(await r.text());
   });
 

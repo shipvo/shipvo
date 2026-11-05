@@ -1,13 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import { find, parseScreen, type Node, type Target } from "./tree.js";
 
+/** One address-book entry. */
+export type Contact = { id: string; name: string; phoneNumbers?: string[]; emails?: string[] };
 type Grant = "granted" | "denied" | "undetermined";
 /** What the simulated phone has. Takes effect for the next action. */
 export type DeviceSettings = {
   location?: { latitude: number; longitude: number; accuracy?: number };
   /** What is in front of the camera: a barcode or QR code, or null for nothing. */
   camera?: { barcode?: { type: string; data: string } | null; delayMs?: number };
-  permissions?: { camera?: Grant; location?: Grant; notifications?: Grant };
+  permissions?: { camera?: Grant; location?: Grant; notifications?: Grant; contacts?: Grant };
+  /** The address book the app can read once contacts permission is granted. Replaces the current one. */
+  contacts?: Contact[];
   biometrics?: { enrolled?: boolean; nextResult?: "success" | "fail" | "cancel" };
   payment?: { nextResult?: "approve" | "decline" | "timeout" | "insufficient_funds"; pin?: string };
   online?: boolean;
@@ -28,6 +32,10 @@ export type OpenOptions = {
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 /** An action the simulator refused. `code` is set for typed failures such as `no_url_listener` or `stale_ref`. */
 export class PhoneError extends Error { constructor(message: string, readonly code?: string) { super(message); this.name = "PhoneError"; } }
+/** What a mocked request answers with. An object `body` is sent as JSON. */
+export type MockResponse = { status: number; body?: string | Record<string, unknown> | unknown[] | null; headers?: Record<string, string>; delayMs?: number };
+/** A string `url` must equal the full request URL. A RegExp is tested against it. Without `method`, any method matches. The first matching rule wins. */
+export type MockRule = { url: string | RegExp; method?: string } & MockResponse;
 type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number };
 
 /** A simulated phone running your app. Every action returns once the screen has settled, and updates `screen`. */
@@ -35,7 +43,9 @@ export class Phone {
   /** The current screen as an accessibility tree. */
   screen = "";
   readonly device: Device;
-  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); }
+  /** The simulated address book. */
+  readonly contacts: Contacts;
+  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); }
 
   /** @internal */
   async call(path: string, body: Record<string, unknown>): Promise<Reply> {
@@ -108,6 +118,11 @@ export class Phone {
   async openNotification(id?: string): Promise<this> { await this.act("open_notification", { id }); return this; }
   /** Open a deep link in the app, as a push tap or share link would. Throws a `PhoneError` with code `no_url_listener` if the app has no `onUrl` listener. */
   async openUrl(url: string): Promise<this> { await this.act("open_url", { url }); return this; }
+  /** Stub `fetch` and XHR calls the app makes. Replaces earlier rules. Unmatched requests go to the network as usual.
+   * Throws a `PhoneError` with code `mock_invalid` for a bad rule. */
+  async mockNetwork(rules: MockRule[]): Promise<this> { await this.act("set_network_mocks", { rules: encodeMockRules(rules) }); return this; }
+  /** Remove every network mock. */
+  async clearNetworkMocks(): Promise<this> { await this.act("set_network_mocks", { rules: [] }); return this; }
   /** What the app did with the device: permission prompts and answers, location reads, scans, fingerprint checks, payments. */
   async deviceLog(): Promise<unknown[]> { return (await this.act("device_log")).log ?? []; }
   /** A PNG of the screen. Works when the test runs on the same machine as the simulator, as in CI. */
@@ -118,6 +133,35 @@ export class Phone {
   }
   /** Nothing to release on the simulator side today; kept so tests read the same if that changes. */
   async close(): Promise<void> {}
+}
+
+/** Turns rules into the wire format. The sim's parseMockRules (packages/sim/mock-rules.mjs) reads it: the two must stay in sync. */
+export function encodeMockRules(rules: MockRule[]): unknown[] {
+  const bad = (i: number, why: string) => new PhoneError(`mockNetwork rule ${i}: ${why}`, "mock_invalid");
+  if (!Array.isArray(rules)) throw new PhoneError("mockNetwork needs an array of rules", "mock_invalid");
+  return rules.map((r, i) => {
+    if (!r || typeof r !== "object") throw bad(i, "must be an object");
+    const { url, method, status, body, headers, delayMs } = r;
+    if (!(typeof url === "string" && url) && !(url instanceof RegExp)) throw bad(i, "url must be a non-empty string or a RegExp");
+    if (method !== undefined && (typeof method !== "string" || !method)) throw bad(i, "method must be a non-empty string");
+    if (!Number.isInteger(status) || status < 100 || status > 599) throw bad(i, "status must be an integer from 100 to 599");
+    if (delayMs !== undefined && (typeof delayMs !== "number" || !(delayMs >= 0) || delayMs > 60000)) throw bad(i, "delayMs must be a number from 0 to 60000");
+    const h: Record<string, string> = { ...(headers ?? {}) };
+    let text = "";
+    if (typeof body === "string") text = body;
+    else if (body !== undefined && body !== null) {
+      text = JSON.stringify(body);
+      if (!Object.keys(h).some((k) => k.toLowerCase() === "content-type")) h["content-type"] = "application/json";
+    }
+    return { ...(typeof url === "string" ? { url } : { urlRegex: { source: url.source, flags: url.flags } }), method, response: { status, body: text, headers: h, delayMs } };
+  });
+}
+
+/** The simulated address book. Apps read it with `expo-contacts` or `device.contacts.getAll()`; writing back is not simulated. */
+export class Contacts {
+  constructor(private readonly phone: Phone) {}
+  /** Seed the address book (replaces what was there). The app still asks for permission; answer with `phone.device.set({ permissions: { contacts } })` or tap the dialog. */
+  async set(contacts: Contact[]): Promise<Phone> { await this.phone.act("set_device", { device: { contacts } }); return this.phone; }
 }
 
 /** The simulated phone's hardware and settings. */
