@@ -1,6 +1,6 @@
 // Owner commands: everything the admin can do, as typed commands. The admin UI calls these, and so can an agent
 // holding the owner token. Commands edit the DRAFT; `publish` validates it and makes it live on every device.
-import { AppContent, ContentBlock } from "@shipvo/schema";
+import { AppContent, ContentBlock, ShipvoPolicy } from "@shipvo/schema";
 import { parseWebhookUrl } from "./alerts";
 
 type Content = AppContent;
@@ -24,23 +24,23 @@ export async function loadPolicy(env: { kv: KVNamespace; appId: string }): Promi
     return { agentPolicy: ["ask", "deny", "allow"].includes(p.agentPolicy) ? p.agentPolicy : "ask", agentDeny: Array.isArray(p.agentDeny) ? p.agentDeny.map(String) : [] };
   } catch { return { agentPolicy: "ask", agentDeny: [] }; }
 }
-const BANDS = ["b0", "b1", "b2"] as const;
-type Band = (typeof BANDS)[number];
-export type ReleasePolicy = { maxBand?: Band; agentMaxBand?: Band };
+export type ReleasePolicy = ShipvoPolicy;
 const RELEASE_POLICY_KEY = (appId: string) => `c/${appId}/release_policy`;
-/** The stored release policy. A missing, corrupt or unknown value means no limit. */
+/** The stored release policy. A missing, corrupt or invalid value means no limit. */
 export async function loadReleasePolicy(env: { kv: KVNamespace; appId: string }): Promise<ReleasePolicy> {
   try {
-    const p = JSON.parse((await env.kv.get(RELEASE_POLICY_KEY(env.appId))) ?? "{}");
-    return { ...(BANDS.includes(p.maxBand) ? { maxBand: p.maxBand } : {}), ...(BANDS.includes(p.agentMaxBand) ? { agentMaxBand: p.agentMaxBand } : {}) };
+    const raw = JSON.parse((await env.kv.get(RELEASE_POLICY_KEY(env.appId))) ?? "{}");
+    if (!raw || typeof raw !== "object") return {};
+    // Keep every field that is valid on its own, so one bad field does not drop the other rules.
+    const out: Record<string, unknown> = {};
+    for (const k of ["maxBand", "agentMaxBand", "blockedWeekdays", "blockedAfterHour", "timeZone", "maxCohortForAgents", "requireStageBeforeFull"]) {
+      if (!(k in raw)) continue;
+      // blockedAfterHour only makes sense with blockedWeekdays, so test it next to a valid one.
+      if (ShipvoPolicy.safeParse({ ...(k === "blockedAfterHour" ? { blockedWeekdays: ["mon"] } : {}), [k]: raw[k] }).success) out[k] = raw[k];
+    }
+    if (!ShipvoPolicy.safeParse(out).success) delete out.blockedAfterHour;
+    return out as ReleasePolicy;
   } catch { return {}; }
-}
-/** Same rules and wording as `checkPolicy` in the CLI, for the two band limits only. */
-export function checkReleasePolicy(policy: ReleasePolicy, band: string, agent: boolean): { ok: true } | { ok: false; rule: "maxBand" | "agentMaxBand"; reason: string } {
-  const at = BANDS.indexOf(band as Band);
-  if (policy.maxBand && at > BANDS.indexOf(policy.maxBand)) return { ok: false, rule: "maxBand", reason: `this publish reaches ${band}, but policy.maxBand is ${policy.maxBand}` };
-  if (agent && policy.agentMaxBand && at > BANDS.indexOf(policy.agentMaxBand)) return { ok: false, rule: "agentMaxBand", reason: `an agent-run publish reaches ${band}, but policy.agentMaxBand is ${policy.agentMaxBand}` };
-  return { ok: true };
 }
 /** What a publish reaches. Telemetry has no device id, so this counts update reports, not phones. */
 async function reach(env: OwnerEnv): Promise<string> {
@@ -224,15 +224,27 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
       const v = { agentPolicy: String(a.agentPolicy), agentDeny: String(a.agentDeny ?? "").split(",").map((x) => x.trim()).filter(Boolean) };
       await env.kv.put(POLICY_KEY(env.appId), JSON.stringify(v)); return v;
     } },
-  get_release_policy: { description: "The band limits publishes must respect: maxBand for everyone, agentMaxBand for AI agents (b0, b1 or b2). Empty means no limit.", params: {}, mutates: false,
+  get_release_policy: { description: "The rules publishes must respect: maxBand, agentMaxBand, blockedWeekdays with blockedAfterHour and timeZone (UTC if none), and requireStageBeforeFull. Empty means no rules.", params: {}, mutates: false,
     run: async (_d, _a, env) => loadReleasePolicy(env) },
-  set_release_policy: { description: "Set maxBand and agentMaxBand (b0, b1 or b2; leave out or empty for no limit). The control plane refuses a publish to a wider band. Owner sign-in only: agents cannot call it.", mutates: false, adminOnly: true,
-    params: { maxBand: { type: "string", description: "Widest band any publish may reach", enum: ["b0", "b1", "b2", ""] }, agentMaxBand: { type: "string", description: "Widest band an agent publish may reach", enum: ["b0", "b1", "b2", ""] } },
+  set_release_policy: { description: "Set the release rules the control plane enforces on publish and promote. maxBand and agentMaxBand: b0, b1 or b2. blockedWeekdays: comma-separated mon..sun, blocked from blockedAfterHour (0-23, default all day) in timeZone (IANA name, UTC if empty). stagePercent with stageMinHours: a release must sit at that percent for that long before 100%. Leave a field out or empty for no rule. Owner sign-in only: agents cannot call it.", mutates: false, adminOnly: true,
+    params: { maxBand: { type: "string", description: "Widest band any publish may reach", enum: ["b0", "b1", "b2", ""] }, agentMaxBand: { type: "string", description: "Widest band an agent publish may reach", enum: ["b0", "b1", "b2", ""] },
+      blockedWeekdays: { type: "string", description: "Comma-separated weekdays (mon, tue, ...) with no publishing" }, blockedAfterHour: { type: "number", description: "Hour 0-23 from which those weekdays are blocked" },
+      timeZone: { type: "string", description: "IANA time zone for the weekday rules (UTC if empty)" }, stagePercent: { type: "number", description: "Percent a release must sit at before 100% (1-99)" }, stageMinHours: { type: "number", description: "Hours it must sit there" } },
     run: async (_d, a, env) => {
-      const v: ReleasePolicy = {};
-      if (a.maxBand) v.maxBand = String(a.maxBand) as Band;
-      if (a.agentMaxBand) v.agentMaxBand = String(a.agentMaxBand) as Band;
-      await env.kv.put(RELEASE_POLICY_KEY(env.appId), JSON.stringify(v)); return v;
+      const v: Record<string, unknown> = {};
+      if (a.maxBand) v.maxBand = String(a.maxBand);
+      if (a.agentMaxBand) v.agentMaxBand = String(a.agentMaxBand);
+      const days = String(a.blockedWeekdays ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+      if (days.length) v.blockedWeekdays = days;
+      if (a.blockedAfterHour !== undefined && a.blockedAfterHour !== "") v.blockedAfterHour = Number(a.blockedAfterHour);
+      if (a.timeZone) v.timeZone = String(a.timeZone);
+      if (a.stagePercent || a.stageMinHours) {
+        if (!a.stagePercent || !a.stageMinHours) return fail("bad_param", "stagePercent and stageMinHours go together");
+        v.requireStageBeforeFull = { percent: Number(a.stagePercent), minHours: Number(a.stageMinHours) };
+      }
+      const r = ShipvoPolicy.safeParse(v);
+      if (!r.success) return fail("bad_param", r.error.issues.map((i) => `${i.path.join(".") || "policy"}: ${i.message}`).join("; "));
+      await env.kv.put(RELEASE_POLICY_KEY(env.appId), JSON.stringify(r.data)); return r.data;
     } },
   audit_log: { description: "Who changed what, newest first.", params: {}, mutates: false,
     run: async (_d, _a, env) => (await env.db.prepare("SELECT at, actor, command, args_json, ok FROM audit WHERE app_id = ? ORDER BY id DESC LIMIT 100").bind(env.appId).all()).results },

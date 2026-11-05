@@ -16,7 +16,17 @@ export function rows(report) {
     return `| ${s.name} | ${s.pass ? "pass" : "FAIL"} | ${t} | ${size} |`;
   });
 }
+/** Seconds with two decimals, or null when the value is missing, not a finite number or not positive. Never "0.00 s". */
+export function secondsOrNull(n) { return typeof n === "number" && Number.isFinite(n) && n > 0 ? (n / 1000).toFixed(2) : null; }
+/** The full-bundle update scenario's publish-to-healthy line from report.firstRun, or a "not measured" line. */
+export function publishToHealthyLine(report) {
+  const f = report.firstRun ?? {};
+  const total = secondsOrNull(f.publishToHealthyMs);
+  if (!total) return "Publish to healthy (full-bundle update scenario, emulator): not measured";
+  const parts = [["download", f.downloadMs], ["apply", f.applyMs]].map(([k, v]) => [k, secondsOrNull(v)]).filter(([, v]) => v).map(([k, v]) => `${k} ${v} s`);
+  return `Publish to healthy (full-bundle update scenario, emulator): ${total} s${parts.length ? ` (${parts.join(", ")})` : ""}`;
+}
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const r = JSON.parse(readFileSync(process.argv[2], "utf8"));
-  console.log(["| Scenario | Result | Median timings (3 trials) | Download |", "| --- | --- | --- | --- |", ...rows(r)].join("\n"));
+  console.log(["| Scenario | Result | Median timings (3 trials) | Download |", "| --- | --- | --- | --- |", ...rows(r)].join("\n") + "\n\n" + publishToHealthyLine(r));
 }

@@ -67,6 +67,7 @@ jobs:
     uses: ./.github/workflows/_agent-claude.yml
     secrets: inherit
     with:
+      upload_media: true   # PR screenshots: /tmp/agent/media/pr-shots/** -> https://shipvo.dev/media/pr-shots/**
       role: engineer
       mode: branch
       branch: agent/claude/issue-${{ needs.pick.outputs.issue }}-${{ github.run_number }}

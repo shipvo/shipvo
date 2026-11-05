@@ -26,6 +26,7 @@
     "frame.mjs",
     "frame.d.mts",
     "mock-rules.mjs",
+    "screen-rules.mjs",
     "push-notification.mjs",
     "README.md"
   ],

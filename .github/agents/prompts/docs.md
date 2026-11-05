@@ -20,3 +20,6 @@ Commit (`git add`, `git commit -m "docs: ..."`). Do not push. Write `/tmp/agent/
 
 
 Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (one line, the loop, comparisons as facts, parity as proof).
+
+
+A new site check is a new file `services/site/scripts/check-<name>.mjs`; `run-checks.mjs` picks it up. Do not edit the `test` script in `services/site/package.json`.

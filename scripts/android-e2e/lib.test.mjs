@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { createPublicKey, verify } from "node:crypto";
 import { b64, keyFromSeed } from "../../packages/cli/dist/index.js";
-import { buildPointer, median, parseLog, telemetry, pctChange, sha256, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion } from "./lib.mjs";
+import { buildPointer, median, parseLog, telemetry, pctChange, sha256, FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion } from "./lib.mjs";
 
 const seed = b64(randomBytes(32)), pub = b64(keyFromSeed(seed).publicKey);
 const bytes = new Uint8Array(randomBytes(500));
@@ -41,6 +41,14 @@ test("steadyTrials drops poll misses and the trial after one", () => {
   const mk = (ms) => ({ timeline: { pointerSeenMs: ms } });
   const kept = steadyTrials([mk(100), mk(10000), mk(120), mk(90), mk(null)]);
   assert.deepEqual(kept.map((t) => t.timeline.pointerSeenMs), [100, 90]);
+});
+
+test("firstRunFrom takes the full-bundle scenario median, and is null when it failed or has no timing", () => {
+  const name = FULL_BUNDLE_SCENARIO;
+  assert.deepEqual(firstRunFrom([{ name, pass: true, median: { pointerToHealthyMs: 4000, downloadMs: 900, applyMs: 100 } }]), { source: name, publishToHealthyMs: 4000, downloadMs: 900, applyMs: 100 });
+  assert.equal(firstRunFrom([{ name, pass: false, median: { pointerToHealthyMs: 4000 } }]), null);
+  assert.equal(firstRunFrom([{ name, pass: true, median: { pointerToHealthyMs: null } }]), null);
+  assert.equal(firstRunFrom([]), null);
 });
 
 const hbc = (v) => { const b = new Uint8Array(32); b.set([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f]); new DataView(b.buffer).setUint32(8, v, true); return b; };
