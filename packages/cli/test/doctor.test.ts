@@ -157,3 +157,69 @@ describe("shipvo doctor checks", () => {
     vi.restoreAllMocks();
   });
 });
+
+describe("shipvo doctor sim checks", () => {
+  const withSim = (sim: boolean) => {
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: "x" }));
+    writeFileSync(join(cwd, "package.json"), JSON.stringify({ scripts: sim ? { sim: "shipvo sim" } : {} }));
+    return cwd;
+  };
+  const run = (cwd: string, o: object = {}) => runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch, ...o });
+
+  it("Chromium check passes when the binary exists and fails with the fix when not", async () => {
+    const cwd = withSim(true);
+    const bin = join(cwd, "chrome");
+    writeFileSync(bin, "");
+    expect(nameOf(await run(cwd, { chromiumPath: () => bin }), "Playwright Chromium installed").ok).toBe(true);
+    const missing = nameOf(await run(cwd, { chromiumPath: () => join(cwd, "nope") }), "Playwright Chromium installed");
+    expect(missing.ok).toBe(false);
+    expect(missing.fix.endsWith("npx playwright install chromium")).toBe(true);
+    expect(nameOf(await run(cwd, { chromiumPath: () => null }), "Playwright Chromium installed").ok).toBe(false);
+  });
+
+  it("port check passes on a free port and fails on a real busy one", async () => {
+    const { createServer } = await import("node:net");
+    const srv = createServer();
+    await new Promise<void>((r) => srv.listen(0, r));
+    const busy = (srv.address() as { port: number }).port;
+    const cwd = withSim(true);
+    const fail = nameOf(await run(cwd, { port: busy }), `sim port ${busy} is free`);
+    expect(fail.ok).toBe(false);
+    expect(fail.fix.endsWith("Stop the other process or pass --port <n>")).toBe(true);
+    await new Promise((r) => srv.close(r));
+    expect(nameOf(await run(cwd, { port: busy }), `sim port ${busy} is free`).ok).toBe(true);
+  });
+
+  it("skips both checks without a sim script", async () => {
+    const names = (await run(withSim(false))).map((r) => r.name);
+    expect(names.some((n) => n.includes("Chromium") || n.includes("sim port"))).toBe(false);
+  });
+
+  it("exits non-zero when a sim check fails", async () => {
+    const cwd = withSim(true);
+    const prev = process.cwd();
+    process.chdir(cwd);
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    try { await expect(doctor([])).rejects.toThrow("exit"); expect(exit).toHaveBeenCalledWith(1); }
+    finally { process.chdir(prev); vi.restoreAllMocks(); }
+  });
+
+  it.each([["foo"], ["--port", "abc"], ["--port", "4545", "4545"]])("rejects bad arguments %j with exit 2", async (...argv) => {
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try { await expect(doctor(argv)).rejects.toThrow("exit"); expect(exit).toHaveBeenCalledWith(2); }
+    finally { vi.restoreAllMocks(); }
+  });
+
+  it("default portFree sees a real busy port", async () => {
+    const { portFree } = await import("../src/sim.js");
+    const { createServer } = await import("node:net");
+    const srv = createServer();
+    await new Promise<void>((r) => srv.listen(0, r));
+    const busy = (srv.address() as { port: number }).port;
+    expect(await portFree(busy)).toBe(false);
+    await new Promise((r) => srv.close(r));
+    expect(await portFree(busy)).toBe(true);
+  });
+});

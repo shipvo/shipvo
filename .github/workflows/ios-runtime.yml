@@ -180,6 +180,31 @@ jobs:
             echo "Simulator: $(xcrun simctl list devices | grep "$UDID" | sed 's/ (.*//;s/^ *//'), $(xcodebuild -version | head -1). Publish-to-healthy is launch to healthy (pointer published before launch). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } | tee "$RUNNER_TEMP/ios-timings.md" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: First update as a patch from the embedded bundle (first-download size)
+        # Issue #1, bet 2. A fresh install runs the embedded main.jsbundle; release 2 lists a bsdiff patch from it,
+        # so the first download should be the patch, not the full bundle. Needs the runtime from #181.
+        continue-on-error: true
+        working-directory: apps/tide-and-tackle
+        run: |
+          python3 -m pip install --quiet bsdiff4 2>/dev/null || python3 -m pip install --quiet --break-system-packages bsdiff4
+          APP=$(ls -d ios/build/Build/Products/Release-iphonesimulator/*.app | head -1)
+          sed -i.bak 's/headline: "[^"]*"/headline: "Release 2 over the air on iOS"/' src/release.ts
+          npx expo export --platform ios --output-dir dist-e2e2 --clear 2>&1 | tail -3
+          HBC=$(ls dist-e2e2/_expo/static/js/ios/*.hbc | head -1)
+          SEED=$(node -p "require(process.env.RUNNER_TEMP + '/key.json').seed")
+          PATCH_FROM="$APP/main.jsbundle" node ../../scripts/ios-e2e/make-release.mjs "$RUNNER_TEMP/cp" e2e "$SEED" 2 "$HBC"
+          xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true
+          xcrun simctl uninstall "$UDID" "$BID"; xcrun simctl install "$UDID" "$APP"
+          : > "$RUNNER_TEMP/server.log"
+          xcrun simctl launch "$UDID" "$BID" > /dev/null
+          for i in $(seq 1 60); do grep -q '^POST /t .*"release":2' "$RUNNER_TEMP/server.log" && break; sleep 2; done
+          cut -c1-200 "$RUNNER_TEMP/server.log"
+          grep -q '^POST /t .*"release":2' "$RUNNER_TEMP/server.log" || { echo "FAIL: app never reported release 2"; exit 1; }
+          grep -q '^GET /b/e2e/ios-d-[0-9a-f]*-r2.bsdiff 200' "$RUNNER_TEMP/server.log" || { echo "FAIL: app did not download the patch"; exit 1; }
+          ! grep -q '^GET /b/e2e/ios-r2.hbc' "$RUNNER_TEMP/server.log" || { echo "FAIL: app downloaded the full bundle"; exit 1; }
+          P=$(stat -f %z "$RUNNER_TEMP"/cp/b/e2e/ios-d-*-r2.bsdiff); F=$(stat -f %z "$HBC"); E=$(stat -f %z "$APP/main.jsbundle")
+          echo "iOS first update from the embedded bundle: patch $P bytes, full bundle $F bytes, embedded bundle $E bytes. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
