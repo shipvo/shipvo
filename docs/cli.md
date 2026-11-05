@@ -5,7 +5,7 @@
 Two modes.
 
 - `shipvo init <dir>` creates a new app in `<dir>`. See [Getting started](getting-started.md).
-- `shipvo init` (or `shipvo init .`) inside an existing Expo app switches to **adopt mode**.
+- `shipvo init` (or `shipvo init .`) inside an existing Expo or bare React Native app switches to **adopt mode**.
 
 ### Adopt mode
 
@@ -29,12 +29,22 @@ With `app.config.js` or `app.config.ts` it does not rewrite your code. It prints
 
 Rules it keeps:
 
-- It never overwrites a file and never touches `ios/` or `android/`.
+- It never overwrites a file. In an Expo app it never touches `ios/` or `android/`.
 - Running it again changes nothing.
 - It refuses apps that use `expo-updates` or `react-native-code-push`, because two update systems would fight over the bundle. See [Migrate from CodePush](migrate-from-codepush.md).
-- Bare React Native apps (committed `ios/` and `android/`, no config plugins) are not supported yet. It says so and changes nothing. If your app is managed, add any config plugin to `app.json`, or remove the `ios/` and `android/` folders, and run it again.
+- A bare React Native app (committed `ios/` and `android/`, no config plugins) is handled as described below. If your app is managed, add any config plugin to `app.json`, or remove the `ios/` and `android/` folders, and run it again.
 
 When it finishes it runs `shipvo doctor`, then tells you to rebuild the native app once and run `shipvo publish --dry-run`.
+
+### Bare React Native apps
+
+In a bare app, `shipvo init` uses the same plan, `--dry-run` and confirmation. The plan has these extra steps, each listed only if it is needed:
+
+- run `npx install-expo-modules@latest`, if Expo Modules are not set up yet. It runs only after you confirm or pass `--yes`;
+- add or update the `dev.shipvo.*` meta-data in `android/app/src/main/AndroidManifest.xml`;
+- add or update the `Shipvo*` keys in `ios/<app>/Info.plist`.
+
+The values are the same ones the config plugin writes. Other keys keep their order, and a second run changes nothing. It does not add a config plugin, because a bare app has no prebuild. If it cannot find the manifest or the Info.plist, it stops and changes nothing. Then it prints the next steps: `cd ios && pod install`, rebuild both apps, `shipvo publish --dry-run`.
 
 Other options: `--control-plane <url>`. `--public-key <key>` must be base64 that decodes to 32 bytes, or it exits 2 before changing anything. If `shipvo.json` has a `publicKey` that does not match `.shipvo/seed.txt`, it stops and changes nothing. If `app.json` is not valid JSON, it stops with a one-line message. If a step fails, it lists the steps already applied.
 
