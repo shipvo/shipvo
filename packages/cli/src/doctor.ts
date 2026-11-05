@@ -22,6 +22,8 @@ type DoctorDeps = {
   port: number;
   /** Path of the Playwright Chromium binary, or null if Playwright is not installed. */
   chromiumPath: (cwd: string) => string | null;
+  /** Version of the playwright that chromiumPath resolved, or null if unknown. */
+  playwrightVersion: (cwd: string) => string | null;
   portFree: (port: number) => Promise<boolean>;
   /** Skip the checks that need the network (control plane reachable and /health). */
   offline: boolean;
@@ -40,6 +42,7 @@ const defaultDeps = (): DoctorDeps => ({
   fileMode: (path) => { try { return statSync(path).mode & 0o777; } catch { return null; } },
   port: 4545,
   chromiumPath: playwrightChromiumPath,
+  playwrightVersion: (cwd) => { try { return createRequire(join(cwd, "package.json"))("playwright/package.json").version as string; } catch { return null; } },
   portFree,
   offline: false,
   skipSim: false,
@@ -57,6 +60,11 @@ function playwrightChromiumPath(cwd: string): string | null {
     try { return get().chromium.executablePath() as string; } catch {}
   }
   return null;
+}
+
+/** Same wording as `shipvo sim` prints when the launch fails. */
+function chromiumFix(version: string | null): string {
+  return `run \`npx playwright install chromium\` in the app folder${version ? ` (playwright ${version})` : ""}. On Linux, if Chromium then fails to start, run \`npx playwright install --with-deps chromium\` or install the system packages it lists.`;
 }
 
 function hasSimScript(deps: DoctorDeps): boolean {
@@ -174,7 +182,7 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   // Simulator checks only apply to projects that have a `sim` script.
   if (!deps.skipSim && hasSimScript(deps)) {
     const exe = deps.chromiumPath(deps.cwd);
-    results.push({ name: "Playwright Chromium installed", ok: !!exe && deps.fileExists(exe), fix: "npx playwright install chromium" });
+    results.push({ name: "Playwright Chromium installed", ok: !!exe && deps.fileExists(exe), fix: chromiumFix(deps.playwrightVersion(deps.cwd)) });
     results.push({ name: `sim port ${deps.port} is free`, ok: await deps.portFree(deps.port), fix: "Stop the other process or pass --port <n>" });
   }
 

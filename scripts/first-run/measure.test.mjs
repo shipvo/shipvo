@@ -88,6 +88,8 @@ test("with --with-install, install step is included", () => {
   const npm = join(bindir, "npm");
   writeFileSync(npm, "#!/bin/sh\nexit 0\n");
   chmodSync(npm, 0o755);
+  writeFileSync(join(bindir, "npx"), "#!/bin/sh\nexit 0\n");
+  chmodSync(join(bindir, "npx"), 0o755);
   const f = fake(INIT + SIM);
   const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install", "--with-session"], {
     encoding: "utf8",
@@ -95,11 +97,31 @@ test("with --with-install, install step is included", () => {
   });
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => x.step), ["init", "install", "doctor", "publish --dry-run", "first agent session", "total"]);
+  assert.deepEqual(j.map((x) => x.step), ["init", "install", "doctor", "publish --dry-run", "browser install", "first agent session", "total"]);
   assert.match(r.stdout, /\| install \|/);
   assert.match(r.stdout, /package manager: pnpm 9\.9\.9/);
   assert.match(r.stdout, /\| first agent session \| \d+\.\d\d \|/);
   assert.ok(j.every((x) => Number.isInteger(x.ms)));
+});
+
+test("the browser install runs in the app folder before the session step starts the simulator", () => {
+  const f = fake(INIT + `import {appendFileSync} from "node:fs"; if (process.argv[2]==="sim") appendFileSync(process.env.ORDER_LOG, "sim\\n");` + SIM);
+  const orderLog = join(dirname(f.out), "order.log");
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install", "--with-session"], { encoding: "utf8", env: { ...process.env, PATH: fakePm(), ORDER_LOG: orderLog } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(readFileSync(orderLog, "utf8").trim().split("\n"), ["npx playwright install chromium", "sim"]);
+  assert.match(r.stdout, /\| browser install \| \d+\.\d\d \|/);
+});
+
+test("a failing browser install stops the run before the session", () => {
+  const f = fake(INIT + SIM);
+  const bin = mkdtempSync(join(tmpdir(), "fake-pm-"));
+  for (const n of ["pnpm", "npm"]) { writeFileSync(join(bin, n), "#!/bin/sh\nexit 0\n"); chmodSync(join(bin, n), 0o755); }
+  writeFileSync(join(bin, "npx"), "#!/bin/sh\necho download failed >&2\nexit 1\n"); chmodSync(join(bin, "npx"), 0o755);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install", "--with-session"], { encoding: "utf8", env: { ...process.env, PATH: bin + ":" + dirname(process.execPath) } });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /download failed/);
+  assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => x.step).slice(-2), ["browser install", "total"]);
 });
 
 test("a first agent session that cannot start the simulator fails the run with its output", () => {
@@ -264,6 +286,7 @@ test("--control-url: an unsigned pointer fails the pointer check", async () => {
 const fakePm = () => {
   const bindir = mkdtempSync(join(tmpdir(), "fake-pm-"));
   for (const n of ["pnpm", "npm"]) { writeFileSync(join(bindir, n), "#!/bin/sh\necho 9.9.9\nexit 0\n"); chmodSync(join(bindir, n), 0o755); }
+  writeFileSync(join(bindir, "npx"), `#!/bin/sh\n[ -n "$ORDER_LOG" ] && echo "npx $*" >> "$ORDER_LOG"\nexit 0\n`); chmodSync(join(bindir, "npx"), 0o755);
   return bindir + ":" + dirname(process.execPath);
 };
 const publishCalls = (log) => readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
@@ -274,7 +297,7 @@ test("--with-export runs the real publish without --skip-export and records a pu
     const r = await runAsync(f, ["--with-install", "--with-session", "--with-export", "--control-url", s.url], { ARGS_LOG: log, PATH: fakePm() });
     assert.equal(r.status, 0, r.stderr);
     const j = JSON.parse(readFileSync(f.out, "utf8"));
-    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["first agent session", 0], ["publish (includes export)", 0], ["pointer", 0], ["total", 0]]);
+    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["browser install", 0], ["first agent session", 0], ["publish (includes export)", 0], ["pointer", 0], ["total", 0]]);
     const calls = publishCalls(log);
     assert.equal(calls.length, 1);
     assert.ok(!calls[0].includes("--skip-export"));

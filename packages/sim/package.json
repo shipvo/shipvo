@@ -16,6 +16,7 @@
   },
   "files": [
     "server.mjs",
+    "chromium-hint.mjs",
     "app-name.mjs",
     "mock-rules.mjs",
     "push-notification.mjs",

@@ -13,11 +13,12 @@ import { parseMockRules } from "./mock-rules.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
+import { launchErrorMessage } from "./chromium-hint.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
-let pw;
-for (const get of [() => createRequire(join(process.cwd(), "package.json"))("playwright"), () => require_("playwright"), () => require_(join(execSync("npm root -g").toString().trim(), "playwright"))]) {
-  try { pw = get(); break; } catch {}
+let pw, pwVersion;
+for (const from of [() => createRequire(join(process.cwd(), "package.json")), () => require_, () => { const root = execSync("npm root -g").toString().trim(); return (id) => require_(join(root, id)); }]) {
+  try { const r = from(); pw = r("playwright"); try { pwVersion = r("playwright/package.json").version; } catch {} break; } catch {}
 }
 if (!pw) { console.error("playwright is not installed: npm i -D playwright && npx playwright install chromium"); process.exit(2); }
 const { chromium, devices } = pw;
@@ -50,7 +51,7 @@ const browserReady = new Promise((resolve, reject) => { launchBrowser = () => {
   const executablePath = arg("chromium", undefined);
   chromium.launch(executablePath ? { executablePath } : {}).then(resolve, reject).finally(() => clearTimeout(timer));
 }; });
-browserReady.catch((e) => { console.error(`sim: could not launch Chromium: ${e.message.split("\n")[0]}`); process.exit(1); });
+browserReady.catch((e) => { console.error(`sim: ${launchErrorMessage(e.message, pwVersion)}`); process.exit(1); });
 const sessions = new Map();
 
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
