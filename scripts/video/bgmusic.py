@@ -10,8 +10,8 @@ Corpus: the full Jamendo mood/theme JSONL (33,921 tracks) if given with --corpus
 jamendo_moodtheme.jsonl next to this script; otherwise the built-in 155-track curated subset (8 clusters).
 Downloads come from https://mp3d.jamendo.com/download/track/<id>/mp32/ . Needs ffmpeg/ffprobe.
 Credit the Jamendo track wherever the video is published.
-Shipvo rule: only tracks whose own licence tag allows commercial use with changes (CC BY, CC BY-SA, CC0);
-check with `license` (reads the ID3 copyright tag) or use `auto`, which filters. Most Jamendo tracks are CC BY-NC*.
+Owner decision (5 Nov 2026): any Jamendo track may be used, always credited. `mix --credits PATH` writes the credit
+(title, artist, licence, links) read from the track's own tags; `license` reports a track's licence.
 """
 import argparse, json, os, re, subprocess, sys, random, shutil
 
@@ -269,6 +269,14 @@ def mix(a):
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", mus, "-af", f"afade=t=in:st=0:d={a.fade_in},afade=t=out:st={fo:.2f}:d={a.fade_out},volume={a.bed_solo}", "-ar", "48000", "-ac", "2", mixw], check=True)
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", a.video, "-i", mixw, "-map", "0:v", "-map", "1:a", "-c:v", "copy",
                     "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", a.out], check=True)
+    if a.credits:
+        tid = re.sub(r"\D", "", os.path.basename(a.music).split(".")[0]) or "0"
+        cred = {"video": os.path.basename(a.out), "music": track_credit(tid, a.music),
+                "credit_line": None}
+        c = cred["music"]; cred["credit_line"] = f'Music: "{c["title"]}" by {c["artist"]} ({c["provider"]}, {c["license"]}) {c["source"]}'
+        old = json.load(open(a.credits)) if os.path.exists(a.credits) else {}
+        old.update(cred); json.dump(old, open(a.credits, "w"), indent=2); open(a.credits, "a").write("\n")
+        print(f"credits: {a.credits}: {cred['credit_line']}")
     Im, Lm = loudness(mixw)
     print(f"wrote {a.out}  ({ffprobe_dur(a.out):.1f}s, mix {Im:.1f} LUFS, LRA {Lm:.1f} LU, music {os.path.basename(a.music)} at {a.music_lufs} LUFS x{a.bed}, ducked by narration)")
 
@@ -279,6 +287,17 @@ def track_license(tid):
     data = subprocess.run(["curl", "-sSL", "-m", "30", "-r", "0-65535", DL.format(id=tid)], capture_output=True).stdout
     m = re.search(rb"creativecommons\.org/(?:licenses|publicdomain)/([a-z-]+)/", data)
     return m.group(1).decode() if m else "unknown"
+
+def track_credit(tid, path):
+    """Title, artist and licence from the MP3's own ID3 tags."""
+    tags = json.loads(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format_tags", "-of", "json", path],
+                                     capture_output=True, text=True).stdout or "{}").get("format", {}).get("tags", {})
+    tags = {k.lower(): v for k, v in tags.items()}
+    lic_url = tags.get("copyright", "")
+    m = re.search(r"creativecommons\.org/(?:licenses|publicdomain)/([a-z-]+)/([0-9.]+)", lic_url)
+    return {"id": int(tid), "title": tags.get("title", ""), "artist": tags.get("artist", ""),
+            "license": f"CC {m.group(1).upper()} {m.group(2)}" if m else "see source", "license_url": lic_url,
+            "source": f"https://www.jamendo.com/track/{tid}", "provider": "Jamendo"}
 
 def license(a):
     """Print each track's licence; exit 1 if any does not allow commercial use with changes (CC BY, CC BY-SA, CC0)."""
@@ -306,6 +325,7 @@ def main():
         p.add_argument("--ratio", type=float, default=10); p.add_argument("--music-lufs", dest="music_lufs", type=float, default=-20)
         p.add_argument("--fade-in", dest="fade_in", type=float, default=2.0); p.add_argument("--fade-out", dest="fade_out", type=float, default=3.5)
         p.add_argument("--work", default=None)
+        p.add_argument("--credits", default=None, help="write the music credit JSON here (e.g. services/site/public/videos/<slug>.credits.json)")
     m = sub.add_parser("mix"); mixargs(m); m.add_argument("--music", required=True)
     li = sub.add_parser("license"); li.add_argument("--ids", required=True)
     au = sub.add_parser("auto"); common(au); mixargs(au)
@@ -315,9 +335,7 @@ def main():
     elif a.cmd == "mix": mix(a)
     elif a.cmd == "license": license(a)
     else:
-        ids = [t for t in search(a) if track_license(t) in ALLOWED]
-        print(f"licence OK: {ids}")
-        res = analyze(a, ids[:4])
+        ids = search(a); res = analyze(a, ids[:4])
         if not res: sys.exit("no candidate downloaded")
         a.music = res[0][2]; print(f"selected {res[0][1]} (flattest energy profile)"); mix(a)
 
