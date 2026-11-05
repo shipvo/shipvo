@@ -248,7 +248,7 @@ footer.old{display:none}
 
 /* ===== footer ===== */
 .foot{border-top:1px solid var(--line);padding:56px 0 28px;color:var(--mute);font-size:14.5px}
-.foot-grid{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:28px}
+.foot-grid{display:grid;grid-template-columns:1.6fr repeat(5,1fr);gap:28px}
 .foot-grid>div{display:flex;flex-direction:column;gap:9px}
 .foot-grid a:hover{color:var(--paper)}
 .listing-badge{display:inline-block;margin-top:6px;line-height:0}

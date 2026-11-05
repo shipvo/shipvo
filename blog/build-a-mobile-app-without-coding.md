@@ -66,7 +66,7 @@ It printed one line per check, and every line began with `PASS`: the Node versio
 
 You do not need a phone or Android Studio to look at your app. `npm run sim` opens it on a simulated phone in your browser. Every device feature, such as the camera or a fingerprint check, is labelled as simulated. Nothing pretends to be real.
 
-The [first app tutorial](/tutorials/first-app/) walks through it with screenshots and assumes you have never used a terminal. On a GitHub Actions Linux runner, `npm install` took 25 s and the first `npm run sim` took 7 s until the page answered. Those numbers are in the tutorial, under "What we measured". They will differ on your machine.
+The [first app tutorial](/learn/first-app/) walks through it with screenshots and assumes you have never used a terminal. On a GitHub Actions Linux runner, `npm install` took 25 s and the first `npm run sim` took 7 s until the page answered. Those numbers are in the tutorial, under "What we measured". They will differ on your machine.
 
 ## Ask an assistant to find what is confusing
 
@@ -101,4 +101,4 @@ We have not run this with an outside team. All our evidence comes from our own s
 5. Back up the signing key.
 6. Read the store rules page before you promise a feature.
 
-Start with the [first app tutorial](/tutorials/first-app/). It takes a few minutes of commands, plus reading time.
+Start with the [first app tutorial](/learn/first-app/). It takes a few minutes of commands, plus reading time.

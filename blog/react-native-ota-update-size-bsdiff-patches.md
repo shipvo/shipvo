@@ -29,7 +29,7 @@ Rebuilding creates a risk: if the phone patches the wrong base, it gets a broken
 2. The rebuilt bundle's size and hash are checked against the signed release pointer.
 3. If any check fails, the phone downloads the full bundle instead.
 
-The full rules are in step 9 of the [adapter contract](/docs/adapters/). The point is that a patch can only make an update smaller. It cannot make it less safe, because the result is verified like a full download.
+The full rules are in step 9 of the [adapter contract](https://github.com/shipvo/shipvo/blob/main/docs/adapters.md). The point is that a patch can only make an update smaller. It cannot make it less safe, because the result is verified like a full download.
 
 ## What `shipvo publish` does
 
@@ -89,4 +89,4 @@ Our spike notes name one more lever. Copy, prices and images do not need a new b
 
 ## Next step
 
-Try it on your own bundle. [Build your first Shipvo app](/docs/getting-started/), publish twice, and read the patch line. If you are moving from CodePush, the [migration guide](/docs/migrate-from-codepush/) covers where patches fit. To see what happens when an update goes wrong, read [how to roll back a bad React Native OTA update](/blog/roll-back-a-bad-react-native-update/).
+Try it on your own bundle. [Build your first Shipvo app](/docs/getting-started/), publish twice, and read the patch line. If you are moving from CodePush, the [migration guide](https://github.com/shipvo/shipvo/blob/main/docs/migrate-from-codepush.md) covers where patches fit. To see what happens when an update goes wrong, read [how to roll back a bad React Native OTA update](/blog/roll-back-a-bad-react-native-update/).
