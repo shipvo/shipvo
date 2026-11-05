@@ -4,6 +4,8 @@ import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { join, extname, normalize, resolve, sep } from "node:path";
 import { loadConfig } from "./config.js";
 import { AGENT_PATH, hostAllowed, isAgentRole, isLoopback, originAllowed, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
@@ -40,30 +42,32 @@ export const FRAMES = {
   ios: { width: 393, height: 852, radius: 55, label: "iOS", sheet: { title: "Would Like to Access", allow: "Allow While Using App", deny: "Don't Allow" } },
 } as const;
 
-/** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. */
-export function runFramePage(platform: Platform, name: string, token?: string): string {
+export type RenderFrame = (o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string };
+
+/** Loads the frame renderer from @shipvo/sim: the app's install first, then the one next to this CLI. */
+export async function loadFrameRenderer(bases: string[] = [process.cwd() + "/package.json", import.meta.url]): Promise<RenderFrame> {
+  let file: string | undefined;
+  for (const base of bases) {
+    try { file = createRequire(base).resolve("@shipvo/sim/frame.mjs"); break; } catch {}
+  }
+  if (!file) throw new Error("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager).");
+  return (await import(pathToFileURL(file).href)).renderFrame;
+}
+
+/** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. The phone body comes from @shipvo/sim's renderFrame. */
+export function runFramePage(platform: Platform, name: string, render: RenderFrame, dark = false, token?: string): string {
   const f = FRAMES[platform];
   const title = name.replace(/[<>&"']/g, "");
-  const top = platform === "android"
-    ? `<div class="status"><span>9:41</span><span class="hole" data-part="punch-hole"></span><span>5G 100%</span></div>`
-    : `<div class="status"><span>9:41</span><span class="island" data-part="dynamic-island"></span><span>5G 100%</span></div>`;
-  const bottom = platform === "android"
-    ? `<div class="bar" data-part="gesture-bar"><i></i></div>`
-    : `<div class="bar" data-part="home-indicator"><i></i></div>`;
+  const sheet = `<div class="sheet" id="sheet" role="dialog" aria-label="${f.label} system sheet" data-part="system-sheet"><div class="box"><p>${f.sheet.title}</p><button type="button" data-act="allow">${f.sheet.allow}</button><button type="button" data-act="deny">${f.sheet.deny}</button></div></div>`;
+  const frame = render({ skin: platform, dark, screen: `<iframe id="app" src="/app/" title="${title}"></iframe>${sheet}` });
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} on ${f.label} (simulated)</title>
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#e8eaed;font:14px system-ui,sans-serif}
-#fit{position:absolute;left:50%;top:50%;transform-origin:center;}
-.phone{width:${f.width}px;height:${f.height}px;border-radius:${f.radius}px;background:#000;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 30px #0006;position:relative}
-.status{flex:none;height:${platform === "ios" ? 54 : 32}px;display:flex;justify-content:space-between;align-items:center;padding:0 ${platform === "ios" ? 36 : 22}px;color:#fff;font-size:13px;position:relative}
-.hole{position:absolute;left:50%;top:8px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#111;border:1px solid #333}
-.island{position:absolute;left:50%;top:11px;width:120px;height:34px;margin-left:-60px;border-radius:20px;background:#000;border:1px solid #222}
-iframe{flex:1;min-height:0;border:0;background:#fff;width:100%}
-.bar{flex:none;height:${platform === "ios" ? 34 : 24}px;display:flex;justify-content:center;align-items:center}
-.bar i{display:block;width:${platform === "ios" ? 134 : 108}px;height:5px;border-radius:3px;background:#fff}
-.sheet{position:absolute;left:0;right:0;bottom:0;top:0;background:#0007;display:none;align-items:${platform === "ios" ? "center" : "flex-end"};justify-content:center;z-index:5}
+html,body{margin:0;height:100%;overflow:hidden;background:${dark ? "#15171a" : "#e8eaed"};font:14px system-ui,sans-serif}
+#fit{position:absolute;left:50%;top:50%;transform-origin:center;touch-action:manipulation}
+${frame.css}
+.sheet{position:absolute;inset:0;background:#0007;display:none;align-items:${platform === "ios" ? "center" : "flex-end"};justify-content:center;z-index:5}
 .sheet.open{display:flex}
 .sheet .box{background:#fff;color:#111;width:${platform === "ios" ? "270px" : "100%"};box-sizing:border-box;padding:20px;border-radius:${platform === "ios" ? "14px" : "28px 28px 0 0"};text-align:center}
 .sheet button{display:block;width:100%;margin-top:8px;padding:10px;border:0;border-radius:${platform === "ios" ? "8px" : "20px"};background:#eee;font:inherit;cursor:pointer}
@@ -72,14 +76,14 @@ iframe{flex:1;min-height:0;border:0;background:#fff;width:100%}
 </style></head><body>
 <div class="tag" role="status">Simulated ${f.label} (${f.width}x${f.height}). The app's web build on the simulated device.</div>
 <button class="sheetbtn" id="sheetbtn" type="button">Show ${f.label} system sheet</button>
-<div id="fit"><div class="phone" id="phone" data-platform="${platform}">${top}<iframe id="app" src="/app/" title="${title}"></iframe>${bottom}<div class="sheet" id="sheet" role="dialog" aria-label="${f.label} system sheet" data-part="system-sheet"><div class="box"><p>${f.sheet.title}</p><button type="button" data-act="allow">${f.sheet.allow}</button><button type="button" data-act="deny">${f.sheet.deny}</button></div></div></div></div>
+<div id="fit"><div id="phone" data-platform="${platform}">${frame.html}</div></div>
 <script>
 var sh=document.getElementById("sheet");
 function sheet(on){sh.classList.toggle("open",on)}
 document.getElementById("sheetbtn").onclick=function(){sheet(!sh.classList.contains("open"))};
 sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet(false)};
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
-function fit(){var s=Math.min(1,(innerWidth-24)/${f.width},(innerHeight-60)/${f.height});var e=document.getElementById("fit");e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${f.width}px";e.style.height="${f.height}px"}
+function fit(){var s=Math.min(1,(innerWidth-24)/${frame.outerWidth},(innerHeight-60)/${frame.outerHeight});var e=document.getElementById("fit");e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
 </script>${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
@@ -104,12 +108,13 @@ export function ensureShipvoIgnored(dir: string): void {
  * The agent channel is a WebSocket at `/__shipvo/agent?role=screen|driver&token=...`, loopback only. It relays JSON
  * messages between the `screen` and the `driver`. With `projectDir`, `.shipvo/run.json` describes the session while it runs.
  */
-export function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string }): Promise<{ server: Server; port: number; token: string; close: () => Promise<void> }> {
+export async function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string; render?: RenderFrame }): Promise<{ server: Server; port: number; token: string; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const token = randomBytes(24).toString("hex");
   // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
   const pageToken = randomBytes(24).toString("hex");
-  const page = runFramePage(opts.platform, opts.name, pageToken);
+  const render = opts.render ?? await loadFrameRenderer();
+  const pages = { light: runFramePage(opts.platform, opts.name, render, false, pageToken), dark: runFramePage(opts.platform, opts.name, render, true, pageToken) };
   const bridge = bridgeScript();
   let boundPort = -1; // set once the server listens; Host and Origin must match it
   const server = createServer((req, res) => {
@@ -118,7 +123,10 @@ export function startRunServer(opts: { dir: string; platform: Platform; name: st
     try { path = decodeURIComponent((req.url ?? "/").split("?")[0]); }
     catch { res.writeHead(400); return void res.end("Bad request"); }
     if (path === "/app") { res.writeHead(302, { location: "/app/" }); return void res.end(); }
-    if (path === "/" || path === "/index.html") { res.writeHead(200, { "content-type": TYPES[".html"] }); return void res.end(page); }
+    if (path === "/" || path === "/index.html") {
+      const dark = new URL(req.url ?? "/", "http://x").searchParams.get("dark") === "1";
+      res.writeHead(200, { "content-type": TYPES[".html"] }); return void res.end(dark ? pages.dark : pages.light);
+    }
     if (path === "/__shipvo/bridge.js") { res.writeHead(200, { "content-type": TYPES[".js"], "cache-control": "no-store" }); return void res.end(bridge); }
     let rel = path.startsWith("/app/") ? path.slice(4) : path;
     if (rel.endsWith("/")) rel += "index.html";

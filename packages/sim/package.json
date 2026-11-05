@@ -13,6 +13,10 @@
   "exports": {
     "./server.mjs": "./server.mjs",
     "./screen-rules.mjs": "./screen-rules.mjs",
+    "./frame.mjs": {
+      "types": "./frame.d.mts",
+      "default": "./frame.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -20,6 +24,8 @@
     "chromium-hint.mjs",
     "browser-resolver.mjs",
     "app-name.mjs",
+    "frame.mjs",
+    "frame.d.mts",
     "mock-rules.mjs",
     "screen-rules.mjs",
     "push-notification.mjs",
