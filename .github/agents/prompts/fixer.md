@@ -24,3 +24,6 @@ Chromium is installed on this runner. For every change to UI (site pages, the ph
 
 
 Merge conflicts: `services/site/package.json` runs every `services/site/scripts/check-*.mjs` through `run-checks.mjs`; never re-add a list of checks to its `test` script, take main's line. `docs/glossary.md` and `docs/content-coverage.md` merge by union: after a merge, remove duplicate entries or rows.
+
+
+Videos: a re-render makes a new file name. Save it under `/tmp/agent/media/videos/` so it is uploaded before your push, and update `services/site/media.json`, `docs/videos.md` and the tutorial together. `services/site/scripts/check-media.mjs` fails CI if a listed file is not in R2.
