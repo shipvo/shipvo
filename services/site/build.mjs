@@ -99,7 +99,7 @@ ${navTag("docs")}
     <div class="results" id="results" hidden></div>
     ${side}
   </aside>
-  <button class="side-toggle" type="button" aria-controls="side" aria-expanded="false">Menu</button>
+  <button class="side-toggle" type="button" aria-controls="side" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h16"/></svg><span>Docs menu</span></button>
   <main class="doc" id="main">
     <div class="doc-head"><div><div class="eyebrow">${esc(page.group)}</div><h1>${esc(page.title)}</h1><p class="sub">${esc(page.desc)}</p></div><a class="edit" href="${REPO}${page.src}" rel="noopener">Edit on GitHub</a></div>
     <article class="prose">${body}</article>

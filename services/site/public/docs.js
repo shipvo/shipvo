@@ -3,7 +3,9 @@
   document.querySelectorAll('.code .copy').forEach(function(b){b.addEventListener('click',function(){var t=b.closest('.code').querySelector('code').textContent;navigator.clipboard&&navigator.clipboard.writeText(t).then(function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1400)})})});
   // sidebar on phones
   var side=document.getElementById('side'),tog=document.querySelector('.side-toggle');
-  if(tog)tog.addEventListener('click',function(){var o=side.classList.toggle('open');tog.setAttribute('aria-expanded',o);tog.textContent=o?'Close':'Menu'});
+  if(tog){var lab=tog.querySelector('span');function setOpen(o){side.classList.toggle('open',o);tog.setAttribute('aria-expanded',o);lab.textContent=o?'Close docs menu':'Docs menu'}
+    tog.addEventListener('click',function(){setOpen(!side.classList.contains('open'))});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&side.classList.contains('open')){setOpen(false);tog.focus()}})}
   // active heading in the outline
   var links=[].slice.call(document.querySelectorAll('.toc a')),hs=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))}).filter(Boolean);
   if(hs.length&&'IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){links.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id)})}})},{rootMargin:'-70px 0px -70% 0px'});hs.forEach(function(h){io.observe(h)})}
