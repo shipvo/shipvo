@@ -38,6 +38,9 @@ export function phoneStep(s, ev) {
   return { mode: mode, menu: menu, reload: reload, event: event };
 }
 
+/** True when the app may receive input: the phone is on and no power menu is open. */
+export function appInteractive(s) { return s.mode === "on" && !s.menu; }
+
 const ICONS = {
   signal: '<svg viewBox="0 0 16 12" width="16" height="12" aria-hidden="true"><path fill="currentColor" d="M0 9h3v3H0zM4.4 6h3v6h-3zM8.8 3h3v9h-3zM13 0h3v12h-3z"/></svg>',
   nosignal: '<svg viewBox="0 0 16 12" width="16" height="12" aria-hidden="true"><path fill="currentColor" opacity=".35" d="M0 9h3v3H0zM4.4 6h3v6h-3zM8.8 3h3v9h-3zM13 0h3v12h-3z"/><path stroke="currentColor" stroke-width="1.6" d="M1 11 15 1"/></svg>',
@@ -114,13 +117,14 @@ export function frameScript() {
   return `(function(){
 ${statusModel}
 ${phoneStep}
+${appInteractive}
 ${batteryIcon}
 var ICONS=${JSON.stringify(ICONS)},SKINS=${JSON.stringify(SKINS)};
 var d=document.getElementById("device"),f=document.getElementById("app"),ps={mode:"on",menu:false},vol=50,volT=0;
 function $(i){return document.getElementById(i)}
 function dev(){try{return f.contentWindow&&f.contentWindow.__pnDevice||null}catch(e){return null}}
 function note(k,x){var v=dev();if(v&&v.frameEvent)v.frameEvent(k,x)}
-function paint(){d.dataset.mode=ps.mode;$("lock").hidden=ps.mode!=="locked";$("lock").style.transform="";$("boot").hidden=ps.mode!=="booting";$("off").hidden=ps.mode!=="off";$("pmenu").hidden=!ps.menu;f.style.visibility=ps.mode==="off"?"hidden":"visible"}
+function paint(){d.dataset.mode=ps.mode;$("lock").hidden=ps.mode!=="locked";$("lock").style.transform="";$("boot").hidden=ps.mode!=="booting";$("off").hidden=ps.mode!=="off";$("pmenu").hidden=!ps.menu;f.style.visibility=ps.mode==="off"?"hidden":"visible";var on=appInteractive(ps);[f,$("back")].forEach(function(e){if(on)e.removeAttribute("inert");else e.setAttribute("inert","")});if(ps.mode==="locked")$("unlock").focus()}
 var booted=0;
 function send(ev,fromDevice){var n=phoneStep(ps,ev);ps={mode:n.mode,menu:n.menu};var v=dev();
  if(!fromDevice&&v){if(n.event==="lock")v.lock();else if(n.event==="unlock")v.unlock()}

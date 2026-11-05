@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SKINS, frameMarkup, frameScript, statusModel, phoneStep, FRAME_CSS } from "./frame.mjs";
+import { SKINS, frameMarkup, frameScript, statusModel, phoneStep, appInteractive, FRAME_CSS } from "./frame.mjs";
 
 test("each skin has its own size, label and side buttons", () => {
   assert.deepEqual([SKINS.android.width, SKINS.android.height], [412, 915]);
@@ -58,4 +58,13 @@ test("long press opens the power menu; power off then power on cold-starts", () 
   n = phoneStep(n, "poweroff"); assert.equal(n.mode, "off");
   n = phoneStep(n, "power"); assert.deepEqual([n.mode, n.reload], ["booting", true]);
   assert.equal(phoneStep({ mode: "off", menu: false }, "longpress").menu, false);
+});
+
+test("the app is inert unless the phone is on with no menu open", () => {
+  for (const mode of ["locked", "booting", "off"]) assert.equal(appInteractive({ mode, menu: false }), false, mode);
+  assert.equal(appInteractive({ mode: "on", menu: true }), false);
+  assert.equal(appInteractive({ mode: "on", menu: false }), true);
+  const js = frameScript();
+  assert.match(js, /setAttribute\("inert",""\)/);
+  assert.match(js, /removeAttribute\("inert"\)/);
 });
