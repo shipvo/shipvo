@@ -49,4 +49,7 @@ describe("policy validation", () => {
     expect(checkPublishPolicy(raw, ["b0", "b1"], thu(9), { SHIPVO_ACTOR: "agent" })).toMatchObject({ ok: false, rule: "agentMaxBand" });
     expect(checkPublishPolicy(raw, ["b0", "b1"], thu(9), {})).toEqual({ ok: true });
   });
+  it("names an unknown band", () => {
+    expect(() => checkPublishPolicy({ maxBand: "b1" }, ["b3"], thu(9), {})).toThrow('--bands: unknown band "b3"');
+  });
 });
