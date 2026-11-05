@@ -21,7 +21,7 @@ test("passes when every step exits 0, writes json and a table", () => {
   const r = run(f);
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["publish --dry-run", 0]]);
+  assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 0], ["publish --dry-run", 0]]);
   assert.ok(j.every((x) => Number.isInteger(x.ms)));
   assert.match(r.stdout, /\| init \| \d+ \| 0 \|/);
 });
@@ -32,6 +32,14 @@ test("a failing step exits non-zero and shows its stderr", () => {
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /boom: no seed/);
   assert.equal(JSON.parse(readFileSync(f.out, "utf8"))[1].exit, 3);
+});
+
+test("a failing doctor stops the run and prints doctor's own output", () => {
+  const f = fake(`import {mkdirSync} from "node:fs"; if (process.argv[2]==="init") mkdirSync(process.argv[3],{recursive:true}); else if (process.argv[2]==="doctor") { console.log("FAIL signing key — fix: x"); process.exit(1); }`);
+  const r = run(f);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /FAIL signing key/);
+  assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 1]]);
 });
 
 test("a failing init stops the run", () => {
@@ -51,7 +59,7 @@ test("without --with-install, no install step", () => {
   const r = run(f);
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => x.step), ["init", "publish --dry-run"]);
+  assert.deepEqual(j.map((x) => x.step), ["init", "doctor", "publish --dry-run"]);
   assert.doesNotMatch(r.stdout, /\| install \|/);
   assert.doesNotMatch(r.stdout, /package manager:/);
 });
@@ -71,7 +79,7 @@ test("with --with-install, install step is included", () => {
   });
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => x.step), ["init", "install", "publish --dry-run"]);
+  assert.deepEqual(j.map((x) => x.step), ["init", "install", "doctor", "publish --dry-run"]);
   assert.match(r.stdout, /\| install \|/);
   assert.match(r.stdout, /package manager: pnpm 9\.9\.9/);
 });
