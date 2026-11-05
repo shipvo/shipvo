@@ -115,7 +115,7 @@ export async function sim(argv: string[]) {
   let exited = false;
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });
   if (await waitListening(Number(port), () => exited)) {
-    console.error(`Simulator on http://localhost:${port}  (open_app("${cfg.appId}") from @shipvo/mcp; Ctrl-C to stop)`);
+    console.error(`Simulator on http://localhost:${port}/app/  (open_app("${cfg.appId}") from @shipvo/mcp; Ctrl-C to stop)`);
     if (a.watch === "true") {
       watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto() });
       console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");

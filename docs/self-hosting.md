@@ -24,6 +24,25 @@ npx wrangler deploy
 
 `https://<worker>.workers.dev/health` answers `{ "ok": true }`. Put a custom domain in front when you have one; the URL goes into every shell, so pick it before you build the first shell.
 
+## Run locally with Docker
+
+To try the control plane on your machine without a Cloudflare account. It runs `wrangler dev` (local workerd) in a Node 22 container.
+
+```bash
+cd services/control-plane
+docker compose up --build            # serves http://localhost:8787
+curl http://localhost:8787/health    # {"ok":true,"service":"shipvo-control",...}
+node ../../scripts/selfhost-smoke.mjs   # in another terminal; prints PASS
+```
+
+On start, the container applies the files in `migrations/` to a local D1 database and adds a local developer key (`SHIPVO_LOCAL_DEV_KEY`, default `sv_test_localdev`). The smoke script uses that key to create an app, publish a signed pointer and read it back. Set the variable to something else if other people can reach your machine, and pass the same value to the script. The value may only contain letters, digits, `_` and `-`. When you change it, the container revokes the earlier local developer key on the next start. The smoke script needs Node 18 or later on the host.
+
+Not covered:
+- No public URL and no TLS. The port is bound to `127.0.0.1` only.
+- Data lives in the Docker volume `control-plane-data` (`/data` in the container). `docker compose down -v` deletes it.
+- `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login does not work offline, so only the routes the smoke script uses are exercised.
+- This is not a production setup.
+
 ## Point apps at it
 
 In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `controlPlane: "https://your-domain"`, and in `shipvo.json`: `kv: { namespaceId: "<POINTERS id>" }`. Publishing needs a Cloudflare API token with *Workers KV Storage: Edit* on the account (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), plus `SHIPVO_SIGNING_SEED`.
