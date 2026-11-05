@@ -17,10 +17,11 @@ Start
   preview [--json]            Publish a public 24-hour preview link (here.now, no account)
 
 Ship
-  publish [--bands b0,b1,b2]  Build, sign and publish an over-the-air release
+  publish [--bands b0,b1,b2] [--release N]  Build, sign and publish an over-the-air release
   publish --dry-run [--out d] Check a release offline: build and sign, write nothing remote
   promote [--to b1,b2]        Widen a staged release to more bands (same release, new signature)
   promote --dry-run           Preview a promote, write nothing
+  promote --report <file>     Refuse to widen when the test report has a failing flow for this release
   auto-halt [--threshold 0.2 --min-reports 20 | --off]  Show, turn on or turn off auto-halt
   rollback --to <release>     Republish an earlier release as a new release
   rollback --to <n> --dry-run Preview a rollback, write nothing
