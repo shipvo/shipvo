@@ -1,7 +1,9 @@
-// Bare React Native adopt, slice 1: Android manifest and the Expo Modules check.
-// Writes the same dev.shipvo.* meta-data as packages/runtime/app.plugin.js, without a prebuild.
+// Bare React Native adopt: write the native config by hand, without a prebuild.
+// Android manifest and the Expo Modules check, then the iOS Info.plist.
+// Writes the same values as packages/runtime/app.plugin.js.
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import plist from "plist";
 
 export interface ShipvoNativeValues {
   baseUrl: string;
@@ -172,4 +174,57 @@ export function checkExpoModules(dir: string): ExpoModulesCheck {
   const ios = has(walk(join(dir, "ios"), /^AppDelegate\.(swift|mm?|h)$/), /\bExpo(AppDelegate|ReactDelegate|Modules)?\b|import Expo/);
   const installed = expoPackage && android && ios;
   return { installed, expoPackage, android, ios, plan: installed ? [] : ["npx install-expo-modules@latest"] };
+}
+
+export type IosConfigValues = ShipvoNativeValues;
+
+/** The Info.plist keys for these values. Optional keys are left out when their value is omitted. */
+export function iosPlistEntries(values: IosConfigValues): Record<string, string> {
+  const { baseUrl, publicKey, appId, shellMajor = 1 } = values;
+  if (!baseUrl || !publicKey || !appId) throw new Error("baseUrl, publicKey and appId are required");
+  const out: Record<string, string> = {
+    ShipvoBaseURL: baseUrl,
+    ShipvoPublicKey: publicKey,
+    ShipvoAppId: appId,
+    ShipvoShellMajor: String(shellMajor),
+  };
+  if (values.hermesBytecodeVersions !== undefined) out.ShipvoHermesBytecodeVersions = formatBytecodeVersions(values.hermesBytecodeVersions);
+  if (values.nativeModules !== undefined) out.ShipvoNativeModules = formatNativeModules(values.nativeModules);
+  return out;
+}
+
+/**
+ * Set the Shipvo keys in an Info.plist. Other keys and their order stay. New keys go at the end.
+ * Returns true when the file changed; a second run with the same values writes nothing.
+ */
+export function writeIosConfig(infoPlistPath: string, values: IosConfigValues): boolean {
+  const entries = iosPlistEntries(values);
+  const dict = plist.parse(readFileSync(infoPlistPath, "utf8")) as Record<string, plist.PlistValue>;
+  if (Object.entries(entries).every(([k, v]) => dict[k] === v)) return false;
+  Object.assign(dict, entries);
+  writeFileSync(infoPlistPath, plist.build(dict, { indent: "\t", newline: "\n" }) + "\n");
+  return true;
+}
+
+/** The app target's Info.plist: `ios/<name>/Info.plist`. Skips Pods and test targets. Undefined when none is found. */
+export function findIosInfoPlist(dir = "."): string | undefined {
+  const ios = join(dir, "ios");
+  let entries;
+  try { entries = readdirSync(ios, { withFileTypes: true }); } catch { return undefined; }
+  const names = entries.filter((e) => e.isDirectory() && !/^Pods$|Tests$|\.(xcodeproj|xcworkspace|xcassets)$/.test(e.name)).map((e) => e.name).sort();
+  const withPlist = names.filter((n) => existsSync(join(ios, n, "Info.plist")));
+  // Prefer the folder named like the Xcode project.
+  const project = entries.find((e) => e.name.endsWith(".xcodeproj"))?.name.replace(/\.xcodeproj$/, "");
+  const pick = withPlist.find((n) => n === project) ?? withPlist[0];
+  return pick ? join(ios, pick, "Info.plist") : undefined;
+}
+
+/** What to tell the user once both platforms are configured. */
+export function adoptNextSteps(): string {
+  return [
+    "Next steps:",
+    "  1. cd ios && pod install",
+    "  2. Rebuild both apps (Android and iOS) so the native shells carry the new config.",
+    "  3. shipvo publish --dry-run",
+  ].join("\n");
 }

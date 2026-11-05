@@ -22,6 +22,7 @@ beforeAll(async () => {
     if (req.url === "/sessions" && listFails) return res.end(JSON.stringify({ ok: false, code: "sim_busy", error: "simulator is busy" }));
     if (req.url === "/sessions") return res.end(JSON.stringify({ ok: true, sessions: [{ session: "live", app: "menu", release: "local", started_at: null }] }));
     if (req.url === "/act" && body.session !== "live") return res.end(JSON.stringify({ ok: false, code: "no_session", error: `no session '${body.session}': call /session first`, screen: null }));
+    if (req.url === "/act" && body.ref === "e999") return res.end(JSON.stringify({ ok: false, code: "stale_ref", error: "stale ref e999: the screen changed. Take a new snapshot (action \"screen\") and use a ref from it.", screen: "heading Menu" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Menu" }));
   });
   await new Promise<void>((r) => fake.listen(0, r));
@@ -79,5 +80,23 @@ describe("end_session", () => {
       expect(r.structuredContent).toMatchObject({ ok: false, code: "sim_busy" });
       await c.close();
     } finally { listFails = false; }
+  });
+});
+
+describe("bad input", () => {
+  it("tap with a ref that does not exist returns a typed code", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "live", ref: "e999" } });
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent).toMatchObject({ ok: false, code: "stale_ref" });
+    await c.close();
+  });
+  it("open_app with an unknown app returns unknown_app", async () => {
+    const c = await connect();
+    const r: any = await c.callTool({ name: "open_app", arguments: { app: "no-such-app" } });
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent).toMatchObject({ ok: false, code: "unknown_app" });
+    expect(r.structuredContent.error).toMatch(/unknown app "no-such-app"/);
+    await c.close();
   });
 });
