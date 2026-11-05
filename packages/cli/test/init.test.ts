@@ -257,3 +257,8 @@ it("writes a preview workflow that comments the link and skips forks", () => {
   expect(w).toContain("gh pr comment");
   expect(w).toContain("head.repo.full_name == github.repository");
 });
+
+it("pins playwright below 1.65.0, whose playwright-core was missing from the registry", () => {
+  const pkg = JSON.parse(readFileSync(join(tmp, "my-shop/package.json"), "utf8"));
+  expect(pkg.devDependencies.playwright).toBe(">=1.63.0 <1.65.0");
+});

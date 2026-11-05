@@ -85,7 +85,7 @@ export async function init(argv: string[]) {
       react: SDK.react, "react-dom": SDK.react, "react-native": SDK.rn, "react-native-web": SDK.rnw,
       "@shipvo/device": "^0.1.0", "@shipvo/runtime": "^0.1.0",
     },
-    devDependencies: { "@shipvo/cli": "^0.1.0", "@shipvo/sim": "^0.1.0", "@shipvo/test": "^0.1.0", "@types/react": "~19.3.0", playwright: "^1.63.0", typescript: "~6.0.3", vitest: "^2.1.4" },
+    devDependencies: { "@shipvo/cli": "^0.1.0", "@shipvo/sim": "^0.1.0", "@shipvo/test": "^0.1.0", "@types/react": "~19.3.0", playwright: ">=1.63.0 <1.65.0", typescript: "~6.0.3", vitest: "^2.1.4" },
   }, null, 2) + "\n");
   w("app.json", JSON.stringify({ expo: {
     name, slug: appId, version: "1.0.0", orientation: "portrait", userInterfaceStyle: "automatic",

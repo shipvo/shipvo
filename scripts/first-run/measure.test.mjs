@@ -115,6 +115,20 @@ test("a failing install stops the run and shows its stderr", () => {
   assert.deepEqual(j.map((x) => x.step), ["init", "install", "total"]);
 });
 
+test("a failing install prints the package manager's stdout too", () => {
+  const bindir = mkdtempSync(join(tmpdir(), "fake-pnpm-"));
+  const pnpm = join(bindir, "pnpm");
+  writeFileSync(pnpm, "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 9.9.9; exit 0; fi\necho ERR_PNPM_NO_MATCHING_VERSION on stdout\nexit 1\n");
+  chmodSync(pnpm, 0o755);
+  const f = fake(`import {mkdirSync} from "node:fs"; if (process.argv[2]==="init") mkdirSync(process.argv[3],{recursive:true});`);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install"], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: bindir + ":" + dirname(process.execPath) },
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /step "install" failed with exit 1:\nERR_PNPM_NO_MATCHING_VERSION on stdout/);
+});
+
 test("with --with-install, a failing init runs no install", () => {
   const bindir = mkdtempSync(join(tmpdir(), "fake-pnpm-"));
   const pnpm = join(bindir, "pnpm");

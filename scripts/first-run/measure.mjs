@@ -117,7 +117,7 @@ function runInstallStep(cwd) {
   const exit = r.status ?? (r.error ? 127 : 1);
   const v = spawnSync(pm, ["--version"], { encoding: "utf8" });
   const version = (v.stdout || "").trim();
-  return { step: "install", ms, exit, stderr: r.stderr || (r.error ? String(r.error) : ""), pm, version };
+  return { step: "install", ms, exit, stderr: [r.stdout, r.stderr, r.error ? String(r.error) : ""].filter(Boolean).join("\n"), pm, version };
 }
 
 const secs = (ms) => (ms / 1000).toFixed(2);
