@@ -55,6 +55,13 @@ export default {
       return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.join("\n")}\n</urlset>\n`, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
     }
     if (url.pathname.startsWith("/media/")) return media(req, env, decodeURIComponent(url.pathname.slice("/media/".length)));
+    // Shipvo HQ: the agent team's live status, written to R2 by the merge bot's workflow after every pass.
+    if (url.pathname === "/hq/status.json") {
+      const obj = env.MEDIA ? await env.MEDIA.get("hq/status.json") : null;
+      if (!obj) return new Response(JSON.stringify({ error: "no snapshot yet" }), { status: 404, headers: { "content-type": "application/json" } });
+      return new Response(obj.body, { headers: { "content-type": "application/json", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+    }
+    if (url.pathname === "/hq") return Response.redirect("https://shipvo.dev/hq/", 301);
     if (url.pathname === "/.well-known/security.txt") return env.ASSETS.fetch(new Request(new URL("/security.txt", url).toString(), req));
     if (url.pathname === "/docs") return Response.redirect("https://shipvo.dev/docs/overview/", 301);
     const m = url.pathname.match(/^\/apps\/([a-z0-9-]+)\/?$/);
