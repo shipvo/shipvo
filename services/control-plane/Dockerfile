@@ -10,7 +10,7 @@ RUN pnpm install --frozen-lockfile --filter @shipvo/control-plane...
 COPY packages/schema packages/schema
 RUN pnpm --filter @shipvo/schema build
 COPY services/control-plane services/control-plane
-COPY services/control-plane/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN cp services/control-plane/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 WORKDIR /repo/services/control-plane
 ENV SHIPVO_PERSIST_DIR=/data
 VOLUME /data
