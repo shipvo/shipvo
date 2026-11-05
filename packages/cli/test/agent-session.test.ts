@@ -43,6 +43,7 @@ describe("agent session auth", () => {
     const s = await host();
     expect(await rawUpgrade(s.port, { host: "evil.example.com" }, s.token)).toBe(403);
     expect(await rawUpgrade(s.port, { origin: "http://evil.example.com" }, s.token)).toBe(403);
+    expect(await rawUpgrade(s.port, { origin: "http://localhost" }, s.token)).toBe(403);
     expect(await rawUpgrade(s.port, {}, s.token)).toBe(101);
   });
   it("refuses an unknown role", async () => {

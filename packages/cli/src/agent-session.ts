@@ -21,10 +21,13 @@ export function encodeFrame(text: string): Buffer {
 /** Reads client frames from a socket. Text, ping and close only; fragmented or binary frames close the socket. */
 function readFrames(sock: Socket, onText: (t: string) => void, head: Buffer = Buffer.alloc(0)) {
   let buf = Buffer.alloc(0);
-  const close = (code: number) => { try { sock.end(Buffer.from([0x88, 2, code >> 8, code & 255])); } catch { /* already closed */ } };
+  let closed = false;
+  const close = (code: number) => { closed = true; sock.off("data", feed); try { sock.end(Buffer.from([0x88, 2, code >> 8, code & 255])); } catch { /* already closed */ } };
   const feed = (d: Buffer) => {
+    if (closed) return;
     buf = Buffer.concat([buf, d]);
     for (;;) {
+      if (closed) return;
       if (buf.length < 2) return;
       const op = buf[0] & 15, fin = buf[0] & 128, masked = buf[1] & 128;
       let len = buf[1] & 127, off = 2;
@@ -58,7 +61,7 @@ export function checkUpgrade(req: IncomingMessage, token: string, port: number):
   if (!LOCAL_HOSTS.has(host)) return { refused: "localhost only" };
   const origin = req.headers.origin;
   if (origin) {
-    try { const o = new URL(origin); if (!LOCAL_HOSTS.has(o.hostname)) return { refused: "localhost only" }; if (o.port && Number(o.port) !== port) return { refused: "localhost only" }; }
+    try { const o = new URL(origin); if (!LOCAL_HOSTS.has(o.hostname)) return { refused: "localhost only" }; if ((o.port ? Number(o.port) : o.protocol === "https:" ? 443 : 80) !== port) return { refused: "localhost only" }; }
     catch { return { refused: "localhost only" }; }
   }
   const url = new URL(req.url ?? "/", "http://localhost");
