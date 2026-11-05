@@ -4,7 +4,7 @@
 //   node build-docs.mjs            → public/docs/<slug>/index.html + public/docs/index.json
 import { marked } from "marked";
 import { head as headTag, nav as navTag, footer as footTag, crumbs } from "./shell.mjs";
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { corona } from "./corona.mjs";
 import { buildBlog } from "./blog.mjs";
 import { mark, symbol, animated } from "./brand.mjs";
@@ -23,13 +23,6 @@ const NAV = [
     { slug: "getting-started", src: "docs/getting-started.md", title: "Build your first app", desc: "Twenty minutes from nothing to a React Native app that AI agents can open in a simulator and phones update over the air." },
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
-  ]},
-  { group: "Learn", pages: [
-    { slug: "learn", src: "docs/tutorials/index.md", title: "Learn", desc: "Step-by-step Shipvo tutorials for people who have never used a terminal, grouped by goal, with the time each one takes and its level." },
-    { slug: "first-app", src: "docs/tutorials/first-app.md", title: "Create your first app", desc: "Create a shop app, open it on a simulated phone in your browser, change its words and check a release. No phone and no coding needed." },
-    { slug: "your-own-shop", src: "docs/tutorials/your-own-shop.md", title: "Make a shop with your own products", desc: "Start from the shop template, put in your own products and prices by editing one file, check the cart on a simulated phone and run a safe practice release." },
-    { slug: "glossary", src: "docs/glossary.md", title: "Glossary", desc: "Plain-English meanings for the words Shipvo docs and tutorials use, such as terminal, simulator, release and over the air." },
-    { slug: "videos", src: "docs/videos.md", title: "Videos", desc: "Short captioned videos that show how Shipvo works: over-the-air updates, signing, staged rollout and rollback, in plain words." },
   ]},
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },
@@ -56,19 +49,50 @@ const NAV = [
 ];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const slugify = (s) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-const all = NAV.flatMap((g) => g.pages.map((p) => ({ ...p, group: g.group })));
-const bySrc = Object.fromEntries(all.map((p) => [p.src.replace(/^docs\//, "").replace(/\.md$/, ""), p.slug]));
+const docPages = NAV.flatMap((g) => g.pages.map((p) => ({ ...p, group: g.group, base: "docs" })));
+const url = (p) => `/${p.base || "docs"}/${p.slug}/`;
+
+// ---------- Learn: tutorials, videos and glossary, built from docs/tutorials/*.md, docs/videos.md and docs/glossary.md ----------
+const clipText = (s, n = 160) => { s = s.replace(/\s+/g, " ").trim(); if (s.length <= n) return s; const c = s.slice(0, n + 1), d = c.lastIndexOf(". "); return d > n * 0.5 ? c.slice(0, d + 1) : c.slice(0, c.lastIndexOf(" ")) + "…"; };
+const plain = (s) => s.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*`_]/g, "");
+// The hub index (docs/tutorials/index.md) says which goal group each tutorial is in, and its time and level.
+const tutorialMeta = {};
+{
+  let group = "";
+  for (const line of readFileSync(join(ROOT, "docs/tutorials/index.md"), "utf8").split("\n")) {
+    const h = line.match(/^## (.+)/); if (h) { group = h[1].trim(); continue; }
+    const r = line.match(/^\|\s*\[[^\]]+\]\(([\w-]+)\.md\)\s*\|(.*)\|(.*)\|(.*)\|\s*$/);
+    if (r) tutorialMeta[r[1]] = { group, time: plain(r[3]).trim(), level: plain(r[4]).trim() };
+  }
+}
+const tutorials = readdirSync(join(ROOT, "docs/tutorials")).filter((f) => f.endsWith(".md") && f !== "index.md").map((f) => {
+  const slug = f.replace(/\.md$/, ""), src = `docs/tutorials/${f}`, md = readFileSync(join(ROOT, src), "utf8");
+  const own = md.match(/\*\*Level:\*\*\s*([^.]+)\./), ownTime = md.match(/\*\*Time:\*\*\s*([^.]+)\./);
+  const m = tutorialMeta[slug] || {};
+  const firstPara = md.replace(/^# .*\n/, "").split(/\n\s*\n/).map((x) => x.trim()).find((x) => x && !x.startsWith("**Level"));
+  return { slug, src, base: "learn", group: m.group || "More", kind: "tutorial", title: md.match(/^# (.*)/)?.[1] ?? slug, desc: clipText(plain(firstPara || "")), time: m.time || ownTime?.[1] || "", level: m.level || (own ? own[1][0].toUpperCase() + own[1].slice(1) : ""), date: lastmod(src) };
+}).sort((a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug));
+const videosMd = readFileSync(join(ROOT, "docs/videos.md"), "utf8");
+const videos = [...videosMd.matchAll(/^## (.+)\n+<video\b([^>]*)>/gm)].map((m) => { const a = (n) => m[2].match(new RegExp(`${n}="([^"]*)"`))?.[1] ?? ""; return { title: m[1].trim(), id: slugify(m[1]), poster: a("poster"), length: a("data-length") }; });
+const GROUP_ORDER = ["Start", "Sell", "Run your app", "Test", "Ship updates"];
+const learnPages = [
+  { slug: "videos", src: "docs/videos.md", title: "Videos", desc: "Short captioned videos that show how Shipvo works: over-the-air updates, signing, staged rollout and rollback, in plain words." },
+  { slug: "glossary", src: "docs/glossary.md", title: "Glossary", desc: "Plain-English meanings for the words Shipvo docs and tutorials use, such as terminal, simulator, release and over the air." },
+].map((p) => ({ ...p, base: "learn", group: "Learn" }));
+const learnAll = [...tutorials.map((t) => ({ ...t, group: "Tutorials" })), ...learnPages];
+const all = [...docPages, ...learnAll];
+const bySrc = { ...Object.fromEntries(all.map((p) => [p.src.replace(/^docs\//, "").replace(/\.md$/, ""), url(p)])), "tutorials/index": "/learn/" };
 
 // Links between docs → site paths; relative repo links → GitHub.
 function rewriteHref(href, src) {
-  if (/^(https?:|mailto:|#)/.test(href) || /^\/(docs|apps|brand|changelog|terms|privacy|security|acceptable-use|llms\.txt|llms-full\.txt)(\/|$|#)|^\/(docs\.md|\.well-known\/security\.txt)$/.test(href)) return href;
+  if (/^(https?:|mailto:|#)/.test(href) || /^\/(docs|learn|apps|brand|changelog|terms|privacy|security|acceptable-use|llms\.txt|llms-full\.txt)(\/|$|#)|^\/(docs\.md|\.well-known\/security\.txt)$/.test(href)) return href;
   let clean = href.replace(/^\.\//, "");
   if (src.includes("/") && /^\.\.\//.test(clean)) clean = join(src.slice(0, src.lastIndexOf("/")), clean).replace(/\\/g, "/");   // ../x.md from docs/tutorials/ → docs/x.md
   else if (src.startsWith("docs/tutorials/") && /^[\w-]+\.md/.test(clean)) clean = "docs/tutorials/" + clean;
   const [path, hash = ""] = clean.split("#");
   const key = path.replace(/^docs\//, "").replace(/\.md$/, "");
-  if (bySrc[key]) return `/docs/${bySrc[key]}/${hash ? "#" + hash : ""}`;
-  const pkg = path.match(/^packages\/(\w+)\/README\.md$/); if (pkg && bySrc[`packages/${pkg[1]}/README`]) return `/docs/${bySrc[`packages/${pkg[1]}/README`]}/`;
+  if (bySrc[key]) return `${bySrc[key]}${hash ? "#" + hash : ""}`;
+  const pkg = path.match(/^packages\/(\w+)\/README\.md$/); if (pkg && bySrc[`packages/${pkg[1]}/README`]) return bySrc[`packages/${pkg[1]}/README`];
   const base = src.includes("/") ? src.slice(0, src.lastIndexOf("/") + 1) : "";
   return REPO + (path.startsWith("/") ? path.slice(1) : base + path) + (hash ? "#" + hash : "");
 }
@@ -90,18 +114,24 @@ function render(page) {
 }
 
 function layout(page, body, headings, prev, next) {
-  const side = NAV.map((g) => `<div class="side-group"><div class="side-title">${esc(g.group)}</div>${g.pages.map((p) => `<a href="/docs/${p.slug}/"${p.slug === page.slug ? ' aria-current="page"' : ""}>${esc(p.title)}</a>`).join("")}</div>`).join("");
+  const learn = page.base === "learn";
+  const link = (p) => `<a href="${url(p)}"${p === page ? ' aria-current="page"' : ""}>${esc(p.title)}</a>`;
+  const groups = learn
+    ? [{ group: "Learn", html: '<a href="/learn/">All of Learn</a>' }, { group: "Tutorials", pages: tutorials }, { group: "More", pages: learnPages }]
+    : NAV.map((g) => g.group === "Get started" ? { ...g, html: '<a href="/learn/">Learn: tutorials and videos</a>' } : g);
+  const side = groups.map((g) => `<div class="side-group"><div class="side-title">${esc(g.group)}</div>${(g.pages || []).map(link).join("")}${g.html || ""}</div>`).join("");
+  const section = learn ? ["Learn", "/learn/", "learn"] : ["Docs", "/docs/overview/", "docs"];
   const toc = headings.filter((h) => h.depth === 2 || h.depth === 3).map((h) => `<a href="#${h.id}" class="d${h.depth}">${esc(h.text)}</a>`).join("");
   return `<!doctype html>
 <html lang="en">
 <head>
-${headTag({ title: `${esc(page.title)} — Shipvo Docs`, desc: esc(page.desc), path: `/docs/${page.slug}/`, type: "article", image: "/og/docs.png", imageAlt: "Shipvo documentation", modified: lastmod(page.src), ld: [crumbs([["Home", "/"], ["Docs", "/docs/overview/"], [page.title, `/docs/${page.slug}/`]]), { "@context": "https://schema.org", "@type": "TechArticle", headline: page.title, description: page.desc, dateModified: lastmod(page.src), author: { "@type": "Person", name: "Hans Ade" }, publisher: { "@type": "Organization", name: "Shipvo", url: "https://shipvo.dev" }, mainEntityOfPage: `https://shipvo.dev/docs/${page.slug}/`, inLanguage: "en" }], extraCss: `<link rel="stylesheet" href="/docs.css"><link rel="alternate" type="text/markdown" href="/docs/${page.slug}.md">` })}
+${headTag({ title: `${esc(page.title)} — Shipvo ${learn ? "Learn" : "Docs"}`, desc: esc(page.desc), path: url(page), type: "article", image: "/og/docs.png", imageAlt: "Shipvo documentation", modified: lastmod(page.src), ld: [crumbs([["Home", "/"], [section[0], section[1]], [page.title, url(page)]]), { "@context": "https://schema.org", "@type": "TechArticle", headline: page.title, description: page.desc, dateModified: lastmod(page.src), author: { "@type": "Person", name: "Hans Ade" }, publisher: { "@type": "Organization", name: "Shipvo", url: "https://shipvo.dev" }, mainEntityOfPage: `https://shipvo.dev${url(page)}`, inLanguage: "en" }], extraCss: `<link rel="stylesheet" href="/docs.css"><link rel="alternate" type="text/markdown" href="${url(page).slice(0, -1)}.md">` })}
 </head>
 <body class="docs">
-${navTag("docs")}
+${navTag(section[2])}
 <div class="docs-shell">
   <aside class="side" id="side">
-    <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="docsearch" type="search" placeholder="Search docs" aria-label="Search docs" autocomplete="off"><kbd>/</kbd></label>
+    <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="docsearch" type="search" placeholder="Search docs and Learn" aria-label="Search docs" autocomplete="off"><kbd>/</kbd></label>
     <div class="results" id="results" hidden></div>
     ${side}
   </aside>
@@ -109,7 +139,7 @@ ${navTag("docs")}
   <main class="doc" id="main">
     <div class="doc-head"><div><div class="eyebrow">${esc(page.group)}</div><h1>${esc(page.title)}</h1><p class="sub">${esc(page.desc)}</p></div><a class="edit" href="${REPO}${page.src}" rel="noopener">Edit on GitHub</a></div>
     <article class="prose">${body}</article>
-    <nav class="pager">${prev ? `<a href="/docs/${prev.slug}/"><small>Previous</small>${esc(prev.title)}</a>` : "<span></span>"}${next ? `<a href="/docs/${next.slug}/" class="next"><small>Next</small>${esc(next.title)}</a>` : ""}</nav>
+    <nav class="pager">${prev ? `<a href="${url(prev)}"><small>Previous</small>${esc(prev.title)}</a>` : "<span></span>"}${next ? `<a href="${url(next)}" class="next"><small>Next</small>${esc(next.title)}</a>` : ""}</nav>
   </main>
   <aside class="toc">${toc ? `<div class="side-title">On this page</div>${toc}` : ""}</aside>
 </div>
@@ -121,20 +151,40 @@ ${footTag()}
 
 const OUT = join(here, "public", "docs"); mkdirSync(OUT, { recursive: true });
 const index = [];
-all.forEach((page, i) => {
+const LOUT = join(here, "public", "learn"); mkdirSync(LOUT, { recursive: true });
+for (const list of [docPages, learnAll]) list.forEach((page, i) => {
   if (!existsSync(join(ROOT, page.src))) { console.error("missing", page.src); return; }
   const { html, headings, text } = render(page);
-  mkdirSync(join(OUT, page.slug), { recursive: true });
-  writeFileSync(join(OUT, page.slug, "index.html"), layout(page, html, headings, all[i - 1], all[i + 1]));
-  index.push({ slug: page.slug, title: page.title, group: page.group, desc: page.desc, headings: headings.map((h) => h.text), text: text.slice(0, 6000) });
+  const dir = join(page.base === "learn" ? LOUT : OUT, page.slug);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "index.html"), layout(page, html, headings, list[i - 1] ?? (page.base === "learn" ? { slug: "", base: "learn", title: "Learn" } : undefined), list[i + 1]));
+  index.push({ slug: page.slug, path: url(page), title: page.title, group: page.group, desc: page.desc, headings: headings.map((h) => h.text), text: text.slice(0, 6000) });
 });
 writeFileSync(join(OUT, "index.json"), JSON.stringify(index));
+
+// ---------- Learn hub: /learn/ lists every tutorial and video, generated from the source files ----------
+{
+  const tutorialCard = (t) => `<a class="lcard" href="${url(t)}"><span class="lgroup">${esc(t.group)}</span><b>${esc(t.title)}</b><span class="ldesc">${esc(t.desc)}</span><span class="lmeta">${t.time ? `<span>${esc(t.time)}</span>` : ""}${t.level ? `<span>${esc(t.level)}</span>` : ""}</span></a>`;
+  const videoCard = (v) => `<a class="lcard lvideo" href="/learn/videos/#${v.id}">${v.poster ? `<img src="${esc(v.poster)}" alt="" loading="lazy" width="640" height="360">` : ""}<b>${esc(v.title)}</b><span class="lmeta"><span>${esc(v.length)}</span><span>Captions and transcript</span></span></a>`;
+  const groups = [...new Set([...GROUP_ORDER, ...tutorials.map((t) => t.group)])].filter((g) => tutorials.some((t) => t.group === g));
+  const desc = "Tutorials, videos and a glossary for people who are new to Shipvo, in plain words. No coding or terminal experience needed.";
+  mkdirSync(LOUT, { recursive: true });
+  writeFileSync(join(LOUT, "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Learn Shipvo: tutorials, videos and glossary", desc, path: "/learn/", ld: [crumbs([["Home", "/"], ["Learn", "/learn/"]])], extraCss: '<link rel="stylesheet" href="/learn.css">' })}</head><body>${navTag("learn")}<main id="main"><section class="learn"><div class="wrap">
+<div class="eyebrow">Learn</div><h1>Learn Shipvo, one small step at a time.</h1>
+<p class="lede">You do not need to be a developer. These tutorials take you from nothing to an app on a simulated phone in your browser. Each one says how long it takes and who it is for, and every new word is explained once in the <a class="link" href="/learn/glossary/">glossary</a>.</p>
+<h2 id="tutorials">Tutorials</h2><p class="lsub">Newest first. Tutorials are grouped by what you want to do: ${groups.map(esc).join(", ")}.</p>
+<div class="lgrid">${tutorials.map(tutorialCard).join("")}</div>
+<h2 id="videos">Videos</h2><p class="lsub">Short, captioned, with a written transcript. <a class="link" href="/learn/videos/">All videos</a></p>
+<div class="lgrid">${videos.map(videoCard).join("")}</div>
+<h2 id="glossary">Glossary</h2><p class="lsub">Stuck on a word? <a class="link" href="/learn/glossary/">Open the glossary</a> for plain-English meanings.</p>
+<h2 id="next">Next: Docs</h2><p class="lsub">Ready for reference material? Go to the <a class="link" href="/docs/overview/">Docs</a>, or start with <a class="link" href="/docs/getting-started/">Build your first app</a>.</p>
+</div></section></main>${footTag()}</body></html>`);
+}
 // /docs/ → the overview
 writeFileSync(join(OUT, "index.html"), `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/docs/overview/"><link rel="canonical" href="/docs/overview/"><title>Shipvo Docs</title>`);
 console.log(`docs: ${index.length} pages`);
 
 // Site pages: pages/*.html with <!--HEAD …-->, <!--NAV x-->, <!--FOOTER--> stamped in.
-import { readdirSync } from "node:fs";
 const PUB = join(here, "public");
 for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html"))) {
   let s = readFileSync(join(here, "pages", f), "utf8");
@@ -195,15 +245,15 @@ function mdFor(page) {
   md = md.replace(/(!?)\[([^\]]*)\]\(([^)\s]+)(\s+"[^"]*")?\)/g, (m, bang, text, href, title) => {
     if (bang) return `![${text}](${/^https?:/.test(href) ? href : SITE + "/img/brand/banner.webp"})`;
     let h = rewriteHref(href, page.src);
-    const d = h.match(/^\/docs\/([\w-]+)\/(#.*)?$/); if (d) h = `${SITE}/docs/${d[1]}.md`;
+    const d = h.match(/^\/(docs|learn)\/([\w-]+)\/(#.*)?$/); if (d) h = `${SITE}/${d[1]}/${d[2]}.md`;
     else if (h.startsWith("/")) h = SITE + h;
     return `[${text}](${h}${title || ""})`;
   });
   return md.replace(/^# .*\n/, "").trim();
 }
 const mdDocs = all.filter((p) => existsSync(join(ROOT, p.src))).map((p) => ({ ...p, md: mdFor(p) }));
-for (const p of mdDocs) writeFileSync(join(OUT, `${p.slug}.md`), `# ${p.title}\n\n> ${p.desc}\n\nCanonical page: ${SITE}/docs/${p.slug}/\n\n${p.md}\n`);
-const mdList = (pages) => pages.map((p) => `- [${p.title}](${SITE}/docs/${p.slug}.md): ${p.desc}`).join("\n");
+for (const p of mdDocs) writeFileSync(join(p.base === "learn" ? LOUT : OUT, `${p.slug}.md`), `# ${p.title}\n\n> ${p.desc}\n\nCanonical page: ${SITE}${url(p)}\n\n${p.md}\n`);
+const mdList = (pages) => pages.map((p) => `- [${p.title}](${SITE}${url(p).slice(0, -1)}.md): ${p.desc}`).join("\n");
 const groups = [...new Set(mdDocs.map((p) => p.group))];
 writeFileSync(join(PUB, "docs.md"), `# Shipvo documentation\n\n> Every docs page is also available as Markdown at \`/docs/<page>.md\`. Everything in one file: ${SITE}/llms-full.txt\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n`);
 const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published.
@@ -216,11 +266,11 @@ Things to know before answering questions about Shipvo:
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (cli, mcp, runtime, device, sim, schema). Source: https://github.com/shipvo/shipvo`;
 const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");
-writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
-writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}/docs/${p.slug}/\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);
+writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Learn](${SITE}/learn/): tutorials, videos and a glossary for people who are new to Shipvo\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
+writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}${url(p)}\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);
 writeFileSync(join(PUB, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /hq/\n\nSitemap: ${SITE}/sitemap.xml\n# For AI tools: ${SITE}/llms.txt and ${SITE}/llms-full.txt\n`);
 const staticPaths = [["/", "services/site/pages/index.html"], ["/apps", "services/site/pages/apps.html"], ["/brand", "services/site/pages/brand.html"], ["/changelog/", "CHANGELOG.md"], ["/blog/", "blog"], ["/compare/", "services/site/pages/compare.html"], ["/pricing/", "services/site/pages/pricing.html"],
-  ...posts.map((p) => [`/blog/${p.slug}/`, `blog/${p.slug}.md`]), ...all.map((p) => [`/docs/${p.slug}/`, p.src]), ...LEGAL.map((l) => [`/${l.slug}/`, l.src])];
+  ...posts.map((p) => [`/blog/${p.slug}/`, `blog/${p.slug}.md`]), ...all.map((p) => [url(p), p.src]), ["/learn/", "docs/tutorials/index.md"], ...LEGAL.map((l) => [`/${l.slug}/`, l.src])];
 writeFileSync(join(PUB, "sitemap-static.txt"), staticPaths.map(([path, src]) => `${path}\t${lastmod(src)}`).join("\n") + "\n");
 writeFileSync(join(PUB, "security.txt"), `Contact: mailto:hans@pipilot.dev\nExpires: ${new Date(Date.now() + 365 * 864e5).toISOString().replace(/\.\d+Z$/, "Z")}\nPreferred-Languages: en, fr\nCanonical: ${SITE}/.well-known/security.txt\nPolicy: ${SITE}/security/\n`);
 
