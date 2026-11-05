@@ -11,6 +11,30 @@ The native half of Shipvo's over-the-air updates, as an Expo module.
 { "expo": { "plugins": [["@shipvo/runtime", { "baseUrl": "https://<your control plane>", "publicKey": "<base64 Ed25519 public key>", "appId": "myshop" }]] } }
 ```
 
+### Hermes bytecode versions and native modules
+
+Shells can declare which Hermes bytecode versions and native modules they support:
+
+```json
+{
+  "expo": {
+    "plugins": [[
+      "@shipvo/runtime",
+      {
+        "baseUrl": "https://<your control plane>",
+        "publicKey": "<base64 Ed25519 public key>",
+        "appId": "myshop",
+        "hermesBytecodeVersions": [96, 98],
+        "nativeModules": { "react-native-fs": "2.0.0", "react-native-camera": "4.0.0" }
+      }
+    ]]
+  }
+}
+```
+
+- `hermesBytecodeVersions`: array of non-negative integers (e.g., `[96, 98]`). Omitted or empty means no restriction.
+- `nativeModules`: object mapping package names to versions (e.g., `{ "react-native-fs": "2.0.0" }`). Omitted or empty means no restriction.
+
 ```ts
 import { Runtime } from "@shipvo/runtime";
 const s = Runtime.getState();            // running / pending / previous release, band, baseUrl, appId
