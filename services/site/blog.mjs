@@ -42,6 +42,7 @@ function render(p) {
   r.heading = function ({ tokens, depth }) { const t = this.parser.parseInline(tokens), id = slugify(t); if (depth === 2) heads.push({ id, text: t.replace(/<[^>]+>/g, "") }); return `<h${depth} id="${id}">${t}</h${depth}>\n`; };
   r.link = function ({ href, title, tokens }) { const ext = /^https?:/.test(href); return `<a href="${esc(href)}"${title ? ` title="${esc(title)}"` : ""}${ext ? ' rel="noopener"' : ""}>${this.parser.parseInline(tokens)}</a>`; };
   r.code = ({ text, lang }) => `<div class="code"><div class="code-bar"><span>${esc(lang || "text")}</span><button type="button" class="copy" aria-label="Copy code">Copy</button></div><pre><code>${esc(text)}</code></pre></div>`;
+  r.table = function ({ header, rows }) { const cell = (c) => `<${c.header ? "th" : "td"}${c.align ? ` style="text-align:${c.align}"` : ""}>${this.parser.parseInline(c.tokens)}</${c.header ? "th" : "td"}>`; return `<div class="table-wrap"><table><thead><tr>${header.map(cell).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map(cell).join("")}</tr>`).join("")}</tbody></table></div>\n`; };
   r.image = ({ href, title, text }) => `<figure class="shot"><img src="${esc(href)}" alt="${esc(text)}" width="400" height="866" loading="lazy">${title ? `<figcaption>${esc(title)}</figcaption>` : ""}</figure>`;
   const html = new Marked({ renderer: r, gfm: true }).parse(p.body).replace(/<p>(<figure[\s\S]*?<\/figure>)<\/p>/g, "$1");
   return { html, heads };

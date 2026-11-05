@@ -8,6 +8,8 @@ One device API for Shipvo apps, implemented twice:
 ```ts
 import { device } from "@shipvo/device";
 const here = await device.location.current();          // permission dialog appears the first time
+// Real camera, microphone and location are used only after the (simulated) permission is granted, a person is present and the browser allows it.
+// A denied or undetermined-then-refused permission never reaches the hardware.
 const code = await device.camera.scan({ prompt: "Scan the product barcode" });
 const auth = await device.auth.confirm("Confirm payment of 10 710 FCFA");   // { ok } | { ok: false, reason }
 const paid = await device.pay.charge({ provider: "mobile_money", amount: 10710, currency: "FCFA", to: "Tide & Tackle", reference: "TT-1001", phone: "677000111" }, pin);
