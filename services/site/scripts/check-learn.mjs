@@ -16,7 +16,7 @@ for (const f of readdirSync(join(repo, 'docs/tutorials')).filter((f) => f.endsWi
   if (!hub.includes(`<b>${title}</b>`)) fail.push(`hub card for ${slug} lacks its title`);
   if (!existsSync(join(pub, 'learn', slug, 'index.html'))) fail.push(`no page for /learn/${slug}/`);
 }
-const videos = [...readFileSync(join(repo, 'docs/videos.md'), 'utf8').matchAll(/^## (.+)\n+<video\b[^>]*data-length="([^"]*)"/gm)];
+const videos = [...readFileSync(join(repo, 'docs/videos.md'), 'utf8').matchAll(/^#{2,3} (.+)\n+<video\b[^>]*data-length="([^"]*)"/gm)];
 if (!videos.length) fail.push('found no videos in docs/videos.md');
 for (const [, title, len] of videos) if (!hub.includes(`<b>${title}</b>`) || !hub.includes(`<span>${len}</span>`)) fail.push(`hub is missing video "${title}" or its length`);
 if (!/lvideo[^>]*>\s*<img src="\/videos\//.test(hub)) fail.push('video cards need their poster');
