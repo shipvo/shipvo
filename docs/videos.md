@@ -43,7 +43,7 @@ That is a safety check you can run before every release. The full guide is at sh
 
 [Captions (.vtt)](/videos/first-app.vtt)
 
-Music: "Epic Adventure" by Akashic Records (Jamendo, CC BY-NC-ND 3.0) https://www.jamendo.com/track/1150771
+Music: "Epic Adventure" by Akashic Records ([Jamendo](https://www.jamendo.com/track/1150771), CC BY-NC-ND 3.0)
 
 <details>
 <summary>Transcript</summary>
