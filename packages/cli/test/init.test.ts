@@ -38,3 +38,22 @@ it("ends with the four next steps, in order, using the directory given", async (
   expect([...at].sort((x, y) => x - y)).toEqual(at);
   expect(out.split("\n").pop()).toContain("4. npx shipvo publish --dry-run");
 });
+
+it("with no folder, prints the short message to stderr and exits 2", async () => {
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+  await expect(init([])).rejects.toThrow("exit");
+  expect(exit).toHaveBeenCalledWith(2);
+  expect(err.mock.calls[0][0]).toBe(`shipvo: init needs a folder name.
+Try:  shipvo init myshop
+This creates ./myshop with a ready app. Other options (app id, bundle id, control plane) have defaults; see 'shipvo init --help'.`);
+  err.mockRestore(); exit.mockRestore();
+});
+
+it("--help lists each flag on its own line", async () => {
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  await init(["--help"]);
+  const out = String(log.mock.calls.at(-1)![0]).split("\n");
+  for (const f of ["--app-id", "--name", "--bundle-id", "--control-plane", "--public-key"])
+    expect(out.filter((l) => l.trim().startsWith(f))).toHaveLength(1);
+});

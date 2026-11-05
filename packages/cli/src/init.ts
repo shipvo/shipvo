@@ -9,12 +9,28 @@ import { args as parse } from "./config.js";
 const HOSTED = "https://api.shipvo.dev";
 const SDK = { expo: "~58.0.21", camera: "~58.0.14", clipboard: "~58.0.4", localAuth: "~58.0.2", location: "~58.0.20", notifications: "~58.1.7", statusBar: "~58.0.4", constants: "~58.0.0", metroRuntime: "~58.0.15", react: "19.3.0", rn: "0.88.1", rnw: "^0.21.4" };
 
+const INIT_NEEDS_DIR = `shipvo: init needs a folder name.
+Try:  shipvo init myshop
+This creates ./myshop with a ready app. Other options (app id, bundle id, control plane) have defaults; see 'shipvo init --help'.`;
+
+const INIT_HELP = `Usage: shipvo init <dir> [options]
+
+Creates <dir> with a ready app. Every option is optional.
+
+  --app-id <id>          App id. Default: the folder name.
+  --name <name>          Display name. Default: the app id in title case.
+  --bundle-id <id>       iOS bundle id and Android package. Default: dev.shipvo.<app id>.
+  --control-plane <url>  Where releases are published. Default: ${HOSTED}.
+  --public-key <b64>     Signing public key to pin. Default: a new key is made for you.
+  --help                 Show this text.`;
+
 const title = (s: string) => s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export async function init(argv: string[]) {
   const [dirArg] = argv.filter((x) => !x.startsWith("--") && !argv[argv.indexOf(x) - 1]?.startsWith("--"));
   const a = parse(argv);
-  if (!dirArg) { console.error("Usage: shipvo init <dir> [--app-id myshop] [--name \"My Shop\"] [--control-plane URL] [--public-key B64] [--bundle-id com.example.myshop]"); process.exit(2); }
+  if (argv.includes("--help") || argv.includes("-h")) { console.log(INIT_HELP); return; }
+  if (!dirArg) { console.error(INIT_NEEDS_DIR); process.exit(2); }
   const dir = resolve(dirArg);
   if (existsSync(dir)) { console.error(`${dir} already exists`); process.exit(1); }
   const appId = (a["app-id"] || dirArg.split("/").pop()!.toLowerCase().replace(/[^a-z0-9-]/g, "-")).slice(0, 32);
