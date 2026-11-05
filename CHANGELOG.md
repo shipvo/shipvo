@@ -4,6 +4,7 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## Unreleased
 
+- **@shipvo/cli**: `shipvo doctor` now checks that Playwright Chromium is installed (fix: `npx playwright install chromium`) and that the sim port is free (default 4545, or `--port <n>`; fix: `Stop the other process or pass --port <n>`). Both run offline and are skipped when `package.json` has no `sim` script. Migration: none; `doctor` now accepts `--port`.
 - **@shipvo/runtime**: Android and iOS shells now refuse a release whose `hermes_bytecode_version` differs from the Hermes bytecode version of the shell's embedded bundle. The release is discarded and the current release keeps running. `consumeEvents()` returns `hermes_bytecode_mismatch:<release>:release=<n>:shell=<m>`, and `checkForUpdate` returns `{ status: "none", reason: "hermes_bytecode_mismatch" }`. A missing field on the release, or an embedded bundle that is not Hermes bytecode, means the release is applied as before. This runs in addition to the signature and hash checks. Migration: none; `CheckResult` gains an optional `reason`.
 
 ## 2026-11-04 (release)

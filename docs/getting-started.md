@@ -27,7 +27,7 @@ npm install
 npx playwright install chromium
 ```
 
-If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with PASS or FAIL, and a FAIL line ends with the exact fix. It checks your Node version, `shipvo.json`, the signing key, control plane reachability and `hermesBytecodeVersion`. It does not check ports or Chromium yet.
+If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with PASS or FAIL, and a FAIL line ends with the exact fix. It checks your Node version, `shipvo.json`, the signing key, control plane reachability and `hermesBytecodeVersion`. If `package.json` has a `sim` script, it also checks that Playwright Chromium is installed and that port 4545 is free (use `--port <n>` to check another port).
 
 `init` writes a complete Expo app:
 
