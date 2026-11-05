@@ -21,7 +21,7 @@ export function checkPolicy(policy: ShipvoPolicy | undefined, ctx: { band: BandN
   const stage = policy.requireStageBeforeFull;
   if (stage && reach === 100) {
     const need = `policy.requireStageBeforeFull needs ${stage.percent}% live for ${stage.minHours}h first`;
-    if (!ctx.stageStartedAt) return { ok: false, rule: "requireStageBeforeFull", reason: `this publish reaches 100%, but no release is live at ${stage.percent}% (${need})` };
+    if (!ctx.stageStartedAt) return { ok: false, rule: "requireStageBeforeFull", reason: `this publish reaches 100%, but no release is live at ${stage.percent}%, or its pointer could not be read (${need})` };
     const hours = (now.getTime() - ctx.stageStartedAt.getTime()) / 3_600_000;
     if (hours < stage.minHours) return { ok: false, rule: "requireStageBeforeFull", reason: `this publish reaches 100%, but the ${stage.percent}% stage has been live ${Math.floor(hours * 10) / 10}h (${need})` };
   }

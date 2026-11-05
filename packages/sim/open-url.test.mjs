@@ -79,7 +79,7 @@ test("empty or missing url: bad_url", async () => {
 });
 
 test("answers GET / without waiting for Chromium, and exits with a message if Chromium cannot start", async () => {
-  const port = PORT + 1000; // 5900-6199: no other test file uses this range
+  const port = PORT + 400;
   const p = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(port), "--dir", join(root, "bad"), "--dist", dist, "--chromium", join(root, "no-such-chromium")], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
   let err = ""; p.stderr.on("data", (d) => { err += d; });
   const exited = new Promise((r) => p.once("exit", (code) => r(code)));
@@ -90,7 +90,7 @@ test("answers GET / without waiting for Chromium, and exits with a message if Ch
 });
 
 test("listens before Chromium has started", async () => {
-  const port = PORT + 1400; // 6300-6599: no other test file uses this range
+  const port = PORT + 500;
   // A launcher that never finishes: the port must still open.
   const hang = join(root, "hang.sh"); writeFileSync(hang, "#!/bin/sh\nexec sleep 60\n", { mode: 0o755 });
   const p = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(port), "--dir", join(root, "slow"), "--dist", dist, "--chromium", hang], { stdio: ["ignore", "ignore", "pipe"], cwd: here });

@@ -31,8 +31,8 @@ const platformsOf = (a: Record<string, string | undefined>): Platform[] => {
 };
 
 /**
- * When the stage required by `policy.requireStageBeforeFull` went live: the oldest signed pointer `issued_at` across the platforms in use.
- * Undefined if no rule applies, or if any pointer is missing or unreadable (unproven). Reads the real store, not the dry-run one.
+ * When the stage required by `policy.requireStageBeforeFull` went live: the oldest pointer `issued_at` across the platforms in use.
+ * The pointer signature is not checked. Undefined if no rule applies, or if any pointer is missing or unreadable (unproven). Reads the real store, not the dry-run one.
  */
 async function stageStart(cfg: ReturnType<typeof loadConfig>, bands: string[], platforms: Platform[]): Promise<Date | undefined> {
   const sb = stageBandOf(cfg.policy);

@@ -163,7 +163,7 @@ describe("publish and the Hermes bytecode check", () => {
       values.set("p/demo/1/b1", "not json");
       await publish(["--dry-run-policy"]);
       expect(process.exitCode).toBe(1);
-      expect(out()).toMatch(/no release is live at 10%/);
+      expect(out()).toMatch(/no release is live at 10%, or its pointer could not be read/);
       process.exitCode = undefined;
       values.set("p/demo/1/b1", JSON.stringify({ body: JSON.stringify({ release: 3, issued_at: "nope" }), signature: "x" }));
       await publish(["--dry-run-policy"]);
