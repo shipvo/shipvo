@@ -43,6 +43,13 @@ describe("POST /t telemetry", () => {
       expect(calls[0].args.slice(0, 3)).toEqual(["tide", 9, event]);
     }
   });
+  it("accepts refusal events and still accepts older ones", async () => {
+    for (const event of ["hermes_bytecode_mismatch", "native_module_missing", "native_module_version", "applied"]) {
+      const { d, calls } = db();
+      expect((await post("/t", { ...ev, release: 4, event }, { DB: d } as any)).status).toBe(202);
+      expect(calls[0].args.slice(0, 3)).toEqual(["tide", 4, event]);
+    }
+  });
   it("drops unknown 'via' and non-integer android_api", async () => {
     const { d, calls } = db();
     await post("/t", { ...ev, via: "zip", android_api: 34.5 }, { DB: d } as any);
@@ -175,6 +182,11 @@ describe("GET /t/:app/summary", () => {
       { release: 2, events: { applied: 3, reverted: 1 }, apply_ms_median: 120, cold_start_ms_median: 800 },
       { release: 1, events: { applied: 2 }, apply_ms_median: null, cold_start_ms_median: 900 },
     ] });
+  });
+  it("counts refusal events per release", async () => {
+    const d = fake([{ release: 3, event: "hermes_bytecode_mismatch", n: 2, last_id: 8 }, { release: 3, event: "native_module_missing", n: 1, last_id: 9 }, { release: 3, event: "native_module_version", n: 4, last_id: 7 }], [], []);
+    const r = await app.request("/t/tide/summary", {}, { DB: d } as any);
+    expect((await r.json() as any).releases[0].events).toEqual({ hermes_bytecode_mismatch: 2, native_module_missing: 1, native_module_version: 4 });
   });
   it("returns an empty list for an app with no rows", async () => {
     const r = await app.request("/t/tide/summary", {}, { DB: fake([], [], []) } as any);
