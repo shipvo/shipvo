@@ -4,6 +4,7 @@ import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort, checkNati
 import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
+import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps } from "./apps";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
@@ -159,6 +160,10 @@ app.post("/t", async (c) => {
     extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
   // Halting is a best-effort side effect: the event is stored, so never fail the response.
   if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release); } catch (e) { console.error("halt check failed", e); } }
+  if (REVERT_EVENTS.has(d.event)) {
+    const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
+    try { c.executionCtx.waitUntil(job); } catch { /* no execution context (tests, local): the job runs on its own */ }
+  }
   return c.json({ ok: true }, 202);
 });
 
