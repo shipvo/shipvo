@@ -2,6 +2,7 @@ import { args, loadConfig } from "./config.js";
 
 type Row = { release: number; events: Record<string, number>; apply_ms_median: number | null; cold_start_ms_median: number | null };
 
+type AutoHalt = { threshold: number; min_reports: number } | null;
 type Halted = { release: number; reports: number; failed: number; threshold: number };
 
 const ms = (v: number | null | undefined) => (typeof v === "number" ? String(Math.round(v)) : "-");
@@ -15,23 +16,32 @@ export function formatStatus(releases: Row[]): string {
   return rows.map((r) => r.map((c, i) => (i === 0 ? c.padEnd(w[i]) : c.padStart(w[i]))).join("  ")).join("\n");
 }
 
+/** "auto-halt: off" or "auto-halt: on at 20% after 20 reports". */
+export function describeAutoHalt(c: AutoHalt | undefined): string {
+  if (!c || typeof c.threshold !== "number") return "auto-halt: off";
+  const n = c.min_reports ?? 20;
+  return `auto-halt: on at ${Math.round(c.threshold * 1000) / 10}% after ${n} report${n === 1 ? "" : "s"}`;
+}
+
 export async function status(argv: string[], fetchFn: typeof fetch = fetch): Promise<number> {
   const a = args(argv);
   const cfg = loadConfig();
   const appId = a.app && a.app !== "true" ? a.app : cfg.appId;
   const base = cfg.controlPlane.replace(/\/$/, "");
   const url = `${base}/t/${encodeURIComponent(appId)}/summary`;
-  let data: { releases?: Row[]; halted?: Halted | null };
+  let data: { releases?: Row[]; halted?: Halted | null; auto_halt?: AutoHalt };
   try {
     const r = await fetchFn(url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    data = (await r.json()) as { releases?: Row[]; halted?: Halted | null };
+    data = (await r.json()) as { releases?: Row[]; halted?: Halted | null; auto_halt?: AutoHalt };
   } catch (e) {
     console.error(`Could not reach the control plane at ${base} (${e instanceof Error ? e.message : String(e)}).`);
     return 1;
   }
   if (argv.includes("--json")) { console.log(JSON.stringify(data)); return 0; }
   const releases = data.releases ?? [];
+  // An older control plane has no auto_halt field: say nothing rather than a wrong "off".
+  if ("auto_halt" in data) console.log(describeAutoHalt(data.auto_halt));
   if (!releases.length) { console.log(`No telemetry yet for "${appId}".`); return 0; }
   const h = data.halted;
   if (h && typeof h === "object") {
