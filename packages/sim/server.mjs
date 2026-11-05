@@ -165,9 +165,11 @@ async function act(id, body) {
     });
     if (covered) throw fail("covered", String(body.ref));
   };
+  // Where a tap landed (viewport pixels), so a recording can draw the touch.
+  let at;
   switch (body.action) {
     case "screen": break;
-    case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
+    case "tap": { const t = await resolve(body.ref); await ready(t); const b = await t.boundingBox(); if (b) at = { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }; await t.click({ timeout: 3000 }); break; }
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
       let t = await resolve(body.ref);
@@ -241,7 +243,7 @@ async function act(id, body) {
     }
     default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
   }
-  return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
+  return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), ...(at ? { at } : {}), screen: await screen(page) };
 }
 
 const DELIVERY = new Set(["tap", "type", "scroll", "back"]);

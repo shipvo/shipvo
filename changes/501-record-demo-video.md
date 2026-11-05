@@ -1,0 +1,3 @@
+- `@shipvo/mcp`: new tools `record_start`, `record_marker` and `record_stop` record a demo video of the app in a phone frame, with taps and scrolls drawn, idle waits trimmed and captions. Needs ffmpeg with libx264.
+- `@shipvo/sim`: a tap result now includes `at: { x, y }`, where the tap landed.
+- Migration: none; new tools and an added field.

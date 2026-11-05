@@ -80,3 +80,7 @@ The HTTP endpoint is stateless. There is no protocol session: each POST is handl
 - This package uses `@modelcontextprotocol/sdk` 1.x (the TypeScript SDK v2 is not stable on npm yet; 1.32.2 is `latest`). Tested by `test/http-stateless.test.ts`: discover without `initialize`, header/body mismatch, scope per request, 2025-era `initialize` clients. Stdio is unchanged.
 
  Requests without a valid key are refused. The hosted version at `sim.shipvo.dev` will issue keys per account with scopes (test, owner, read).
+
+## Record a demo video
+
+`record_start`, `record_marker` and `record_stop` record the app in a phone frame (9:16, 16:9 or 1:1) with taps and scrolls drawn, long waits cut to 0.6 s and captions from markers. `record_stop` returns `{ file, duration_s, width, height, chapters }` and saves an H.264 MP4 under `.shipvo/recordings/`. Needs `ffmpeg` with `libx264`. See [Record a demo video](../../docs/record-a-demo-video.md).

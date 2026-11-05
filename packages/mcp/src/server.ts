@@ -16,6 +16,8 @@ import { z } from "zod";
 import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
+import { FORMATS } from "./demo.js";
+import { mixAudio, newRec, recordingsDir, render, swipeFor, type Rec } from "./recorder.js";
 import { satisfied, sameTree, wantsMatch, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -40,7 +42,7 @@ async function localApps(): Promise<AppInfo> {
   return TIDE;
 }
 
-type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
+type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null; at?: { x: number; y: number }; data?: string };
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
@@ -61,6 +63,14 @@ const sessions = new Map<string, { app: string; steps: number; startedAt: number
 const trees = new Map<string, string>();
 // Recorded steps per session, for export_test. Dropped when the session ends.
 const steps = new Map<string, Step[]>();
+// Demo recordings in progress, per session. Frames and touches are collected as the agent acts.
+const recs = new Map<string, Rec>();
+function snap(sid: string, rec: Rec, t: number) {
+  rec.pending = rec.pending.then(async () => {
+    const r = await sim("/act", { session: sid, action: "screenshot", inline: true, format: "jpeg" });
+    if (r.ok && r.data) rec.frames.push({ t, png: Buffer.from(r.data, "base64") });
+  }).catch(() => {});
+}
 // Tool annotations (MCP hints): clients use them to decide what to run without asking.
 const RO = { readOnlyHint: true, destructiveHint: false };
 const WR = { readOnlyHint: false, destructiveHint: false };
@@ -68,8 +78,15 @@ const DEST = { readOnlyHint: false, destructiveHint: true };
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
-const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string; step?: Step; waited?: Waited } = {}) => {
+const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string; step?: Step; waited?: Waited; dir?: string } = {}) => {
   if (!r.ok || r.screen == null) return result(sid, r);
+  const rec = recs.get(sid);
+  if (rec) {
+    const t = Date.now();
+    if (action === "tap" && r.at) rec.touches.push({ t, kind: "tap", ...r.at });
+    else if (action === "scroll" && o.dir) rec.touches.push({ t, ...swipeFor(o.dir) });
+    snap(sid, rec, t + 1);
+  }
   const prev = trees.get(sid);
   trees.set(sid, r.screen);
   const change = prev === undefined ? "unknown (no earlier screen to compare)" : classify(prev, r.screen, action);
@@ -174,7 +191,7 @@ server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen.
 server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
   async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await sim("/act", { session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
 server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
-  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "scroll", direction, ref }), { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
+  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "scroll", direction, ref }), { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction }, dir: direction }); });
 server.tool("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await sim("/act", { session, action: "screenshot" });
@@ -216,6 +233,37 @@ server.tool("device_log", "What the app did with the device in this session: per
 server.tool("device_reset", "Put the simulated phone back to a known state (permissions undetermined, default location, nothing in front of the camera, log cleared), optionally with a new profile.", { session: sid, platform: z.enum(["android", "ios"]).optional(), api: z.number().optional() }, WR,
   async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
 
+// Demo videos: the app in the phone frame, with touches shown, idle waits trimmed and captions from markers.
+server.tool("record_start", "Start recording a demo video of this session: the app in a phone frame on a clean background, with a dot and ripple on every tap and a trail on scrolls. Use the app as usual, add captions with record_marker, then call record_stop. Long waits are cut to about 0.6 s.", { session: sid, format: z.enum(["9:16", "16:9", "1:1"]).optional().describe("Video shape (default 9:16: 1080x1920; 16:9 is 1920x1080)"), fps: z.union([z.literal(30), z.literal(60)]).optional(), background: z.string().optional().describe('"brand" (default), "plain" or a CSS colour such as #0b1220'), show_taps: z.boolean().optional(), title: z.string().optional().describe("Used in the file name") }, WR, async ({ session, ...o }) => {
+  if (recs.has(session)) return result(session, { ok: false, code: "already_recording", error: "this session is already being recorded: call record_stop first" });
+  let rec: Rec; try { rec = newRec(o); } catch (e) { return result(session, { ok: false, code: "bad_background", error: (e as Error).message }); }
+  const first = await sim("/act", { session, action: "screenshot", inline: true, format: "jpeg" });
+  if (!first.ok || !first.data) return result(session, first.ok ? { ok: false, error: "the simulator returned no screenshot" } : first);
+  rec.frames.push({ t: Date.now(), png: Buffer.from(first.data, "base64") }); recs.set(session, rec);
+  return text(`Recording ${rec.opts.format} at ${rec.opts.fps} fps (${FORMATS[rec.opts.format].w}x${FORMATS[rec.opts.format].h}). Use the app, then call record_stop.`);
+});
+server.tool("record_marker", "Add an on-screen caption (lower third) from this moment of the recording, for example 'Add to cart'. Markers also become the chapters record_stop returns.", { session: sid, caption: z.string().min(1).max(80) }, WR, async ({ session, caption }) => {
+  const rec = recs.get(session);
+  if (!rec) return result(session, { ok: false, code: "not_recording", error: "call record_start first" });
+  rec.markers.push({ t: Date.now(), caption }); snap(session, rec, Date.now());
+  return text(`Marker ${rec.markers.length}: ${caption}`);
+});
+server.tool("record_stop", "Stop recording and encode the demo video (H.264 MP4, needs ffmpeg). Returns { file, duration_s, width, height, chapters: [{ t, caption }] }. Saved under .shipvo/recordings/. narration is the path of a WAV file; music mixes a credited music bed under it and writes the credits JSON next to the video.", { session: sid, narration: z.string().optional().describe("Path of a WAV voiceover"), music: z.boolean().optional() }, WR, async ({ session, narration, music }) => {
+  const rec = recs.get(session);
+  if (!rec) return result(session, { ok: false, code: "not_recording", error: "call record_start first" });
+  await rec.pending; recs.delete(session);
+  try {
+    const slug = (rec.opts.title ?? session).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "demo";
+    const out = join(recordingsDir(), `${slug}-${new Date(rec.t0).toISOString().replace(/[:.]/g, "-")}.mp4`);
+    const v = await render(rec, { out });
+    const credits = mixAudio(out, { narration, music });
+    const res = { file: out, duration_s: v.duration_s, width: v.width, height: v.height, chapters: v.chapters, ...(credits ? { music_credits: credits } : {}), ...(rec.markers.length && !v.captions ? { note: "this ffmpeg has no drawtext, so captions are in chapters only, not on screen" } : {}) };
+    return { ...text(JSON.stringify(res, null, 2)), structuredContent: res };
+  } catch (e) {
+    const m = String((e as Error).message), code = /^(\w+):/.exec(m)?.[1] ?? "record_failed";
+    return result(session, { ok: false, code, error: m });
+  }
+});
 server.tool("export_test", "Turn the steps taken in this session (tap, type, scroll, back, set_device) into a @shipvo/test script and return its source. Read-only. Targets are named by their visible text; ambiguous ones become TODO comments and password fields use an environment variable instead of the typed value.", { session: sid }, RO, async ({ session }) => {
   const rec = steps.get(session), s = sessions.get(session);
   if (!rec || !s) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
@@ -228,7 +276,7 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
   const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string }[] };
   if (!listed.ok) return result(session, listed);
   if (!(listed.sessions ?? []).some((x) => x.session === session)) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
-  const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session); steps.delete(session);
+  const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session); steps.delete(session); recs.delete(session);
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
