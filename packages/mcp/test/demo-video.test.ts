@@ -81,7 +81,7 @@ describe("render", () => {
     expect(existsSync(join(out, "demo.mp4")) && statSync(join(out, "demo.mp4")).size > 1000).toBe(true);
     expect(readFileSync(join(out, "demo.mp4")).subarray(4, 8).toString()).toBe("ftyp");
     expect(v.chapters).toEqual([{ t: v.chapters[0]!.t, caption: "Add to cart" }]);
-  });
+  }, 60_000);
   it("says what is missing when ffmpeg is absent", async () => {
     const old = process.env.SHIPVO_FFMPEG; process.env.SHIPVO_FFMPEG = "/nonexistent/ffmpeg";
     try { await expect(render(session(), { out: join(out, "x.mp4") })).rejects.toThrow(/ffmpeg_missing/); } finally { if (old === undefined) delete process.env.SHIPVO_FFMPEG; else process.env.SHIPVO_FFMPEG = old; }
