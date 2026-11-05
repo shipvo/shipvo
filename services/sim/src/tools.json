@@ -244,7 +244,7 @@
  },
  {
   "name": "set_device",
-  "description": "Change what the simulated phone has: location, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.",
+  "description": "Change what the simulated phone has: location, the address book (contacts), a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.",
   "inputSchema": {
    "type": "object",
    "properties": {
@@ -329,6 +329,14 @@
         "denied",
         "undetermined"
        ]
+      },
+      "contacts": {
+       "type": "string",
+       "enum": [
+        "granted",
+        "denied",
+        "undetermined"
+       ]
       }
      },
      "additionalProperties": false
@@ -370,6 +378,38 @@
     },
     "online": {
      "type": "boolean"
+    },
+    "contacts": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "phoneNumbers": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "emails": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "id",
+       "name"
+      ],
+      "additionalProperties": false
+     },
+     "description": "Replace the address book the app can read (needs contacts permission)"
     }
    },
    "required": [

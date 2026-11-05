@@ -145,11 +145,12 @@ server.tool("screenshot", "A PNG of the phone screen (for checking layout, colou
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
 });
 // The simulated device: what the phone has, and what happens to it.
-server.tool("set_device", "Change what the simulated phone has: location, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
+server.tool("set_device", "Change what the simulated phone has: location, the address book (contacts), a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
   session: sid,
   location: z.object({ latitude: z.number(), longitude: z.number(), accuracy: z.number().optional() }).optional(),
   camera: z.object({ barcode: z.object({ type: z.string(), data: z.string() }).nullable().optional(), delayMs: z.number().optional() }).optional(),
-  permissions: z.object({ camera: z.enum(["granted", "denied", "undetermined"]).optional(), location: z.enum(["granted", "denied", "undetermined"]).optional(), notifications: z.enum(["granted", "denied", "undetermined"]).optional() }).optional(),
+  permissions: z.object({ camera: z.enum(["granted", "denied", "undetermined"]).optional(), location: z.enum(["granted", "denied", "undetermined"]).optional(), notifications: z.enum(["granted", "denied", "undetermined"]).optional(), contacts: z.enum(["granted", "denied", "undetermined"]).optional() }).optional(),
+  contacts: z.array(z.object({ id: z.string(), name: z.string(), phoneNumbers: z.array(z.string()).optional(), emails: z.array(z.string()).optional() })).optional().describe("Replace the address book the app can read (needs contacts permission)"),
   biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
   payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),

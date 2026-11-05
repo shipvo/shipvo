@@ -9,7 +9,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const root = resolve(__dirname, "..");
 let out = ""; let fake: http.Server; let port = 0;
-const posts: string[] = [];
+const posts: string[] = []; const bodies: string[] = [];
 
 beforeAll(async () => {
   out = mkdtempSync(join(root, "dist-test-"));
@@ -18,7 +18,7 @@ beforeAll(async () => {
   // a stand-in simulator that serves the scaffolded app "menu"
   fake = http.createServer(async (req, res) => {
     let raw = ""; for await (const c of req) raw += c;
-    posts.push(req.url ?? "");
+    posts.push(req.url ?? ""); bodies.push(raw);
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, app: "menu", release: "local", screen: "heading Table Menu" }));
@@ -40,6 +40,16 @@ async function connect(extra: Record<string, string> = {}) {
 const textOf = (r: any) => r.content[0].text as string;
 
 describe("local mcp", () => {
+  it("set_device accepts contacts and passes them to the simulator", async () => {
+    const c = await connect();
+    const contacts = [{ id: "1", name: "Amina Njoya", phoneNumbers: ["+237655001122"] }];
+    const r: any = await c.callTool({ name: "set_device", arguments: { session: "menu-1", contacts, permissions: { contacts: "denied" } } });
+    expect(r.isError).toBeFalsy();
+    const sent = JSON.parse(bodies.filter((b) => b.includes('"set_device"')).at(-1)!);
+    expect(sent.device).toEqual({ contacts, permissions: { contacts: "denied" } });
+    await c.close();
+  });
+
   it("opens the app the simulator serves, with no PN_APPS", async () => {
     const c = await connect();
     expect(textOf(await c.callTool({ name: "list_apps", arguments: {} }))).toContain('menu: Table Menu');
