@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { secret, redact, parseSteps, runSteps, PhoneError } from "../src/index.js";
 import { Phone } from "../src/index.js";
+import "../src/vitest.js";
 
 afterEach(() => { delete process.env.SHIPVO_TEST_PASSWORD; });
 
@@ -72,6 +73,27 @@ describe("Phone errors", () => {
     const g = await phone.waitForGone("oops", { timeout: 1, interval: 1 }).catch((e) => e as Error) as Error;
     expect(g.message).toContain("***");
     expect(g.message).not.toContain("s3cr3t-zz");
+  });
+  it("masks the secret in a PhoneError from act()", async () => {
+    process.env.SHIPVO_TEST_PASSWORD = "s3cr3t-zz";
+    secret("PASSWORD");
+    const phone = phoneShowing(SCREEN);
+    phone.call = async () => ({ ok: false, error: "bad s3cr3t-zz", screen: SCREEN });
+    const e = await phone.act("tap").catch((x) => x as Error) as Error;
+    expect(e).toBeInstanceOf(PhoneError);
+    expect(e.message).toContain("***");
+    expect(e.message).not.toContain("s3cr3t-zz");
+  });
+  it("masks the secret in toSee and toHaveButton failures", () => {
+    process.env.SHIPVO_TEST_PASSWORD = "s3cr3t-zz";
+    secret("PASSWORD");
+    const phone = phoneShowing(SCREEN);
+    for (const run of [() => expect(phone).toSee("absent"), () => expect(phone).toHaveButton("absent"), () => expect(phone).not.toSee("oops")]) {
+      let msg = "";
+      try { run(); } catch (e) { msg = (e as Error).message; }
+      expect(msg).toContain("***");
+      expect(msg).not.toContain("s3cr3t-zz");
+    }
   });
   it("does not mask values shorter than 4 characters", () => {
     process.env.SHIPVO_TEST_PASSWORD = "12";

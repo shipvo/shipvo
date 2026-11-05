@@ -146,7 +146,7 @@ await phone.type("Password", secret("PASSWORD"));
 type "{secret:PASSWORD}" into "Password"
 ```
 
-The placeholder is resolved only when the step runs. The step text, `--repair` diffs and compiled tests keep `{secret:PASSWORD}`. Error messages and `--report` files show `***` in place of any secret value that was read. Masking is by exact value, so a secret that the app shows in a changed form (for example upper-cased) is not masked. Values shorter than 4 characters are never masked, and masking lasts for the process that read the secret.
+The placeholder is resolved only when the step runs. The step text, `--repair` diffs and compiled tests keep `{secret:PASSWORD}`. Error messages and `--report` files show `***` in place of any secret value that was read. Masking is by exact value, so a secret that the app shows in a changed form (for example upper-cased) is not masked. Values shorter than 4 characters are never masked, and masking lasts for the process that read the secret. `{secret:NAME}` is resolved only in `type` steps, not in `see` or `wait for`.
 
 In GitHub Actions, map a repository secret to the variable:
 

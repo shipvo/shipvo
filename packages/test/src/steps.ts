@@ -48,6 +48,7 @@ export async function runSteps(phone: Phone, steps: Step[]): Promise<void> {
         case "scroll": await phone.scroll(s.direction); break;
         case "back": await phone.back(); break;
         case "wait_for": await phone.waitFor(s.text); break;
+        // see and not_see put the screen in the message: the catch below redacts it. Keep that.
         case "see": if (!phone.sees(s.text)) throw new Error(`expected to see "${s.text}"\n\nScreen now:\n${phone.screen}`); break;
         case "not_see": if (phone.sees(s.text)) throw new Error(`expected not to see "${s.text}"\n\nScreen now:\n${phone.screen}`); break;
       }
