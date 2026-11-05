@@ -1,7 +1,7 @@
 // Simulated device: the same API, backed by a device state the Shipvo simulator controls, with system sheets
 // (permission dialog, camera viewfinder, fingerprint prompt, payment prompt, notification banner, share sheet)
 // drawn as real dialogs so an agent sees and operates them exactly as it would a phone's.
-import type { Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification, Contact, PermissionName } from "./types";
+import type { Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification, Contact, CalendarEvent, PermissionName } from "./types";
 export * from "./types";
 
 export type DeviceState = {
@@ -11,6 +11,8 @@ export type DeviceState = {
   permissions: Record<PermissionName, PermissionStatus>;
   /** The address book the app can read once contacts permission is granted. */
   contacts: Contact[];
+  /** The calendar the app can read once calendar permission is granted. */
+  calendar: CalendarEvent[];
   location: Coords;
   /** What the camera "sees": a barcode in view, or nothing. */
   camera: { barcode?: { type: string; data: string } | null; delayMs?: number };
@@ -26,8 +28,9 @@ const platform: "android" | "ios" = cfg.device?.platform ?? "android"; const api
 const state: DeviceState = {
   appName: cfg.appName ?? "This app", platform, api,
   // Before Android 13 (API 33) notifications need no runtime permission.
-  permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", notifications: platform === "android" && api < 33 ? "granted" : "undetermined" },
+  permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: platform === "android" && api < 33 ? "granted" : "undetermined" },
   contacts: [],
+  calendar: [],
   location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, // Bonapriso, Douala
   camera: { barcode: null, delayMs: 800 },
   biometrics: { enrolled: true, nextResult: "success" },
@@ -67,11 +70,11 @@ async function askPermission(name: PermissionName): Promise<PermissionStatus> {
   let result: PermissionStatus = "denied";
   // The system's own dialog, worded as the platform words it.
   const title = state.platform === "ios"
-    ? (name === "camera" ? `“${state.appName}” Would Like to Access the Camera` : name === "location" ? `Allow “${state.appName}” to use your location?` : name === "contacts" ? `“${state.appName}” Would Like to Access Your Contacts` : `“${state.appName}” Would Like to Send You Notifications`)
-    : `Allow ${state.appName} to ${name === "camera" ? "take pictures and record video" : name === "location" ? "access this device's location" : name === "contacts" ? "access your contacts" : "send you notifications"}?`;
+    ? (name === "camera" ? `“${state.appName}” Would Like to Access the Camera` : name === "location" ? `Allow “${state.appName}” to use your location?` : name === "contacts" ? `“${state.appName}” Would Like to Access Your Contacts` : name === "calendar" ? `“${state.appName}” Would Like to Access Your Calendar` : `“${state.appName}” Would Like to Send You Notifications`)
+    : `Allow ${state.appName} to ${name === "camera" ? "take pictures and record video" : name === "location" ? "access this device's location" : name === "contacts" ? "access your contacts" : name === "calendar" ? "access your calendar" : "send you notifications"}?`;
   const choices: [string, PermissionStatus][] = state.platform === "ios"
     ? (name === "location" ? [["Allow Once", "granted"], ["Allow While Using App", "granted"], ["Don’t Allow", "denied"]] : name === "camera" ? [["Allow", "granted"], ["Don’t Allow", "denied"]] : [["Allow", "granted"], ["Don’t Allow", "denied"]])
-    : (name === "notifications" || name === "contacts" ? [["Allow", "granted"], name === "contacts" ? ["Deny", "denied"] : ["Don’t allow", "denied"]] : [["While using the app", "granted"], ["Only this time", "granted"], ["Deny", "denied"]]);
+    : (name === "notifications" || name === "contacts" || name === "calendar" ? [["Allow", "granted"], name !== "notifications" ? ["Deny", "denied"] : ["Don’t allow", "denied"]] : [["While using the app", "granted"], ["Only this time", "granted"], ["Deny", "denied"]]);
   await sheet(title, (card, close) => {
     const row = document.createElement("div"); Object.assign(row.style, { display: "grid", gap: "8px" });
     for (const [label, st] of choices) row.append(btn(label, () => { result = st; close(); }, st === "granted"));
@@ -80,7 +83,7 @@ async function askPermission(name: PermissionName): Promise<PermissionStatus> {
   state.permissions[name] = result; log("permission", { name, result }); return result;
 }
 
-const ALL_SIM = { camera: "simulated", location: "simulated", biometrics: "simulated", payments: "simulated", notifications: "simulated", share: "simulated", clipboard: "simulated", contacts: "simulated", network: "simulated" } as const;
+const ALL_SIM = { camera: "simulated", location: "simulated", biometrics: "simulated", payments: "simulated", notifications: "simulated", share: "simulated", clipboard: "simulated", contacts: "simulated", calendar: "simulated", network: "simulated" } as const;
 export const device: Device = {
   kind: "simulated",
   capabilities: () => ({ ...ALL_SIM }),
@@ -150,6 +153,15 @@ export const device: Device = {
       log("contacts", { count: state.contacts.length }); return state.contacts.map((c) => ({ ...c }));
     },
   },
+  calendar: {
+    async getEvents(range) {
+      const from = new Date(range.start).getTime(), to = new Date(range.end).getTime();
+      if (isNaN(from) || isNaN(to)) throw new Error("Calendar range needs valid start and end dates");
+      if ((await askPermission("calendar")) !== "granted") throw new Error("Calendar permission denied");
+      const found = state.calendar.filter((e) => new Date(e.start).getTime() < to && new Date(e.end).getTime() > from).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      log("calendar", { count: found.length }); return found.map((e) => ({ ...e }));
+    },
+  },
   clipboard: { async set(t) { state.clipboard = t; }, async get() { return state.clipboard; } },
   net: { online: () => state.online, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
 };
@@ -169,7 +181,7 @@ function showBanner(n: Notification) {
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
 g.__pnDevice = {
   state,
-  set(patch: Partial<DeviceState>) { Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, camera: { ...state.camera, ...(patch.camera ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (patch.online !== undefined) netSubs.forEach((f) => f(state.online)); },
+  set(patch: Partial<DeviceState>) { Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, camera: { ...state.camera, ...(patch.camera ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (patch.online !== undefined) netSubs.forEach((f) => f(state.online)); },
   push(n: Omit<Notification, "id">) { const id = `n${Date.now().toString(36)}`; showBanner({ id, ...n }); },
   log: () => state.log,
   /** Notifications delivered so far (the banner is gone after 5 s, like a heads-up on a phone; this is the notification shade). */
@@ -181,8 +193,8 @@ g.__pnDevice = {
   capabilities: () => device.capabilities(),
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
-    Object.assign(state, { permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
-      location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", contacts: [], log: [] }, profile ?? {});
+    Object.assign(state, { permissions: { camera: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: state.platform === "android" && state.api < 33 ? "granted" : "undetermined" },
+      location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, clipboard: "", contacts: [], calendar: [], log: [] }, profile ?? {});
     recent.length = 0;
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
