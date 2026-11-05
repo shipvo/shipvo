@@ -26,8 +26,8 @@ const lightMedia = vars(css.match(/:root:not\(\[data-theme=dark\]\)\{(--ink[^}]*
 const TEXT = ['paper', 'mute', 'dim', 'faint', 'accent', 'sky', 'prose', 'code-inline', 'ok-text', 'sky-text', 'bad', 'ok'];
 const BG = ['ink', 'ink-2', 'ink-3'];
 
-export function placeholderRule() {
-  return /\.search input::placeholder\{[^}]*color:var\(--dim\)/.test(css);
+function placeholderRule() {
+  return /\.search input::placeholder\{(?=[^}]*color:var\(--dim\))(?=[^}]*opacity:1(?![.\d]))[^}]*\}/.test(css);
 }
 
 export function check() {
@@ -40,7 +40,7 @@ export function check() {
       if (r < 4.5) failures.push(`${name}: --${fg} ${t[fg]} on --${bg} ${t[bg]} = ${r.toFixed(2)}:1`);
     }
   }
-  if (!placeholderRule()) failures.push('.search input::placeholder must use color:var(--dim), which is checked above on --ink-2');
+  if (!placeholderRule()) failures.push('.search input::placeholder must use color:var(--dim) and opacity:1; --dim is checked above on --ink-2');
   return failures;
 }
 
