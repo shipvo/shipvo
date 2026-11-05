@@ -2,6 +2,8 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { PARITY_LIMITS } from "./explore.js";
 import { pathToFileURL } from "node:url";
 
 type Node = { role: string; name: string; text: string; ref: string };
@@ -57,12 +59,37 @@ async function loadKit(): Promise<TestKit> {
   return (await import(pathToFileURL(path).href)) as TestKit;
 }
 
+export type FlowReport = { name: string; status: "passed" | "failed"; steps: StepLike[]; failedStep: StepLike | null; message: string | null };
+
+function gitCommit(): string | null {
+  const sha = process.env.GITHUB_SHA?.trim();
+  if (sha) return sha;
+  try { return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null; }
+  catch { return null; }
+}
+
+function appIdFromConfig(): string | null {
+  try { const id = JSON.parse(readFileSync("shipvo.json", "utf8")).appId; return typeof id === "string" ? id : null; }
+  catch { return null; }
+}
+
+/** Value of `--name <value>`, or undefined. */
+function flagValue(argv: string[], name: string): string | undefined {
+  const i = argv.indexOf(name);
+  return i >= 0 && argv[i + 1] && !argv[i + 1]!.startsWith("--") ? argv[i + 1] : undefined;
+}
+
 /** Runs the suite. Returns the exit code: 0 when every step passed (or every failure was repaired and written), 1 otherwise. */
 export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) => void = console.log): Promise<number> {
   const repair = argv.includes("--repair");
   const write = argv.includes("--write");
   if (write && !repair) { console.error("--write only works with --repair"); return 2; }
-  const given = argv.filter((a) => !a.startsWith("--"));
+  const reportPath = flagValue(argv, "--report");
+  const release = flagValue(argv, "--release");
+  if (argv.includes("--report") && !reportPath) { console.error("--report needs a file name"); return 2; }
+  const valueIdx = new Set(["--report", "--release"].map((f) => argv.indexOf(f) + 1).filter((i) => i > 0));
+  const given = argv.filter((a, i) => !a.startsWith("--") && !valueIdx.has(i));
+  const flows: FlowReport[] = [];
   const files = given.length ? given : findStepFiles("tests");
   if (!files.length) { console.error("No tests found. Put plain-language steps in tests/*.steps, or pass file names."); return 2; }
   const k = kit ?? (await loadKit());
@@ -72,10 +99,13 @@ export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) =>
     const steps = k.parseSteps(text);
     const phone = await k.openApp();
     const edits = new Map<number, string>();
+    const flow: FlowReport = { name: file, status: "passed", steps, failedStep: null, message: null };
+    flows.push(flow);
     for (const step of steps) {
       try { await k.runSteps(phone, [step]); continue; }
       catch (e) {
         failed++;
+        if (!flow.failedStep) { flow.status = "failed"; flow.failedStep = step; flow.message = (e as Error).message.split("\n")[0]!; }
         log(`FAIL ${file}:${step.line}: ${(e as Error).message.split("\n")[0]}`);
         if (!repair) break;
         const r = k.proposeRepair(step, phone.screen);
@@ -102,5 +132,10 @@ export async function testCmd(argv: string[], kit?: TestKit, log: (s: string) =>
   }
   if (repair) log(`${failed} failed step(s): ${repaired} repaired${write ? " and written" : " (not written; add --write)"}, ${unresolved} unresolved`);
   else log(failed ? `${failed} failed` : "all steps passed");
+  if (reportPath) {
+    const report = { app: appIdFromConfig(), commit: gitCommit(), release: release ?? null, time: new Date().toISOString(), parityLimits: PARITY_LIMITS, flows };
+    writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
+    log(`wrote report ${reportPath}`);
+  }
   return failed === 0 || (write && repaired === failed) ? 0 : 1;
 }

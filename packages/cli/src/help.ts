@@ -31,7 +31,7 @@ Ship
                               Show each store's steps and what to do next
   status [--app id] [--json]  Show how the newest releases are doing on phones
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
-  test [files] [--repair [--write]]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it
+  test [files] [--repair [--write]] [--report <file> [--release <id>]]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
   doctor [--port <n>]         Check setup before first publish
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
