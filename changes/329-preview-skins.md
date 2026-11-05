@@ -1,0 +1,2 @@
+- cli: `shipvo preview` frame page has Android and iPhone skins with status bars, a phone / large phone / tablet size switch (no reload) and a Back control that presses the app's Back button, like the simulator's back action.
+- cli: in `shipvo preview`, Back presses the app's Back button, or falls back to browser history when the screen has none (the simulator's back action throws instead). It also does nothing if the app is on another origin.
