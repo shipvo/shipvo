@@ -33,7 +33,7 @@ Input metrics:
 | Metric | Current value | Source or how to measure |
 | --- | --- | --- |
 | npm downloads, last week (2026-10-28 to 2026-11-03) | `@shipvo/mcp` 1,299; `@shipvo/cli` 830; `@shipvo/sim` 602; `@shipvo/device` 592; `@shipvo/runtime` 582; `@shipvo/schema` 474; `@shipvo/test` 238 | `https://api.npmjs.org/downloads/point/last-week/@shipvo/<pkg>`, read 2026-11-04. These include CI installs and mirrors; they are not unique users. |
-| Time from first `shipvo init` to first applied OTA | Not measured yet | Add a timed first-run job in CI on a clean machine (bet 3). |
+| Time from first `shipvo init` to first applied OTA | Partial: `init` 100 ms and `publish --dry-run` 107 ms, offline, on a CI Linux runner, 2026-11-05 (`scripts/first-run/`). Install, bundle export, store builds and a real applied OTA are not timed, so this is not the full path. | Add a timed first-run job in CI on a clean machine (bet 3). |
 | Update safety on device (Android) | Publish to applied 16–36 s; patch 64 KB vs 1.57 MB full; crash-loop revert after 3 failed boots; cold start 847–931 ms on a Redmi 9A (Android only) | [spike results](../spike-results.md), 2026-10-30 |
 | Simulator-vs-device parity | 100% actionable on 13 screens (Flows A and B) on Android and iOS; text 98.6% Android, 96.2% iOS | [parity results](../parity-results.md) |
 | Agent task success without screenshots | 5/5 Haiku, after 4/5 Sonnet on round 1 | [agent gate results](../agent-gate-results.md) |
