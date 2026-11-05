@@ -1,0 +1,1 @@
+- docs: add a captioned video for the "Create your first app" tutorial, and list it on the Videos page.
