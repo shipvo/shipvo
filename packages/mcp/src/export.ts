@@ -11,7 +11,10 @@ export type Step = {
   changed?: boolean;
 };
 
-const q = (s: string) => JSON.stringify(s);
+// JSON.stringify leaves U+2028 and U+2029 raw, but TypeScript treats them as line breaks.
+const q = (s: string) => JSON.stringify(s).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+// Comment text must stay on one line.
+const oneLine = (s: string) => s.replace(/[\r\n\u2028\u2029]+/g, " ");
 const envName = (label: string) =>
   "SHIPVO_TEST_" + (label.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toUpperCase() || "FIELD");
 const DIRECTIONS = ["down", "up", "left", "right"];
@@ -21,19 +24,19 @@ function lineFor(s: Step): string[] {
   switch (s.action) {
     case "open": return [];
     case "back": return ["await phone.back();"];
-    case "set_device": return [`await phone.device.set(${JSON.stringify(s.device ?? {})});`];
+    case "set_device": return [`await phone.device.set(${JSON.stringify(s.device ?? {}).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029")});`];
     case "scroll": {
       const d = s.direction && DIRECTIONS.includes(s.direction) ? s.direction : "down";
       return [`await phone.scroll(${q(d)});`];
     }
     case "tap":
       if (!t) return ["// TODO: tap without a target"];
-      if (t.matches > 1) return [`// TODO: ambiguous target ${q(t.text)}`];
+      if (t.matches > 1) return [`// TODO: ambiguous target ${oneLine(q(t.text))}`];
       return [`await phone.tap(${q(t.text)});`];
     case "type": {
       const label = s.fieldLabel ?? t?.text;
       if (!label) return ["// TODO: type without a field label"];
-      if (t && t.matches > 1 && !s.fieldLabel) return [`// TODO: ambiguous target ${q(label)}`];
+      if (t && t.matches > 1) return [`// TODO: ambiguous target ${oneLine(q(label))}`];
       const value = s.passwordLike ? `process.env.${envName(label)}!` : q(s.text ?? "");
       return [`await phone.type(${q(label)}, ${value});`];
     }

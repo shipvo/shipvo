@@ -10,7 +10,7 @@ describe("exportTest", () => {
     expect(out).toContain('openApp({ app: "menu" })');
     expect(out).not.toContain("phone.tap");
   });
-  it("open emits nothing extra", () => expect(body([{ action: "open" }])).not.toContain("phone."+"tap"));
+  it("open emits nothing extra", () => expect(body([{ action: "open" }])).toBe(body([])));
   it("tap", () => expect(body([{ action: "tap", target: t("Add to cart") }])).toContain('await phone.tap("Add to cart");'));
   it("type", () => expect(body([{ action: "type", fieldLabel: "Email", text: "a@b.c" }])).toContain('await phone.type("Email", "a@b.c");'));
   it("scroll", () => expect(body([{ action: "scroll", direction: "up" }])).toContain('await phone.scroll("up");'));
@@ -32,6 +32,47 @@ describe("exportTest", () => {
     expect(out).not.toContain("hunter2");
   });
   it("escapes quotes in text", () => expect(body([{ action: "tap", target: t('Say "hi"') }])).toContain('phone.tap("Say \\"hi\\"")'));
+  const LS = String.fromCharCode(0x2028);
+  const PS = String.fromCharCode(0x2029);
+  const onlyCodeOrComments = (out: string) => {
+    const lines = out.split(/[\r\n\u2028\u2029]/).slice(5, -2).filter((l) => l.trim());
+    for (const l of lines) expect(l.trim().startsWith("//") || /^await .*;( \/\/.*)?$/.test(l.trim())).toBe(true);
+  };
+  it("line separators in an ambiguous target stay inside the comment", () => {
+    for (const sep of [LS, PS]) {
+      const out = body([{ action: "tap", target: t(`x${sep}await evil();`, 2) }]);
+      expect(out).not.toContain(sep);
+      onlyCodeOrComments(out);
+    }
+  });
+  it("line separators in tap text are escaped", () => {
+    for (const sep of [LS, PS]) {
+      const out = body([{ action: "tap", target: t(`x${sep}await evil();`) }]);
+      expect(out).not.toContain(sep);
+      expect(out).toContain("phone.tap(");
+      onlyCodeOrComments(out);
+    }
+  });
+  it("ambiguous type target without a field label is a TODO", () => {
+    const out = body([{ action: "type", target: t("Email", 2), text: "x" }]);
+    expect(out).toContain("// TODO: ambiguous target");
+    expect(out).not.toContain("phone.type");
+  });
+  it("ambiguous target is a TODO even with a field label", () => {
+    const out = body([{ action: "type", fieldLabel: "Email", target: t("Email", 2), text: "x" }]);
+    expect(out).toContain("// TODO: ambiguous target");
+    expect(out).not.toContain("phone.type");
+  });
+  it("type with no label and no target is a TODO with no value", () => {
+    const out = body([{ action: "type", text: "secret-value" }]);
+    expect(out).toContain("// TODO: type without a field label");
+    expect(out).not.toContain("secret-value");
+  });
+  it("passwordLike with no label is a TODO with no value", () => {
+    const out = body([{ action: "type", text: "hunter2", passwordLike: true }]);
+    expect(out).toContain("// TODO");
+    expect(out).not.toContain("hunter2");
+  });
   it("sample script snapshot", () => {
     expect(body([
       { action: "open" },
