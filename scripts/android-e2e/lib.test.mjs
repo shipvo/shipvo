@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { createPublicKey, verify } from "node:crypto";
 import { b64, keyFromSeed } from "../../packages/cli/dist/index.js";
-import { buildPointer, median, parseLog, telemetry, pctChange, sha256 } from "./lib.mjs";
+import { buildPointer, median, parseLog, telemetry, pctChange, sha256, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion } from "./lib.mjs";
 
 const seed = b64(randomBytes(32)), pub = b64(keyFromSeed(seed).publicKey);
 const bytes = new Uint8Array(randomBytes(500));
@@ -43,7 +43,6 @@ test("steadyTrials drops poll misses and the trial after one", () => {
   assert.deepEqual(kept.map((t) => t.timeline.pointerSeenMs), [100, 90]);
 });
 
-import { hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion } from "./lib.mjs";
 const hbc = (v) => { const b = new Uint8Array(32); b.set([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f]); new DataView(b.buffer).setUint32(8, v, true); return b; };
 test("hermesVersionOf reads the header and returns null for plain JS", () => {
   assert.equal(hermesVersionOf(hbc(96)), 96);
