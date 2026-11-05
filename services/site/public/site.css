@@ -52,6 +52,7 @@ code,kbd{font-family:var(--mono);font-size:.92em}
 .hero .cmd{margin-top:18px;max-width:560px}
 .hero .facts{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:28px;font-family:var(--mono);font-size:13px;color:var(--dim)}
 .hero .facts b{color:var(--paper);font-weight:500}
+@media(min-width:1201px){.hero .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @media(max-width:900px){.hero .wrap{grid-template-columns:minmax(0,1fr)}}
 .reveal{opacity:0;transform:translateY(18px);animation:up .8s cubic-bezier(.2,.7,.2,1) forwards}
 .reveal:nth-child(2){animation-delay:.08s}.reveal:nth-child(3){animation-delay:.16s}.reveal:nth-child(4){animation-delay:.24s}.reveal:nth-child(5){animation-delay:.32s}.reveal:nth-child(6){animation-delay:.4s}
@@ -59,7 +60,7 @@ code,kbd{font-family:var(--mono);font-size:.92em}
 @keyframes up{to{opacity:1;transform:none}}
 
 /* phone */
-.phone-stage{position:relative;display:flex;justify-content:flex-end;align-items:flex-start;padding:150px 0 70px}
+.phone-stage{position:relative;display:flex;justify-content:flex-end;align-items:flex-start;padding:150px 0 110px}
 .phone-stage::before{content:"";position:absolute;width:420px;height:420px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,154,46,.28),transparent 70%);filter:blur(10px);right:6%;top:18%;z-index:0}
 .device{position:relative;z-index:1;width:272px;aspect-ratio:272/588;border-radius:44px;padding:9px;background:linear-gradient(160deg,#2A3850,#0E1524 55%,#1F2A3F);box-shadow:0 50px 100px -30px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.07) inset,0 0 80px -20px rgba(255,154,46,.35);margin-right:4%}
 .device::before{content:"";position:absolute;top:16px;left:50%;transform:translateX(-50%);width:76px;height:20px;border-radius:12px;background:#05080E;z-index:3}
@@ -81,11 +82,11 @@ code,kbd{font-family:var(--mono);font-size:.92em}
 .bubble{position:absolute;right:4%;top:0;width:min(300px,70vw);z-index:3;background:var(--paper);color:var(--ink);border-radius:18px 18px 18px 4px;padding:13px 15px;box-shadow:0 20px 40px -20px rgba(0,0,0,.6)}
 .bubble small{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:#566074;font-weight:500}
 .bubble b{display:block;margin-top:5px;font-size:17px;line-height:1.25;font-weight:700}
-.result{position:absolute;left:30px;bottom:6px;width:min(270px,72vw);z-index:3;background:var(--ink-3);border:1px solid var(--accent);border-radius:14px;padding:11px 13px;opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s;box-shadow:0 20px 40px -20px rgba(255,154,46,.5)}
+.result{position:absolute;right:4%;bottom:0;width:272px;max-width:72vw;z-index:3;background:var(--ink-3);border:1px solid var(--accent);border-radius:14px;padding:11px 13px;opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s;box-shadow:0 20px 40px -20px rgba(255,154,46,.5)}
 .result.on{opacity:1;transform:none}
 .result small{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent);font-weight:500}
 .result code{display:block;margin-top:5px;font-size:12.5px;line-height:1.5;color:var(--paper)}
-@media(max-width:1100px){.phone-stage{display:flex;flex-direction:column;align-items:center;gap:14px;min-height:0;padding:8px 0 24px}.phone-stage::before{right:auto;left:50%;transform:translateX(-50%);top:30%}.bubble,.agentview,.result{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:min(340px,92vw)}.device{margin-right:0;order:2}.bubble{order:1}.agentview{order:3;backdrop-filter:none}.result{order:4;transform:none;opacity:0}.result.on{opacity:1}}
+@media(max-width:1200px){.phone-stage{display:flex;flex-direction:column;align-items:center;gap:14px;min-height:0;padding:8px 0 24px}.phone-stage::before{right:auto;left:50%;transform:translateX(-50%);top:30%}.bubble,.agentview,.result{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:min(340px,92vw);max-width:none}.device{margin-right:0;order:2}.bubble{order:1}.agentview{order:3;backdrop-filter:none}.result{order:4;transform:none;opacity:0}.result.on{opacity:1}}
 @media(prefers-reduced-motion:reduce){.tap.on,.agentview small i{animation:none}.screen img{transition:none}}
 
 /* sections */
