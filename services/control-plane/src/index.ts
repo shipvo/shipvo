@@ -311,6 +311,22 @@ app.delete("/app/:id/api/halt-config", async (c) => {
   return c.json({ enabled: false });
 });
 
+/** Audit rows for one app, newest first. ?limit= (default 50, max 200), ?before=<id>. Owner or the app's publish token. */
+app.get("/audit/:app", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const lq = c.req.query("limit"), bq = c.req.query("before");
+  const limit = lq === undefined ? 50 : Number(lq);
+  if (!Number.isInteger(limit) || limit < 1) return c.json({ error: "bad_request", message: "limit must be a positive integer" }, 400);
+  if (bq !== undefined && !/^\d+$/.test(bq)) return c.json({ error: "bad_request", message: "before must be a row id" }, 400);
+  const n = Math.min(limit, 200);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, app_id, at, actor, actor_kind, action, release, release_id, before, after FROM audit_log WHERE app_id = ?${bq !== undefined ? " AND id < ?" : ""} ORDER BY id DESC LIMIT ?`,
+  ).bind(...(bq !== undefined ? [appId, Number(bq), n] : [appId, n])).all();
+  return c.json({ app: appId, rows: results ?? [] }, 200, { "cache-control": "no-store" });
+});
+
 app.route("/auth", auth);
 app.route("/apps", apps);
 
