@@ -46,6 +46,18 @@ final class Store {
   /// Shell binary the stored OTA bundles were downloaded under.
   var binaryVersion: String? { get { d.string(forKey: "binary_version") } set { d.set(newValue, forKey: "binary_version") } }
   var appBundle: Bundle { bundle }
+  /// The `main.jsbundle` inside the app: the first release, and the patch base before any download.
+  func embeddedBundle() -> Data? {
+    guard let url = bundle.url(forResource: "main", withExtension: "jsbundle") else { return nil }
+    return try? Data(contentsOf: url)
+  }
+  /// Its sha256, cached per installed binary so the file is hashed once.
+  func embeddedSha() -> String? {
+    let key = "embedded_sha:" + installedBinaryVersion
+    if let v = d.string(forKey: key) { return v }
+    guard let data = embeddedBundle() else { return nil }
+    let sha = Verify.sha256Hex(data); d.set(sha, forKey: key); return sha
+  }
   func block(_ release: Int) { if release > blockedRelease { blockedRelease = release } }
 
   var trialBoots: Int { get { d.integer(forKey: "trial_boots") } set { d.set(newValue, forKey: "trial_boots") } }
