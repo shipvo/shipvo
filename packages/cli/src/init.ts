@@ -89,13 +89,15 @@ Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TO
 
 ${seedNote}
 Public key pinned in the shell: ${publicKey}
-
-Next steps:
-1. cd ${dirArg}
-2. npx shipvo doctor
-3. npm run sim
-4. npx shipvo publish --dry-run
 `);
+
+  const cdDir = /\s/.test(dirArg) ? `"${dirArg}"` : dirArg;
+  console.log("");
+  console.log("Next steps:");
+  console.log(`1. cd ${cdDir}`);
+  console.log("2. npx shipvo doctor");
+  console.log("3. npm run sim");
+  console.log("4. npx shipvo publish --dry-run");
 }
 
 const APP_TSX = (name: string, appId: string) => `import { useEffect, useRef, useState } from "react";
