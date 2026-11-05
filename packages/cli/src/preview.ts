@@ -133,15 +133,16 @@ body.dark .panel{background:#22262b;color:#eee}
 <p class="note">${title}: simulated device, public preview. System sheets such as permissions and payments are simulated.</p>
 <script>
 ${PANEL_JS}
-var S={phone:[360,760,"android"],large:[412,915,"android"],iphone:[390,844,"ios"],tablet:[820,1180,"android"]},f=document.getElementById("app"),dv=document.getElementById("device"),P=null,$=function(i){return document.getElementById(i)};
+var S={phone:[360,760,"android"],large:[412,915,"android"],iphone:[390,844,"ios"],tablet:[820,1180,"android"]},f=document.getElementById("app"),dv=document.getElementById("device"),P=null,pin=null,$=function(i){return document.getElementById(i)};
 function skin(k){dv.className="device "+k+(dv.classList.contains("commenting")?" commenting":"");try{if(P)P.platform(k)}catch(e){}}
 document.querySelectorAll("[data-device]").forEach(function(b){b.onclick=function(){var s=S[b.dataset.device];dv.style.width=s[0]+"px";dv.style.height=s[1]+"px";skin(s[2]);document.querySelectorAll("[data-device]").forEach(function(o){o.setAttribute("aria-pressed",o===b)})}});
 dv.style.width="360px";dv.style.height="760px";
 var t=$("theme");t.onclick=function(){var d=!document.body.classList.contains("dark");document.body.classList.toggle("dark",d);t.setAttribute("aria-pressed",d);t.textContent=d?"Light":"Dark";f.style.colorScheme=d?"dark":"light"};
 function say(m){$("msg").textContent=m||""}
-function run(fn){return function(){try{say("");fn()}catch(e){say(e.message)}}}
+function run(fn,ok){return function(){try{say("");fn();if(ok)say(ok)}catch(e){say(e.message)}}}
 function down(name,text){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/plain"}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
 f.addEventListener("load",function(){
+  $("cl").textContent="";dv.querySelectorAll(".pin").forEach(function(n){n.remove()});pin=null;
   P=shipvoPanel(f.contentWindow,${JSON.stringify(title)});
   var d=f.contentDocument;
   d.addEventListener("click",function(e){P.tap(e.target)},true);
@@ -151,13 +152,12 @@ function need(){if(!P)throw new Error("The app is still loading.");return P}
 $("loc-set").onclick=run(function(){var v=$("loc").value.split(",");need().location(v[0],v[1])});
 $("loc-xy").onclick=run(function(){need().location($("lat").value,$("lng").value)});
 $("cam-set").onclick=run(function(){var v=$("cam").value.split("|");need().camera(v[0],v[1])});
-$("bio-ok").onclick=run(function(){need().biometrics(true)});$("bio-no").onclick=run(function(){need().biometrics(false)});
-$("pay-ok").onclick=run(function(){need().payment(true)});$("pay-no").onclick=run(function(){need().payment(false)});
-$("net-on").onclick=run(function(){need().network("online")});$("net-off").onclick=run(function(){need().network("offline")});
+$("bio-ok").onclick=run(function(){need().biometrics(true)},"Next fingerprint check: match");$("bio-no").onclick=run(function(){need().biometrics(false)},"Next fingerprint check: no match");
+$("pay-ok").onclick=run(function(){need().payment(true)},"Next payment: approved");$("pay-no").onclick=run(function(){need().payment(false)},"Next payment: declined");
+$("net-on").onclick=run(function(){need().network("online")},"Network: online");$("net-off").onclick=run(function(){need().network("offline")},"Network: offline");
 $("push").onclick=run(function(){need().push($("pt").value,$("pb").value)});
 $("back").onclick=run(function(){need().back()});$("edge").onclick=$("back").onclick;
 $("st").onclick=run(function(){down("recorded.test.ts",need().toTest())});
-var pin=null;
 $("cm").onclick=function(){var on=!dv.classList.contains("commenting");dv.classList.toggle("commenting",on);this.setAttribute("aria-pressed",on)};
 $("shield").onclick=function(e){var r=dv.getBoundingClientRect();pin=[Math.round(e.clientX-r.left),Math.round(e.clientY-r.top)];dv.classList.remove("commenting");$("cm").setAttribute("aria-pressed","false");$("cn").focus()};
 $("cs").onclick=run(function(){if(!pin)throw new Error("Tap Comment, then the spot on the screen.");var c=need().comment(pin[0],pin[1],$("cn").value);var m=document.createElement("span");m.className="pin";m.textContent=P.comments().length;m.style.left=pin[0]+"px";m.style.top=pin[1]+"px";dv.appendChild(m);var li=document.createElement("li");li.textContent=c.note+" (after "+c.steps+" steps)";$("cl").appendChild(li);$("cn").value="";pin=null});

@@ -91,6 +91,18 @@ describe("frame page", () => {
     expect(h).toContain('id="theme"');
     expect(h).toContain('src="app.html"');
   });
+  it("confirms each next-result setting in the status region", () => {
+    const h = framePage("Shop");
+    expect(h).toContain('id="msg" role="status"');
+    for (const m of ["Next fingerprint check: match", "Next fingerprint check: no match", "Next payment: approved", "Next payment: declined", "Network: online", "Network: offline"]) expect(h).toContain(m);
+  });
+  it("clears the comment list and pins when the app reloads", () => {
+    const h = framePage("Shop");
+    const load = h.slice(h.indexOf('f.addEventListener("load"'));
+    expect(load.indexOf('$("cl").textContent=""')).toBeGreaterThan(-1);
+    expect(load.indexOf('$("cl").textContent=""')).toBeLessThan(load.indexOf("P=shipvoPanel"));
+    expect(load).toContain('querySelectorAll(".pin")');
+  });
   it("wrapBuild moves the app entry to app.html and writes the frame as index.html", () => {
     const d = mkdtempSync(join(tmpdir(), "pv-"));
     writeFileSync(join(d, "index.html"), "<app>"); writeFileSync(join(d, "x.js"), "1");
