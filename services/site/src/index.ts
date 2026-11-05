@@ -32,6 +32,19 @@ async function media(req: Request, env: Env, key: string): Promise<Response> {
   const obj = await env.MEDIA.get(key);
   return new Response(obj?.body ?? null, { status: 200, headers: h });
 }
+// Learn pages used to live under /docs/. Old links keep working with a permanent redirect.
+export const LEARN_REDIRECTS: Record<string, string> = {
+  "/docs/learn": "/learn/",
+  "/docs/first-app": "/learn/first-app/",
+  "/docs/your-own-shop": "/learn/your-own-shop/",
+  "/docs/videos": "/learn/videos/",
+  "/docs/glossary": "/learn/glossary/",
+  "/docs/learn.md": "/learn/",
+  "/docs/first-app.md": "/learn/first-app.md",
+  "/docs/your-own-shop.md": "/learn/your-own-shop.md",
+  "/docs/videos.md": "/learn/videos.md",
+  "/docs/glossary.md": "/learn/glossary.md",
+};
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -63,6 +76,8 @@ export default {
     }
     if (url.pathname === "/hq") return Response.redirect("https://shipvo.dev/hq/", 301);
     if (url.pathname === "/.well-known/security.txt") return env.ASSETS.fetch(new Request(new URL("/security.txt", url).toString(), req));
+    const moved = LEARN_REDIRECTS[url.pathname.replace(/\/+$/, "")];
+    if (moved) return Response.redirect(`https://shipvo.dev${moved}${url.search}`, 301);
     if (url.pathname === "/docs") return Response.redirect("https://shipvo.dev/docs/overview/", 301);
     const m = url.pathname.match(/^\/apps\/([a-z0-9-]+)\/?$/);
     if (m) {
