@@ -26,7 +26,9 @@ export type OpenOptions = {
   device?: DeviceSettings;
 };
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
-type Reply = { ok: boolean; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number };
+/** An action the simulator refused. `code` is set for typed failures such as `no_url_listener` or `stale_ref`. */
+export class PhoneError extends Error { constructor(message: string, readonly code?: string) { super(message); this.name = "PhoneError"; } }
+type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number };
 
 /** A simulated phone running your app. Every action returns once the screen has settled, and updates `screen`. */
 export class Phone {
@@ -51,7 +53,7 @@ export class Phone {
       const again = await this.call("/act", { session: this.session, action: "screen" });
       if (typeof again.screen === "string") this.screen = again.screen;
     }
-    if (!r.ok) throw new Error(`${action} failed: ${r.error}\n\nScreen now:\n${this.screen}`);
+    if (!r.ok) throw new PhoneError(`${action} failed: ${r.error}\n\nScreen now:\n${this.screen}`, r.code);
     return r;
   }
 
@@ -104,6 +106,8 @@ export class Phone {
   async notifications(): Promise<Notification[]> { return (await this.act("notifications")).notifications ?? []; }
   /** Tap a notification from the shade (the newest if no id). */
   async openNotification(id?: string): Promise<this> { await this.act("open_notification", { id }); return this; }
+  /** Open a deep link in the app, as a push tap or share link would. Throws a `PhoneError` with code `no_url_listener` if the app has no `onUrl` listener. */
+  async openUrl(url: string): Promise<this> { await this.act("open_url", { url }); return this; }
   /** What the app did with the device: permission prompts and answers, location reads, scans, fingerprint checks, payments. */
   async deviceLog(): Promise<unknown[]> { return (await this.act("device_log")).log ?? []; }
   /** A PNG of the screen. Works when the test runs on the same machine as the simulator, as in CI. */

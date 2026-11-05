@@ -461,6 +461,32 @@
   }
  },
  {
+  "name": "open_url",
+  "description": "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "url": {
+     "type": "string",
+     "description": "The URL to deliver, e.g. myapp://item/3"
+    }
+   },
+   "required": [
+    "session",
+    "url"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
   "name": "device_log",
   "description": "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.",
   "inputSchema": {

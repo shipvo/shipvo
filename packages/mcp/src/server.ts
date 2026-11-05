@@ -118,6 +118,8 @@ server.tool("notifications", "The notification shade: notifications delivered to
   async ({ session }) => { need(session); return text(JSON.stringify((await sim("/act", { session, action: "notifications" }) as { notifications?: unknown }).notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() },
   async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
+server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  async ({ session, url }) => { need(session); return result(session, await sim("/act", { session, action: "open_url", url })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid },
   async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; return text(JSON.stringify({ note: "Everything here is simulated: no real biometric check or money movement took place.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 

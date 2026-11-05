@@ -85,6 +85,8 @@ export const device: Device = {
 };
 export const setOnline = (o: boolean) => { online = o; netSubs.forEach((f) => f(o)); };
 export const openUrl = (url: string) => Linking.openURL(url);
+/** Call `cb` with each URL opened in the app (deep links). Returns an unsubscribe function. */
+export const onUrl = (cb: (url: string) => void) => { const s = Linking.addEventListener("url", (e) => cb(e.url)); return () => s.remove(); };
 
 // Bridges: UI-owned flows (scanner, payment prompt) resolve a promise when the screen reports back.
 function bridge<Req, Res>() {

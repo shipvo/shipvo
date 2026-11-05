@@ -16,10 +16,12 @@ beforeAll(async () => {
   const b = spawnSync(process.execPath, [createRequire(join(root, "package.json")).resolve("typescript/bin/tsc"), "-p", root, "--outDir", out], { encoding: "utf8" });
   if (b.status !== 0) throw new Error(b.stdout + b.stderr);
   fake = http.createServer(async (req, res) => {
-    for await (const _ of req);
+    let raw = ""; for await (const c of req) raw += c;
+    const sent = raw ? JSON.parse(raw) : {};
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, release: "local", screen: "heading Table Menu" }));
+    if (sent.action === "open_url") return res.end(JSON.stringify(sent.url === "myapp://item/3" ? { ok: true, screen: "heading Item 3" } : { ok: false, code: "no_url_listener", error: "the app has no URL listener", screen: "heading Home" }));
     res.end(JSON.stringify({ ok: true, screen: "ok" }));
   });
   await new Promise<void>((r) => fake.listen(0, r));
@@ -47,6 +49,19 @@ describe("stateless HTTP", () => {
     const call = await rpc("tools/call", { name: "open_app", arguments: { app: "menu" } });
     expect(call.status).toBe(200);
     expect(call.body.result.content[0].text).toContain("heading Table Menu");
+  });
+
+  it("registers open_url with annotations and shows a typed failure as Error [code]", async () => {
+    const tool = (await rpc("tools/list", {})).body.result.tools.find((t: any) => t.name === "open_url");
+    expect(tool).toBeTruthy();
+    expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: false });
+    const opened = await rpc("tools/call", { name: "open_app", arguments: { app: "menu" } });
+    expect(opened.body.result.isError).toBeFalsy();
+    const session = "s1";
+    const ok = await rpc("tools/call", { name: "open_url", arguments: { session, url: "myapp://item/3" } });
+    expect(ok.body.result.content[0].text).toContain("heading Item 3");
+    const bad = await rpc("tools/call", { name: "open_url", arguments: { session, url: "myapp://other" } });
+    expect(bad.body.result.content[0].text).toContain("Error [no_url_listener]");
   });
 
   it("enforces the scope of each request on its own", async () => {
