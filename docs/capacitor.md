@@ -56,6 +56,8 @@ The output is a signed `.ipa` in the `ios-release` artifact.
 
 ## Upload to the stores
 
+The iOS job has not been run on a macOS runner in this repo yet; the template is checked by a parse test only. Your first run is the check.
+
 The template stops at the signed files. Download them from the run's artifacts and upload them with Play Console and Transporter, or add your own upload step. It uses the certificate and profile route, not an App Store Connect API key.
 
 ---

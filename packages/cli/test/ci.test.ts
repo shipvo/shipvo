@@ -53,8 +53,20 @@ describe("capacitor build template", () => {
   it("inlines no secret values: every credential comes from secrets.*", () => {
     const uses = text.match(/\$\{\{[^}]*\}\}/g) ?? [];
     expect(uses.length).toBeGreaterThan(0);
-    for (const u of uses) expect(u).toMatch(/secrets\.[A-Z0-9_]+|vars\.|\|\|/);
+    for (const u of uses) expect(u).toMatch(/^\$\{\{\s*(secrets\.[A-Z0-9_]+|vars\.[A-Z0-9_]+( \|\| '[^']*')?)\s*\}\}$/);
     expect(text).not.toMatch(/-----BEGIN/);
+  });
+
+  it("signs the iOS archive manually with the installed profile", () => {
+    const archive = doc.jobs.ios.steps.find((x: { name?: string }) => x.name === "Archive");
+    expect(archive.env.IOS_PROFILE_NAME).toBe("${{ secrets.IOS_PROFILE_NAME }}");
+    expect(archive.run).toContain("CODE_SIGN_STYLE=Manual");
+    expect(archive.run).toContain('PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME"');
+    expect(archive.run).toContain('CODE_SIGN_IDENTITY="Apple Distribution"');
+    expect(doc.permissions).toEqual({ contents: "read" });
+  });
+
+  it("has no inline secret values", () => {
     expect(text).not.toMatch(/(PASSWORD|KEY_ALIAS|BASE64)\s*:\s*(?!\$\{\{)\S/);
   });
 });
