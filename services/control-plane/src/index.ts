@@ -190,7 +190,11 @@ app.get("/t/:app/summary", async (c) => {
   const a = med(apply.results), k = med(cold.results);
   const releases = [...byRelease.values()].sort((x, y) => y.last - x.last)
     .map((e) => ({ release: e.release, events: e.events, apply_ms_median: a.get(e.release) ?? null, cold_start_ms_median: k.get(e.release) ?? null }));
-  return c.json({ releases });
+  // The halt object for this app, or null. A missing or corrupt value is null.
+  let halted: unknown = null;
+  const haltRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt/${appId}`) : null;
+  if (haltRaw) { try { const v = JSON.parse(haltRaw); if (v && typeof v === "object") halted = v; } catch { /* corrupt: null */ } }
+  return c.json({ releases, halted });
 });
 
 app.get("/band/:cohort", (c) => {
