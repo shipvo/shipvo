@@ -67,6 +67,9 @@ it("--template content writes two screens, the data file and its own test", asyn
   expect(data.length).toBeGreaterThan(1);
   expect(readFileSync(join(dir, "tests/app.test.ts"), "utf8")).toContain("articles[0].body");
   expect(readFileSync(join(dir, "tests/app.test.ts"), "utf8")).not.toContain("Use my location");
+  const readme = readFileSync(join(dir, "README.md"), "utf8");
+  expect(readme).not.toContain("camera");
+  expect(readme).toContain("src/data/articles.json");
 });
 
 it("the default and --template blank write the same files as before", async () => {

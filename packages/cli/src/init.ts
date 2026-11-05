@@ -100,7 +100,7 @@ export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/releas
   w(".github/workflows/test.yml", TEST_WORKFLOW);
   w("tests/app.test.ts", template === "content" ? CONTENT_TEST : TEST_APP(name));
   w("vitest.config.ts", VITEST_CONFIG);
-  w("README.md", README(name, appId, controlPlane));
+  w("README.md", README(name, appId, controlPlane, template));
 
   console.log(`
 Created ${name} in ${dirArg}
@@ -296,14 +296,14 @@ jobs:
         run: npx shipvo publish | tee -a "$GITHUB_STEP_SUMMARY"
 `;
 
-const README = (name: string, appId: string, cp: string) => `# ${name}
+const README = (name: string, appId: string, cp: string, template = "blank") => `# ${name}
 
 A [Shipvo](https://github.com/shipvo/shipvo) app: one React Native codebase that people install from the stores and AI agents operate in a simulator, kept current with signed over-the-air releases.
 
 - \`npm run sim\` opens it in the simulator; \`npx -y @shipvo/mcp\` lets Claude, Cursor or ChatGPT use it (\`open_app("${appId}")\`).
 - \`npx expo run:android\` builds the native shell (the trust root and control plane \`${cp}\` are pinned in it).
 - Push to \`main\`: the publish workflow signs the new JavaScript and every phone and simulator gets it.
-- \`src/release.ts\` is the first thing to edit; \`App.tsx\` shows the device API (camera, location, biometrics, notifications).
+- \`src/release.ts\` is the first thing to edit; ${template === "content" ? "`src/data/articles.json` holds the titles and text; `src/screens/` has the list and detail screens." : "`App.tsx` shows the device API (camera, location, biometrics, notifications)."}
 `;
 
 const CONTENT_DATA = JSON.stringify([

@@ -39,7 +39,7 @@ To start from a reader app instead, add `--template content`: a list screen and 
 | --- | --- |
 | `shipvo.json` | App id, name, control plane URL, the public key pinned in the shell. Every `shipvo` command reads it. |
 | `app.json` | Expo config with the `@shipvo/runtime` plugin (trust root + control plane go into the native shell) and the Expo permission strings. |
-| `App.tsx` | A small screen that boots the OTA runtime and exercises the device API: scan, location, fingerprint, notification. |
+| `App.tsx` (blank template) | A small screen that boots the OTA runtime and exercises the device API: scan, location, fingerprint, notification. |
 | `src/release.ts` | The first thing you edit: push a change and every phone and simulator gets it. |
 | `metro.config.js` | `withShipvoSim`: simulator builds swap Expo's native modules for the simulated device. |
 | `.github/workflows/publish.yml` | Runs `shipvo publish` for you on every push to `main` (optional; you can always run it yourself). |
