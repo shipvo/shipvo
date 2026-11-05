@@ -64,7 +64,7 @@ setTimeout(() => process.exit(0), 3000);`);
     expect(logs.some((l) => l.startsWith("Simulator on"))).toBe(false);
     await done;
     expect(logs.filter((l) => l.startsWith("Simulator on"))).toEqual([
-      `Simulator on http://localhost:${port}  (open_app("demo") from @shipvo/mcp; Ctrl-C to stop)`,
+      `Simulator on http://localhost:${port}/app/  (open_app("demo") from @shipvo/mcp; Ctrl-C to stop)`,
     ]);
     expect(Date.now() - started).toBeGreaterThanOrEqual(500);
     expect(err).toHaveBeenCalled();

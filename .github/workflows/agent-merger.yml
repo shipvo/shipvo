@@ -27,7 +27,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
-          AGENT_MAX_MERGES_PER_DAY: ${{ vars.AGENT_MAX_MERGES_PER_DAY || 40 }}
+          AGENT_MAX_MERGES_PER_DAY: ${{ vars.AGENT_MAX_MERGES_PER_DAY || 100 }}
           AGENT_STALE_DAYS: ${{ vars.AGENT_STALE_DAYS || 4 }}
       - name: Shipvo HQ snapshot (shipvo.dev/hq)
         if: always()
@@ -46,4 +46,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
-          AGENT_MAX_MERGES_PER_DAY: ${{ vars.AGENT_MAX_MERGES_PER_DAY || 40 }}
+          AGENT_MAX_MERGES_PER_DAY: ${{ vars.AGENT_MAX_MERGES_PER_DAY || 100 }}
