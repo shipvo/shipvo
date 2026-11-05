@@ -101,12 +101,15 @@ describe("stateless HTTP", () => {
 
   it("declares annotations on every tool", async () => {
     const list = await rpc("tools/list", {});
-    const byName = Object.fromEntries(list.body.result.tools.map((t: any) => [t.name, t.annotations ?? {}]));
+    const tools = list.body.result.tools;
+    const byName = Object.fromEntries(tools.map((t: any) => [t.name, t.annotations ?? {}]));
     const readOnly = ["list_apps", "list_sessions", "screen", "screenshot", "notifications", "device_log", "owner_describe"];
-    for (const name of readOnly) expect(byName[name].readOnlyHint).toBe(true);
     const destructive = ["owner_command", "end_session"];
+    const others = ["open_app", "tap", "type", "scroll", "back", "set_device", "push_notification", "open_notification", "device_reset", "open_url"];
+    const all = [...readOnly, ...destructive, ...others];
+    expect(tools.map((t: any) => t.name).sort()).toEqual(all.sort());
+    for (const name of readOnly) expect(byName[name].readOnlyHint).toBe(true);
     for (const name of destructive) expect(byName[name].destructiveHint).toBe(true);
-    const others = ["open_app", "tap", "type", "scroll", "back", "set_device", "push_notification", "open_notification", "device_reset"];
     for (const name of others) expect(byName[name].readOnlyHint).toBe(false);
   });
 
@@ -118,5 +121,12 @@ describe("stateless HTTP", () => {
     expect(bad.body.result.isError).toBe(true);
     expect(bad.body.result.structuredContent).toMatchObject({ ok: false, code: "no_url_listener" });
     expect(bad.body.result.content[0].text).toContain("Error [no_url_listener]");
+  });
+
+  it("returns no isError and no structuredContent on a successful call", async () => {
+    const session = "s2";
+    const opened = await rpc("tools/call", { name: "open_app", arguments: { app: "menu", session } });
+    expect(opened.body.result.isError).toBeFalsy();
+    expect(opened.body.result.structuredContent).toBeUndefined();
   });
 });

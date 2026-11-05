@@ -57,8 +57,10 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
 };
 const result = (sid: string, r: Act) => {
   const s = sessions.get(sid); if (s) s.steps++;
-  const msg = `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}`;
-  if (!r.ok) return { content: [{ type: "text" as const, text: msg }], isError: true, structuredContent: { ok: false, code: r.code, error: r.error } };
+  if (!r.ok) {
+    const msg = `Error${r.code ? ` [${r.code}]` : ""}: ${r.error}${/no session/.test(String(r.error)) ? " (sessions expire with the phone; call open_app again)" : ""}\n\nScreen now:\n${r.screen ?? ""}`;
+    return { content: [{ type: "text" as const, text: msg }], isError: true, structuredContent: { ok: false, code: r.code, error: r.error } };
+  }
   return text(r.screen ?? "");
 };
 // Sessions live in the simulator; this map only tracks step counts. A client may reconnect between calls
