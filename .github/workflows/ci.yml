@@ -3,7 +3,9 @@ on:
   push: { branches: [main, "agent/**", "copilot/**"] }   # agent branches too: GitHub runs no pull_request CI while a PR has conflicts
   pull_request:
 concurrency:
-  group: "ci-${{ github.ref }}-${{ github.event_name }}"
+  # Main gets one group per run: a shared group still cancels a *pending* run when a newer one queues,
+  # which cancelled most main runs even with cancel-in-progress off (runs 42124071938, 42124173204, 42124362052).
+  group: "ci-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}-${{ github.event_name }}"
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}   # never cancel CI on main
 jobs:
   test:
