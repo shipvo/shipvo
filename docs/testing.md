@@ -84,7 +84,7 @@ jobs:
 - **Fingerprint and Face ID.** Success, failure and cancel: `biometrics: { nextResult: "fail" }`.
 - **Offline.** `online: false`, then check queued actions and error messages.
 - **Push notifications.** `phone.notify(...)`, then `phone.openNotification()` and assert the deep link lands on the right screen.
-- **Deep links.** `await phone.openUrl("myapp://item/3")`, then assert the right screen. The app must listen with `onUrl` from `@shipvo/device`; if it does not, `openUrl` throws a `PhoneError` with code `no_url_listener`. The MCP tool is `open_url`.
+- **Deep links.** `await phone.openUrl("myapp://item/3")`, then assert the right screen. The app must listen with `onUrl` from `@shipvo/device`; if it does not, `openUrl` throws a `PhoneError` with code `no_url_listener`. The MCP tool is `open_url`. On a phone, `onUrl` fires only for URLs that arrive while the app runs; for a URL that launched the app, read `Linking.getInitialURL()`.
 - **Release regressions.** Keep the flows that earn money in a test file. A change that breaks them fails the pull request, not a customer.
 - **Dark mode.** `openApp({ dark: true })`.
 
