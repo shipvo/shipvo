@@ -87,10 +87,20 @@ jobs:
             echo "LOCKFILE_STALE=1" >> "$GITHUB_ENV"
           fi
           pnpm --filter @shipvo/schema build
+          # Same as CI: build every package so tests can import sibling @shipvo packages. A broken build on
+          # a PR branch must not stop the fixer that is meant to repair it.
+          pnpm -r --filter "./packages/**" build || echo "::warning::Some packages did not build; see the log above"
       - name: Install Chromium for the simulator
         # Code roles run @shipvo/sim, the sim tests and scripts that start it; without this, Playwright has no browser.
         if: steps.chk.outputs.ok == 'true' && inputs.mode != 'read' && inputs.engine == 'claude'
-        run: pnpm --filter @shipvo/sim exec playwright install --with-deps chromium || echo "::warning::Chromium install failed; simulator runs will not work in this job"
+        # Playwright's --with-deps runs apt-get, which fails at once if another apt process holds the lock
+        # (seen on the fixer for #293). Retry instead of giving up on the first try.
+        run: |
+          for a in 1 2 3 4; do
+            pnpm --filter @shipvo/sim exec playwright install --with-deps chromium && exit 0
+            echo "Chromium install failed (try $a), retrying in $(( a * 15 ))s"; sleep $(( a * 15 ))
+          done
+          echo "::warning::Chromium install failed; simulator runs will not work in this job"
 
       - name: Prepare branch
         if: steps.chk.outputs.ok == 'true'
