@@ -11,9 +11,10 @@ import { verifyPointer } from "./verify.js";
 import { signingKey } from "./signing.js";
 import { appCmd } from "./app.js";
 import { doctor } from "./doctor.js";
-import { help, unknownCommand } from "./help.js";
+import { failure, help, unknownCommand } from "./help.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
+try {
 switch (cmd) {
   case "init": await init(rest); break;
   case "sim": await sim(rest); break;
@@ -44,4 +45,8 @@ switch (cmd) {
   }
   case undefined: case "--help": case "-h": case "help": console.log(help); break;
   default: console.error(unknownCommand(cmd)); process.exit(1);
+}
+} catch (e) {
+  console.error(failure(e));
+  process.exit(1);
 }

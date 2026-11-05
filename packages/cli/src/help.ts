@@ -62,3 +62,10 @@ export function unknownCommand(input: string): string {
   const s = suggest(input);
   return `shipvo: '${input}' is not a command.${s ? ` Did you mean '${s}'?` : ""}\nRun 'shipvo --help' to see all commands.\n`;
 }
+
+/** What to print when a command throws: the message, not a stack trace. Set SHIPVO_DEBUG=1 for the stack. */
+export function failure(e: unknown, debug = !!process.env.SHIPVO_DEBUG): string {
+  if (debug && e instanceof Error && e.stack) return e.stack;
+  const m = e instanceof Error ? e.message : String(e);
+  return `shipvo: ${m}\nRun 'shipvo doctor' to check your setup, or set SHIPVO_DEBUG=1 to see the full error.\n`;
+}
