@@ -10,8 +10,13 @@
 // Default run uses no network. With --with-install, also times an install in the scaffolded app,
 // which downloads packages (network). init prints `npm install (or pnpm / bun)`; we prefer pnpm
 // when it is on PATH, so the recorded number is quoted honestly.
-// The bundle export (`expo export`) needs an install and network, so it is not timed: a small
-// plain-JS bundle is staged where the export would write it, and publish runs with --skip-export.
+// Prints one table (step, seconds) and a total (wall time). The JSON keeps milliseconds and ends with a "total" row.
+// A failed step prints its output and exits 1. Nothing is recorded as 0 s for a step that did not run.
+// Full path on a clean Linux runner (no secrets), after `pnpm --filter @shipvo/cli build`:
+//   node scripts/first-run/measure.mjs --with-install --with-export --control-url http://localhost:8787
+// --with-export (needs --with-install and --control-url) runs the real bundle export (`expo export`) inside the
+// real `shipvo publish`, so "publish" includes the export. Without it, a small plain-JS bundle is staged where
+// the export would write it, and publish runs with --skip-export.
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { createPublicKey, verify } from "node:crypto";
@@ -42,7 +47,7 @@ function runStepAsync(name, cli, args, cwd, extraEnv) {
 const devKey = () => process.env.SHIPVO_LOCAL_DEV_KEY ?? "sv_test_localdev";
 
 /** Real publish against a control plane, then check the pointer it serves. Returns the steps to record. */
-async function realPublish(cli, app, controlUrl) {
+async function realPublish(cli, app, controlUrl, withExport) {
   const base = controlUrl.replace(/\/$/, "");
   const cfgPath = join(app, "shipvo.json");
   const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
@@ -58,7 +63,7 @@ async function realPublish(cli, app, controlUrl) {
   } catch (e) { return [fail("app create", 0, `create app: ${e.cause?.code ?? e.message}`)]; }
   try {
     writeFileSync(cfgPath, JSON.stringify({ ...cfg, controlPlane: base }, null, 2) + "\n");
-    const pub = await runStepAsync("publish", cli, ["publish", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app, { SHIPVO_PUBLISH_TOKEN: token });
+    const pub = await runStepAsync("publish", cli, ["publish", ...(withExport ? [] : ["--skip-export", "true"]), "--skip-web", "true", "--platform", "android", "--bands", "b0"], app, { SHIPVO_PUBLISH_TOKEN: token });
     if (pub.exit !== 0) return [pub];
     const t0 = performance.now();
     const pointer = (exit, msg) => ({ step: "pointer", ms: Math.round(performance.now() - t0), exit, stderr: msg });
@@ -105,11 +110,17 @@ function runInstallStep(cwd) {
   return { step: "install", ms, exit, stderr: r.stderr || (r.error ? String(r.error) : ""), pm, version };
 }
 
-export function table(results) {
-  return ["| step | ms | exit |", "| --- | ---: | ---: |", ...results.map((r) => `| ${r.step} | ${r.ms} | ${r.exit} |`)].join("\n");
+const secs = (ms) => (ms / 1000).toFixed(2);
+
+/** One table: step and seconds, then the total. `totalMs` is wall time; it defaults to the sum of the steps. */
+export function table(results, totalMs = results.reduce((n, r) => n + r.ms, 0)) {
+  return ["| step | seconds |", "| --- | ---: |", ...results.map((r) => `| ${r.step} | ${secs(r.ms)} |`), `| total | ${secs(totalMs)} |`].join("\n");
 }
 
-export async function measure(cli, withInstall = false, controlUrl) {
+// withExport: run the real bundle export inside `shipvo publish` (needs install and network).
+export async function measure(cli, withInstall = false, controlUrl, withExport = false) {
+  if (withExport && !(withInstall && controlUrl)) throw new Error("--with-export needs --with-install and --control-url");
+  const start = performance.now();
   const root = mkdtempSync(join(tmpdir(), "shipvo-first-run-"));
   const app = join(root, "app");
   const results = [];
@@ -126,14 +137,15 @@ export async function measure(cli, withInstall = false, controlUrl) {
       results.push(doc);
       ok = doc.exit === 0;
     }
-    if (ok) {
+    if (ok && !withExport) {
       const js = join(app, "dist-ota/_expo/static/js/android");
       mkdirSync(js, { recursive: true });
       writeFileSync(join(js, "index.js"), "console.log('first run');\n");
       results.push(runStep("publish --dry-run", cli, ["publish", "--dry-run", "--skip-export", "true", "--skip-web", "true", "--platform", "android", "--bands", "b0"], app));
-      if (controlUrl && results[results.length - 1].exit === 0) results.push(...(await realPublish(cli, app, controlUrl)));
+      if (controlUrl && results[results.length - 1].exit === 0) results.push(...(await realPublish(cli, app, controlUrl, withExport)));
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
+  results.totalMs = Math.round(performance.now() - start);
   return results;
 }
 
@@ -144,9 +156,11 @@ export async function main(argv) {
   const out = resolve(opt("--out", "first-run.json"));
   const withInstall = argv.includes("--with-install");
   const controlUrl = opt("--control-url", undefined);
-  const results = await measure(cli, withInstall, controlUrl);
-  writeFileSync(out, JSON.stringify(results.map(({ step, ms, exit }) => ({ step, ms, exit })), null, 2) + "\n");
-  console.log(table(results));
+  let results;
+  try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export")); }
+  catch (e) { console.error(e.message); return 1; }
+  writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }], null, 2) + "\n");
+  console.log(table(results, results.totalMs));
   if (withInstall) {
     const inst = results.find((r) => r.step === "install");
     const pm = inst?.pm;

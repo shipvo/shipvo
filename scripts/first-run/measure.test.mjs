@@ -23,9 +23,10 @@ test("passes when every step exits 0, writes json and a table", () => {
   const r = run(f);
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 0], ["publish --dry-run", 0]]);
+  assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 0], ["publish --dry-run", 0], ["total", 0]]);
   assert.ok(j.every((x) => Number.isInteger(x.ms)));
-  assert.match(r.stdout, /\| init \| \d+ \| 0 \|/);
+  assert.match(r.stdout, /\| init \| \d+\.\d\d \|/);
+  assert.match(r.stdout, /\| total \| \d+\.\d\d \|/);
 });
 
 test("a failing step exits non-zero and shows its stderr", () => {
@@ -41,7 +42,7 @@ test("a failing doctor stops the run and prints doctor's own output", () => {
   const r = run(f);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /FAIL signing key/);
-  assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 1]]);
+  assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 1], ["total", 1]]);
 });
 
 test("a failing init stops the run", () => {
@@ -49,11 +50,20 @@ test("a failing init stops the run", () => {
   const r = run(f);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /init broke/);
-  assert.equal(JSON.parse(readFileSync(f.out, "utf8")).length, 1);
+  assert.equal(JSON.parse(readFileSync(f.out, "utf8")).length, 2);
 });
 
-test("table renders rows", () => {
-  assert.equal(table([{ step: "a", ms: 5, exit: 0 }]).split("\n")[2], "| a | 5 | 0 |");
+test("table renders seconds and a total from fake timings", () => {
+  const rows = [{ step: "init", ms: 1500, exit: 0 }, { step: "install", ms: 42250, exit: 0 }, { step: "publish", ms: 8000, exit: 0 }];
+  assert.equal(table(rows, 52000), ["| step | seconds |", "| --- | ---: |", "| init | 1.50 |", "| install | 42.25 |", "| publish | 8.00 |", "| total | 52.00 |"].join("\n"));
+  assert.equal(table(rows).split("\n").pop(), "| total | 51.75 |");
+});
+
+test("--with-export without install and control url fails with a clear message", () => {
+  const f = fake(`process.exit(0);`);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-export"], { encoding: "utf8" });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /--with-export needs --with-install and --control-url/);
 });
 
 test("without --with-install, no install step", () => {
@@ -61,7 +71,7 @@ test("without --with-install, no install step", () => {
   const r = run(f);
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => x.step), ["init", "doctor", "publish --dry-run"]);
+  assert.deepEqual(j.map((x) => x.step), ["init", "doctor", "publish --dry-run", "total"]);
   assert.doesNotMatch(r.stdout, /\| install \|/);
   assert.doesNotMatch(r.stdout, /package manager:/);
 });
@@ -81,7 +91,7 @@ test("with --with-install, install step is included", () => {
   });
   assert.equal(r.status, 0, r.stderr);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => x.step), ["init", "install", "doctor", "publish --dry-run"]);
+  assert.deepEqual(j.map((x) => x.step), ["init", "install", "doctor", "publish --dry-run", "total"]);
   assert.match(r.stdout, /\| install \|/);
   assert.match(r.stdout, /package manager: pnpm 9\.9\.9/);
 });
@@ -102,7 +112,7 @@ test("a failing install stops the run and shows its stderr", () => {
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /boom: install failed/);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => x.step), ["init", "install"]);
+  assert.deepEqual(j.map((x) => x.step), ["init", "install", "total"]);
 });
 
 test("with --with-install, a failing init runs no install", () => {
@@ -117,7 +127,7 @@ test("with --with-install, a failing init runs no install", () => {
   });
   assert.notEqual(r.status, 0);
   const j = JSON.parse(readFileSync(f.out, "utf8"));
-  assert.deepEqual(j.map((x) => x.step), ["init"]);
+  assert.deepEqual(j.map((x) => x.step), ["init", "total"]);
 });
 
 // A tiny control plane: POST /apps, PUT /apps/:id/kv/*, GET /p/*, DELETE /apps/:id.
@@ -169,9 +179,9 @@ test("--control-url runs a real publish and checks the signed pointer", async ()
     const r = await runAsync(f, ["--control-url", s.url]);
     assert.equal(r.status, 0, r.stderr);
     const j = JSON.parse(readFileSync(f.out, "utf8"));
-    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 0], ["publish --dry-run", 0], ["publish", 0], ["pointer", 0]]);
+    assert.deepEqual(j.map((x) => [x.step, x.exit]), [["init", 0], ["doctor", 0], ["publish --dry-run", 0], ["publish", 0], ["pointer", 0], ["total", 0]]);
     assert.ok(j.every((x) => Number.isInteger(x.ms)));
-    assert.match(r.stdout, /\| publish \| \d+ \| 0 \|/);
+    assert.match(r.stdout, /\| publish \| \d+\.\d\d \|/);
     assert.ok(s.log.includes("DELETE /apps/demo"));
   } finally { s.close(); }
 });
@@ -183,7 +193,7 @@ test("--control-url: a non-2xx publish exits 1 and prints the server's message",
     assert.equal(r.status, 1);
     assert.match(r.stderr, /quota exceeded on purpose/);
     const j = JSON.parse(readFileSync(f.out, "utf8"));
-    assert.deepEqual(j.slice(3).map((x) => [x.step, x.exit]), [["publish", 1]]);
+    assert.deepEqual(j.slice(3).map((x) => [x.step, x.exit]), [["publish", 1], ["total", 1]]);
   } finally { s.close(); }
 });
 
@@ -193,6 +203,6 @@ test("--control-url: an unsigned pointer fails the pointer check", async () => {
     const r = await runAsync(f, ["--control-url", s.url]);
     assert.equal(r.status, 1);
     assert.match(r.stderr, /not signed/);
-    assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).slice(3).map((x) => [x.step, x.exit]), [["publish", 0], ["pointer", 1]]);
+    assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).slice(3).map((x) => [x.step, x.exit]), [["publish", 0], ["pointer", 1], ["total", 1]]);
   } finally { s.close(); }
 });
