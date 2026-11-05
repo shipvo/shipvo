@@ -51,6 +51,7 @@ describe("cli", () => {
       const r = run(...args);
       expect(r.status).toBe(0);
       for (const h of ["Start", "Ship", "Advanced"]) expect(r.stdout).toContain(`\n${h}\n`);
+      expect(r.stdout).toContain("sim --watch");
     }
   });
 });

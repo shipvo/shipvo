@@ -18,6 +18,11 @@ internal object BootRules {
   /** The promoting boot was a trial boot and was not counted. Count it now, until the app proves stable. */
   fun countPromotedBoot(c: BootCounts, now: Long) { c.unhealthyBoots = 1; c.firstUnhealthyAt = now }
 
+  /** Whether a downloaded release may still be staged. Two overlapping checks can both pass the early "newer than known"
+   *  test. The second one must not stage the same release again: that would reset `trialBoots` and give a crashing release
+   *  more than MAX_BOOTS runs. Call this inside the handler lock, right before staging. */
+  fun mayStage(release: Int, current: Int, pending: Int, blocked: Int): Boolean = release > maxOf(current, pending, blocked)
+
   fun clear(c: BootCounts) { c.unhealthyBoots = 0; c.firstUnhealthyAt = 0 }
 
   /** The load that last reported healthy (0 = none). */

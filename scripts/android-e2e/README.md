@@ -24,3 +24,5 @@ Tests for the helpers: `node --test scripts/android-e2e/*.test.mjs`. Build `@shi
 Build note: `build-apk.sh` passes `-x lintVitalRelease`. Lint rejects the hardcoded `debuggable` flag that the harness needs for `run-as`.
 
 How times are taken: the server and the runner share one clock. "Pointer published" is the time the pointer file became visible. "Healthy" is the time the server received the app's `applied` telemetry for the new release (sent after `markHealthy`). The app polls every 10 s while open, so pointer-to-healthy includes up to one poll interval.
+
+Run time: a full run takes about 18 minutes (the crash-loop scenarios alone take about 10). If you run it from a tool with a time limit, set the limit above 20 minutes. The staged-rollout scenario runs before the crash-loop scenarios on purpose: a failed late-crash run leaves the app open with a dead React host, and the staged check needs a device that is polling.

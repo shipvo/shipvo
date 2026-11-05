@@ -46,6 +46,40 @@ afterEach(() => { process.chdir(prev); vi.restoreAllMocks(); });
 const withBundle = (v: number) => writeFileSync(join(cwd, "dist-ota/_expo/static/js/android/index.hbc"), fakeHbc(v));
 const flags = ["--skip-export", "true", "--skip-web", "true", "--bands", "b0"];
 
+describe("publish and native modules", () => {
+  const fixture = () => {
+    writeFileSync(join(cwd, "package.json"), JSON.stringify({ dependencies: { "react-native-camera-kit": "^14.0.0", "@scope/maps": "~2.1.0", "plain-js": "^1.0.0", local: "workspace:*" } }));
+    mkdirSync(join(cwd, "node_modules/react-native-camera-kit/android"), { recursive: true });
+    mkdirSync(join(cwd, "node_modules/@scope/maps"), { recursive: true });
+    writeFileSync(join(cwd, "node_modules/@scope/maps/Maps.podspec"), "");
+    mkdirSync(join(cwd, "node_modules/plain-js"), { recursive: true });
+    mkdirSync(join(cwd, "node_modules/local/ios"), { recursive: true });
+  };
+  it("records required_native_modules and prints them in --dry-run", async () => {
+    fixture(); withBundle(96);
+    await publish([...flags, "--dry-run"]);
+    const want = { "@scope/maps": "~2.1.0", "react-native-camera-kit": "^14.0.0" };
+    expect(JSON.parse(JSON.parse(readFileSync(join(cwd, ".shipvo/dry-run/p/demo/1/b0"), "utf8")).body).required_native_modules).toEqual(want);
+    const err = (console.error as any).mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+    expect(err).toContain("@scope/maps@~2.1.0, react-native-camera-kit@^14.0.0");
+  });
+  it("reports native dependencies it skips, such as pre-release ranges", async () => {
+    writeFileSync(join(cwd, "package.json"), JSON.stringify({ dependencies: { "react-native-beta": "^1.0.0-beta.1", "react-native-ok": "^1.0.0" } }));
+    for (const n of ["react-native-beta", "react-native-ok"]) mkdirSync(join(cwd, "node_modules", n, "ios"), { recursive: true });
+    withBundle(96);
+    await publish([...flags, "--dry-run"]);
+    const err = (console.error as any).mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+    expect(err).toContain("not recorded");
+    expect(err).toContain("react-native-beta@^1.0.0-beta.1");
+    expect(err).toContain("requires: react-native-ok@^1.0.0");
+  });
+  it("omits the field when no dependency is native", async () => {
+    withBundle(96);
+    await publish([...flags]);
+    expect(JSON.parse(JSON.parse(values.get("p/demo/1/b0")!).body).required_native_modules).toBeUndefined();
+  });
+});
+
 describe("publish and the Hermes bytecode check", () => {
   it("throws on a version mismatch before any upload", async () => {
     withBundle(98);

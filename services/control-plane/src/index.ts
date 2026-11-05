@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
+import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort, checkNativeModules } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
 import { describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
@@ -48,6 +48,14 @@ async function servePointer(c: any, platform: "android" | "ios") {
       const ok = hbc.split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0);
       if (ok.length === 0) return c.json({ error: "bad_request" }, 400);
       if (!ok.includes(body.hermes_bytecode_version)) return c.json({ error: "hermes_bytecode_mismatch" }, 404, { "cache-control": "public, max-age=5" });
+    }
+    // A shell may list its native modules: ?nm=@scope/pkg@1.2.3,other@2.0.0. Without it, or without required_native_modules, every release is offered.
+    const nm = c.req.query("nm");
+    if (nm !== undefined && body.required_native_modules !== undefined) {
+      const shell: Record<string, string> = {};
+      for (const item of nm.split(",").filter(Boolean)) { const i = item.lastIndexOf("@"); if (i <= 0) return c.json({ error: "bad_request" }, 400); shell[item.slice(0, i)] = item.slice(i + 1); }
+      const bad = checkNativeModules(body.required_native_modules, shell);
+      if (bad) return c.json({ error: bad.reason, module: bad.module, required: bad.required, ...(bad.have ? { have: bad.have } : {}) }, 404, { "cache-control": "public, max-age=5" });
     }
   } catch { return c.json({ error: "corrupt_pointer" }, 500); }
   const etag = `"${release}"`;
