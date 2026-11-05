@@ -9,6 +9,7 @@ function shipvoEnv(l){return "SHIPVO_TEST_"+(l.replace(/[^A-Za-z0-9]+/g,"_").rep
 function shipvoLine(s){
   var t=s.target;
   if(s.action==="note")return ["// "+shipvoOneLine(s.text||"")];
+  if(s.action==="set_device")return ["await phone.device.set("+shipvoQ(s.device||{})+");"];
   if(s.action==="back")return ["await phone.back();"];
   if(s.action==="scroll")return ["await phone.scroll("+shipvoQ(["down","up","left","right"].indexOf(s.direction)>=0?s.direction:"down")+");"];
   if(s.action==="tap"){
@@ -43,7 +44,8 @@ function shipvoCount(doc,label){
   return n;
 }
 function shipvoAttach(frame,onStep){
-  var doc=frame.contentDocument;if(!doc)return;
+  var doc=frame.contentDocument;if(!doc||doc.__shipvoAttached)return;
+  doc.__shipvoAttached=true;
   var sel="button,a,[role=button],[role=link],[role=tab],[role=switch],[role=checkbox]";
   doc.addEventListener("click",function(e){
     var el=e.target&&e.target.closest&&e.target.closest(sel);

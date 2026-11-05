@@ -16,6 +16,8 @@ const session: Step[] = [
   { action: "tap", target: t("OK", 2), changed: true },
   { action: "scroll", direction: "up" },
   { action: "back" },
+  { action: "set_device", device: { location: { latitude: 1.5, longitude: 36.8, accuracy: 20 } } },
+  { action: "set_device", device: { online: false } },
 ];
 
 describe("preview recorder", () => {
@@ -33,7 +35,7 @@ describe("preview recorder", () => {
     (globalThis as any).__rec = { calls, env: { SHIPVO_TEST_PASSWORD: "x" } };
     const phone = {
       async tap(x: string) { calls.push("tap " + x); }, async type(l: string) { calls.push("type " + l); },
-      async scroll(d: string) { calls.push("scroll " + d); }, async back() { calls.push("back"); }, async waitFor() { calls.push("wait"); },
+      async scroll(d: string) { calls.push("scroll " + d); }, async back() { calls.push("back"); }, device: { async set() { calls.push("device.set"); } }, async waitFor() { calls.push("wait"); },
     };
     (globalThis as any).__rec.phone = phone;
     (globalThis as any).__rec.opened = [];
@@ -46,7 +48,12 @@ describe("preview recorder", () => {
     await import(/* @vite-ignore */ file);
     await (globalThis as any).__rec.run();
     expect((globalThis as any).__rec.opened).toEqual(["shop"]);
-    expect(calls).toEqual(["tap Add to cart", "wait", "type Email", "type Password", "scroll up", "back"]);
+    expect(calls).toEqual(["tap Add to cart", "wait", "type Email", "type Password", "scroll up", "back", "device.set", "device.set"]);
+  });
+  it("writes set_device steps as phone.device.set", () => {
+    const out = page.exp("shop", [{ action: "set_device", device: { online: false } }]);
+    expect(out).toContain("await phone.device.set({\"online\":false});");
+    expect(out).toBe(exportTest("shop", [{ action: "set_device", device: { online: false } }]));
   });
   it("opens the app id, not the display name", () => {
     const h = framePage("Tide & Tackle", "com.example.tide");

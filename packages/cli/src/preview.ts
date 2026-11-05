@@ -140,6 +140,7 @@ body.dark .panel select,body.dark .panel option{background:#15171a;color:#eee}.p
 var APP=${JSON.stringify(appId).replace(/</g, "\\u003c")},TITLE=${JSON.stringify(title).replace(/</g, "\\u003c")},recording=false;
 function step(s){if(recording){shipvoSteps.push(s);document.getElementById("count").textContent=shipvoSteps.length+(shipvoSteps.length===1?" step":" steps");document.getElementById("dl").disabled=false}}
 document.getElementById("app").addEventListener("load",function(){shipvoAttach(this,step)});
+(function(a){if(a.contentDocument&&a.contentDocument.readyState==="complete")shipvoAttach(a,step)})(document.getElementById("app"));
 document.getElementById("rec").onclick=function(){recording=!recording;if(recording){shipvoSteps.length=0;document.getElementById("count").textContent="0 steps";document.getElementById("dl").disabled=true}this.setAttribute("aria-pressed",recording)};
 document.getElementById("dl").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([shipvoExport(APP,shipvoSteps,TITLE)],{type:"text/typescript"}));a.download="recorded-session.test.ts";a.click()};
 var SIZES={phone:[360,760],large:[412,892],tablet:[820,1180]},IPHONE={phone:[390,844],large:[430,932],tablet:[820,1180]};
@@ -157,7 +158,7 @@ function pnSay(m){P.textContent=m+" (simulated)"}
 function pnDev(){var d=f.contentWindow&&f.contentWindow.__pnDevice;if(!d){pnSay("The app is still loading");return null}return d}
 function pnNum(c){var v=pnVal(c).trim();return v===""?NaN:Number(v)}
 function pnVal(c){return document.querySelector('[data-control="'+c+'"]').value}
-function pnSet(patch,msg){var d=pnDev();if(d){d.set(patch);pnSay(msg)}}
+function pnSet(patch,msg){var d=pnDev();if(d){d.set(patch);step({action:"set_device",device:patch});pnSay(msg)}}
 var pnDelay=0;
 function pnSlow(){var w=f.contentWindow;if(!w||w.__pnSlow||!w.fetch)return;w.__pnSlow=1;var o=w.fetch.bind(w);w.fetch=function(){var a=arguments;return new Promise(function(r){setTimeout(r,pnDelay)}).then(function(){return o.apply(null,a)})}}
 var A={
@@ -171,7 +172,7 @@ var A={
 "net-online":function(){pnDelay=0;pnSet({online:true},"Network online")},
 "net-slow":function(){if(!pnDev())return;pnDelay=1500;pnSlow();pnSet({online:true},"Network slow (requests wait 1.5 s)")},
 "net-offline":function(){pnDelay=0;pnSet({online:false},"Network offline")},
-"push-send":function(){var d=pnDev();if(!d)return;var t=pnVal("push-title")||"Notification",b=pnVal("push-body");pnSay(d.push({title:t,body:b})===null?"Not delivered: the app has not been granted notification permission":"Push sent")}
+"push-send":function(){var d=pnDev();if(!d)return;var t=pnVal("push-title")||"Notification",b=pnVal("push-body");var ok=d.push({title:t,body:b})!==null;if(ok)step({action:"note",text:"panel: push sent"});pnSay(ok?"Push sent":"Not delivered: the app has not been granted notification permission")}
 };
 var pnGroups=[["bio-success","bio-fail"],["pay-approve","pay-decline"],["net-online","net-slow","net-offline"]];
 document.querySelectorAll("[data-control]").forEach(function(e){var c=e.dataset.control;if(A[c])e.onclick=function(){A[c]();pnGroups.forEach(function(g){if(g.indexOf(c)<0)return;g.forEach(function(k){var b=document.querySelector('[data-control="'+k+'"]');if(b.setAttribute)b.setAttribute("aria-pressed",k===c)})})}});
