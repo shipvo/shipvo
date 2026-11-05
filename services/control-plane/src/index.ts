@@ -124,18 +124,28 @@ app.get("/t/:app", async (c) => {
   return c.json(results);
 });
 
+/** Same public access as GET /t/:app. */
 app.get("/t/:app/summary", async (c) => {
   const appId = c.req.param("app");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
-  const { results } = await c.env.DB.prepare(
-    "SELECT release, event, COUNT(*) AS n, MAX(id) AS latest_id, group_concat(apply_ms) AS apply_ms_values, group_concat(cold_start_ms) AS cold_start_ms_values FROM telemetry WHERE app_id = ? GROUP BY release, event"
+  // First pick the newest 20 releases in SQL so work is bounded to 20 releases.
+  const { results: releaseRows } = await c.env.DB.prepare(
+    "SELECT release FROM telemetry WHERE app_id = ? GROUP BY release ORDER BY MAX(id) DESC LIMIT 20"
   ).bind(appId).all();
+  const releases20 = (releaseRows as { release: number }[]).map((r) => Number(r.release));
+  if (releases20.length === 0) return c.json({ releases: [] });
+  const placeholders = releases20.map(() => "?").join(",");
+  const { results } = await c.env.DB.prepare(
+    `SELECT release, event, COUNT(*) AS n, MAX(id) AS latest_id, group_concat(apply_ms) AS apply_ms_values, group_concat(cold_start_ms) AS cold_start_ms_values FROM telemetry WHERE app_id = ? AND release IN (${placeholders}) GROUP BY release, event`
+  ).bind(appId, ...releases20).all();
+  type Row = { release: number; event: string; n: number; latest_id: number; apply_ms_values: string | null; cold_start_ms_values: string | null };
   const byRelease = new Map<number, { release: number; events: Record<string, number>; apply: number[]; cold: number[]; latestId: number }>();
-  for (const row of results as any[]) {
+  for (const row of results as Row[]) {
     const release = Number(row.release);
     if (!byRelease.has(release)) byRelease.set(release, { release, events: {}, apply: [], cold: [], latestId: Number(row.latest_id) });
     const entry = byRelease.get(release)!;
     entry.events[String(row.event)] = (entry.events[String(row.event)] ?? 0) + Number(row.n);
+    // group_concat joins values with ","; split(",") can yield empty/NaN tokens for null rows, so filter to finite numbers.
     if (row.apply_ms_values) entry.apply.push(...String(row.apply_ms_values).split(",").map(Number).filter(Number.isFinite));
     if (row.cold_start_ms_values) entry.cold.push(...String(row.cold_start_ms_values).split(",").map(Number).filter(Number.isFinite));
     entry.latestId = Math.max(entry.latestId, Number(row.latest_id));
@@ -148,7 +158,6 @@ app.get("/t/:app/summary", async (c) => {
   };
   const releases = [...byRelease.values()]
     .sort((a, b) => b.latestId - a.latestId || b.release - a.release)
-    .slice(0, 20)
     .map(({ release, events, apply, cold }) => ({
       release,
       events,
