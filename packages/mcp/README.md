@@ -12,6 +12,14 @@ Start the simulator first (`shipvo sim` in the app). The server asks the simulat
 
 Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none | content changed | new screen | scrolled`, then the screen. `type` also adds `Value of <ref>: "..."`. Pass `compact: true` to get only the added (`+`) and removed (`-`) lines when the change is `content changed`; refs match the full screen. If the server has no earlier screen for the session (for example after a reconnect), the first line is `Change: unknown`. The `content changed` / `new screen` split is a heuristic (under half the lines kept means a new screen), so on a short screen one change can read as `new screen`.
 
+`tap`, `type`, `scroll` and `back` also take optional fields to wait for the effect instead of sleeping:
+
+- `wait_for`: `{ ref }`, `{ text }` or `{ role, name }` that must appear on the screen, or add `gone: true` to wait for it to disappear. `text` and `name` match as substrings.
+- `settle: true`: wait until the screen stops changing (two reads 100 ms apart that are equal, ignoring ref numbers).
+- `timeout_ms`: the most time `wait_for` and `settle` may take together (default 2000, at most 30000).
+
+The result gets a line `Waited: matched | timed out after <ms> ms` and `structuredContent.waited = { matched, ms }`. On a timeout the action still happened: the result is the latest screen, it is not an error, and the action's own outcome (such as `delivered`) is unchanged. Without these fields the result is the same as before.
+
 **Time limit.** Every call to the simulator stops after 30 s; set `SHIPVO_SIM_TIMEOUT_MS` to change it. A call that gets no answer returns an error result (`isError: true`, code `sim_timeout`, also in `structuredContent`). The action may still have run and the session may still be alive, so call `screen` to see where it is. Timed-out actions are not retried.
 
 **Error codes.** A failed call has `isError: true` and `structuredContent: { ok: false, code, error }`. Some failures from other causes (for example a read-only key) have `code: null`; read `error`.
