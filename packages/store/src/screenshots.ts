@@ -1,11 +1,15 @@
 /**
  * Store screenshot sizes and a checker. Pure code: bytes in, problems out.
  *
- * Sources (the numbers below come from the issue text; they were NOT
- * re-checked against these pages when this file was written, so confirm them
- * before relying on them):
+ * Checked on 2026-11-05 against:
  * - Apple: https://developer.apple.com/help/app-store-connect/reference/screenshot-specifications
+ *   (JPEG or PNG, no alpha, 1 to 10 per device size, the sizes listed below)
  * - Google Play: https://support.google.com/googleplay/android-developer/answer/9866151
+ *   (phone: 320 to 3840 px, long side at most 2x the short side; tablets: 1080 to
+ *   7680 px; 2 to 8 screenshots; feature graphic 1024x500 JPEG or PNG without alpha;
+ *   icon 512x512 PNG, alpha allowed, at most 1024 KB)
+ * Google recommends 9:16 and 16:9 but only enforces the 2x limit, so we do too.
+ * Recheck these pages when either store changes its rules.
  */
 
 export type ScreenshotSetId =
@@ -22,21 +26,36 @@ export interface ScreenshotSetSpec {
   /** Exact sizes accepted. Portrait or landscape both pass. */
   exact?: { width: number; height: number }[];
   /** Range rule for sets Google defines by shape, not by exact size. */
-  range?: { minSide: number; maxSide: number; ratio: [number, number] };
+  range?: { minSide: number; maxSide: number; maxAspect: number };
   min: number;
   max: number;
+  /** Transparency is allowed (Play icon only). Default false. */
+  allowAlpha?: boolean;
+  /** Only PNG is accepted (Play icon). */
+  pngOnly?: boolean;
+  /** Largest file in bytes. */
+  maxBytes?: number;
 }
 
+const sizes = (...pairs: [number, number][]) => pairs.map(([width, height]) => ({ width, height }));
+
 export const SCREENSHOT_SETS: Record<ScreenshotSetId, ScreenshotSetSpec> = {
-  iphone: { label: "iPhone", exact: [{ width: 1206, height: 2622 }, { width: 1179, height: 2556 }], min: 1, max: 10 },
-  "ipad-13": { label: "iPad 13-inch", exact: [{ width: 2064, height: 2752 }, { width: 2048, height: 2732 }], min: 1, max: 10 },
-  // 9:16, at least 1080 on the short side.
-  "play-phone": { label: "Play phone", range: { minSide: 1080, maxSide: 7680, ratio: [9, 16] }, min: 2, max: 8 },
-  // Tablets: 16:9 or 9:16 within Google's side limits.
-  "play-tablet-7": { label: "Play 7-inch tablet", range: { minSide: 320, maxSide: 3840, ratio: [9, 16] }, min: 1, max: 8 },
-  "play-tablet-10": { label: "Play 10-inch tablet", range: { minSide: 1080, maxSide: 7680, ratio: [9, 16] }, min: 1, max: 8 },
-  "play-feature-graphic": { label: "Play feature graphic", exact: [{ width: 1024, height: 500 }], min: 1, max: 1 },
-  "play-icon": { label: "Play icon", exact: [{ width: 512, height: 512 }], min: 1, max: 1 },
+  iphone: {
+    label: "iPhone",
+    exact: sizes(
+      [1398, 2034], [2007, 2853], [1260, 2736], [1290, 2796], [1320, 2868], [1284, 2778], [1242, 2688],
+      [1179, 2556], [1206, 2622], [1170, 2532], [1125, 2436], [1080, 2340], [1242, 2208], [750, 1334],
+      [640, 1096], [640, 1136], [640, 920], [640, 960],
+    ),
+    min: 1,
+    max: 10,
+  },
+  "ipad-13": { label: "iPad 13-inch", exact: sizes([2064, 2752], [2048, 2732]), min: 1, max: 10 },
+  "play-phone": { label: "Play phone", range: { minSide: 320, maxSide: 3840, maxAspect: 2 }, min: 1, max: 8 },
+  "play-tablet-7": { label: "Play 7-inch tablet", range: { minSide: 1080, maxSide: 7680, maxAspect: 2 }, min: 1, max: 8 },
+  "play-tablet-10": { label: "Play 10-inch tablet", range: { minSide: 1080, maxSide: 7680, maxAspect: 2 }, min: 1, max: 8 },
+  "play-feature-graphic": { label: "Play feature graphic", exact: sizes([1024, 500]), min: 1, max: 1 },
+  "play-icon": { label: "Play icon", exact: sizes([512, 512]), min: 1, max: 1, allowAlpha: true, pngOnly: true, maxBytes: 1024 * 1024 },
 };
 
 export interface ScreenshotFile {
@@ -48,8 +67,6 @@ export interface CheckResult {
   ok: boolean;
   /** Reasons the stores would reject the file. */
   problems: string[];
-  /** Things worth knowing that do not fail the check. */
-  notes: string[];
 }
 
 interface Info {
@@ -108,43 +125,43 @@ function sizeOk(spec: ScreenshotSetSpec, w: number, h: number): boolean {
   if (spec.exact) return spec.exact.some((s) => (w === s.width && h === s.height) || (w === s.height && h === s.width));
   const r = spec.range!;
   const short = Math.min(w, h), long = Math.max(w, h);
-  return short >= r.minSide && long <= r.maxSide && short * r.ratio[1] === long * r.ratio[0];
+  return short >= r.minSide && long <= r.maxSide && long <= short * r.maxAspect;
 }
 
 function describeSize(spec: ScreenshotSetSpec): string {
   if (spec.exact) return spec.exact.map((s) => `${s.width}x${s.height}`).join(" or ");
   const r = spec.range!;
-  return `${r.ratio[0]}:${r.ratio[1]} with the short side at least ${r.minSide}px and the long side at most ${r.maxSide}px`;
+  return `sides of ${r.minSide} to ${r.maxSide}px with the long side at most ${r.maxAspect}x the short side`;
 }
 
-/** Check one file against a set: PNG or JPEG, exact size, no alpha. */
+/** Check one file against a set: PNG or JPEG, size rule, alpha, file size. */
 export function checkScreenshot(file: ScreenshotFile, set: ScreenshotSetId): CheckResult {
   const spec = SCREENSHOT_SETS[set];
   const problems: string[] = [];
   const info = readInfo(file.bytes);
   if (!info) {
-    return { ok: false, problems: [`${file.name}: not a PNG or JPEG file.`], notes: [] };
+    return { ok: false, problems: [`${file.name}: not a PNG or JPEG file.`] };
   }
   if (!sizeOk(spec, info.width, info.height)) {
     problems.push(`${file.name}: is ${info.width}x${info.height}; ${spec.label} needs ${describeSize(spec)}.`);
   }
-  if (info.alpha) problems.push(`${file.name}: has an alpha channel (transparency); flatten it onto a solid background.`);
-  return { ok: problems.length === 0, problems, notes: [] };
+  if (spec.pngOnly && info.format !== "png") problems.push(`${file.name}: ${spec.label} must be a PNG.`);
+  if (spec.maxBytes !== undefined && file.bytes.length > spec.maxBytes) {
+    problems.push(`${file.name}: is ${file.bytes.length} bytes; ${spec.label} allows at most ${spec.maxBytes}.`);
+  }
+  if (info.alpha && !spec.allowAlpha) problems.push(`${file.name}: has an alpha channel (transparency); flatten it onto a solid background.`);
+  return { ok: problems.length === 0, problems };
 }
 
 /** Check the file count for a set, then every file in it. */
 export function checkSet(files: ScreenshotFile[], set: ScreenshotSetId): CheckResult {
   const spec = SCREENSHOT_SETS[set];
   const problems: string[] = [];
-  const notes: string[] = [];
   if (files.length < spec.min) problems.push(`${spec.label} needs at least ${spec.min} file(s); got ${files.length}.`);
   if (files.length > spec.max) problems.push(`${spec.label} allows at most ${spec.max} file(s); got ${files.length}.`);
-  if (set === "play-phone" && files.length >= spec.min && files.length < 4) {
-    notes.push("Play phone has fewer than 4 screenshots; 4 or more are needed to be eligible for promotion.");
-  }
   for (const f of files) {
     const r = checkScreenshot(f, set);
     problems.push(...r.problems);
   }
-  return { ok: problems.length === 0, problems, notes };
+  return { ok: problems.length === 0, problems };
 }

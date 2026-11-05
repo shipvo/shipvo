@@ -27,20 +27,49 @@ const f = (name: string, bytes: Uint8Array) => ({ name, bytes });
 describe("checkScreenshot", () => {
   it("accepts a valid file for each set", () => {
     expect(checkScreenshot(f("a.png", png(1206, 2622)), "iphone").ok).toBe(true);
+    expect(checkScreenshot(f("a.png", png(1320, 2868)), "iphone").ok).toBe(true);
+    expect(checkScreenshot(f("a.jpg", jpeg(1290, 2796)), "iphone").ok).toBe(true);
     expect(checkScreenshot(f("a.png", png(2048, 2732)), "ipad-13").ok).toBe(true);
     expect(checkScreenshot(f("a.png", png(1080, 1920)), "play-phone").ok).toBe(true);
     expect(checkScreenshot(f("a.png", png(1080, 1920)), "play-tablet-7").ok).toBe(true);
     expect(checkScreenshot(f("a.png", png(1440, 2560)), "play-tablet-10").ok).toBe(true);
     expect(checkScreenshot(f("a.png", png(1024, 500)), "play-feature-graphic").ok).toBe(true);
-    expect(checkScreenshot(f("a.jpg", jpeg(512, 512)), "play-icon").ok).toBe(true);
+    expect(checkScreenshot(f("a.png", png(512, 512)), "play-icon").ok).toBe(true);
   });
   it("rejects the wrong size", () => {
     const r = checkScreenshot(f("a.png", png(1000, 2000)), "iphone");
     expect(r.ok).toBe(false);
     expect(r.problems[0]).toContain("1000x2000");
   });
-  it("rejects a Play phone screenshot below 1080 wide", () => {
-    expect(checkScreenshot(f("a.png", png(720, 1280)), "play-phone").ok).toBe(false);
+  it("accepts a 9:18 Play phone screenshot and rejects 9:20 (over 2x)", () => {
+    expect(checkScreenshot(f("a.png", png(1080, 2160)), "play-phone").ok).toBe(true);
+    expect(checkScreenshot(f("a.png", png(1080, 2400)), "play-phone").ok).toBe(false);
+  });
+  it("rejects Play phone shots outside the documented limits", () => {
+    expect(checkScreenshot(f("a.png", png(300, 600)), "play-phone").ok).toBe(false); // under 320
+    expect(checkScreenshot(f("a.png", png(1080, 4000)), "play-phone").ok).toBe(false); // over 3840
+    expect(checkScreenshot(f("a.png", png(1000, 2100)), "play-phone").ok).toBe(false); // longer than 2x
+  });
+  it("rejects a Play tablet screenshot below 1080", () => {
+    expect(checkScreenshot(f("a.png", png(800, 1280)), "play-tablet-10").ok).toBe(false);
+  });
+  it("allows alpha for the Play icon but only as PNG", () => {
+    expect(checkScreenshot(f("a.png", png(512, 512, 6)), "play-icon").ok).toBe(true);
+    expect(checkScreenshot(f("a.jpg", jpeg(512, 512)), "play-icon").ok).toBe(false);
+  });
+  it("rejects a Play icon over 1024 KB", () => {
+    const big = Buffer.concat([png(512, 512), Buffer.alloc(1024 * 1024)]);
+    expect(checkScreenshot(f("a.png", big), "play-icon").ok).toBe(false);
+  });
+  it("returns ok:false, without throwing, for truncated files", () => {
+    const p = png(1206, 2622);
+    for (const cut of [4, 12, 20, 28]) {
+      expect(checkScreenshot(f("a.png", p.slice(0, cut)), "iphone").ok).toBe(false);
+    }
+    const j = jpeg(1290, 2796);
+    for (const cut of [2, 5, 12, 16]) {
+      expect(checkScreenshot(f("a.jpg", j.slice(0, cut)), "iphone").ok).toBe(false);
+    }
   });
   it("rejects an alpha PNG", () => {
     const r = checkScreenshot(f("a.png", png(1206, 2622, 6)), "iphone");
@@ -65,14 +94,6 @@ describe("checkSet", () => {
   });
   it("rejects too few files", () => {
     expect(checkSet([], "iphone").ok).toBe(false);
-    const phone = [f("a.png", png(1080, 1920))];
-    expect(checkSet(phone, "play-phone").ok).toBe(false);
-  });
-  it("notes, but passes, Play phone with fewer than 4 shots", () => {
-    const three = Array.from({ length: 3 }, (_, i) => f(`${i}.png`, png(1080, 1920)));
-    const r = checkSet(three, "play-phone");
-    expect(r.ok).toBe(true);
-    expect(r.notes[0]).toContain("4");
-    expect(checkSet([...three, three[0]], "play-phone").notes).toEqual([]);
+    expect(checkSet([], "play-phone").ok).toBe(false);
   });
 });
