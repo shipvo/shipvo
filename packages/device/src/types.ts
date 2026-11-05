@@ -20,6 +20,7 @@ export type Notification = { id: string; title: string; body: string; data?: Rec
 
 export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "contacts" | "calendar" | "files";
 /** How a capability is provided here: by the real OS/SDK, by the simulated device, or not at all. Never a silent fallback. */
+export type MicrophoneSession = { source: "real" | "simulated"; stream?: unknown; level(): number; stop(): void };
 export type Support = "real" | "simulated" | "unavailable";
 export interface Device {
   /** Where this API is running. */
@@ -30,6 +31,8 @@ export interface Device {
   location: { current(): Promise<Coords> };
   /** Opens the camera to scan one barcode or QR code. Resolves with the code, or null if the person cancels. */
   camera: { scan(opts?: { prompt?: string }): Promise<ScanResult | null> };
+  /** Web and simulator only. Opens the microphone: the real one when a person is present and allows it, else the simulated one. `source` says which. */
+  microphone?: { open(): Promise<MicrophoneSession> };
   auth: { available(): Promise<boolean>; confirm(reason: string): Promise<AuthResult> };
   /** Charges through the configured provider. The prompt UI (amount, PIN) is the app's own sheet, identical on every platform. */
   pay: { charge(req: PaymentRequest, pin: string): Promise<PaymentResult> };

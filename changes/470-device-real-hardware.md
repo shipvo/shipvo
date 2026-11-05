@@ -1,0 +1,2 @@
+- device: in the browser, `device.camera.scan`, `device.location.current` and the new `device.microphone.open` use the real webcam, microphone and location when a person is present and allows it. Headless, hidden, refused or missing hardware falls back to the simulated device. The microphone API is optional on `Device` (web and simulator only), so existing code is unaffected.
+- device: every `device_log` entry has `source: "real"` or `"simulated"`. `set_device` takes `source: "simulated"` to force simulated mode, and `microphone: { level }` for the simulated microphone.
