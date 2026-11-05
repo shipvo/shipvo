@@ -24,14 +24,17 @@ export function compactDiff(prev: string, next: string): string {
   const out: string[] = [];
   for (const l of pl) { const n = nc.get(norm(l)) ?? 0; if (n > 0) nc.set(norm(l), n - 1); else out.push("- " + l.trim()); }
   for (const l of nl) { const n = pc.get(norm(l)) ?? 0; if (n > 0) pc.set(norm(l), n - 1); else out.push("+ " + l.trim()); }
-  return out.join("\n");
+  return out.length ? out.join("\n") : "(same lines, new order)";
 }
 
-// The value of the field with this ref: the text after "]:" on its line.
+// The value of the field with this ref: the text after its attribute brackets and ":".
+// Handles more attributes after the ref ([ref=e3] [cursor=pointer]: Ana) and YAML-quoted lines.
 export function fieldValue(tree: string, ref: string): string | undefined {
-  for (const l of lines(tree)) {
-    const m = new RegExp(`\\[ref=\\w*${ref}\\](?::\\s*(.*))?$`).exec(l.trim());
-    if (m) return (m[1] ?? "").replace(/^"(.*)"$/, "$1");
+  for (const raw of lines(tree)) {
+    const q = /^(\s*- )'(.*)'(:.*)?$/.exec(raw);
+    const l = (q ? q[1] + q[2]!.replace(/''/g, "'") + (q[3] ?? "") : raw).trim();
+    const m = new RegExp(`\\[ref=${ref}\\]((?: \\[[^\\]]*\\])*)(?::\\s*(.*))?$`).exec(l);
+    if (m) return (m[2] ?? "").trim().replace(/^"(.*)"$/, "$1");
   }
   return undefined;
 }

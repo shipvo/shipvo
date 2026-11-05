@@ -49,7 +49,7 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
   const prev = s?.tree; if (s) s.tree = r.screen;
   const change = classify(prev, r.screen, action);
   const head = [`Change: ${change}`];
-  if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); if (v !== undefined) head.push(`Value of ${o.ref}: ${JSON.stringify(v)}`); }
+  if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
   const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
   return result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
 };

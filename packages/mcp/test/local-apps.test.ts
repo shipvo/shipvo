@@ -72,6 +72,10 @@ describe("change line", () => {
     const list = ['- heading "Shop"', '- button "Buy" [ref=e1]', '- button "Dead" [ref=e2]', '- textbox "Name" [ref=e3]', '- text "Row 1"', '- text "Row 2"', '- text "Row 3"', '- text "Row 4"'];
     screens.home = list.join("\n");
     screens.typed = list.map((l) => (l.includes("Name") ? l + ": Ana" : l)).join("\n");
+    screens.attrs = list.map((l) => (l.includes("Name") ? '- textbox "Name" [ref=e3] [cursor=pointer]: Ana' : l)).join("\n");
+    screens.quoted = list.map((l) => (l.includes("Name") ? `- 'textbox "a: b" [ref=e3]': Ana` : l)).join("\n");
+    screens.gone = list.filter((l) => !l.includes("Name")).join("\n");
+    screens.reordered = [list[0], ...list.slice(1).reverse()].join("\n");
     screens.badge = list.concat('- text "Added to cart" [ref=e9]').join("\n");
     screens.next = '- heading "Cart"\n- button "Pay" [ref=e4]';
     screens.scrolled = list.slice(0, 1).concat(['- text "Row 5"', '- text "Row 6"']).join("\n");
@@ -113,5 +117,26 @@ describe("change line", () => {
     expect(compact).toContain('+ - text "Added to cart" [ref=e9]');
     expect(compact).not.toContain("Row 1");
     expect(compact.length).toBeLessThan(full.length);
+  });
+  it("finds the value when attributes follow the ref", async () => {
+    await act("tap", "home", { ref: "e2" });
+    expect(await act("type", "attrs", { ref: "e3", text: "Ana" })).toContain('Value of e3: "Ana"');
+  });
+  it("finds the value on a YAML-quoted line", async () => {
+    await act("tap", "home", { ref: "e2" });
+    expect(await act("type", "quoted", { ref: "e3", text: "Ana" })).toContain('Value of e3: "Ana"');
+  });
+  it("finds the value when the whole line is quoted", async () => {
+    screens.quoted2 = `- 'textbox "a: b" [ref=e3]: Ana'`;
+    await act("tap", "home", { ref: "e2" });
+    expect(await act("type", "quoted2", { ref: "e3", text: "Ana" })).toContain('Value of e3: "Ana"');
+  });
+  it("says when the value is not shown", async () => {
+    expect(await act("type", "gone", { ref: "e3", text: "Ana" })).toContain("Value of e3: not shown");
+  });
+  it("does not return an empty diff when lines only moved", async () => {
+    await act("tap", "home", { ref: "e2" });
+    const r = await act("tap", "reordered", { ref: "e1", compact: true });
+    expect(r).toContain("(same lines, new order)");
   });
 });
