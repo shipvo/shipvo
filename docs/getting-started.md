@@ -8,7 +8,7 @@ Video: [Ship an update to phones in minutes](videos.md), 1 min 30 s, with captio
 
 This guide takes you from nothing to an app that AI agents can open in a simulator, that installs on an Android phone, and that you update over the air with one command, `shipvo publish`.
 
-What we measured: on 2026-11-05, on a GitHub Actions Linux runner (4 vCPU, AMD EPYC 7763, Node 22), `shipvo init` took 100 ms and `shipvo publish --dry-run` took 107 ms, run offline. We did not time install, bundle export or store builds, so this is not the full path. See [`scripts/first-run/`](../scripts/first-run/) to re-run it.
+What we measured: on 2026-11-05, on a GitHub Actions Linux runner (4 vCPU, AMD EPYC 7763, Node 22), `shipvo init` took 100 ms and `shipvo publish --dry-run` took 107 ms, run offline. Those two numbers skip the bundle export (`--skip-export`). A full run on the same kind of runner, with the real export, took 12 s with `--skip-web true` and 18 s without it ([dogfood report](product/dogfood/2026-11-05-habits.md)). We did not time store builds. See [`scripts/first-run/`](../scripts/first-run/) to re-run it.
 
 ## 0. What you need
 
@@ -28,6 +28,8 @@ npx playwright install chromium
 ```
 
 If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with PASS or FAIL, and a FAIL line ends with the exact fix. It checks your Node version, `shipvo.json`, the signing key, control plane reachability and `hermesBytecodeVersion`. It does not check ports or Chromium yet.
+
+`init` also writes `tests/app.test.ts`, which tests the starter screen. When you replace `App.tsx` with your own screens, replace or delete that file too, or `npm test` fails on buttons that no longer exist.
 
 `init` writes a complete Expo app:
 
