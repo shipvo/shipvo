@@ -266,7 +266,10 @@ export function applyRow(report) {
   if (typeof ms !== "number" || !Number.isFinite(ms) || ms <= 0) return null;
   const { downloadMs, applyMs } = report.firstRun;
   const ok = (n) => (typeof n === "number" && Number.isFinite(n) && n > 0 ? n : undefined);
-  return { step: "publish to healthy (emulator)", ms: Math.round(ms), exit: 0, downloadMs: ok(downloadMs), applyMs: ok(applyMs) };
+  const row = { step: "publish to healthy (emulator)", ms: Math.round(ms), exit: 0 };
+  if (ok(downloadMs)) row.downloadMs = ok(downloadMs);
+  if (ok(applyMs)) row.applyMs = ok(applyMs);
+  return row;
 }
 
 export async function main(argv) {
@@ -281,8 +284,8 @@ export async function main(argv) {
   catch (e) { console.error(e.message); return 1; }
   const applyPath = opt("--apply-report", undefined);
   let apply = null;
-  if (applyPath) { try { apply = applyRow(JSON.parse(readFileSync(applyPath, "utf8"))); } catch {} }
-  writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }, ...(apply ? [{ step: apply.step, ms: apply.ms, exit: 0, downloadMs: apply.downloadMs, applyMs: apply.applyMs }] : [])], null, 2) + "\n");
+  if (applyPath) { try { apply = applyRow(JSON.parse(readFileSync(applyPath, "utf8"))); } catch (e) { console.error(`--apply-report ${applyPath}: ${e.code === "ENOENT" ? "file not found" : e.message}`); } }
+  writeFileSync(out, JSON.stringify([...results.map(({ step, ms, exit }) => ({ step, ms, exit })), { step: "total", ms: results.totalMs, exit: results.some((r) => r.exit !== 0) ? 1 : 0 }, ...(apply ? [apply] : [])], null, 2) + "\n");
   console.log(table(results, results.totalMs));
   if (applyPath) console.log(apply ? `\npublish to healthy (emulator): ${secs(apply.ms)} s (not part of the total above)` : "\npublish to healthy (emulator): not measured");
   if (withInstall) {

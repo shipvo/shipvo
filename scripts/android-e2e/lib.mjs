@@ -70,3 +70,15 @@ export function steadyTrials(trials, pollMissMs = 3000) {
   const miss = trials.map((t) => t.timeline?.pointerSeenMs == null || t.timeline.pointerSeenMs > pollMissMs);
   return trials.filter((_, i) => !miss[i] && !(i > 0 && miss[i - 1]));
 }
+
+/**
+ * The `firstRun` block of the report. The first-run app is not published in this job, so the honest equivalent is the
+ * median of the full-bundle update scenario: a device with no patch base, which is what a new app's first update is.
+ * Returns null when that scenario failed or has no timing, so the summary says "not measured".
+ */
+export function firstRunFrom(scenarios) {
+  const s = scenarios.find((x) => x.name === "update: full bundle (no patches offered)");
+  const m = s?.pass ? s.median : null;
+  if (!m || !(typeof m.pointerToHealthyMs === "number" && m.pointerToHealthyMs > 0)) return null;
+  return { source: s.name, publishToHealthyMs: m.pointerToHealthyMs, downloadMs: m.downloadMs ?? null, applyMs: m.applyMs ?? null };
+}
