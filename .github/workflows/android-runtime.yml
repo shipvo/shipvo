@@ -1,0 +1,55 @@
+name: android-runtime
+# Runs the Android OTA runtime's JVM unit tests (packages/runtime/android/src/test) on every change to the runtime.
+# The runtime is an Expo module, so it is built inside the sample app's prebuilt Android project.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["packages/runtime/**", ".github/workflows/android-runtime.yml"]
+  pull_request:
+    paths: ["packages/runtime/**", ".github/workflows/android-runtime.yml"]
+permissions: { contents: read }
+concurrency: { group: "android-runtime-${{ github.ref }}", cancel-in-progress: true }
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
+      - name: Prebuild the sample app's Android project
+        working-directory: apps/tide-and-tackle
+        run: CI=1 npx expo prebuild -p android --no-install
+      - name: Run the runtime's unit tests
+        working-directory: apps/tide-and-tackle/android
+        run: |
+          P=$(./gradlew -q projects --no-daemon | grep -oE "':?[^']*shipvo[^']*runtime[^']*'" | tr -d "'" | head -1)
+          [ -n "$P" ] || { echo "::error::could not find the @shipvo/runtime Gradle project"; ./gradlew -q projects --no-daemon; exit 1; }
+          case "$P" in :*) ;; *) P=":$P" ;; esac
+          echo "runtime project: $P"
+          ./gradlew "$P:testDebugUnitTest" --no-daemon -PreactNativeArchitectures=arm64-v8a
+      - name: Test summary
+        if: always()
+        run: |
+          shopt -s globstar nullglob
+          files=(packages/runtime/android/build/test-results/**/*.xml apps/tide-and-tackle/android/**/build/test-results/testDebugUnitTest/*.xml node_modules/@shipvo/runtime/android/build/test-results/**/*.xml)
+          [ ${#files[@]} -gt 0 ] || { echo "No test results found." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          node -e '
+            const fs=require("fs");let t=0,f=0,s=0;const rows=[];
+            for(const p of process.argv.slice(1)){const x=fs.readFileSync(p,"utf8");const m=x.match(/<testsuite[^>]*name="([^"]+)"[^>]*tests="(\d+)"[^>]*skipped="(\d+)"[^>]*failures="(\d+)"/);if(!m)continue;t+=+m[2];s+=+m[3];f+=+m[4];rows.push(`| ${m[1]} | ${m[2]} | ${m[4]} |`)}
+            console.log(`### Android runtime unit tests\n\n${t} tests, ${f} failed, ${s} skipped.\n\n| Suite | Tests | Failed |\n| --- | --- | --- |\n${[...new Set(rows)].join("\n")}`)' "${files[@]}" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: android-runtime-test-reports
+          path: |
+            **/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
