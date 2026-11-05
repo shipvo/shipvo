@@ -76,7 +76,7 @@ const roles = Object.entries(ROLE).map(([wf, name]) => {
   // Busy roles fill the shared run list; look up quieter ones on their own workflow.
   const own = real.length ? [] : (api(`repos/${REPO}/actions/workflows/${wf}.yml/runs?per_page=20`)?.workflow_runs || []).filter((r) => r.conclusion !== "skipped");
   const last = real[0] || own[0] || mine[0];
-  const day = real.filter((r) => age(r.created_at) < D);
+  const day = (real.length ? real : own).filter((r) => age(r.created_at) < D);
   return { id: wf, name, file: `${wf}.yml`, running: mine.some((r) => r.status !== "completed"), last: last ? { at: last.created_at, status: last.status, conclusion: last.conclusion, url: last.html_url, title: last.display_title } : null, runs_24h: day.length, failed_24h: day.filter((r) => r.conclusion === "failure").length };
 });
 
