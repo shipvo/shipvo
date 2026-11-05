@@ -17,7 +17,7 @@ Music: "Thrilled hands holding" by Tymphony (Jamendo, CC BY-SA 3.0) https://www.
 <details>
 <summary>Transcript</summary>
 
-Who tests your app before you ship it? You can ask an A I assistant to do it. It taps every button, like a customer. And it needs no phone.
+Who tests your app before you ship it? You can ask an AI assistant to do it. It taps every button, like a customer. And it needs no phone.
 
 Step one. Start your shop in the simulator. Then give your assistant one setting. It tells Claude, or Cursor, to start the Shipvo tools. That plug is called MCP.
 

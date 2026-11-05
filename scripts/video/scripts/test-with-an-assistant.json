@@ -14,7 +14,8 @@
       "id": "hook",
       "visual": "taHook",
       "min": 9,
-      "narration": "Who tests your app before you ship it? You can ask an A I assistant to do it. It taps every button, like a customer. And it needs no phone."
+      "narration": "Who tests your app before you ship it? You can ask an A I assistant to do it. It taps every button, like a customer. And it needs no phone.",
+      "caption": "Who tests your app before you ship it? You can ask an AI assistant to do it. It taps every button, like a customer. And it needs no phone."
     },
     {
       "id": "connect",

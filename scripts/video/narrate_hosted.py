@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """narrate_hosted.py — Kokoro narration via the hosted keyless endpoint."""
-import argparse, json, os, subprocess, sys, tempfile, time, urllib.parse, urllib.request
+import argparse, json, os, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request
 
 BASE = "https://tts.voice-generator.com"
 
@@ -16,15 +16,18 @@ def fetch(text, voice, speed, out, tries=6):
     q = urllib.parse.urlencode({"text": text, "voice": voice, "lang": lang_for(voice), "format": "wav", "speed": str(speed)})
     last = None
     for i in range(tries):
+        limited = False
         try:
             with urllib.request.urlopen(f"{BASE}/tts?{q}", timeout=180) as r:
                 ct, data = r.headers.get("content-type", ""), r.read()
             if ct.startswith("audio/"):  # errors arrive as HTTP 200 + JSON: trust the content type
                 open(out, "wb").write(data); return
             last = data[:200].decode(errors="replace")
+        except urllib.error.HTTPError as e:
+            last, limited = str(e), e.code == 429
         except Exception as e:
             last = str(e)
-        time.sleep(2 * (i + 1) * (5 if "429" in str(last) else 1))
+        time.sleep(2 * (i + 1) * (5 if limited else 1))
     raise SystemExit(f"TTS failed after {tries} tries: {last}")
 
 def dur(path):
