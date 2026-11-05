@@ -1,0 +1,3 @@
+- `@shipvo/mcp`: `tap`, `type`, `scroll` and `back` return `delivery` (`delivered` or `not_delivered`) in `structuredContent`. On `not_delivered` they add `reason` (`stale_ref`, `not_visible`, `disabled`, `covered`) and `safe_to_retry`. `type` also returns `value`.
+- `@shipvo/sim`: `/act` checks that the target is visible, enabled and not covered before tap, type and back, and returns the same fields.
+- Migration: none; the fields are additive.

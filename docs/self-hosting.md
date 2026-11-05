@@ -57,6 +57,7 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 | KV | `h/<app>/r<N>` | Release history (sha, size, min shell) for rollback |
 | KV | `halt-config/<app>`, `halt/<app>` | Auto-halt. Turn it on with `shipvo auto-halt --threshold 0.2 --min-reports 20` (see [the CLI docs](cli.md#shipvo-auto-halt)). That writes `halt-config/<app>`; you can also write it yourself as `{"threshold": 0.2, "min_reports": 20}` to turn halting on. The control plane writes `halt/<app>` as `{"release": 5, "halted_at": "<ISO time>", "reports": n, "failed": n, "threshold": 0.2}` when release 5 fails on too many devices. While it holds the live release, the pointer answers 404 `release_halted` and shells keep their current release. Publishing a new release clears the effect; you do not need to delete the key. |
 | D1 | `telemetry` | applied / reverted / cold-start / download events from phones |
+| R2 (optional) | `telemetry/v1/app=<app>/day=<day>/*.parquet` | Telemetry export for SQL tools; see [telemetry export](telemetry-export.md) |
 | D1 | `content`, `content_history` | Live content per app, with an audit trail of owner changes |
 | D1 | `orders` | What apps post to `/o/<app>` |
 | D1 | `api_keys`, `sim_sessions` | Hosted simulator keys and sandboxes (only if you run the simulator service) |
