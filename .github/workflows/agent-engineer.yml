@@ -23,7 +23,7 @@ jobs:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
       REPO: ${{ github.repository }}
       WANT: ${{ github.event.issue.number || inputs.issue || '' }}
-      MAX_ACTIVE: ${{ vars.AGENT_CLAUDE_MAX_ACTIVE || 4 }}
+      MAX_ACTIVE: 6   # Claude does nearly all code work now (Mistral and Aider: docs and tests only)
     steps:
       - id: pick
         run: |
