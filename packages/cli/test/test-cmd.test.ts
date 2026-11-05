@@ -77,3 +77,35 @@ describe("shipvo test --repair", () => {
     expect(() => stepLine({ kind: "tap", target: 'Say "hi"', line: 1 })).toThrow();
   });
 });
+
+describe("shipvo test --report", () => {
+  const rep = (f: string) => JSON.parse(readFileSync(f, "utf8"));
+  it("writes a passing run, with null commit and release when unknown", async () => {
+    const f = project(); const out = join(tmpdir(), `rep-${Date.now()}.json`);
+    const d = mkdtempSync(join(tmpdir(), "norepo-")); process.chdir(d);
+    const sha = process.env.GITHUB_SHA; delete process.env.GITHUB_SHA;
+    try {
+      const code = await testCmd([f, "--report", out], kit('- button "Add to cart" [ref=e1]'), () => {});
+      expect(code).toBe(0);
+      const r = rep(out);
+      expect(r.commit).toBeNull(); expect(r.release).toBeNull(); expect(r.app).toBeNull();
+      expect(r.flows).toHaveLength(1);
+      expect(r.flows[0]).toMatchObject({ name: f, status: "passed", failedStep: null, message: null });
+      expect(r.flows[0].steps).toHaveLength(2);
+      expect(r.parityLimits.length).toBeGreaterThan(0);
+      expect(Number.isNaN(Date.parse(r.time))).toBe(false);
+    } finally { if (sha) process.env.GITHUB_SHA = sha; }
+  });
+  it("writes a failing run with the failing step; exit code stays 1", async () => {
+    const f = project(); const out = join(tmpdir(), `rep-${Date.now()}b.json`);
+    process.env.GITHUB_SHA = "abc123";
+    try {
+      const code = await testCmd([f, "--report", out, "--release", "7"], kit(), () => {});
+      expect(code).toBe(1);
+      const r = rep(out);
+      expect(r.commit).toBe("abc123"); expect(r.release).toBe("7");
+      expect(r.flows[0]).toMatchObject({ status: "failed", failedStep: { kind: "tap", target: "Add to cart", line: 2 } });
+      expect(r.flows[0].message).toContain("Add to cart");
+    } finally { delete process.env.GITHUB_SHA; }
+  });
+});

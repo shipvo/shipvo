@@ -41,3 +41,17 @@ describe("hosted kv network errors", () => {
     expect(lastBytes).toBe(2 * 1024 * 1024 + 5);
   });
 });
+
+describe("hosted kv policy refusal", () => {
+  it("prints the server's rule and reason, and sends the agent header under SHIPVO_ACTOR=agent", async () => {
+    const seen: Record<string, string | undefined> = {};
+    const s = createServer((req, res) => { seen.actor = req.headers["x-shipvo-actor"] as string | undefined; req.resume(); req.on("end", () => { res.statusCode = 403; res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ error: "policy_refused", code: "policy_refused", rule: "maxBand", reason: "this publish reaches b2, but policy.maxBand is b1" })); }); });
+    await new Promise<void>((ok) => s.listen(0, "127.0.0.1", ok));
+    process.env.SHIPVO_PUBLISH_TOKEN = "t"; process.env.SHIPVO_ACTOR = "agent";
+    const c = { ...cfg(), controlPlane: `http://127.0.0.1:${(s.address() as { port: number }).port}` };
+    try {
+      await expect(kv(c).put("p/app/1/b2", "x", "text/plain")).rejects.toThrow("Refused by policy rule maxBand: this publish reaches b2, but policy.maxBand is b1");
+      expect(seen.actor).toBe("agent");
+    } finally { delete process.env.SHIPVO_ACTOR; s.close(); }
+  });
+});

@@ -24,6 +24,24 @@ export async function loadPolicy(env: { kv: KVNamespace; appId: string }): Promi
     return { agentPolicy: ["ask", "deny", "allow"].includes(p.agentPolicy) ? p.agentPolicy : "ask", agentDeny: Array.isArray(p.agentDeny) ? p.agentDeny.map(String) : [] };
   } catch { return { agentPolicy: "ask", agentDeny: [] }; }
 }
+const BANDS = ["b0", "b1", "b2"] as const;
+type Band = (typeof BANDS)[number];
+export type ReleasePolicy = { maxBand?: Band; agentMaxBand?: Band };
+const RELEASE_POLICY_KEY = (appId: string) => `c/${appId}/release_policy`;
+/** The stored release policy. A missing, corrupt or unknown value means no limit. */
+export async function loadReleasePolicy(env: { kv: KVNamespace; appId: string }): Promise<ReleasePolicy> {
+  try {
+    const p = JSON.parse((await env.kv.get(RELEASE_POLICY_KEY(env.appId))) ?? "{}");
+    return { ...(BANDS.includes(p.maxBand) ? { maxBand: p.maxBand } : {}), ...(BANDS.includes(p.agentMaxBand) ? { agentMaxBand: p.agentMaxBand } : {}) };
+  } catch { return {}; }
+}
+/** Same rules and wording as `checkPolicy` in the CLI, for the two band limits only. */
+export function checkReleasePolicy(policy: ReleasePolicy, band: string, agent: boolean): { ok: true } | { ok: false; rule: "maxBand" | "agentMaxBand"; reason: string } {
+  const at = BANDS.indexOf(band as Band);
+  if (policy.maxBand && at > BANDS.indexOf(policy.maxBand)) return { ok: false, rule: "maxBand", reason: `this publish reaches ${band}, but policy.maxBand is ${policy.maxBand}` };
+  if (agent && policy.agentMaxBand && at > BANDS.indexOf(policy.agentMaxBand)) return { ok: false, rule: "agentMaxBand", reason: `an agent-run publish reaches ${band}, but policy.agentMaxBand is ${policy.agentMaxBand}` };
+  return { ok: true };
+}
 /** What a publish reaches. Telemetry has no device id, so this counts update reports, not phones. */
 async function reach(env: OwnerEnv): Promise<string> {
   try {
@@ -206,6 +224,16 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
       const v = { agentPolicy: String(a.agentPolicy), agentDeny: String(a.agentDeny ?? "").split(",").map((x) => x.trim()).filter(Boolean) };
       await env.kv.put(POLICY_KEY(env.appId), JSON.stringify(v)); return v;
     } },
+  get_release_policy: { description: "The band limits publishes must respect: maxBand for everyone, agentMaxBand for AI agents (b0, b1 or b2). Empty means no limit.", params: {}, mutates: false,
+    run: async (_d, _a, env) => loadReleasePolicy(env) },
+  set_release_policy: { description: "Set maxBand and agentMaxBand (b0, b1 or b2; leave out or empty for no limit). The control plane refuses a publish to a wider band. Owner sign-in only: agents cannot call it.", mutates: false, adminOnly: true,
+    params: { maxBand: { type: "string", description: "Widest band any publish may reach", enum: ["b0", "b1", "b2", ""] }, agentMaxBand: { type: "string", description: "Widest band an agent publish may reach", enum: ["b0", "b1", "b2", ""] } },
+    run: async (_d, a, env) => {
+      const v: ReleasePolicy = {};
+      if (a.maxBand) v.maxBand = String(a.maxBand) as Band;
+      if (a.agentMaxBand) v.agentMaxBand = String(a.agentMaxBand) as Band;
+      await env.kv.put(RELEASE_POLICY_KEY(env.appId), JSON.stringify(v)); return v;
+    } },
   audit_log: { description: "Who changed what, newest first.", params: {}, mutates: false,
     run: async (_d, _a, env) => (await env.db.prepare("SELECT at, actor, command, args_json, ok FROM audit WHERE app_id = ? ORDER BY id DESC LIMIT 100").bind(env.appId).all()).results },
 };
@@ -282,7 +310,7 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   } catch (e) {
     res = e instanceof OwnerError ? { ok: false, error: { code: e.code, message: e.message } } : { ok: false, error: { code: "internal", message: String(e) } };
   }
-  if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy" || name === "set_alert_webhook")
+  if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy" || name === "set_release_policy" || name === "set_alert_webhook")
     await env.db.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
       .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(denied ? { ...auditArgs(name, args), denied: true } : confirmed ? { ...auditArgs(name, args), confirmed: true } : auditArgs(name, args)).slice(0, 2000), res.ok && !denied ? 1 : 0).run();
   return res;
