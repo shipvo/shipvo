@@ -13,6 +13,9 @@ const root = resolve(__dirname, "..");
 const have = (bin: string) => spawnSync(bin, ["-version"]).status === 0;
 const required = process.env.SHIPVO_REQUIRE_FFMPEG === "1";
 const ffmpegOk = have("ffmpeg") && have("ffprobe");
+const chromiumPath = () => { try { return process.env.SHIPVO_CHROMIUM ?? createRequire(import.meta.url)("playwright").chromium.executablePath(); } catch { return ""; } };
+const browserOk = !!chromiumPath() && existsSync(chromiumPath());
+const encodeOk = ffmpegOk && (browserOk || required);
 if (required && !ffmpegOk) throw new Error("SHIPVO_REQUIRE_FFMPEG=1 but ffmpeg or ffprobe is missing");
 
 let page: http.Server; let url = ""; let out = ""; let dist = "";
@@ -32,7 +35,7 @@ const probe = (file: string) => {
 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-describe.skipIf(!ffmpegOk)("Recorder", () => {
+describe.skipIf(!encodeOk)("Recorder", () => {
   it.each([["9:16", 1080, 1920], ["16:9", 1920, 1080], ["1:1", 1080, 1080]] as const)("writes an H.264 MP4 for %s", async (format, width, height) => {
     const r = new Recorder();
     await r.start({ url, format, title: "My Demo", dir: out });
@@ -65,6 +68,23 @@ describe("Recorder without a recording", () => {
   });
 });
 
+describe("Recorder stop race", () => {
+  it("refuses start while stop is still encoding", async () => {
+    const r: any = new Recorder();
+    let finish!: (c: number) => void;
+    r.running = true; r.file = "a.mp4"; r.t0 = Date.now();
+    r.ff = { stdin: { end() {}, writable: false }, kill() {} };
+    r.done = new Promise<number>((res) => { finish = res; });
+    const stopping = r.stop();
+    expect(r.active).toBe(true);
+    await expect(r.start({ url, dir: out })).rejects.toMatchObject({ code: "recording_active" });
+    expect(r.file).toBe("a.mp4");
+    finish(0);
+    expect(await stopping).toMatchObject({ file: "a.mp4" });
+    expect(r.active).toBe(false);
+  });
+});
+
 describe("Recorder start failures (no ffmpeg needed)", () => {
   const withChromium = async (path: string | undefined, f: () => Promise<void>) => {
     const old = process.env.SHIPVO_CHROMIUM;
@@ -80,7 +100,10 @@ describe("Recorder start failures (no ffmpeg needed)", () => {
   }, 60000);
   it("an unreachable page gives frame_unreachable with the URL", async () => {
     const chromium = process.env.SHIPVO_CHROMIUM ?? (await import("playwright")).chromium.executablePath();
-    if (!existsSync(chromium)) return; // no browser on this machine; the launch test above covers that path
+    if (!existsSync(chromium)) {
+      if (required) throw new Error("SHIPVO_REQUIRE_FFMPEG=1 but Chromium is missing");
+      return; // no browser on this machine; the launch test above covers that path
+    }
     await withChromium(chromium, async () => {
       const r = new Recorder(); const bad = "http://127.0.0.1:1/";
       await expect(r.start({ url: bad, dir: out })).rejects.toMatchObject({ code: "frame_unreachable", message: expect.stringContaining(bad) });
@@ -119,7 +142,7 @@ describe("MCP tools", () => {
     expect(r.structuredContent.error).toMatch(/record_start/);
     await c.close();
   });
-  it.skipIf(!ffmpegOk)("records a scripted session end to end", async () => {
+  it.skipIf(!encodeOk)("records a scripted session end to end", async () => {
     const c2 = await connect({ SHIPVO_FRAME_URL: url });
     await c2.callTool({ name: "record_start", arguments: { format: "1:1", title: "e2e" } });
     await sleep(400); await c2.callTool({ name: "record_marker", arguments: { caption: "hello" } }); await sleep(400);

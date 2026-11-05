@@ -17,12 +17,12 @@ type Browser = { newPage(o: object): Promise<Page>; close(): Promise<void> };
 
 export class Recorder {
   private browser?: Browser; private page?: Page; private ff?: ChildProcess; private loop?: Promise<void>;
-  private t0 = 0; private running = false; private starting = false; private ffErr = ""; private done?: Promise<number | null>;
+  private t0 = 0; private running = false; private starting = false; private stopping = false; private ffErr = ""; private done?: Promise<number | null>;
   private chapters: Chapter[] = []; private file = ""; private size = SIZES["9:16"]; private fps = 30;
-  get active() { return this.running || this.starting; }
+  get active() { return this.running || this.starting || this.stopping; }
 
   async start(o: { url: string; format?: Format; fps?: 30 | 60; title?: string; dir?: string }): Promise<{ file: string; width: number; height: number }> {
-    if (this.running || this.starting) throw new RecorderError("recording_active", "a recording is already running: call record_stop first");
+    if (this.active) throw new RecorderError("recording_active", "a recording is already running: call record_stop first");
     this.starting = true;
     try {
       this.size = SIZES[o.format ?? "9:16"]; this.fps = o.fps ?? 30; this.chapters = []; this.ffErr = "";
@@ -62,14 +62,18 @@ export class Recorder {
 
   async stop(): Promise<Recording> {
     if (!this.running) throw new RecorderError("no_recording", "no recording is running: call record_start first");
-    this.running = false; await this.loop;
-    await this.grab();
-    const duration_s = Math.round((Date.now() - this.t0)) / 1000;
-    this.ff!.stdin!.end();
-    const code = await this.done; const err = this.ffErr; const out = { file: this.file, duration_s, ...this.size, chapters: this.chapters };
-    await this.cleanup();
-    if (code !== 0) throw new RecorderError("encode_failed", `ffmpeg failed${code === -1 ? " to start (is it installed?)" : ""}: ${err.trim().slice(0, 300)}`);
-    return out;
+    this.running = false; this.stopping = true;
+    try {
+      const { file, size, chapters, ff, done, t0 } = this;
+      await this.loop;
+      await this.grab();
+      const duration_s = Math.round((Date.now() - t0)) / 1000;
+      ff!.stdin!.end();
+      const code = await done; const err = this.ffErr; const out = { file, duration_s, ...size, chapters };
+      await this.cleanup();
+      if (code !== 0) throw new RecorderError("encode_failed", `ffmpeg failed${code === -1 ? " to start (is it installed?)" : ""}: ${err.trim().slice(0, 300)}`);
+      return out;
+    } finally { this.stopping = false; }
   }
 
   private async cleanup() {
