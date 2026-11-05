@@ -130,3 +130,26 @@ describe("suggest", () => {
     expect(suggest("roll")).toBeUndefined();
   });
 });
+
+describe("store details", () => {
+  const app = () => {
+    const d = mkdtempSync(join(tmpdir(), "shipvo-store-"));
+    writeFileSync(join(d, "shipvo.json"), JSON.stringify({ appId: "shop", name: "Shop", controlPlane: "https://cp.test", publicKey: "k", listing: { capabilities: ["contacts", "hologram"] } }));
+    return d;
+  };
+  it("--dry-run prints answers and writes both files", () => {
+    const d = app();
+    const r = spawnSync(process.execPath, [join(out, "cli.js"), "store", "details", "--dry-run", "--out", "o"], { encoding: "utf8", cwd: d });
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toContain("contacts: Contacts / Contacts");
+    expect(r.stdout).toContain('"hologram"');
+    expect(readFileSync(join(d, "o", "data-safety.csv"), "utf8")).toContain("PSL_CONTACTS");
+    expect(readFileSync(join(d, "o", "privacy-policy.md"), "utf8")).toContain("Review before publishing");
+  });
+  it("without --dry-run exits 2 and writes nothing", () => {
+    const d = app();
+    const r = spawnSync(process.execPath, [join(out, "cli.js"), "store", "details"], { encoding: "utf8", cwd: d });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("upload is not available yet; use --dry-run");
+  });
+});
