@@ -145,6 +145,12 @@ class ShipvoRuntimeModule : Module() {
     if (release <= known) return mapOf("status" to "none")
     val shellVersion = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "0.0.0"
     require(!Verify.semverLess(shellVersion, body.getString("min_shell_version"))) { "shell too old for release $release" }
+    // In addition to the signature and hash checks: never stage bytecode this shell cannot run. Keep the current release.
+    val releaseHbc = if (body.has("hermes_bytecode_version")) body.optInt("hermes_bytecode_version") else null
+    if (BootRules.bytecodeMismatch(s.hermesBytecodeVersion, releaseHbc)) {
+      s.addEvent("bytecode_mismatch:$release")
+      return mapOf("status" to "rejected", "reason" to "bytecode_mismatch", "release" to release)
+    }
     val verifyPointerMs = SystemClock.elapsedRealtime() - t0
 
     val core = body.getJSONObject("core")

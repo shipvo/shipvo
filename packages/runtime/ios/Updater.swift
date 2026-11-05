@@ -14,6 +14,9 @@ enum Updater {
     return r
   }
 
+  /// True when a release was built for another Hermes bytecode version than this shell runs. Either side missing = no mismatch.
+  static func bytecodeMismatch(shell: Int?, release: Int?) -> Bool { if let shell, let release { return shell != release }; return false }
+
   private static func resolve(_ s: Store, _ url: String) -> String { url.hasPrefix("http") ? url : "\(s.baseUrl)/\(url.drop(while: { $0 == "/" }))" }
 
   static func check(_ s: Store) async throws -> [String: Any] {
@@ -34,6 +37,11 @@ enum Updater {
     guard let release = body["release"] as? Int else { throw UpdateError("pointer has no release") }
     if release <= known { return ["status": "none"] }
     try require(!Verify.semverLess(s.shellVersion, body["min_shell_version"] as? String ?? "0.0.0"), "shell too old for release \(release)")
+    // In addition to the signature and hash checks: never stage bytecode this shell cannot run. Keep the current release.
+    if bytecodeMismatch(shell: s.hermesBytecodeVersion, release: (body["hermes_bytecode_version"] as? NSNumber)?.intValue) {
+      s.addEvent("bytecode_mismatch:\(release)")
+      return ["status": "rejected", "reason": "bytecode_mismatch", "release": release]
+    }
     let verifyPointerMs = (Store.now() - t0) * 1000
 
     guard let core = body["core"] as? [String: Any], let wantSha = core["sha256"] as? String,

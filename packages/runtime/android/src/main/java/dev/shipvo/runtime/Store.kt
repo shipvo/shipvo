@@ -82,6 +82,8 @@ internal class Store(private val ctx: Context) : BootCounts {
   val baseUrl: String get() = (meta("dev.shipvo.BASE_URL") ?: "").trimEnd('/')
   val publicKey: String get() = meta("dev.shipvo.PUBLIC_KEY") ?: ""
   val appId: String get() = meta("dev.shipvo.APP_ID") ?: ""
+  /** Hermes bytecode version this shell runs, from the config plugin. Null = unknown, so the check is skipped. */
+  val hermesBytecodeVersion: Int? get() = meta("dev.shipvo.HERMES_BYTECODE_VERSION")?.toIntOrNull()
   val shellMajor: Int get() = (meta("dev.shipvo.SHELL_MAJOR") ?: "1").toIntOrNull() ?: 1
 
   companion object {

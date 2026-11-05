@@ -6,6 +6,7 @@ final class Store {
   /// Replaces what the app's Info.plist and file system would say. Tests use it; the app never does.
   struct Overrides {
     var suite: String, dir: URL, baseUrl: String, publicKey: String, appId: String, shellMajor: Int, shellVersion: String, binaryVersion: String
+    var hermesBytecodeVersion: Int? = nil
   }
 
   private let d: UserDefaults
@@ -85,6 +86,8 @@ final class Store {
   var baseUrl: String { var s = o?.baseUrl ?? plist("ShipvoBaseURL") ?? ""; while s.hasSuffix("/") { s.removeLast() }; return s }
   var publicKey: String { o?.publicKey ?? plist("ShipvoPublicKey") ?? "" }
   var appId: String { o?.appId ?? plist("ShipvoAppId") ?? "" }
+  /// Hermes bytecode version this shell runs, from the config plugin. nil = unknown, so the check is skipped.
+  var hermesBytecodeVersion: Int? { if let o { return o.hermesBytecodeVersion }; return plist("ShipvoHermesBytecodeVersion").flatMap { Int($0) } }
   var shellMajor: Int { if let o { return o.shellMajor }; return Int(plist("ShipvoShellMajor") ?? "1") ?? 1 }
 
   // MARK: per-process state

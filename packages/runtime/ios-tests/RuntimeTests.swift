@@ -16,8 +16,8 @@ final class RuntimeTests: XCTestCase {
   }
   override func tearDown() { if let tmp { try? FileManager.default.removeItem(at: tmp) } }
 
-  private func store(_ app: String, shell: String = "1.0.0", binary: String = "1.0.0/1", key: String? = nil) -> Store {
-    let s = Store(overrides: .init(suite: "shipvo.test.\(UUID().uuidString)", dir: tmp, baseUrl: base, publicKey: key ?? pub, appId: app, shellMajor: 1, shellVersion: shell, binaryVersion: binary))
+  private func store(_ app: String, shell: String = "1.0.0", binary: String = "1.0.0/1", key: String? = nil, hbc: Int? = nil) -> Store {
+    let s = Store(overrides: .init(suite: "shipvo.test.\(UUID().uuidString)", dir: tmp, baseUrl: base, publicKey: key ?? pub, appId: app, shellMajor: 1, shellVersion: shell, binaryVersion: binary, hermesBytecodeVersion: hbc))
     s.binaryVersion = binary
     return s
   }
@@ -148,6 +148,31 @@ final class RuntimeTests: XCTestCase {
   func testUsesTheFullBundleWhenNothingIsRunningYet() async throws {
     let r = try await Updater.check(store("patch"))
     XCTAssertEqual(r["via"] as? String, "full")
+  }
+
+  func testBytecodeMismatchKeepsCurrentRelease() async throws {
+    let s = store("hbc-mismatch", hbc: 96)
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "rejected")
+    XCTAssertEqual(r["reason"] as? String, "bytecode_mismatch")
+    XCTAssertEqual(s.pendingRelease, 0); XCTAssertNil(s.pendingPath)
+    XCTAssertTrue(s.consumeEvents().contains("bytecode_mismatch:5"))
+  }
+
+  func testBytecodeMatchStages() async throws {
+    let s = store("hbc-match", hbc: 96)
+    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+    XCTAssertEqual(s.pendingRelease, 5)
+  }
+
+  func testMissingBytecodeFieldStages() async throws {
+    let s = store("good", hbc: 96)   // pointer has no field: apply as before
+    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
+  }
+
+  func testShellWithoutBytecodeVersionStages() async throws {
+    let s = store("hbc-mismatch")                                // shell version unknown: apply as before
+    XCTAssertEqual(try await Updater.check(s)["status"] as? String, "staged")
   }
 
   func testRefusesWhatItCannotTrust() async throws {

@@ -74,3 +74,10 @@ class StabilityTest {
     assertFalse(BootRules.mayStage(5, 3, 0, 5))
   }
 }
+
+class BytecodeMismatchTest {
+  @org.junit.Test fun differentVersionsMismatch() { org.junit.Assert.assertTrue(BootRules.bytecodeMismatch(96, 98)) }
+  @org.junit.Test fun sameVersionMatches() { org.junit.Assert.assertFalse(BootRules.bytecodeMismatch(96, 96)) }
+  @org.junit.Test fun missingReleaseFieldApplies() { org.junit.Assert.assertFalse(BootRules.bytecodeMismatch(96, null)) }
+  @org.junit.Test fun unknownShellVersionApplies() { org.junit.Assert.assertFalse(BootRules.bytecodeMismatch(null, 98)) }
+}

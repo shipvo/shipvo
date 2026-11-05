@@ -23,6 +23,9 @@ describe("forwardRuntimeEvents", () => {
   it("reports download_failed once with the release id", () => {
     expect(run(["download_failed:8"])).toEqual([["download_failed", 8]]);
   });
+  it("reports bytecode_mismatch with the release id", () => {
+    expect(run(["bytecode_mismatch:9"])).toEqual([["bytecode_mismatch", 9]]);
+  });
   it("does not override the release for crash_loop_revert", () => {
     expect(run(["crash_loop_revert:5"])).toEqual([["crash_loop_revert", undefined]]);
   });

@@ -23,6 +23,9 @@ internal object BootRules {
    *  more than MAX_BOOTS runs. Call this inside the handler lock, right before staging. */
   fun mayStage(release: Int, current: Int, pending: Int, blocked: Int): Boolean = release > maxOf(current, pending, blocked)
 
+  /** True when a release was built for another Hermes bytecode version than this shell runs. Either side missing = no mismatch. */
+  fun bytecodeMismatch(shell: Int?, release: Int?): Boolean = shell != null && release != null && shell != release
+
   fun clear(c: BootCounts) { c.unhealthyBoots = 0; c.firstUnhealthyAt = 0 }
 
   /** The load that last reported healthy (0 = none). */
