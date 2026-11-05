@@ -1,1 +1,2 @@
-- mcp: the `tap` description and the `settle` and `wait_for` fields now tell assistants to wait after any action that starts work, so they do not report "Paying..." as the result. No API change.
+- `@shipvo/mcp`: the `tap` description and the `settle` and `wait_for` fields now tell assistants to wait after any action that starts work, so they do not report "Paying..." as the result.
+- Migration: none.
