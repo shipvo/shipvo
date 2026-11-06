@@ -3,7 +3,8 @@ import PackageDescription
 
 // The iOS half of @shipvo/capacitor. `ShipvoBundle` has no Capacitor code, so it builds and tests anywhere.
 // `ShipvoPlugin` needs UIKit and is added only when this manifest is read on macOS.
-var products: [Product] = []
+// Two products, so Xcode also generates the `ShipvoCapacitor-Package` scheme that the CI `ios` job tests.
+var products: [Product] = [.library(name: "ShipvoBundle", targets: ["ShipvoBundle"])]
 var dependencies: [Package.Dependency] = []
 var targets: [Target] = [
     .target(name: "ShipvoBundle", path: "ios/Sources/ShipvoBundle"),
