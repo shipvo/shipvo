@@ -27,12 +27,39 @@ runs:
       shell: bash
       run: |
         npx shipvo sim --port 4545 > sim.log 2>&1 &
+        SIM_PID=$!
         for i in $(seq 1 90); do curl -sf http://localhost:4545/app/ > /dev/null && break; sleep 2; done
         rc=0
+        cr=0
         npx shipvo ci check || rc=$?
         if [ "$EVENT_NAME" = "pull_request" ]; then
+          # Screenshots need the PR build on port 4545, so they run before the PR simulator is stopped.
           npx shipvo ci shots --changed-from "$BASE_SHA" || true
-          npx shipvo ci comment --changed-from "$BASE_SHA" --pr "$PR_NUMBER" || true
+          # Run the same flows on the base commit, built in a second folder, for the regression comparison.
+          # The simulator serves one build at a time, so the PR build is stopped first.
+          rm -rf shipvo-base
+          if git worktree add shipvo-base "$BASE_SHA" > /dev/null 2>&1; then
+            pkill -P $SIM_PID 2>/dev/null || true
+            kill $SIM_PID 2>/dev/null || true
+            (
+              cd shipvo-base
+              if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile
+              elif [ -f yarn.lock ]; then yarn install --frozen-lockfile
+              elif [ -f package-lock.json ]; then npm ci
+              else npm install; fi
+              PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear
+              npx shipvo sim --port 4545 > ../sim-base.log 2>&1 &
+              for i in $(seq 1 90); do curl -sf http://localhost:4545/app/ > /dev/null && break; sleep 2; done
+              npx shipvo test --report ../shipvo-base-report.json || true
+              kill $! 2>/dev/null || true
+            ) > shipvo-base.log 2>&1 || echo "Base run failed, see shipvo-base.log. The comment has no comparison."
+            git worktree remove --force shipvo-base || true
+          else
+            echo "Base commit not available (the checkout needs fetch-depth: 0), skipping comparison."
+          fi
+          # The comment step runs last. Only exit 1 (a regression) fails the check; other codes are ignored.
+          npx shipvo ci comment --changed-from "$BASE_SHA" --pr "$PR_NUMBER" --base-report shipvo-base-report.json --fail-on-regression || cr=$?
+          if [ "$cr" = "1" ]; then rc=1; fi
         fi
         exit $rc
       env:
@@ -48,5 +75,7 @@ runs:
           explore-report.md
           explore-report.json
           shipvo-report.json
+          shipvo-base-report.json
+          shipvo-base.log
           shipvo-shots/
         if-no-files-found: ignore

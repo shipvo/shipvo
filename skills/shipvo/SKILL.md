@@ -87,6 +87,6 @@ Over MCP, with a session open: `record_start` → do the steps, calling `record_
 
 ## Planned
 
-`shipvo smoke [--timeout 30] [--json]` answers "does the app load?" Exit 0 loads, 1 failed, 2 setup error. JSON: `{ ok, code, summary, data: { time_to_first_screen_ms, elements, errors, error_count }, next }`; `data.errors` has the first 5 errors. It does not take a platform.
+`shipvo smoke [android|ios] [--timeout 30] [--json]` answers "does the app load?" Exit 0 loads, 1 failed, 2 setup error. JSON: `{ ok, code, summary, data: { platform, time_to_first_screen_ms, elements, errors, error_count }, next }`; `data.errors` has the first 5 errors. `android` (default) or `ios` is passed to the simulator as the session's device platform; another value exits 2.
 
 `shipvo agents setup` and `--json` on every command are planned (see issue 533). Today `smoke`, `doctor`, `test`, `explore`, `status`, `publish`, `promote`, `rollback` and `auto-halt` take `--json`.

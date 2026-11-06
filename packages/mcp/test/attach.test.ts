@@ -54,7 +54,8 @@ async function open(args: Record<string, unknown>, app = "menu") {
   return { c, text: r.content[0].text, isError: r.isError };
 }
 
-describe("open_app attach", () => {
+// Each open() starts a server process; two of them can pass 5 s on a busy CI runner.
+describe("open_app attach", { timeout: 30_000 }, () => {
   it("attaches to a live run and routes actions through it", async () => {
     runJson(process.pid);
     const { c, text } = await open({});

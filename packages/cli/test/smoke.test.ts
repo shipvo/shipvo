@@ -20,13 +20,35 @@ const fake = (o: { screen?: string; errors?: string[]; hang?: boolean }) => ({
 });
 
 describe("smoke (fake simulator)", () => {
-  it("ok: exit 0, envelope shape, no platform in the summary", async () => {
+  it("ok: exit 0, envelope shape", async () => {
     const { doc, exit } = await inDir(() => smokeCheck(["--json"], fake({})));
     expect(exit).toBe(0);
     expect(doc).toMatchObject({ ok: true, code: "ok", data: { elements: 2, errors: [], error_count: 0 } });
     expect(Object.keys(doc).sort()).toEqual(["code", "data", "next", "ok", "summary"]);
     expect(doc.summary).toMatch(/^The app loads/);
-    expect(doc.summary).not.toMatch(/android|ios/i);
+  });
+  it.each([["android", []], ["android", ["android"]], ["ios", ["ios"]]])("platform %s reaches the driver (args %j)", async (want, argv) => {
+    let got: string | undefined;
+    const d = fake({});
+    const { doc, exit } = await inDir(() => smokeCheck([...argv, "--json"], { ...d, driver: ((_b: string, _a: string, _s: string, p: string) => { got = p; return d.driver(); }) as any }));
+    expect(exit).toBe(0); expect(got).toBe(want);
+    expect((doc.data as any).platform).toBe(want);
+    expect(doc.summary).toContain(`on ${want}`);
+  });
+  it("bad platform: exit 2 with a next entry, sim never started", async () => {
+    let started = false;
+    const { doc, exit } = await inDir(() => smokeCheck(["windows"], { ...fake({}), start: async () => { started = true; return { base: "x", stop() {} }; } }));
+    expect(exit).toBe(2); expect(started).toBe(false); expect(doc.next.length).toBeGreaterThan(0);
+  });
+  it("a flag value is not taken as the platform", async () => {
+    expect((await inDir(() => smokeCheck(["--timeout", "5", "ios"], fake({})))).doc.data).toMatchObject({ platform: "ios" });
+  });
+  it("simDriver sends the platform as the session device", async () => {
+    const { simDriver } = await import("../src/explore");
+    const bodies: any[] = []; const f = globalThis.fetch;
+    globalThis.fetch = (async (_u: any, i: any) => { bodies.push(JSON.parse(i.body)); return { ok: true, json: async () => ({ ok: true }) }; }) as any;
+    try { await simDriver("http://s", "demo", "x", "ios").open(); } finally { globalThis.fetch = f; }
+    expect(bodies[0]).toMatchObject({ session: "x", app: "demo", device: { platform: "ios" } });
   });
   it("errors: exit 1, first 5 in data.errors", async () => {
     const errors = Array.from({ length: 7 }, (_, i) => `boom ${i}`);
