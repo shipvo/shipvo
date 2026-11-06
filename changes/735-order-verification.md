@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: orders are `unverified` until the owner token settles them at `POST /app/:id/api/orders/:order/settle`. `POST /o/:app` is idempotent per order id, rate limited per IP and install, and recomputes prices from the published content (`price_mismatch`, `422`). Simulated orders are labelled. The admin shows each status.
+- Migration: run `0018_order_status.sql`. It keeps the first row of any duplicate order id. Existing orders become `unverified`. `list_orders` rows now carry `status`.

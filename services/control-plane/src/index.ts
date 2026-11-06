@@ -9,6 +9,7 @@ import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
+import { checkPrices, contentFor, sha, RATE_PER_IP, RATE_PER_INSTALL } from "./orders";
 import { decideOffer, type OfferResult } from "./offer";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
@@ -273,11 +274,47 @@ app.post("/o/:app", async (c) => {
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
   let body: any; try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
   const o = body?.order;
-  if (!o || typeof o.id !== "string" || !Array.isArray(o.lines) || !Number.isFinite(o.total)) return c.json({ error: "bad_order" }, 400);
+  if (!o || typeof o.id !== "string" || !o.id || o.id.length > 40 || !Array.isArray(o.lines) || !Number.isFinite(o.total)) return c.json({ error: "bad_order" }, 400);
   const json = JSON.stringify({ order: o, content_version: body.content_version ?? null, release: body.release ?? null });
   if (json.length > 20_000) return c.json({ error: "too_large" }, 413);
-  await c.env.DB.prepare("INSERT INTO orders (app_id, order_id, total, json) VALUES (?,?,?,?)").bind(appId, o.id.slice(0, 40), Math.round(o.total), json).run();
-  return c.json({ ok: true }, 202);
+  const reply = (status: string, duplicate = false) => status === "price_mismatch"
+    ? c.json({ ok: false, error: "price_mismatch", status, duplicate }, 422) : c.json({ ok: true, status, duplicate }, 202);
+  // Idempotency: one order id per app. A repeat returns the first result and changes nothing.
+  const first = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND order_id = ?").bind(appId, o.id).first<{ status: string }>();
+  if (first) return reply(first.status, true);
+  // Rate limits per IP and per install, over the last minute.
+  const ip = await sha(c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "unknown");
+  const install = typeof body.install_id === "string" && body.install_id ? body.install_id.slice(0, 64) : null;
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const n = async (col: string, v: string) => (await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM orders WHERE app_id = ? AND ${col} = ? AND received_at > ?`).bind(appId, v, since).first<{ n: number }>())?.n ?? 0;
+  if ((await n("ip_hash", ip)) >= RATE_PER_IP || (install && (await n("install", install)) >= RATE_PER_INSTALL)) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  // Simulated orders (from the simulator) stay labelled and are never settled. The label can only lower trust.
+  const simulated = body.simulated === true || c.req.header("x-shipvo-simulated") === "1";
+  let status: string = "unverified", why: string[] = [];
+  if (simulated) status = "simulated";
+  else {
+    why = checkPrices(o, await contentFor(c.env.DB, c.env.POINTERS, appId, body.content_version));
+    if (why.length) status = "price_mismatch";
+  }
+  const stored = why.length ? JSON.stringify({ order: o, content_version: body.content_version ?? null, release: body.release ?? null, price_errors: why.slice(0, 5) }) : json;
+  await c.env.DB.prepare("INSERT INTO orders (app_id, order_id, total, json, status, simulated, ip_hash, install) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(app_id, order_id) DO NOTHING")
+    .bind(appId, o.id, Math.round(o.total), stored, status, simulated ? 1 : 0, ip, install).run();
+  return reply(status);
+});
+
+/** The merchant's backend confirms payment for one order. Owner token only: an admin cookie or the app itself cannot do this. */
+app.post("/app/:id/api/orders/:order/settle", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if ((await owner(c, appId)) !== AGENT_ACTOR) return c.json({ error: "unauthorized", message: "Send the owner token as a bearer token" }, 401);
+  const body: any = await c.req.json().catch(() => ({}));
+  const row = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND order_id = ?").bind(appId, c.req.param("order")).first<{ status: string }>();
+  if (!row) return c.json({ error: "not_found" }, 404);
+  if (row.status === "settled") return c.json({ ok: true, status: "settled", already: true });
+  if (row.status !== "unverified") return c.json({ error: "cannot_settle", status: row.status }, 409);
+  await c.env.DB.prepare("UPDATE orders SET status = 'settled', settled_at = ?, settlement_ref = ? WHERE app_id = ? AND order_id = ? AND status = 'unverified'")
+    .bind(new Date().toISOString(), typeof body?.reference === "string" ? body.reference.slice(0, 80) : null, appId, c.req.param("order")).run();
+  return c.json({ ok: true, status: "settled" });
 });
 
 /* ---------- admin ---------- */
