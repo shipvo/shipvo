@@ -72,3 +72,20 @@ test("the Store screen lists the fixture apps and a tap installs one, in both sk
     }
   } finally { await b.close(); }
 });
+
+import { resolveUrl as resolveUrlFn } from "./apps.mjs";
+import { test as urlTest } from "node:test";
+import urlAssert from "node:assert/strict";
+{
+  const st = loadProfile({ apps: [{ id: "shop", name: "Shop", schemes: ["myapp", "mailto:"] }, { id: "notes" }] });
+  const code = (url, s = st) => { try { resolveUrlFn(s, url); } catch (e) { return e.code; } };
+  urlTest("resolveUrl: text without a scheme is invalid_url", () => { for (const u of ["item/3", "", "://x", 5]) urlAssert.equal(code(u), "invalid_url"); });
+  urlTest("resolveUrl: an undeclared scheme is no_handler", () => urlAssert.equal(code("other://x"), "no_handler"));
+  urlTest("resolveUrl: a declared scheme returns the owning app", () => {
+    for (const u of ["myapp://item/42", "myapp:item/3", "MAILTO:a@b.c"]) urlAssert.equal(resolveUrlFn(st, u).app, "shop");
+  });
+  urlTest("resolveUrl: shipvo.json declarations count, and with no schemes the URL passes through", () => {
+    urlAssert.equal(resolveUrlFn(loadProfile({ apps: [{ id: "a" }] }), "tel:1", [{ id: "me", schemes: ["tel"] }]).app, "me");
+    urlAssert.deepEqual(resolveUrlFn(loadProfile({ apps: [{ id: "a" }] }), "https://x.dev"), { passthrough: true });
+  });
+}

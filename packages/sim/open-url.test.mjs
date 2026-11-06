@@ -63,6 +63,19 @@ test("with a listener: ok, and the app saw the URL", async () => {
   assert.match(r.screen, /Opened myapp:\/\/item\/3/);
 });
 
+const PHONE = { apps: [{ id: "shop", name: "Shop", schemes: ["myapp", "tel:"] }, { id: "notes", name: "Notes" }] };
+test("resolves a declared scheme to its app, and gives typed errors", async () => {
+  assert.ok((await call("/session", { session: "d", phone: PHONE })).ok);
+  for (const [url, app] of [["myapp://item/42", "shop"], ["MYAPP:item/3", "shop"], ["tel:+15550100", "shop"]]) {
+    const r = await act("d", { action: "open_url", url });
+    assert.equal(r.ok, true, r.error); assert.equal(r.app, app);
+  }
+  const none = await act("d", { action: "open_url", url: "other://x" });
+  assert.equal(none.ok, false); assert.equal(none.code, "no_handler");
+  const bad = await act("d", { action: "open_url", url: "item/42" });
+  assert.equal(bad.ok, false); assert.equal(bad.code, "invalid_url");
+});
+
 test("act for an unknown session: no_session", async () => {
   const r = await act("nobody", { action: "screen" });
   assert.equal(r.ok, false);
