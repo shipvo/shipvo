@@ -3,11 +3,16 @@ import type { ReleasePointerBody } from "@shipvo/schema";
 
 type Body = ReturnType<typeof ReleasePointerBody.parse>;
 
+/** Same pattern as the CLI's engine id check (`packages/cli/src/hermes.ts`). */
+const ENGINE_ID = /^\d+\.\d+\.\d+$/;
+
 export type OfferInput = {
   /** The parsed release pointer body. */
   body: Body;
   /** The `?hbc=` query value, or undefined. */
   hbc?: string;
+  /** The `?hbe=` query value (the shell's Hermes engine build id), or undefined. */
+  hbe?: string;
   /** The `?nm=` query value, or undefined. */
   nm?: string;
   /** The raw value stored under `halt/<app>`, or null/undefined when there is none. */
@@ -20,14 +25,18 @@ export type OfferResult =
 
 /**
  * Decide whether a shell may be offered this release. Pure: no request, KV or framework types.
- * Rules, in order: Hermes bytecode, native modules, halt. A halt for another release or a corrupt halt value is ignored.
+ * Rules, in order: Hermes bytecode, Hermes engine, native modules, halt. A halt for another release or a corrupt halt value is ignored.
  */
-export function decideOffer({ body, hbc, nm, haltedRelease }: OfferInput): OfferResult {
+export function decideOffer({ body, hbc, hbe, nm, haltedRelease }: OfferInput): OfferResult {
   // A shell may say which Hermes bytecode versions it runs: ?hbc=96,98. Without it, every release is offered.
   if (hbc !== undefined && body.hermes_bytecode_version !== undefined) {
     const ok = hbc.split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0);
     if (ok.length === 0) return { ok: false, status: 400, error: "bad_request" };
     if (!ok.includes(body.hermes_bytecode_version)) return { ok: false, status: 404, error: "hermes_bytecode_mismatch" };
+  }
+  // A shell may send its Hermes engine build id: ?hbe=250829098.0.10. A malformed value counts as absent.
+  if (hbe !== undefined && body.hermes_engine !== undefined && ENGINE_ID.test(hbe.trim()) && hbe.trim() !== body.hermes_engine) {
+    return { ok: false, status: 404, error: "hermes_bytecode_mismatch" };
   }
   // A shell may list its native modules: ?nm=@scope/pkg@1.2.3,other@2.0.0. Without it, or without required_native_modules, every release is offered.
   if (nm !== undefined && body.required_native_modules !== undefined) {
