@@ -16,6 +16,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "skills",
     "src",
     "android",
     "ios",

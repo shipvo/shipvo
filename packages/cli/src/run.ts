@@ -17,6 +17,18 @@ import { portFree, rebuildInto } from "./sim.js";
 export type Platform = "android" | "ios";
 export type RunOptions = { platform: Platform; open: boolean; port?: number; native: boolean };
 
+export const RUN_USAGE = `Usage: shipvo run android|ios [options]
+
+Options:
+  --no-open     do not open the browser
+  --port <n>    serve on this port (default: a free port)
+  --native      run on a real emulator or simulator with \`npx expo run:<platform>\`
+
+Example: shipvo run android`;
+
+/** True when this project has no earlier web build, so Metro starts with an empty cache. */
+export const isFirstBuild = (root: string): boolean => !existsSync(join(root, "sim-dist"));
+
 /** Parses `run` arguments. Throws a plain message for anything it does not know. */
 export function parseRunArgs(argv: string[]): RunOptions {
   let platform: Platform | undefined; let open = true; let port: number | undefined; let native = false;
@@ -31,7 +43,7 @@ export function parseRunArgs(argv: string[]): RunOptions {
       port = Number(v);
     } else throw new Error(`Unknown argument "${a}". Usage: shipvo run android|ios [--no-open] [--port <n>] [--native]`);
   }
-  if (!platform) throw new Error("Say which phone: shipvo run android or shipvo run ios.");
+  if (!platform) throw new Error("Say which phone: shipvo run android or shipvo run ios. Try: shipvo run android");
   return { platform, open, port, native };
 }
 
@@ -214,6 +226,7 @@ function openBrowser(url: string) {
 
 /** Returns the exit code. */
 export async function run(argv: string[]): Promise<number> {
+  if (argv.includes("--help") || argv.includes("-h")) { console.log(RUN_USAGE); return 0; }
   let o: RunOptions;
   try { o = parseRunArgs(argv); } catch (e) { console.error((e as Error).message); return 2; }
   if (o.native) {
@@ -226,6 +239,7 @@ export async function run(argv: string[]): Promise<number> {
   try { const c = loadConfig(); name = c.name; appId = c.appId; } catch (e) { console.error((e as Error).message); return 1; }
   if (o.port !== undefined && o.port !== 0 && !(await portFree(o.port))) { console.error(`Port ${o.port} is in use. Pass another --port <n>.`); return 1; }
   const out = join(process.cwd(), "sim-dist");
+  if (isFirstBuild(process.cwd())) console.error("First build, this can take a minute.");
   console.error(`Building ${name} for web with the simulated device…`);
   try { await buildWeb(process.cwd()); } catch (e) { console.error((e as Error).message); return 1; }
   try { ensureShipvoIgnored(process.cwd()); } catch { /* read-only project: the session still works */ }
