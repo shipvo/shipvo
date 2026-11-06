@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runFlows, renderFlows } from "../src/flows.js";
+import { runFlows, renderFlows, parseFlowNames } from "../src/flows.js";
 import type { Driver, Reply } from "../src/explore.js";
 
 // A fake shop shaped like apps/tide-and-tackle: a search box, products, an "Add 1 to cart" button, a cart and a checkout form.
@@ -110,5 +110,31 @@ describe("login and sign up", () => {
     d.tap = async (ref) => { const r = await tap(ref); return ref === "e4" && r.screen!.includes("Continue") ? { ...r, screen: `- heading "You are in" [ref=e1]` } : r; };
     const f = (await by(d)).login!;
     expect(f.invalid.status).toBe("failed");
+  });
+});
+
+describe("parseFlowNames", () => {
+  it("runs all five flows for a bare --flows", () => {
+    expect(parseFlowNames("true")).toEqual(["signup", "login", "search", "add_to_cart", "checkout"]);
+  });
+  it("reads a list and turns hyphens into underscores", () => {
+    expect(parseFlowNames("search,add-to-cart")).toEqual(["search", "add_to_cart"]);
+  });
+  it("throws on an unknown flow", () => {
+    expect(() => parseFlowNames("search,pay")).toThrow('--flows: unknown flow "pay"');
+  });
+  it("reads a bare flag followed by another flag as the bare form", async () => {
+    const { args: parse } = await import("../src/config.js");
+    expect(parseFlowNames(parse(["--flows", "--json"]).flows!)).toHaveLength(5);
+  });
+});
+
+describe("runFlows with a driver that throws", () => {
+  it("reports the flow as failed instead of aborting the run", async () => {
+    const d = shop();
+    d.open = async () => { throw new Error("driver gone"); };
+    const r = await runFlows(d, { flows: ["search"] });
+    expect(r.flows[0]!.status).toBe("failed");
+    expect(r.flows[0]!.message).toContain("driver gone");
   });
 });

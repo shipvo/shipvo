@@ -9,7 +9,7 @@ import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
-import { runFlows, renderFlows, FLOW_NAMES, type FlowName } from "./flows.js";
+import { runFlows, renderFlows, parseFlowNames } from "./flows.js";
 
 export type Step =
   | { action: "open" }
@@ -378,20 +378,20 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     }
     let seed: number | undefined;
     if (a.seed !== undefined) { seed = Number(a.seed); if (!Number.isInteger(seed) || seed < 0) throw new Error("--seed must be a whole number of 0 or more"); }
+    const flowNames = a.flows !== undefined ? parseFlowNames(a.flows) : undefined;
     const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, seed, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
-    if (a.flows !== undefined) {
-      const names = a.flows === "true" ? FLOW_NAMES : a.flows.split(",").map((x) => x.trim().replace(/-/g, "_"));
-      const bad = names.find((n) => !FLOW_NAMES.includes(n as FlowName));
-      if (bad) throw new Error(`--flows: unknown flow "${bad}". Use ${FLOW_NAMES.join(", ")}`);
-      const fr = await runFlows(simDriver(base, cfg.appId), { flows: names as FlowName[], app: cfg.appId });
-      writeFileSync(`${out}-flows.md`, renderFlows(fr)); writeFileSync(`${out}-flows.json`, JSON.stringify(fr, null, 2) + "\n");
-      const msg = `Flows: ${fr.flows.map((f) => `${f.flow} ${f.status}`).join(", ")}. Wrote ${out}-flows.md and ${out}-flows.json`;
-      if (json) console.error(msg); else console.log(msg);
-    }
     const nothingChanged = onlyRoutes && !routes?.length;
     if (nothingChanged) console.error("No screens changed, nothing explored.");
     writeFileSync(`${out}.md`, (nothingChanged ? "No screens changed, nothing explored.\n\n" : "") + renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
+    let flowsFailed = false;
+    if (flowNames) {
+      const fr = await runFlows(simDriver(base, cfg.appId), { flows: flowNames!, app: cfg.appId });
+      writeFileSync(`${out}-flows.md`, renderFlows(fr)); writeFileSync(`${out}-flows.json`, JSON.stringify(fr, null, 2) + "\n");
+      flowsFailed = fr.flows.some((f) => f.status === "failed");
+      const msg = `Flows: ${fr.flows.map((f) => `${f.flow} ${f.status}`).join(", ")}. Wrote ${out}-flows.md and ${out}-flows.json`;
+      if (json) console.error(msg); else console.log(msg);
+    }
     let issueInfo: Record<string, unknown> = {};
     const line = `${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`;
     if (a["issues-dir"] !== undefined) {
@@ -403,7 +403,7 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
       } else issueInfo = { issue_files: files, file_commands: commands };
     }
     const failOn = a["fail-on-findings"] === "true";
-    const exit = report.error ? 1 : report.findings.length && failOn ? 1 : 0;
+    const exit = report.error ? 1 : (report.findings.length || flowsFailed) && failOn ? 1 : 0;
     if (json) {
       const data = { ...issueInfo, report_files: [`${out}.md`, `${out}.json`], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
       const code = report.error ? "walk_failed" : report.findings.length ? "findings" : "ok";

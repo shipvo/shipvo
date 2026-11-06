@@ -232,6 +232,10 @@ shipvo approvals list --json          # one JSON line: { ok, code, summary, data
 - Exit codes: 0 done, 1 refused by a rule, 2 error. With `--json` the output is the same `{ ok, code, summary, data, next }` envelope as `status --json`. On a refusal `code` is the rule (`self_approval`) and `data.rule` repeats it; other failures use `usage`, `config`, `no_credentials`, `unreachable` or `http_<status>`.
 - MCP tools: `approvals_list(app)` and `approval_approve(app, id)`. Both use the server's owner token (the MCP server holds no publish token), so an MCP agent counts as an agent and can approve only holds that a person proposed.
 
+## `shipvo explore --flows`
+
+`shipvo explore --flows` also looks for sign up, log in, search, add to cart and checkout. It drives each with valid input and then invalid input, and writes `explore-report-flows.md` and `explore-report-flows.json`. Each flow is passed, failed (with the step) or not found. Pass a list to run some: `--flows search,add-to-cart`. A failed flow counts as a finding for `--fail-on-findings`; a flow that is not found does not.
+
 ## `--json` for `doctor`, `test` and `explore`
 
 `shipvo doctor --json`, `shipvo test --json` and `shipvo explore --json` print the same envelope as `status --json`: `{ ok, code, summary, data, next }`. Stdout holds only that one JSON line. Progress and logs go to stderr, including the Playwright install notice for `explore` and the progress lines of `test`. The text output is unchanged without `--json`.
@@ -247,7 +251,7 @@ shipvo approvals list --json          # one JSON line: { ok, code, summary, data
 | Exit code | Meaning |
 | --- | --- |
 | 0 | ok |
-| 1 | the check or test failed (`explore` exits 1 on findings only with `--fail-on-findings`, and always when the walk fails) |
+| 1 | the check or test failed (`explore` exits 1 on findings or a failed `--flows` flow only with `--fail-on-findings`, and always when the walk fails) |
 | 2 | usage or setup error |
 
 ## `shipvo audit`

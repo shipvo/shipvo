@@ -185,13 +185,22 @@ async function once(d: Driver, flow: FlowName, invalid: boolean): Promise<FlowRu
   }
 }
 
+/** Turn the `--flows` value into flow names. A bare flag (the arg parser gives "true") means all of them. */
+export function parseFlowNames(v: string): FlowName[] {
+  if (v === "true") return [...FLOW_NAMES];
+  const names = v.split(",").map((x) => x.trim().replace(/-/g, "_")).filter(Boolean);
+  const bad = names.find((n) => !FLOW_NAMES.includes(n as FlowName));
+  if (bad) throw new Error(`--flows: unknown flow "${bad}". Use ${FLOW_NAMES.join(", ")}`);
+  return names as FlowName[];
+}
+
 /** Run each flow with valid input, then once with invalid input. Each run starts on a fresh phone. */
 export async function runFlows(d: Driver, o: { flows?: FlowName[]; app?: string } = {}): Promise<FlowReport> {
   const out: FlowResult[] = [];
   for (const flow of o.flows ?? FLOW_NAMES) {
-    const valid = await once(d, flow, false);
+    const valid = await once(d, flow, false).catch((e): FlowRun => ({ status: "failed", message: `The flow stopped: ${e instanceof Error ? e.message : String(e)}`, steps: [] }));
     const status = valid.status === "not_run" ? "not_found" : valid.status;
-    const invalid: FlowRun = status === "not_found" ? { status: "not_run", message: "The flow was not found", steps: [] } : await once(d, flow, true);
+    const invalid: FlowRun = status === "not_found" ? { status: "not_run", message: "The flow was not found", steps: [] } : await once(d, flow, true).catch((e): FlowRun => ({ status: "failed", message: `The flow stopped: ${e instanceof Error ? e.message : String(e)}`, steps: [] }));
     out.push({ flow, status, message: valid.message, step: valid.step, steps: valid.steps, invalid });
   }
   return { app: o.app ?? "", generatedAt: new Date().toISOString(), flows: out };
