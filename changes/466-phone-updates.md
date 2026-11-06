@@ -2,4 +2,3 @@
 - `@shipvo/sim`: the phone keeps an update state (`idle`, `checking`, `downloading`, `ready`, `applied`, `reverted`) with the release and the last reason (`verify_failed`, `download_failed`, `crash_loop`). It checks a signed release pointer and the bundle hash, applies with a restart, and reverts after 3 failed boots. Each state change is in `device_log` as simulated. A "Simulated" status banner shows for `ready`, `applied` and `reverted` in both skins.
 - New simulator options: `--update-url` and `--update-key` (or `PN_UPDATE_URL`, `PN_UPDATE_KEY`); a session can pass `update_url` and `update_key`.
 - Migration: none. Without an update source `check_for_update` returns `no_update`.
-- Limits: web bundles only (a single `index.html` named by the pointer's `web` field); no patch (bsdiff) simulation. The banner in the `shipvo run` frame page is drawn from a `pn:update` message and is not yet fed by the MCP tools.

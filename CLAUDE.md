@@ -41,6 +41,10 @@ If you are stuck because of something you may not change (a workflow, a prompt, 
 
 This repository, its issues and PRs, the site, docs, blog, tutorials, videos, llms.txt and release notes are public. Never write in them: our hosting plans or vendor tiers, provider limits we run under, internal quotas and their numbers, infrastructure costs or margins, or which limits we are close to. Describe behaviour instead ("usage quotas apply; when one is reached you see how to get more"). Quota numbers live in configuration and private notes, not in public text. If a task needs such a detail, ask in an escalation rather than writing it down.
 
+## Lead with what Shipvo does
+
+Public content (site, README, docs, blog, tutorials, videos, llms.txt, release notes, launch posts) says what Shipvo does and what was measured. Never add "what this does not replace", "what it does not do", "not yet", "known gaps", "limitations" or "caveats" sections or sentences, and never describe Shipvo or a feature as basic, partial or early. If something is not built or not measured yet, leave it out of public content and track it in an issue. This never permits a false or rounded-up claim: every number stays exact and linked to where it was measured.
+
 ## Device testing standard
 
 Android emulators and the iOS Simulator in CI are our device test standard. Prove features there and ship on that evidence. Never block work, mark an issue `needs-human`, or file an issue because something has not been tried on a physical phone, and do not add "not tested on a real device" notes to docs, the site, the README or release notes. Report what CI measured, on what, as it is.

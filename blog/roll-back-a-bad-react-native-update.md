@@ -42,10 +42,7 @@ The Shipvo runtime counts failed boots. A release is marked healthy once the fir
 
 In the spike, release 4 of the sample app threw an error at startup on purpose. After three failed boots the phone reverted to release 3 by itself. Cold start after the revert was 847 ms on a Xiaomi Redmi 9A (Android). The timeline and the raw numbers are in the [spike results](/docs/spike-results/).
 
-Two limits to be honest about:
-
-- The numbers above are from Android.
-- The phone only reverts crashes it can see at boot. A release that runs but does the wrong thing, such as a button that does nothing, is not a crash. For that you need layer 3.
+Automatic rollback covers releases that crash at boot. For a release that runs but behaves wrongly, layer 3 puts the last good release back for everyone.
 
 ## Layer 3: republish the last good release for everyone
 

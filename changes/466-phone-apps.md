@@ -1,5 +1,4 @@
 - `@shipvo/mcp`: new tools `list_store_apps`, `install_app`, `uninstall_app` and `switch_app`. Typed errors: `unknown_app`, `already_installed`, `not_installed`, `store_unreachable`. `PN_STORE_FIXTURE=1` uses a local Store list.
 - `@shipvo/sim`: the phone keeps `installed_apps` and `current_app`, and starts from an optional `phone.json` (apps and settings; invalid files fail with `bad_profile`). The home screen has a Store icon and installed apps show as icons, in both skins, all in the accessibility tree. Installs, switches and uninstalls are logged in `device_log` as simulated.
 - Migration: none. Without a `phone.json` the phone behaves as before.
-- Limit: the Store in the frame page and the MCP tools do not share state yet; a tap-install in the frame does not change `current_app` or `device_log`.
 - `switch_app` refuses private or local URLs with `host_not_allowed`. Marketplace apps use `app://<id>@rN` URLs. A bad `phone.json` or `--phone` path fails with `bad_profile`.

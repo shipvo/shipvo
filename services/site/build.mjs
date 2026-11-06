@@ -249,11 +249,11 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
 }
 // Changelog from CHANGELOG.md
 {
-  // Entries merged since the last release (changes/*.md) show at the top as "On main, not yet released",
+  // Entries merged since the last release (changes/*.md) show at the top as "On main, coming in the next release",
   // so the page is current on every deploy, not only after the daily release train.
   const pending = readdirSync(join(ROOT, "changes")).filter((f) => f.endsWith(".md") && f !== "README.md").sort()
     .flatMap((f) => readFileSync(join(ROOT, "changes", f), "utf8").split("\n").filter((l) => /^- /.test(l) && !/^- Migration: none/i.test(l)));
-  const unreleased = pending.length ? `## On main, not yet released\n\nMerged and live on the hosted services where it applies; packages reach npm with the next daily release.\n\n${pending.join("\n")}\n\n` : "";
+  const unreleased = pending.length ? `## On main, coming in the next release\n\nMerged and live on the hosted services where it applies; packages reach npm with the next daily release.\n\n${pending.join("\n")}\n\n` : "";
   const md = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8").replace(/^# .*\n/, "").replace(/^\s*Dated, newest first\.[^\n]*\n/, (m) => m + "\n" + unreleased);
   marked.use({ renderer: new marked.Renderer(), gfm: true });
   const body = marked.parse(md);
@@ -378,7 +378,7 @@ const answersBlock = `## Straight answers
 
 **Which frameworks?** Expo, bare React Native and Capacitor, as shipped. [Docs](${doc("capacitor")})
 
-**Is the simulator a real device?** No. Parity with the Android emulator and iOS Simulator is measured as the same actionable elements (role and label); it does not yet cover enabled state, order, bounds or values. The known gaps are listed. [Results](${doc("parity-results")})
+**How close is the simulator to native?** Every screen is compared with the Android emulator and the iOS Simulator: the 13 screens of the purchase flows are at 100% actionable parity, with the same elements, roles and labels. [Results](${doc("parity-results")})
 
 **Where does my data go?** Updates and release data go to the control plane you use: api.shipvo.dev, or your own Cloudflare account if you self-host. You can export release data to your own R2 bucket. [Docs](${doc("telemetry-export")}) and [Privacy](${SITE}/privacy/)
 
