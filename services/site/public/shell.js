@@ -37,10 +37,12 @@
     mm.addEventListener('click',function(e){if(e.target.closest('a[href^="#"]'))setOpen(false)});
     matchMedia('(min-width:981px)').addEventListener('change',function(m){if(m.matches&&!mm.hidden)setOpen(false)});
   }
-  // GitHub stars (live, cached an hour per browser)
+  // GitHub stars (live, cached an hour per browser). The nav keeps saying "Star" until the repo has more than
+  // 100 stars (owner, 6 Nov 2026); after that it shows the count.
   var el=document.querySelector('[data-stars]');
-  if(el){try{var c=JSON.parse(localStorage.getItem('shipvo.stars')||'null');if(c&&Date.now()-c.t<36e5){el.textContent=c.v;el=null}}catch(e){}
-    if(el)fetch('https://api.github.com/repos/shipvo/shipvo').then(function(r){return r.json()}).then(function(d){if(typeof d.stargazers_count==='number'){var v=d.stargazers_count>=1000?(d.stargazers_count/1000).toFixed(1)+'k':String(d.stargazers_count);el.textContent=v;try{localStorage.setItem('shipvo.stars',JSON.stringify({v:v,t:Date.now()}))}catch(e){}}}).catch(function(){})}
+  var showStars=function(n){if(typeof n==='number'&&n>100)el.textContent=n>=1000?(n/1000).toFixed(1)+'k':String(n)};
+  if(el){var fresh=false;try{var c=JSON.parse(localStorage.getItem('shipvo.stars.n')||'null');if(c&&Date.now()-c.t<36e5){showStars(c.n);fresh=true}}catch(e){}
+    if(!fresh)fetch('https://api.github.com/repos/shipvo/shipvo').then(function(r){return r.json()}).then(function(d){if(typeof d.stargazers_count==='number'){showStars(d.stargazers_count);try{localStorage.setItem('shipvo.stars.n',JSON.stringify({n:d.stargazers_count,t:Date.now()}))}catch(e){}}}).catch(function(){})}
   // live service status in the footer
   var st=document.querySelector('[data-status]');
   if(st){Promise.all([fetch('https://api.shipvo.dev/health',{cache:'no-store'}).then(function(r){return r.ok}).catch(function(){return false}),fetch('https://sim.shipvo.dev/health',{cache:'no-store'}).then(function(r){return r.ok}).catch(function(){return false})]).then(function(a){var ok=a[0]&&a[1];st.classList.add(ok?'ok':a[0]||a[1]?'warn':'down');st.querySelector('span:last-child').textContent=ok?'all systems live':a[0]||a[1]?'partial outage':'services unreachable'})}

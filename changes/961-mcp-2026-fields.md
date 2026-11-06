@@ -1,0 +1,4 @@
+- `@shipvo/mcp`: the HTTP endpoint now returns `-32020` (was `-32001`) for a missing or mismatched `Mcp-Method`/`Mcp-Name` header, and `-32022` for a 2026-era request that names an unsupported protocol version.
+- `@shipvo/mcp`: 2026-07-28 requests get `resultType: "complete"` on results, and `tools/list` also gets `ttlMs` and `cacheScope: "private"`. 2025-era responses are unchanged.
+- `@shipvo/mcp`: `tools/list` is now sorted by tool name on stdio and HTTP.
+- Migration: a client that matched on `-32001` for header mismatch must match `-32020`. Clients that read tools by name need no change; clients that relied on registration order should sort or look up by name.
