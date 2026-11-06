@@ -86,8 +86,8 @@ export function rotationRoutes(adminSession: (c: any, appId: string) => Promise<
     // One batch: the statement and its audit row are stored together or not at all.
     try {
       await c.env.DB.batch([
-      c.env.DB.prepare("INSERT INTO rotations (app_id, sequence, body, signature, created_at) VALUES (?, ?, ?, ?, ?)").bind(appId, s.sequence, env.body, env.signature, at),
-      c.env.DB.prepare("INSERT INTO audit_log_v2 (app_id, at, actor, actor_kind, action, release, release_id, before, after) VALUES (?, ?, ?, 'person', 'key-rotation', NULL, NULL, NULL, ?)").bind(appId, at, g.s.actor, JSON.stringify({ sequence: s.sequence, validFrom: s.validFrom })),
+        c.env.DB.prepare("INSERT INTO rotations (app_id, sequence, body, signature, created_at) VALUES (?, ?, ?, ?, ?)").bind(appId, s.sequence, env.body, env.signature, at),
+        c.env.DB.prepare("INSERT INTO audit_log_v2 (app_id, at, actor, actor_kind, action, release, release_id, before, after) VALUES (?, ?, ?, 'person', 'key-rotation', NULL, NULL, NULL, ?)").bind(appId, at, g.s.actor, JSON.stringify({ sequence: s.sequence, validFrom: s.validFrom })),
       ]);
     } catch (e) {
       // A concurrent upload of the same sequence hits the primary key: that is a replay, not a server error.

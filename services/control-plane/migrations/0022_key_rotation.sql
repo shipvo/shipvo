@@ -1,6 +1,6 @@
 -- Key rotation (docs/design/key-rotation.md, sections 6 and 11). Additive only: no table is dropped or renamed.
 -- The audit_log CHECK cannot be widened in place without a rebuild, so the audit trail moves to audit_log_v2,
--- whose action check also allows 'key-rotation'. Existing rows are copied once (same ids). audit_log is kept as it was.
+-- whose action check also allows 'key-rotation'. Existing rows are copied once (same ids); run this migration once, before the Worker deploy. Rows written to audit_log after it stay there. audit_log is kept as it was.
 CREATE TABLE IF NOT EXISTS audit_log_v2 (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   app_id TEXT NOT NULL,
