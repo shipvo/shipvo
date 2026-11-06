@@ -103,12 +103,12 @@ describe("Recorder stop race", () => {
     const r: any = new Recorder();
     let finish!: (c: number) => void;
     r.running = true; r.file = "a.mp4"; r.t0 = Date.now();
-    r.ff = { stdin: { end() {}, writable: false }, kill() {} };
-    r.done = new Promise<number>((res) => { finish = res; });
+    r.encode = () => new Promise<number>((res) => { finish = res; });
     const stopping = r.stop();
     expect(r.active).toBe(true);
     await expect(r.start({ url, dir: out })).rejects.toMatchObject({ code: "recording_active" });
     expect(r.file).toBe("a.mp4");
+    await new Promise((res) => setTimeout(res, 50));
     finish(0);
     expect(await stopping).toMatchObject({ file: "a.mp4" });
     expect(r.active).toBe(false);
