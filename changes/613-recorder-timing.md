@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: demo videos keep correct timing on a busy machine. Frames are saved with their capture time and encoded once at `record_stop`.
+- Migration: none; no API change.
