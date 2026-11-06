@@ -55,3 +55,26 @@ export async function runJson(fn: () => Promise<Done>, fallbackNext: Next[]): Pr
   emit(doc);
   process.exitCode = exit;
 }
+
+class ExitSignal extends Error { constructor(readonly status: number) { super("exit"); } }
+
+/**
+ * Run a text-mode command that ends with `process.exit` after printing to stderr. An exit becomes a thrown
+ * CliFailure built by `classify(message, status)`; the stderr text is still written. Status 0 returns normally.
+ */
+export async function trapExit(fn: () => Promise<unknown>, classify: (message: string, status: number) => CliFailure): Promise<void> {
+  const exit = process.exit, err = console.error, msgs: string[] = [];
+  process.exit = ((c?: number) => { throw new ExitSignal(c ?? 0); }) as never;
+  console.error = (...a: unknown[]) => { msgs.push(a.map(String).join(" ")); err(...a); };
+  try { await fn(); }
+  catch (e) { if (!(e instanceof ExitSignal)) throw e; if (e.status !== 0) throw classify(msgs.join("\n").trim(), e.status); }
+  finally { process.exit = exit; console.error = err; }
+}
+
+/** Collect what `fn` prints with console.log instead of printing it. Used so output that holds a secret never reaches a stream. */
+export async function captureLog(fn: () => Promise<unknown>): Promise<string[]> {
+  const log = console.log, lines: string[] = [];
+  console.log = (...a: unknown[]) => { lines.push(a.map(String).join(" ")); };
+  try { await fn(); } finally { console.log = log; }
+  return lines;
+}

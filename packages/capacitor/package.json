@@ -26,7 +26,7 @@
     "url": "git+https://github.com/shipvo/shipvo.git",
     "directory": "packages/capacitor"
   },
-  "files": ["dist", "README.md"],
+  "files": ["dist", "android/build.gradle", "android/src/main", "README.md"],
   "publishConfig": {
     "access": "public",
     "provenance": true

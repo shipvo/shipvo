@@ -13,10 +13,11 @@ import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
 import { TELEMETRY_LIMITS, check as rateCheck } from "./ratelimit";
+import { REPORT_TTL_SECONDS, maxReportBytes, reportKey, sanitizeReport, summarize, type StoredReport } from "./tests-report";
 import { installs, verifyReport } from "./installs";
 import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, type InstallVote } from "./halt";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string; VAULT_MASTER_KEY?: string };
+type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string; VAULT_MASTER_KEY?: string; MAX_TEST_REPORT_BYTES?: string };
 const app = new Hono<{ Bindings: Env }>();
 
 /* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
@@ -105,6 +106,35 @@ app.get("/w/:app/:rel/*", async (c) => {
   if (!v.value) return c.json({ error: "not_found" }, 404);
   const type = path.endsWith(".html") ? "text/html; charset=utf-8" : path.endsWith(".js") ? "text/javascript" : path.endsWith(".json") ? "application/json" : path.endsWith(".css") ? "text/css" : path.endsWith(".ico") ? "image/x-icon" : path.endsWith(".png") ? "image/png" : path.endsWith(".ttf") ? "font/ttf" : "application/octet-stream";
   return new Response(v.value, { headers: { "content-type": type, "cache-control": path.endsWith(".html") ? "public, max-age=60" : "public, max-age=31536000, immutable", "access-control-allow-origin": "*" } });
+});
+
+/* ---------- test results by release (shipvo test --report --upload) ---------- */
+app.post("/r/:app/:release/tests", async (c) => {
+  const { app: appId, release: rel } = c.req.param();
+  if (!ID.test(appId) || !/^\d{1,9}$/.test(rel)) return c.json({ error: "bad_request", message: "Use /r/<app>/<release number>/tests." }, 400);
+  if (!(await owner(c, appId)) && !(await publisher(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const no = await roleDenied(c, appId, "publish"); if (no) return no;
+  const cap = maxReportBytes(c.env);
+  const text = await c.req.text();
+  if (new TextEncoder().encode(text).length > cap) return c.json({ error: "report_too_large", message: `The test report is larger than ${cap} bytes. Send fewer flows.` }, 413);
+  let raw: unknown; try { raw = JSON.parse(text); } catch { return c.json({ error: "bad_report", message: "The test report is not valid JSON." }, 400); }
+  const r = sanitizeReport(raw, appId, Number(rel));
+  if (!r.ok) return c.json({ error: "bad_report", message: r.message }, 400);
+  await c.env.POINTERS.put(reportKey(appId, r.report.release, r.report.platform), JSON.stringify(r.report), { expirationTtl: REPORT_TTL_SECONDS });
+  return c.json({ ok: true, release: r.report.release, platform: r.report.platform, flows: r.report.flows.length });
+});
+app.get("/r/:app/tests", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await owner(c, appId)) && !(await publisher(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const reports: StoredReport[] = [];
+  let cursor: string | undefined;
+  do {
+    const page: any = await c.env.POINTERS.list({ prefix: `tr/${appId}/`, cursor });
+    for (const k of page.keys) { try { const v = JSON.parse((await c.env.POINTERS.get(k.name)) ?? "null"); if (v && v.app === appId) reports.push(v); } catch { /* skip a bad entry */ } }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return c.json({ app: appId, releases: summarize(reports) });
 });
 
 app.get("/b/:app/:file", async (c) => {

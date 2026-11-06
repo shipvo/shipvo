@@ -204,3 +204,34 @@ describe("shipvo test --json errors", () => {
     await expect(testCmd([join(tmpdir(), "shipvo-no-such-file.steps")], kit(), () => {})).rejects.toThrow();
   });
 });
+
+describe("shipvo test --upload", () => {
+  function app(f: string) {
+    const d = join(f, "..");
+    writeFileSync(join(d, "shipvo.json"), JSON.stringify({ appId: "shop", controlPlane: "https://cp.test/", publicKey: "k" }));
+    process.chdir(d);
+    return join(d, "report.json");
+  }
+  it("posts the report file to the release route with the publish token", async () => {
+    const f = project(); const rep = app(f); vi.stubEnv("SHIPVO_PUBLISH_TOKEN", "sv_publish_x");
+    const calls: any[] = [];
+    const fetchFn = (async (u: string, init: any) => { calls.push([u, init]); return new Response("{}", { status: 200 }); }) as any;
+    const code = await testCmd([f, "--report", rep, "--release", "7", "--platform", "ios", "--upload"], kit('- button "Add to cart" [ref=e1]'), () => {}, fetchFn);
+    expect(code).toBe(0);
+    expect(calls[0][0]).toBe("https://cp.test/r/shop/7/tests");
+    expect(calls[0][1].headers.authorization).toBe("Bearer sv_publish_x");
+    expect(JSON.parse(calls[0][1].body)).toMatchObject({ app: "shop", release: "7", platform: "ios" });
+    vi.unstubAllEnvs();
+  });
+  it("needs --report and --release, and says plainly when the upload fails", async () => {
+    const f = project(); const rep = app(f); vi.stubEnv("SHIPVO_PUBLISH_TOKEN", "sv_publish_x");
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await testCmd([f, "--upload"], kit(), () => {})).toBe(2);
+    expect(await testCmd([f, "--report", rep, "--upload"], kit(), () => {})).toBe(2);
+    const out: string[] = [];
+    const bad = (async () => new Response(JSON.stringify({ message: "The test report is not valid JSON." }), { status: 400 })) as any;
+    await testCmd([f, "--report", rep, "--release", "7", "--upload"], kit('- button "Add to cart" [ref=e1]'), (s) => out.push(s), bad);
+    expect(out.join("\n")).toContain("Could not upload the report: The test report is not valid JSON.");
+    err.mockRestore(); vi.unstubAllEnvs();
+  });
+});
