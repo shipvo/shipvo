@@ -32,6 +32,8 @@ export type ToolDef<S extends ZodRawShape = ZodRawShape> = {
   readonly errorCodes: readonly string[];
   /** True when the tool can return a plan that a person must approve first (an agent cannot approve it). */
   readonly needsApproval: boolean;
+  /** JSON Schema of the result. Not set yet: results are text or images and no tool declares one. */
+  readonly outputSchema?: Record<string, unknown>;
 };
 const def = <S extends ZodRawShape>(name: string, description: string, input: S, annotations: ToolDef["annotations"], errorCodes: readonly string[] = [], needsApproval = false): ToolDef<S> =>
   ({ name, description, input, annotations, errorCodes, needsApproval });
@@ -132,7 +134,7 @@ export const tools = {
 /** Every tool, in registration order. */
 export const toolList: readonly ToolDef[] = Object.values(tools);
 
-export type ToolInfo = { name: string; description: string; inputSchema: Record<string, unknown>; annotations: ToolDef["annotations"]; errorCodes: readonly string[]; needsApproval: boolean };
+export type ToolInfo = { name: string; description: string; inputSchema: Record<string, unknown>; annotations: ToolDef["annotations"]; errorCodes: readonly string[]; needsApproval: boolean; outputSchema?: Record<string, unknown> };
 
 /** The tool list as plain data: what both MCP servers must show, with JSON Schemas for the input. */
 export function describeTools(): ToolInfo[] {
@@ -140,6 +142,6 @@ export function describeTools(): ToolInfo[] {
     const inputSchema = zodToJsonSchema(z.object(t.input), { target: "jsonSchema7" }) as Record<string, unknown>;
     // The MCP SDK leaves additionalProperties out for a tool with no inputs.
     if (Object.keys(t.input).length === 0) delete inputSchema.additionalProperties;
-    return { name: t.name, description: t.description, inputSchema, annotations: t.annotations, errorCodes: t.errorCodes, needsApproval: t.needsApproval };
+    return { name: t.name, description: t.description, inputSchema, annotations: t.annotations, errorCodes: t.errorCodes, needsApproval: t.needsApproval, ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}) };
   });
 }

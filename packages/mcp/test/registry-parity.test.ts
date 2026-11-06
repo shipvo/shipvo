@@ -47,6 +47,18 @@ describe("one tool registry for the stdio and remote servers", () => {
     }
   });
 
+  it("has error codes and an approval flag on every registry tool", () => {
+    // Error codes and needsApproval are not in the MCP tool list, so a server cannot show them differently.
+    // Both servers register handlers from the same registry entries; this pins the shape of every entry.
+    const reg = describeTools();
+    for (const r of reg) {
+      expect(Array.isArray(r.errorCodes), r.name).toBe(true);
+      for (const c of r.errorCodes) expect(c, r.name).toMatch(/^[a-z][a-z0-9_]*$/);
+      expect(typeof r.needsApproval, r.name).toBe("boolean");
+    }
+    expect(reg.filter((t) => t.needsApproval).map((t) => t.name)).toEqual(["owner_command"]);
+  });
+
   it("keeps error codes and approval steps in the registry only, so both servers share them", () => {
     const reg = describeTools();
     expect(reg.find((t) => t.name === "owner_command")).toMatchObject({ needsApproval: true, errorCodes: expect.arrayContaining(["needs_confirm"]) });
