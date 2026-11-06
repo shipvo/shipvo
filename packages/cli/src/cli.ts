@@ -19,6 +19,7 @@ import { status } from "./status.js";
 import { agentsCmd } from "./agents.js";
 import { doctor } from "./doctor.js";
 import { audit } from "./audit.js";
+import { migrate } from "./migrate.js";
 import { approvals } from "./approvals.js";
 import { store } from "./store.js";
 import { ci } from "./ci.js";
@@ -44,6 +45,7 @@ switch (cmd) {
   case "agents": process.exitCode = await agentsCmd(rest); break;
   case "skills": process.exitCode = rest[0] === "sync" ? await agentsCmd(["skills-sync", ...rest.slice(1)]) : (console.error("Usage: shipvo skills sync [--dry-run] [--json]"), 2); break;
   case "audit": await audit(rest); break;
+  case "migrate": process.exitCode = await migrate(rest); break;
   case "approvals": process.exitCode = await approvals(rest); break;
   case "test": process.exitCode = await testCmd(rest); break;
   case "store": await store(rest); break;
