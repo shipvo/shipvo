@@ -46,3 +46,32 @@ Always read the "Priority now" list at the top of `docs/content-coverage.md` fir
 
 
 Follow "Internal details stay private" in `CLAUDE.md`: never write hosting plans, vendor tiers, limits, quota numbers or costs in anything public.
+
+## Story ads: the craft standard (owner, 6 Nov 2026)
+
+Our videos must never feel boring. Besides tutorials and demos, the Video Studio makes **story ads**: short films where a person has a real problem, uses Shipvo, and we see the result. Benchmark: a 70-second co-branded AI product ad built as a mini film (a struggling roadside diner, the product used inside the story, a full car park at sunset). Take its structure and energy; never its footage, music, characters or text.
+
+**Structure (60 to 75 seconds, 16:9 and 9:16 cuts):**
+1. Hook, 0 to 5 s: a striking cinematic shot and the problem in one line ("Our shop has no app. Customers ask their assistants, not Google.").
+2. The product inside the story: the character asks their assistant; the real Shipvo moments appear on screen (spec app on the phone in the chat, the vault form, install, an agent ordering). Every Shipvo screen is a real recording made with `record_start`/`record_stop`, composited into the scene (on a laptop, a phone in hand, a shop window).
+3. Two feature captions at most, each one beat: short, bold, on screen for about 1.5 s ("From idea to app in one chat." "Your assistant's phone.").
+4. Payoff the viewer can see (orders arriving, a busy shop at sunset). Any number shown must come from a real, measured demo run, with the source in the description.
+5. End card: logo, one line, shipvo.dev, 2 to 3 s.
+
+**Characters: hand-crafted, anime-inspired, original.**
+- A recurring Shipvo cast, designed once and reused so viewers recognise them: for example a small-shop owner, a young founder, a busy parent, and the assistant shown as a soft light or small companion shape (never a robot cliché). Write the cast bible in `scripts/video/cast/README.md` (names, personalities, palettes, silhouettes, expressions, outfits).
+- Drawn by us in code (SVG/canvas rigs with layered parts: head, eyes, mouth shapes, brows, hair, arms, hands, torso), anime-inspired proportions and line work, our own designs. Never draw known characters, mascots or anything that recalls a specific studio's characters; no AI-generated images or footage (owner preference: hand-crafted visuals built from scratch).
+- Expressive acting: blinks, eye direction, mouth shapes synced to narration, brow and head tilts, secondary motion in hair and clothes, hand gestures on key words.
+
+**Motion and cinematography:**
+- Camera language: establishing wide shot, push-ins on emotion, cut to close-ups for reveals, a slow dolly or parallax on every shot (3 to 5 depth layers), whip-pans or match cuts between scenes. No static frame longer than 2 s.
+- Easing everywhere (no linear moves), anticipation and follow-through, overshoot on pop-ins, 30 fps minimum (60 fps for the 9:16 cut when smooth motion matters).
+- Light and atmosphere: time-of-day palettes (dawn, golden hour, neon night), soft glows, light rays, particles (dust, sparks, confetti on the payoff), subtle film grain and vignette.
+- Typography: one display font for captions, animated in (mask reveal or kinetic type), never more than 7 words on screen.
+
+**Sound:**
+- Music: an energetic bed around 125 to 130 BPM for no-voiceover cuts (louder mix is fine without narration, around -14 LUFS for social), a calmer bed under narration as usual (`bgmusic.py`, ducked). Hit points: the music swells on the reveal and the payoff; a beat of near-silence before the payoff lands.
+- Sound effects on every action that matters (tap, whoosh on transitions, notification ping on an order, a door bell, crowd murmur). Credit every music track and any effects library as usual.
+- Narration, when used: the cast's voices (distinct voice per character), short lines, natural pauses.
+
+**Quality gate before any story ad ships:** a 10-frame contact sheet and the full video watched end to end by a second Claude review pass with this checklist: hook in 3 s, problem clear without sound, product used not described, every Shipvo screen real, at most two captions, visible payoff, no static frame over 2 s, characters on-model, credits present. Fix and re-render until it passes; put the checklist result in the PR.
