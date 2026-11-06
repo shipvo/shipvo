@@ -43,6 +43,53 @@ Not covered:
 - `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login does not work offline, so only the routes the smoke script uses are exercised.
 - This is not a production setup.
 
+## Back up and upgrade
+
+This is for the Docker control plane above. All state (the local D1 database and KV data) is in one place: the Docker volume `control-plane-data`, mounted at `/data`. Compose prefixes the project name, so from `services/control-plane` the volume is called `control-plane_control-plane-data` (check with `docker volume ls`). The image holds no state, and `docker compose down -v` deletes the volume.
+
+`scripts/selfhost-upgrade-check.mjs` proves the data survived. `seed` registers an app, publishes a signed pointer and writes `{appId, pointer}` to `selfhost-upgrade-check.json` (change the path with `UPGRADE_CHECK_FILE`). `verify` reads that file and exits 1 unless the server still serves the same pointer. Both use `SHIPVO_LOCAL_DEV_KEY` like the smoke script.
+
+### Back up
+
+Stop the control plane first, so the files are not copied mid-write. Run these in `services/control-plane`:
+
+```bash
+docker compose stop
+mkdir -p backup
+docker run --rm -v control-plane_control-plane-data:/data:ro -v "$PWD/backup":/backup node:22-bookworm-slim \
+  tar czf /backup/control-plane-data.tgz -C /data .
+docker compose start
+```
+
+### Restore
+
+Into a new, empty volume (after `docker compose down -v`, or on another machine):
+
+```bash
+docker volume create control-plane_control-plane-data
+docker run --rm -v control-plane_control-plane-data:/data -v "$PWD/backup":/backup:ro node:22-bookworm-slim \
+  tar xzf /backup/control-plane-data.tgz -C /data
+docker compose up -d
+```
+
+### Upgrade
+
+The compose file builds the image from this repository (`build:`), so there is no image to pull. You upgrade by updating the checkout and rebuilding.
+
+1. Before you change anything, with the server running, record a pointer: `node ../../scripts/selfhost-upgrade-check.mjs seed http://localhost:8787`. Do this once per environment; skip it if you already have a `selfhost-upgrade-check.json` from the same server.
+2. Back up the volume (above).
+3. Note the version you run now: `git rev-parse HEAD`.
+4. Update the code: `git pull`.
+5. Rebuild and restart: `docker compose up --build -d`. On start the container applies any new files in `migrations/` to the existing database.
+6. Run `node ../../scripts/selfhost-upgrade-check.mjs verify http://localhost:8787`. It prints `PASS` and exits 0 when the earlier release is still served. If it exits 1, the message says what is missing; roll back.
+
+### Roll back
+
+1. `docker compose down` (no `-v`).
+2. Check out the version from step 3: `git checkout <commit>`.
+3. If the failed upgrade changed or lost data, restore the backup into an empty volume (see Restore). Run `docker compose down -v` first so the volume is empty.
+4. `docker compose up --build -d`, then run `verify` again.
+
 ## Point apps at it
 
 In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `controlPlane: "https://your-domain"`, and in `shipvo.json`: `kv: { namespaceId: "<POINTERS id>" }`. Publishing needs a Cloudflare API token with *Workers KV Storage: Edit* on the account (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), plus `SHIPVO_SIGNING_SEED`.
