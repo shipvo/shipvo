@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import http from "node:http";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
@@ -103,15 +103,37 @@ describe("Recorder stop race", () => {
     const r: any = new Recorder();
     let finish!: (c: number) => void;
     r.running = true; r.file = "a.mp4"; r.t0 = Date.now();
-    r.ff = { stdin: { end() {}, writable: false }, kill() {} };
-    r.done = new Promise<number>((res) => { finish = res; });
+    r.encode = () => new Promise<number>((res) => { finish = res; });
     const stopping = r.stop();
     expect(r.active).toBe(true);
     await expect(r.start({ url, dir: out })).rejects.toMatchObject({ code: "recording_active" });
     expect(r.file).toBe("a.mp4");
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
     finish(0);
     expect(await stopping).toMatchObject({ file: "a.mp4" });
     expect(r.active).toBe(false);
+  });
+});
+
+describe("Recorder frame timing (no ffmpeg needed)", () => {
+  it("writes each frame's duration from its capture time and removes the frames dir at stop", async () => {
+    const dir = mkdtempSync(join(out, "ft-")); const framesDir = join(dir, "x.frames"); mkdirSync(framesDir);
+    const r: any = new Recorder();
+    const t = 1_000_000; let listText = "";
+    r.running = true; r.file = join(dir, "x.mp4"); r.raw = join(dir, "x.raw.mp4"); r.framesDir = framesDir; r.t0 = t; r.frames = [t, t + 1000, t + 1100];
+    const enc = r.encode.bind(r);
+    r.encode = (end: number) => { const p = enc(end); listText = readFileSync(join(framesDir, "list.txt"), "utf8"); return p; };
+    vi.spyOn(Date, "now").mockReturnValue(t + 2000);
+    try { await r.stop().catch(() => {}); } finally { vi.restoreAllMocks(); }
+    expect(listText.split("\n").filter(Boolean)).toEqual([
+      "file '0.jpg'", "duration 1.000", "file '1.jpg'", "duration 0.100", "file '2.jpg'", "duration 0.900", "file '2.jpg'",
+    ]);
+    expect(existsSync(framesDir)).toBe(false);
+  });
+  it("a failed start leaves no .frames directory", async () => {
+    const dir = mkdtempSync(join(out, "fs-"));
+    await new Recorder().start({ url: "http://127.0.0.1:1/", dir }).catch(() => {});
+    expect(readdirSync(dir).filter((f) => f.endsWith(".frames"))).toEqual([]);
   });
 });
 
