@@ -1,0 +1,3 @@
+- `@shipvo/store`: new `renderFrame`, `fitCaption`, `frameStyleFor`, `decodePng` and `encodePng`. They draw an Android or iPhone/iPad style frame with a caption on a solid background, as RGB PNG with no alpha.
+- `@shipvo/cli`: `shipvo store screenshots --mode frames` writes framed store screenshots to `store-assets/frames/<set>/`. Captions come from `store.captions` in `shipvo.json`, or the screen title. `--json` prints one envelope.
+- Migration: none; `--mode` now accepts `fast` or `frames`, and `renderScreenshots` takes an optional fourth argument.

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { join } from "node:path";
 import { createSign } from "node:crypto";
-import { checkScreenshot, checkSet, SCREENSHOT_SETS, deriveStoreDetails, renderDataSafetyCsv, renderPrivacyPolicy, routeStore, SHIPVO_TESTERS_GROUP, SHIPVO_TESTERS_JOIN_URL } from "@shipvo/store";
+import { checkScreenshot, checkSet, renderFrame, SCREENSHOT_SETS, deriveStoreDetails, renderDataSafetyCsv, renderPrivacyPolicy, routeStore, SHIPVO_TESTERS_GROUP, SHIPVO_TESTERS_JOIN_URL } from "@shipvo/store";
 import type { RouteAnswers, ScreenshotSetId, StoreRoute } from "@shipvo/store";
 import { args, loadConfig } from "./config.js";
 import { startSim } from "./explore.js";
@@ -17,7 +17,7 @@ export async function store(argv: string[]): Promise<void> {
 
 const STORE_NEXT: Next[] = [{ command: "shipvo store setup --json", why: "Write your store plan." }, { command: "shipvo doctor --json", why: "Check your setup." }];
 const STORE_RULES: [RegExp, string][] = [
-  [/^No store-plan\.json/, "no_plan"], [/^Unknown step/, "unknown_step"], [/must be yes or no|--as must be|--play-key needs|only fast mode/, "usage"],
+  [/^No store-plan\.json/, "no_plan"], [/^Unknown step/, "unknown_step"], [/must be yes or no|--as must be|--play-key needs|--mode must be/, "usage"],
   [/upload is not available/, "usage"], [/^Usage:/, "usage"], [/No shipvo\.json/, "no_config"],
 ];
 
@@ -49,7 +49,7 @@ async function storeJson(argv: string[]): Promise<void> {
     }
     if (sub === "screenshots") {
       if (process.exitCode) throw new CliFailure("Some store screenshots failed the size or format checks.", "screenshots_failed", 1, [{ command: "shipvo store screenshots --json", why: "Run it again after fixing the app screens." }]);
-      return { code: "screenshots_ready", summary: "Screenshots written and checked.", data: { out: argv.includes("--out") ? argv[argv.indexOf("--out") + 1] : "store-assets/raw" }, next: [{ command: "shipvo store status --json", why: "See the next store step." }] };
+      return { code: "screenshots_ready", summary: "Screenshots written and checked.", data: lastReport ?? { out: argv.includes("--out") ? argv[argv.indexOf("--out") + 1] : "store-assets/raw" }, next: [{ command: "shipvo store status --json", why: "See the next store step." }] };
     }
     const cfg = loadConfig(), d = deriveStoreDetails(cfg);
     return { code: "details_written", summary: `Wrote data safety answers for ${d.appName}.`, data: { app: d.appName, rows: d.rows.length, unknown: d.unknown.map((u) => u.question), filled: d.fill.filled, total: d.fill.total }, next: [{ command: "shipvo store setup --json", why: "Plan the store steps." }] };
@@ -171,11 +171,47 @@ export const RENDER_SETS: { set: ScreenshotSetId; width: number; height: number;
 ];
 
 /** Renders one screen at a size and returns JPEG bytes. `route` is undefined for the start screen. */
-export type Renderer = (size: { width: number; height: number; scale: number }, route: string | undefined) => Promise<Uint8Array>;
+export type Renderer = (size: { width: number; height: number; scale: number }, route: string | undefined, format?: "jpeg" | "png") => Promise<Uint8Array>;
+
+/** Output options. With `caption`, raw PNG renders are drawn into a phone or tablet frame (frames mode). */
+export interface FrameOptions {
+  /** Caption for a screen: `store.captions` by route or file name, else the screen title. */
+  caption?: (route: string | undefined, slug: string) => string;
+  /** Print one JSON envelope instead of lines. */
+  json?: boolean;
+  /** Called with the full report before `renderScreenshots` returns. */
+  onReport?: (r: ScreenshotReport) => void;
+}
+
+export interface ScreenshotReport { ok: boolean; mode: "fast" | "frames"; out: string; files: { set: string; file: string; ok: boolean; problems: string[] }[]; notes: string[] }
+
+/** The report of the last `screenshots` run, so the `--json` envelope can carry it. */
+let lastReport: ScreenshotReport | undefined;
+
+/** The screen title used when `store.captions` has no entry: the app name for the start screen, else the route words. */
+export function screenTitle(slug: string, appName: string): string {
+  if (slug === "start") return appName;
+  const t = slug.replace(/-/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Caption lookup: the config's `store.captions` is keyed by route ("tide://cart"), by file name ("cart") or "start". */
+export function captionFor(cfg: { name: string; store?: { captions?: Record<string, string> } }): NonNullable<FrameOptions["caption"]> {
+  const caps = cfg.store?.captions ?? {};
+  return (route, slug) => {
+    const c = (route !== undefined ? caps[route] : undefined) ?? caps[slug];
+    return typeof c === "string" && c.trim() ? c.trim() : screenTitle(slug, cfg.name);
+  };
+}
 
 /** Fast mode: render each route at each set's size, write files, print the checker result per file. Returns the exit code. */
-export async function renderScreenshots(routes: string[] | undefined, render: Renderer, outDir: string): Promise<number> {
-  console.log("fast mode: simulator render, not the native UI");
+export async function renderScreenshots(routes: string[] | undefined, render: Renderer, outDir: string, opts?: FrameOptions): Promise<number> {
+  const frames = opts?.caption ? { caption: opts.caption } : undefined;
+  const json = opts?.json === true;
+  const log = (m: string) => { if (!json) console.log(m); };
+  const report: { set: string; file: string; ok: boolean; problems: string[] }[] = [];
+  const notes: string[] = [];
+  log(frames ? "frames mode: simulator render drawn into a device frame, not the native UI" : "fast mode: simulator render, not the native UI");
   const screens: (string | undefined)[] = [undefined, ...(routes ?? [])];
   let failed = 0;
   for (const { set, width, height, scale } of RENDER_SETS) {
@@ -183,33 +219,43 @@ export async function renderScreenshots(routes: string[] | undefined, render: Re
     const dir = join(outDir, set);
     mkdirSync(dir, { recursive: true });
     const used = screens.slice(0, spec.max);
-    if (used.length < screens.length) console.log(`${spec.label}: the store takes ${spec.max} at most; rendering the first ${spec.max} of ${screens.length} screens.`);
+    if (used.length < screens.length) log(`${spec.label}: the store takes ${spec.max} at most; rendering the first ${spec.max} of ${screens.length} screens.`);
     const files: { name: string; bytes: Uint8Array }[] = [];
     for (const [i, route] of used.entries()) {
       const slug = route === undefined ? "start" : route.replace(/^[a-z][a-z0-9+.-]*:\/*/i, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "route";
       const base = `${String(i + 1).padStart(2, "0")}-${slug}`;
-      const bytes = await render({ width, height, scale }, route);
+      let bytes: Uint8Array;
+      if (frames) {
+        try { bytes = renderFrame({ png: await render({ width, height, scale }, route, "png"), set, width, height, caption: frames.caption(route, slug) }); }
+        catch (e) { failed++; const msg = `${base}: ${(e as Error).message}`; report.push({ set, file: join(dir, base), ok: false, problems: [msg] }); log(`${join(dir, base)}: FAILED\n  - ${(e as Error).message}`); continue; }
+      } else bytes = await render({ width, height, scale }, route);
       const r = checkScreenshot({ name: base, bytes }, set);
       const file = join(dir, `${base}.${r.format === "png" ? "png" : r.format === "jpeg" ? "jpg" : "bin"}`);
       writeFileSync(file, bytes);
       files.push({ name: file, bytes });
-      if (r.ok) console.log(`${file}: ok`);
-      else { failed++; console.log(`${file}: FAILED`); for (const p of r.problems) console.log(`  - ${p}`); }
+      report.push({ set, file, ok: r.ok, problems: r.problems });
+      if (r.ok) log(`${file}: ok`);
+      else { failed++; log(`${file}: FAILED`); for (const p of r.problems) log(`  - ${p}`); }
     }
     const c = checkSet(files, set);
-    for (const p of c.problems.filter((p) => /file\(s\)/.test(p))) { failed++; console.log(`${spec.label}: ${p}`); }
-    for (const n of c.notes ?? []) console.log(`${spec.label}: note: ${n}`);
+    for (const p of c.problems.filter((p) => /file\(s\)/.test(p))) { failed++; report.push({ set, file: dir, ok: false, problems: [p] }); log(`${spec.label}: ${p}`); }
+    for (const n of c.notes ?? []) { notes.push(`${spec.label}: ${n}`); log(`${spec.label}: note: ${n}`); }
   }
-  console.log(`\nFiles are in ${outDir}. Check the sizes against the store pages before you submit.`);
+  const full: ScreenshotReport = { ok: failed === 0, mode: frames ? "frames" : "fast", out: outDir, files: report, notes };
+  opts?.onReport?.(full);
+  if (json) console.log(JSON.stringify(full, null, 2));
+  else console.log(`\nFiles are in ${outDir}. Check the sizes against the store pages before you submit.`);
   return failed ? 1 : 0;
 }
 
 /** `shipvo store screenshots [--out dir] [--sim url] [--port n] [--skip-build]`: fast mode only. */
 async function screenshots(argv: string[]): Promise<void> {
   const a = args(argv);
-  if (a.mode !== undefined && a.mode !== "fast") fail(`shipvo store screenshots: only fast mode exists so far; --mode ${a.mode} is not available.`);
-  const cfg = loadConfig();
-  const out = a.out && a.out !== "true" ? a.out : "store-assets/raw";
+  if (a.mode !== undefined && a.mode !== "fast" && a.mode !== "frames") fail(`shipvo store screenshots: --mode must be fast or frames, not ${a.mode}.`);
+  const framed = a.mode === "frames";
+  const cfg = loadConfig() as ReturnType<typeof loadConfig> & { store?: { captions?: Record<string, string> } };
+  const out = a.out && a.out !== "true" ? a.out : framed ? "store-assets/frames" : "store-assets/raw";
+  lastReport = undefined;
   const sim = await startSim(a, cfg);
   let code = 1;
   try {
@@ -219,17 +265,17 @@ async function screenshots(argv: string[]): Promise<void> {
       return (await r.json()) as { ok?: boolean; error?: string; data?: string };
     };
     const session = `shots-${Date.now().toString(36)}`;
-    code = await renderScreenshots(cfg.routes, async (size, route) => {
+    code = await renderScreenshots(cfg.routes, async (size, route, format = "jpeg") => {
       const open = await post("/session", { session, app: cfg.appId, ...size });
       if (open.ok === false) throw new Error(`could not open the app: ${open.error ?? "unknown error"}`);
       if (route !== undefined) {
         const r = await post("/act", { session, action: "open_url", url: route });
         if (!r.ok) throw new Error(`could not open ${route}: ${r.error ?? "unknown error"}`);
       }
-      const shot = await post("/act", { session, action: "screenshot", format: "jpeg", inline: true });
+      const shot = await post("/act", { session, action: "screenshot", format, inline: true });
       if (!shot.ok || !shot.data) throw new Error(`screenshot failed: ${shot.error ?? "no data"}`);
       return new Uint8Array(Buffer.from(shot.data, "base64"));
-    }, out);
+    }, out, { caption: framed ? captionFor(cfg) : undefined, onReport: (r) => { lastReport = r; } });
   } finally { sim.stop(); }
   process.exitCode = code;
 }

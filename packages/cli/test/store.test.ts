@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -203,4 +203,90 @@ it("addTesterGroup does not write when the group is already there", async () => 
   const r = await addTesterGroup({ pkg: "p", token: "t", group: "shipvo-testers@googlegroups.com", fetch: fake });
   expect(r.added).toBe(false);
   expect(methods).not.toContain("PUT");
+});
+
+describe("store screenshots --mode frames", () => {
+  const pngOf = async (w: number, h: number) => {
+    const { encodePng } = await import("@shipvo/store");
+    return encodePng({ width: w, height: h, rgb: new Uint8Array(w * h * 3).fill(180) });
+  };
+
+  it("writes a framed PNG per route in every set, passes the checker, and uses captions then titles", async () => {
+    const { renderScreenshots, captionFor } = await import("../src/store");
+    const log = vi.spyOn(console, "log"); log.mockClear();
+    const formats: (string | undefined)[] = [];
+    const caption = captionFor({ name: "Tide", store: { captions: { "tide://cart": "Pay in one tap" } } });
+    expect(caption("tide://cart", "cart")).toBe("Pay in one tap");
+    expect(caption("tide://tides", "tides")).toBe("Tides");
+    expect(caption(undefined, "start")).toBe("Tide");
+    const code = await renderScreenshots(["tide://cart"], async (s, _r, f) => { formats.push(f); return pngOf(s.width, s.height); }, "frames-out", { caption });
+    expect(code).toBe(0);
+    expect(new Set(formats)).toEqual(new Set(["png"]));
+    for (const set of ["iphone", "ipad-13", "play-phone", "play-tablet-7", "play-tablet-10"]) {
+      expect(existsSync(join(app, "frames-out", set, "01-start.png"))).toBe(true);
+      expect(existsSync(join(app, "frames-out", set, "02-cart.png"))).toBe(true);
+    }
+    expect(log.mock.calls.map((c) => c.join(" ")).join("\n")).toContain("frames mode");
+  }, 60000);
+
+  it("--json prints one envelope and nothing else", async () => {
+    const { renderScreenshots } = await import("../src/store");
+    const log = vi.spyOn(console, "log"); log.mockClear();
+    const code = await renderScreenshots(undefined, async (s) => pngOf(s.width, s.height), "frames-json", { caption: () => "Hello", json: true });
+    expect(code).toBe(0);
+    expect(log).toHaveBeenCalledTimes(1);
+    const env = JSON.parse(String(log.mock.calls[0][0]));
+    expect(env.ok).toBe(true);
+    expect(env.mode).toBe("frames");
+    expect(env.files).toHaveLength(5);
+  }, 60000);
+
+  it("reports a JPEG render as a failed file, not a crash", async () => {
+    const { renderScreenshots } = await import("../src/store");
+    const code = await renderScreenshots(undefined, async () => jpeg(100, 100), "frames-bad", { caption: () => "x", json: true });
+    expect(code).toBe(1);
+  });
+
+  it("--json with --mode frames puts the frames report in the stdout envelope", async () => {
+    const { createServer } = await import("node:http");
+    const { encodePng } = await import("@shipvo/store");
+    const srv = createServer((req, res) => {
+      let body = ""; req.on("data", (c) => { body += c; });
+      req.on("end", () => {
+        const b = JSON.parse(body || "{}");
+        if (req.url === "/session" && b.width) (srv as any).size = { w: b.width, h: b.height };
+        const sz = (srv as any).size ?? { w: 100, h: 100 };
+        const data = req.url === "/act" && b.action === "screenshot" ? Buffer.from(encodePng({ width: sz.w, height: sz.h, rgb: new Uint8Array(sz.w * sz.h * 3).fill(180) })).toString("base64") : undefined;
+        res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ ok: true, data }));
+      });
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const port = (srv.address() as { port: number }).port;
+    const out: string[] = [];
+    const w = vi.spyOn(process.stdout, "write").mockImplementation(((c: string) => { out.push(String(c)); return true; }) as never);
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { out.push(a.join(" ") + "\n"); });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try { await store(["screenshots", "--mode", "frames", "--out", "json-frames", "--sim", `http://127.0.0.1:${port}`, "--json"]); }
+    finally { w.mockRestore(); log.mockRestore(); err.mockRestore(); srv.close(); }
+    const doc = JSON.parse(out.join(""));
+    expect(doc.code).toBe("screenshots_ready");
+    expect(doc.data.mode).toBe("frames");
+    expect(doc.data.out).toBe("json-frames");
+    expect(doc.data.files).toHaveLength(5);
+    expect(doc.data.files.every((f: { ok: boolean }) => f.ok)).toBe(true);
+    process.exitCode = undefined;
+  }, 60000);
+
+  it("--json with a bad --mode is a usage error", async () => {
+    const out: string[] = [];
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    const w = vi.spyOn(process.stdout, "write").mockImplementation(((c: string) => { out.push(String(c)); return true; }) as never);
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { out.push(a.join(" ") + "\n"); });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try { await store(["screenshots", "--mode", "bogus", "--json"]); }
+    finally { w.mockRestore(); log.mockRestore(); err.mockRestore(); exit.mockRestore(); }
+    const doc = JSON.parse(out.join(""));
+    expect(doc.code).toBe("usage");
+    process.exitCode = undefined;
+  });
 });
