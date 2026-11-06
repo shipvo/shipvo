@@ -204,7 +204,17 @@ function editCode(raw: string): { text: string; removed: string[] } | null {
   if (!removed.length) return null;
   const usesRuntime = out.some((l) => /\bRuntime\./.test(l));
   const hasRuntime = /import[^;]*\bRuntime\b[^;]*from\s*['"]@shipvo\/runtime['"]/.test(out.join("\n"));
-  const stillCp = out.some((l, i) => !imports.includes(i) && !isComment(l) && /\b(?:codePush|CodePush)\b/.test(l));
+  const bound = new Set<string>(["codePush", "CodePush"]);
+  for (const i of imports) {
+    const m = /^import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]*)\})?/.exec(lines[i].trim());
+    if (m?.[1]) bound.add(m[1]);
+    for (const part of (m?.[2] ?? "").split(",")) {
+      const name = part.trim().split(/\s+as\s+/).pop()?.replace(/^type\s+/, "").trim();
+      if (name && /^\w+$/.test(name)) bound.add(name);
+    }
+  }
+  const boundRe = new RegExp(String.raw`\b(?:${[...bound].join("|")})\b`);
+  const stillCp = out.some((l, i) => !imports.includes(i) && !isComment(l) && boundRe.test(l));
   if (imports.length && !stillCp) {
     const first = imports[0];
     for (const i of imports.slice().reverse()) {

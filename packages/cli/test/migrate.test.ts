@@ -207,6 +207,29 @@ it("CodePush --apply leaves native bootstrap files alone and lists them as manua
   expect(where).toContain("android/app/src/main/java/MainApplication.kt:1");
 });
 
+it("CodePush --apply keeps the import when a named binding is still used", async () => {
+  cpFixture();
+  const app = "import CodePush, { InstallMode } from 'react-native-code-push';\nCodePush.sync({});\nconst m = InstallMode.IMMEDIATE;\n";
+  w("App.tsx", app);
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  out.length = 0;
+  expect(await migrate(["--apply"], tmp)).toBe(0);
+  const after = rd("App.tsx");
+  expect(after).toContain("from 'react-native-code-push'");
+  expect(after).toContain("InstallMode.IMMEDIATE");
+  expect(after).toContain("Runtime.checkForUpdate(true)");
+});
+
+it("CodePush --apply handles CRLF files", async () => {
+  cpFixture();
+  w("App.tsx", "import CodePush from 'react-native-code-push';\r\nCodePush.notifyAppReady();\r\n");
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  expect(await migrate(["--apply"], tmp)).toBe(0);
+  const after = rd("App.tsx");
+  expect(after).toContain("Runtime.markHealthy()");
+  expect(after).not.toContain("react-native-code-push");
+});
+
 it("CodePush --apply refuses a dirty tree with dirty_tree, and --json works", async () => {
   cpFixture();
   git("init", "-q"); git("add", "."); git("commit", "-qm", "x");

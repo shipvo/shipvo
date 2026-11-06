@@ -360,7 +360,7 @@ Makes the safe edits for the switch from EAS Update: removes the `expo-updates` 
 
 For CodePush apps, `--apply` edits only these things, each file copied to `.shipvo/migrate-backup/` first:
 
-- Single-line `codePush({...})(App)` becomes `App`, `CodePush.sync(...)` becomes `Runtime.checkForUpdate(true)` and `CodePush.notifyAppReady()` becomes `Runtime.markHealthy()`. The `react-native-code-push` import becomes `import { Runtime } from "@shipvo/runtime"`.
+- Single-line `codePush({...})(App)` becomes `App`, `CodePush.sync(...)` becomes `Runtime.checkForUpdate(true)` and `CodePush.notifyAppReady()` becomes `Runtime.markHealthy()`. The `react-native-code-push` import becomes `import { Runtime } from "@shipvo/runtime"`. `checkForUpdate(true)` drops the original arguments (install mode, callbacks) and the returned status, so review each of those call sites. If a named import such as `InstallMode` is still used, the import stays and the call is listed as a manual step.
 - `CodePushDeploymentKey` and `CodePushPublicKey` are removed from `Info.plist` and `strings.xml`.
 - In `package.json`, `react-native-code-push` is replaced by `@shipvo/runtime` and `@shipvo/device`, with `@shipvo/cli` as a dev dependency. It does not run your package manager.
 
