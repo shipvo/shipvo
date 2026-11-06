@@ -205,7 +205,7 @@ for (const [kind, file, title, maxBadRuns] of [
     const pr = prefs(), after = entries().filter((e) => e.t >= (restored?.at ?? Infinity) && e.path.includes(`r${p.release}.hbc`)).length;
     const revertEvent = tele().some((e) => e.event === "crash_loop_revert" && e.at >= p.at);
     const badRuns = boots - 1;
-    trials.push({ release: p.release, staged: staged === "pending", timeline, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
+    trials.push({ release: p.release, staged: staged === "pending", reached: staged || null, timeline, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
       revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 && badRuns <= maxBadRuns });
   }
   return { pass: trials.every((t) => t.pass), kind, maxBadRuns, trials, median: summarize(trials, ["restoredMs", "boots", "badRuns"]) };
