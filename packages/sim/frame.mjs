@@ -99,9 +99,9 @@ function battery(b) {
 }
 
 // Side buttons sit on the frame edge: Android has them on the right, the iPhone has volume left and power right.
-// They are drawn only. Nothing wires them to actions yet, so they are hidden from keyboard and screen readers.
+// They are drawn only. Nothing wires them to actions yet, so they are hidden from screen readers.
 function buttons(skin) {
-  const b = (part, label, side) => `<button type="button" class="sf-btn sf-${side}" data-part="${part}" tabindex="-1" aria-hidden="true" title="${label}"></button>`;
+  const b = (part, label, side) => `<div class="sf-btn sf-${side}" data-part="${part}" aria-hidden="true" title="${label}"></div>`;
   return skin === "ios"
     ? b("volume-up", "Volume up", "l1") + b("volume-down", "Volume down", "l2") + b("power", "Power", "r1")
     : b("power", "Power", "r1") + b("volume-up", "Volume up", "r2") + b("volume-down", "Volume down", "r3");

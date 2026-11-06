@@ -1,3 +1,3 @@
-- sim: the phone frame draws power, volume up and volume down buttons. They are not interactive yet (follow-up #542).
+- sim: the phone frame draws power, volume up and volume down buttons. They are not interactive yet (follow-up #542). The lock screen shows the time and "Locked"; notifications on it and an unlock control come with #542.
 - sim: new actions `lock`, `unlock` and `restart`. Restart reloads the app (cold start) and keeps storage. While locked, other actions fail with code `locked`. `screen`, `screenshot`, `push_notification`, `notifications`, `errors` and `device_log` still work while locked; `screen` shows only the lock screen. Each is logged as simulated in `device_log`.
 - mcp: new tools `lock`, `unlock` and `restart`, with typed errors `already_locked`, `not_locked` and `locked`. No migration needed.

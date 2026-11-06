@@ -54,7 +54,7 @@ test("power and volume buttons sit on the frame edge and are not interactive", (
   for (const skin of ["android", "ios"]) {
     const f = renderFrame({ skin, status: { time: "7:05" } });
     for (const p of ["power", "volume-up", "volume-down"]) assert.ok(f.html.includes(`data-part="${p}"`), `${skin} ${p}`);
-    assert.match(f.html, /data-part="power"[^>]*tabindex="-1" aria-hidden="true"/);
+    assert.match(f.html, /data-part="power"[^>]*aria-hidden="true"/);
     assert.doesNotMatch(f.html, /sf-ov|lock-screen/);
   }
 });

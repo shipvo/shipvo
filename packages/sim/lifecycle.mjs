@@ -47,7 +47,7 @@ export function lockOverlay(style) {
   const el = document.createElement("div");
   el.setAttribute("data-pn-lock", ""); el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Lock screen");
   el.style.cssText = style + "background:linear-gradient(#10243a,#050b14);justify-content:space-between;padding:120px 0 40px;";
-  el.innerHTML = `<div style="font-size:72px;font-weight:300">${t}</div><div>Swipe up to unlock</div>`;
+  el.innerHTML = `<div style="font-size:72px;font-weight:300">${t}</div><div>Locked</div>`;
   document.body.appendChild(el);
 }
 export function removeLockOverlay() {

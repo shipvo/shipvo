@@ -32,7 +32,7 @@ const PAGE = `<!doctype html><html><head><title>fx</title></head><body><h1>Home<
 <script>
 const n = Number(localStorage.getItem("loads") || 0) + 1; localStorage.setItem("loads", n);
 document.getElementById("loads").textContent = "Loads: " + n + " Saved: " + (localStorage.getItem("note") || "none");
-</script><button onclick="localStorage.setItem('note','kept');this.textContent='Saved note'">Save note</button><button id="b2" onclick="document.querySelector('h1').textContent='Detail'">Open detail</button></body></html>`;
+</script><button onclick="localStorage.setItem('note','kept');this.textContent='Saved note'">Save note</button><button id="arm" onclick="setTimeout(()=>location.reload(),600)">Arm reload</button><button id="b2" onclick="document.querySelector('h1').textContent='Detail'">Open detail</button></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
 const ref = (screen, text) => new RegExp(`${text}[^\\n]*\\[ref=(\\w+)\\]`).exec(screen)?.[1];
@@ -63,14 +63,14 @@ test("lock then unlock returns to the same screen", async () => {
   assert.match(before_, /Detail/);
   const locked = await act("l1", { action: "lock" });
   assert.equal(locked.ok, true, locked.error);
-  assert.match(locked.screen, /Swipe up to unlock/);
+  assert.match(locked.screen, /Locked/);
   assert.doesNotMatch(locked.screen, /Detail|Open detail/);
   const blocked = await act("l1", { action: "tap", ref: "e1" });
   assert.equal(blocked.ok, false); assert.equal(blocked.code, "locked"); assert.equal(blocked.delivery, "not_delivered");
   assert.equal((await act("l1", { action: "lock" })).code, "already_locked");
   const un = await act("l1", { action: "unlock" });
   assert.equal(un.ok, true, un.error);
-  assert.doesNotMatch(un.screen, /Swipe up/);
+  assert.doesNotMatch(un.screen, /Locked/);
   assert.match(un.screen, /Detail/);
   assert.equal((await act("l1", { action: "unlock" })).code, "not_locked");
 });
@@ -86,7 +86,7 @@ test("restart reloads the app (cold start) and storage survives", async () => {
   // restart also leaves the lock screen
   await act("r1", { action: "lock" });
   const r2 = await act("r1", { action: "restart" });
-  assert.match(r2.screen, /Loads: 3 Saved: kept/); assert.doesNotMatch(r2.screen, /Swipe up/);
+  assert.match(r2.screen, /Loads: 3 Saved: kept/); assert.doesNotMatch(r2.screen, /Locked/);
 });
 
 test("device_log lists lock, unlock and restart as simulated", async () => {
@@ -116,4 +116,13 @@ test("a push arrives while locked", async () => {
   const r = await act("p1", { action: "notifications" });
   assert.notEqual(r.code, "locked");
   assert.notEqual((await act("p1", { action: "push_notification", title: "Hi", body: "x" })).code, "locked");
+});
+
+test("a reload while locked brings the lock screen back", async () => {
+  const first = await call("/session", { session: "l9" });
+  assert.ok((await act("l9", { action: "tap", ref: ref(first.screen, "Arm reload") })).ok);
+  assert.equal((await act("l9", { action: "lock" })).ok, true);
+  await new Promise((r) => setTimeout(r, 1800));
+  const s = await act("l9", { action: "screen" });
+  assert.match(s.screen, /Locked/); assert.doesNotMatch(s.screen, /Arm reload/);
 });
