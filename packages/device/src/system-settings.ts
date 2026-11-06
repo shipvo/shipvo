@@ -24,7 +24,7 @@ export function installSystemSettings(dev: { system(): any }, rn: any = { Appear
       if (name === "change") { subs.dimensions.add(fn); return { remove: () => subs.dimensions.delete(fn) }; }
       return add ? add(name, fn) : { remove() {} };
     };
-    subs.dimensions.emit = () => { const d = dims(); subs.dimensions.forEach((f) => f(d)); };
+    (subs.dimensions as any).emit = () => { const d = dims(); subs.dimensions.forEach((f) => f(d)); };
   }
   if (AI) {
     AI.isBoldTextEnabled = async () => cur().boldText;
