@@ -54,7 +54,7 @@ npm run sim                      # the app in the simulator; agents: open_app("m
 npx expo run:android             # the native shell; `shipvo publish` ships changes over the air
 ```
 
-Guides: [Build your first app](docs/getting-started.md) · [Tutorials](docs/tutorials/index.md) · [CLI](docs/cli.md) · [Test your app in CI](docs/testing.md) · [Test with an assistant](docs/test-with-an-assistant.md) · [Store release](docs/store.md) · [Frameworks and adapters](docs/adapters.md) · [Migrate from CodePush](docs/migrate-from-codepush.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
+Guides: [Build your first app](docs/getting-started.md) · [Tutorials](docs/tutorials/index.md) · [CLI](docs/cli.md) · [Test your app in CI](docs/testing.md) · [Test with an assistant](docs/test-with-an-assistant.md) · [Store release](docs/store.md) · [Frameworks and adapters](docs/adapters.md) · [Migrate from CodePush](docs/migrate-from-codepush.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · [Threat model for signed updates](docs/threat-model.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
 
 ## Use Shipvo with your coding agent
 

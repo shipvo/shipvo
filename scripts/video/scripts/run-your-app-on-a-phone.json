@@ -1,0 +1,60 @@
+{
+  "slug": "run-your-app-on-a-phone",
+  "posterAt": 5,
+  "title": "See your app on a phone in your browser with shipvo run",
+  "tutorial": "docs/run.md",
+  "voice": "af_heart",
+  "music": {
+    "id": 633200,
+    "bed": 0.35,
+    "credits": "services/site/public/videos/run-your-app-on-a-phone.credits.json"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "visual": "rpHook",
+      "min": 9,
+      "narration": "Want to see your app on a phone? You do not need a phone. You do not need Android Studio, or Xcode. One command opens a phone in your browser."
+    },
+    {
+      "id": "cmd",
+      "visual": "rpCmd",
+      "min": 13,
+      "narration": "Open a terminal in your app folder. Type npx shipvo run android, and press Enter. Shipvo builds a web copy of your app. It needs no account."
+    },
+    {
+      "id": "phone",
+      "visual": "rpPhone",
+      "min": 14,
+      "narration": "Your browser opens on a page with a phone in the middle. A label says Simulated, because this is a copy of a phone, not a real one. Click it like you would tap."
+    },
+    {
+      "id": "ios",
+      "visual": "rpIos",
+      "min": 13,
+      "narration": "Want an iPhone instead? Type ios. You get the iPhone look, with its Dynamic Island. The page scales the phone to your window. Add dark equals one to the address for the dark frame.",
+      "caption": "Want an iPhone instead? Type ios. You get the iPhone look, with its Dynamic Island. The page scales the phone to your window. Add ?dark=1 to the address for the dark frame."
+    },
+    {
+      "id": "assistant",
+      "visual": "rpAssistant",
+      "min": 16,
+      "narration": "Now the best part. Your A I assistant can drive the same phone while you watch. While shipvo run is up, the assistant calls open underscore app, and finds your live phone. It taps, types and scrolls. You see every move.",
+      "caption": "Now the best part. Your AI assistant can drive the same phone while you watch. While shipvo run is up, the assistant calls open_app, and finds your live phone. It taps, types and scrolls. You see every move."
+    },
+    {
+      "id": "stop",
+      "visual": "rpStop",
+      "min": 12,
+      "narration": "Need another port? Add dash dash port. Want a real emulator later? Add dash dash native. When you are done, press Control C in the terminal.",
+      "caption": "Need another port? Add --port. Want a real emulator later? Add --native. When you are done, press Ctrl+C in the terminal."
+    },
+    {
+      "id": "cta",
+      "visual": "rpCta",
+      "min": 11,
+      "narration": "That is it. A phone in your browser, in seconds. Try npx shipvo run android in your app folder. The guide is at shipvo dot dev, slash learn.",
+      "caption": "That is it. A phone in your browser, in seconds. Try npx shipvo run android in your app folder. The guide is at shipvo.dev/learn."
+    }
+  ]
+}

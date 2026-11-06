@@ -38,9 +38,11 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
 | `already_locked` | `lock` was called on a locked phone. | Call `unlock` if you want to use the app. |
 | `not_locked` | `unlock` was called on a phone that is not locked. | Carry on; nothing to do. |
+| `app_not_foreground` | The home screen or app switcher is showing, so tap, type, scroll, back, `open_url` and `open_notification` were not sent. | Call `resume_app`. |
+| `recents_not_open` | `kill_app` was called without the app switcher open. | Call `open_recents` first. |
 | `mock_invalid` | A network mock rule is not valid. | Fix the rule. |
 
-Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `export_test`, `end_session`, `owner_describe`, `owner_command`.
+Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `export_test`, `end_session`, `owner_describe`, `owner_command`, `approvals_list`, `approval_approve` (both need an owner token, and the MCP agent counts as an agent: it cannot approve an agent's hold).
 
 `export_test { session }` is read-only. It turns the taps, typing, scrolls, `back` and `set_device` calls recorded in a session into a `@shipvo/test` script and returns the source. Targets are named by visible text; an ambiguous target becomes a `// TODO` comment, and a password-like field uses `process.env.SHIPVO_TEST_<LABEL>` so the typed value is never in the output. Only sessions opened through this server are recorded; an unknown session returns `no_session`. Steps are dropped when the session ends. `payment.pin` is removed from recorded `set_device` calls. Only labels and roles that look like a password, passcode or PIN are treated as secret; other secret-like fields (card number, token) are exported as typed. `type` with `enter: true` and `scroll` with a `ref` are recorded without the Enter or the ref, so a replay can differ from the session.
 

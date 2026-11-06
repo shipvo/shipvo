@@ -1,0 +1,3 @@
+- `@shipvo/schema`: new optional `hermes_engine` string (for example `250829098.0.10`) on the shell declaration and on the release record.
+- `@shipvo/cli`: `shipvo publish` records the version of the project's `hermes-compiler` as `hermes_engine`, and fails if `hermesEngine` in `shipvo.json` names another build. `shipvo doctor` shows the engine build and fails when installed and declared differ.
+- Migration: none required. The field is optional and absent means unknown, so nothing changes until you add `hermesEngine` to `shipvo.json`. To opt in, set it to the engine id your shell was built with.
