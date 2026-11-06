@@ -6,6 +6,7 @@ import type { TestReport } from "./report-md.js";
 import type { Report as ExploreReport } from "./explore.js";
 import { diffReports, type Comparison, type FlowResult } from "./ci-compare.js";
 import { stepText } from "./report-md.js";
+import { beforeAfterSection, ensureMediaBranch, pairShots, uploadShot, type BeforeAfter } from "./ci-before-after.js";
 
 /** Hidden marker used to find our comment again. */
 export const MARKER = "<!-- shipvo-check -->";
@@ -29,7 +30,7 @@ export function changedFiles(base: string): string[] {
   return execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" }).split("\n").filter(Boolean);
 }
 
-export type CommentInput = { test?: TestReport | null; explore?: ExploreReport | null; changed?: string[]; screenshots?: string[]; runUrl?: string; compare?: Comparison | null };
+export type CommentInput = { test?: TestReport | null; explore?: ExploreReport | null; changed?: string[]; screenshots?: string[]; runUrl?: string; compare?: Comparison | null; beforeAfter?: BeforeAfter | null };
 
 const cell = (s: string) => s.replace(/\s+/g, " ").replace(/\|/g, "\\|").trim();
 
@@ -78,6 +79,7 @@ export function renderComment(i: CommentInput): string {
       L.push("");
     }
   }
+  if (i.beforeAfter) L.push(...beforeAfterSection(i.beforeAfter, i.runUrl));
   const shots = (i.screenshots ?? []).slice(0, MAX_SHOTS);
   const changed = (i.changed ?? []).slice(0, MAX_SHOTS);
   if (changed.length || shots.length) {
@@ -132,7 +134,23 @@ export async function commentCmd(argv: string[]): Promise<number> {
     if (!baseReport) console.error(`No comparison with base: could not read ${baseFile}.`);
     else compare = diffReports(baseReport, test);
   }
-  const body = renderComment({ compare, test, explore: readJson("explore-report.json"), changed, screenshots: shots,
+  let beforeAfter: BeforeAfter | null = null;
+  const beforeDir = `${dir}/before`, afterDir = `${dir}/after`;
+  if (existsSync(afterDir) && existsSync(beforeDir)) {
+    const repo = env.GITHUB_REPOSITORY, token = env.GITHUB_TOKEN, sha = env.GITHUB_SHA;
+    const prNum = Number(val("--pr") ?? /refs\/pull\/(\d+)\//.exec(env.GITHUB_REF ?? "")?.[1]);
+    const urls = new Map<string, string>();
+    if (repo && token && sha && prNum) {
+      try {
+        await ensureMediaBranch({ repo, token, sha });
+        for (const side of ["before", "after"] as const) for (const n of readdirSync(`${dir}/${side}`).filter((x) => /\.png$/i.test(x))) urls.set(`${dir}/${side}/${n}`, await uploadShot({ repo, token, sha, pr: prNum, side, name: n, file: `${dir}/${side}/${n}` }));
+      } catch (e) { console.error(`Before and after images not uploaded: ${e instanceof Error ? e.message : e}`); urls.clear(); }
+    }
+    const pairs = pairShots(changed, beforeDir, afterDir, (file) => urls.get(file) ?? "");
+    // Without uploaded images there is nothing to embed; the artifact has the files.
+    if (urls.size) beforeAfter = pairs;
+  }
+  const body = renderComment({ beforeAfter, compare, test, explore: readJson("explore-report.json"), changed, screenshots: shots,
     runUrl: env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : undefined });
   const fail = argv.includes("--fail-on-regression") && !!compare?.regressions.length ? 1 : 0;
   const pr = Number(val("--pr") ?? /refs\/pull\/(\d+)\//.exec(env.GITHUB_REF ?? "")?.[1]);

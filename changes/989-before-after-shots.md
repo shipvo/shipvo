@@ -1,0 +1,2 @@
+- `@shipvo/cli`: the check comment has a "Before and after" section: each changed screen on the base commit and the pull request, on Android and iOS, up to 6 screens. `shipvo ci shots` takes `--skins` and `--screens-file`. The generated workflow now has `contents: write` so images can be stored on the `shipvo-check-media` branch.
+- Migration: rerun `shipvo ci init --check --force` to get the new permission, or add `contents: write` to your workflow.

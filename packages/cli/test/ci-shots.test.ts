@@ -31,3 +31,14 @@ describe("captureScreens", () => {
     expect(await captureScreens(["x/[id]"], async () => new Uint8Array(), join(tmpdir(), "never-made-xyz"))).toEqual([]);
   });
 });
+
+describe("captureScreens with skins", () => {
+  it("shoots each screen on android and ios, up to six screens", async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "shots-")), "after");
+    const seen: string[] = [];
+    const names = ["a", "b", "c", "d", "e", "f", "g"];
+    await captureScreens(names, async (r, skin) => { seen.push(`${r}:${skin}`); return new TextEncoder().encode(`${r}${skin}`); }, dir, () => {}, { skins: ["android", "ios"], max: 6 });
+    expect(readdirSync(dir).sort()).toEqual(names.slice(0, 6).flatMap((n) => [`${n}.android.png`, `${n}.ios.png`]).sort());
+    expect(seen).toContain("/a:ios");
+  });
+});

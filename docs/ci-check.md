@@ -48,6 +48,12 @@ The workflow must check out the full history (`fetch-depth: 0`) so the diff agai
 
 Run it by hand with `npx shipvo ci comment --changed-from <sha> --pr <number>`. Without a token it prints the comment.
 
+### Before and after
+
+For each screen the diff changed, the comment shows the screen on the base commit and on the pull request side by side, on the Android and iOS skins, light theme, 390x844. The action runs `npx shipvo ci shots --skins android,ios` on the pull request build and again on the base build, with the same screen list. At most 6 screens are shown, and the comment links to the rest in the `shipvo-check` artifact. A screen whose images are identical before and after is not shown.
+
+The images are stored on the `shipvo-check-media` branch of your own repository, with your `GITHUB_TOKEN`, so the workflow needs `contents: write` (the generated workflow has it). Nothing is sent to Shipvo. Each push uploads its own images, and the single comment is updated in place to point at them.
+
 ### Compared with base
 
 The action also builds the base commit in a second folder and runs the same flows there. The comment then has a "Compared with base" section: regressions first (flows that passed on base and fail now, with the first failing step), then fixed, then still failing. Flows only on the pull request are not regressions. The check fails on a regression because the action passes `--fail-on-regression`; by hand, use `npx shipvo ci comment --base-report base.json --report shipvo-report.json --fail-on-regression`. If the base report is missing or unreadable, the comment has no such section and the check does not fail. If the pull request report is missing, there is no comparison and no failure either. If the base commit cannot be checked out, the action prints a line saying so and skips the comparison.
