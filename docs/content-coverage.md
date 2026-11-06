@@ -2,6 +2,17 @@
 
 One row per user-visible feature or advantage. Each column is a link, or empty when nothing exists yet. Docs, blog, tutorial and video agents pick the biggest gap in their column, newest and most important features first, and add their link here in the same commit. Source of features: `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs. First version, backfilled on 2026-11-05 from the docs, blog posts, tutorials and videos that exist; it is not yet complete.
 
+## Priority now
+
+Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
+
+1. Shipvo Testers and `shipvo store testers` (video, blog)
+2. Shipvo Phone and `shipvo run` (all columns, as slices land)
+3. Store path: `shipvo store` from working app to both stores (video, blog)
+4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
+5. Signed over-the-air updates, staged rollout and rollback (tutorial, video)
+6. Capacitor support (all columns, as slices land)
+
 | Feature | Docs | Tutorial | Video | Blog |
 | --- | --- | --- | --- | --- |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
@@ -24,10 +35,20 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 | Telemetry export to R2 | [telemetry-export](telemetry-export.md) | | | |
 | Move from CodePush | [migrate-from-codepush](migrate-from-codepush.md) | | | [a-codepush-alternative-after-app-center](../blog/a-codepush-alternative-after-app-center.md) |
 | New machine and key backup | [new-machine](new-machine.md) | | | |
-| Release health dashboard and alerts | | | | |
+| Release health dashboard and alerts | [self-hosting](self-hosting.md#revert-alerts-webhook), [telemetry-export](telemetry-export.md) | | | |
 | Take mobile money payments | [device-api](device-api.md) | | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | `shipvo test --repair`, `--report`, plain steps | [testing](testing.md) | | | |
 | Release policy and `--dry-run-policy` | [CLI guide](cli.md) | | | |
 | Audit log and `shipvo audit` | [CLI guide](cli.md) | | | |
 | `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | | | |
 | MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
+| `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | | | |
+| Assistant attaches to the live `shipvo run` phone (`open_app`) | [run](run.md), [agents](agents.md) | | | |
+| Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md) | | | |
+| Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | | |
+| Real camera, microphone and location in the browser | [device-api](device-api.md) | | | |
+| Gate a rollout on test results (`shipvo promote --report`, `--report-md`) | [testing](testing.md), [cli](cli.md) | | | |
+| Test secrets (`secret(name)`, `{secret:NAME}`) | [testing](testing.md) | | | |
+| The `shipvo` skill for coding agents | [agents](agents.md) | | | |
+| Policy enforced by the control plane (weekday, staged rollout, max band) | [cli](cli.md) | | | |
+| Hosted MCP `server/discover` support | [mcp](../packages/mcp/README.md) | | | |

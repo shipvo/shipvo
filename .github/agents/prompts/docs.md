@@ -27,3 +27,5 @@ A new site check is a new file `services/site/scripts/check-<name>.mjs`; `run-ch
 The ledger must list **every** shipped user-visible feature (owner goal: each one gets a video and a tutorial). Each run, compare it with `CHANGELOG.md`, `changes/` and merged PRs and add every missing row.
 
 Every row in `docs/content-coverage.md` must have a Docs link (owner goal, 6 Nov 2026): each run, fill the empty Docs cells first, newest features first, with a real page or section (what it is, who it is for, how to use it, every option, troubleshooting). Keep `docs/ROADMAP.md` current every run; it feeds the public roadmap page at shipvo.dev/roadmap. "Now": every open epic (`gh issue list --label epic --state open`) with its link, owner direction first (`docs/product/platform.md`), and the planner's latest plan comment. "Shipped": complete, dated, newest first; move finished epics there.
+
+Always read the "Priority now" list at the top of `docs/content-coverage.md` first and take the first item that still has an empty cell in your column.

@@ -66,6 +66,13 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-06: `shipvo run android|ios` opens a phone frame in your browser; your assistant attaches to it with `open_app` ([Run on a phone](run.md), #454, #500, #510, #519, #540)
+- 2026-11-06: `record_start`, `record_marker` and `record_stop` write an MP4 of the phone ([Record a demo video](record.md), #525)
+- 2026-11-06: `shipvo promote` refuses releases with failing test flows; `shipvo test --report-md`; `secret()` in tests ([Testing](testing.md), #489, #490, #493)
+- 2026-11-06: Shipvo Testers group and `shipvo store testers` ([Store](store.md), #520)
+- 2026-11-06: Real camera, microphone and location in the browser with simulated fallback ([Device API](device-api.md), #474)
+- 2026-11-06: Control plane enforces weekday and staged-rollout policy rules on publish ([CLI guide](cli.md), #506)
+- 2026-11-06: The `shipvo` skill for coding agents, `npx skills add` ([Agents](agents.md), #537)
 - 2026-11-05: Release rules in `shipvo.json` (`policy`), checked by `shipvo publish --dry-run-policy` and enforced on publish by the control plane ([CLI guide](cli.md), #426)
 - 2026-11-05: `shipvo audit` exports the audit log; publishes, halts and rollbacks are recorded ([CLI guide](cli.md), #346, #353, #354, #359, #403)
 - 2026-11-05: `shipvo explore` walks the app in the simulator and reports findings ([Agents](agents.md), #366)
