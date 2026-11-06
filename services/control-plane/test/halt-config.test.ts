@@ -12,6 +12,7 @@ function setup(healthy = 14, failed = 6, tokens: Record<string, Tok> = {}) {
     run: async () => ({}),
     first: async () => {
       if (sql.includes("FROM publish_tokens")) { const [h, app_] = _a as string[]; const t = tokens[h]; return t && t.app_id === app_ && !t.revoked_at ? { id: 1, expires_at: t.expires_at ?? null } : null; }
+      if (sql.includes("'applied'")) return { n: healthy };
       if (sql.includes("COUNT(DISTINCT install_id) AS installs")) return { installs: failed, nets: 5, fresh_installs: 0, recent: 0 };
       if (sql.includes("COUNT(*) AS n FROM telemetry")) return { n: 0 };
       if (sql.includes("FROM apps")) return { public_key: "k", bytes_used: 0 };

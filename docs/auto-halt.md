@@ -34,7 +34,9 @@ The request shows up as an `approvals_list` entry of kind `halt` (id `halt-<rele
 
 ## Rate limits
 
-Per minute: `POST /t` 300 per IP, 30 per install, 3000 per app. `POST /t/register` 10 per IP, 300 per app. Over the limit the server answers 429. Revert alert webhooks need 3 distinct verified installs for the release, and stay capped at 10 per app per hour and one per release per hour.
+Per minute: `POST /t` 300 per IP, then the report is checked. A verified report costs the app 3000 and its install 30. A report that fails the check costs only a shared 600 per app, so forged traffic cannot use up the budget of real installs. `POST /t/register` 10 per IP, 300 per app. With no client IP (self-hosted without Cloudflare) the per-IP limits are skipped. Over the limit the server answers 429. A rate-limited report is not marked as seen, so the device may retry it.
+
+A hold that the owner dismissed stays dismissed: a later failure of the same release that still has an anomaly reason is not raised again. A later failure with no anomaly reason halts as usual. Revert alert webhooks need 3 distinct verified installs for the release, and stay capped at 10 per app per hour and one per release per hour.
 
 ## Old runtimes
 

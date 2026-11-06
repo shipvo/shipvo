@@ -11,6 +11,7 @@ function setup(cfg: unknown, healthy: number, failed: number, initial: Record<st
   const DB = { prepare: (sql: string) => ({ bind: (...a: unknown[]) => (binds.push(a), {
     run: async () => ({}),
     first: async () => {
+      if (sql.includes("'applied'")) return { n: healthy };
       if (sql.includes("COUNT(DISTINCT install_id) AS installs")) return { installs: failed, nets: 5, fresh_installs: 0, recent: 0 };
       if (sql.includes("COUNT(*) AS n FROM telemetry")) return { n: 0 };
       return null;

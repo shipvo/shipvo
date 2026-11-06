@@ -27,6 +27,7 @@ function world(cfg: object = { threshold: 0.2, min_reports: 50 }, webhook: strin
         return { installs: distinct(m, (r) => r.install), nets: distinct(m, (r) => r.net), fresh_installs: distinct(m.filter((r) => r.fresh), (r) => r.install), recent: distinct(m.filter((r) => r.at >= a[0]), (r) => r.install) };
       }
       if (sql.includes("COUNT(*) AS n FROM telemetry")) return { n: rows.filter((r) => r.app === a[0] && r.verified === 1 && r.release !== a[1] && FAILED.includes(r.event) && r.at >= a[2] && r.at < a[3]).length };
+      if (sql.includes("'applied'")) return { n: distinct(rows.filter((r) => r.app === a[0] && r.release === a[1] && r.verified === 1 && ["applied", "content_applied"].includes(r.event)), (r) => r.install) };
       if (sql.includes("COUNT(DISTINCT install_id) AS n")) return { n: distinct(rows.filter((r) => r.app === a[0] && r.release === a[1] && r.verified === 1 && ["rolled_back", "crash_loop_revert"].includes(r.event)), (r) => r.install) };
       if (sql.includes("FROM app_alerts")) return webhook ? { webhook } : null;
       if (sql.includes("COUNT(*)")) return { n: [...sent.keys()].filter((k) => k.startsWith(`${a[0]}/`)).length };
@@ -151,6 +152,39 @@ describe("anomaly guard", () => {
 });
 
 describe("rate limits and alert slots", () => {
+  it("a full unverified bucket does not block a signed report from a registered install", async () => {
+    const w = world();
+    const inst = await newInstall(w.env, "tide", "198.51.100.9");
+    let last = 0;
+    for (let i = 0; i < 605; i++) last = (await raw(w.env, { ...rb(), n: i }, `192.0.${Math.floor(i / 250)}.${i % 250}`)).status;
+    expect(last).toBe(429);
+    expect((await inst.send(ok(1), "198.51.100.9")).status).toBe(202);
+  });
+  it("forged reports for an install id do not spend that install's budget", async () => {
+    const w = world();
+    const inst = await newInstall(w.env, "tide", "198.51.100.10");
+    for (let i = 0; i < 40; i++) await raw(w.env, { ...ok(i), install_id: inst.install_id }, `192.0.3.${i}`);
+    expect((await inst.send(ok(1), "198.51.100.10")).status).toBe(202);
+  });
+  it("a rate-limited signed report does not burn its replay key", async () => {
+    const w = world();
+    const inst = await newInstall(w.env);
+    for (let i = 0; i < 30; i++) await inst.send(ok(i));
+    const body = JSON.stringify(await inst.sign(ok(99)));
+    const post = () => app.request("/t", { method: "POST", headers: { "cf-connecting-ip": "203.0.113.7" }, body }, w.env);
+    expect((await post()).status).toBe(429);
+    expect(await w.env.POINTERS.get(`seen/tide/${JSON.parse(body).sig}`)).toBeNull();
+  });
+  it("without an IP there is no shared per-IP bucket", async () => {
+    const w = world();
+    let last = 0;
+    for (let i = 0; i < 605; i++) last = (await app.request("/t", { method: "POST", body: JSON.stringify({ ...rb(), n: i }) }, w.env)).status;
+    // Unverified traffic still has its own per-app bucket, but it is not the per-IP one (300) that real phones would share.
+    const reg = [];
+    for (let i = 0; i < 12; i++) reg.push((await app.request("/t/register", { method: "POST", body: JSON.stringify({ schema_version: "1.0", app_id: "tide", install_id: `${i}`.padStart(16, "0"), install_key: "a".repeat(64), shell_version: "1.0.0" }) }, w.env)).status);
+    expect(reg.every((c) => c === 200)).toBe(true);
+    expect(last).toBe(429);
+  });
   it("limits POST /t per IP and /t/register per IP", async () => {
     const w = world();
     let last = 0;

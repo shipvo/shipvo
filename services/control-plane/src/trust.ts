@@ -66,9 +66,9 @@ export async function registerInstall(env: TrustEnv, body: unknown): Promise<{ s
   return { status: 200, json: { install_token: await tokenFor(secret, r.app_id, r.install_id, r.shell_version, keyHash), registered_at: new Date(at).toISOString() } };
 }
 
-export type ReportTrust = { verified: boolean; duplicate: boolean; installId: string | null; fresh: boolean };
+export type ReportTrust = { verified: boolean; duplicate: boolean; installId: string | null; fresh: boolean; seenKey?: string };
 
-/** Check the token and the body HMAC. A replayed body (same HMAC) is a duplicate and is not stored again. */
+/** Check the token and the body HMAC. A replayed body (same HMAC) is a duplicate and is not stored again. Read-only: call `markSeen` with the returned `seenKey` once the report is accepted, so a rate-limited request does not burn its replay key. */
 export async function verifyReport(env: TrustEnv, d: Telemetry, body: Record<string, unknown>): Promise<ReportTrust> {
   const none: ReportTrust = { verified: false, duplicate: false, installId: null, fresh: false };
   const secret = serverSecret(env);
@@ -82,7 +82,12 @@ export async function verifyReport(env: TrustEnv, d: Telemetry, body: Record<str
     if (!eq(d.sig, await hmacHex(rec.k, canonicalize(unsigned)))) return none;
     const seen = `seen/${d.app_id}/${d.sig}`;
     if (await env.POINTERS.get(seen)) return { verified: true, duplicate: true, installId: d.install_id, fresh: false };
-    await env.POINTERS.put(seen, "1", { expirationTtl: 86400 });
-    return { verified: true, duplicate: false, installId: d.install_id, fresh: Date.now() - rec.at < FRESH_MS };
+    return { verified: true, duplicate: false, installId: d.install_id, fresh: Date.now() - rec.at < FRESH_MS, seenKey: seen };
   } catch { return none; }
+}
+
+/** Remember an accepted report body so a replay is a duplicate. Never throws. */
+export async function markSeen(env: TrustEnv, seenKey: string | undefined): Promise<void> {
+  if (!seenKey || !env.POINTERS) return;
+  try { await env.POINTERS.put(seenKey, "1", { expirationTtl: 86400 }); } catch { /* replay guard is best effort */ }
 }

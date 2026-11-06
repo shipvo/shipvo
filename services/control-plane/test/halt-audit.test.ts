@@ -7,7 +7,7 @@ function setup(failAudit: boolean) {
   const audits: unknown[][] = [];
   const DB = { prepare: (sql: string) => ({ bind: (...a: unknown[]) => ({
     run: async () => { if (sql.includes("INSERT INTO audit_log")) { if (failAudit) throw new Error("db down"); audits.push(a); } return {}; },
-    first: async () => sql.includes("AS installs") ? { installs: 6, nets: 5, fresh_installs: 0, recent: 0 } : sql.includes("COUNT(*) AS n FROM telemetry") ? { n: 0 } : null,
+    first: async () => sql.includes("'applied'") ? { n: 14 } : sql.includes("AS installs") ? { installs: 6, nets: 5, fresh_installs: 0, recent: 0 } : sql.includes("COUNT(*) AS n FROM telemetry") ? { n: 0 } : null,
     all: async () => ({ results: sql.includes("GROUP BY event") ? [{ event: "applied", n: 14 }, { event: "rolled_back", n: 6 }] : [] }),
   }) }) } as any;
   return { env: { POINTERS, DB, OWNER_TOKEN: "secret" } as any, store, audits };

@@ -6,7 +6,7 @@ import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerC
 import { auth } from "./auth";
 import { forbidden, type Action } from "./roles";
 import { ALERT_MIN_INSTALLS, REVERT_EVENTS, sendRevertAlert } from "./alerts";
-import { DEFAULT_MIN_INSTALLS, DEFAULT_MIN_NETWORKS, DEFAULT_MIN_REPORTS, clientIp, netHash, rateLimit, registerInstall, verifyReport } from "./trust";
+import { DEFAULT_MIN_INSTALLS, DEFAULT_MIN_NETWORKS, DEFAULT_MIN_REPORTS, clientIp, netHash, markSeen, rateLimit, registerInstall, verifyReport } from "./trust";
 import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
@@ -144,8 +144,9 @@ async function maybeHalt(env: Env, appId: string, release: number, kv?: { failed
   const inList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
   let nets = 0;
   try {
-    const rows = (await env.DB.prepare("SELECT event, COUNT(DISTINCT install_id) AS n FROM telemetry WHERE app_id = ? AND release = ? AND verified = 1 GROUP BY event").bind(appId, release).all<{ event: string; n: number }>()).results ?? [];
-    for (const r of rows) if (HEALTHY_EVENTS.includes(r.event)) counts.healthy += r.n;
+    const healthyIn = HEALTHY_EVENTS.map((e) => `'${e}'`).join(",");
+    const h = await env.DB.prepare(`SELECT COUNT(DISTINCT install_id) AS n FROM telemetry WHERE app_id = ? AND release = ? AND verified = 1 AND event IN (${healthyIn})`).bind(appId, release).first<{ n: number }>();
+    counts.healthy = h?.n ?? 0;
     const since = new Date(Date.now() - ANOMALY_WINDOW_MS).toISOString();
     const f = await env.DB.prepare(`SELECT COUNT(DISTINCT install_id) AS installs, COUNT(DISTINCT net_hash) AS nets, COUNT(DISTINCT CASE WHEN fresh = 1 THEN install_id END) AS fresh_installs, COUNT(DISTINCT CASE WHEN received_at >= ? THEN install_id END) AS recent FROM telemetry WHERE app_id = ? AND release = ? AND verified = 1 AND event IN (${inList})`)
       .bind(since, appId, release).first<{ installs: number; nets: number; fresh_installs: number; recent: number }>();
@@ -196,8 +197,8 @@ async function holdHalt(env: Env, appId: string, release: number, halted: Record
 
 /** Register an install (once, on first launch). Rate limited per IP and per app. */
 app.post("/t/register", async (c) => {
-  const ip = clientIp(c) ?? "unknown";
-  if (!(await rateLimit(c.env.POINTERS, `reg-ip/${ip}`, 10))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  const ip = clientIp(c);
+  if (ip && !(await rateLimit(c.env.POINTERS, `reg-ip/${ip}`, 10))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
   let body: any;
   try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
   if (typeof body?.app_id === "string" && !(await rateLimit(c.env.POINTERS, `reg-app/${body.app_id}`, 300))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
@@ -209,15 +210,21 @@ app.post("/t/register", async (c) => {
 /** Device telemetry: applied / reverted / timings. Reports from registered installs are verified; all others are stored as unverified. */
 app.post("/t", async (c) => {
   const ip = clientIp(c);
-  if (!(await rateLimit(c.env.POINTERS, `t-ip/${ip ?? "unknown"}`, 300))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  // No IP (self-hosted without Cloudflare): skip the per-IP limit, the per-app and per-install limits still apply.
+  if (ip && !(await rateLimit(c.env.POINTERS, `t-ip/${ip}`, 300))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
   let body: any;
   try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
   const t = Telemetry.safeParse(body);
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
-  if (!(await rateLimit(c.env.POINTERS, `t-app/${d.app_id}`, 3000)) || (d.install_id && !(await rateLimit(c.env.POINTERS, `t-install/${d.app_id}/${d.install_id}`, 30)))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  // Verify first (read-only), so forged traffic cannot spend the budget of real, signed installs.
   const trust = await verifyReport(c.env, d, extra);
+  const limited = trust.verified
+    ? !(await rateLimit(c.env.POINTERS, `t-app/${d.app_id}`, 3000)) || !(await rateLimit(c.env.POINTERS, `t-install/${d.app_id}/${trust.installId}`, 30))
+    : !(await rateLimit(c.env.POINTERS, `t-app-unverified/${d.app_id}`, 600));
+  if (limited) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
   if (trust.duplicate) return c.json({ ok: true, duplicate: true }, 202);
+  await markSeen(c.env, trust.seenKey);
   const net = await netHash(c.env, d.app_id, ip);
   let stored = true;
   try {
