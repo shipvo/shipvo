@@ -1,0 +1,1 @@
+- cli: new `exportTest(finding)` in `explore-tests.ts` returns the source of a `@shipvo/test` file that replays a finding's steps and fails while the bug exists. App text (names, typed text, URLs) is written only as JSON string literals, never in comments.
