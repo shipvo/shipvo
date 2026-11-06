@@ -13,7 +13,7 @@ A stolen publish token must also never be enough to take over an app. Today the 
 
 What was read: `packages/cli/src/signing.ts` (only `keys export` and `keys import`), `signDoc` and `verifyDoc` in `packages/cli/src/index.ts`, `Verify.kt`, `Verify.swift`, `ShipvoRuntimeModule.kt` (pointer check around line 149), `Updater.swift` (around line 50), and both `Store` files.
 
-Prior art consulted by reading project docs and source (nothing copied): TUF (root, targets, version numbers, expiry), and the key handling of expo-updates (code signing with a certificate chain). TUF's idea of an offline root that signs online keys is the model used here.
+Prior art: this design draws on general knowledge of TUF (root, targets, version numbers, expiry) and expo-updates code signing (certificate chain). No other project's source or docs were consulted while writing it, and DeepWiki was not used. TUF's idea of an offline root that signs online keys is the model used here.
 
 ## 1. Model
 
@@ -31,7 +31,7 @@ Key set the runtime trusts at any moment:
 1. The current release key: the key from the highest-sequence valid statement, or the pinned genesis key if none is stored.
 2. The previous release key, only until `previous_valid_until` (the grace window, below). This lets devices that missed the rotation keep updating while they fetch the statement.
 
-**Old key revoked after a set time.** Each statement carries `old_key_valid_until`. The default is 14 days after `valid_from`, and the CLI refuses a value over 30 days. After that time the runtime rejects pointers signed by the old key. For a leak the owner sets it to `valid_from` (zero grace); the cost is that devices that have not yet fetched the statement stop receiving updates until they do.
+**Old key revoked after a set time.** Each statement carries `old_key_valid_until`. The default is 14 days after `valid_from`, and the CLI refuses a value over 30 days, and the runtime rejects it too (section 4). Both sides check the cap. After that time the runtime rejects pointers signed by the old key. For a leak the owner sets it to `valid_from` (zero grace); the cost is that devices that have not yet fetched the statement stop receiving updates until they do.
 
 **One time rule: the device clock decides.** The runtime reads its own clock, `now`, once per check. It never uses a pointer's `issued_at` for key decisions, because whoever holds the old key can forge it.
 
@@ -73,7 +73,7 @@ So the publish token alone can never rotate. An attacker needs the root seed.
 
 **M-of-N: not in v1.** Reason: the threat we close is "stolen publish token", and a single offline root key already closes it. M-of-N protects against one stolen root key, but it costs a multi-party signing flow, more shell-pinned keys (a larger and harder-to-change surface) and more ways to lose enough keys to be locked out. Teams with that need can keep the root key in a hardware token or a split-secret vault. The wire format reserves a `signatures` array so M-of-N can be added later without a new format (see section 4).
 
-**Recovery delay: yes, a short one for non-emergency rotations.** The runtime promotes a statement at `valid_from` (section 4, "Between fetch and `valid_from`"), and the CLI sets `valid_from` to now plus 24 hours by default for planned rotation, so an owner watching alerts can notice an unexpected rotation. This does not protect against a stolen root key (the attacker chooses `valid_from`), so the runtime does not enforce a minimum delay. The control plane emails/log-events the owner on every statement upload; that is the only real signal and it is weak. Say so in docs. Emergency rotation (`--emergency`) sets `valid_from` to now.
+**Recovery delay: yes, a short one for non-emergency rotations.** The runtime promotes a statement at `valid_from` (section 4, "Between fetch and `valid_from`"), and the CLI sets `valid_from` to now plus 24 hours by default for planned rotation (this is the one place the default is defined; other sections refer here), so an owner watching alerts can notice an unexpected rotation. This does not protect against a stolen root key (the attacker chooses `valid_from`), so the runtime does not enforce a minimum delay. The control plane emails/log-events the owner on every statement upload; that is the only real signal and it is weak. Say so in docs. Emergency rotation (`--emergency`) sets `valid_from` to now.
 
 ## 4. Wire format, replay protection, storage
 
@@ -212,5 +212,6 @@ Record what CI measured and on what image. Do not report results from other devi
 
 ## Open questions
 
+- Cap the length of the `statements` chain a device will verify (for example 16), so a hostile server cannot make a device verify an unbounded chain. A device further behind than the cap would need a new store build. The number is not chosen.
 - Should the control plane send the owner a message on every statement upload? Proposed yes; delivery channel is not chosen.
 - Do we offer `keys root` as a separate offline command that never needs a network? Proposed yes, so a root seed never has to touch a machine with a publish token.
