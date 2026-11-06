@@ -49,8 +49,15 @@ export async function rotationCmd(sub: string, rest: string[]): Promise<number> 
   const a = args(rest);
   if (sub === "root") {
     const s = b64(randomBytes(32));
-    if (a.out && a.out !== "true") { writeFileSync(a.out, s + "\n", { mode: 0o600 }); console.error(`Root seed written to ${a.out}. Keep it offline. Never commit it or put it in CI.`); }
-    else { console.error("Warning: the root seed is printed below. Use --out <file> to keep it out of shell history and CI logs."); console.log(`root seed (secret, keep offline): ${s}`); }
+    if (a.out && a.out !== "true") {
+      try { writeFileSync(a.out, s + "\n", { mode: 0o600, flag: "wx" }); }
+      catch (e) {
+        if ((e as NodeJS.ErrnoException).code === "EEXIST") console.error(`${a.out} already exists. Not overwriting it, because it may hold your root seed. Pick another file name.`);
+        else console.error(`Could not write the root seed to ${a.out}.`);
+        return 1;
+      }
+      console.error(`Root seed written to ${a.out}. Keep it offline. Never commit it or put it in CI.`);
+    } else { console.error("Warning: the root seed is printed below. Use --out <file> to keep it out of shell history and CI logs."); console.log(`root seed (secret, keep offline): ${s}`); }
     console.log(`rootKey (public, add to shipvo.json before your next store build): ${pub(s)}`);
     return 0;
   }

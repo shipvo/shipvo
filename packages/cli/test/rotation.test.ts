@@ -10,7 +10,7 @@ const seed = () => b64(randomBytes(32));
 const pub = (s: string) => b64(keyFromSeed(s).publicKey);
 const root = seed(), rel = seed(), next = seed();
 const trust: TrustState = { appId: "tide", rootKey: pub(root), releaseKey: pub(rel), sequence: 0 };
-const body = (o = {}) => ({ appId: "tide", sequence: 1, previousKey: pub(rel), newKey: pub(next), validFrom: new Date().toISOString(), revokeOldAfter: null, ...o });
+const body = (o = {}) => ({ appId: "tide", sequence: 1, previousKey: pub(rel), newKey: pub(next), validFrom: new Date(Date.now() - 1000).toISOString(), revokeOldAfter: null, ...o });
 
 describe("key rotation statements", () => {
   it("accepts a root-signed statement", () => expect(checkRotation(makeRotation(body(), root), trust)).toBeNull());
@@ -132,6 +132,15 @@ describe("shipvo keys root", () => {
     expect(r.out).toContain(pub(s));
     expect(r.out).not.toContain(s);
   });
+  it("refuses to overwrite an existing file", async () => {
+    const f = join(mkdtempSync(join(tmpdir(), "root-")), "root.txt");
+    writeFileSync(f, "original\n");
+    const r = await capture(["--out", f]);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/already exists/);
+    expect(readFileSync(f, "utf8")).toBe("original\n");
+    expect(r.out).toBe("");
+  });
   it("without --out warns on stderr and still prints the key", async () => {
     const r = await capture([]);
     expect(r.code).toBe(0);
@@ -139,5 +148,14 @@ describe("shipvo keys root", () => {
     const seedLine = r.out.split("\n").find((l) => l.startsWith("root seed"))!;
     const s = seedLine.split(": ").pop()!.trim();
     expect(r.out).toContain(pub(s));
+  });
+});
+
+describe("validFrom skew", () => {
+  it("rejects a statement just past now + skew and accepts one at the edge", () => {
+    const now = Date.now(), skew = 5000;
+    const at = (d: number) => makeRotation(body({ validFrom: new Date(now + d).toISOString() }), root);
+    expect(checkRotation(at(skew), trust, now, skew)).toBeNull();
+    expect(checkRotation(at(skew + 1), trust, now, skew)).toBe("not_yet_valid");
   });
 });

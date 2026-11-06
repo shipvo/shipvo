@@ -55,6 +55,9 @@ Ship
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine
+  keys root [--out f]         Make the offline root key that signs key rotations
+  keys rotate --root-seed-file f [--revoke-after days|now]
+                              Sign a release key rotation statement
   mcp                         Print the MCP config that agents need
 
 Advanced
