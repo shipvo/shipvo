@@ -58,6 +58,10 @@ This section is set by the owner. The Head of Product plans from it and does not
 
 **Risks to watch:** Apple and Google rules on updates (stay on interpreted code and declared capabilities, and document compliance publicly); trust in AI-written code (the merge contract and test evidence are the answer, never hidden); and adoption (only real users prove anything).
 
+### Infrastructure: one Cloudflare account (owner, 6 Nov 2026)
+
+Everything runs in one Cloudflare account. The Shipvo Runner starts as one shared Worker that executes app specs (no user code) on the Workers Free plan (100,000 requests a day); we move to Workers Paid ($5 a month) only when usage reaches the free limits, with an alert at 70%. User-written code (spec levels 2 and 3) never runs in the shared runner; it waits for Workers for Platforms with one script per person, and heavy jobs go to E2B. See `docs/design/app-spec.md` section 15.7.
+
 ### Shipvo for coding agents (owner, 6 Nov 2026)
 
 Any coding agent sets up and uses Shipvo by itself from one line: `npx skills add shipvo/shipvo --skill shipvo -g`, or `curl -fsSL https://shipvo.dev/install.sh | bash`, or "run `npx -y @shipvo/cli agents setup`". Every command answers in JSON with exit codes and the next command to run; packages ship their own skills. Expo has `@expo/agent-cli` and Expo Simulators in preview; Shipvo must be at least as easy for agents and give them more (a whole phone, testing, demos, the store path, signed updates). Epic #533.
