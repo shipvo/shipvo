@@ -35,10 +35,10 @@ type Run = (argv: string[]) => Promise<number>;
 
 /** `shipvo ci check`: run `shipvo test`, then `shipvo explore` (so the report exists even when a flow fails).
  * Fails on a test regression or a crash. Exploration findings alone do not fail it. */
-export async function check(runTest: Run = testCmd, runExplore: Run = explore, extra: string[] = []): Promise<number> {
+export async function check(runTest: Run = testCmd, runExplore: Run = explore, changedFrom?: string): Promise<number> {
   const t = await runTest(["--report", "shipvo-report.json"]);
   let e: number;
-  try { e = await runExplore(["--sim", "http://localhost:4545", ...extra]); }
+  try { e = await runExplore(["--sim", "http://localhost:4545", ...(changedFrom ? ["--changed-from", changedFrom] : [])]); }
   catch (err) { console.error(err instanceof Error ? err.message : String(err)); e = 1; }
   return t !== 0 ? t : e;
 }
@@ -57,8 +57,9 @@ export async function ci(argv: string[], cwd = process.cwd()): Promise<number> {
   const [sub, ...rest] = argv;
   if (sub === "check") {
     const i = rest.indexOf("--changed-from");
-    if (i >= 0 && (!rest[i + 1] || rest[i + 1]!.startsWith("-"))) { console.error("shipvo ci check: --changed-from needs a commit sha"); return 2; }
-    return check(testCmd, explore, i >= 0 ? ["--changed-from", rest[i + 1]!] : []);
+    const v = i >= 0 ? rest[i + 1] : undefined;
+    if (i >= 0 && (v === undefined || v.startsWith("-"))) { console.error("shipvo ci check: --changed-from needs a commit sha"); return 2; }
+    return check(testCmd, explore, v);
   }
   if (sub === "shots") return shotsCmd(rest);
   if (sub === "comment") return commentCmd(rest);

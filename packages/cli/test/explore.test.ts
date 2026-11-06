@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { walk, elements, changedRoutes, changedRoutesOrAll, renderMarkdown, explore, type Driver, type Reply } from "../src/explore.js";
+import { walk, elements, renderMarkdown, explore, routesFromChange, appScheme, type Driver, type Reply } from "../src/explore.js";
+
+const changed = vi.hoisted(() => ({ files: [] as string[], fail: false }));
+vi.mock("../src/ci-comment.js", async (orig) => ({
+  ...(await orig<typeof import("../src/ci-comment.js")>()),
+  changedFiles: () => { if (changed.fail) throw new Error("bad revision"); return changed.files; },
+}));
 
 // A fixture app: Home has a button that crashes, an unnamed button, a link to Settings and a link to a dead end.
 const SCREENS: Record<string, string> = {
@@ -70,6 +76,15 @@ describe("walk", () => {
     const { driver } = fixture();
     const r = await walk(driver, { routes: ["app://settings"] });
     expect(r.screens).toBeGreaterThanOrEqual(3);
+  });
+
+  it("walks only the given routes with onlyRoutes", async () => {
+    const { driver } = fixture();
+    const r = await walk(driver, { routes: ["app://settings"], onlyRoutes: true });
+    expect(r.screens).toBeGreaterThanOrEqual(1);
+    const none = await walk(fixture().driver, { onlyRoutes: true });
+    expect(none.steps).toBe(0);
+    expect(none.findings).toEqual([]);
   });
 
   it("reports a tap that was not delivered", async () => {
@@ -185,47 +200,48 @@ describe("explore --json", () => {
   });
 });
 
-describe("--changed-from", () => {
-  it("turns a fake diff into routes: changed, non-dynamic screens only", () => {
-    const diff = () => ["app/settings.tsx", "app/item/[id].tsx", "app/_layout.tsx", "app/index.tsx", "README.md", "app/settings.test.tsx"];
-    expect(changedRoutes("abc", diff)).toEqual(["/settings", "/"]);
+describe("routesFromChange", () => {
+  it("walks only changed routable screens, at most four", async () => {
+    changed.fail = false;
+    changed.files = ["app/a.tsx", "app/b.tsx", "app/c.tsx", "app/d.tsx", "app/e.tsx", "app/[id].tsx", "README.md"];
+    const r = await routesFromChange("abc", () => {}, "tide");
+    expect(r.onlyRoutes).toBe(true);
+    expect(r.routes).toEqual(["tide://a", "tide://b", "tide://c", "tide://d"]);
   });
-  it("walks only the changed screens and does not follow links off them", async () => {
-    const { driver, taps } = fixture();
-    const visited: string[] = [];
-    const wrapped: Driver = { ...driver, async openUrl(url) { visited.push(url); return driver.openUrl(url === "/settings" ? "app://settings" : url); } };
-    const r = await walk(wrapped, { routes: changedRoutes("abc", () => ["app/settings.tsx", "app/item/[id].tsx"]), onlyRoutes: true, maxDepth: 1 });
-    expect(visited).toEqual(["/settings"]);
-    expect(taps).toEqual(["Deeper"]);
-    expect(r.stoppedEarly).toBeNull();
-    expect(r.findings.some((f) => f.screen.includes('heading "Home"'))).toBe(false);
-    expect(taps).not.toContain("Crash");
+  it("walks nothing when no screen changed", async () => {
+    changed.fail = false; changed.files = ["README.md", "app/[id].tsx"];
+    expect(await routesFromChange("abc", () => {}, "tide")).toEqual({ routes: [], onlyRoutes: true });
   });
-  it("falls back to the whole app (undefined) with a message when the diff cannot be read", () => {
-    const warned: string[] = [];
-    const r = changedRoutesOrAll("abc", () => { throw new Error("fatal: bad revision 'abc'"); }, (m) => warned.push(m));
-    expect(r).toBeUndefined();
-    expect(warned).toHaveLength(1);
-    expect(warned[0]).toContain("Exploring the whole app instead");
+  it("falls back to the full walk when the diff cannot be read", async () => {
+    changed.fail = true;
+    const logs: string[] = [];
+    const r = await routesFromChange("abc", (s) => logs.push(s));
+    changed.fail = false;
+    expect(r).toEqual({ onlyRoutes: false });
+    expect(logs[0]).toMatch(/^could not read the diff: bad revision/);
   });
-  it("a diff that touches no screens gives a clean empty report", async () => {
-    const { driver, taps } = fixture();
-    const routes = changedRoutes("abc", () => ["README.md", "app/_layout.tsx", "app/item/[id].tsx"]);
-    expect(routes).toEqual([]);
-    const r = await walk(driver, { routes, onlyRoutes: true, maxDepth: 1 });
-    expect(r.screens).toBe(0);
-    expect(r.findings).toEqual([]);
-    expect(r.stoppedEarly).toBeNull();
-    expect(taps).toEqual([]);
-    const md = renderMarkdown(r);
-    expect(md).toContain("Screens seen: 0");
-    expect(md).toContain("Stopped early: no");
-    expect(md).toContain("No findings in 0 steps");
+  it("falls back to the full walk when the app has no known scheme", async () => {
+    changed.fail = false; changed.files = ["app/settings.tsx"];
+    const logs: string[] = [];
+    expect(await routesFromChange("abc", (s) => logs.push(s))).toEqual({ onlyRoutes: false });
+    expect(logs[0]).toMatch(/URL scheme/);
   });
-  it("without the flag, home and every route are still walked", async () => {
-    const { driver } = fixture();
-    const r = await walk(driver, { app: "fx" });
-    expect(r.screens).toBeGreaterThanOrEqual(4);
-    expect(r.findings.some((f) => f.kind === "error")).toBe(true);
+  it("produces links the walker can open, on a driver that rejects other shapes", async () => {
+    changed.fail = false; changed.files = ["app/settings.tsx"];
+    const { routes, onlyRoutes } = await routesFromChange("abc", () => {}, "app");
+    const fx = fixture();
+    const opened: string[] = [];
+    const strict: Driver = { ...fx.driver, async openUrl(url) { opened.push(url); if (!/^app:\/\/[a-z-]+$/.test(url)) throw new Error(`bad url ${url}`); return fx.driver.openUrl(url); } };
+    const rep = await walk(strict, { routes, onlyRoutes, maxDepth: 3, maxSteps: 50 });
+    expect(rep.error).toBeNull();
+    expect(opened).toContain("app://settings");
+    expect(rep.screens).toBeGreaterThan(0);
+  });
+  it("reads the scheme from app.json, else from a configured route", () => {
+    const d = mkdtempSync(join(tmpdir(), "scheme-"));
+    expect(appScheme(["tide://cart"], d)).toBe("tide");
+    expect(appScheme(undefined, d)).toBeUndefined();
+    writeFileSync(join(d, "app.json"), JSON.stringify({ expo: { scheme: "shop" } }));
+    expect(appScheme(["tide://cart"], d)).toBe("shop");
   });
 });

@@ -177,6 +177,134 @@ function applyEdits0(dir: string, force: boolean) {
   return applyEdits(dir);
 }
 
+type CpEdit = { file: string; removed: string[] };
+const CP_PKG = ["react-native-code-push", "@revopush/react-native-code-push"];
+const CP_IMPORT = /^import\s[^;]*?\bfrom\s*['"](?:@revopush\/)?react-native-code-push['"];?[ \t]*$/;
+const CP_ARGS = String.raw`\((?:[^()]|\([^()]*\))*\)`;
+const CP_WRAP = new RegExp(String.raw`\bcodePush\s*${CP_ARGS}\s*\(\s*(\w+)\s*\)`);
+const CP_SYNC = new RegExp(String.raw`\bCodePush\.sync\s*${CP_ARGS}`);
+const CP_READY = /\bCodePush\.notifyAppReady\s*\(\s*\)/;
+const isComment = (l: string) => /^\s*(\/\/|\*)/.test(l);
+
+/** Rewrites one code file. Single-line patterns only; anything else is left for the manual list. */
+function editCode(raw: string): { text: string; removed: string[] } | null {
+  if (!/react-native-code-push|\bcodePush\b|\bCodePush\b/.test(raw)) return null;
+  const removed: string[] = [];
+  const lines = raw.split("\n");
+  const imports: number[] = [];
+  const out = lines.map((l, i) => {
+    if (isComment(l)) return l;
+    if (CP_IMPORT.test(l.trim())) { imports.push(i); return l; }
+    let r = l;
+    if (CP_WRAP.test(r)) { r = r.replace(CP_WRAP, "$1"); removed.push(`${i + 1}: codePush() wrapper`); }
+    if (CP_SYNC.test(r)) { r = r.replace(CP_SYNC, "Runtime.checkForUpdate(true)"); removed.push(`${i + 1}: CodePush.sync`); }
+    if (CP_READY.test(r)) { r = r.replace(CP_READY, "Runtime.markHealthy()"); removed.push(`${i + 1}: CodePush.notifyAppReady`); }
+    return r;
+  });
+  if (!removed.length) return null;
+  const usesRuntime = out.some((l) => /\bRuntime\./.test(l));
+  const hasRuntime = /import[^;]*\bRuntime\b[^;]*from\s*['"]@shipvo\/runtime['"]/.test(out.join("\n"));
+  const bound = new Set<string>(["codePush", "CodePush"]);
+  for (const i of imports) {
+    const m = /^import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]*)\})?/.exec(lines[i].trim());
+    if (m?.[1]) bound.add(m[1]);
+    for (const part of (m?.[2] ?? "").split(",")) {
+      const name = part.trim().split(/\s+as\s+/).pop()?.replace(/^type\s+/, "").trim();
+      if (name && /^\w+$/.test(name)) bound.add(name);
+    }
+  }
+  const boundRe = new RegExp(String.raw`\b(?:${[...bound].join("|")})\b`);
+  const stillCp = out.some((l, i) => !imports.includes(i) && !isComment(l) && boundRe.test(l));
+  if (imports.length && !stillCp) {
+    const first = imports[0];
+    for (const i of imports.slice().reverse()) {
+      if (i === first && usesRuntime && !hasRuntime) out[i] = 'import { Runtime } from "@shipvo/runtime";';
+      else out.splice(i, 1);
+    }
+    removed.push("import react-native-code-push");
+  } else if (usesRuntime && !hasRuntime) {
+    out.splice(imports.length ? imports[0] + 1 : 0, 0, 'import { Runtime } from "@shipvo/runtime";');
+  }
+  return { text: out.join("\n"), removed };
+}
+
+function editNative(raw: string, base: string): { text: string; removed: string[] } | null {
+  const removed: string[] = [];
+  let text = raw;
+  for (const key of ["CodePushDeploymentKey", "CodePushPublicKey"]) {
+    const re = base === "Info.plist"
+      ? new RegExp(String.raw`[ \t]*<key>${key}</key>[ \t]*\r?\n[ \t]*<string>[^<]*</string>[ \t]*\r?\n?`)
+      : new RegExp(String.raw`[ \t]*<string\s+name="${key}"[^>]*>[^<]*</string>[ \t]*\r?\n?`);
+    if (re.test(text)) { text = text.replace(re, ""); removed.push(key); }
+  }
+  return removed.length ? { text, removed } : null;
+}
+
+/** CodePush --apply: wrapper and sync calls, native keys, and the dependency. Never runs a package manager. */
+export function applyCodePushEdits(dir: string, dry = false): CpEdit[] {
+  const pending: { file: string; text: string; removed: string[] }[] = [];
+  for (const file of walk(dir)) {
+    const base = file.split("/").pop()!;
+    const native = base === "Info.plist" || base === "strings.xml";
+    if (file === "package.json" || (!native && !CODE_EXT.test(file))) continue;
+    let raw: string; try { raw = readFileSync(join(dir, file), "utf8"); } catch { continue; }
+    const e = native ? editNative(raw, base) : editCode(raw);
+    if (e) pending.push({ file, text: e.text, removed: e.removed.map((r) => `${file} ${r}`) });
+  }
+  const pkgPath = join(dir, "package.json");
+  if (existsSync(pkgPath)) {
+    const raw = readFileSync(pkgPath, "utf8");
+    let e: { text: string; removed: string[] } | null = null;
+    try {
+      e = editJson(raw, (o) => {
+        const r: string[] = [];
+        for (const sec of ["dependencies", "devDependencies"]) for (const n of CP_PKG) if (o?.[sec]?.[n]) { delete o[sec][n]; r.push(`package.json ${sec}: ${n}`); }
+        if (!r.length) return r;
+        o.dependencies = { ...(o.dependencies ?? {}) };
+        o.devDependencies = { ...(o.devDependencies ?? {}) };
+        for (const n of ["@shipvo/runtime", "@shipvo/device"]) if (!o.dependencies[n]) { o.dependencies[n] = "^0.1.0"; r.push(`package.json dependencies: added ${n}`); }
+        if (!o.devDependencies["@shipvo/cli"]) { o.devDependencies["@shipvo/cli"] = "^0.1.0"; r.push("package.json devDependencies: added @shipvo/cli"); }
+        for (const sec of ["dependencies", "devDependencies"]) if (!Object.keys(o[sec]).length) delete o[sec];
+        return r;
+      });
+    } catch { /* unreadable package.json: leave it */ }
+    if (e) pending.push({ file: "package.json", ...e });
+  }
+  if (!dry) {
+    for (const f of pending) {
+      const b = join(dir, BACKUP, f.file);
+      mkdirSync(dirname(b), { recursive: true });
+      copyFileSync(join(dir, f.file), b);
+    }
+    for (const f of pending) writeFileSync(join(dir, f.file), f.text);
+  }
+  return pending.map((f) => ({ file: f.file, removed: f.removed }));
+}
+
+function applyCodePush(dir: string, force: boolean): CpEdit[] {
+  // Same rule as the EAS path: nothing to edit means nothing to refuse.
+  if (!applyCodePushEdits(dir, true).length) return [];
+  if (!force) {
+    const d = dirtyFiles(dir);
+    if (d.length) throw new CliFailure(`Git tree is not clean (${d.length} changed path(s)). Commit or stash first, or pass --force.`, "dirty_tree", 1, [{ command: "git status", why: "See what changed." }, { command: "shipvo migrate --apply --force", why: "Apply anyway. Backups go in " + BACKUP + "." }]);
+  }
+  return applyCodePushEdits(dir);
+}
+
+const NATIVE_SRC = /(?:\.(?:java|kt|m|mm|swift|gradle)|(?:^|\/)Podfile)$/;
+
+/** Native bootstrap files that still mention CodePush. --apply never edits them, so they are listed as manual. */
+function scanNativeBootstrap(dir: string) {
+  const out: { where: string; entry: string; why: string }[] = [];
+  for (const file of walk(dir)) {
+    if (!NATIVE_SRC.test(file)) continue;
+    let lines: string[]; try { lines = readFileSync(join(dir, file), "utf8").split("\n"); } catch { continue; }
+    const i = lines.findIndex((l) => /CodePush|code-push/.test(l));
+    if (i >= 0) out.push({ where: `${file}:${i + 1}`, entry: lines[i].trim().slice(0, 120), why: "Native code still uses CodePush and --apply does not edit native files: remove it by hand or the native build will fail once the dependency is gone" });
+  }
+  return out;
+}
+
 const buildPlanPm = (dir: string) => detectProject(dir).packageManager;
 
 export async function migrate(argv: string[], dir = process.cwd()): Promise<number> {
@@ -207,7 +335,30 @@ export async function migrate(argv: string[], dir = process.cwd()): Promise<numb
       }
       return { code: "applied", summary: `Removed ${edits.reduce((n, e) => n + e.removed.length, 0)} entries from ${edits.length} file(s). Backups in ${BACKUP}.`, data: { changed: edits, backupDir: BACKUP, steps: rest }, next: [{ command: `${pm} install`, why: "Refresh the lockfile after removing expo-updates." }, { command: "shipvo init", why: "Add Shipvo. It is not run for you." }] };
     }
-    if (apply && plan.system === "codepush") throw new UsageError("--apply only supports EAS Update. For CodePush the apply step is manual: run shipvo migrate --plan and see docs/migrate-from-codepush.md.");
+    if (apply && plan.system === "codepush") {
+      const edits = applyCodePush(dir, argv.includes("--force"));
+      const left = scanCodePush(dir);
+      const manual = [...left.filter((f) => f.kind === "command" || f.kind === "wrapper" || f.kind === "sync")
+        .map((f) => ({ where: f.where, entry: f.entry, why: f.kind === "command" ? "appcenter codepush command: replace with shipvo publish or shipvo rollback" : "CodePush call --apply could not rewrite: change it by hand" })), ...scanNativeBootstrap(dir)];
+      const pm = buildPlanPm(dir);
+      if (!edits.length) {
+        if (!json) {
+          console.log("Nothing left to do: no CodePush code, keys or dependency remain that --apply can edit.");
+          for (const m of manual) console.log(`  manual: ${m.where}: ${m.entry}`);
+        }
+        return { code: "nothing_left", summary: "Nothing left to do: no CodePush entries remain that --apply can edit.", data: { changed: [], manual, backupDir: BACKUP }, next: [{ command: "shipvo init --dry-run", why: "Preview what init adds." }] };
+      }
+      if (!json) {
+        console.log("Changed:");
+        for (const e of edits) { console.log(`  ${e.file}`); for (const r of e.removed) console.log(`    - ${r}`); }
+        console.log(`\nBackups are in ${BACKUP}/.`);
+        if (manual.length) { console.log("\nManual steps (left in place):"); for (const m of manual) console.log(`  - ${m.where}: ${m.entry}\n      ${m.why}`); }
+        console.log(`\nNext: run ${pm} install to refresh the lockfile. I did not run it.`);
+        console.log("Then create the Shipvo config (shipvo init in a scratch folder), build one new store build, and publish. Old binaries keep using CodePush.");
+        console.log("See docs/migrate-from-codepush.md.");
+      }
+      return { code: "applied", summary: `Edited ${edits.length} file(s). Backups in ${BACKUP}. ${manual.length} manual step(s) left.`, data: { changed: edits, manual, backupDir: BACKUP, steps: plan.steps }, next: [{ command: `${pm} install`, why: "Refresh the lockfile after the dependency swap." }, { command: "shipvo init --dry-run", why: "Preview the Shipvo config; copy it into your app." }] };
+    }
     if (!plan.system) {
       if (!json) console.log(apply ? "Nothing left to do: this app has no expo-updates or CodePush." : "Nothing to migrate: this app has no expo-updates or CodePush.");
       return { code: "nothing_to_migrate", summary: "Nothing to migrate: no expo-updates or CodePush found.", data: plan, next: [{ command: "shipvo init", why: "Add Shipvo to this app." }] };

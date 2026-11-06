@@ -1,2 +1,2 @@
-- `@shipvo/cli`: `shipvo explore --changed-from <sha>` visits only the screens changed since that commit (dynamic screens and layouts are skipped). `shipvo ci check` accepts the same flag, and the Shipvo check action passes it on pull requests.
-- Migration: none; without the flag nothing changes.
+- `@shipvo/cli`: `shipvo explore --changed-from <sha>` walks only the screens changed since that commit; the Shipvo check uses it on pull requests.
+- Migration: none; new flag.
