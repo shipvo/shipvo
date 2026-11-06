@@ -41,6 +41,10 @@ exports[`MCP tools > lists the three tools with their schemas 1`] = `
           ],
           "type": "number",
         },
+        "show_taps": {
+          "description": "Draw a finger dot and ripple on taps and a trail on scrolls (default true)",
+          "type": "boolean",
+        },
         "title": {
           "description": "Used in the file name",
           "type": "string",
