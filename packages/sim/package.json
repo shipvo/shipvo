@@ -25,6 +25,7 @@
     "browser-resolver.mjs",
     "app-name.mjs",
     "frame.mjs",
+    "phone-browser.mjs",
     "frame.d.mts",
     "mock-rules.mjs",
     "screen-rules.mjs",
