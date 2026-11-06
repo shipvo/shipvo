@@ -36,6 +36,16 @@ You need the app folder from [Build your first app](getting-started.md) and a te
 
 The page scales the phone to your window. Add `?dark=1` to the address to see the dark frame.
 
+## Your app reaches its backend, with no CORS errors
+
+On a real Android or iOS phone, an app calls its backend directly and there is no CORS. In the simulated phone the app runs in a browser tab, so Shipvo sends every request to another origin (`fetch` and `XMLHttpRequest`) through the `shipvo run` server at `/__shipvo/net`. The server makes the real request from Node and returns the status, headers and body unchanged. Requests to the app's own origin go straight through.
+
+- Every method, request bodies, binary data and streaming responses work. A streamed response arrives in chunks.
+- `http://localhost:<port>` and backends on your network work, and `http` backends work from the page.
+- Each phone session has one cookie jar, kept by the server, the way each installed app has its own cookies. Two browser tabs have two jars.
+- The phone's network profile (offline, 2g, 3g, slow-4g, spotty) applies to these requests too.
+- Only the phone page can use the route, with its session token, on the loopback address. Every proxied request is added to the device log with its method, host, status and time.
+
 ## Let your assistant drive the phone you are watching
 
 While `shipvo run` is up, it writes `.shipvo/run.json` in your project (port, platform, app, a secret session token and the process id) and adds `.shipvo/` to `.gitignore`. The token only works from your own computer.
