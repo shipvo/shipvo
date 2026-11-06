@@ -27,3 +27,5 @@ Merge conflicts: `services/site/package.json` runs every `services/site/scripts/
 
 
 Videos: a re-render makes a new file name. Save it under `/tmp/agent/media/videos/` so it is uploaded before your push, and update `services/site/media.json`, `docs/videos.md` and the tutorial together. `services/site/scripts/check-media.mjs` fails CI if a listed file is not in R2.
+
+Renders and recordings are never kept between runs: rebuild them on this runner. Follow the "Make it" steps in the branch's own README (for example `scripts/video/story/README.md`): `shipvo run android` and `record_start`/`record_stop` drive the web simulator (the "Simulated" phone frame), so no Android emulator is needed; Chromium and ffmpeg are installed; pick music again with `scripts/video/musicpick.py` from its brief. Re-record first, then re-render, then run `pacing.py`. Escalate only if one of these steps fails here, and paste the error.
