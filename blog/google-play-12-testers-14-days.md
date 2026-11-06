@@ -124,6 +124,6 @@ Honest limits:
 
 ## Next steps
 
-- Follow the step-by-step [Get your 12 testers tutorial](/docs/tutorials/get-your-12-testers/), with a 1 minute 42 second video.
+- Follow the step-by-step [Get your 12 testers tutorial](/learn/get-your-12-testers/), with a 1 minute 42 second video.
 - Read the [store guide](/docs/store/) for `setup`, `status`, `screenshots` and `testers`.
 - Join [Shipvo Testers](https://shipvo.dev/testers/) and test someone else's app this week.
