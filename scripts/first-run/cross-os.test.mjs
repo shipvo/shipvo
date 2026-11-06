@@ -27,7 +27,7 @@ test("findTarballs reads a real directory whose name has a space", () => {
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("step list is the five-command path in order", () => {
+test("step list is the four-step path in order", () => {
   const steps = stepList(findTarballs("x", files));
   assert.deepEqual(steps.map((s) => s.name), ["npm create shipvo", "npm install", "shipvo doctor --json", "shipvo publish --dry-run"]);
   assert.deepEqual(steps[0].args, ["exec", "--yes", `--package=${join("x", "create-shipvo-0.1.0.tgz")}`, "--", "create-shipvo", APP_NAME]);
