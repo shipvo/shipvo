@@ -1,1 +1,1 @@
-- Docs: `docs/migrate-from-eas-update.md` shows real `shipvo migrate --plan` output, the concept map and the gaps. Linked from getting-started and the README.
+- Docs: `docs/migrate-from-eas-update.md` shows real `shipvo migrate --plan` output, and the concept map. Linked from getting-started and the README.

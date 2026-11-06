@@ -9,7 +9,7 @@ import { checkBundle, checkEngine, installedHermesEngine, parseDeclared, parseEn
 import { requiredNativeModules } from "./native.js";
 import { checkPublishPolicy } from "./policy.js";
 import { CliFailure, UsageError, runJson, type Done, type Next } from "./json-out.js";
-import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
+import { args as parse, hasStore, kv as kvFor, loadConfig, offlineKv, seed } from "./config.js";
 
 const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".css": "text/css", ".ico": "image/x-icon", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ttf": "font/ttf", ".svg": "image/svg+xml" };
 const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
@@ -280,7 +280,10 @@ export async function rollback(argv: string[]) {
 
 async function rollbackRun(argv: string[], json: boolean): Promise<Done> {
   checkFlags(argv, ["to", "bands", "platform", "dry-run", "json"]);
-  const a = parse(argv), dry = a["dry-run"] !== undefined, cfg = loadConfig(), SEED = seed(), kv = kvFor(cfg);
+  const a = parse(argv), dry = a["dry-run"] !== undefined, cfg = loadConfig();
+  const offline = dry && !hasStore();
+  const SEED = dry ? "" : seed(), kv = offline ? offlineKv() : kvFor(cfg);
+  if (offline) console.error("Offline rehearsal: reading releases from .shipvo/dry-run (written by shipvo publish --dry-run). No login used, nothing is sent.");
   const APP = cfg.appId, MAJOR = cfg.shellMajor, to = Number(a.to);
   if (!to) {
     const usage = "Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all] [--dry-run] [--json]";

@@ -67,7 +67,7 @@ Read these with care. They are one sample app, one Android phone (a Redmi 9A) an
 
 The 291 KB figure is the one most guides skip. On a fresh install, the phone has only the bundle that shipped inside the app. That bundle was built separately from your OTA bundles, so more bytes differ. The patch against it is larger than a patch between two OTA releases.
 
-We track this as a known gap. The next step in the spike notes is to build the embedded bundle the same way as OTA bundles, so the first patch shrinks. The iOS run shows the same shape: the patch is the first download from the embedded bundle, not a steady-state patch.
+After that first update, every patch is between two OTA releases, which is where the 64 KB steady-state figure comes from. The iOS run shows the same shape.
 
 ## Hermes makes diffing harder
 

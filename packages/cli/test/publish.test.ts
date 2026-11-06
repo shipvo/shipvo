@@ -23,6 +23,7 @@ vi.mock("../src/config.js", async (orig) => ({
   loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k", ...(cfgPolicy.value ? { policy: cfgPolicy.value } : {}), ...(cfgPolicy.engine ? { hermesEngine: cfgPolicy.engine } : {}) }),
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
+  hasStore: () => true,
 }));
 import { publish, rollback, dryRunSummary, isInside } from "../src/publish";
 import path from "node:path";
