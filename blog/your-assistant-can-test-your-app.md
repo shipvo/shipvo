@@ -75,3 +75,5 @@ The simulator is not a phone. It renders your app on the web and simulates the d
 Use the assistant for exploration, the questions you would not think to write down. When you find a flow worth protecting, write it as a [typed test](/docs/testing/) so it runs on every pull request. The assistant finds the bug once; the test makes sure it stays fixed.
 
 New to terminals? Read [how to build a mobile app without coding, and what to plan for after version one](/blog/build-a-mobile-app-without-coding/).
+
+If you want to see your own app on a simulated phone first, [one command does it in your browser](/blog/see-your-react-native-app-on-a-phone-in-your-browser/).
