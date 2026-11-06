@@ -45,3 +45,8 @@ test("flashes start at an offset from the scene start and stop at the scene end"
   assert.equal(f[1].start, p.scenes[1].end - 0.5);
   assert.equal(f[1].end, p.scenes[1].end);
 });
+test("a flash that starts after its scene ends is dropped", () => {
+  const s = { scenes: [{ ...script.scenes[0], flashes: [{ at: 999, text: "late" }] }, script.scenes[1]] };
+  const p = buildPlan(s, man);
+  assert.deepEqual(flashes(s, p), []);
+});

@@ -6,13 +6,13 @@ Short videos for people who are new to Shipvo. Each one has captions and a writt
 
 ### From working app to Google Play and the App Store
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 4 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-14f89377.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 4 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-d5724de7.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
 2 minutes 4 seconds. The store path in four steps: `shipvo store setup` for your plan, `shipvo store status` for one timeline per store, `shipvo store details --dry-run` for draft data safety answers and a privacy policy, and `shipvo store screenshots` for checked store sizes. It ends on the Google Play tester rule and `shipvo store testers`, with a link to the [testers video](#get-your-12-google-play-testers-with-shipvo-testers). It follows [Store details](store.md).
 
 [Captions (.vtt)](/videos/from-app-to-both-stores.vtt)
 
-<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Cinematic" by Matti Paalanen (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/">CC BY-NC-ND 3.0</a>). Source: <a href="https://www.jamendo.com/track/1221581">https://www.jamendo.com/track/1221581</a></details>
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "chanson à la marié2012" by Adragante (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>). Source: <a href="https://www.jamendo.com/track/941485">https://www.jamendo.com/track/941485</a></details>
 
 <details>
 <summary>Transcript</summary>
