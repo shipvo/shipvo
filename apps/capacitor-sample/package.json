@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Minimal Capacitor 8 app used to test Shipvo's Capacitor adapter work.",
   "scripts": {
+    "prebuild": "pnpm --filter @shipvo/capacitor... build",
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "serve": "pnpm build && node scripts/serve.mjs",
     "sync": "pnpm build && cap sync",

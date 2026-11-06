@@ -7,7 +7,7 @@ The core is TypeScript and makes every decision: it verifies the signature and t
 | Platform | Native layer |
 |---|---|
 | Android | `android/`: stores the verified bundle zip in app-private files and the state in SharedPreferences; switches the web view with `Bridge.setServerBasePath` to the unpacked bundle |
-| iOS | `ios/`: stores the verified bundle zip in the app's Application Support directory and the state in UserDefaults; switches the web view by setting the Capacitor server base path to the unpacked bundle |
+| iOS | Next slice, tracked in its own issue. It will use the same JavaScript core and the same `boot` and `bootAndServe` calls as Android. |
 
 ## Android
 
