@@ -10,9 +10,10 @@ import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
+import { installs, verifyReport } from "./installs";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket };
+type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string };
 const app = new Hono<{ Bindings: Env }>();
 
 /* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
@@ -159,21 +160,28 @@ async function maybeHalt(env: Env, appId: string, release: number, kv?: { failed
 }
 
 /** Device telemetry for the spike: applied / reverted / timings. */
+app.route("/", installs);
 app.post("/t", async (c) => {
   let body: any;
-  try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
+  const raw = await c.req.text();
+  try { body = JSON.parse(raw); } catch { return c.json({ error: "bad_json" }, 400); }
   const t = Telemetry.safeParse(body);
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
   let stored = true;
+  // Signed reports are marked verified. Everything else is still stored for dashboards.
+  // The signature is the `x-shipvo-sig` header or a `sig` field. A body signature covers the raw body with that field removed.
+  const sig = c.req.header("x-shipvo-sig") ?? extra.sig;
+  const signed = typeof extra.sig === "string" && sig === extra.sig ? raw.replace(`,"sig":"${extra.sig}"`, "").replace(`"sig":"${extra.sig}",`, "").replace(`"sig":"${extra.sig}"`, "") : raw;
+  const verified = extra.install_id !== undefined && sig !== undefined && await verifyReport(c.env.DB, d.app_id, extra.install_id, sig, signed) ? 1 : 0;
   try {
   await c.env.DB.prepare(
-    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via, verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(d.app_id, d.release, d.event, d.cold_start_ms ?? null, d.bytes_downloaded ?? null, d.apply_ms ?? null, d.device_class ?? null,
     typeof extra.published_at === "string" ? extra.published_at.slice(0, 40) : null,
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
-    extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
+    extra.via === "patch" || extra.via === "full" ? extra.via : null, verified).run();
   } catch (e) {
     // D1 can refuse writes (for example the Free plan daily limit). Never send a 5xx to the phone.
     stored = false;
