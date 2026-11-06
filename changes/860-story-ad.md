@@ -1,0 +1,2 @@
+- `scripts/video`: first Shipvo story ad, "From a chat to an app on every assistant" (main cut and vertical cut), built from the cast rig, with real simulator recordings, synthesised sound effects and tests for the craft rules.
+- Migration: none; internal tooling.
