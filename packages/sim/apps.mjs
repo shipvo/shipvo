@@ -84,8 +84,8 @@ export function findHandler(st, url) {
   const m = /^([a-z][a-z0-9+.-]*):(?:\/\/)?\S+$/i.exec(String(url ?? "").trim());
   if (!m) throw new AppsError("invalid_url", `not a URL with a scheme: ${String(url ?? "").slice(0, 80)}. Use something like myapp://item/42`);
   const scheme = m[1].toLowerCase();
-  const app = st.installed_apps.find((a) => a.schemes.includes(scheme));
-  if (!app) throw new AppsError("no_handler", `no installed app handles '${scheme}://'. Schemes: ${st.installed_apps.flatMap((a) => a.schemes.map((x) => `${x}:// (${a.id})`)).join(", ") || "none"}`);
+  const app = st.installed_apps.find((a) => (a.schemes ?? []).includes(scheme));
+  if (!app) throw new AppsError("no_handler", `no installed app handles '${scheme}://'. Schemes: ${st.installed_apps.flatMap((a) => (a.schemes ?? []).map((x) => `${x}:// (${a.id})`)).join(", ") || "none"}`);
   return app;
 }
 /** Open a URL on the phone: the owning app comes to the front and the URL is its initial URL. Returns the app. */
@@ -96,12 +96,12 @@ export function openLink(st, url, nav) {
   return app;
 }
 /** Apps on the share sheet: installed apps that accept shares. */
-export const shareTargets = (st) => st.installed_apps.filter((a) => a.shares).map((a) => ({ id: a.id, name: a.name }));
+export const shareTargets = (st) => st.installed_apps.filter((a) => a.shares === true).map((a) => ({ id: a.id, name: a.name }));
 /** Deliver shared content to an app: it comes to the front. Throws not_installed or not_share_target. */
 export function shareToApp(st, id, content, nav) {
   const app = st.installed_apps.find((a) => a.id === id);
   if (!app) throw new AppsError("not_installed", `'${id}' is not installed`);
-  if (!app.shares) throw new AppsError("not_share_target", `'${id}' does not accept shares. Targets: ${shareTargets(st).map((t) => t.id).join(", ") || "none"}`);
+  if (app.shares !== true) throw new AppsError("not_share_target", `'${id}' does not accept shares. Targets: ${shareTargets(st).map((t) => t.id).join(", ") || "none"}`);
   st.current_app = id; if (nav) nav.where = "app";
   st.shared.push({ app: id, ...content }); note(st, "share_to", id); st.log[st.log.length - 1].message = content.message;
   return app;

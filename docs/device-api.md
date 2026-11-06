@@ -82,7 +82,7 @@ await device.share.text("Order TT-1001: …", "My order");   // true if shared
 await device.clipboard.set(text); await device.clipboard.get();
 ```
 
-Simulator: a bottom sheet with the installed apps that accept shares, plus Copy; Copy writes the simulated clipboard. `device.share.share({ message, url })` takes a link too. See [phone apps](phone-apps.md).
+Simulator: a bottom sheet with the installed apps that accept shares, plus Copy; Copy writes the simulated clipboard. `device.share.share({ message, url })` takes a link too. If delivery to an app fails (for example it was uninstalled), the device log has a `share_failed` event with the code and `share` returns false. `onShared` in the native build is a no-op and never fires; it only works in the simulator. See [phone apps](phone-apps.md).
 
 ## Contacts
 

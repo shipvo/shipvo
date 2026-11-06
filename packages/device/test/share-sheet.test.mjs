@@ -63,3 +63,18 @@ test("deliverUrl sets the initial URL and calls onUrl; deliverShare calls onShar
   assert.equal(await mod.getInitialUrl(), "bee://item/42"); assert.deepEqual(urls, ["bee://item/42"]);
   assert.equal(dev.deliverShare({ message: "hi" }), true); assert.deepEqual(shares, [{ message: "hi" }]);
 });
+
+test("a failed delivery logs share_failed with the code and the share does not count as done", async () => {
+  dev.reset({});
+  const before = globalThis.__pnShareTo;
+  globalThis.__pnShareTo = () => ({ ok: false, code: "not_installed" });
+  try {
+    const done = device.share.share({ message: "Look" });
+    await new Promise((r) => setTimeout(r, 0));
+    dev.shareTo("notes");
+    assert.equal(await done, false);
+    const l = dev.log();
+    assert.equal(l.find((e) => e.kind === "share_failed").detail.code, "not_installed");
+    assert.equal(l.find((e) => e.kind === "share"), undefined);
+  } finally { globalThis.__pnShareTo = before; }
+});

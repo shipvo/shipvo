@@ -232,10 +232,14 @@ export const device: Device = {
         // Two skins: the iOS sheet floats with round corners and centred text; the Android sheet is flush with the bottom edge.
         if (state.platform === "ios") Object.assign(card.style, { width: "calc(100% - 16px)", margin: "0 8px 8px", borderRadius: "20px", textAlign: "center" });
         card.append(p(opts.title ?? (message || opts.url || "")));
-        const pick = (id: string, name: string) => {
-          ok = true;
+        const pick = async (id: string, name: string) => {
           if (id === "copy") state.clipboard = [message, opts.url].filter(Boolean).join(" ");
-          else try { void Promise.resolve(gx.__pnShareTo?.(id, payload)).catch(() => {}); } catch { /* no simulator */ }
+          else {
+            let r: { ok?: boolean; code?: string } | undefined;
+            try { r = (await gx.__pnShareTo?.(id, payload)) as typeof r; } catch { r = { ok: false, code: "share_error" }; }
+            if (r && r.ok === false) { log("share_failed", { target: name, targetId: id, code: r.code ?? "unknown" }); close(); return; }
+          }
+          ok = true;
           log("share", { target: name, targetId: id, text: message, url: opts.url }); close();
         };
         shareTargets = new Map();

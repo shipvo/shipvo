@@ -103,3 +103,17 @@ test("only apps that accept shares are targets; a share brings the target to the
   assert.equal(st.current_app, "n"); assert.equal(st.shared[0].message, "hi");
   assert.equal(st.log.at(-1).source, "simulated");
 });
+
+test("apps without a schemes array or shares flag do not throw: no_handler and not a target", async () => {
+  const { findHandler, shareTargets, shareToApp, loadProfile } = await import("./apps.mjs");
+  const st = loadProfile({});
+  st.installed_apps.push({ id: "raw", name: "Raw", url: "x" }); // skips entry()
+  assert.throws(() => findHandler(st, "raw://x"), { code: "no_handler" });
+  assert.deepEqual(shareTargets(st), []);
+  assert.throws(() => shareToApp(st, "raw", { message: "hi" }), { code: "not_share_target" });
+  // installApp goes through entry(): a Store entry without schemes/shares gets [] and false; with them it keeps them.
+  const s2 = installApp(loadProfile({}), "notes", [{ id: "bare", name: "Bare", url: "x" }, { id: "notes", name: "N", url: "x", schemes: ["notes"], shares: true }]);
+  installApp(s2, "bare", [{ id: "bare", name: "Bare", url: "x" }]);
+  const [n, b] = s2.installed_apps;
+  assert.deepEqual([n.schemes, n.shares, b.schemes, b.shares], [["notes"], true, [], false]);
+});
