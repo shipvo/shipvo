@@ -132,7 +132,11 @@ jobs:
           set -o pipefail
           SIM=$(xcrun simctl list devices available | awk -F' [(]' '!f && /^ +iPhone [0-9]/ { sub(/^ +/, "", $1); print $1; f=1 }')
           echo "simulator: $SIM"
-          xcodebuild test -scheme ShipvoCapacitor-Package -destination "platform=iOS Simulator,name=$SIM" \
+          # SwiftPM names the scheme <package>-Package when there are several products, else the product name.
+          SCHEME=$(xcodebuild -list -json | python3 -c 'import json,sys; d=json.load(sys.stdin); w=d.get("workspace") or d.get("project") or {}; s=w.get("schemes",[]); print(next((x for x in s if x.endswith("-Package")), s[0] if s else ""))')
+          echo "scheme: $SCHEME"
+          [ -n "$SCHEME" ] || { echo "::error::no scheme in packages/capacitor"; xcodebuild -list; exit 1; }
+          xcodebuild test -scheme "$SCHEME" -destination "platform=iOS Simulator,name=$SIM" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/xcodetest.log" \
             | grep -E "error:|Test Suite|Test Case.*(passed|failed)|TEST (SUCCEEDED|FAILED)"
       - uses: actions/upload-artifact@v4

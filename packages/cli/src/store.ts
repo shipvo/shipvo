@@ -6,9 +6,57 @@ import { checkScreenshot, checkSet, renderFrame, SCREENSHOT_SETS, deriveStoreDet
 import type { RouteAnswers, ScreenshotSetId, StoreRoute } from "@shipvo/store";
 import { args, loadConfig } from "./config.js";
 import { startSim } from "./explore.js";
+import { CliFailure, classifyExit, runJson, takeJson, trapExit, type Done, type Next } from "./json-out.js";
 
 /** `shipvo store details --dry-run [--out dir]`: print the answers, write two files. Nothing is uploaded; no credentials are read. */
 export async function store(argv: string[]): Promise<void> {
+  const { json, rest: plain } = takeJson(argv);
+  if (json) return storeJson(plain);
+  return storeRun(plain);
+}
+
+const STORE_NEXT: Next[] = [{ command: "shipvo store setup --json", why: "Write your store plan." }, { command: "shipvo doctor --json", why: "Check your setup." }];
+const STORE_RULES: [RegExp, string][] = [
+  [/^No store-plan\.json/, "no_plan"], [/^Unknown step/, "unknown_step"], [/must be yes or no|--as must be|--play-key needs|only fast mode/, "usage"],
+  [/upload is not available/, "usage"], [/^Usage:/, "usage"], [/No shipvo\.json/, "no_config"],
+];
+
+/** `--json` for every `store` subcommand: one envelope on stdout, the text output on stderr. */
+async function storeJson(argv: string[]): Promise<void> {
+  const sub = argv[0] ?? "";
+  const read = (): Plan | null => existsSync(PLAN_FILE) ? JSON.parse(readFileSync(PLAN_FILE, "utf8")) as Plan : null;
+  const stepNext = (plan: Plan): Next[] => {
+    const r = routeStore(plan.answers);
+    const open = [...r.play.steps, ...r.apple.steps].find((x) => (plan.marks[x.id] ?? "todo") !== "done");
+    return open ? [{ command: `shipvo store status --mark ${open.id} --json`, why: `${open.title}. Mark it when it is finished.` }] : [{ command: "shipvo publish --json", why: "Both stores are set up. Publish a release." }];
+  };
+  await runJson(async (): Promise<Done> => {
+    // `testers` builds its own envelope data, so it runs apart from the text-mode wrapper.
+    if (sub === "testers") return testersDone(argv.slice(1));
+    process.exitCode = undefined; // a stale value must not turn a success into screenshots_failed
+    try { await trapExit(() => storeRun(argv), classifyExit(STORE_RULES, STORE_NEXT)); }
+    catch (e) {
+      // `loadConfig` throws instead of exiting, so classify its message here.
+      if (e instanceof Error && !(e instanceof CliFailure) && /^No shipvo\.json/.test(e.message)) throw new CliFailure(e.message, "no_config", 1, STORE_NEXT);
+      throw e;
+    }
+    const plan = read();
+    if (sub === "setup") return { code: "plan_written", summary: `Wrote ${PLAN_FILE}.`, data: { file: PLAN_FILE, answers: plan?.answers ?? null }, next: plan ? stepNext(plan) : STORE_NEXT };
+    if (sub === "status" && plan) {
+      const r = routeStore(plan.answers), steps = [...r.play.steps, ...r.apple.steps];
+      const done = steps.filter((x) => plan.marks[x.id] === "done").length;
+      return { code: done === steps.length ? "live" : "in_progress", summary: `${done} of ${steps.length} store steps done.`, data: { done, total: steps.length, marks: plan.marks, steps: steps.map((x) => ({ id: x.id, title: x.title, state: plan.marks[x.id] ?? "todo" })) }, next: stepNext(plan) };
+    }
+    if (sub === "screenshots") {
+      if (process.exitCode) throw new CliFailure("Some store screenshots failed the size or format checks.", "screenshots_failed", 1, [{ command: "shipvo store screenshots --json", why: "Run it again after fixing the app screens." }]);
+      return { code: "screenshots_ready", summary: "Screenshots written and checked.", data: { out: argv.includes("--out") ? argv[argv.indexOf("--out") + 1] : "store-assets/raw" }, next: [{ command: "shipvo store status --json", why: "See the next store step." }] };
+    }
+    const cfg = loadConfig(), d = deriveStoreDetails(cfg);
+    return { code: "details_written", summary: `Wrote data safety answers for ${d.appName}.`, data: { app: d.appName, rows: d.rows.length, unknown: d.unknown.map((u) => u.question), filled: d.fill.filled, total: d.fill.total }, next: [{ command: "shipvo store setup --json", why: "Plan the store steps." }] };
+  }, STORE_NEXT);
+}
+
+async function storeRun(argv: string[]): Promise<void> {
   const [sub, ...rest] = argv;
   if (sub === "setup") return setup(rest);
   if (sub === "status") return status(rest);
@@ -273,8 +321,8 @@ export function testersGuide(pkg: string, track = "alpha") {
   };
 }
 
-/** `shipvo store testers [--package id] [--track alpha] [--play-key file] [--json]`: print the steps. Calls Play only with --play-key. */
-async function testers(argv: string[]): Promise<void> {
+/** Runs the `testers` work: the guide, plus the Play call when --play-key is given. */
+async function testersData(argv: string[]) {
   const a = args(argv);
   const pkg = a.package && a.package !== "true" ? a.package : loadConfig().appId;
   const track = a.track && a.track !== "true" ? a.track : "alpha";
@@ -285,9 +333,22 @@ async function testers(argv: string[]): Promise<void> {
     try {
       const key = JSON.parse(readFileSync(a["play-key"], "utf8"));
       api = await addTesterGroup({ pkg, track, group: SHIPVO_TESTERS_GROUP, token: await playToken(key, fetch) });
-    } catch (e) { api = { error: (e as Error).message }; process.exitCode = 1; }
+    } catch (e) { api = { error: (e as Error).message }; }
   }
-  if (a.json !== undefined && a.json !== "false") { console.log(JSON.stringify({ ...guide, ...(api ? { api } : {}) }, null, 2)); return; }
+  return { pkg, track, guide, api };
+}
+
+async function testersDone(argv: string[]): Promise<Done> {
+  let r!: Awaited<ReturnType<typeof testersData>>;
+  await trapExit(async () => { r = await testersData(argv); }, classifyExit(STORE_RULES, STORE_NEXT));
+  if (r.api && "error" in r.api) throw new CliFailure(`Could not update the track: ${r.api.error}`, "remote_failed", 1, [{ command: "shipvo store testers --json", why: "Print the steps and add the group by hand." }]);
+  return { code: r.api ? "testers_updated" : "testers_guide", summary: r.api ? `${SHIPVO_TESTERS_GROUP} is on the "${r.track}" track.` : `Steps to get 12 testers for ${r.pkg}.`, data: { ...r.guide, ...(r.api ? { api: r.api } : {}) }, next: [{ command: "shipvo store status --json", why: "See the next store step." }] };
+}
+
+/** `shipvo store testers [--package id] [--track alpha] [--play-key file]`: print the steps. Calls Play only with --play-key. */
+async function testers(argv: string[]): Promise<void> {
+  const { pkg, track, guide, api } = await testersData(argv);
+  if (api && "error" in api) process.exitCode = 1;
   console.log(`Get your 12 testers for ${pkg} (closed track "${track}"):\n`);
   guide.steps.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
   console.log(`\n${guide.firstUploadByHand}`);

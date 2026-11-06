@@ -3,6 +3,8 @@ export { celSyntaxError } from "./cel.js";
 export type { Issue, ValidationResult } from "./types.js";
 export { evaluate, evaluateTemplate, ExpressionError, MAX_COST } from "./eval.js";
 export type { EvalOptions } from "./eval.js";
+export { runSource, runAction, RunError, memoryCache, trimResponse, usedFields } from "./run.js";
+export type { RunContext, RunCache, RunErrorCode } from "./run.js";
 export { renderScreen, describeTree, unlabelled, toSnapshot } from "./render.js";
 export type { ScreenNode, PhoneStyle, RenderOptions, RenderResult } from "./render.js";
 export { toolsFromSpec } from "./tools.js";

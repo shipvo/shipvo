@@ -2,6 +2,7 @@ import { describe, expect, it, afterAll, beforeAll } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,16 +86,22 @@ const require_ = createRequire(import.meta.url);
 const simServer = require_.resolve("@shipvo/sim/server.mjs");
 let chromium = false;
 try { chromium = existsSync(require_("playwright").chromium.executablePath()); } catch {}
+const freePort = () => new Promise<number>((res, rej) => {
+  const s = createServer();
+  s.once("error", rej);
+  s.listen(0, () => { const { port } = s.address() as AddressInfo; s.close(() => res(port)); });
+});
 const PAGES = {
   ok: '<!doctype html><html><body><button>Hello</button></body></html>',
   throws: '<!doctype html><html><body><button>Hi</button><script>throw new Error("fixture threw on load")</script></body></html>',
   reject: '<!doctype html><html><body><button>Hi</button><script>Promise.reject(new Error("fixture rejected"))</script></body></html>',
 };
 describe.skipIf(!chromium)("smoke (real simulator)", () => {
-  const base = 47000 + Math.floor(Math.random() * 2000) * 3;
-  const ports: Record<string, number> = { ok: base, throws: base + 1, reject: base + 2 };
+  const ports: Record<string, number> = {};
   const procs: ChildProcess[] = [];
   beforeAll(async () => {
+    // Ask the OS for free ports so parallel test files cannot collide with us.
+    for (const k of Object.keys(PAGES)) ports[k] = await freePort();
     for (const [k, html] of Object.entries(PAGES)) {
       const d = join(dir, k); mkdirSync(join(d, "dist"), { recursive: true }); writeFileSync(join(d, "dist", "index.html"), html);
       procs.push(spawn(process.execPath, [simServer, "--port", String(ports[k]), "--app", "demo", "--dir", join(d, "state"), "--dist", join(d, "dist")], { stdio: ["ignore", "ignore", "inherit"], cwd: dirname(simServer) }));

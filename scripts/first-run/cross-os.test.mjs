@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { findTarballs, stepList, jsonLine, withOverrides, commandLine, APP_NAME } from "./cross-os.mjs";
+import { workspacePackages, packClosure, findTarballs, stepList, jsonLine, withOverrides, commandLine, APP_NAME } from "./cross-os.mjs";
 
 const files = ["shipvo-cli-0.1.0.tgz", "shipvo-0.1.0.tgz", "create-shipvo-0.1.0.tgz", "other.txt"];
 
@@ -30,7 +30,7 @@ test("findTarballs reads a real directory whose name has a space", () => {
 test("step list is the four-step path in order", () => {
   const steps = stepList(findTarballs("x", files));
   assert.deepEqual(steps.map((s) => s.name), ["npm create shipvo", "npm install", "shipvo doctor --json", "shipvo publish --dry-run"]);
-  assert.deepEqual(steps[0].args, ["exec", "--yes", `--package=${join("x", "create-shipvo-0.1.0.tgz")}`, "--", "create-shipvo", APP_NAME]);
+  assert.deepEqual(steps[0].args, ["exec", "--yes", ...["create-shipvo-0.1.0", "shipvo-cli-0.1.0", "shipvo-0.1.0"].map((n) => `--package=${join("x", n + ".tgz")}`), "--", "create-shipvo", APP_NAME]);
   assert.deepEqual(stepList()[0].args, ["create", "shipvo", APP_NAME]);
   assert.ok(steps[2].args.includes("--json"));
   assert.ok(steps[3].args.includes("--dry-run"));
@@ -57,4 +57,49 @@ test("commandLine quotes spaces for a Windows shell and not elsewhere", () => {
   const w = commandLine("npm", args, "win32");
   assert.equal(w.shell, true);
   assert.equal(w.cmd, `npm create "${join("my dir", "a.tgz")}" myshop`);
+});
+
+test("dependency walk packs the CLI's @shipvo deps transitively", () => {
+  const root = mkdtempSync(join(tmpdir(), "ws "));
+  try {
+    const add = (dir, name, deps) => {
+      mkdirSync(join(root, "packages", dir), { recursive: true });
+      writeFileSync(join(root, "packages", dir, "package.json"), JSON.stringify({ name, dependencies: Object.fromEntries(deps.map((d) => [d, "workspace:^"])) }));
+    };
+    add("cli", "@shipvo/cli", ["@shipvo/sim", "@shipvo/store"]);
+    add("sim", "@shipvo/sim", ["@shipvo/schema"]);
+    add("store", "@shipvo/store", []);
+    add("schema", "@shipvo/schema", []);
+    add("unused", "@shipvo/unused", []);
+    add("shipvo", "shipvo", ["@shipvo/cli"]);
+    add("create-shipvo", "create-shipvo", ["@shipvo/cli"]);
+    assert.deepEqual(packClosure(workspacePackages(root)), ["@shipvo/cli", "@shipvo/schema", "@shipvo/sim", "@shipvo/store", "create-shipvo", "shipvo"]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a private service with the same name never replaces the published package", () => {
+  const root = mkdtempSync(join(tmpdir(), "ws "));
+  try {
+    const add = (group, dir, json) => {
+      mkdirSync(join(root, group, dir), { recursive: true });
+      writeFileSync(join(root, group, dir, "package.json"), JSON.stringify(json));
+    };
+    add("packages", "cli", { name: "@shipvo/cli", dependencies: { "@shipvo/sim": "workspace:^" } });
+    add("packages", "sim", { name: "@shipvo/sim", version: "0.1.6" });
+    add("services", "sim", { name: "@shipvo/sim", version: "0.0.1", private: true });
+    const ws = workspacePackages(root);
+    assert.equal(ws.get("@shipvo/sim").dir, join(root, "packages", "sim"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("unpublished versions: every tarball is a --package and an override", () => {
+  const f = [...files, "shipvo-sim-9.9.9.tgz", "shipvo-store-9.9.9.tgz", "shipvo-schema-9.9.9.tgz"];
+  const t = findTarballs("d", f);
+  assert.equal(t.all["@shipvo/sim"], join("d", "shipvo-sim-9.9.9.tgz"));
+  const args = stepList(t)[0].args;
+  for (const n of ["shipvo-sim-9.9.9", "shipvo-store-9.9.9", "shipvo-schema-9.9.9", "shipvo-cli-0.1.0"]) assert.ok(args.includes(`--package=${join("d", n + ".tgz")}`), n);
+  const out = withOverrides({}, t);
+  assert.match(out.overrides["@shipvo/sim"], /^file:\/\/.*shipvo-sim-9\.9\.9\.tgz$/);
+  assert.match(out.overrides["@shipvo/store"], /shipvo-store-9\.9\.9\.tgz$/);
+  assert.equal(out.overrides["@shipvo/cli"], "$@shipvo/cli");
 });

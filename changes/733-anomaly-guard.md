@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: when failures come mostly from installs registered in the last hour, or arrive in a sudden burst, the release is held instead of halted and an owner approval is created. Confirm halts it; dismiss clears the hold.
+- Migration: none.

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { Server } from "node:http";
+import { createServer, type AddressInfo } from "node:net";
 import { Lumi, lumiPage, parseCommand, routeName, startLumiServer, type State } from "../src/lumi.js";
 import type { Driver, Reply } from "../src/explore.js";
 
@@ -150,12 +151,19 @@ describe("Lumi", () => {
   });
 });
 
+const freePort = () => new Promise<number>((res, rej) => {
+  const s = createServer();
+  s.once("error", rej);
+  s.listen(0, "127.0.0.1", () => { const { port } = s.address() as AddressInfo; s.close(() => res(port)); });
+});
+
 describe("page and server", () => {
   let server: Server | undefined;
   afterEach(() => { server?.closeAllConnections(); server?.close(); server = undefined; });
   const frame = { html: `<div data-part="phone-body"><img data-part="screen" alt="x"></div>`, css: "" };
   const boot = async () => {
-    const port = 40000 + Math.floor(Math.random() * 2000);
+    // Ask the OS for a free port so parallel test files cannot collide with us.
+    const port = await freePort();
     const lumi = new Lumi(shop().driver, opts);
     server = await startLumiServer({ lumi, page: lumiPage(frame, "Tide <b>"), shot: async () => Buffer.from([0xff, 0xd8]), port });
     return { lumi, base: `http://127.0.0.1:${port}` };

@@ -4,13 +4,36 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "./config.js";
 import { savedCreds } from "./login.js";
+import { classifyExit, runJson, takeJson, trapExit, type Done } from "./json-out.js";
 
+const NEXT = [{ command: "shipvo login --json", why: "Sign in first." }, { command: "shipvo doctor --json", why: "Check your setup." }];
+
+/** `shipvo app create | list | delete <id> --yes`, with `--json` for one envelope on stdout. */
 export async function appCmd(argv: string[]) {
+  const { json, rest } = takeJson(argv);
+  if (!json) return appRun(rest);
+  const sub = rest[0];
+  const got: Record<string, unknown> = {};
+  await runJson(async (): Promise<Done> => {
+    await trapExit(() => appRun(rest, got), classifyExit([
+      [/Not signed in/, "not_signed_in"], [/^No app "/, "not_found"], [/Could not register/, "register_failed"],
+    ], NEXT));
+    if (sub === "list") {
+      const apps = (got.apps ?? []) as unknown[];
+      return { code: "listed", summary: `${apps.length} app(s).`, data: { count: apps.length, apps }, next: [{ command: "shipvo app create --json", why: "Register this app." }] };
+    }
+    if (sub === "delete") return { code: "deleted", summary: `Deleted "${rest[1]}".`, data: { app_id: rest[1] }, next: [{ command: "shipvo app list --json", why: "Confirm the app is gone." }] };
+    return { code: "created", summary: "Registered this app.", data: { app_id: got.app_id ?? loadConfig().appId, created: got.created ?? null, expires_at: got.expires_at ?? null, token_file: ".shipvo/publish-token" }, next: [{ command: "shipvo publish --json", why: "Publish a release." }] };
+  }, NEXT);
+}
+
+async function appRun(argv: string[], got: Record<string, unknown> = {}) {
   const [sub] = argv; const c = savedCreds();
   if (!c) { console.error("Not signed in. Run `shipvo login` first."); process.exit(1); }
   if (sub === "list") {
     const r = await fetch(`${c.control}/apps`, { headers: { authorization: `Bearer ${c.key}` } }); const d: any = await r.json();
     if (!r.ok) { console.error(d.hint ?? d.error); process.exit(1); }
+    got.apps = d.apps;
     console.log(d.apps.length ? d.apps.map((a: any) => `${a.app_id}  ${a.name}  r${a.latest_release ?? "-"}  ${(a.bytes_used / 1048576).toFixed(1)} MB  ${a.listed ? (a.approved ? "public" : "listing under review") : "private"}`).join("\n") : "No apps yet. Run `shipvo app create` inside an app made with `shipvo init`.");
     return;
   }
@@ -25,6 +48,7 @@ export async function appCmd(argv: string[]) {
   const r = await fetch(`${c.control}/apps`, { method: "POST", headers: { authorization: `Bearer ${c.key}`, "content-type": "application/json" }, body: JSON.stringify({ app_id: cfg.appId, name: cfg.name, public_key: cfg.publicKey, description: cfg.listing?.description ?? "", category: cfg.listing?.category ?? "other", listed: !!cfg.listing?.public, tagline: cfg.listing?.tagline ?? "", website: cfg.listing?.website ?? "" }) });
   const d: any = await r.json();
   if (!r.ok) { console.error(`Could not register "${cfg.appId}": ${d.message ?? d.hint ?? d.error}`); process.exit(1); }
+  got.app_id = d.app_id; got.created = !!d.created; got.expires_at = d.expires_at;
   mkdirSync(join(process.cwd(), ".shipvo"), { recursive: true });
   writeFileSync(join(process.cwd(), ".shipvo", "publish-token"), d.publish_token + "\n", { mode: 0o600 });
   console.log(`${d.created ? "Registered" : "Updated"} "${d.app_id}" (publish token expires ${String(d.expires_at).slice(0, 10)}).`);
