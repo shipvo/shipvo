@@ -85,6 +85,7 @@ jobs:
 - **Offline.** `online: false`, then check queued actions and error messages.
 - **Push notifications.** Grant `permissions: { notifications: "granted" }` first (without it nothing is delivered). Then `phone.notifications.receive(...)` and `phone.notifications.tap()`, and assert the deep link lands on the right screen.
 - **Deep links.** `await phone.openUrl("myapp://item/3")`, then assert the right screen. The app must listen with `onUrl` from `@shipvo/device`; if it does not, `openUrl` throws a `PhoneError` with code `no_url_listener`. The MCP tool is `open_url`. On a phone, `onUrl` fires only for URLs that arrive while the app runs; for a URL that launched the app, read `Linking.getInitialURL()`.
+- **Lock and restart.** The phone frame has power and volume buttons. The MCP tools `lock`, `unlock` and `restart` do the same: `lock` shows the lock screen, `unlock` returns to the same screen, `restart` cold-starts the app and keeps storage. While locked, `tap`, `type`, `scroll` and `back` fail with `phone_locked`; `lock` twice fails with `already_locked`, and `unlock` on an unlocked phone fails with `not_locked`. `screenshot` while locked still shows the app, not the lock screen.
 - **Release regressions.** Keep the flows that earn money in a test file. A change that breaks them fails the pull request, not a customer.
 - **Dark mode.** `openApp({ dark: true })`.
 

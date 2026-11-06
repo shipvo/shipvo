@@ -25,6 +25,7 @@
     "browser-resolver.mjs",
     "app-name.mjs",
     "frame.mjs",
+    "lifecycle.mjs",
     "frame.d.mts",
     "mock-rules.mjs",
     "screen-rules.mjs",
