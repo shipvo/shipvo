@@ -1,2 +1,0 @@
-- docs: add `docs/research/first-party-apps.md`, the research behind the first five apps (notes and tasks, calendar, wallet and passes, files and photos, shopping).
-- Migration: none; docs only.

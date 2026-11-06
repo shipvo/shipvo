@@ -1,2 +1,0 @@
-- `@shipvo/control-plane`: one dispatcher on the existing scheduled tick runs every app schedule, so the number of triggers stays the same as apps are added. New `app_schedules` table (migration `0022_app_schedules.sql`, additive).
-- Migration: none for users; self-hosters apply the new migration.

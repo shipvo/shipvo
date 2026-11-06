@@ -1,1 +1,0 @@
-- mcp: export-replay test no longer picks port 5060 or 5061, which fetch refuses (fixes the CI failure on main)

@@ -1,1 +1,0 @@
-- sim tests: the port picker now skips every port that fetch refuses, not just 5060 and 5061, so `sizes.test.mjs` no longer fails to start when it draws 6566.

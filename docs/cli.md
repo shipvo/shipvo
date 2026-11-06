@@ -236,6 +236,10 @@ shipvo approvals list --json          # one JSON line: { ok, code, summary, data
 
 `shipvo explore --flows` also looks for sign up, log in, search, add to cart and checkout. It drives each with valid input and then invalid input, and writes `explore-report-flows.md` and `explore-report-flows.json`. Each flow is passed, failed (with the step) or not found. Pass a list to run some: `--flows search,add-to-cart`. A failed flow counts as a finding for `--fail-on-findings`; a flow that is not found does not. With `--json`, `data.flows` lists each flow with `status`, `invalid_status` and `message`, and `report_files` includes the two `-flows` files. When the walk has no findings and a flow failed, `code` is `flows_failed`.
 
+## `shipvo explore --record-features <file>`
+
+Writes one JSON line per action with screen features, action features and the outcome. It holds roles, counts, types and hashes, never app text or typed values. Off by default. The line format is in [explore-features.md](explore-features.md).
+
 ## `--json` for `doctor`, `test` and `explore`
 
 `shipvo doctor --json`, `shipvo test --json` and `shipvo explore --json` print the same envelope as `status --json`: `{ ok, code, summary, data, next }`. Stdout holds only that one JSON line. Progress and logs go to stderr, including the Playwright install notice for `explore` and the progress lines of `test`. The text output is unchanged without `--json`.
