@@ -1,3 +1,5 @@
 - `@shipvo/cli`: on Windows, `shipvo sim`, `run --native`, `preview`, `eas`, adopt mode and the Playwright auto-install now start `npm`, `npx` and `pnpm` through the shell with quoted arguments. Before, `PN_SIM=1 npx ...` and bare `npx` spawns failed in cmd.exe. Other systems are unchanged.
 - `@shipvo/cli`: `shipvo doctor --json` prints `{ ok, checks }` as one JSON document.
 - Migration: none.
+- `shipvo` and `create-shipvo`: the bins now work when the install path contains a space (they built a file URL from the percent-encoded `URL.pathname`). Before, `npx shipvo` failed with `ERR_MODULE_NOT_FOUND` in such folders.
+- `@shipvo/cli`: `publish` prints a line when a bsdiff patch cannot be built, and publishes the full bundle.

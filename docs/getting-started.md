@@ -151,7 +151,7 @@ The simulator also runs hosted: one Worker spins up a sandbox per API key and ex
 
 ## Supported systems
 
-`scripts/first-run/cross-os.mjs` checks the first run from packed npm tarballs of `@shipvo/cli`, `sim`, `test`, `device`, `runtime`, `schema` and `store`, in a folder whose name has a space. It runs `shipvo init`, `npm install`, `npx shipvo doctor --json`, `npx shipvo sim` (fetches the app page), `npx shipvo publish --dry-run`, and `npx shipvo run android --no-open` (fetches the frame page). It prints the time of each step. It does not run store builds, `shipvo login` or a real publish.
+`scripts/first-run/cross-os.mjs` checks the first run from packed npm tarballs of `shipvo`, `create-shipvo`, `@shipvo/cli`, `sim`, `test`, `device`, `runtime`, `schema` and `store`, in a folder whose name has a space. The tarballs are installed with `file:` overrides, so it does not check that the names are published on npm. It checks that the `shipvo` bin resolves, then runs `npm exec create-shipvo myshop` (the same bin as `npm create shipvo`), `npm install`, `npx shipvo doctor --json`, `npx shipvo sim` (fetches the app page), `npx shipvo publish --dry-run`, and `npx shipvo run android --no-open` (fetches the frame page). It prints the time of each step. It does not run store builds, `shipvo login` or a real publish.
 
 The script is not yet run in CI, so this page records no per-OS result.
 

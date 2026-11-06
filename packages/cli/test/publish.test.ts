@@ -338,6 +338,21 @@ describe("publish and the Hermes bytecode check", () => {
     expect(err).toMatch(/Updates still work/);
   });
 
+  it("says so when a patch cannot be built, and still publishes the full bundle", async () => {
+    withBundle(96);
+    values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: "abc" }));
+    blobs.set("b/demo/r1.hbc", fakeHbc(96));
+    const realKeys = stub.keys;
+    stub.keys = async (p: string) => (p === "h/demo/r" ? ["h/demo/r1"] : realKeys(p));
+    exec.fn = (c) => { if (c.includes("file_diff")) throw new Error("diff failed"); };
+    await publish([...flags, "--release", "2"]);
+    stub.keys = realKeys;
+    const err = (console.error as any).mock.calls.join("\n");
+    expect(err).toMatch(/Could not build a patch from abc/);
+    expect(err).toMatch(/full bundle/);
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it("dry run with --release 5 does not say first release", async () => {
     withBundle(96);
     await publish([...flags, "--dry-run", "--release", "5"]);

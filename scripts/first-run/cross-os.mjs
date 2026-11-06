@@ -1,6 +1,8 @@
 // First-run check for Windows, macOS and Linux, from packed tarballs (what a user gets from npm).
 // Usage: node scripts/first-run/cross-os.mjs --tarballs <dir> [--work <dir>] [--out cross-os.json]
-// <dir> holds the .tgz files from `pnpm pack` of @shipvo/cli, sim, test, device, runtime, schema, store (and any other @shipvo package they need).
+// <dir> holds the .tgz files from `pnpm pack` of shipvo, create-shipvo, @shipvo/cli, sim, test, device, runtime, schema, store (and any other @shipvo package they need).
+// init runs as `npm exec create-shipvo myshop` and `npm exec shipvo` from the packed tarballs (installed with file: overrides, so no registry is needed for @shipvo/*).
+// This cannot prove that the names are published on npm; it proves the packed bins resolve and run.
 // The app is made in a folder whose name has a space, to catch quoting bugs. Steps (each timed, in ms):
 //   init, npm install, doctor --json, sim (background) + GET /app/, publish --dry-run, run android --no-open + GET frame page.
 // Needs network for `npm install`. Exits 1 at the first failed step and prints its output.
@@ -67,7 +69,10 @@ async function get(name, url, mustHave) {
 const tgz = readdirSync(tarDir).filter((f) => f.endsWith(".tgz"));
 const find = (n) => { const f = tgz.find((t) => t.startsWith(`${n}-`)); if (!f) { console.error(`No tarball for ${n} in ${tarDir}`); process.exit(2); } return join(tarDir, f); };
 find("shipvo-cli");
-const pkgNames = tgz.filter((f) => f.startsWith("shipvo-")).map((f) => f.replace(/-\d.*$/, "").replace(/^shipvo-/, ""));
+const pkgNames = tgz.filter((f) => f.startsWith("shipvo-") && !/^shipvo-\d/.test(f)).map((f) => f.replace(/-\d.*$/, "").replace(/^shipvo-/, ""));
+const shortTgz = tgz.find((t) => /^shipvo-\d/.test(t)), createTgz = tgz.find((t) => /^create-shipvo-\d/.test(t));
+if (!shortTgz || !createTgz) { console.error(`Need shipvo-<v>.tgz and create-shipvo-<v>.tgz in ${tarDir}`); process.exit(2); }
+const fileSpec = (f) => `file:${join(tarDir, f).replace(/\\/g, "/")}`;
 
 rmSync(work, { recursive: true, force: true }); mkdirSync(work, { recursive: true });
 console.error(`OS ${platform()} ${process.arch}, node ${process.version}, work dir "${work}"`);
@@ -76,13 +81,16 @@ console.error(`OS ${platform()} ${process.arch}, node ${process.version}, work d
 const spec = (n) => `file:${join(tarDir, tgz.find((t) => t.startsWith(`shipvo-${n}-`))).replace(/\\/g, "/")}`;
 const overrides = {};
 for (const n of pkgNames) overrides[`@shipvo/${n}`] = spec(n);
+overrides.shipvo = fileSpec(shortTgz); overrides["create-shipvo"] = fileSpec(createTgz);
 
-// 1. Install the packed CLI with those overrides in a tool folder, then run its init (as `npx -y @shipvo/cli init myshop` would).
+// 1. Install the packed packages with those overrides in a tool folder, check the `shipvo` bin resolves, then run init the way users do.
 const tool = join(work, "tool"); mkdirSync(tool, { recursive: true });
-writeFileSync(join(tool, "package.json"), JSON.stringify({ name: "tool", version: "0.0.0", private: true, dependencies: { "@shipvo/cli": overrides["@shipvo/cli"] }, overrides }, null, 2));
+writeFileSync(join(tool, "package.json"), JSON.stringify({ name: "tool", version: "0.0.0", private: true, dependencies: { "@shipvo/cli": overrides["@shipvo/cli"], shipvo: overrides.shipvo, "create-shipvo": overrides["create-shipvo"] }, overrides }, null, 2));
 run("install cli", "npm", ["install", "--no-audit", "--no-fund"], tool);
 const appParent = join(work, "apps"); mkdirSync(appParent);
-run("init", process.execPath, [join(tool, "node_modules", "@shipvo", "cli", "dist", "cli.js"), "init", "myshop", "--name", "My Shop"], appParent);
+const ver = run("shipvo bin resolves", "npm", ["exec", "--prefix", tool, "--no", "--", "shipvo", "help"], appParent);
+if (!ver.trim()) fail("shipvo bin resolves", "`shipvo help` printed nothing");
+run("init (npm create shipvo)", "npm", ["exec", "--prefix", tool, "--no", "--", "create-shipvo", "myshop", "--name", "My Shop"], appParent);
 const app = join(appParent, "myshop");
 
 // 2. Pin the app to the packed tarballs too.
@@ -123,6 +131,6 @@ stop(ra.child);
 
 console.log(`\nFirst run on ${platform()} (${process.arch}), node ${process.version}`);
 console.log("step".padEnd(26) + "seconds");
-for (const s of steps) console.log(s.step.padEnd(26) + (s.ms / 1000).toFixed(1));
+for (const s of steps) console.log(s.step.padEnd(26) + (s.ms / 1000).toFixed(1) + (s.exit ? `  (exit ${s.exit})` : ""));
 writeFileSync(outFile, JSON.stringify({ os: platform(), arch: process.arch, node: process.version, ok: true, steps }, null, 2) + "\n");
 process.exit(0);

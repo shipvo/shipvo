@@ -155,7 +155,7 @@ export async function publish(argv: string[]) {
           if (fromSha === newSha) continue;
           const base = await kv.getBytes(key); if (!base) continue;
           writeFileSync(join(work, "old.hbc"), base);
-          if (!runPython("import sys, bsdiff4; bsdiff4.file_diff(sys.argv[1], sys.argv[2], sys.argv[3])", [join(work, "old.hbc"), join(work, "new.hbc"), join(work, "p.bsdiff")])) continue;
+          if (!runPython("import sys, bsdiff4; bsdiff4.file_diff(sys.argv[1], sys.argv[2], sys.argv[3])", [join(work, "old.hbc"), join(work, "new.hbc"), join(work, "p.bsdiff")])) { console.error(`Could not build a patch from ${fromSha.slice(0, 8)} (the bsdiff4 step failed). Devices on that release get the full bundle.`); continue; }
           const patch = new Uint8Array(readFileSync(join(work, "p.bsdiff")));
           if (patch.length >= bytes.length * 0.6) continue;
           const pkey = `b/${APP}/${pf === "ios" ? "ios-" : ""}d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
