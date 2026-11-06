@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+let forceVerified = false;
+vi.mock("../src/installs", async (orig) => { const m: any = await orig(); return { ...m, verifyReport: async (...a: any[]) => forceVerified || m.verifyReport(...a) }; });
 import app from "../src/index";
 import { runOwnerCommand } from "../src/owner";
-import { MAX_ALERTS_PER_APP } from "../src/alerts";
+import { MAX_ALERTS_PER_APP, MAX_UNVERIFIED_ALERTS_PER_APP, sendRevertAlert } from "../src/alerts";
 
 // A tiny D1 stand-in for the three statements the alert code uses.
 function fakeDb(webhook: string | null) {
@@ -9,19 +11,20 @@ function fakeDb(webhook: string | null) {
   const d = { prepare: (sql: string) => ({ bind: (...a: any[]) => ({
     run: async () => {
       if (sql.startsWith("INSERT INTO alert_sent")) {
-        const k = `${a[0]}/${a[1]}`; const prev = sent.get(k);
+        const k = `${sql.includes("alert_sent_unverified") ? "u" : "v"}:${a[0]}/${a[1]}`; const prev = sent.get(k);
         if (prev && !(prev <= a[3])) return { meta: { changes: 0 } };
         sent.set(k, a[2]); return { meta: { changes: 1 } };
       }
       if (sql.startsWith("DELETE FROM alert_sent")) {
-        for (const [k, v] of sent) if (k.startsWith(`${a[0]}/`) && v <= a[1]) sent.delete(k);
+        const pre = sql.includes("alert_sent_unverified") ? "u" : "v";
+        for (const [k, v] of sent) if (k.startsWith(`${pre}:${a[0]}/`) && v <= a[1]) sent.delete(k);
         return { meta: { changes: 1 } };
       }
       if (sql.startsWith("INSERT INTO app_alerts")) hook = a[1];
       if (sql.startsWith("DELETE FROM app_alerts")) hook = null;
       return { meta: { changes: 1 } };
     },
-    first: async () => sql.includes("COUNT(*)") ? { n: [...sent.keys()].filter((k) => k.startsWith(`${a[0]}/`)).length } : (sql.includes("FROM app_alerts") && hook ? { webhook: hook } : null),
+    first: async () => sql.includes("COUNT(*)") ? { n: [...sent.keys()].filter((k) => k.startsWith(`${sql.includes("alert_sent_unverified") ? "u" : "v"}:${a[0]}/`)).length } : (sql.includes("FROM app_alerts") && hook ? { webhook: hook } : null),
   }) }) } as any;
   return { d, get hook() { return hook; } };
 }
@@ -29,7 +32,7 @@ const ev = (event: string, release = 3) => ({ schema_version: "1.0", app_id: "ti
 const send = (db: any, body: unknown, ctx?: any) => app.request("/t", { method: "POST", body: JSON.stringify(body) }, { DB: db } as any, ctx);
 const ctx = () => { const p: Promise<unknown>[] = []; return { c: { waitUntil: (x: Promise<unknown>) => p.push(x), passThroughOnException() {} } as any, done: () => Promise.all(p) }; };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); forceVerified = false; });
 
 describe("revert webhook alert", () => {
   it("sends one POST with the expected body", async () => {
@@ -68,12 +71,31 @@ describe("revert webhook alert", () => {
     const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
     const { d } = fakeDb("https://hooks.example.com/x"); const x = ctx();
     const t0 = Date.now(); const now = vi.spyOn(Date, "now"); now.mockReturnValue(t0);
-    for (let r = 1; r <= 25; r++) await send(d, ev("rolled_back", r), x.c);
-    await x.done();
+    for (let r = 1; r <= 25; r++) await sendRevertAlert(d, "tide", r, "rolled_back", true);
     expect(f).toHaveBeenCalledTimes(MAX_ALERTS_PER_APP);
-    now.mockReturnValue(t0 + 3600_000 + 1000); await send(d, ev("rolled_back", 99), x.c); await x.done();
+    now.mockReturnValue(t0 + 3600_000 + 1000); await sendRevertAlert(d, "tide", 99, "rolled_back", true);
     expect(f).toHaveBeenCalledTimes(MAX_ALERTS_PER_APP + 1);
     now.mockRestore();
+  });
+  it("forged rollbacks do not use up the alert slots for real ones", async () => {
+    const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
+    const { d } = fakeDb("https://hooks.example.com/x"); const x = ctx();
+    for (let r = 1; r <= 50; r++) await send(d, ev("rolled_back", r), x.c); // unsigned: unverified
+    await x.done();
+    expect(f).toHaveBeenCalledTimes(MAX_UNVERIFIED_ALERTS_PER_APP);
+    // The same release number a forger already used, and new ones, still alert when verified.
+    await sendRevertAlert(d, "tide", 1, "rolled_back", true);
+    for (let r = 100; r < 100 + MAX_ALERTS_PER_APP - 1; r++) await sendRevertAlert(d, "tide", r, "crash_loop_revert", true);
+    expect(f).toHaveBeenCalledTimes(MAX_UNVERIFIED_ALERTS_PER_APP + MAX_ALERTS_PER_APP);
+  });
+  it("a signed report through POST /t uses the verified slots", async () => {
+    const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
+    const { d } = fakeDb("https://hooks.example.com/x"); const x = ctx();
+    forceVerified = true; // stands in for a valid install signature
+    const signed = (r: number) => send(d, { ...ev("rolled_back", r), install_id: "i1", sig: "0".repeat(64) }, x.c);
+    for (let r = 1; r <= MAX_UNVERIFIED_ALERTS_PER_APP + 2; r++) await signed(r);
+    await x.done();
+    expect(f).toHaveBeenCalledTimes(MAX_UNVERIFIED_ALERTS_PER_APP + 2);
   });
   it("sends nothing without a webhook, or for events that are not reverts", async () => {
     const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);

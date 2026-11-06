@@ -14,13 +14,11 @@ const ev = (extra: object = {}) => ({ schema_version: "1.0", app_id: "tide", rel
 const post = (e: any, body: unknown, ip: string) => app.request("/t", { method: "POST", body: JSON.stringify(body), headers: { "cf-connecting-ip": ip } }, e);
 const reg = (e: any, body: unknown, ip: string) => app.request("/t/register", { method: "POST", body: JSON.stringify(body), headers: { "cf-connecting-ip": ip } }, e);
 
-// Windows are fixed 60s buckets of wall-clock time. Pin the clock early in a bucket so filling a
-// budget cannot straddle a bucket boundary and reset the count.
-const pinClock = () => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(Math.floor(Date.now() / 60_000) * 60_000 + 1_000); };
+// The limiter uses fixed windows. Pin the clock to the middle of one so a slow run cannot cross a boundary and reset a count.
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date(1_700_000_000_000 + 17_000)); });
+afterEach(() => vi.useRealTimers());
 
 describe("POST /t rate limits", () => {
-  beforeEach(pinClock);
-  afterEach(() => vi.useRealTimers());
   it("passes requests under the limits, including old runtimes with no install id", async () => {
     const { e } = env();
     for (let i = 0; i < 20; i++) expect((await post(e, ev(), "1.1.1.1")).status).toBe(202);
@@ -58,8 +56,6 @@ describe("POST /t rate limits", () => {
 });
 
 describe("POST /t caps count unverified reports only", () => {
-  beforeEach(pinClock);
-  afterEach(() => vi.useRealTimers());
   const KEY = "key-hash-for-test";
   const signedEnv = () => {
     const x = env();
