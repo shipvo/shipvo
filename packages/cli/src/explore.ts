@@ -1,7 +1,7 @@
 // `shipvo explore`: a deterministic walker over the simulator's accessibility tree. No LLM call.
 // The walker (`walk`) only needs a `Driver`, so tests run it against a fake app. `explore` wires it to the simulator.
 import { execSync, spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
@@ -9,6 +9,7 @@ import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
+import { features, train, Ranker, type ActionInfo, type Sample } from "./explore-ranker.js";
 
 export type Step =
   | { action: "open" }
@@ -118,6 +119,10 @@ export type WalkOptions = {
   seed?: number;
   /** Wait in ms between looks at a screen that shows a loading indicator. Default 400. */
   settleMs?: number;
+  /** A trained ranker. It picks which safe action to try next on a screen. Without it the order is the seeded shuffle. */
+  ranker?: Ranker;
+  /** Called after each action with anonymous features and whether it reached a new screen or a finding. Used to train a ranker. */
+  onSample?: (s: Sample) => void;
 };
 type Act = { kind: "tap" | "type"; el: El; text?: string; enter?: boolean; risky: boolean; done: boolean };
 type Node = { sig: string; path: Step[]; depth: number; acts: Act[]; n: number; reward: number };
@@ -240,12 +245,18 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
         }
         screen = landed ?? (await replay(node.path)).screen;
       }
-      const a = todo(node).find((x) => !x.risky) ?? todo(node)[0]!;
+      const left = todo(node);
+      const safe = left.filter((x) => !x.risky);
+      const info = (x: Act): ActionInfo => ({ kind: x.kind, role: x.el.role, name: x.el.name, nth: x.el.nth, invalid: !!x.enter, risky: x.risky, depth: node.depth, left: left.length, total: node.acts.length, visits: node.n, index: node.acts.indexOf(x) });
+      let a = safe[0] ?? left[0]!;
+      if (o.ranker && safe.length > 1) { let top = -Infinity; for (const x of safe) { const sc = o.ranker.score(info(x)); if (sc > top) { top = sc; a = x; } } }
       a.done = true;
       const target = find(screen, a.el, a.kind === "type" ? FIELDS : ACTIONABLE);
       if (!target) { at = node; continue; }
       const step: Step = a.kind === "type" ? { action: "type", role: a.el.role, name: a.el.name, nth: a.el.nth, text: a.text!, ...(a.enter ? { enter: true } : {}) } : { action: "tap", role: a.el.role, name: a.el.name, nth: a.el.nth };
-      const here = [...node.path, step]; steps++; node.n++;
+      const here = [...node.path, step]; steps++;
+      const x = o.onSample ? features(info(a)) : null; const found = findings.length;
+      node.n++;
       const r = a.kind === "type" ? await driver.type!(target.ref, a.text!, a.enter) : await driver.tap(target.ref);
       if (r.delivery === "not_delivered") add({ kind: "not_delivered", message: `Not delivered (${r.reason ?? "unknown reason"}): ${r.error ?? "the app did not receive the tap"}`, screen, steps: here });
       else if (!r.ok) add({ kind: "action_failed", message: `Action failed${r.code ? ` [${r.code}]` : ""}: ${r.error ?? "unknown"}`, screen, steps: here });
@@ -253,12 +264,14 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
       await checkErrors(after, here);
       const crashed = !r.ok || r.screen == null || !!redScreen(after);
       const next = signature(after);
-      if (crashed) { screen = null; at = null; continue; }
-      if (next !== node.sig && !seen.has(next)) {
+      if (crashed) { x && o.onSample!({ x, y: 1 }); screen = null; at = null; continue; }
+      const fresh = next !== node.sig && !seen.has(next);
+      if (fresh) {
         node.reward++;
         if (node.depth >= maxDepth) { cut++; seen.add(next); }
         else await register(after, here, node.depth + 1);
       }
+      x && o.onSample!({ x, y: fresh || findings.length > found ? 1 : 0 });
       screen = after; at = nodes.get(next) ?? null;
     }
   } catch (e) {
@@ -363,7 +376,18 @@ export async function routesFromChange(sha: string, log: (s: string) => void = c
 }
 
 async function exploreRun(argv: string[], json: boolean): Promise<number> {
-  const a = parse(argv); const cfg = loadConfig();
+  const a = parse(argv);
+  if (a.train !== undefined) {
+    // Train a ranker from samples recorded with --record-features. No simulator is started.
+    const outFile = a["ranker-out"] ?? "ranker.json";
+    if (a.train === "true") throw new Error("--train needs a samples file");
+    const samples = readFileSync(a.train, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Sample);
+    if (!samples.length) throw new Error("--train: the samples file is empty");
+    writeFileSync(outFile, JSON.stringify(train(samples)) + "\n");
+    console.log(`Trained a ranker on ${samples.length} samples. Wrote ${outFile}`);
+    return 0;
+  }
+  const cfg = loadConfig();
   const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
   const maxDepth = num("max-depth", 3), maxSteps = num("max-steps", 100);
   const sim = await startSim(a, cfg, json); const base = sim.base;
@@ -377,7 +401,11 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     }
     let seed: number | undefined;
     if (a.seed !== undefined) { seed = Number(a.seed); if (!Number.isInteger(seed) || seed < 0) throw new Error("--seed must be a whole number of 0 or more"); }
-    const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, seed, app: cfg.appId, skin: a.skin as Skin | undefined });
+    for (const k of ["ranker", "record-features"]) if (a[k] === "true") throw new Error(`--${k} needs a file`);
+    const ranker = a.ranker ? Ranker.from(JSON.parse(readFileSync(a.ranker, "utf8"))) : undefined;
+    // Opt-in only: one JSON line per action, with numbers and flags. No labels, text or values.
+    const onSample = a["record-features"] ? (smp: Sample) => appendFileSync(a["record-features"]!, JSON.stringify(smp) + "\n") : undefined;
+    const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, seed, ranker, onSample, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
     const nothingChanged = onlyRoutes && !routes?.length;
     if (nothingChanged) console.error("No screens changed, nothing explored.");

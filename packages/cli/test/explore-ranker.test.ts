@@ -1,0 +1,49 @@
+import { describe, expect, it } from "vitest";
+import { features, FEATURES, Ranker, train, type ActionInfo } from "../src/explore-ranker.js";
+import { walk } from "../src/explore.js";
+import { benchApp, benchmark, run } from "./bench/apps.js";
+
+const act = (o: Partial<ActionInfo> = {}): ActionInfo => ({ kind: "tap", role: "button", name: "Next", nth: 0, invalid: false, risky: false, depth: 1, left: 3, total: 4, visits: 0, index: 1, ...o });
+
+describe("ranker features", () => {
+  it("hold no app content", () => {
+    const a = features(act({ name: "Alice Smith's secret order 4417" })), b = features(act({ name: "Bob Jones's other order 9001" }));
+    expect(a).toEqual(b);
+    expect(a.length).toBe(FEATURES.length);
+    expect(a.every((v) => Number.isFinite(v) && v >= 0 && v <= 1)).toBe(true);
+    expect(features(act({ name: "Continue" }))).not.toEqual(features(act({ name: "Close" })));
+  });
+});
+
+describe("ranker model", () => {
+  it("learns a simple rule and survives a JSON round trip", () => {
+    const xs = [features(act({ name: "Continue" })), features(act({ name: "Close" }))];
+    const r = train(Array.from({ length: 40 }, (_, i) => ({ x: xs[i % 2]!, y: (i % 2 ? 0 : 1) as 0 | 1 })));
+    const back = Ranker.from(JSON.parse(JSON.stringify(r)));
+    expect(back.score(act({ name: "Continue" }))).toBeGreaterThan(0.8);
+    expect(back.score(act({ name: "Close" }))).toBeLessThan(0.2);
+    expect(train([]).score(act())).toBeCloseTo(0.5);
+  });
+  it("rejects a model that does not match the feature list", () => {
+    expect(() => Ranker.from({ version: 1, features: ["x"], weights: [0], bias: 0, trained: 0 })).toThrow(/different feature list/);
+    expect(() => Ranker.from({ version: 2 })).toThrow(/not a valid/);
+  });
+});
+
+describe("ranker in the walker", () => {
+  it("records one sample per step and repeats with a seed", async () => {
+    const app = benchApp(5); const got: number[][] = [];
+    const r = await walk(app.make(), { settleMs: 1, maxSteps: 12, onSample: (s) => got.push(s.x) });
+    expect(got.length).toBe(r.steps);
+    const ranker = train((await run(benchApp(5), 30, 1)).samples);
+    const a = await run(benchApp(6), 20, 3, ranker), b = await run(benchApp(6), 20, 3, ranker);
+    expect({ ...a, samples: 0 }).toEqual({ ...b, samples: 0 });
+  });
+  it("reaches more screens and findings than the heuristic in the same steps on held-out benchmark apps", async () => {
+    const b = await benchmark([15, 30]);
+    for (const row of b.rows) {
+      expect(row.ranker.screens).toBeGreaterThan(row.heuristic.screens);
+      expect(row.ranker.findings).toBeGreaterThanOrEqual(row.heuristic.findings);
+    }
+  }, 60000);
+});

@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo explore` has three new opt-in flags: `--record-features <file>` (anonymous action features, no app content), `--train <file> --ranker-out <file>` (train a small ranker) and `--ranker <file>` (use it to choose actions). Off by default. See `docs/research/lumi-action-ranker.md`.
+- Migration: none; new flags.
