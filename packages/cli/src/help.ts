@@ -1,5 +1,6 @@
 export const COMMANDS = [
   "init", "sim", "smoke", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "approvals", "test", "keys", "mcp",
+  "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
 export const help = `shipvo <command>
