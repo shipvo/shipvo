@@ -1,2 +1,0 @@
-- Shipvo Phone: Lumi shows a first-run guide in 3 short steps (home screen, the Store, connecting an assistant). You can skip it, and it never shows again in that browser. It is off when Lumi is off (default in CI).
-- `@shipvo/sim`: `renderFrame` takes a new option `guide` (default `false`); `shipvo run` turns it on. No migration needed.

@@ -1,2 +1,0 @@
-- `@shipvo/cli`: a test checks that every `shipvo` command and flag in `docs/migrate-from-codepush.md` exists in the CLI help.
-- Migration: none; docs and test only.

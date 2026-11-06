@@ -1,2 +1,0 @@
-- `tide-and-tackle`: the sample app registers its install once and signs its `/t` reports, so they count as verified for auto-halt. If registering fails, reports are sent unsigned as before.
-- Migration: none.

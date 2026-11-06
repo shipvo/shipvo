@@ -1,1 +1,0 @@
-- Android e2e harness: crash-loop trials stop waiting once the release is pending or already current, and report `reached`. Migration: none.

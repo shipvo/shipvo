@@ -1,1 +1,0 @@
-- mcp: `record_stop` takes `narration`, a path to a wav. It is mixed over the video, trimmed to the video length (the result's `notes` says so) and padded with silence if shorter. With `music: true` the music is ducked under the voice into one audio stream. A missing or unreadable wav throws `narration_unreadable` and leaves the silent video (#523).

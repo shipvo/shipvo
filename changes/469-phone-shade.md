@@ -1,4 +1,0 @@
-- `@shipvo/sim`: the phone frame has a notification shade (Android) and Notification Center and Control Center (iPhone). Pull down from the top; tiles change the simulated device; notifications show app, title, text and time, open their deep link on tap, swipe away, and have "Clear all".
-- `@shipvo/mcp`, `@shipvo/sim`: new tools and actions `open_notifications`, `open_control_center`, `toggle_tile`, `dismiss_notification` and `close_panels`. `set_device` takes `wifi`, `mobileData`, `airplane`, `locationServices`, `darkMode`, `dnd`, `autoRotate`, `flashlight`, `orientationLock` and `brightness`.
-- `@shipvo/device`: new device switches with those names, `__pnDevice.settings()`, `dismiss()` and `clearAll()`, and notifications carry `at` and `app`. With `dnd` on, a notification goes to the shade without a banner. Wi-Fi and mobile data both off take the network offline.
-- Migration: none. Existing calls behave as before.

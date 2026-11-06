@@ -1,1 +1,0 @@
-- `shipvo ci shots --changed-from <sha>` saves one simulator screenshot per changed screen (up to four) in `shipvo-shots/`, and the Shipvo check action runs it before posting the comment. New command; no existing API changed.
