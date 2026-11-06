@@ -189,7 +189,9 @@ async function act(id, body) {
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
   if (["tap", "type", "scroll", "back", "open_url", "open_notification", ...SHADE_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   // Home screen or app switcher showing: the app is in the background and takes no input.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
+  // An open panel covers the app on a phone, so input to the app is refused until it is closed.
+  if (["tap", "type", "scroll"].includes(body.action) && s.shade.open !== "none") throw new SimError("panel_open", `a panel (${s.shade.open}) is open and covers the app, so nothing was sent to it. Close it first (close_panels).`);
   switch (body.action) {
     // Home, recents, resume and kill. The app hears them as AppState changes (document.visibilityState). Kill is a cold start.
     case "press_home": case "open_recents": case "resume_app": case "kill_app": {

@@ -51,6 +51,23 @@ test("a swipe-dismiss does not also open the notification", async () => {
   } finally { await b.close(); }
 });
 
+test("each note has an app icon, and a keyboard user can dismiss it", async () => {
+  const b = await chromium.launch();
+  try {
+    for (const skin of ["android", "ios"]) {
+      const { p, box } = await open(b, skin);
+      await pull(p, box.x + 40, box.y);
+      const icon = p.locator('[data-note="n1"] .sf-icon');
+      assert.equal(await icon.count(), 1); assert.equal(await icon.getAttribute("aria-hidden"), "true");
+      assert.equal(await icon.textContent(), "C");
+      await p.focus('[data-dismiss="n1"]'); await p.keyboard.press("Enter");
+      assert.equal(await p.locator('[data-note="n1"]').count(), 0);
+      assert.equal(await p.locator('[data-note="n2"]').count(), 1);
+      assert.deepEqual(await p.evaluate(() => document.getElementById("app").contentWindow.__opened), []);
+    }
+  } finally { await b.close(); }
+});
+
 test("iPhone: top left pull is Notification Center, top right is Control Center", async () => {
   const b = await chromium.launch();
   try {
