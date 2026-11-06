@@ -73,7 +73,10 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 
 ## Install apps and switch between them
 
-The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools:
+The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools.
+
+**Limit today:** the Store in the phone frame and the tools below are two separate views. A tap-install in the frame page does not change the session's `current_app` or `device_log`, and an MCP install does not draw an icon on a live `shipvo run` phone. Use the tools for state that tests can check.
+
 
 | Tool | What it does | Typed errors |
 | --- | --- | --- |
@@ -101,7 +104,9 @@ A `phone.json` in the folder where the simulator starts (or `--phone <path>`) sa
 }
 ```
 
-`settings` takes the same keys as `set_setting`. An invalid file fails the session with `bad_profile` and says why. Contacts and photos are not part of the profile yet.
+`settings` takes the same keys as `set_setting`. An invalid file, or a `--phone` path that does not exist, fails the session with `bad_profile` and says why. Only a missing default `./phone.json` is ignored.
+
+App `url` values: `fixture://…` loads nothing, `app://<id>@r13` (or `@latest`) loads a published release the way `open_app` does, and any other `http(s)` URL goes through the Browser app's private-host guard. A private or local address fails `switch_app` with `host_not_allowed` and the page does not change. Contacts and photos are not part of the profile yet.
 
 ### Example
 

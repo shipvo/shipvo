@@ -71,7 +71,7 @@ async function storeApps(): Promise<{ ok: true; apps: StoreApp[]; fixture: boole
     const r = await fetch(`${CONTROL}/apps/public`, { signal: AbortSignal.timeout(simTimeoutMs()) });
     if (!r.ok) throw new Error(`status ${r.status}`);
     const list = ((await r.json()) as { apps?: { app_id: string; name?: string; latest_release?: number }[] }).apps ?? [];
-    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, url: `${CONTROL}/w/${a.app_id}/`, version: a.latest_release != null ? `r${a.latest_release}` : "latest" })) };
+    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, url: a.latest_release != null ? `app://${a.app_id}@r${a.latest_release}` : `app://${a.app_id}@latest`, version: a.latest_release != null ? `r${a.latest_release}` : "latest" })) };
   } catch (e) { return { ok: false, code: "store_unreachable", error: `the marketplace at ${CONTROL} did not answer (${(e as Error).message}). Try again when the network is back.` }; }
 }
 const recorder = new Recorder();

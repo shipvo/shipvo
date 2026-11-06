@@ -79,4 +79,16 @@ describe("phone app tools", () => {
     expect((await call(c, "uninstall_app", { session: s, id: "notes" })).content[0].text).toMatch(/current: null/);
     await c.close();
   });
+  it("marketplace apps get an app:// url that the sim resolves like open_app", async () => {
+    const cp = http.createServer((req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(req.url === "/apps/public" ? JSON.stringify({ apps: [{ app_id: "tide", name: "Tide", latest_release: 13 }, { app_id: "fresh", name: "Fresh" }] }) : "{}");
+    });
+    await new Promise<void>((r) => cp.listen(0, r));
+    const cport = (cp.address() as { port: number }).port;
+    const c = await connect({ PN_CONTROL: `http://127.0.0.1:${cport}` });
+    const r = await call(c, "list_store_apps");
+    expect(r.structuredContent.apps.map((a: any) => a.url)).toEqual(["app://tide@r13", "app://fresh@latest"]);
+    await c.close(); cp.close();
+  });
 });

@@ -14,7 +14,7 @@ import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
-import { PhoneBrowser } from "./phone-browser.mjs";
+import { PhoneBrowser, BrowserError, checkUrl } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
 import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
@@ -39,7 +39,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 let CFG = {}; try { CFG = JSON.parse(readFileSync(join(process.cwd(), "shipvo.json"), "utf8")); } catch {}
 const PORT = Number(arg("port", 4545)), DIR = arg("dir", "/tmp/pn-ui"), DIST = arg("dist", join(process.cwd(), "sim-dist"));
-let PROFILE = null; try { PROFILE = JSON.parse(readFileSync(arg("phone", join(process.cwd(), "phone.json")), "utf8")); } catch {}
+// phone.json: only a missing default ./phone.json is ignored. A bad --phone path or a bad file fails sessions with bad_profile.
+let PROFILE = null, PROFILE_ERR = null;
+{ const given = arg("phone", null);
+  try { PROFILE = readFileSync(given ?? join(process.cwd(), "phone.json"), "utf8"); }
+  catch (e) { if (given || e?.code !== "ENOENT") PROFILE_ERR = `cannot read ${given ?? "phone.json"}: ${e?.code ?? e?.message}`; } }
 const DEFAULT_APP = arg("app", CFG.appId || "tide"), APP_NAME = CFG.name || "Tide & Tackle";
 // Published releases: open_app("tide@r13") loads the web artifact that `shipvo publish` stored next to the phone bundle.
 const CONTROL = (process.env.PN_CONTROL || process.env.CONTENT_FROM || CFG.controlPlane || "https://api.shipvo.dev").replace(/\/$/, "");
@@ -125,7 +129,7 @@ async function newSession(id, opts = {}) {
   const page = await ctx.newPage();
   const errors = [];
   // phone.json: the apps and settings this phone starts with. The same profile gives the same phone every run.
-  let apps; try { apps = loadProfile(opts.phone ?? PROFILE ?? {}); } catch (e) { await ctx.close(); throw e instanceof AppsError ? new SimError(e.code, e.message) : e; }
+  let apps; try { if (PROFILE_ERR && opts.phone === undefined) throw new AppsError("bad_profile", PROFILE_ERR); apps = loadProfile(opts.phone ?? PROFILE ?? {}); } catch (e) { await ctx.close(); throw e instanceof AppsError ? new SimError(e.code, e.message) : e; }
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
@@ -218,9 +222,18 @@ async function act(id, body) {
         if (body.action === "install_app") installApp(s.apps, id, Array.isArray(body.catalog) ? body.catalog : s.apps.store);
         else if (body.action === "uninstall_app") uninstallApp(s.apps, id, s.nav);
         else {
+          const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
+          // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
+          // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
+          let dest = null;
+          const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
+          if (am) dest = (await resolveApp(am[1])).url;
+          else if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^fixture:/i.test(url)) {
+            try { dest = (await checkUrl(url, { allowPrivate: false, allowHosts: [] })).href; }
+            catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
+          }
           switchApp(s.apps, id, s.nav);
-          const url = s.apps.installed_apps.find((a) => a.id === id)?.url;
-          if (/^https?:\/\//.test(url ?? "") && page.url() !== url) { await page.goto(url, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+          if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
           await page.evaluate(setVisibilityInPage, "active");
         }
       } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
@@ -416,7 +429,7 @@ const server = http.createServer(async (req, res) => {
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
     if (url.pathname === "/sessions") return send(200, { ok: true, sessions: [...sessions.entries()].map(([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, url: s.page.url() })) });
-    if (url.pathname === "/session") { await newSession(body.session, body); const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof SimError && e.code === "bad_profile") return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
