@@ -2,7 +2,7 @@
 // Our own artwork. It does not copy any vendor's icons, fonts or exact device outlines.
 // Scaling to fit the window is done by the page with a CSS transform on the element this markup sits in.
 
-import { lockScreenHtml, bootScreenHtml } from "./lifecycle.mjs";
+import { lockScreenHtml, bootScreenHtml, offScreenHtml } from "./lifecycle.mjs";
 
 export const SKINS = {
   android: { label: "Android", width: 412, height: 915, radius: 36, bezel: 10, status: 36, bar: 24, pad: 22, indicator: 108, part: "punch-hole", bottom: "gesture-bar" },
@@ -64,7 +64,7 @@ var clean=${clean.toString()},clamp=${clamp.toString()};
 var dev={online:true,airplane:false,battery:{level:100,charging:false}};
 function root(){return document.querySelector('[data-part="phone-body"]')}
 function draw(){var r=root();if(!r)return;var p=statusParts(statusFromDevice(dev,new Date()));
-r.querySelector('[data-part="time"]').textContent=p.time;r.querySelector(".sf-icons").innerHTML=p.icons}
+r.querySelector('[data-part="time"]').textContent=p.time;var lt=r.querySelector('[data-part="lock-time"]');if(lt)lt.textContent=p.time;r.querySelector(".sf-icons").innerHTML=p.icons}
 function topColor(w){try{var d=w.document,e=d.elementFromPoint(Math.floor(w.innerWidth/2),1);
 while(e){var c=w.getComputedStyle(e).backgroundColor;if(c&&c!=="transparent"&&!/rgba\\(.*,\\s*0\\)$/.test(c))return c;e=e.parentElement}var b=d.body&&w.getComputedStyle(d.body).backgroundColor;if(b&&!/rgba\\(.*,\\s*0\\)$/.test(b)&&b!=="transparent")return b}catch(x){}return"#fff"}
 function theme(w){var r=root();if(!r)return;var c=topColor(w),dark=isDarkBackground(c);
@@ -73,21 +73,41 @@ function hook(){var f=document.getElementById(${JSON.stringify(iframeId)});var w
 if(w.__pnDevice&&w.__pnDevice.status)dev=w.__pnDevice.status();draw();theme(w);
 if(!w.__shipvoStatusHooked){w.__shipvoStatusHooked=true;w.addEventListener("pn:status",function(e){dev=e.detail;draw();theme(w)})}}
 var f=document.getElementById(${JSON.stringify(iframeId)});if(f){f.addEventListener("load",hook);hook()}
-(function buttons(){var r=root();if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')},vol=50,hold,volT;
+(function buttons(){var r=root();if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')},vol=50,hold,volT,bootT;
 if(!q("power-button")||!q("lock-screen")||!q("power-menu"))return;
 function show(el,on){if(el)el.hidden=!on}
-function lockNow(){show(q("lock-screen"),true)}
-q("lock-screen").addEventListener("click",function(){});
-var sy=null;q("lock-screen").addEventListener("pointerdown",function(e){sy=e.clientY});
-q("lock-screen").addEventListener("pointerup",function(e){if(sy!=null&&sy-e.clientY>60)show(q("lock-screen"),false);sy=null});
+function shown(p){var e=q(p);return !!e&&!e.hidden}
+function lockNow(){show(q("power-menu"),false);show(q("lock-screen"),true);var u=q("unlock-button");if(u)u.focus()}
+function unlockNow(){show(q("lock-screen"),false);var p=q("power-button");if(p)p.focus()}
+function closeMenu(){if(shown("power-menu")){show(q("power-menu"),false);q("power-button").focus()}}
+function powerOn(){show(q("off-screen"),false);show(q("boot-screen"),true);clearTimeout(bootT);bootT=setTimeout(function(){show(q("boot-screen"),false)},1200)}
+function openMenu(){show(q("power-menu"),true);var b=q("power-menu").querySelector("button");if(b)b.focus()}
+var sy=null,ls=q("lock-screen");
+ls.addEventListener("pointerdown",function(e){sy=e.clientY});
+ls.addEventListener("pointerup",function(e){if(sy!=null&&sy-e.clientY>60)unlockNow();sy=null});
+ls.addEventListener("keydown",function(e){if(e.key==="ArrowUp"||e.key==="Enter"){e.preventDefault();unlockNow()}});
+if(q("unlock-button"))q("unlock-button").addEventListener("click",unlockNow);
 var pw=q("power-button");
-pw.addEventListener("pointerdown",function(){hold=setTimeout(function(){hold=null;show(q("power-menu"),true)},700)});
-pw.addEventListener("pointerup",function(){if(hold){clearTimeout(hold);hold=null;lockNow()}});
+function stopHold(){if(hold){clearTimeout(hold);hold=null}}
+pw.addEventListener("pointerdown",function(){stopHold();hold=setTimeout(function(){hold=null;if(shown("off-screen"))return;openMenu();pw.setAttribute("data-held","1")},700)});
+pw.addEventListener("pointerleave",stopHold);pw.addEventListener("pointercancel",stopHold);
+pw.addEventListener("pointerup",stopHold);
+pw.addEventListener("click",function(e){
+if(pw.getAttribute("data-held")){pw.removeAttribute("data-held");return}
+if(shown("off-screen")){powerOn();return}
+if(e.detail===0&&e.shiftKey){shown("power-menu")?closeMenu():openMenu();return}
+if(shown("power-menu")){closeMenu();return}
+if(shown("lock-screen")){return}
+lockNow()});
 function bump(d){vol=Math.max(0,Math.min(100,vol+d));q("volume-level").textContent=vol;show(q("volume-overlay"),true);clearTimeout(volT);volT=setTimeout(function(){show(q("volume-overlay"),false)},1500)}
 q("volume-up-button").addEventListener("click",function(){bump(10)});q("volume-down-button").addEventListener("click",function(){bump(-10)});
+q("off-screen").addEventListener("click",powerOn);q("off-screen").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();powerOn()}});
+r.addEventListener("keydown",function(e){if(e.key==="Escape")closeMenu()});
+document.addEventListener("pointerdown",function(e){if(shown("power-menu")&&!q("power-menu").contains(e.target)&&e.target!==pw)closeMenu()});
 q("power-menu").addEventListener("click",function(e){var a=e.target.getAttribute&&e.target.getAttribute("data-act");if(!a)return;show(q("power-menu"),false);
-if(a==="restart"){show(q("boot-screen"),true);var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)f.contentWindow.location.reload();setTimeout(function(){show(q("boot-screen"),false)},1200)}
-else{show(q("boot-screen"),true)}})})();
+if(a==="cancel"){pw.focus();return}
+if(a==="restart"){show(q("boot-screen"),true);var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)f.contentWindow.location.reload();clearTimeout(bootT);bootT=setTimeout(function(){show(q("boot-screen"),false)},1200)}
+else{show(q("lock-screen"),false);show(q("off-screen"),true);pw.focus()}})})();
 (function tick(){draw();var n=new Date();setTimeout(tick,(60-n.getSeconds())*1000-n.getMilliseconds()+50)})();
 // The app can change its top colour (a theme switch) without any event we can hear, so look again every 2 seconds. Skipped while the page is hidden.
 setInterval(function(){if(document.hidden)return;var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)theme(f.contentWindow)},2000);
@@ -134,8 +154,8 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
   const html = `<div class="sf-body" data-skin="${skin}" data-theme="${dark ? "dark" : "light"}" data-part="phone-body">`
     + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}<span class="sf-icons">${icons(st)}</span></div>`
     + `<div class="sf-content">${screen}</div>`
-    + lockScreenHtml(st.time) + bootScreenHtml()
-    + `<div class="sf-vol" data-part="volume-overlay" hidden><span data-part="volume-level">50</span></div><div class="sf-menu" data-part="power-menu" hidden><button data-act="restart">Restart</button><button data-act="poweroff">Power off</button></div>`
+    + lockScreenHtml(st.time) + bootScreenHtml() + offScreenHtml()
+    + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button><button role="menuitem" data-act="cancel">Cancel</button></div>`
     + `<div class="sf-bar" data-part="${k.bottom}"><i></i></div></div>`
     + `<button class="sf-btn sf-power" data-part="power-button" aria-label="Power"></button><button class="sf-btn sf-volup" data-part="volume-up-button" aria-label="Volume up"></button><button class="sf-btn sf-voldown" data-part="volume-down-button" aria-label="Volume down"></button>`
     + `<span class="sf-label" data-part="simulated-label">Simulated</span></div>`;
@@ -152,9 +172,9 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-content iframe{border:0;background:#fff;width:100%;height:100%;display:block}`,
     `.sf-bar{flex:none;height:${k.bar}px;display:flex;justify-content:center;align-items:center;background:var(--sf-bg)}`,
     `.sf-bar i{display:block;width:${k.indicator}px;height:5px;border-radius:3px;background:var(--sf-fg);opacity:.85}`,
-    `.sf-btn{position:absolute;right:-4px;width:4px;padding:0;border:0;border-radius:0 2px 2px 0;background:#2a2d31;cursor:pointer}.sf-power{top:200px;height:80px}.sf-volup{top:310px;height:56px}.sf-voldown{top:376px;height:56px}`,
-    `.sf-lock,.sf-boot,.sf-menu,.sf-vol{position:absolute;z-index:5}.sf-lock[hidden],.sf-boot[hidden],.sf-menu[hidden],.sf-vol[hidden]{display:none}`,
-    `.sf-lock{inset:0;background:#10151c;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif}.sf-lock-time{font-size:64px;font-weight:300}.sf-lock-hint{font-size:14px;opacity:.7}`,
+    `.sf-btn{position:absolute;right:-5px;width:5px;padding:0;border:0;border-radius:0 2px 2px 0;background:#5b6068;box-shadow:0 0 0 1px #000;cursor:pointer}.sf-btn::before{content:"";position:absolute;top:-6px;bottom:-6px;left:-4px;right:-10px}.sf-btn:focus-visible,.sf-lock button:focus-visible,.sf-menu button:focus-visible{outline:3px solid #4da3ff;outline-offset:2px}.sf-power{top:200px;height:80px}.sf-volup{top:310px;height:56px}.sf-voldown{top:376px;height:56px}`,
+    `.sf-lock,.sf-boot,.sf-off,.sf-menu,.sf-vol{position:absolute;z-index:5}.sf-lock[hidden],.sf-boot[hidden],.sf-off[hidden],.sf-menu[hidden],.sf-vol[hidden]{display:none}.sf-off{inset:0;z-index:7;background:#000;cursor:pointer}`,
+    `.sf-lock{inset:0;background:#10151c;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif}.sf-lock-time{font-size:64px;font-weight:300}.sf-lock-hint{font-size:14px;opacity:.7}.sf-lock button{margin-top:8px;padding:10px 28px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer}`,
     `.sf-boot{inset:0;z-index:6;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font:700 34px system-ui,sans-serif;letter-spacing:.04em}`,
     `.sf-vol{top:80px;right:12px;padding:8px 14px;border-radius:14px;background:#222d;color:#fff;font:600 14px system-ui,sans-serif}`,
     `.sf-menu{left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:16px;background:#222;box-shadow:0 8px 30px #0008}.sf-menu button{padding:10px 24px;border:0;border-radius:10px;background:#3a3d42;color:#fff;font:600 15px system-ui,sans-serif}`,

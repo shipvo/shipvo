@@ -26,7 +26,7 @@ test("lock, unlock and restart change state and log as simulated", () => {
 test("the frame draws power, volume, lock, boot and menu parts", () => {
   for (const skin of ["android", "ios"]) {
     const { html } = renderFrame({ skin });
-    for (const p of ["power-button", "volume-up-button", "volume-down-button", "lock-screen", "boot-screen", "volume-overlay", "power-menu"]) assert.ok(html.includes(`data-part="${p}"`), `${skin} ${p}`);
+    for (const p of ["power-button", "volume-up-button", "volume-down-button", "lock-screen", "boot-screen", "off-screen", "unlock-button", "volume-overlay", "power-menu"]) assert.ok(html.includes(`data-part="${p}"`), `${skin} ${p}`);
     assert.match(html, /Restart/); assert.match(html, /Power off/);
   }
   assert.match(statusClientScript(), /power-button/);

@@ -36,10 +36,15 @@ export function assertUnlocked(st) {
 /** Lock screen markup (time and a swipe hint). `time` is plain text such as "9:41". */
 export function lockScreenHtml(time = "9:41") {
   const t = String(time).replace(/[<>&"'\\]/g, "").slice(0, 12);
-  return `<div class="sf-lock" data-part="lock-screen" hidden><div class="sf-lock-time" data-part="lock-time">${t}</div><div class="sf-lock-hint">Swipe up to unlock</div></div>`;
+  return `<div class="sf-lock" data-part="lock-screen" role="dialog" aria-label="Lock screen" tabindex="-1" hidden><div class="sf-lock-time" data-part="lock-time">${t}</div><div class="sf-lock-hint">Swipe up to unlock</div><button type="button" data-part="unlock-button">Unlock</button></div>`;
 }
 
 /** Boot screen markup: the Shipvo name on black. Shown for a moment during restart. */
 export function bootScreenHtml() {
   return `<div class="sf-boot" data-part="boot-screen" hidden><div class="sf-boot-logo">Shipvo</div></div>`;
+}
+
+/** Screen shown after "Power off": black. A click on it, or the power button, turns the phone on again. */
+export function offScreenHtml() {
+  return `<div class="sf-off" data-part="off-screen" role="button" tabindex="0" aria-label="Phone is off. Press to power on" hidden></div>`;
 }

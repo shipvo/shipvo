@@ -1,3 +1,4 @@
 - `@shipvo/sim`: the phone frame has power, volume up and volume down buttons. Power press locks (lock screen with the time, swipe up unlocks), long-press opens a menu with Restart and Power off, volume shows an overlay. Restart shows a boot screen and cold-starts the app; storage is kept.
 - `@shipvo/sim`, `@shipvo/mcp`: new actions and tools `lock`, `unlock` and `restart`. While locked, tap, type, scroll and back fail with `phone_locked`; `lock` and `unlock` out of order fail with `already_locked` and `not_locked`. Each is logged in `device_log` with source `simulated`.
 - Migration: none.
+- `@shipvo/sim`: the frame buttons work from the keyboard (Enter locks, Shift+Enter opens the power menu, Escape or Cancel closes it), the lock screen has an Unlock button and a dialog role, and a powered-off phone turns on again from the power button or a click. New MCP error codes are listed in the `@shipvo/mcp` README.
