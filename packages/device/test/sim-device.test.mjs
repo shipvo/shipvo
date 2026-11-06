@@ -38,7 +38,6 @@ test("payment: each scripted result maps to its reason, and every charge is logg
 
 test("notifications: blocked while permission is not granted, delivered after", async () => {
   dev.reset({ platform: "ios" });
-  grant(); // no-op patch keeps notifications undetermined on iOS
   const got = [];
   const off = device.notifications.onReceived((n) => got.push(n));
   assert.equal(dev.push({ title: "Hi", body: "there" }), null);
