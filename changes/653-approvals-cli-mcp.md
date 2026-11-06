@@ -1,4 +1,5 @@
 - `@shipvo/cli`: new `shipvo approvals list` and `shipvo approvals approve <id>` (with `--json`) for promotes held above `policy.requireApprovalAbove`.
 - `@shipvo/mcp`: new tools `approvals_list` and `approval_approve`. An agent cannot approve an agent's proposal.
 - control-plane: new `GET /apps/:app/approvals` (pending holds). A refused self-approval now writes an audit row (`approval: "refused"`, `rule: "self_approval"`), and an agent can no longer approve an agent's proposal.
-- Migration: none; additive.
+- Behaviour change to the existing approve endpoint: `OWNER_TOKEN` used to approve a hold made with the publish token. It now gets `self_approval` (403), because the owner token counts as an agent.
+- Migration: no schema change. If you automated approvals with the owner token, run `shipvo login` as a person and approve with that instead. A person's hold can still be approved with the owner token.

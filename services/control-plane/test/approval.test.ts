@@ -14,7 +14,7 @@ async function pointer(band: string) {
 }
 
 // One keypair per test so the registered key matches the signed pointer.
-async function run(policy: object | undefined, band: string, headers: Record<string, string> = {}, ownerLogin = "ann") {
+async function run(policy: object | undefined, band: string, headers: Record<string, string> = {}, ownerLogin = "ann", bobAccount = 2) {
   const state = { bytes: 0 };
   const p = await pointer(band);
   const store: Record<string, string> = {}, audits: any[][] = [];
@@ -24,7 +24,7 @@ async function run(policy: object | undefined, band: string, headers: Record<str
       if (sql.includes("FROM publish_tokens")) return args[0] === (await sha(PUB)) ? { id: 1, expires_at: null } : null;
       if (sql.includes("JOIN accounts a ON a.id = k.account_id")) {
         if (args[0] === (await sha(ANN))) return { account_id: 1, expires_at: null, github_login: "ann" };
-        if (args[0] === (await sha(BOB))) return { account_id: 2, expires_at: null, github_login: "bob" };
+        if (args[0] === (await sha(BOB))) return { account_id: bobAccount, expires_at: null, github_login: "bob" };
         return null;
       }
       if (sql.includes("JOIN accounts")) return { login: ownerLogin };
@@ -107,6 +107,15 @@ describe("requireApprovalAbove", () => {
     const { approval_id } = (await r.json()) as any;
     expect((await act(approval_id, "approve", ANN)).status).toBe(403);
     expect(store[PTR]).toBeUndefined();
+  });
+  it("a different signed-in owner approves a person's hold; the audit row names them", async () => {
+    const { r, store, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2", {}, "ann", 1);
+    const { approval_id } = (await r.json()) as any;
+    const a = await act(approval_id, "approve", BOB);
+    expect(a.status).toBe(200); expect(store[PTR]).toBeTruthy();
+    const row = audits[audits.length - 1]!;
+    expect(row).toContain("bob"); expect(row).toContain("person");
+    expect(JSON.parse(row[8] as string)).toMatchObject({ approval: "approved", approval_id });
   });
   it("a person who does not own the app is refused; no auth is refused", async () => {
     const { r, act } = await run({ requireApprovalAbove: "b1" }, "b2");

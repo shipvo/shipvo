@@ -22,13 +22,15 @@ describe("shipvo approvals", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     expect(await approvals(["list"], { fetchFn: f as any, now: NOW })).toBe(0);
     expect(String(f.mock.calls[0][0])).toBe("https://cp.test/apps/shop/approvals");
-    expect(String(log.mock.calls[0][0])).toContain("h1\t7\tb2\tagent (publish token)\t2h");
+    const lines = String(log.mock.calls[0][0]).split("\n");
+    expect(lines[0]).toMatch(/^ID\s+RELEASE\s+BAND\s+PROPOSER\s+AGE$/);
+    expect(lines[1]).toMatch(/^h1\s+7\s+b2\s+agent \(publish token\)\s+2h$/);
   });
   it("--json prints one envelope line", async () => {
     inApp();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await approvals(["list", "--json"], { fetchFn: (async () => res({ approvals: [held] })) as any, now: NOW });
-    expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({ ok: true, command: "list", approvals: [{ id: "h1", age_seconds: 7200, band: "b2" }] });
+    expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({ ok: true, code: "ok", summary: expect.any(String), next: expect.any(Array), data: { command: "list", approvals: [{ id: "h1", age_seconds: 7200, band: "b2" }] } });
   });
   it("approve posts and reports", async () => {
     inApp();
@@ -37,7 +39,7 @@ describe("shipvo approvals", () => {
     expect(await approvals(["approve", "h1", "--json"], { fetchFn: f as any })).toBe(0);
     expect(String(f.mock.calls[0][0])).toBe("https://cp.test/apps/shop/approvals/h1/approve");
     expect((f.mock.calls[0][1] as any).method).toBe("POST");
-    expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({ ok: true, status: "approved" });
+    expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({ ok: true, code: "ok", data: { status: "approved", approval_id: "h1" } });
   });
   it("a self-approval is refused with the rule named and exit 1", async () => {
     inApp();
@@ -45,6 +47,13 @@ describe("shipvo approvals", () => {
     const code = await approvals(["approve", "h1"], { fetchFn: (async () => res({ error: "self_approval", rule: "self_approval", message: "cannot approve" }, 403)) as any });
     expect(code).toBe(1);
     expect(String(log.mock.calls[0][0])).toContain("self_approval");
+  });
+  it("a refusal with --json puts the rule in code and exits 1", async () => {
+    inApp();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const code = await approvals(["approve", "h1", "--json"], { fetchFn: (async () => res({ error: "self_approval", rule: "self_approval", message: "no" }, 403)) as any });
+    expect(code).toBe(1);
+    expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({ ok: false, code: "self_approval", data: { rule: "self_approval", status: 403 }, next: [{ command: "shipvo login" }] });
   });
   it("a 401 says the token was not accepted and exits 2", async () => {
     inApp();
@@ -70,7 +79,7 @@ describe("shipvo approvals", () => {
     inApp();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await approvals(["list", "--json"], { fetchFn: (async () => res({ approvals: [{ ...held, proposed_at: "bad" }] })) as any, now: NOW });
-    expect(JSON.parse(String(log.mock.calls[0][0])).approvals[0].age_seconds).toBeNull();
+    expect(JSON.parse(String(log.mock.calls[0][0])).data.approvals[0].age_seconds).toBeNull();
   });
   it("needs an id and a known subcommand", async () => {
     inApp();
