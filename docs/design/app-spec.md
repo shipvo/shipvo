@@ -233,13 +233,73 @@ Warnings (shown, not refused): touch targets under 44 px, more than three type s
 - Every change to an installed app's spec is a new signed release, delivered over the air, with the same staged rollout and rollback as any Shipvo update.
 - Collections migrate automatically when fields are added; removing or retyping a field needs an explicit `migrate` step.
 
-## 15. Escape hatch
+## 15. Where apps are made, and the escape hatches
 
-`shipvo eject <app>` turns a spec into a normal Shipvo React Native project (screens, components, actions as code) for apps that outgrow the spec. Designed separately.
+### 15.1 Surfaces: the chat first, every MCP server the same
+
+The main user is a person in a chat assistant (ChatGPT, Claude, Gemini) connected to Shipvo's **remote MCP server**. There is no terminal: every step is an MCP tool plus a card in the chat. Coding agents (Claude Code, Cursor, Codex) use the **local stdio MCP server** (`npx -y @shipvo/mcp`). The CLI is a third door for developers.
+
+**Parity rule:** the remote and stdio servers expose the same tools, with the same names, input and output schemas, error codes and approval steps. Both are built from one shared tool registry (one package both servers import); a CI test fails if their tool lists or schemas differ. Differences are only in where work runs and how a person signs in:
+
+| | Remote MCP (chat assistants) | Stdio MCP (coding agents) |
+| --- | --- | --- |
+| Sign in | OAuth in the chat | `shipvo login` once, or a project token |
+| Validation, bundling of islands and functions | Shipvo's edge | Locally, same engine package, same checks |
+| Preview | Inline phone card in the chat | Shipvo Phone in the person's browser (`shipvo run`), plus the same live session for the agent |
+| Secrets | Vault form inside the chat (inline UI, URL elicitation or a vault link) | The vault page opened in the person's browser; never typed into the terminal or the agent |
+| Export | To the person's GitHub, a zip link, or PiPilot | The same, plus straight into a local folder |
+| Approvals (new code, new domains, money) | Approval card in the chat | The same approval, in the vault/approval page in the browser; an agent can never approve its own request |
+
+The CLI calls the same engine, so `shipvo app create`, `shipvo app export` and the MCP tools produce identical results.
+
+### 15.2 The ladder
+
+Most apps never leave the spec. Those that need more climb one step and keep the contract: typed actions for agents, labelled screens, declared permissions, vault keys, signed releases, over-the-air updates and the Shipvo check. An agent cannot tell which level an app is on.
+
+| Level | For | MCP tool (remote and stdio) | Card the person sees |
+| --- | --- | --- | --- |
+| 0 Spec | Most apps | `create_app(spec)`, `update_app(app, patch)`, `preview_app(app)`, `install_app(app)` | Live phone preview; install card |
+| 1 Rich blocks | Unique looks, custom charts, gauges | Same tools (vector, motion and theme are part of the spec) | Same |
+| 2 Code island | One special piece of UI (signature pad, game board, 3D viewer) | `add_component(app, name, code, props, events, labels)` | "New custom part: signature pad. Runs isolated, no internet." Review, then Add |
+| 3 Server function | Logic CEL cannot express: multi-step integrations, webhooks, reconciliation | `add_function(app, name, code, input, output, domains, secrets, schedule?)` | "New logic: reconcile. Can reach shopify.com and stripe.com with your saved keys. Runs nightly." Approve |
+| 4 Export | Apps that outgrow the spec, or go to the stores | `export_app(app, to: "github" \| "zip" \| "pipilot" \| "folder")` | "Exported to github.com/you/stripe-tracker", a download link, or "Opened in PiPilot" |
+| 5 Native | Hardware or OS features with no web equivalent | none: the assistant explains it needs a store build and offers export | Explanation and next step |
+
+### 15.3 Level 2: code islands
+
+- The spec gets `{ "type": "custom", "component": "signature-pad", "props": { }, "label": "Signature" }`.
+- The code (React for web, TypeScript or JavaScript) arrives inside the tool call, written by the assistant's own model. Shipvo bundles it in seconds; there is no separate build server.
+- It runs isolated (its own frame on Shipvo Phone), talks to the app only through declared props in and events out, has no network unless declared, and never sees the vault.
+- It must declare its accessible labels and its events; each event becomes a typed action (`signature_captured`). Missing declarations are validation errors.
+- Checks before it is added: size limit, no undeclared network, no secret-like strings, no dynamic code loading. Failures return exact errors so the assistant can fix and resend.
+- Adding or changing an island needs the person's approval card. Public listings with islands also get a human review.
+
+### 15.4 Level 3: server functions
+
+- An action can be `{ "run": "function", "function": "reconcile" }`; the function is TypeScript sent in `add_function`.
+- It runs on Shipvo's edge in an isolate (remote) or locally in the same isolate engine during development (stdio), with: typed input and output (so it is still an MCP tool), vault secrets by name only, network only to declared domains, CPU and time limits, logs visible to the person.
+- Optional schedule (cron in the person's time zone) and optional webhook endpoint (`/hooks/<app>/<function>`, signed).
+- Adding a function, or widening its domains or secrets, needs the person's approval card.
+- It is the only level that runs custom code per call, so it is metered: a free allowance, then paid.
+
+### 15.5 Level 4: export
+
+- `export_app` writes a normal Shipvo React Native project: screens as components, data as hooks, the theme as a token file, actions as typed owner commands, islands as components, functions as server code. MCP tools, labels, permissions and secret names carry over; secret values never leave the vault.
+- Destinations: the person's GitHub (they connect GitHub once with OAuth; we create the repo in their account), a zip download link, PiPilot (opens as a project there), or a local folder (stdio and CLI only).
+- One way by design: the export card lists what becomes code and asks to confirm. The spec stays in the project history as the starting point. After export the app keeps running on the person's phone, now updated from the exported project.
+- Store builds happen after export, through EAS or the team's own CI. Shipvo does not build store binaries.
+
+### 15.6 Level 5: native modules
+
+Only for real phones (Bluetooth devices, background location, custom native SDKs). On Shipvo Phone a native-only feature needs a web fallback or a simulated version in `@shipvo/device`; publish checks flag anything that will not work there.
+
+### 15.7 Specs on real phones: the Shipvo player app
+
+One Shipvo app on Google Play and the App Store, containing the engine. People install it once; every app their assistant builds for them appears inside it, updated over the air, with no store submission per app. Android first. iOS needs a policy check before we commit: Apple's guidelines on apps that run downloaded content allow some mini-app and HTML5 experiences under conditions (no change of the app's main purpose, no downloaded executable native code, reviewable content). Specs are data, not code, which helps; islands and functions need a careful reading. This is a decision for the owner (strategy doc).
 
 ## 16. Open questions
 
 1. ~~Expression language~~: decided, CEL with `@bufbuild/cel` and the Shipvo function library (section 7).
 2. How much custom styling per block before apps become inconsistent: tokens only, or limited per-block overrides?
 3. Sharing: can a person publish a personal app as a template for others (with secrets removed)?
-4. Real phones: ship the engine inside the native shell so specs run natively, or only export to code?
+4. Real phones: the Shipvo player app (15.7), Android first; iOS after a policy check. Owner decision.
