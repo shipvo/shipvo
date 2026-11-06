@@ -26,12 +26,20 @@ const negatives: [string, string][] = [
   ["number", "12345678901234567890123456789012345"],
   ["public key name", "request_secret STRIPE_KEY"],
   ["short sk", "sk-1234"],
+  ["base64 image", "data:image/png;base64," + Buffer.from(Array.from({ length: 600 }, (_, i) => (i * 37 + (i >> 3) * 11) & 255)).toString("base64")],
+  ["base64 with slashes", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="],
+  ["long mixed-case path", "src/components/CartScreen2/ItemRowView3/CheckoutSummaryPanel4"],
+  ["long camelCase id", "useCartScreen2ItemRowView3CheckoutSummary"],
   ["snake case id", "this_is_a_very_long_snake_case_identifier_name"],
 ];
 
 describe("key-shaped text", () => {
   it.each(positives)("flags %s", (_n, s) => expect(containsKeyShapedText(s)).toBe(true));
   it.each(negatives)("passes %s", (_n, s) => expect(containsKeyShapedText(s)).toBe(false));
+  it("scans object keys and fails closed past the depth limit", () => {
+    expect(inputHasKey({ [positives[0][1]]: 1 })).toBe(true);
+    expect(inputHasKey({ a: { b: { c: { d: { e: { f: { g: { h: { i: "x" } } } } } } } } })).toBe(true);
+  });
   it("looks inside nested inputs", () => {
     expect(inputHasKey({ a: [{ b: positives[0][1] }] })).toBe(true);
     expect(inputHasKey({ a: [{ b: "hello" }], n: 5 })).toBe(false);
