@@ -32,5 +32,8 @@ jobs:
           pub @shipvo/schema
           for pj in packages/*/package.json; do
             name=$(node -p "const p=require('./$pj'); p.private ? '' : p.name")
-            [ -n "$name" ] && [ "$name" != "@shipvo/schema" ] && pub "$name"
+            [ -n "$name" ] && [ "$name" != "@shipvo/schema" ] || continue
+            # The unscoped short names (shipvo, create-shipvo) need the npm token to cover unscoped packages;
+            # a refusal there must not stop the @shipvo packages.
+            case "$name" in @shipvo/*) pub "$name" ;; *) pub "$name" || echo "::warning::$name was not published (check the npm token covers unscoped packages)" ;; esac
           done
