@@ -53,3 +53,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **MP4.** A common video file. Shipvo can record the simulated phone to one.
 
 **Shipvo Testers.** A group of founders who test each other's apps on Google Play, to help each other reach the 12 testers Google asks for.
+
+**Port.** A number that tells your computer which program a web address belongs to. `shipvo run` picks a free one. If it says the port is in use, pick another number with `--port`.
+
+**Shipvo Phone.** The simulated phone Shipvo shows in your browser, in an Android style or an iPhone style. It runs your app on your computer, so you need no real phone.
