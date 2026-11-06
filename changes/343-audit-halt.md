@@ -1,2 +1,0 @@
-- `services/control-plane`: the automatic halt rule now writes one `audit_log` row (`actor` `halt-rule`, `actor_kind` `system`, `action` `halt`) when it halts a release (slice 3 of #305, halt half). A failed audit write does not change the response or the halt.
-- Migration: none.

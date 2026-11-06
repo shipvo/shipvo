@@ -1,1 +1,0 @@
-- site: long inline code on docs pages wraps on phones instead of scrolling the whole page sideways; the Copy button is a 44 px tap target on touch screens.

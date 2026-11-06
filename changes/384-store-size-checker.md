@@ -1,2 +1,0 @@
-- `@shipvo/store`: new `checkScreenshot` and `checkSet` check store screenshot size, alpha channel, format and count before upload.
-- Migration: none; new exports.

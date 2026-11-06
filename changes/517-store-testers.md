@@ -1,3 +1,0 @@
-- `store`: new exports `SHIPVO_TESTERS_GROUP`, `SHIPVO_TESTERS_JOIN_URL`, `SHIPVO_TESTERS_SHORT_URL`. The `play-closed-test` step text for personal accounts under the tester rule now names the Shipvo Testers group. Migration: none.
-- `cli`: new `shipvo store testers [--package id] [--track alpha] [--play-key file] [--json]` prints the steps to get 12 testers and, with your own Play service account key, adds the Shipvo Testers group to the closed track (keeps existing groups; the key is never stored).
-- `site`: `shipvo.dev/testers` redirects to the Shipvo Testers join page.

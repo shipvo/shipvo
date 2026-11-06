@@ -1,2 +1,0 @@
-- `@shipvo/test`: new `secret(name)` reads `SHIPVO_TEST_<NAME>` and names the variable if it is missing. Plain-language steps accept `{secret:NAME}` in typed text, resolved at run time. Errors and `shipvo test --report` files show `***` for secret values. Export is additive.
-- Migration: none.

@@ -1,1 +1,0 @@
-- sim: the simulator finds system Chrome or Edge, then the Playwright Chromium cache, then runs `npx playwright install chromium` once. Set `SHIPVO_NO_AUTO_INSTALL=1` to skip the install. `--chromium` still wins. Missing Linux libraries now point to `npx playwright install-deps chromium`.

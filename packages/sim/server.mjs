@@ -153,6 +153,14 @@ async function act(id, body) {
     }
     case "screen": break;
     case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
+    // Where an element is: centre and size as 0..1 of the viewport. Used by the recorder to draw taps. Does not act.
+    case "locate": {
+      let box = null; const vp = page.viewportSize();
+      try { box = await (await resolve(body.ref)).boundingBox({ timeout: 1000 }); } catch {}
+      if (!box || !vp) throw new SimError("not_found", `no element ${body.ref} on this screen.`);
+      const c = (v) => Math.min(1, Math.max(0, v));
+      return { locate: { x: c((box.x + box.width / 2) / vp.width), y: c((box.y + box.height / 2) / vp.height), w: c(box.width / vp.width), h: c(box.height / vp.height) } };
+    }
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
       let t = await resolve(body.ref);
@@ -234,7 +242,7 @@ async function act(id, body) {
       const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
