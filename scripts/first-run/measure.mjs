@@ -143,7 +143,7 @@ export function installBrowser(app, spawnFn = spawnSync) {
 }
 
 const STEP_SESSION = "first agent session";
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function freePort() {
   return new Promise((res, rej) => { const s = createServer(); s.once("error", rej); s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => res(p)); }); });
@@ -230,7 +230,7 @@ export function appTest(cli, app, timeoutMs = 300000) {
 }
 
 // No secrets in, nothing to log in to: the seed comes from the .shipvo/seed.txt that init writes.
-function cleanEnv() {
+export function cleanEnv() {
   const e = { ...process.env };
   for (const k of Object.keys(e)) if (/SIGNING_SEED|TOKEN|SHIPVO_API|CLOUDFLARE/i.test(k)) delete e[k];
   return e;
@@ -242,7 +242,7 @@ function detectPackageManager() {
   return "npm";
 }
 
-function runInstallStep(cwd) {
+export function runInstallStep(cwd) {
   const pm = detectPackageManager();
   const t0 = performance.now();
   const r = spawnSync(pm, ["install"], { cwd, encoding: "utf8", env: cleanEnv() });
