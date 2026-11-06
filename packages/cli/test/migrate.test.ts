@@ -151,3 +151,98 @@ it("CodePush plan finds sync calls, the public key and CI commands, and ignores 
   expect(found).toContain("command fastlane/Fastfile:2");
   expect(found.some((f: string) => f.startsWith("wrapper"))).toBe(false);
 });
+
+const cpFixture = () => {
+  w("package.json", JSON.stringify({ name: "a", scripts: { release: "appcenter codepush release-react -a o/a" }, dependencies: { expo: "~58.0.0", "react-native-code-push": "^8.0.0" } }, null, 2) + "\n");
+  w("App.tsx", "import codePush from 'react-native-code-push';\nimport CodePush from 'react-native-code-push';\n\nfunction App() {\n  useEffect(() => { CodePush.sync({ installMode: 1 }); }, []);\n  return null;\n}\nexport default codePush({ checkFrequency: 1 })(App);\n");
+  mkdirSync(join(tmp, "android/app/src/main/res/values"), { recursive: true });
+  w("android/app/src/main/res/values/strings.xml", '<resources>\n    <string name="app_name">A</string>\n    <string name="CodePushDeploymentKey">abc</string>\n</resources>\n');
+  mkdirSync(join(tmp, "ios/App"), { recursive: true });
+  w("ios/App/Info.plist", "<dict>\n  <key>CFBundleName</key>\n  <string>A</string>\n  <key>CodePushDeploymentKey</key>\n  <string>k</string>\n  <key>CodePushPublicKey</key>\n  <string>p</string>\n</dict>\n");
+  mkdirSync(join(tmp, ".github/workflows"), { recursive: true });
+  w(".github/workflows/r.yml", "steps:\n  - run: appcenter codepush release-react -a o/a\n");
+};
+const rd = (p: string) => readFileSync(join(tmp, p), "utf8");
+
+it("CodePush --apply edits code, keys and dependency only, lists manual steps, and is idempotent", async () => {
+  cpFixture();
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  const ci = rd(".github/workflows/r.yml");
+  expect(await migrate(["--apply"], tmp)).toBe(0);
+  const app = rd("App.tsx");
+  expect(app).toContain('import { Runtime } from "@shipvo/runtime";');
+  expect(app).not.toMatch(/code-push|codePush|CodePush/);
+  expect(app).toContain("Runtime.checkForUpdate(true);");
+  expect(app).toContain("export default App;");
+  expect(rd("android/app/src/main/res/values/strings.xml")).toBe('<resources>\n    <string name="app_name">A</string>\n</resources>\n');
+  expect(rd("ios/App/Info.plist")).toBe("<dict>\n  <key>CFBundleName</key>\n  <string>A</string>\n</dict>\n");
+  const pkg = JSON.parse(rd("package.json"));
+  expect(pkg.dependencies).toEqual({ expo: "~58.0.0", "@shipvo/runtime": "^0.1.0", "@shipvo/device": "^0.1.0" });
+  expect(pkg.devDependencies).toEqual({ "@shipvo/cli": "^0.1.0" });
+  expect(pkg.scripts.release).toContain("appcenter codepush");
+  expect(rd(".github/workflows/r.yml")).toBe(ci);
+  expect(out.join("\n")).toContain("Manual steps");
+  expect(out.join("\n")).toContain(".github/workflows/r.yml:2");
+  expect(existsSync(join(tmp, ".shipvo/migrate-backup/App.tsx"))).toBe(true);
+  const after = rd("App.tsx") + rd("package.json");
+  out.length = 0;
+  expect(await migrate(["--apply"], tmp)).toBe(0);
+  expect(out.join("\n")).toContain("Nothing left to do");
+  expect(rd("App.tsx") + rd("package.json")).toBe(after);
+});
+
+it("CodePush --apply leaves native bootstrap files alone and lists them as manual", async () => {
+  cpFixture();
+  const native = '#import <CodePush/CodePush.h>\n- (NSURL *)bundleURL { return [CodePush bundleURL]; }\n';
+  w("ios/App/AppDelegate.mm", native);
+  mkdirSync(join(tmp, "android/app/src/main/java"), { recursive: true });
+  w("android/app/src/main/java/MainApplication.kt", "override fun getJSBundleFile() = CodePush.getJSBundleFile()\n");
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  out.length = 0;
+  expect(await migrate(["--apply", "--json"], tmp)).toBe(0);
+  const doc = JSON.parse(out.join(""));
+  expect(rd("ios/App/AppDelegate.mm")).toBe(native);
+  const where = doc.data.manual.map((m: { where: string }) => m.where);
+  expect(where).toContain("ios/App/AppDelegate.mm:1");
+  expect(where).toContain("android/app/src/main/java/MainApplication.kt:1");
+});
+
+it("CodePush --apply keeps the import when a named binding is still used", async () => {
+  cpFixture();
+  const app = "import CodePush, { InstallMode } from 'react-native-code-push';\nCodePush.sync({});\nconst m = InstallMode.IMMEDIATE;\n";
+  w("App.tsx", app);
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  out.length = 0;
+  expect(await migrate(["--apply"], tmp)).toBe(0);
+  const after = rd("App.tsx");
+  expect(after).toContain("from 'react-native-code-push'");
+  expect(after).toContain("InstallMode.IMMEDIATE");
+  expect(after).toContain("Runtime.checkForUpdate(true)");
+});
+
+it("CodePush --apply handles CRLF files", async () => {
+  cpFixture();
+  w("App.tsx", "import CodePush from 'react-native-code-push';\r\nCodePush.notifyAppReady();\r\n");
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  expect(await migrate(["--apply"], tmp)).toBe(0);
+  const after = rd("App.tsx");
+  expect(after).toContain("Runtime.markHealthy()");
+  expect(after).not.toContain("react-native-code-push");
+});
+
+it("CodePush --apply refuses a dirty tree with dirty_tree, and --json works", async () => {
+  cpFixture();
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  w("README.md", "dirty");
+  const lines: string[] = [];
+  vi.mocked(console.log).mockRestore();
+  vi.spyOn(console, "log").mockImplementation((...a) => { lines.push(a.join(" ")); });
+  await migrate(["--apply", "--json"], tmp);
+  expect(JSON.parse(lines[0])).toMatchObject({ ok: false, code: "dirty_tree" });
+  expect(rd("package.json")).toContain("react-native-code-push");
+  lines.length = 0;
+  await migrate(["--apply", "--force", "--json"], tmp);
+  const doc = JSON.parse(lines[0]);
+  expect(doc).toMatchObject({ ok: true, code: "applied" });
+  expect(doc.data.manual.some((m: any) => m.where.startsWith("package.json:"))).toBe(true);
+});

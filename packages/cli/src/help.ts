@@ -51,7 +51,7 @@ Ship
   test [files] [--repair [--write]] [--report <file> [--release <id>]] [--json]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
   doctor [--port <n>] [--json]  Check setup before first publish
   migrate --plan [--json]     Read-only plan to switch from Expo EAS Update (expo-updates) to Shipvo
-  migrate --apply [--force] [--json]  Make the safe edits for that switch (backups in .shipvo/migrate-backup/)
+  migrate --apply [--force] [--json]  Make the safe edits (EAS Update or CodePush) (backups in .shipvo/migrate-backup/)
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine
