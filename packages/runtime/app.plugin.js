@@ -44,9 +44,30 @@ function formatNativeModules(value) {
     .join(",");
 }
 
+// Returns the root key, or undefined when the prop is omitted. Must be base64 of 32 bytes (an Ed25519 public key).
+function checkRootKey(value) {
+  if (value === undefined) return undefined;
+  const ok = typeof value === "string" && /^[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length % 4 === 0 && Buffer.from(value, "base64").length === 32;
+  if (!ok) throw new Error("@shipvo/runtime: rootKey must be a base64 string that decodes to 32 bytes");
+  return value;
+}
+
+// Returns the minimum rotation sequence, or undefined when the prop is omitted.
+function checkMinSequence(value) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`@shipvo/runtime: minSequence must be a non-negative integer, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
 module.exports = function withShipvo(config, props) {
-  const { baseUrl, publicKey, appId, shellMajor = 1 } = props || {};
+  const { baseUrl, publicKey, appId, shellMajor = 1, rootKey, minSequence } = props || {};
   if (!baseUrl || !publicKey || !appId) throw new Error("@shipvo/runtime: baseUrl, publicKey and appId are required");
+  checkRootKey(rootKey);
+  checkMinSequence(minSequence);
+  // minSequence is the replay floor for rotation statements; without a root key no statement is accepted, so it would do nothing.
+  if (minSequence !== undefined && rootKey === undefined) throw new Error("@shipvo/runtime: minSequence needs rootKey");
   const hbc = formatBytecodeVersions(props.hermesBytecodeVersions);
   const hbe = formatHermesEngine(props.hermesEngine);
   const nm = formatNativeModules(props.nativeModules);
@@ -68,6 +89,8 @@ module.exports = function withShipvo(config, props) {
     set("dev.shipvo.PUBLIC_KEY", publicKey);
     set("dev.shipvo.APP_ID", appId);
     set("dev.shipvo.SHELL_MAJOR", shellMajor);
+    if (rootKey !== undefined) set("dev.shipvo.ROOT_KEY", rootKey);
+    if (minSequence !== undefined) set("dev.shipvo.MIN_SEQUENCE", minSequence);
     if (hbc !== undefined) set("dev.shipvo.HERMES_BYTECODE_VERSIONS", hbc);
     if (hbe !== undefined) set("dev.shipvo.HERMES_ENGINE", hbe);
     if (nm !== undefined) set("dev.shipvo.NATIVE_MODULES", nm);

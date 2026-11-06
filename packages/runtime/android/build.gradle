@@ -13,10 +13,16 @@ android {
     versionName "0.0.1"
     consumerProguardFiles "proguard-rules.pro"
   }
+  // The shared key rotation vectors (also used by the CLI and iOS tests) are read as test resources.
+  sourceSets {
+    test.resources.srcDirs += ["../test-vectors"]
+  }
 }
 
 dependencies {
   testImplementation 'junit:junit:4.13.2'
+  // The Android SDK's org.json is a stub in JVM unit tests.
+  testImplementation 'org.json:json:20231013'
   implementation 'com.facebook.react:react-android'
   // Ed25519 verification on Android 7+ (no platform Ed25519 before API 33). Pure Java, ~60 KB.
   implementation 'net.i2p.crypto:eddsa:0.3.0'

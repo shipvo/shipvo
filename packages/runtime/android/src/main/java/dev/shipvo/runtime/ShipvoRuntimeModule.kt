@@ -128,6 +128,8 @@ class ShipvoRuntimeModule : Module() {
   private fun check(): Map<String, Any?> {
     val s = Store(ctx)
     require(s.baseUrl.isNotEmpty() && s.publicKey.isNotEmpty() && s.appId.isNotEmpty()) { "runtime not configured" }
+    val rotation = s.rotation()
+    rotation.applyDue() // due root-signed key rotations apply before any pointer is checked
     val known = maxOf(s.currentRelease, s.pendingRelease, s.blockedRelease)
     val conn = http(PointerQuery.url(s.baseUrl, s.appId, s.shellMajor, s.band, s.hermesBytecodeVersions, s.nativeModules, s.hermesEngine), if (known > 0) "\"$known\"" else null)
     val code = conn.responseCode
@@ -144,9 +146,11 @@ class ShipvoRuntimeModule : Module() {
     val envelope = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
     conn.disconnect()
 
+    // Root-signed rotation statements ride along with the pointer; handle them before the pointer is verified.
+    envelope.optJSONArray("rotations")?.let { rotation.handle(it) }
     val t0 = SystemClock.elapsedRealtime()
     val bodyStr = envelope.getString("body")
-    require(Verify.ed25519(bodyStr.toByteArray(Charsets.UTF_8), envelope.getString("signature"), s.publicKey)) { "pointer signature invalid" }
+    require(Verify.ed25519(bodyStr.toByteArray(Charsets.UTF_8), envelope.getString("signature"), rotation.currentReleaseKey())) { "pointer signature invalid" }
     val body = JSONObject(bodyStr)
     require(body.getString("app_id") == s.appId && body.getInt("shell_major") == s.shellMajor) { "pointer for another app/shell" }
     val release = body.getInt("release")
