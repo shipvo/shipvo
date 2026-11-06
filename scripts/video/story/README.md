@@ -33,13 +33,19 @@ FRAME=http://127.0.0.1:<port>/ node scripts/video/story/record-screens.mjs rush
 # 2. crop the phone out of each MP4 into 30 fps frames (the phone sits at x 324, y 485, 432 x 950 in the 1080 x 1920 recording)
 for n in order rush; do mkdir -p ph/$n; ffmpeg -i <$n.mp4> -vf "fps=30,crop=432:950:324:485,scale=324:-1" -q:v 4 ph/$n/%04d.jpg; done
 # 3. render both cuts
-node scripts/video/story/render-story.mjs --phones ph --out out --music-main m.mp3 --offset-main 110 --music-short m.mp3 --offset-short 178.5
+node scripts/video/story/render-story.mjs --phones ph --out out --music-main m.mp3 --offset-main 0 --music-short m.mp3 --offset-short 178.5
+# 4. pick the music again from the briefs, and check the pacing of both renders
+python3 scripts/video/musicpick.py --brief scripts/video/story/from-a-chat.main.brief.json
+python3 scripts/video/musicpick.py --brief scripts/video/story/from-a-chat.short.brief.json
+python3 scripts/video/pacing.py out/from-a-chat.mp4 && python3 scripts/video/pacing.py out/from-a-chat-vertical.mp4
 ```
+
+Edit rules that `pacing.py` enforces with its defaults: every scene change is a hard cut, and `ANGLE_CUTS` in `from-a-chat.mjs` adds a cut inside each long scene, so no stretch runs 6 s without a cut. The retention map is in `scripts/video/scripts/from-a-chat.json`; the series plan is `scripts/video/series.json` (this film is S1 · E1).
 
 ## What is real, what is drawn
 
-Real: every screen of the shop's app. They are recordings of the Tide & Tackle sample app in the simulator, driven through the MCP server (`open_app`, `tap`, `record_start`, `record_stop`). The frame is the simulator's own ("Simulated" label included). The numbers the film shows come from those recordings: order TT-1001 (2 x Chrome Spoon, 5 600 FCFA); then TT-1001, TT-1002, TT-1003 (2 800, 3 900 and 4 200 FCFA).
+Real: every screen of the shop's app. They are recordings of the Tide & Tackle sample app in the simulator, driven through the MCP server (`open_app`, `tap`, `record_start`, `record_stop`). The frame is the simulator's own ("Simulated" label included). The numbers the film shows come from those recordings: order TT-1001 (1 x Chrome Spoon, 2 800 FCFA) in the `order` beat, and the same order first in the list in the `rush` beat: TT-1001, TT-1002, TT-1003 (2 800, 3 900 and 4 200 FCFA). One order, one total.
 
-Drawn by us in code: the street, the shop, the characters (the cast rig), the chat on Jun's phone, light, grain and the end card. No AI-generated images or footage.
+Drawn by us in code: the street, the shop, the characters (the cast rig), the chat on Jun's phone (a drawn mock, not the real product), light, grain and the end card. No AI-generated images or footage.
 
 Known gaps: the sample app's own screens stand in for the shop's app. The tap sounds are placed by hand near the taps in the recording, not locked to frames.

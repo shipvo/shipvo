@@ -1,2 +1,3 @@
 - `scripts/video`: first Shipvo story ad, "From a chat to an app on every assistant" (main cut and vertical cut), built from the cast rig, with real simulator recordings, synthesised sound effects and tests for the craft rules.
 - Migration: none; internal tooling.
+- `scripts/video`: story ad edit uses hard cuts and angle cuts so `pacing.py` passes on both cuts; one order, one total in the recordings; series plan and retention map added.

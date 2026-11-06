@@ -15,8 +15,8 @@ export const TITLE = "From a chat to an app on every assistant";
 // Made with record_start / record_stop against `shipvo run android` and the Tide & Tackle sample app (see README.md).
 // A frame is cropped to the phone and stored as <name>/<0001..N>.jpg at 30 fps.
 export const RECORDINGS = {
-  order: { frames: 274, seconds: 9.112, what: "one order placed through the MCP server: lures, 2 x Chrome Spoon, shop pickup, order TT-1001, total 5 600 FCFA" },
-  rush: { frames: 750, seconds: 24.998, what: "three orders placed one after another, then My orders: TT-1001 2 800, TT-1002 3 900, TT-1003 4 200 FCFA" },
+  order: { frames: 248, seconds: 8.23, what: "one order placed through the MCP server: lures, 1 x Chrome Spoon, shop pickup, order TT-1001, total 2 800 FCFA" },
+  rush: { frames: 800, seconds: 26.648, what: "three orders placed one after another, then My orders: TT-1001 2 800, TT-1002 3 900, TT-1003 4 200 FCFA" },
 };
 export const recSrc = (base, name, tRec) => {
   const r = RECORDINGS[name], i = Math.min(r.frames, Math.max(1, Math.floor(tRec * 30) + 1));
@@ -71,8 +71,8 @@ export const SFX = [
   { t: 40.2, kind: "whoosh" },
   { t: 41.3, kind: "swell", dur: 1.6 },
   { t: 41.9, kind: "chime", note: "the app appears" },
-  ...[54.2, 55.3, 56.1, 57.0, 58.0, 59.4, 60.4, 61.3, 62.2].map((t) => ({ t, kind: "tap", note: "assistant taps in the real recording (about, not frame-locked)" })),
-  { t: 62.4, kind: "ping", note: "order placed" },
+  ...[54.5, 55.4, 56.5, 57.5, 58.6, 59.6, 60.6].map((t) => ({ t, kind: "tap", note: "assistant taps in the real recording (about, not frame-locked)" })),
+  { t: 61.9, kind: "ping", note: "order placed" },
   { t: 70.2, kind: "whoosh" },
   { t: 71.0, kind: "murmur", dur: 15, gain: 0.7 },
   ...[76.5, 79.5, 82.5].map((t) => ({ t, kind: "ping", note: "orders arrive" })),
@@ -256,12 +256,13 @@ const sceneLayers = {
       { depth: 0, svg: wideSky("skE", "night") + glow("gE", 640, 300, 520, "#1d4ed8", .35) },
       { depth: 1, svg: `<g transform="translate(${f(640 - 90 * k)} ${f(110)}) scale(${f(.35 * k)})" opacity="${f(clamp01(k))}">${mark("endmark").replace(/ width="512" height="512"/, ' width="512" height="512"')}</g>`
         + `<g opacity="${f(k2)}" transform="translate(0 ${f((1 - k2) * 16)})">${twoLines(END_CARD.line)}</g>`
-        + `<g opacity="${f(k3)}">${T(640, 520, END_CARD.url, 34, "#ffc266", 'text-anchor="middle" font-weight="700" letter-spacing="2"')}</g>` },
+        + `<g opacity="${f(k3)}">${T(640, 560, END_CARD.url, 34, "#ffc266", 'text-anchor="middle" font-weight="700" letter-spacing="2"')}</g>` },
       { depth: 1.3, svg: particles({ seed: 5, t, count: 30, color: "#8fb4ff", size: 2.4 }) },
     ];
   },
 };
-const twoLines = (line) => { const w = line.split(" "), h = Math.floor(w.length / 2); return [w.slice(0, h).join(" "), w.slice(h).join(" ")].map((l, i) => T(640, 400 + i * 54, l, 46, "#fff", 'text-anchor="middle" font-weight="800"')).join(""); };
+// Three short lines, so the end card also fits the 405 px wide slice of the vertical cut.
+const twoLines = (line) => { const w = line.split(" "), n = Math.ceil(w.length / 3); return [w.slice(0, n).join(" "), w.slice(n, 2 * n).join(" "), w.slice(2 * n).join(" ")].filter(Boolean).map((l, i) => T(640, 385 + i * 50, l, 42, "#fff", 'text-anchor="middle" font-weight="800"')).join(""); };
 const BASE = { v: "http://127.0.0.1:0" };
 /** The renderer sets this to the local server that serves the phone frames. */
 export const setFrameBase = (url) => { BASE.v = url; };
@@ -326,8 +327,21 @@ export const shotFor = (scene) => SHOTS.find((s) => s.t0 === scene.t0 && s.t1 ==
 const WHIPS = [{ t0: 4.7, t1: 5.3 }, { t0: 40.2, t1: 41.0 }, { t0: 70.2, t1: 71.0 }, { t0: 99.6, t1: 100.3 }];
 const sceneAt = (t) => SCENES.find((s) => t >= s.t0 && t < s.t1) ?? SCENES.at(-1);
 
+/** Hard cuts inside a scene: at each time the camera jumps to another framing (a punch-in, then back wide, and so on).
+ *  Scene changes are hard cuts too. Together they keep every stretch of the film under 6 s without a cut. */
+export const ANGLE_CUTS = [
+  { t: 9.5, zoom: 2.6, dx: 330, dy: -30 }, { t: 18, zoom: 2.1, dx: 230, dy: 30 },
+  { t: 26.5, zoom: 2.2, dx: 270, dy: -110 }, { t: 36, zoom: 1.5, dx: 0, dy: 30 },
+  { t: 45, zoom: 1.9, dx: -330, dy: -40 }, { t: 49, zoom: 1, dx: 0, dy: 0 },
+  { t: 57.5, zoom: 1.9, dx: -300, dy: -40 }, { t: 62, zoom: 1, dx: 0, dy: 0 }, { t: 66.5, zoom: 1.9, dx: 330, dy: -40 },
+  { t: 75.5, zoom: 1.9, dx: -330, dy: -40 }, { t: 80.5, zoom: 1, dx: 0, dy: 0 },
+  { t: 91, zoom: 1.8, dx: -160, dy: 30 }, { t: 95.5, zoom: 1.7, dx: 160, dy: 30 },
+];
 function worldLayers(t) {
-  const sc = sceneAt(t), cam = cameraAt(SHOTS.filter((s) => s.t0 <= sc.t0 + 1e-9 && s.t1 <= sc.t1 + 1e-9 && s.t0 >= sc.t0 - 1e-9), t, { x: 640, y: 360, zoom: 1 });
+  const sc = sceneAt(t);
+  let cam = cameraAt(SHOTS.filter((s) => s.t0 <= sc.t0 + 1e-9 && s.t1 <= sc.t1 + 1e-9 && s.t0 >= sc.t0 - 1e-9), t, { x: 640, y: 360, zoom: 1 });
+  const a = ANGLE_CUTS.filter((c) => c.t > sc.t0 && c.t <= t && c.t < sc.t1).at(-1);
+  if (a && a.zoom !== 1) cam = { ...cam, zoom: cam.zoom * a.zoom, x: cam.x + a.dx, y: cam.y + a.dy };
   return { sc, cam };
 }
 function sceneSvg(sc, t) {
@@ -357,7 +371,7 @@ export function frameSvg(t, { vertical = null } = {}) {
   const prev = sceneAt(Math.max(0, sc.t0 - 1e-3));
   const wp = WHIPS.map((w) => whipPan(t, { t0: w.t0, t1: w.t1, from: { x: 640, y: 360 }, to: { x: 640, y: 360 } })).reduce((m, x) => Math.max(m, x.blur), 0);
   let world = sceneSvg(sc, t);
-  const fadeIn = progress(t, sc.t0, sc.t0 + .35, EASE.inOutSine);
+  const fadeIn = progress(t, sc.t0, sc.t0 + .04, EASE.inOutSine);
   if (sc.t0 > 0 && fadeIn < 1) world = `<g>${sceneSvg(prev, Math.min(t, prev.t1 - 1e-3))}</g><g opacity="${f(fadeIn)}">${world}</g>`;
   world = motionBlur("wpb", wp, world);
   if (!vertical) {

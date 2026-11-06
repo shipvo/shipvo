@@ -1,0 +1,24 @@
+{
+  "slug": "from-a-chat",
+  "title": "S1 · E1 · From a chat to an app on every assistant",
+  "series": { "season": 1, "episode": 1, "recap": null, "next": "the-first-update", "cliffhanger": "Orders pour in at golden hour; the assistants have only just started." },
+  "retention": {
+    "hook": { "t": "0 to 3 s", "what": "Customers walk past the shop with phones out; caption 'Customers ask their assistants.' The street moves from the first frame." },
+    "promise": { "t": "by 8 s", "what": "Mara's counter is empty while the street is full. The viewer wants to know how she gets those customers." },
+    "openLoops": [
+      { "opens": 8, "closes": 22, "what": "Why does a customer walk away? A customer's assistant says it cannot order from the shop (drawn chat, 'empty' scene)." },
+      { "opens": 22, "closes": 41, "what": "Will Jun's chat produce anything? The request is typed; 'From a chat to an app.'" },
+      { "opens": 41, "closes": 71, "what": "Does the app work for an assistant? A real recording shows an assistant placing order TT-1001; caption 'Every assistant can order.'" }
+    ],
+    "reHooks": [
+      { "t": 22, "what": "Door bell: Jun arrives (new scene, new character)." },
+      { "t": 41, "what": "The app appears on the phone (real screen, chime, music lift)." },
+      { "t": 71, "what": "The rush: three orders in a row, ping each." },
+      { "t": 88, "what": "Music dips, then lifts into the payoff." }
+    ],
+    "payoff": { "t": "88 to 100 s", "what": "A busy shop at golden hour and the orders list; then the end card 'Every assistant can use your app.'" },
+    "previously": "None: this is episode 1.",
+    "trailer": "Next on Shipvo (E2, The first update): follow-up issue; not part of this cut.",
+    "cliffhanger": "Orders keep coming; E2 asks what happens when something goes wrong at the busiest hour."
+  }
+}

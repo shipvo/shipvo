@@ -36,7 +36,7 @@ let started = false;
 try {
   console.log((await call("record_start", { format: "9:16", fps: 30, title: which, background: "#0b1f3a" })).slice(0, 120)); started = true;
   screen = await call("open_app", { app: "tide", session: S }); await sleep(1500);
-  if (which === "order") await order(/Chrome Spoon/, 2);
+  if (which === "order") await order(/Chrome Spoon/, 1);
   else {
     for (const p of [/Chrome Spoon/, /Metal Jig/, /Surface Popper/]) { await order(p, 1); await tap(/Back to shop/, 500); }
     await tap(/My orders/, 1500);

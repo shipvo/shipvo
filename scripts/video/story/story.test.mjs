@@ -2,7 +2,7 @@
 // Run: node --test scripts/video/story/story.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SCENES, DURATION, CAPTIONS, CUT_VERTICAL, verticalDuration, verticalToMain, SFX, MUSIC_DIP, SHOTS, shotFor, RECORDINGS, recSrc, frameSvg, setFrameBase } from "./from-a-chat.mjs";
+import { SCENES, DURATION, CAPTIONS, CUT_VERTICAL, verticalDuration, verticalToMain, SFX, MUSIC_DIP, SHOTS, ANGLE_CUTS, shotFor, RECORDINGS, recSrc, frameSvg, setFrameBase } from "./from-a-chat.mjs";
 import { SOUNDS, sfxPlan } from "./audio.mjs";
 
 setFrameBase("http://127.0.0.1:1");
@@ -66,4 +66,14 @@ test("the problem is visible without sound, in both cuts: a customer's assistant
   assert.notEqual(frameSvg(16.5), frameSvg(20.5), "the bubbles arrive one by one");
   assert.ok(CUT_VERTICAL.some((r) => r.t0 <= 20 && r.t1 > 20), "the vertical cut keeps the problem beat");
   assert.ok(!/Simulated/.test(frameSvg(20.5)), "the drawn assistant chat is not a Shipvo screen");
+});
+
+test("one order, one total: TT-1001 has the same total in both real recordings", () => {
+  const totals = Object.values(RECORDINGS).map((r) => r.what.match(/TT-1001,? (?:total )?(\d [\d]{3})(?:,| FCFA)/)?.[1]);
+  assert.deepEqual(totals, ["2 800", "2 800"]);
+});
+
+test("no stretch of the main cut runs 6 s or more without a hard cut (scene change or angle cut)", () => {
+  const cuts = [0, ...SCENES.map((s) => s.t0), ...ANGLE_CUTS.map((c) => c.t), DURATION].sort((a, b) => a - b);
+  for (let i = 1; i < cuts.length; i++) assert.ok(cuts[i] - cuts[i - 1] < 6, `${cuts[i - 1]} to ${cuts[i]} has no cut`);
 });

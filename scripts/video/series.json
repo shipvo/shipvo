@@ -1,0 +1,19 @@
+{
+  "seasons": [
+    {
+      "number": 1,
+      "title": "The shop runs on agents",
+      "episodes": [
+        { "number": 1, "title": "From a chat to an app on every assistant", "slug": "from-a-chat", "logline": "Mara's shop is invisible to customers' assistants until Jun builds her an app in one chat.", "cliffhanger": "Orders pour in at golden hour. Who is Pip, and what else can the assistants do for the shop?", "status": "rendering" },
+        { "number": 2, "title": "The first update", "slug": "the-first-update", "logline": "A wrong price goes live at the busiest hour. Jun ships the fix to every phone without a store review.", "cliffhanger": "The fix lands, but one phone in a far village still shows the old price.", "status": "planned" },
+        { "number": 3, "title": "The rush hour", "slug": "the-rush-hour", "logline": "A festival fills the shop with orders. A bad release starts to crash, and the shop must roll back before closing.", "cliffhanger": "The rollback saves the evening. Then a message arrives from a shop in another country.", "status": "planned" },
+        { "number": 4, "title": "Mara's second shop", "slug": "marras-second-shop", "logline": "Mara opens a second stall and asks her assistant to run both apps while she sleeps.", "cliffhanger": "Season finale: the assistants start talking to each other. Season 2 teaser.", "status": "planned" }
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Shipvo in 60 seconds",
+      "episodes": []
+    }
+  ]
+}
