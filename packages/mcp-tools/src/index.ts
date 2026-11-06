@@ -1,3 +1,4 @@
+import { KEY_IN_INPUT } from "./secret-guard.js";
 import { z, type ZodRawShape } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
@@ -36,7 +37,7 @@ export type ToolDef<S extends ZodRawShape = ZodRawShape> = {
   readonly outputSchema?: Record<string, unknown>;
 };
 const def = <S extends ZodRawShape>(name: string, description: string, input: S, annotations: ToolDef["annotations"], errorCodes: readonly string[] = [], needsApproval = false): ToolDef<S> =>
-  ({ name, description, input, annotations, errorCodes, needsApproval });
+  ({ name, description, input, annotations, errorCodes: errorCodes.includes(KEY_IN_INPUT) ? errorCodes : [...errorCodes, KEY_IN_INPUT], needsApproval });
 
 export const tools = {
   list_apps: def("list_apps", "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').", { query: z.string().optional() }, RO, []),
@@ -155,3 +156,4 @@ export function describeTools(): ToolInfo[] {
     return { name: t.name, description: t.description, inputSchema, annotations: t.annotations, errorCodes: t.errorCodes, needsApproval: t.needsApproval, ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}) };
   });
 }
+export { containsKeyShapedText, inputHasKey, KEY_REFUSAL, KEY_IN_INPUT } from "./secret-guard.js";

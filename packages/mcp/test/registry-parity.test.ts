@@ -71,3 +71,29 @@ describe("one tool registry for the stdio and remote servers", () => {
     expect(reg.find((t) => t.name === "open_url")?.errorCodes).toContain("no_url_listener");
   });
 });
+
+describe("key-shaped input is refused on stdio and remote", () => {
+  const key = "sk_" + "live_" + "abcdefghijklmnop1234567890";
+  const call = async (c: Client) => { const r: any = await c.callTool({ name: "list_apps", arguments: { query: key } }); return r; };
+  const check = (r: any) => {
+    expect(r.isError).toBe(true);
+    expect(JSON.stringify(r)).not.toContain(key);
+    expect(r.content[0].text).toMatch(/rotate/);
+    expect(r.content[0].text).toMatch(/request_secret/);
+  };
+  it("stdio", async () => {
+    const c = new Client({ name: "guard", version: "1" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [server], env }));
+    check(await call(c)); await c.close();
+  }, 30000);
+  it("remote", async () => {
+    const port = await freePort();
+    const p = spawn(process.execPath, [server, "--http", String(port)], { env, stdio: "pipe" });
+    try {
+      for (let i = 0; i < 100; i++) { try { if ((await fetch(`http://127.0.0.1:${port}/health`)).ok) break; } catch {} await new Promise((r) => setTimeout(r, 100)); }
+      const c = new Client({ name: "guard", version: "1" });
+      await c.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)));
+      check(await call(c)); await c.close();
+    } finally { p.kill(); }
+  }, 30000);
+});

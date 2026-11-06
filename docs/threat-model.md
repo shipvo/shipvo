@@ -132,6 +132,18 @@ The control plane has a verifier for OIDC ID tokens from Okta, Entra ID, Google 
 - The issuer and JWKS URL must be https. Keys are cached. An unknown `kid` causes at most one refetch per minute, so forged `kid` values cannot make us hammer the identity provider.
 - A role comes only from a configured group or a verified email domain. The highest matching role wins. No match means no access.
 
+## Secret vault, key-shaped text in tool inputs (slice 5)
+
+A person may paste an API key into the chat. The model would then pass it to a tool, and it could reach a transcript or log. Code: `packages/mcp-tools/src/secret-guard.ts`, applied in `use()` in `packages/mcp/src/server.ts`, so the stdio and remote servers behave the same.
+
+| Threat | What stops it | Test |
+| --- | --- | --- |
+| A key travels in a tool input | Before any handler runs, every string in the input is checked for provider prefixes, PEM private keys, JWTs and long mixed-case high-entropy tokens. A match refuses the call with the code `key_in_input`. Hex hashes, UUIDs, ids and plain words pass. | "flags ..." and "passes ..." in `packages/mcp-tools/test/secret-guard.test.ts` |
+| The refusal or a log repeats the key | The refusal is fixed text. It says the key is exposed, to rotate it, and to use `request_secret`. The input is not logged. | "the refusal text never contains the matched value" |
+| One server skips the check | One wrapper serves both servers. | "key-shaped input is refused on stdio and remote" in `packages/mcp/test/registry-parity.test.ts` |
+
+The model has already seen the key by the time the check runs, so the advice is to rotate it.
+
 ## How to check these claims
 
 Every path and test name above can be found with `rg`, for example:
