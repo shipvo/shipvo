@@ -112,7 +112,7 @@ describe("net hash", () => {
 
 describe("auto-halt on real rows", () => {
   const cfg = { "halt-config/tide": JSON.stringify({ threshold: 0.2 }) };
-  async function fleet(n: number, ips: string[], per = 1, sign = true) {
+  async function fleet(n: number, ips: string[], per = 1, sign = true, established = true) {
     const { sql, env } = setup();
     const kv: Record<string, string> = { ...cfg };
     env.POINTERS = { get: async (k: string) => kv[k] ?? null, put: async (k: string, v: string) => { kv[k] = v; } };
@@ -120,6 +120,7 @@ describe("auto-halt on real rows", () => {
       const id = `inst-${String(i).padStart(8, "0")}`;
       const ip = ips[i % ips.length].replace(/\.\d+$/, "." + (i + 1)); // same /24, different host
       const j: any = await (await reg(env, { app_id: "tide", install_id: id, shell_version: "1" }, ip)).json();
+      if (established) sql.prepare("UPDATE installs SET created_at = '2026-01-01T00:00:00.000Z' WHERE install_id = ?").run(id);
       const secret = await signingSecret(j.key);
       for (let j = 0; j < per; j++) {
         const body = JSON.stringify({ ...report, install_id: id });

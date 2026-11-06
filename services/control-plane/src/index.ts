@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
-import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand } from "./owner";
+import { AGENT_ACTOR, describeOwner, createChallenge, listChallenges, loadChallenge, resolveChallenge, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { forbidden, type Action } from "./roles";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
@@ -11,7 +11,7 @@ import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
 import { installs, verifyReport } from "./installs";
-import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, type InstallVote } from "./halt";
+import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, anomalyReason, ANOMALY_COMMAND, SPIKE_WINDOW_MINUTES, SPIKE_BASELINE_HOURS, type InstallVote } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string };
 const app = new Hono<{ Bindings: Env }>();
@@ -138,22 +138,69 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const failedList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
   const healthyList = HEALTHY_EVENTS.map((e) => `'${e}'`).join(",");
   const rows = (await env.DB.prepare(
-    `SELECT t.install_id AS install_id, i.net_hash AS net_hash, MAX(t.event IN (${failedList})) AS failed, MAX(t.event IN (${healthyList})) AS healthy ` +
+    `SELECT t.install_id AS install_id, i.net_hash AS net_hash, i.created_at AS created_at, MAX(t.event IN (${failedList})) AS failed, MAX(t.event IN (${healthyList})) AS healthy ` +
     "FROM telemetry t LEFT JOIN installs i ON i.app_id = t.app_id AND i.install_id = t.install_id " +
-    "WHERE t.app_id = ? AND t.release = ? AND t.verified = 1 AND t.install_id IS NOT NULL GROUP BY t.install_id, i.net_hash"
-  ).bind(appId, release).all<{ install_id: string; net_hash: string | null; failed: number; healthy: number }>()).results ?? [];
-  const votes: InstallVote[] = rows.map((r) => ({ install_id: r.install_id, net_hash: r.net_hash, failed: !!r.failed, healthy: !!r.healthy }));
+    "WHERE t.app_id = ? AND t.release = ? AND t.verified = 1 AND t.install_id IS NOT NULL GROUP BY t.install_id, i.net_hash, i.created_at"
+  ).bind(appId, release).all<{ install_id: string; net_hash: string | null; created_at: string | null; failed: number; healthy: number }>()).results ?? [];
+  const votes: InstallVote[] = rows.map((r) => ({ install_id: r.install_id, net_hash: r.net_hash, created_at: r.created_at, failed: !!r.failed, healthy: !!r.healthy }));
   const counts = tallyVotes(votes);
   const verdict = shouldHalt(counts, { threshold, minReports, minInstalls });
   if (!verdict.halt) return;
   const key = `halt/${appId}`;
-  // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
   const cur = await env.POINTERS.get(key);
   if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
-  const halted = { release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold };
-  await env.POINTERS.put(key, JSON.stringify(halted));
+  // Anomaly guard: a burst of fresh installs, or a sudden jump in failures, is held for the owner. The release stays at its band.
+  const reason = anomalyReason(votes, await failureRate(env, appId), Date.now());
+  if (reason) { await holdRelease(env, appId, release, reason, verdict.reports, counts.failed, threshold); return; }
+  await applyHalt(env, appId, release, verdict.reports, counts.failed, threshold);
+}
+
+/** Failure reports for the app in the spike window and in the baseline period before it. Null if it cannot be read. */
+async function failureRate(env: Env, appId: string): Promise<{ recent: number; baseline: number } | null> {
+  try {
+    const failedList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
+    const now = Date.now(), split = new Date(now - SPIKE_WINDOW_MINUTES * 60_000).toISOString(), from = new Date(now - (SPIKE_WINDOW_MINUTES * 60_000 + SPIKE_BASELINE_HOURS * 3_600_000)).toISOString();
+    const r = await env.DB.prepare(
+      `SELECT SUM(received_at >= ?) AS recent, SUM(received_at < ?) AS baseline FROM telemetry WHERE app_id = ? AND verified = 1 AND event IN (${failedList}) AND received_at >= ?`
+    ).bind(split, split, appId, from).first<{ recent: number | null; baseline: number | null }>();
+    return r ? { recent: r.recent ?? 0, baseline: r.baseline ?? 0 } : null;
+  } catch { return null; }
+}
+
+/** Write the halt key and the audit row. Used by the halt rule and when the owner confirms a hold. */
+async function applyHalt(env: Env, appId: string, release: number, reports: number, failed: number, threshold: number | undefined, actor = "halt-rule", actorKind: "system" | "person" = "system"): Promise<void> {
+  // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
+  await env.POINTERS.put(`halt/${appId}`, JSON.stringify({ release, halted_at: new Date().toISOString(), reports, failed, threshold }));
   // recordAudit never throws, so a failed audit write cannot undo or block the halt.
-  await recordAudit(env.DB, { app_id: appId, actor: "halt-rule", actor_kind: "system", action: "halt", release, before: null, after: JSON.stringify({ release, reports: verdict.reports, failed: counts.failed, threshold }) });
+  await recordAudit(env.DB, { app_id: appId, actor, actor_kind: actorKind, action: "halt", release, before: null, after: JSON.stringify({ release, reports, failed, threshold }) });
+}
+
+/** Do not halt. Create one owner approval entry per release while it is pending. */
+async function holdRelease(env: Env, appId: string, release: number, reason: string, reports: number, failed: number, threshold: number | undefined): Promise<void> {
+  const key = `anomaly-hold/${appId}`;
+  const raw = await env.POINTERS.get(key);
+  if (raw) {
+    try {
+      const h = JSON.parse(raw);
+      const ch = h.release === release ? await loadChallenge({ kv: env.POINTERS, appId }, h.challenge_id) : null;
+      if (ch && ch.status === "pending" && Date.parse(ch.expires_at) > Date.now()) return;
+    } catch { /* bad value: replace it */ }
+  }
+  const ch = await createChallenge({ kv: env.POINTERS, appId }, { command: ANOMALY_COMMAND, args_hash: `release:${release}`, requester: "halt-rule",
+    plan: [`Release ${release} looks attacked: ${reason}. It was not halted and stays at its current band.`, "Confirm to halt it, or dismiss to clear the hold."] });
+  await env.POINTERS.put(key, JSON.stringify({ release, challenge_id: ch.id, reports, failed, threshold, reason, held_at: ch.created_at }));
+}
+
+/** After the owner decides a hold: confirm halts the release, dismiss clears. Either way the hold record goes. */
+async function settleHold(env: Env, appId: string, ch: { id: string; command: string; approved_by?: string }, verb: "approve" | "deny"): Promise<void> {
+  if (ch.command !== ANOMALY_COMMAND) return;
+  const key = `anomaly-hold/${appId}`;
+  const raw = await env.POINTERS.get(key);
+  let h: any = null;
+  try { h = raw ? JSON.parse(raw) : null; } catch { /* corrupt: nothing to settle */ }
+  if (!h || h.challenge_id !== ch.id) return;
+  if (verb === "approve") await applyHalt(env, appId, h.release, h.reports, h.failed, h.threshold, ch.approved_by ?? "owner", "person");
+  await env.POINTERS.delete(key);
 }
 
 /** Device telemetry for the spike: applied / reverted / timings. */
@@ -412,6 +459,7 @@ for (const verb of ["approve", "deny"] as const) app.post(`/app/:id/api/approval
   if (!actor) return c.json({ error: "unauthorized" }, 401);
   if (actor === AGENT_ACTOR) return c.json({ ok: false, error: { code: "agent_cannot_approve", message: "Only the owner signed in to the admin can decide an approval. A token cannot." } }, 403);
   const r = await resolveChallenge({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, c.req.param("cid"), verb, actor, "admin session");
+  if (r.ok) await settleHold(c.env, appId, r.challenge, verb);
   return c.json(r, r.ok ? 200 : r.error.code === "approval_not_found" ? 404 : 409);
 });
 
