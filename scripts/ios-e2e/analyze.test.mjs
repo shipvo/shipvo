@@ -2,9 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
+import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { analyze, analyzePatch, median, parseLog } from "./analyze.mjs";
+import { analyze, analyzePatch, median, parseLog, analyzeResume, resumeTable } from "./analyze.mjs";
 
 const L = (t, path, bytes) => JSON.stringify({ t, path, bytes });
 // Run windows: [1000,2000], [3000,4000], [5000,6500], [7000,8000]
@@ -134,6 +135,60 @@ test("Hermes mismatch refused: failing logs", () => {
   assert.equal(analyzeHermesRefusal(ok, { ...hm, running_release: 3 }).pass, false);
   assert.match(hermesRefusalTable({ pass: false, detail: "x" }), /\| fail \|/);
   assert.throws(() => analyzeHermesRefusal(ok, {}), /missing release/);
+});
+
+
+const rm = { release: 3, bundlePath: "/b/e2e/ios-r3.hbc" };
+const rl = (...lines) => lines.join("\n");
+const P = "/b/e2e/ios-r3.hbc";
+
+test("Interrupted download resumed: passing log", () => {
+  const r = analyzeResume(rl(`GET ${P} 200 cut at 500`, `GET ${P} 206 from 500 range=bytes=500-`, tl({ release: 3, event: "applied" })), rm);
+  assert.equal(r.pass, true);
+  assert.match(resumeTable(r), /Interrupted download resumed \| pass/);
+});
+
+test("Interrupted download resumed: failing logs", () => {
+  const cut = `GET ${P} 200 cut at 500`, ok = `GET ${P} 206 from 500 range=bytes=500-`, applied = tl({ release: 3, event: "applied" });
+  assert.match(analyzeResume(rl(`GET ${P} 200`, applied), rm).detail, /never cut/);
+  assert.match(analyzeResume(rl(cut, applied), rm).detail, /did not retry/);
+  assert.match(analyzeResume(rl(cut, `GET ${P} 200`, applied), rm).detail, /byte 0/);
+  assert.equal(analyzeResume(rl(cut, `GET ${P} 206 from 0 range=bytes=0-`, applied), rm).pass, false);
+  assert.match(analyzeResume(rl(cut, ok), rm).detail, /never became healthy/);
+  assert.match(analyzeResume(rl(cut, ok, tl({ release: 2, event: "applied" })), rm).detail, /never became healthy/);
+  assert.match(analyzeResume(rl(cut, ok, `GET ${P} 200`, applied), rm).detail, /after the ranged request/);
+  assert.throws(() => analyzeResume("", {}), /need release/);
+});
+
+test("RESUME_MARKS without the text log exits 2", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rm-")), f = join(dir, "m.json");
+  const jl = join(dir, "s.jsonl");
+  writeFileSync(f, JSON.stringify([{ pointer_published: 900, app_launched: 1000, healthy: 2000 }]));
+  writeFileSync(jl, L(1300, "/b/e2e/ios-r1.hbc", 1000) + "\n");
+  const r = spawnSync(process.execPath, [new URL("./analyze.mjs", import.meta.url).pathname, jl, f], { env: { ...process.env, RESUME_MARKS: f }, encoding: "utf8" });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /resume marks need the text server log as the fifth argument/);
+});
+
+test("server CUT_ONCE closes the first response early, then serves Range with 206", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cut-")), port = 18000 + (process.pid % 1000);
+  execFileSync("mkdir", ["-p", join(dir, "b")]);
+  writeFileSync(join(dir, "b/x.hbc"), Buffer.alloc(1000, 7));
+  const logf = join(dir, "s.log");
+  const srv = spawn(process.execPath, [new URL("./server.mjs", import.meta.url).pathname, dir, String(port), logf], { env: { ...process.env, CUT_ONCE: "/b/x.hbc:400" }, stdio: "ignore" });
+  try {
+    for (let i = 0; i < 100; i++) {
+      if (await new Promise((r) => net.connect(port, "127.0.0.1").once("connect", function () { this.destroy(); r(true); }).once("error", () => r(false)))) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const base = `http://127.0.0.1:${port}`;
+    await assert.rejects(async () => { const r = await fetch(base + "/b/x.hbc"); await r.arrayBuffer(); });
+    const r2 = await fetch(base + "/b/x.hbc", { headers: { range: "bytes=400-" } });
+    assert.equal(r2.status, 206); assert.equal((await r2.arrayBuffer()).byteLength, 600);
+    assert.equal((await (await fetch(base + "/b/x.hbc")).arrayBuffer()).byteLength, 1000);
+    const text = readFileSync(logf, "utf8");
+    assert.match(text, /GET \/b\/x\.hbc 200 cut at 400\nGET \/b\/x\.hbc 206 from 400 range=bytes=400-\n/);
+  } finally { srv.kill(); }
 });
 
 import { analyzeCrashLoop, crashLoopTable } from "./analyze.mjs";
