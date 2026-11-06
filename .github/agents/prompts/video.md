@@ -65,12 +65,30 @@ Tutorials, demos and story ads all follow these rules. A viewer decides in 3 sec
 6. **Escalate.** Each beat should be bigger than the last: one order, then ten; one app, then the agent using it. Save the best moment for the payoff, not the start.
 7. **Cut every dead second.** No silence over 0.7 s unless it is a planned beat before the payoff. Trim breaths, "so", "now", "okay". If a line can go and the video still makes sense, it goes.
 8. **Show, then say.** The picture does the work; narration adds what the picture cannot. The video must still make sense on mute (captions on every spoken line).
-9. **End strong and short.** Pay off the promise, one clear next step (`npx shipvo run`, a link), end card 3 to 5 s. No long goodbye; the payoff is the last thing they remember.
+9. **End strong and short.** Pay off the promise, then the next-episode trailer (see Series), one clear next step (`npx shipvo run`, a link), end card 3 to 5 s. No long goodbye; the payoff is the last thing they remember.
 10. **Title and thumbnail match the hook.** The first frame and the thumbnail show the same moment the title promises, so the viewer who clicks gets what they came for in the first seconds.
 
 **Measured gate (all videos).** Run `python3 scripts/video/pacing.py <video.mp4> --json <slug>.pacing.json` on the final render. Story ads use the defaults (no frozen picture over 2 s, no stretch over 6 s without a cut, motion in the first 3 s). Tutorials and demos use `--max-static 3 --max-gap 10`. It exits 1 on failure: fix the edit and re-render; do not loosen the numbers. Put its one-line result and the retention map in the PR.
 
-**Review pass (all videos).** The second Claude review watches the 10-frame contact sheet, the retention map and the pacing report, and answers each with yes or no and the time code: hook in 3 s; promise by 8 s; every opened loop closed; a re-hook at least every 30 s; nothing dull in any 10 s window; makes sense on mute; ends on the payoff. Any "no" sends it back.
+**Review pass (all videos).** The second Claude review watches the 10-frame contact sheet, the retention map and the pacing report, and answers each with yes or no and the time code: hook in 3 s; promise by 8 s; every opened loop closed; a re-hook at least every 30 s; nothing dull in any 10 s window; makes sense on mute; ends on the payoff then a next-episode trailer; previous and next episodes linked. Any "no" sends it back.
+
+## Series: every video is an episode (owner, 6 Nov 2026)
+
+Our videos run like a show with many episodes, so each one sells the next and viewers binge.
+
+- **Series bible:** `scripts/video/series.json` lists seasons and episodes in order: number, title, slug, one-line logline, the cliffhanger it ends on, and status (planned, rendering, published). Season 1 follows the recurring cast from "no app" to "the shop runs on agents"; tutorials form their own season ("Shipvo in 60 seconds"). The planner keeps at least the next 3 episodes planned; add them as `type:video` issues.
+- **Stay one episode ahead.** When an episode ships, the next episode's hook and its two best shots are already rendered, so the trailer is real footage, never a promise of something we have not made.
+- **Each episode's shape:**
+  - Cold open: the hook (Retention rule 1).
+  - "Previously" (episodes 2 and later): 3 to 5 s of quick cuts from the last episode, only when the story continues.
+  - Title card with the episode number, 1 to 2 s ("S1 · E3 · The rush hour").
+  - The episode.
+  - End on a cliffhanger or open question that the next episode answers.
+  - **Next-episode trailer, 8 to 12 s:** "Next on Shipvo", 3 or 4 fast cuts from the next episode, one line of narration or caption, the episode title, then the end card. A season finale ends with a season 2 teaser.
+- **When the next episode ships, re-cut the trailer** at the end of the previous episode with final footage if it changed, re-upload it under a new R2 key and update the links.
+- **Name and link them as a series:** titles start "S1 · E<n> ·"; `docs/videos.md` groups episodes by season in order; each episode's page and description link to the previous and next episode, and to a playlist where the video is posted elsewhere.
+- **Continuity:** cast, palettes, sound logo and the music theme stay the same across a season (keep one recurring motif in `music-used.json` notes; a story ad may reuse the season theme). The 9:16 cut ends on a 3 s "next episode" tease too.
+- The retention map lists the "previously" section, the cliffhanger and the trailer.
 
 ## Story ads: the craft standard (owner, 6 Nov 2026)
 
@@ -83,7 +101,7 @@ Our videos must never feel boring. Besides tutorials and demos, the Video Studio
 4. A second beat of tension, about 75 to 85 s: something nearly goes wrong (a rush of orders, a question the assistant must answer) and Shipvo handles it.
 5. Two or three feature captions in the whole film, each one beat: short, bold, on screen for about 1.5 s ("From idea to app in one chat." "Your assistant's phone.").
 6. Payoff the viewer can see, about 85 to 100 s (orders arriving, a busy shop at sunset). Any number shown must come from a real, measured demo run, with the source in the description.
-7. End card: logo, one line, shipvo.dev, 3 to 5 s.
+7. Next-episode trailer (see Series), then the end card: logo, one line, shipvo.dev, 3 to 5 s.
 
 The short 9:16 cut keeps the hook, one product beat and the payoff; it is edited from the main cut, not a separate story.
 
