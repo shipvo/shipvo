@@ -50,9 +50,13 @@ Run it by hand with `npx shipvo ci comment --changed-from <sha> --pr <number>`. 
 
 ### Before and after
 
-For each screen the diff changed, the comment shows the screen on the base commit and on the pull request side by side, on the Android and iOS skins, light theme, 390x844. The action runs `npx shipvo ci shots --skins android,ios` on the pull request build and again on the base build, with the same screen list. At most 6 screens are shown, and the comment links to the rest in the `shipvo-check` artifact. A screen whose images are identical before and after is not shown.
+For each screen the diff changed, the comment shows the screen on the base commit and on the pull request side by side, on the Android and iOS skins, light theme, 390x844. The action runs `npx shipvo ci shots --skins android,ios` on the pull request build and again on the base build, with the same screen list. At most 6 screens are shown, and the comment links to the rest in the `shipvo-check` artifact. A screen whose images are the same before and after is not shown. "N more changed screens" counts every changed screen in the list, including those beyond the six that were shot.
 
-The images are stored on the `shipvo-check-media` branch of your own repository, with your `GITHUB_TOKEN`, so the workflow needs `contents: write` (the generated workflow has it). Nothing is sent to Shipvo. Each push uploads its own images, and the single comment is updated in place to point at them.
+The images are stored on the `shipvo-check-media` branch of your own repository, with your `GITHUB_TOKEN`, so the workflow needs `contents: write` (the generated workflow has it). The branch is created on first use as a separate history with one README, so your source code is not copied to it. Nothing is sent to Shipvo. Each push uploads its own images, and the single comment is updated in place to point at them.
+
+Write access: `contents: write` is a permission of the whole job, and the job runs your pull request's own code (`npx shipvo`, your build and tests). The action gives `GITHUB_TOKEN` only to the step that posts the comment, not to the steps that build and test, but the job token itself can write. Pull requests from forks get a read-only token: the upload is skipped, the comment has no Before and after section, and the check result does not change. If you do not want write access, remove `contents: write` and the section is left out the same way.
+
+In a private repository, raw image links do not render in comments. The same images are in the `shipvo-check` artifact of the run: open the run, download the zip, and look in `shipvo-shots/before` and `shipvo-shots/after`. If the base build fails, there are no before images and the action prints a line saying so.
 
 ### Compared with base
 

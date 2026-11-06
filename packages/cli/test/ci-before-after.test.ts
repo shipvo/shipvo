@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pairShots, beforeAfterSection } from "../src/ci-before-after";
-import { renderComment, upsertComment, MARKER } from "../src/ci-comment";
+import { pairShots, beforeAfterSection, ensureMediaBranch, uploadShot } from "../src/ci-before-after";
+import { renderComment, upsertComment, commentCmd, MARKER } from "../src/ci-comment";
+import { shotsCmd } from "../src/ci-shots";
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "ba-"));
@@ -55,5 +56,134 @@ describe("before and after", () => {
     };
     expect(await upsertComment({ repo: "o/r", pr: 3, token: "t", body, fetch })).toBe("updated");
     expect(calls.at(-1)).toBe("PATCH o/r/issues/comments/7");
+  });
+});
+
+const res = (status: number, body: unknown = {}) => ({ ok: status < 300, status, json: async () => body });
+
+describe("media branch and upload", () => {
+  it("creates the branch as an orphan: a new tree and a commit with no parent", async () => {
+    const calls: { method?: string; url: string; body?: any }[] = [];
+    const fetch = async (url: string, init?: { method?: string; body?: string }) => {
+      calls.push({ method: init?.method, url: url.split("/git/")[1], body: init?.body ? JSON.parse(init.body) : undefined });
+      return res(init?.method === "GET" ? 404 : 201, { sha: "abc" });
+    };
+    await ensureMediaBranch({ repo: "o/r", token: "t", fetch });
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual(["GET ref/heads/shipvo-check-media", "POST trees", "POST commits", "POST refs"]);
+    expect(calls[2].body.parents).toEqual([]);
+    expect(calls[3].body).toEqual({ ref: "refs/heads/shipvo-check-media", sha: "abc" });
+  });
+  it("does nothing when the branch exists", async () => {
+    const calls: string[] = [];
+    await ensureMediaBranch({ repo: "o/r", token: "t", fetch: async (u) => { calls.push(u); return res(200); } });
+    expect(calls).toHaveLength(1);
+  });
+  it("accepts a 422 for a file that exists, rejects other 422 errors", async () => {
+    const { a } = fixture();
+    const file = join(a, "home.ios.png");
+    const base = { repo: "o/r", token: "t", sha: "0123456789abcdef", pr: 1, side: "after", name: "home.ios.png", file };
+    expect(await uploadShot({ ...base, fetch: async () => res(422, { message: "Invalid request.\n\n\"sha\" wasn't supplied." }) })).toContain("/pr-1/0123456789ab/after/home.ios.png");
+    await expect(uploadShot({ ...base, fetch: async () => res(422, { message: "Branch not found" }) })).rejects.toThrow(/422: Branch not found/);
+  });
+});
+
+describe("pairShots total", () => {
+  it("counts changed screens that were not shot", () => {
+    const root = mkdtempSync(join(tmpdir(), "ba-"));
+    const b = join(root, "b"), a = join(root, "a");
+    mkdirSync(b); mkdirSync(a);
+    const names = "abcdefgh".split("");
+    for (const n of names.slice(0, 6)) for (const skin of ["android", "ios"]) { writeFileSync(join(b, `${n}.${skin}.png`), "1"); writeFileSync(join(a, `${n}.${skin}.png`), "2"); }
+    const r = pairShots(names, b, a, (f) => f);
+    expect(r.screens).toHaveLength(6);
+    expect(r.total).toBe(8);
+  });
+});
+
+describe("commentCmd with uploads", () => {
+  const saved = { ...process.env };
+  afterEach(() => { process.env = { ...saved }; vi.restoreAllMocks(); });
+
+  function setup() {
+    const root = mkdtempSync(join(tmpdir(), "ba-"));
+    const dir = join(root, "shots");
+    const b = join(dir, "before"), a = join(dir, "after");
+    mkdirSync(b, { recursive: true }); mkdirSync(a, { recursive: true });
+    for (const skin of ["android", "ios"]) {
+      writeFileSync(join(b, `home.${skin}.png`), "old"); writeFileSync(join(a, `home.${skin}.png`), "new");
+      writeFileSync(join(b, `same.${skin}.png`), "x"); writeFileSync(join(a, `same.${skin}.png`), "x");
+    }
+    writeFileSync(join(a, "screens.json"), JSON.stringify(["home", "same"]));
+    process.env.GITHUB_TOKEN = "t"; process.env.GITHUB_REPOSITORY = "o/r"; process.env.GITHUB_SHA = "0123456789abcdef";
+    return { dir, root };
+  }
+  const run = async (args: string[]) => {
+    const out: string[] = [], errs: string[] = [];
+    const log = console.log, err = console.error;
+    console.log = (m: string) => { out.push(String(m)); }; console.error = (m: string) => { errs.push(String(m)); };
+    try { return { rc: await commentCmd(args), out: out.join("\n"), err: errs.join("\n") }; } finally { console.log = log; console.error = err; }
+  };
+
+  it("uploads only the images it shows and puts them in the posted comment", async () => {
+    const { dir } = setup();
+    const puts: string[] = [];
+    let posted = "";
+    vi.stubGlobal("fetch", async (url: string, init?: { method?: string; body?: string }) => {
+      const m = init?.method ?? "GET";
+      if (url.includes("/contents/")) { puts.push(url.split("/contents/")[1]); return res(201); }
+      if (url.includes("/git/ref/")) return res(200);
+      if (m === "GET") return res(200, []);
+      posted = JSON.parse(init!.body!).body; return res(201);
+    });
+    const r = await run(["--pr", "3", "--screenshots", dir, "--report", join(dir, "none.json")]);
+    expect(r.rc).toBe(0);
+    expect(puts.sort()).toEqual(["pr-3/0123456789ab/after/home.android.png", "pr-3/0123456789ab/after/home.ios.png", "pr-3/0123456789ab/before/home.android.png", "pr-3/0123456789ab/before/home.ios.png"]);
+    expect(posted).toContain("### Before and after");
+    expect(posted).toContain("raw.githubusercontent.com/o/r/shipvo-check-media/pr-3/0123456789ab/after/home.ios.png");
+    expect(posted).not.toContain("same");
+  });
+
+  it("leaves the section out and exits 0 when the token cannot write (403)", async () => {
+    const { dir } = setup();
+    let posted = "";
+    vi.stubGlobal("fetch", async (url: string, init?: { method?: string; body?: string }) => {
+      const m = init?.method ?? "GET";
+      if (url.includes("/git/ref/")) return res(404);
+      if (url.includes("/git/")) return res(403);
+      if (m === "GET") return res(200, []);
+      posted = JSON.parse(init!.body!).body; return res(201);
+    });
+    const r = await run(["--pr", "3", "--screenshots", dir, "--report", join(dir, "none.json"), "--fail-on-regression"]);
+    expect(r.rc).toBe(0);
+    expect(r.err).toContain("Before and after images not uploaded");
+    expect(posted).toContain("Shipvo check");
+    expect(posted).not.toContain("Before and after");
+  });
+});
+
+describe("shotsCmd screens.json", () => {
+  it("writes the screen list with --skins and reads it back with --screens-file", async () => {
+    const root = mkdtempSync(join(tmpdir(), "sc-"));
+    writeFileSync(join(root, "shipvo.json"), JSON.stringify({ appId: "app", controlPlane: "http://x", publicKey: "k" }));
+    const list = join(root, "list.json");
+    writeFileSync(list, JSON.stringify(["a", "b"]));
+    const cwd = process.cwd();
+    vi.stubGlobal("fetch", async () => res(200, { ok: true, data: Buffer.from("png").toString("base64") }));
+    process.chdir(root);
+    try {
+      const out = join(root, "out");
+      expect(await shotsCmd(["--skins", "android,ios", "--screens-file", list, "--out", join(root, "base")])).toBe(0);
+      expect(existsSync(join(root, "base", "screens.json"))).toBe(false);
+      expect(existsSync(join(root, "base", "a.ios.png"))).toBe(true);
+      // Without --screens-file the list comes from the diff and is written next to the images.
+      const { execFileSync } = await import("node:child_process");
+      execFileSync("git", ["init", "-q"], { cwd: root });
+      execFileSync("git", ["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-q", "--allow-empty", "-m", "i"], { cwd: root });
+      mkdirSync(join(root, "app")); writeFileSync(join(root, "app", "home.tsx"), "x");
+      execFileSync("git", ["add", "."], { cwd: root });
+      execFileSync("git", ["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-q", "-m", "s"], { cwd: root });
+      expect(await shotsCmd(["--changed-from", "HEAD~1", "--skins", "android,ios", "--out", out])).toBe(0);
+      expect(JSON.parse(readFileSync(join(out, "screens.json"), "utf8"))).toEqual(["home"]);
+    } finally { process.chdir(cwd); vi.unstubAllGlobals(); }
   });
 });

@@ -11,6 +11,7 @@ import { beforeAfterSection, ensureMediaBranch, pairShots, uploadShot, type Befo
 /** Hidden marker used to find our comment again. */
 export const MARKER = "<!-- shipvo-check -->";
 const MAX_SHOTS = 4;
+const UPLOADS = 4;
 const SCREEN_DIRS = /^(?:.*\/)?(?:app|screens|src\/screens|src\/app)\//;
 const SCREEN_FILE = /\.(?:tsx|ts|jsx|js)$/;
 
@@ -139,16 +140,27 @@ export async function commentCmd(argv: string[]): Promise<number> {
   if (existsSync(afterDir) && existsSync(beforeDir)) {
     const repo = env.GITHUB_REPOSITORY, token = env.GITHUB_TOKEN, sha = env.GITHUB_SHA;
     const prNum = Number(val("--pr") ?? /refs\/pull\/(\d+)\//.exec(env.GITHUB_REF ?? "")?.[1]);
-    const urls = new Map<string, string>();
-    if (repo && token && sha && prNum) {
+    // The screen list written by `ci shots`, so screens beyond the six that were shot are still counted.
+    const listed = readJson<string[]>(`${afterDir}/screens.json`) ?? changed;
+    const pairs = pairShots(listed, beforeDir, afterDir, (file) => file);
+    const files = [...new Set(pairs.screens.flatMap((s) => s.pairs.flatMap((p) => [p.before, p.after]).filter((x): x is string => !!x)))];
+    if (files.length && repo && token && sha && prNum) {
+      const urls = new Map<string, string>();
       try {
-        await ensureMediaBranch({ repo, token, sha });
-        for (const side of ["before", "after"] as const) for (const n of readdirSync(`${dir}/${side}`).filter((x) => /\.png$/i.test(x))) urls.set(`${dir}/${side}/${n}`, await uploadShot({ repo, token, sha, pr: prNum, side, name: n, file: `${dir}/${side}/${n}` }));
-      } catch (e) { console.error(`Before and after images not uploaded: ${e instanceof Error ? e.message : e}`); urls.clear(); }
+        await ensureMediaBranch({ repo, token });
+        let next = 0;
+        const worker = async () => {
+          while (next < files.length) {
+            const file = files[next++];
+            const side = file.startsWith(`${beforeDir}/`) ? "before" : "after";
+            urls.set(file, await uploadShot({ repo, token, sha, pr: prNum, side, name: file.split("/").pop()!, file }));
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(UPLOADS, files.length) }, worker));
+        const u = (x?: string) => (x ? urls.get(x) : undefined);
+        beforeAfter = { total: pairs.total, screens: pairs.screens.map((s) => ({ screen: s.screen, pairs: s.pairs.map((p) => ({ skin: p.skin, before: u(p.before), after: u(p.after) })) })) };
+      } catch (e) { console.error(`Before and after images not uploaded: ${e instanceof Error ? e.message : e}. The images are in the shipvo-check artifact.`); }
     }
-    const pairs = pairShots(changed, beforeDir, afterDir, (file) => urls.get(file) ?? "");
-    // Without uploaded images there is nothing to embed; the artifact has the files.
-    if (urls.size) beforeAfter = pairs;
   }
   const body = renderComment({ beforeAfter, compare, test, explore: readJson("explore-report.json"), changed, screenshots: shots,
     runUrl: env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : undefined });

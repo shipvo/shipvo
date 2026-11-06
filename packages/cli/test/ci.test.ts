@@ -87,6 +87,7 @@ describe("shipvo ci init --check", () => {
     expect(CHECK_WORKFLOW).toBe(readFileSync(CHECK, "utf8"));
     const doc = yaml.load(CHECK_WORKFLOW);
     expect(doc.on).toHaveProperty("pull_request");
+    expect(doc.permissions).toEqual({ contents: "write", "pull-requests": "write" });
   });
 
   it("writes the workflow into a dir with no templates folder", async () => {
