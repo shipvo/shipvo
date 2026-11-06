@@ -1,0 +1,1 @@
+- docs: new pages "Run on a phone in your browser" (`shipvo run`, assistant attach) and "Record a demo video" (`record_start`, `record_marker`, `record_stop`). The Device API page covers real camera, microphone and location, and has troubleshooting. The glossary has four new terms.

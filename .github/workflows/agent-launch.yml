@@ -1,0 +1,20 @@
+# Launch Lead: twice a day, makes sure every shipped feature is showcased on the site and gets a launch kit
+# (X, LinkedIn and Show HN drafts the owner posts himself), and pushes content gaps up the priority list.
+name: agent-launch
+on:
+  schedule: [{ cron: "37 9,21 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
+concurrency: { group: agent-launch }
+jobs:
+  launch:
+    uses: ./.github/workflows/_agent-claude.yml
+    secrets: inherit
+    with:
+      upload_media: true
+      role: launch
+      mode: branch
+      branch: agent/launch/${{ github.run_number }}
+      pr_labels: agent:claude,type:docs
+      max_turns: 150
+      timeout: 90
