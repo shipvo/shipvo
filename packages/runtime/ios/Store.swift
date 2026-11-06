@@ -7,6 +7,7 @@ final class Store {
   struct Overrides {
     var suite: String, dir: URL, baseUrl: String, publicKey: String, appId: String, shellMajor: Int, shellVersion: String, binaryVersion: String
     var hermesBytecodeVersions: [Int] = [], hermesEngine: String? = nil, nativeModules: [String: String] = [:]
+    var rootKey: String = "", minSequence: Int = 0, clock: Clock? = nil
   }
 
   private let d: UserDefaults
@@ -98,6 +99,20 @@ final class Store {
   private func plist(_ key: String) -> String? { bundle.object(forInfoDictionaryKey: key) as? String }
   var baseUrl: String { var s = o?.baseUrl ?? plist("ShipvoBaseURL") ?? ""; while s.hasSuffix("/") { s.removeLast() }; return s }
   var publicKey: String { o?.publicKey ?? plist("ShipvoPublicKey") ?? "" }
+  /// Pinned root key (Info.plist `ShipvoRootKey`). Empty means key rotation is off for this shell.
+  var rootKey: String { o?.rootKey ?? plist("ShipvoRootKey") ?? "" }
+  /// Highest rotation statement sequence that existed when this build was made (Info.plist `ShipvoMinSequence`, default 0).
+  var minSequence: Int {
+    if let o { return o.minSequence }
+    let v = bundle.object(forInfoDictionaryKey: "ShipvoMinSequence")
+    return max(0, (v as? NSNumber)?.intValue ?? Int((v as? String) ?? "") ?? 0)
+  }
+  var clock: Clock { o?.clock ?? SystemClock() }
+  /// Rotation state: key, sequence, pinned key and pending statements, written as one dictionary so they change together.
+  var rotationRecord: [String: Any]? {
+    get { d.dictionary(forKey: "rotation") }
+    set { if let newValue { d.set(newValue, forKey: "rotation") } else { d.removeObject(forKey: "rotation") } }
+  }
   var appId: String { o?.appId ?? plist("ShipvoAppId") ?? "" }
   /// Hermes bytecode versions this shell runs (Info.plist `ShipvoHermesBytecodeVersions`: an array of numbers or a "96,98" string).
   var hermesBytecodeVersions: [Int] {
