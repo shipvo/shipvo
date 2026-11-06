@@ -13,7 +13,7 @@ const stmt = (id: number, step = 0, i = 0) => V.cases.find((c: any) => c.id === 
 const seqOf = (e: any) => JSON.parse(e.body).sequence;
 
 function mkEnv(opts: { root?: string | null; keys?: Record<string, { account_id: number }>; // keys: hash of the key (sha256 hex)
-   owner?: Record<string, number>; failBatch?: boolean } = {}) {
+   owner?: Record<string, number>; failBatch?: boolean; raceSeq?: number; raceCount?: boolean } = {}) {
   const roots: Record<string, string> = opts.root === null ? {} : { tide: opts.root ?? V.root.publicKey };
   const rows: any[] = [];
   const audits: any[] = [];
@@ -25,7 +25,7 @@ function mkEnv(opts: { root?: string | null; keys?: Record<string, { account_id:
         if (sql.includes("FROM apps")) return opts.owner?.[a[0]] !== undefined ? { account_id: opts.owner[a[0]] } : null;
         if (sql.includes("FROM rotation_roots")) return roots[a[0]] ? { root_key: roots[a[0]] } : null;
         if (sql.includes("MAX(sequence)")) return { top: rows.filter((r) => r.app_id === a[0]).reduce((m, r) => Math.max(m, r.sequence), 0) || null };
-        if (sql.includes("COUNT(*)")) return { n: rows.filter((r) => r.app_id === a[0]).length };
+        if (sql.includes("COUNT(*)")) return opts.raceCount ? { n: 0 } : { n: rows.filter((r) => r.app_id === a[0]).length };
         return null;
       },
       all: async () => ({ results: rows.filter((r) => r.app_id === a[0]).sort((x, y) => y.sequence - x.sequence).slice(0, a[1]) }),
@@ -33,10 +33,11 @@ function mkEnv(opts: { root?: string | null; keys?: Record<string, { account_id:
     }) }),
     batch: async (stmts: any[]) => {
       if (opts.failBatch) throw new Error("db down");
+      if (opts.raceSeq !== undefined) { rows.push({ app_id: "tide", sequence: opts.raceSeq, body: "x", signature: "x" }); throw new Error("D1_ERROR: UNIQUE constraint failed: rotations.app_id, rotations.sequence"); }
       for (const s of stmts) {
         if (s._sql.includes("INSERT INTO rotations")) rows.push({ app_id: s._args[0], sequence: s._args[1], body: s._args[2], signature: s._args[3] });
-        else if (s._sql.includes("INSERT INTO audit_log_v2")) audits.push(s._args);
-        else if (s._sql.includes("rotation_roots")) roots[s._args[0]] = s._args[1];
+        else if (s._sql.includes("INSERT INTO audit_log_v2")) { if (!(s._sql.includes("NOT EXISTS") && rows.some((r) => r.app_id === "tide"))) audits.push(s._args); }
+        else if (s._sql.includes("INTO rotation_roots")) { if (!rows.some((r) => r.app_id === s._args[0])) roots[s._args[0]] = s._args[1]; }
       }
       return [];
     },
@@ -111,6 +112,12 @@ describe("POST /rotation/:app", () => {
     expect(m.rows.map((r) => r.sequence)).toEqual([1, 10]);
     expect((await post(env, h, V.cases.find((c: any) => c.id === 9).steps[0].deliver.find((e: any) => seqOf(e) === 5))).status).toBe(409);
   });
+  it("answers 409 replay when a concurrent upload wins the primary key", async () => {
+    const m = mkEnv({ raceSeq: 1 }); const env = { DB: m.DB, ADMIN_PASSWORD: "pw" };
+    const r = await post(env, { cookie: await cookie("pw") }, stmt(1));
+    expect(r.status).toBe(409);
+    expect(await r.json()).toMatchObject({ error: "replay" });
+  });
   it("needs a registered root key", async () => {
     const m = mkEnv({ root: null }); const env = { DB: m.DB, ADMIN_PASSWORD: "pw" };
     expect((await post(env, { cookie: await cookie("pw") }, stmt(1))).status).toBe(409);
@@ -147,6 +154,24 @@ describe("PUT /rotation/:app/root", () => {
   });
 });
 
+describe("PUT /rotation/:app/root race", () => {
+  it("does not replace the root key when a statement lands after the lock check", async () => {
+    const m = mkEnv({ raceCount: true }); const env = { DB: m.DB, ADMIN_PASSWORD: "pw" }; const h = { cookie: await cookie("pw") };
+    m.rows.push({ app_id: "tide", sequence: 1, body: "x", signature: "x" });
+    const r = await post(env, h, { root_key: V.forgedRoot.publicKey }, "/rotation/tide/root", "PUT");
+    expect(r.status).toBe(409);
+    expect(m.roots.tide).toBe(V.root.publicKey);
+    expect(m.audits).toHaveLength(0);
+  });
+  it("writes the root with a statement-free guard in the SQL", async () => {
+    const sqls: string[] = [];
+    const m = mkEnv({ root: null }); const orig = m.DB.prepare;
+    m.DB.prepare = (q: string) => { sqls.push(q); return orig(q); };
+    await post({ DB: m.DB, ADMIN_PASSWORD: "pw" }, { cookie: await cookie("pw") }, { root_key: V.root.publicKey }, "/rotation/tide/root", "PUT");
+    expect(sqls.filter((q) => q.includes("INTO rotation_roots") || q.includes("INTO audit_log_v2")).every((q) => q.includes("WHERE NOT EXISTS (SELECT 1 FROM rotations"))).toBe(true);
+  });
+});
+
 describe("rotations in the pointer response (shared vector 9)", () => {
   const ten = V.cases.find((c: any) => c.id === 9).steps[0].deliver;
   it("sends the 8 highest sequences, ascending", async () => {
@@ -159,24 +184,61 @@ describe("rotations in the pointer response (shared vector 9)", () => {
   it("is empty, not an error, when the table cannot be read", async () => {
     expect(await rotationsFor({ prepare: () => { throw new Error("no table"); } }, "tide")).toEqual({ rotations: [], top: 0 });
   });
+  const ptr = (body: string, signature = "sig") => {
+    const raw = JSON.stringify({ body, signature });
+    return { raw, POINTERS: { get: async (k: string) => (k === "p/tide/1/b0" ? raw : null) } };
+  };
+  const h64 = "a".repeat(64);
+  const base = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 4, issued_at: "2026-10-30T00:00:00Z", core: { version: "1.0.0", sha256: h64, size: 10, url: "c" }, min_shell_version: "1.0.0" };
+  const plain = JSON.stringify(base);
   it("adds rotations to GET /p/... and changes the ETag", async () => {
     const m = mkEnv();
-    const body = JSON.stringify({ app_id: "tide", release: 4, shell_major: 1, release_id: "r4", min_shell_version: "1.0.0", patch: { url: "u", size: 1, sha256: "a" }, bundle: { size: 1, sha256: "b" } });
-    const raw = JSON.stringify({ body, signature: "sig" });
-    const POINTERS = { get: async (k: string) => (k === "p/tide/1/b0" ? raw : null) };
+    const { raw, POINTERS } = ptr(plain);
     const env = { DB: m.DB, POINTERS };
     const before = await app.request("/p/tide/1/b0", {}, env);
-    const baseText = await before.text();
+    expect(before.status).toBe(200);
+    expect(await before.text()).toBe(raw);
+    expect(before.headers.get("etag")).toBe('"4"');
     for (const e of ten) m.rows.push({ app_id: "tide", sequence: seqOf(e), body: e.body, signature: e.signature });
     const r = await app.request("/p/tide/1/b0", {}, env);
-    if (before.status === 200) {
-      expect(baseText).toBe(raw);
-      const j: any = await r.json();
-      expect(j.body).toBe(body); expect(j.signature).toBe("sig");
-      expect(j.rotations.map(seqOf)).toEqual([3, 4, 5, 6, 7, 8, 9, 10]);
-      expect(r.headers.get("etag")).toBe('"4-r10"');
-      expect((await app.request("/p/tide/1/b0", { headers: { "if-none-match": '"4-r10"' } }, env)).status).toBe(304);
-    }
+    expect(r.status).toBe(200);
+    const j: any = await r.json();
+    expect(j.body).toBe(plain); expect(j.signature).toBe("sig");
+    expect(j.rotations.map(seqOf)).toEqual([3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(r.headers.get("etag")).toBe('"4-r10"');
+    expect((await app.request("/p/tide/1/b0", { headers: { "if-none-match": '"4-r10"' } }, env)).status).toBe(304);
+  });
+  it("keeps body and signature byte for byte with unicode and escaped characters", async () => {
+    const m = mkEnv();
+    const body = JSON.stringify({ ...base, core: { ...base.core, url: "c \u00e9 \" \\ \n \u2028 \ud83d\ude80 é 🚀" } });
+    const signature = "AAAA";
+    const { POINTERS } = ptr(body, signature);
+    m.rows.push({ app_id: "tide", sequence: 1, body: ten[0].body, signature: ten[0].signature });
+    const j: any = await (await app.request("/p/tide/1/b0", {}, { DB: m.DB, POINTERS })).json();
+    expect(j.body).toBe(body); expect(j.signature).toBe(signature);
+    expect(Object.keys(j)).toEqual(["body", "signature", "rotations"]);
+  });
+  it("carries rotations on a halted answer", async () => {
+    const m = mkEnv(); m.rows.push({ app_id: "tide", sequence: 1, body: ten[0].body, signature: ten[0].signature });
+    const { POINTERS } = ptr(plain);
+    const P = { get: async (k: string) => (k === "halt/tide" ? JSON.stringify({ release: 4, halted_at: "2026-11-05T00:00:00Z" }) : POINTERS.get(k)) };
+    const r = await app.request("/p/tide/1/b0", {}, { DB: m.DB, POINTERS: P });
+    expect(r.status).toBe(404);
+    const j: any = await r.json();
+    expect(j.error).toBe("release_halted");
+    expect(j.rotations).toHaveLength(1);
+  });
+  it("carries rotations on an out-of-band answer and leaves one without rotations unchanged", async () => {
+    const m = mkEnv();
+    const { POINTERS } = ptr(JSON.stringify({ ...base, hermes_bytecode_version: 96 }));
+    const plainRes = await app.request("/p/tide/1/b0?hbc=98", {}, { DB: m.DB, POINTERS });
+    const baseText = await plainRes.text();
+    expect(plainRes.status).toBe(404);
+    expect(baseText).not.toContain("rotations");
+    m.rows.push({ app_id: "tide", sequence: 1, body: ten[0].body, signature: ten[0].signature });
+    const withRot: any = await (await app.request("/p/tide/1/b0?hbc=98", {}, { DB: m.DB, POINTERS })).json();
+    expect(withRot.error).toBe("hermes_bytecode_mismatch");
+    expect(withRot.rotations).toHaveLength(1);
   });
 });
 

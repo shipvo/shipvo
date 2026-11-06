@@ -21,7 +21,7 @@ export async function rotationsFor(db: any, appId: string): Promise<{ rotations:
     const rows = (Array.isArray(r?.results) ? r.results : []).filter((x: any) => typeof x?.body === "string" && typeof x?.signature === "string" && Number.isInteger(x.sequence));
     rows.sort((a: any, b: any) => a.sequence - b.sequence);
     return { rotations: rows.map((x: any) => ({ body: x.body, signature: x.signature })), top: rows.length ? rows[rows.length - 1].sequence : 0 };
-  } catch { return { rotations: [], top: 0 }; }
+  } catch (e) { console.error("rotationsFor failed", e); return { rotations: [], top: 0 }; }
 }
 
 /**
@@ -64,10 +64,13 @@ export function rotationRoutes(adminSession: (c: any, appId: string) => Promise<
       if (n && Number(n.n) > 0) return bad(c, "root_key_locked", "A different root key is registered and statements are stored. The root key cannot be changed over the air.", 409);
     }
     const at = new Date().toISOString();
+    // Both writes are conditional on no stored statements, so a statement stored after the check above cannot be orphaned.
     await c.env.DB.batch([
-      c.env.DB.prepare("INSERT OR REPLACE INTO rotation_roots (app_id, root_key, created_at) VALUES (?, ?, ?)").bind(appId, b.root_key, at),
-      c.env.DB.prepare("INSERT INTO audit_log_v2 (app_id, at, actor, actor_kind, action, release, release_id, before, after) VALUES (?, ?, ?, 'person', 'key-rotation', NULL, NULL, ?, ?)").bind(appId, at, g.s.actor, have ? String(have.root_key) : null, `root key registered: ${b.root_key}`),
+      c.env.DB.prepare("INSERT INTO rotation_roots (app_id, root_key, created_at) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM rotations WHERE app_id = ?) ON CONFLICT(app_id) DO UPDATE SET root_key = excluded.root_key, created_at = excluded.created_at").bind(appId, b.root_key, at, appId),
+      c.env.DB.prepare("INSERT INTO audit_log_v2 (app_id, at, actor, actor_kind, action, release, release_id, before, after) SELECT ?, ?, ?, 'person', 'key-rotation', NULL, NULL, ?, ? WHERE NOT EXISTS (SELECT 1 FROM rotations WHERE app_id = ?)").bind(appId, at, g.s.actor, have ? String(have.root_key) : null, `root key registered: ${b.root_key}`, appId),
     ]);
+    const now: any = await c.env.DB.prepare("SELECT root_key FROM rotation_roots WHERE app_id = ?").bind(appId).first();
+    if (!now || now.root_key !== b.root_key) return bad(c, "root_key_locked", "A different root key is registered and statements are stored. The root key cannot be changed over the air.", 409);
     return c.json({ ok: true, root_key: b.root_key });
   });
 
@@ -93,10 +96,20 @@ export function rotationRoutes(adminSession: (c: any, appId: string) => Promise<
     if (s.sequence <= highest) return bad(c, "replay", `sequence ${s.sequence} is not above the highest stored (${highest}).`, 409);
     const at = new Date().toISOString();
     // One batch: the statement and its audit row are stored together or not at all.
-    await c.env.DB.batch([
+    try {
+      await c.env.DB.batch([
       c.env.DB.prepare("INSERT INTO rotations (app_id, sequence, body, signature, created_at) VALUES (?, ?, ?, ?, ?)").bind(appId, s.sequence, env.body, env.signature, at),
       c.env.DB.prepare("INSERT INTO audit_log_v2 (app_id, at, actor, actor_kind, action, release, release_id, before, after) VALUES (?, ?, ?, 'person', 'key-rotation', NULL, NULL, NULL, ?)").bind(appId, at, g.s.actor, JSON.stringify({ sequence: s.sequence, validFrom: s.validFrom })),
-    ]);
+      ]);
+    } catch (e) {
+      // A concurrent upload of the same sequence hits the primary key: that is a replay, not a server error.
+      if (/UNIQUE|constraint/i.test(String((e as any)?.message ?? e))) {
+        const t: any = await c.env.DB.prepare("SELECT MAX(sequence) AS top FROM rotations WHERE app_id = ?").bind(appId).first();
+        const now = Number(t?.top ?? 0) || 0;
+        if (now >= s.sequence) return bad(c, "replay", `sequence ${s.sequence} is not above the highest stored (${now}).`, 409);
+      }
+      throw e;
+    }
     return c.json({ ok: true, sequence: s.sequence, validFrom: s.validFrom });
   });
 
