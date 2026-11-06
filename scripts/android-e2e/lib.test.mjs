@@ -73,3 +73,10 @@ test("buildPointer signs hermes_bytecode_version into the body only when given",
   assert.equal(JSON.parse(buildPointer({ ...base, hermesBytecodeVersion: 98 }).body).hermes_bytecode_version, 98);
   assert.equal("hermes_bytecode_version" in JSON.parse(buildPointer(base).body), false);
 });
+
+import { releaseReached } from "./lib.mjs";
+test("releaseReached stops waiting when the stage was too short to see", () => {
+  assert.equal(releaseReached({ pending_release: 5 }, 5), "pending");
+  assert.equal(releaseReached({ pending_release: 0, current_release: 5 }, 5), "current");
+  assert.equal(releaseReached({ current_release: 4 }, 5), null);
+});
