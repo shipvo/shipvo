@@ -1,4 +1,4 @@
 - `@shipvo/control-plane`: revert alert webhooks now keep separate slots for verified and unverified reports, so forged rollbacks cannot use up the slots for real ones. Adds migration `0021_alert_sent_unverified.sql`.
 - Docs: `docs/threat-model.md` and `docs/auto-halt.md` list what is protected and what is not.
-- Migration: apply `0021_alert_sent_unverified.sql` (adds one table; no existing data changes).
+- Migration: `sendRevertAlert` gained a required fifth argument; it is internal and not exported by the package. Apply `0021_alert_sent_unverified.sql` (adds one table; no existing data changes).
 - Behaviour change for webhook owners: alerts from unsigned reports now get 3 per app per hour, down from the shared 10. Alerts from signed reports keep 10.

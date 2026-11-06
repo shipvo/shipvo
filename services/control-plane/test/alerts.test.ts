@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+let forceVerified = false;
+vi.mock("../src/installs", async (orig) => { const m: any = await orig(); return { ...m, verifyReport: async (...a: any[]) => forceVerified || m.verifyReport(...a) }; });
 import app from "../src/index";
 import { runOwnerCommand } from "../src/owner";
 import { MAX_ALERTS_PER_APP, MAX_UNVERIFIED_ALERTS_PER_APP, sendRevertAlert } from "../src/alerts";
@@ -30,7 +32,7 @@ const ev = (event: string, release = 3) => ({ schema_version: "1.0", app_id: "ti
 const send = (db: any, body: unknown, ctx?: any) => app.request("/t", { method: "POST", body: JSON.stringify(body) }, { DB: db } as any, ctx);
 const ctx = () => { const p: Promise<unknown>[] = []; return { c: { waitUntil: (x: Promise<unknown>) => p.push(x), passThroughOnException() {} } as any, done: () => Promise.all(p) }; };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); forceVerified = false; });
 
 describe("revert webhook alert", () => {
   it("sends one POST with the expected body", async () => {
@@ -85,6 +87,15 @@ describe("revert webhook alert", () => {
     await sendRevertAlert(d, "tide", 1, "rolled_back", true);
     for (let r = 100; r < 100 + MAX_ALERTS_PER_APP - 1; r++) await sendRevertAlert(d, "tide", r, "crash_loop_revert", true);
     expect(f).toHaveBeenCalledTimes(MAX_UNVERIFIED_ALERTS_PER_APP + MAX_ALERTS_PER_APP);
+  });
+  it("a signed report through POST /t uses the verified slots", async () => {
+    const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
+    const { d } = fakeDb("https://hooks.example.com/x"); const x = ctx();
+    forceVerified = true; // stands in for a valid install signature
+    const signed = (r: number) => send(d, { ...ev("rolled_back", r), install_id: "i1", sig: "0".repeat(64) }, x.c);
+    for (let r = 1; r <= MAX_UNVERIFIED_ALERTS_PER_APP + 2; r++) await signed(r);
+    await x.done();
+    expect(f).toHaveBeenCalledTimes(MAX_UNVERIFIED_ALERTS_PER_APP + 2);
   });
   it("sends nothing without a webhook, or for events that are not reverts", async () => {
     const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
