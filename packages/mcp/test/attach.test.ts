@@ -96,6 +96,19 @@ describe("open_app attach", { timeout: 30_000 }, () => {
       expect(denied.content[0].text).toContain("this key opens: menu");
     } finally { proc.kill(); }
   });
+  it("attach_session attaches without an app id, and errors when no run is live", async () => {
+    runJson(process.pid, "tok", "founder");
+    const { c, text } = await open({ attach: "never" });
+    await text; // a headless open first, to get a connected client
+    const r = await c.callTool({ name: "attach_session", arguments: {} }) as { isError?: boolean; content: { text: string }[] };
+    expect(r.isError).toBeFalsy();
+    expect(r.content[0].text).toContain("app: founder");
+    expect(r.content[0].text).toContain("attached to the live shipvo run phone");
+    runJson(2 ** 22 + 12345);
+    const n = await c.callTool({ name: "attach_session", arguments: {} }) as { isError?: boolean; content: { text: string }[] };
+    expect(n.isError).toBe(true); expect(n.content[0].text).toContain("no_live_run");
+    await c.close();
+  });
   it("maps taken_over to a clear tool error", async () => {
     runJson(process.pid);
     const { c, text } = await open({});

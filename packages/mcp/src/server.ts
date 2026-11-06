@@ -165,7 +165,7 @@ use(server, tools.list_apps, async ({ query }) => {
   return text(lines.join("\n") || `no apps match "${query}"`);
 });
 
-use(server, tools.open_app, async ({ app, session, seed_cart, dark, attach }) => {
+const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always" }) => {
   const id = app.split("@")[0];
   const live = attach === "never" ? undefined : findLiveRun(id);
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
@@ -198,6 +198,13 @@ use(server, tools.open_app, async ({ app, session, seed_cart, dark, attach }) =>
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
+};
+use(server, tools.open_app, openApp);
+// Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.
+use(server, tools.attach_session, async ({ app, session }) => {
+  const live = findLiveRun(app);
+  if (!live) return result("", { ok: false, code: "no_live_run", error: "no live shipvo run found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start `shipvo run android` or `shipvo run ios` first." });
+  return openApp({ app: live.app, session, attach: "always" });
 });
 
 use(server, tools.list_sessions, async () => {
