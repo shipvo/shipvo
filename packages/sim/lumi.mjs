@@ -31,6 +31,9 @@ export function lumiHtml(state = "idle") {
     + `<g class="sf-lumi-eyes"><ellipse cx="7.8" cy="11" rx="1.4" ry="1.9" fill="#10151c"/><ellipse cx="14.2" cy="11" rx="1.4" ry="1.9" fill="#10151c"/></g>${faces}</svg></span>`;
 }
 
+/** The caption pill Lumi shows for the agent's current step. Hidden until a step is shown. Outside the app's screen tree like Lumi. */
+export const lumiCaptionHtml = () => `<span class="sf-lumi-cap" data-part="lumi-caption" aria-hidden="true" inert hidden></span>`;
+
 /** Style for Lumi. `top` and `offset` place it beside the cutout. Motion stops for people who ask for less of it. */
 export const lumiCss = (k) => [
   // The glow must never paint over the app's screen below the status bar.
@@ -41,17 +44,25 @@ export const lumiCss = (k) => [
   `.sf-lumi [hidden]{display:none}`,
   `.sf-lumi[data-state=working] svg{animation-duration:1.1s}.sf-lumi[data-state=working]{animation-duration:1.6s}`,
   `.sf-lumi[data-state=happy] svg{box-shadow:0 0 9px 3px #ffe08aaa}.sf-lumi[data-state=worried] svg{box-shadow:0 0 7px 2px #ff9a8aaa}`,
+  `.sf-lumi-cap{position:absolute;left:50%;top:${k.status + 6}px;transform:translateX(-50%);max-width:80%;box-sizing:border-box;padding:4px 12px;border-radius:14px;background:#10151ce6;color:#fff;font:600 12px system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;z-index:4}.sf-lumi-cap[hidden]{display:none}`,
   `@keyframes sf-lumi-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}`,
   `@keyframes sf-lumi-glow{0%,100%{opacity:.88}50%{opacity:1;filter:brightness(1.12)}}`,
   `@keyframes sf-lumi-blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}`,
   `@media (prefers-reduced-motion:reduce){.sf-lumi,.sf-lumi svg,.sf-lumi-eyes{animation:none}}`,
 ].join("\n");
 
-/** Browser script: `window.shipvoLumi.set(state)` and a `{ type: "pn:lumi", state }` message change Lumi's state. Touches only Lumi. */
+/**
+ * Browser script. `window.shipvoLumi.set(state)` and a `{ type: "pn:lumi", state }` message change Lumi's state.
+ * `window.shipvoLumi.say(text, state, holdMs)` (or `{ type: "pn:lumi", state, caption, hold }`) also shows a short caption.
+ * With `holdMs` > 0 the caption goes away and Lumi goes back to idle after that long. Touches only Lumi and its caption.
+ */
 export function lumiClientScript() {
-  return `(function(){var S=${JSON.stringify(LUMI_STATES)};
+  return `(function(){var S=${JSON.stringify(LUMI_STATES)},T=0;
 function set(state){if(S.indexOf(state)<0)return false;var l=document.querySelector('[data-part="lumi"]');if(!l)return false;l.setAttribute("data-state",state);
 var g=l.querySelectorAll("[data-face]");for(var i=0;i<g.length;i++)g[i].hidden=g[i].getAttribute("data-face")!==state;return true}
-if(typeof window==="undefined")return;window.shipvoLumi={set:set,states:S};
-window.addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pn:lumi")set(d.state)})})();`;
+function say(text,state,hold){clearTimeout(T);var c=document.querySelector('[data-part="lumi-caption"]');var ok=set(state||"working");
+if(c){var t=String(text==null?"":text).replace(/\\s+/g," ").trim().slice(0,80);c.textContent=t;c.hidden=!t}
+if(hold>0)T=setTimeout(function(){if(c){c.hidden=true;c.textContent=""}set("idle")},hold);return ok}
+if(typeof window==="undefined")return;window.shipvoLumi={set:set,say:say,states:S};
+window.addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pn:lumi")return;if(typeof d.caption==="string")say(d.caption,d.state,Number(d.hold)||0);else set(d.state)})})();`;
 }

@@ -280,6 +280,16 @@ function bridgeMain(win: any, token: string) {
     if (m.type === "scroll") return "Scrolled " + m.direction + (m.ref ? " in " + target() : "");
     return "Pressed Back";
   };
+  /** Lumi's caption for a step, from the same element the agent named: "Tapping Checkout". Nothing is invented; an unnamed element is "an element". */
+  const caption = (m: any): string => {
+    const target = () => { try { const e = byRef.get(String(m.ref))?.el; if (!e) return "an element"; const r = roleOf(e); const n = r ? nameOf(e, r).name : norm(e.textContent); return n || "an element"; } catch { return "an element"; } };
+    if (m.type === "tap") return "Tapping " + target();
+    if (m.type === "type") return "Typing into " + target();
+    if (m.type === "scroll") return "Scrolling " + m.direction + (m.ref ? " in " + target() : "");
+    return "Going back";
+  };
+  /** Shows a caption on Lumi in the phone frame. Does nothing when the frame has no Lumi (it is off). */
+  const lumiSay = (text: string, state: string, hold = 0) => { try { win.shipvoLumi && win.shipvoLumi.say(text, state, hold); } catch {} };
   function takeOver(e: any) {
     if (!e.isTrusted || taken || !seenAgent) return;
     if (e.target && e.target.closest && e.target.closest("#shipvo-agent, #shipvo-log-toggle, #shipvo-capture")) return;
@@ -426,12 +436,21 @@ function bridgeMain(win: any, token: string) {
     }
     if (taken && m.type !== "tree") { ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, code: "taken_over", error: "the person took over" })); return; }
     const words = /^(tap|type|scroll|back)$/.test(m.type) ? (showBanner(), describe(m)) : "";
+    const cap = /^(tap|type|scroll|back)$/.test(m.type) ? caption(m) : "";
+    if (cap) lumiSay(cap, "working");
+    if (m.type === "lumi") {
+      // The MCP server names a step the page cannot see itself (opening the app). The text is cut to 80 characters in the frame.
+      const ok = typeof m.caption === "string" && ["working", "idle", "happy", "worried"].includes(m.state);
+      if (ok) lumiSay(m.caption, m.state, Number(m.hold) > 0 ? Math.min(Number(m.hold), 10000) : 0);
+      ws.send(JSON.stringify({ id: m.id, type: "lumi", ok }));
+      return;
+    }
     try {
       if (m.type === "screen") ws.send(JSON.stringify({ id: m.id, type: "screen", ok: true, screen: tree() }));
       else if (m.type === "tree") ws.send(JSON.stringify({ id: m.id, type: "tree", ok: true, tree: tree() }));
       else if (/^(tap|type|scroll|back)$/.test(m.type)) {
-        act(m).then((r) => { step(words); return r; }).then((r) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r })),
-          (err: any) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, ...(err && err.code ? { code: err.code } : {}), error: String(err && err.message || err), screen: screenOrUndefined() })));
+        act(m).then((r) => { step(words); lumiSay(cap, "idle", 1800); return r; }).then((r) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r })),
+          (err: any) => { lumiSay("Failed: " + cap, "worried", 2500); ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, ...(err && err.code ? { code: err.code } : {}), error: String(err && err.message || err), screen: screenOrUndefined() })); });
       }
       else ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: "unknown request: " + m.type }));
     } catch (err: any) { ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: String(err && err.message || err) })); }

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
-import { lumiDefault, lumiHtml, LUMI_STATES } from "./lumi.mjs";
+import { lumiDefault, lumiHtml, lumiCaptionHtml, LUMI_STATES } from "./lumi.mjs";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
 const APP = `<!doctype html><title>t</title><body style="margin:0;background:#fff"><h1>Cart</h1><button>Checkout</button><label>Email <input aria-label="Email"></label>`;
@@ -36,10 +36,10 @@ test("lumi: false removes every trace of Lumi", () => {
   }
 });
 
-test("with Lumi on, the frame is the same markup as off plus the Lumi element", () => {
+test("with Lumi on, the frame is the same markup as off plus the Lumi element and its caption", () => {
   for (const skin of ["android", "ios"]) {
     const on = renderFrame({ skin, lumi: true, screen: "<p>x</p>" }), off = renderFrame({ skin, lumi: false, screen: "<p>x</p>" });
-    assert.equal(on.html.replace(lumiHtml(), ""), off.html);
+    assert.equal(on.html.replace(lumiHtml(), "").replace(lumiCaptionHtml(), ""), off.html);
     assert.deepEqual([on.width, on.height, on.outerWidth, on.outerHeight], [off.width, off.height, off.outerWidth, off.outerHeight]);
   }
 });
@@ -120,5 +120,23 @@ test("Lumi on or off: app screenshot, recorded frames and labelled screen tree a
       assert.equal(out[true].page, out[false].page, `${skin}: whole page tree, Lumi is not in it`);
       assert.match(out[true].tree, /Checkout/);
     }
+  } finally { await b.close(); }
+});
+
+test("say() shows a caption and a state, and clears both after the hold", async () => {
+  const b = await chromium.launch();
+  try {
+    const p = await b.newPage({ viewport: { width: 460, height: 960 } });
+    await p.setContent(page(withApp("android", true)));
+    const cap = () => p.$eval('[data-part="lumi-caption"]', (e) => (e.hidden ? "" : e.textContent));
+    await p.evaluate(() => window.shipvoLumi.say("Tapping Checkout", "working", 0));
+    assert.equal(await cap(), "Tapping Checkout");
+    assert.equal(await p.$eval('[data-part="lumi"]', (e) => e.dataset.state), "working");
+    await p.evaluate(() => window.shipvoLumi.say("x".repeat(200), "working", 100));
+    assert.equal((await cap()).length, 80);
+    await p.waitForTimeout(300);
+    assert.equal(await cap(), "");
+    assert.equal(await p.$eval('[data-part="lumi"]', (e) => e.dataset.state), "idle");
+    await p.close();
   } finally { await b.close(); }
 });
