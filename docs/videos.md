@@ -2,6 +2,39 @@
 
 Short videos for people who are new to Shipvo. Each one has captions and a written transcript.
 
+## Put your app in the stores
+
+### From working app to Google Play and the App Store
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 4 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-6ada6c3a.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+2 minutes 4 seconds. The store path in four commands: `shipvo store setup` for your plan, `shipvo store status` for one timeline per store, `shipvo store details --dry-run` for draft data safety answers and a privacy policy, and `shipvo store screenshots` for checked store sizes. It ends on the Google Play tester rule and `shipvo store testers`. It follows [Store details](store.md).
+
+[Captions (.vtt)](/videos/from-app-to-both-stores.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Cinematic" by Matti Paalanen (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-nd/3.0/">CC BY-NC-ND 3.0</a>). Source: <a href="https://www.jamendo.com/track/1221581">https://www.jamendo.com/track/1221581</a></details>
+
+<details>
+<summary>Transcript</summary>
+
+Your app works. Now you need Google Play and the App Store. By the end, you have a plan for both stores, draft answers, and screenshots. And one rule on Google Play, that catches most founders.
+
+Step one. Make your plan. Type shipvo store setup. It asks if you have a registered company. With a company, you get organization accounts, and no tester rule on Google Play. Without one, you get a personal account, and the tester rule applies.
+
+Step two. Type shipvo store status. You see one timeline for each store. Every step is to do, waiting, or done. It tells you what to do next. When you finish a step, mark it done.
+
+Step three. The stores ask what data your app collects. Type shipvo store details, --dry-run. Shipvo reads the features your app uses, and drafts the data safety answers and a privacy policy. Some questions only you can answer, like third party tools and a contact address.
+
+Step four. Screenshots. Type shipvo store screenshots. Shipvo shows your app in the simulator, and saves files in the sizes the stores ask for. It checks each one.
+
+Now, the rule. On Google Play with a personal account, you need twelve testers for fourteen days in a row. Type shipvo store testers for the steps. Shipvo Testers is a group of founders who test each other's apps. We have a video about it.
+
+So here is what you have. A plan for each store, in order. Data safety answers, and a privacy policy draft. Screenshots in every store size, checked. And the tester steps. You press submit.
+
+Start with your plan. Type shipvo store setup in your app folder. Next, get your twelve testers. The guide is at shipvo.dev/learn.
+
+</details>
+
 ## Run your app
 
 ### See your app on a phone in your browser with shipvo run

@@ -11,6 +11,7 @@ PW_DIR=/tmp/pw node scripts/video/render.mjs <slug> --vo vo.wav --manifest vo.js
 ```
 
 - `scripts/<slug>.json`: the script. Each scene has `narration` (written for the voice), optional `caption` (same sentences, written for the eye), `visual` (a key in `scenes.mjs`) and `min` seconds.
+- `flashes` (per scene, `[{at, text}]`): a 1.5 s full-frame paper card that cuts in `at` seconds into the scene. Use them as pattern interrupts so `pacing.py --max-static 3 --max-gap 10` passes. Each scene also gets a slow push-in.
 - `plan.mjs`: scene timing and caption cues from the narration manifest. Tested: `node --test scripts/video/plan.test.mjs`.
 - `scenes.mjs` + `deck.html`: the scenes. Animations are CSS and are seeked per frame, so output is deterministic.
 

@@ -25,6 +25,8 @@ const script = JSON.parse(readFileSync(join(here, "scripts", slug + ".json"), "u
 const man = JSON.parse(readFileSync(resolve(opt("manifest", "vo.json")), "utf8"));
 const vo = resolve(opt("vo", "vo.wav"));
 const plan = buildPlan(script, man);
+// Pattern interrupts: a short full-frame card per flash (script scene.flashes: [{at, text}], seconds from scene start).
+plan.flashes = plan.scenes.flatMap((sc, i) => (script.scenes[i].flashes || []).map((x) => ({ start: sc.start + x.at, end: sc.start + x.at + 1.5, text: x.text })));
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, slug + ".vtt"), vtt(plan));
 

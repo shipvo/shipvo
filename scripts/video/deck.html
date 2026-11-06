@@ -41,9 +41,11 @@ h2{font-weight:800;font-size:54px;line-height:1.08;letter-spacing:-.02em}
 @keyframes fly{from{transform:translate(var(--fx),var(--fy));opacity:0}15%{opacity:1}to{transform:translate(var(--tx),var(--ty));opacity:1}}
 .shake{animation:shake .5s ease-in-out var(--d) both}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+#flash{position:absolute;left:0;top:0;width:1280px;height:560px;background:var(--paper);color:var(--ink);display:none;align-items:center;justify-content:center;font:800 76px/1.1 "Bricolage Grotesque","Inter","Helvetica Neue","Liberation Sans",sans-serif;letter-spacing:-.02em;text-align:center;padding:0 90px;z-index:5}
+#flash b{color:#d9730a}
 </style></head><body><div id="stage">
 {{SCENES}}
-<div id="cap"></div><div id="bar"></div></div>
+<div id="flash"><span></span></div><div id="cap"></div><div id="bar"></div></div>
 <script>
 window.setup=(plan)=>{window.PLAN=plan;window.scenes=[...document.querySelectorAll('.scene')];};
 window.seek=(t)=>{
@@ -51,6 +53,10 @@ window.seek=(t)=>{
   const s=P.scenes[i],lt=t-s.start;
   window.scenes.forEach((e,k)=>e.classList.toggle('on',k===i));
   window.scenes[i].getAnimations({subtree:true}).forEach(a=>{a.pause();a.currentTime=lt*1000});
+  const fl=(P.flashes||[]).find(x=>t>=x.start&&t<x.end),fe=document.getElementById('flash');
+  fe.style.display=fl?'flex':'none';
+  if(fl){const k=Math.min(1,(t-fl.start)/.25),e=1-Math.pow(1-k,3);fe.firstChild.textContent=fl.text;fe.firstChild.style.transform='scale('+(.86+.14*e+.04*(t-fl.start))+')';}
+  window.scenes[i].style.transform='scale('+(1+.05*lt/(s.end-s.start))+')';
   const c=P.cues.find(c=>t>=c.start&&t<c.end);
   document.getElementById('cap').innerHTML=c?`<span>${c.text}</span>`:'';
   document.getElementById('bar').style.width=(t/P.total*1280)+'px';

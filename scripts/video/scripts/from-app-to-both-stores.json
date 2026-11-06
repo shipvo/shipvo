@@ -1,0 +1,173 @@
+{
+  "slug": "from-app-to-both-stores",
+  "posterAt": 4.5,
+  "title": "From working app to Google Play and the App Store",
+  "tutorial": "docs/store.md",
+  "voice": "af_heart",
+  "music": {
+    "id": 1221581,
+    "bed": 0.35,
+    "credits": "services/site/public/videos/from-app-to-both-stores.credits.json"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "visual": "stHook",
+      "min": 9,
+      "narration": "Your app works. Now you need Google Play and the App Store. By the end, you have a plan for both stores, draft answers, and screenshots. And one rule on Google Play, that catches most founders.",
+      "flashes": [
+        {
+          "at": 6,
+          "text": "12 testers. 14 days."
+        },
+        {
+          "at": 10.5,
+          "text": "A plan. Answers. Screenshots."
+        }
+      ]
+    },
+    {
+      "id": "setup",
+      "visual": "stSetup",
+      "min": 14,
+      "narration": "Step one. Make your plan. Type shipvo store setup. It asks if you have a registered company. With a company, you get organization accounts, and no tester rule on Google Play. Without one, you get a personal account, and the tester rule applies.",
+      "flashes": [
+        {
+          "at": 6.5,
+          "text": "Company or no company?"
+        },
+        {
+          "at": 12.5,
+          "text": "store-plan.json saved"
+        }
+      ]
+    },
+    {
+      "id": "status",
+      "visual": "stStatus",
+      "min": 14,
+      "narration": "Step two. Type shipvo store status. You see one timeline for each store. Every step is to do, waiting, or done. It tells you what to do next. When you finish a step, mark it done.",
+      "flashes": [
+        {
+          "at": 3.5,
+          "text": "Two stores. Two timelines."
+        },
+        {
+          "at": 9.5,
+          "text": "Mark each step done"
+        }
+      ]
+    },
+    {
+      "id": "details",
+      "visual": "stDetails",
+      "min": 15,
+      "narration": "Step three. The stores ask what data your app collects. Type shipvo store details, dash dash dry run. Shipvo reads the features your app uses, and drafts the data safety answers and a privacy policy. Some questions only you can answer, like third party tools and a contact address.",
+      "caption": "Step three. The stores ask what data your app collects. Type shipvo store details --dry-run. Shipvo reads the features your app uses, and drafts the data safety answers and a privacy policy. Some questions only you can answer, like third-party tools and a contact address.",
+      "flashes": [
+        {
+          "at": 7,
+          "text": "8 of 12 fields drafted"
+        },
+        {
+          "at": 13.5,
+          "text": "You answer the rest"
+        }
+      ]
+    },
+    {
+      "id": "shots",
+      "visual": "stShots",
+      "min": 14,
+      "narration": "Step four. Screenshots. Type shipvo store screenshots. Shipvo shows your app in the simulator, and saves files in the sizes the stores ask for. It checks each one.",
+      "flashes": [
+        {
+          "at": 2.5,
+          "text": "Step four: screenshots"
+        },
+        {
+          "at": 6,
+          "text": "Every store size"
+        },
+        {
+          "at": 10.5,
+          "text": "Each file checked"
+        }
+      ]
+    },
+    {
+      "id": "testers",
+      "visual": "stTesters",
+      "min": 14,
+      "narration": "Now, the rule. On Google Play with a personal account, you need twelve testers for fourteen days in a row. Type shipvo store testers for the steps. Shipvo Testers is a group of founders who test each other's apps. We have a video about it.",
+      "flashes": [
+        {
+          "at": 4.5,
+          "text": "12 testers"
+        },
+        {
+          "at": 10,
+          "text": "14 days in a row"
+        },
+        {
+          "at": 14,
+          "text": "Founders test each other"
+        }
+      ]
+    },
+    {
+      "id": "honest",
+      "visual": "stHonest",
+      "min": 13,
+      "narration": "So here is what you have. A plan for each store, in order. Data safety answers, and a privacy policy draft. Screenshots in every store size, checked. And the tester steps. You press submit.",
+      "flashes": [
+        {
+          "at": 7,
+          "text": "You press submit"
+        }
+      ]
+    },
+    {
+      "id": "cta",
+      "visual": "stCta",
+      "min": 10,
+      "narration": "Start with your plan. Type shipvo store setup in your app folder. Next, get your twelve testers. The guide is at shipvo dot dev, slash learn.",
+      "caption": "Start with your plan. Type shipvo store setup in your app folder. Next, get your twelve testers. The guide is at shipvo.dev/learn.",
+      "flashes": [
+        {
+          "at": 2.5,
+          "text": "shipvo store setup"
+        },
+        {
+          "at": 10,
+          "text": "Next: your 12 testers"
+        }
+      ]
+    }
+  ],
+  "retention": {
+    "hook": "0-3s: 'Your app works. Now you need Google Play and the App Store.' with the store badges popping in and the paper plane flying.",
+    "promise": "by 8s: 'By the end, you have a plan for both stores, draft answers, and screenshots.'",
+    "openLoops": [
+      {
+        "loop": "'one rule on Google Play that catches most founders' (opened at 7s)",
+        "opens": 7,
+        "paysOff": "testers scene, the twelve testers for fourteen days rule"
+      }
+    ],
+    "reHooks": [
+      {
+        "t": "step 3, a new command that writes files",
+        "type": "scene change"
+      },
+      {
+        "t": "the tester scene: 12 people appear, stake raised",
+        "type": "new stake"
+      }
+    ],
+    "payoff": "checklist scene: everything you now have, then the command to start",
+    "previously": "none; this tutorial episode has no recap (series bible not on main yet)",
+    "cliffhanger": "Next, get your twelve testers (links to the Shipvo Testers video)",
+    "trailer": "end card names the next step, the testers video"
+  }
+}
