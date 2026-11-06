@@ -62,3 +62,28 @@ test("Linking: openURL goes through the phone; getInitialURL and the url event s
   win.dispatchEvent({ type: "pn:url", detail: "myapp://item/43" });
   assert.deepEqual(seen, ["myapp://item/43"]);
 });
+
+// Runs before any link is delivered in this file: a delivered link takes precedence over the preset one.
+test("getInitialURL falls back to the URL the phone set before the app loaded", async () => {
+  const L = {};
+  installSystemSettings(dev, { Linking: L }, w);
+  globalThis.__pnInitialUrl = "appb://cold/9";
+  try { assert.equal(await L.getInitialURL(), "appb://cold/9"); } finally { delete globalThis.__pnInitialUrl; }
+});
+
+test("Linking only: an app that listens with Linking.addEventListener counts as a listener, through the real phone path", async () => {
+  const L = {};
+  installSystemSettings(dev, { Linking: L }, w);
+  const seen = [];
+  // The phone (sim server) hands the URL back to the page the way open_url does.
+  globalThis.__pnOpenApp = async (u) => (dev.openUrl(u) ? true : { code: "no_url_listener", message: "x" });
+  try {
+    assert.equal(dev.openUrl("appb://none"), false);
+    const sub = L.addEventListener("url", (e) => seen.push(e.url));
+    assert.equal(dev.openUrl("appb://item/1"), true);
+    assert.deepEqual(seen, ["appb://item/1"]);
+    sub.remove();
+    assert.equal(dev.openUrl("appb://item/2"), false);
+    assert.deepEqual(seen, ["appb://item/1"]);
+  } finally { delete globalThis.__pnOpenApp; }
+});

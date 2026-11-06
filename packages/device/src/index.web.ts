@@ -314,7 +314,9 @@ g.__pnDevice = {
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
   /** What the app's Linking.openURL does: through the phone, so other apps can take the link. */
   openLink: (url: string) => openUrl(url),
-  initialUrl: () => initialUrl,
+  initialUrl: () => initialUrl ?? (g as { __pnInitialUrl?: string }).__pnInitialUrl ?? null,
+  /** Subscribe to deep links; counts as a listener for openUrl. Used by the patched Linking.addEventListener. */
+  onUrl: (cb: (url: string) => void) => onUrl(cb),
   capabilities: () => device.capabilities(),
   /** What the status bar shows: network, airplane and battery. */
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
@@ -357,7 +359,7 @@ function deliverUrl(url: string): boolean | Promise<boolean> {
   return urlSubs.size > 0;
 }
 /** The URL that opened the app (Linking.getInitialURL), or null. Set when the phone delivers a deep link. */
-export const getInitialUrl = async (): Promise<string | null> => initialUrl;
+export const getInitialUrl = async (): Promise<string | null> => g.__pnDevice.initialUrl();
 /**
  * Linking.openURL. A link to another app's scheme goes through the phone: the owning app comes to the front and gets it.
  * Rejects with `code` no_handler (no installed app has the scheme) or invalid_url. Web pages open in the Browser app.

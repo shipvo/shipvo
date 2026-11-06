@@ -5,7 +5,7 @@ import { Appearance, PixelRatio, AccessibilityInfo, I18nManager, Linking } from 
 
 export const FONT_SCALES = { small: 0.85, default: 1, large: 1.15, largest: 1.3 } as const;
 
-export function installSystemSettings(dev: { system(): any; openLink?(u: string): Promise<void>; initialUrl?(): string | null }, rn: any = { Appearance, PixelRatio, AccessibilityInfo, I18nManager, Linking }, w: any = globalThis) {
+export function installSystemSettings(dev: { system(): any; openLink?(u: string): Promise<void>; initialUrl?(): string | null; onUrl?(cb: (u: string) => void): () => void }, rn: any = { Appearance, PixelRatio, AccessibilityInfo, I18nManager, Linking }, w: any = globalThis) {
   const cur = () => dev.system();
   const subs: Record<string, Set<(v: any) => void>> = { colorScheme: new Set(), boldTextChanged: new Set(), reduceMotionChanged: new Set() };
   const { Appearance: A, PixelRatio: P, AccessibilityInfo: AI, I18nManager: I } = rn;
@@ -31,6 +31,8 @@ export function installSystemSettings(dev: { system(): any; openLink?(u: string)
     const origAdd = L.addEventListener?.bind(L);
     L.addEventListener = (name: string, fn: (e: { url: string }) => void) => {
       if (name !== "url") return origAdd ? origAdd(name, fn) : { remove() {} };
+      // Register with the device so the app counts as listening; fall back to the window event without one.
+      if (dev.onUrl) { const off = dev.onUrl((u) => fn({ url: u })); return { remove: off }; }
       const h = (e: any) => fn({ url: e.detail }); w.addEventListener?.("pn:url", h);
       return { remove: () => w.removeEventListener?.("pn:url", h) };
     };

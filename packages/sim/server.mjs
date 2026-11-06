@@ -227,7 +227,7 @@ async function screen(page) {
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
 
 // Bring an installed app to the front (tap its icon). Shared by switch_app and deep links.
-async function switchToApp(s, id) {
+async function switchToApp(s, id, initialUrl = null) {
   const { page } = s;
   const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
   // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
@@ -240,19 +240,28 @@ async function switchToApp(s, id) {
     catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
   }
   switchApp(s.apps, id, s.nav);
-  if (dest && s.page.url() !== dest) { await s.page.goto(dest, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); }
+  let navigated = false;
+  if (dest && s.page.url() !== dest) {
+    // A freshly loaded app reads the link as getInitialURL. The script runs before the app's code and stops applying after 30 s.
+    if (initialUrl) await s.page.addInitScript(([u, until]) => { if (Date.now() < until) globalThis.__pnInitialUrl = u; }, [initialUrl, Date.now() + 30000]);
+    await s.page.goto(dest, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); navigated = true;
+  }
   await s.page.evaluate(setVisibilityInPage, "active");
+  return navigated;
 }
 // A deep link from outside the app (open_url) or from inside it (Linking.openURL). Resolves true, or { code, message }.
 // An installed app that declares the scheme comes to the front and gets the URL; the app sees it as getInitialURL and the url event.
 async function openUrlOnPhone(s, url) {
   let target;
   try { target = resolveUrl(s.apps, url); } catch (e) { if (e instanceof AppsError) return { code: e.code, message: e.message }; throw e; }
-  try { if (target && target.id !== s.apps.current_app) await switchToApp(s, target.id); }
+  let navigated = false;
+  try { if (target && target.id !== s.apps.current_app) navigated = await switchToApp(s, target.id, url); }
   catch (e) { if (e instanceof AppsError || e instanceof SimError) return { code: e.code, message: e.message }; throw e; }
-  const handled = await s.page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), url);
-  if (!handled) return { code: "no_url_listener", message: `the app has no URL listener, so it did not handle ${url}. Register one with onUrl from @shipvo/device.` };
-  if (target) s.apps.log.push({ at: Date.now(), name: "open_url", app: target.id, url, source: "simulated" });
+  const handled = !!(await s.page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), url));
+  // Logged once the app is in front, with the delivery result, so a switch never goes unrecorded.
+  if (target) s.apps.log.push({ at: Date.now(), name: "open_url", app: target.id, url, handled, source: "simulated" });
+  // An app that was just loaded by this link has the URL as getInitialURL, so a later or missing listener is not a failure.
+  if (!handled && !navigated) return { code: "no_url_listener", message: `the app has no URL listener, so it did not handle ${url}. Register one with onUrl from @shipvo/device.` };
   return true;
 }
 

@@ -84,3 +84,16 @@ test("resolveUrl: the app that declares the scheme, no_handler, invalid_url", as
   assert.equal(resolveUrl(loadProfile({ apps: [{ id: "a" }] }), "myapp://x"), null);   // no schemes declared: old behaviour
   assert.equal(code(() => loadProfile({ apps: [{ id: "a", schemes: [5] }] })), "bad_profile");
 });
+
+test("resolveUrl: mailto:, tel: and sms: links have no //", async () => {
+  const { resolveUrl } = await import("./apps.mjs");
+  const none = loadProfile({ apps: [{ id: "a" }] });
+  const some = loadProfile({ apps: [{ id: "a", schemes: ["appa"] }] });
+  for (const u of ["mailto:a@b.co", "tel:+4412345", "sms:123", "myapp:item/3"]) {
+    assert.equal(resolveUrl(none, u), null, u);          // no schemes declared: the running app gets it, as before
+    assert.equal(code(() => resolveUrl(some, u)), "no_handler", u);
+  }
+  assert.deepEqual(resolveUrl(some, "appa:item/3"), { id: "a" });
+  assert.equal(code(() => resolveUrl(none, "junk")), "invalid_url");
+  assert.equal(code(() => resolveUrl(none, "mailto:")), "invalid_url");
+});

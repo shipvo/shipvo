@@ -63,9 +63,9 @@ Give each app in `phone.json` the URL schemes it handles:
 { "apps": [{ "id": "shop", "name": "Shop", "url": "app://shop", "schemes": ["myshop"] }] }
 ```
 
-`open_url(session, url)` and `Linking.openURL(url)` in an app do the same thing. The app that declares the scheme comes to the front and gets the URL through `Linking.getInitialURL` and the `url` event. It works the same in the Android and iPhone skins. The open is recorded in `device_log` with source "simulated".
+`open_url(session, url)` and `Linking.openURL(url)` in an app do the same thing. The app that declares the scheme comes to the front and gets the URL through `Linking.getInitialURL` and the `url` event. It works the same in the Android and iPhone skins. The open is recorded in `device_log` with source "simulated" and `handled`, which says whether the app had a listener. An app that the link just loaded can read it with `Linking.getInitialURL` even if it registers its listener later. Links without `//`, such as `mailto:` and `tel:`, work too.
 
-Errors: `no_handler` (no installed app declares the scheme) and `invalid_url` (the text is not a URL with a scheme). When no installed app declares a scheme, the link goes to the running app as before.
+Errors: `no_handler` (no installed app declares the scheme) and `invalid_url` (the text has no scheme, such as `junk`). When no installed app declares a scheme, the link goes to the running app as before.
 
 ## Troubleshooting
 

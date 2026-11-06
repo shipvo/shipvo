@@ -83,14 +83,14 @@ export function switchApp(st, id, nav) {
  * declares any scheme (the caller keeps the old behaviour: the running app gets it). Throws invalid_url or no_handler.
  */
 export function resolveUrl(st, url) {
-  const m = typeof url === "string" ? /^([a-z][a-z0-9+.-]*):\/\/\S*$/i.exec(url) : null;
-  if (!m) throw new AppsError("invalid_url", `not a URL with a scheme, such as myapp://item/3: ${String(url).slice(0, 80)}`);
+  const m = typeof url === "string" ? /^([a-z][a-z0-9+.-]*):\S/i.exec(url) : null;
+  if (!m) throw new AppsError("invalid_url", `not a URL with a scheme, such as myapp://item/3 or mailto:a@b.co: ${String(url).slice(0, 80)}`);
   const scheme = m[1].toLowerCase();
   if (scheme === "http" || scheme === "https") return null;
   const declared = st.installed_apps.filter((a) => a.schemes?.length);
   if (!declared.length) return null;
   const app = declared.find((a) => a.schemes.includes(scheme));
-  if (!app) throw new AppsError("no_handler", `no installed app handles '${scheme}://'. Schemes: ${declared.flatMap((a) => a.schemes).join(", ")}`);
+  if (!app) throw new AppsError("no_handler", `no installed app handles '${scheme}:'. Schemes: ${declared.flatMap((a) => a.schemes).join(", ")}`);
   return { id: app.id };
 }
 
