@@ -17,11 +17,16 @@ import { runStep, table, pickAppId } from "./measure.mjs";
 
 export const STEPS = ["init", "install", "build apk", "adb install", "first publish", "first open", "publish", "publish to healthy"];
 
-/** The release number the CLI reports on its last JSON line (`{"release":N,...}`), or undefined. */
+/** The release number the CLI reports: the last JSON line (`{"release":N,...}`) or the last `Published release N` sentence, or undefined. */
 export function releaseFrom(output) {
-  for (const l of String(output).split("\n").reverse()) {
-    if (!l.startsWith("{")) continue;
-    try { const n = JSON.parse(l).release; if (Number.isInteger(n)) return n; } catch {}
+  const lines = String(output).split("\n").reverse();
+  for (const l of lines) {
+    if (l.startsWith("{")) {
+      try { const n = JSON.parse(l).release; if (Number.isInteger(n)) return n; } catch {}
+      continue;
+    }
+    const m = /Published release (\d+)/.exec(l);
+    if (m) return Number(m[1]);
   }
   return undefined;
 }
