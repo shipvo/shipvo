@@ -22,6 +22,8 @@ export function routableScreens(screens: string[], max = MAX): (readonly [string
 
 export type Shoot = (route: string, skin?: SkinName) => Promise<Uint8Array>;
 
+/** One simulator session per skin, so the two skins do not share state. */
+const sessionFor = (session: string, skin?: SkinName) => (skin ? `${session}-${skin}` : session);
 export const shotFile = (name: string, skin?: SkinName) => `${name.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "screen"}${skin ? `.${skin}` : ""}.png`;
 
 /** Capture screens (first four, or `max`). With `skins`, each screen is shot once per skin as `<screen>.<skin>.png`. A shot that fails is reported and skipped. Returns the files written. */
@@ -71,15 +73,15 @@ export async function shotsCmd(argv: string[]): Promise<number> {
     // One session per skin, reused for every screen.
     const key = skin ?? "";
     if (!opened.has(key)) {
-      const p = post("/session", { session: skin ? `${session}-${skin}` : session, app: appId, width: 390, height: 844, ...(skin ? { device: { platform: skin } } : {}) })
+      const p = post("/session", { session: sessionFor(session, skin), app: appId, width: 390, height: 844, ...(skin ? { device: { platform: skin } } : {}) })
         .then((open) => { if (open.ok === false) throw new Error(`could not open the app: ${open.error ?? "unknown error"}`); });
       opened.set(key, p);
       p.catch(() => opened.delete(key));
     }
     await opened.get(key);
-    const nav = await post("/act", { session: skin ? `${session}-${skin}` : session, action: "open_url", url: route });
+    const nav = await post("/act", { session: sessionFor(session, skin), action: "open_url", url: route });
     if (!nav.ok) throw new Error(`could not open ${route}: ${nav.error ?? "unknown error"}`);
-    const shot = await post("/act", { session: skin ? `${session}-${skin}` : session, action: "screenshot", format: "png", inline: true });
+    const shot = await post("/act", { session: sessionFor(session, skin), action: "screenshot", format: "png", inline: true });
     if (!shot.ok || !shot.data) throw new Error(`screenshot failed: ${shot.error ?? "no data"}`);
     return new Uint8Array(Buffer.from(shot.data, "base64"));
   }, out, (s) => console.error(s), skins ? { skins, max: MAX_COMPARE } : {});

@@ -6,7 +6,7 @@ import type { TestReport } from "./report-md.js";
 import type { Report as ExploreReport } from "./explore.js";
 import { diffReports, type Comparison, type FlowResult } from "./ci-compare.js";
 import { stepText } from "./report-md.js";
-import { beforeAfterSection, ensureMediaBranch, pairShots, uploadShot, type BeforeAfter } from "./ci-before-after.js";
+import { beforeAfterSection, ensureMediaBranch, isPrivateRepo, pairShots, uploadShot, type BeforeAfter } from "./ci-before-after.js";
 
 /** Hidden marker used to find our comment again. */
 export const MARKER = "<!-- shipvo-check -->";
@@ -146,14 +146,18 @@ export async function commentCmd(argv: string[]): Promise<number> {
     if (files.length && repo && token && sha && prNum) {
       const urls = new Map<string, string>();
       try {
-        await ensureMediaBranch({ repo, token });
-        // One at a time: each upload is a commit on the same branch.
-        for (const file of files) {
-          const side = file.startsWith(`${beforeDir}/`) ? "before" : "after";
-          urls.set(file, await uploadShot({ repo, token, sha, pr: prNum, side, name: file.split("/").pop()!, file }));
+        // Raw image links do not render in comments of a private repository, so the comment points to the artifact there.
+        if (await isPrivateRepo({ repo, token })) beforeAfter = { total: pairs.total, artifact: true, screens: pairs.screens };
+        else {
+          await ensureMediaBranch({ repo, token });
+          // One at a time: each upload is a commit on the same branch.
+          for (const file of files) {
+            const side = file.startsWith(`${beforeDir}/`) ? "before" : "after";
+            urls.set(file, await uploadShot({ repo, token, sha, pr: prNum, side, name: file.split("/").pop()!, file }));
+          }
+          const u = (x?: string) => (x ? urls.get(x) : undefined);
+          beforeAfter = { total: pairs.total, screens: pairs.screens.map((s) => ({ screen: s.screen, pairs: s.pairs.map((p) => ({ skin: p.skin, before: u(p.before), after: u(p.after) })) })) };
         }
-        const u = (x?: string) => (x ? urls.get(x) : undefined);
-        beforeAfter = { total: pairs.total, screens: pairs.screens.map((s) => ({ screen: s.screen, pairs: s.pairs.map((p) => ({ skin: p.skin, before: u(p.before), after: u(p.after) })) })) };
       } catch (e) { console.error(`Before and after images not uploaded: ${e instanceof Error ? e.message : e}. The images are in the shipvo-check artifact.`); }
     }
   }

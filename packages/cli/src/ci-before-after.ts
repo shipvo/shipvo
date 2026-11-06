@@ -6,11 +6,12 @@ import { MAX_COMPARE, SKINS, routableScreens, shotFile, type SkinName } from "./
 
 export type ShotPair = { skin: SkinName; before?: string; after?: string };
 export type ScreenShots = { screen: string; pairs: ShotPair[] };
-export type BeforeAfter = { screens: ScreenShots[]; total: number };
+/** With `artifact` set, the pairs hold file names inside the `shipvo-check` artifact, not image URLs (private repositories). */
+export type BeforeAfter = { screens: ScreenShots[]; total: number; artifact?: boolean };
 
 export const MEDIA_BRANCH = "shipvo-check-media";
 
-/** Pair the base and head shots per screen. Screens whose images are identical on every skin did not change visually and are dropped. Images are passed through `url`. */
+/** Pair the base and head shots per screen. Images are compared byte for byte, so both sides must be shot the same way (same simulator, same size, same theme). Screens whose images are identical on every skin did not change visually and are dropped. Images are passed through `url`. */
 export function pairShots(changed: string[], beforeDir: string, afterDir: string, url: (file: string, side: "before" | "after", name: string) => string): BeforeAfter {
   const screens: ScreenShots[] = [];
   const all = routableScreens(changed, Infinity);
@@ -39,7 +40,14 @@ const img = (u: string | undefined, alt: string) => (u ? `<img src="${u}" width=
 export function beforeAfterSection(b: BeforeAfter, runUrl?: string): string[] {
   if (!b.screens.length) return [];
   const L = ["### Before and after", "", "Base commit on the left, this pull request on the right. Light theme, phone size.", ""];
-  for (const s of b.screens) {
+  if (b.artifact) {
+    L.push("The images are in the `shipvo-check` artifact" + (runUrl ? ` of [this run](${runUrl})` : " of this run") + ".", "");
+    for (const s of b.screens) {
+      L.push(`**\`${s.screen}\`**`, "");
+      for (const p of s.pairs) L.push(`- ${label(p.skin)}: \`shipvo-shots/before/${shotFile(s.screen, p.skin)}\` and \`shipvo-shots/after/${shotFile(s.screen, p.skin)}\``);
+      L.push("");
+    }
+  } else for (const s of b.screens) {
     L.push(`**\`${s.screen}\`**`, "", "| Skin | Before | After |", "| --- | --- | --- |");
     for (const p of s.pairs) L.push(`| ${label(p.skin)} | ${img(p.before, `${s.screen} before, ${label(p.skin)}`)} | ${img(p.after, `${s.screen} after, ${label(p.skin)}`)} |`);
     L.push("");
@@ -68,6 +76,16 @@ export async function uploadShot(o: { repo: string; token: string; sha: string; 
     if (!(r.status === 422 && /\bsha\b/i.test(msg))) throw new Error(`GitHub PUT ${path} answered ${r.status}${msg ? `: ${msg}` : ""}`);
   }
   return `https://raw.githubusercontent.com/${o.repo}/${MEDIA_BRANCH}/${path}`;
+}
+
+/** True when the repository is private, or when that cannot be read: raw image links do not render in comments there. */
+export async function isPrivateRepo(o: { repo: string; token: string; fetch?: Fetch }): Promise<boolean> {
+  const f: Fetch = o.fetch ?? (fetch as unknown as Fetch);
+  try {
+    const r = await f(`https://api.github.com/repos/${o.repo}`, { method: "GET", headers: { authorization: `Bearer ${o.token}`, accept: "application/vnd.github+json" } });
+    if (!r.ok) return true;
+    return ((await r.json()) as { private?: boolean })?.private !== false;
+  } catch { return true; }
 }
 
 /** Make sure the media branch exists. It is created as an orphan: one commit with no parent and a one-file tree, so the pull request's source never lands on it. */

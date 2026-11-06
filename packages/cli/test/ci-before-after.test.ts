@@ -153,6 +153,7 @@ describe("commentCmd with uploads", () => {
       const m = init?.method ?? "GET";
       if (url.includes("/contents/")) { puts.push(url.split("/contents/")[1]); return res(201); }
       if (url.includes("/git/ref/")) return res(200);
+      if (url === "https://api.github.com/repos/o/r") return res(200, { private: false });
       if (m === "GET") return res(200, []);
       posted = JSON.parse(init!.body!).body; return res(201);
     });
@@ -164,12 +165,53 @@ describe("commentCmd with uploads", () => {
     expect(posted).not.toContain("same");
   });
 
+  it("links the artifact instead of embedding images in a private repository", async () => {
+    const { dir } = setup();
+    let posted = ""; let uploads = 0;
+    vi.stubGlobal("fetch", async (url: string, init?: { method?: string; body?: string }) => {
+      const m = init?.method ?? "GET";
+      if (url.includes("/contents/") || url.includes("/git/")) { uploads++; return res(201); }
+      if (url === "https://api.github.com/repos/o/r") return res(200, { private: true });
+      if (m === "GET") return res(200, []);
+      posted = JSON.parse(init!.body!).body; return res(201);
+    });
+    const r = await run(["--pr", "3", "--screenshots", dir, "--report", join(dir, "none.json")]);
+    expect(r.rc).toBe(0);
+    expect(uploads).toBe(0);
+    expect(posted).toContain("### Before and after");
+    expect(posted).not.toContain("<img");
+    expect(posted).toContain("Android: `shipvo-shots/before/home.android.png` and `shipvo-shots/after/home.android.png`");
+    expect(posted).toContain("iOS: `shipvo-shots/before/home.ios.png`");
+    expect(posted).not.toContain("same.");
+  });
+
+  it("with several changed screens where one differs, shows exactly that one on Android and iOS", async () => {
+    const { dir } = setup();
+    for (const n of ["a", "b", "c"]) for (const skin of ["android", "ios"]) for (const side of ["before", "after"]) writeFileSync(join(dir, side, `${n}.${skin}.png`), "same");
+    writeFileSync(join(dir, "after", "screens.json"), JSON.stringify(["a", "b", "c", "home", "same"]));
+    let posted = "";
+    vi.stubGlobal("fetch", async (url: string, init?: { method?: string; body?: string }) => {
+      const m = init?.method ?? "GET";
+      if (url.includes("/contents/")) return res(201);
+      if (url.includes("/git/ref/")) return res(200);
+      if (url === "https://api.github.com/repos/o/r") return res(200, { private: false });
+      if (m === "GET") return res(200, []);
+      posted = JSON.parse(init!.body!).body; return res(201);
+    });
+    await run(["--pr", "3", "--screenshots", dir, "--report", join(dir, "none.json")]);
+    expect(posted.match(/\*\*`[^`]+`\*\*/g)).toEqual(["**`home`**"]);
+    expect(posted).toContain("| Android |");
+    expect(posted).toContain("| iOS |");
+    expect(posted).not.toContain("more changed screen");
+  });
+
   it("leaves the section out and exits 0 when the token cannot write (403)", async () => {
     const { dir } = setup();
     let posted = "";
     vi.stubGlobal("fetch", async (url: string, init?: { method?: string; body?: string }) => {
       const m = init?.method ?? "GET";
       if (url.includes("/git/ref/")) return res(404);
+      if (url === "https://api.github.com/repos/o/r") return res(200, { private: false });
       if (url.includes("/git/")) return res(403);
       if (m === "GET") return res(200, []);
       posted = JSON.parse(init!.body!).body; return res(201);
