@@ -137,7 +137,7 @@ function wrap(words: string[], max: number): string[] | undefined {
 /**
  * Fit a caption into `maxLines` lines of `maxPx` pixels. A caption that is too long is
  * shortened at a word boundary and ends in "...". A word wider than a line is never cut: the
- * text scale shrinks instead (down to `minScale`), and as a last resort the word is dropped.
+ * text scale shrinks instead (down to `minScale`), and as a last resort the text shrinks below that, and if the first word still does not fit the caption is a single "...".
  */
 export function fitCaption(caption: string, maxPx: number, basePx: number, maxLines = 3, minPx = Math.max(2, Math.ceil(basePx * 0.6))): { lines: string[]; scale: number } {
   let words = caption.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
@@ -154,9 +154,11 @@ export function fitCaption(caption: string, maxPx: number, basePx: number, maxLi
     const lines = wrap(use, max);
     if (lines && lines.length <= maxLines) return { lines, scale: minPx };
   }
-  // 3. Not even the first word fits: keep its start (the only case a word is cut).
+  // 3. Not even the first word fits at the minimum scale: shrink further, keeping the whole word.
   const w = words[0];
-  return { lines: [textUnits(w) > max ? w.slice(0, Math.max(1, Math.floor((max + 1) / GLYPH_W) - 3)) + "..." : w], scale: minPx };
+  for (let scale = minPx - 1; scale >= 1; scale--) if (textUnits(w) * scale <= maxPx) return { lines: [w], scale };
+  // 4. Still too wide at scale 1: show only "..." rather than part of a word.
+  return { lines: ["..."], scale: minPx };
 }
 
 type Rgb = [number, number, number];
@@ -217,15 +219,17 @@ export function renderFrame(o: FrameOptions): Uint8Array {
   const tablet = o.set === "ipad-13" || o.set.startsWith("play-tablet");
   const bezel = Math.max(4, Math.round(W * (tablet ? 0.016 : 0.012)));
   const areaTop = top + fit.lines.length * lineH + Math.round(H * 0.03);
-  const outerH = H - areaTop - Math.round(H * 0.035);
-  const screenH = outerH - 2 * bezel;
-  const screenW = Math.round(screenH * (src.width / src.height));
+  const availH = H - areaTop - Math.round(H * 0.035);
+  const maxScreenH = availH - 2 * bezel;
+  const screenW = Math.round(maxScreenH * (src.width / src.height));
   const outerW = Math.min(W - 2 * Math.round(W * 0.04), screenW + 2 * bezel);
   const sw = outerW - 2 * bezel;           // screen width actually used (never wider than the canvas)
-  const cx = W / 2, cy = areaTop + outerH / 2;
+  const screenH = Math.min(maxScreenH, Math.round(sw * (src.height / src.width))); // keep the aspect ratio
+  const outerH = screenH + 2 * bezel;
+  const cx = W / 2, cy = areaTop + availH / 2;
   const rOuter = outerW * (tablet ? (style === "ios" ? 0.045 : 0.03) : style === "ios" ? 0.14 : 0.07);
   const rInner = Math.max(0, rOuter - bezel);
-  const x0 = Math.floor(cx - outerW / 2) - 1, y0 = Math.floor(areaTop) - 1;
+  const x0 = Math.floor(cx - outerW / 2) - 1, y0 = Math.floor(cy - outerH / 2) - 1;
   const sx0 = cx - sw / 2, sy0 = cy - screenH / 2;
   // Camera cut-out: a pill for iPhone, a dot for Android.
   const cut = !tablet ? (style === "ios"

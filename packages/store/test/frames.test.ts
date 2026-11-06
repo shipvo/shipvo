@@ -66,4 +66,12 @@ describe("fitCaption", () => {
     const r = fitCaption("Extraordinarily good", 900, 10);
     expect(r.lines.join(" ")).toBe("Extraordinarily good");
   });
+  it("never cuts a single very long word", () => {
+    const word = "Supercalifragilisticexpialidocious".repeat(4);
+    const r = fitCaption(word, 300, 10);
+    expect(r.lines.every((l) => l === word || l === "...")).toBe(true);
+    const fits = fitCaption("Supercalifragilistic", 300, 10);
+    expect(fits.lines).toEqual(["Supercalifragilistic"]);
+    expect(fits.lines[0]).not.toContain("...");
+  });
 });
