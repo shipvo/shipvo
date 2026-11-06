@@ -136,8 +136,7 @@ await scenario("hermes bytecode mismatch: a release for another bytecode version
   if (!pid()) launch(); // the app only polls while it is open
   const cur = good().rel, releaseVersion = otherHermesVersion(shellVersion), before = prefs();
   const p = await publish(withHermesVersion(bundle("v" + AFTER_PATCH), releaseVersion), { bases: [], hermesBytecodeVersion: releaseVersion });
-  const reason = await waitFor(() => refusalReason(tele(), p.release, p.at), 60_000);
-  await sleep(15_000); // more poll cycles: the release must stay refused
+  await sleep(25_000); // several poll cycles: the release must stay refused
   const e = entries().filter((x) => x.t >= p.at), after = prefs();
   const sawPointer = e.some((x) => x.path === `/p/${APP}/1/${BAND}.json` && x.status === 200);
   const downloaded = e.some((x) => x.path.startsWith("/b/") && x.path.includes(`r${p.release}.`));
@@ -145,6 +144,9 @@ await scenario("hermes bytecode mismatch: a release for another bytecode version
   const alive = !!pid();
   stop(); await sleep(800); const t1 = Date.now(); launch();
   const again = await waitFor(() => healthy(cur, t1), 30_000);
+  // The sample app reads the runtime's queued events only when it starts (`consumeEvents` on mount), so the typed
+  // reason reaches telemetry on this relaunch, not while the app stays open.
+  const reason = await waitFor(() => refusalReason(tele(), p.release, p.at), 30_000);
   return { pass: reason === "hermes_bytecode_mismatch" && sawPointer && !downloaded && !ranIt && alive && after.current_release === cur && !after.pending_release && !!again && !fatal(),
     refusalReason: reason, release: p.release, shellBytecodeVersion: shellVersion, releaseBytecodeVersion: releaseVersion, runningBefore: cur, currentAfter: after.current_release, pendingAfter: after.pending_release ?? 0,
     blockedAfter: after.blocked_release ?? 0, devicePolledPointer: sawPointer, deviceDownloadedBundle: downloaded, appStayedAlive: alive, restartedOnRelease: again?.release ?? null };
