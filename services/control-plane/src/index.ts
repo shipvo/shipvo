@@ -282,12 +282,12 @@ app.post("/o/:app", async (c) => {
   const ip = await sha(c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "unknown");
   const install = typeof body.install_id === "string" && body.install_id ? body.install_id.slice(0, 64) : null;
   // Idempotency key. Order ids are not unique across customers (the Tide app starts every customer at TT-1001),
-  // so the key is the client's idempotency_key, else install_id + order id, else IP hash + order id + a hash of the
+  // so the key is the client's idempotency_key, else (install_id or IP hash) + order id + a hash of the
   // order body. Without the body hash, two customers behind one IP who both place TT-1001 would collide and the second order would be lost.
   // With it, only a byte-identical retry is a duplicate.
   // Another install or key can never collide with it, so nobody can squat an id to block a real order.
   const idem = typeof body.idempotency_key === "string" && body.idempotency_key ? "k:" + body.idempotency_key.slice(0, 64)
-    : install ? `i:${install}:${o.id}` : `p:${ip}:${o.id}:${(await sha(json)).slice(0, 16)}`;
+    : `${install ? `i:${install}` : `p:${ip}`}:${o.id}:${(await sha(json)).slice(0, 16)}`;
   const first = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND idem = ?").bind(appId, idem).first<{ status: string }>();
   if (first) return reply(first.status, true);
   // Rate limits per IP and per install, over the last minute. The count and the insert are not atomic,
@@ -295,6 +295,7 @@ app.post("/o/:app", async (c) => {
   const since = new Date(Date.now() - 60_000).toISOString();
   const n = async (col: string, v: string) => (await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM orders WHERE app_id = ? AND ${col} = ? AND received_at > ?`).bind(appId, v, since).first<{ n: number }>())?.n ?? 0;
   if ((await n("ip_hash", ip)) >= RATE_PER_IP || (install && (await n("install", install)) >= RATE_PER_INSTALL)) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  // A price_mismatch row keeps idem NULL, so it never answers for the key: a retry with corrected content can succeed.
   // Simulated orders (from the simulator) stay labelled and are never settled. The label can only lower trust.
   const simulated = body.simulated === true || c.req.header("x-shipvo-simulated") === "1";
   let status: string = "unverified", why: string[] = [];
@@ -305,7 +306,7 @@ app.post("/o/:app", async (c) => {
   }
   const stored = why.length ? JSON.stringify({ order: o, content_version: body.content_version ?? null, release: body.release ?? null, price_errors: why.slice(0, 5) }) : json;
   const ins = await c.env.DB.prepare("INSERT INTO orders (app_id, order_id, total, json, status, simulated, ip_hash, install, idem) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(app_id, idem) DO NOTHING")
-    .bind(appId, o.id, Math.round(o.total), stored, status, simulated ? 1 : 0, ip, install, idem).run();
+    .bind(appId, o.id, Math.round(o.total), stored, status, simulated ? 1 : 0, ip, install, status === "price_mismatch" ? null : idem).run();
   if ((ins as any)?.meta?.changes === 0) {
     // A concurrent request with the same key won the race: report what it stored.
     const won = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND idem = ?").bind(appId, idem).first<{ status: string }>();

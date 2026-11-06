@@ -69,6 +69,26 @@ describe("POST /o/:app trust rules", () => {
     expect(((await (await place(env, good("TT-1001"), {}, h)).json()) as any).duplicate).toBe(true);
     expect(rows).toHaveLength(2);
   });
+  it("stores two different orders with the same install_id and order id; an identical retry is a duplicate", async () => {
+    const { env, rows } = fake();
+    const other = { ...good("TT-1001"), lines: [{ product_id: "line", quantity: 1, unit_price: 500 }], subtotal: 500, discount: 0, delivery_fee: 200, total: 700, promo: undefined };
+    expect(((await (await place(env, good("TT-1001"), { install_id: "a" })).json()) as any).duplicate).toBe(false);
+    expect(((await (await place(env, other, { install_id: "a" })).json()) as any).duplicate).toBe(false);
+    expect(rows).toHaveLength(2);
+    expect(((await (await place(env, good("TT-1001"), { install_id: "a" })).json()) as any).duplicate).toBe(true);
+    expect(rows).toHaveLength(2);
+  });
+  it("lets a retry with corrected content succeed after a price_mismatch under the same idempotency_key", async () => {
+    const { env, rows } = fake();
+    const r1 = await app.request("/o/tide", { method: "POST", body: JSON.stringify({ order: good("TT-9"), content_version: 99, idempotency_key: "k9" }) }, env);
+    expect(r1.status).toBe(422);
+    const r2 = await place(env, good("TT-9"), { idempotency_key: "k9" });
+    expect(r2.status).toBe(202);
+    const b = (await r2.json()) as any;
+    expect(b.status).toBe("unverified");
+    expect(b.duplicate).toBe(false);
+    expect(rows.map((x) => x.status)).toEqual(["price_mismatch", "unverified"]);
+  });
   it("accepts the exact payload Tide sends today (order, content_version, release) as unverified", async () => {
     const { env, rows } = fake();
     const r = await app.request("/o/tide", { method: "POST", body: JSON.stringify({ order: good("TT-1001"), content_version: 3, release: "1.0.0" }) }, env);
