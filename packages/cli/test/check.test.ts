@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MARKER, changedScreens, compareFlows, exitCode, findMarked, renderComment, routeOf, upsertComment } from "../src/check";
+import { MARKER, exploreOutcome, postComment, testOutcome, changedScreens, compareFlows, exitCode, findMarked, renderComment, routeOf, upsertComment } from "../src/check";
 import { ci, CHECK_WORKFLOW_PATH } from "../src/ci";
 
 const pass = (name: string) => ({ name, status: "passed" as const, message: null });
@@ -112,5 +112,41 @@ describe("shipvo ci init --check", () => {
     expect(await ci(["init", "--check"], cwd)).toBe(0);
     expect(existsSync(join(cwd, CHECK_WORKFLOW_PATH))).toBe(true);
     expect(readFileSync(join(cwd, CHECK_WORKFLOW_PATH), "utf8")).toContain("actions/check");
+  });
+});
+
+describe("crashes and failures to post", () => {
+  it("a test run with no report fails the check and says so", () => {
+    const o = testOutcome(1, null);
+    expect(o.error).toMatch(/wrote no report/);
+    const d = { flows: o.flows, findings: [], testError: o.error };
+    expect(exitCode(d)).toBe(1);
+    expect(renderComment(d)).toContain("wrote no report");
+    expect(renderComment(d)).not.toContain("No flows ran.");
+  });
+  it("no flows and a non-zero exit fails; no flows and exit 0 does not", () => {
+    expect(testOutcome(1, { flows: [] }).error).toBeTruthy();
+    expect(testOutcome(0, { flows: [] }).error).toBeNull();
+  });
+  it("a failed base run is shown as skipped, not as every flow new", () => {
+    const d = { flows: [pass("a")], findings: [], baseNote: "base run failed. boom" };
+    expect(renderComment(d)).toContain("Comparison with base skipped: base run failed");
+    expect(renderComment(d)).not.toContain("(new)");
+  });
+  it("explore that exits non-zero without a report is an error", () => {
+    const o = exploreOutcome(1, null);
+    expect(o.error).toMatch(/crashed/);
+    expect(exitCode({ flows: [], findings: [], exploreError: o.error })).toBe(1);
+    expect(exploreOutcome(0, null).skipped).toBeTruthy();
+  });
+  it("a 403 when posting is logged in one line and does not throw", async () => {
+    const f = vi.fn(async () => new Response("no", { status: 403 })) as unknown as typeof fetch;
+    const lines: string[] = [];
+    await postComment({ repo: "a/b", pr: 1, token: "t", body: MARKER, f }, (s) => lines.push(s));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("could not post the comment (403)");
+  });
+  it("notes that some changed files reach no screen", () => {
+    expect(renderComment({ flows: [], findings: [], shared: true, exploredRoutes: ["/"] })).toContain("not reached from any screen");
   });
 });

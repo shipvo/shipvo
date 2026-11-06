@@ -2,7 +2,7 @@
 // --compare-base), runs explore on the changed screens, and writes one PR comment. The pure parts (changed-screen selection,
 // comment text, marker update, exit code) are exported so tests need no simulator and no network.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +70,12 @@ export type CheckData = {
   sha?: string; baseSha?: string;
   flows: FlowLite[]; baseFlows?: FlowLite[];
   findings: Finding[]; exploreError?: string | null; exploredRoutes?: string[]; exploreSkipped?: string | null;
+  /** Set when `shipvo test` crashed or wrote no report. Fails the check. */
+  testError?: string | null;
+  /** Set when the base run failed, so the comparison was skipped. */
+  baseNote?: string | null;
+  /** True when a changed file is reached from no screen, so more screens may be affected. */
+  shared?: boolean;
   shots?: Shot[]; recordingUrl?: string; artifactsUrl?: string;
 };
 
@@ -93,9 +99,9 @@ export const crashes = (findings: Finding[]) => findings.filter((f) => f.kind ==
  * 0 or 1. The check fails on a flow that fails (with --compare-base: only one that passed on base), and on a crash.
  * Dead ends, unnamed buttons and other exploration notes never fail it.
  */
-export function exitCode(d: Pick<CheckData, "flows" | "baseFlows" | "findings" | "exploreError">): number {
+export function exitCode(d: Pick<CheckData, "flows" | "baseFlows" | "findings" | "exploreError"> & { testError?: string | null }): number {
   const bad = compareFlows(d.flows, d.baseFlows).some((f) => f.change === "fail" || f.change === "regression");
-  return bad || crashes(d.findings).length > 0 || !!d.exploreError ? 1 : 0;
+  return bad || crashes(d.findings).length > 0 || !!d.exploreError || !!d.testError ? 1 : 0;
 }
 
 const ICON: Record<FlowChange["change"], string> = { pass: "✅ passed", fail: "❌ failed", regression: "❌ regression (passed on base)", fixed: "✅ fixed (failed on base)", "still-failing": "⚠️ still failing (also failed on base)", new: "✅ passed (new)" };
@@ -110,8 +116,10 @@ export function renderComment(d: CheckData): string {
   const L: string[] = [MARKER, `## Shipvo check: ${code === 0 ? "passed" : "failed"}`, ""];
   if (d.sha) L.push(`Commit \`${d.sha.slice(0, 7)}\`${d.baseSha ? `, compared with base \`${d.baseSha.slice(0, 7)}\`` : ""}. Built for web and run headless on Shipvo Phone.`, "");
   L.push("### Flows", "");
-  if (!flows.length) L.push("No flows ran.", "");
+  if (d.testError) L.push(`❌ ${d.testError}`, "");
+  else if (!flows.length) L.push("No flows ran.", "");
   else { L.push("| Flow | Result |", "| --- | --- |"); for (const f of flows) L.push(`| \`${f.name}\` | ${ICON[f.change]}${f.status === "failed" && f.message ? `: ${firstLine(f.message)}` : ""} |`); L.push(""); }
+  if (d.baseNote) L.push(`Comparison with base skipped: ${d.baseNote}`, "");
   L.push("### Crashes and runtime errors", "");
   if (d.exploreError) L.push(`Exploration stopped: ${firstLine(d.exploreError)}`, "");
   else if (!crash.length) L.push(d.exploreSkipped ? "Not checked (see below)." : "None found.", "");
@@ -119,7 +127,8 @@ export function renderComment(d: CheckData): string {
   L.push("### Exploration notes", "");
   if (d.exploreSkipped) L.push(d.exploreSkipped, "");
   else {
-    if (d.exploredRoutes?.length) L.push(`Changed screens explored: ${d.exploredRoutes.map((r) => `\`${r}\``).join(", ")}.`, "");
+    if (d.exploredRoutes?.length) L.push(`Screens that changed: ${d.exploredRoutes.map((r) => `\`${r}\``).join(", ")}. Exploration walks the whole app, not only these screens.`, "");
+    if (d.shared) L.push("Some changed files are not reached from any screen, so more screens may be affected.", "");
     if (!notes.length) L.push("No dead ends or accessibility problems found.", "");
     else L.push(...notes.map((f) => `- ${KIND[f.kind]}: ${firstLine(f.message)}`), "", "Notes do not fail the check.", "");
   }
@@ -182,10 +191,34 @@ function listSources(root: string): string[] {
 const cliPath = () => join(dirname(fileURLToPath(import.meta.url)), "cli.js");
 const readJson = <T,>(p: string): T | null => { try { return JSON.parse(readFileSync(p, "utf8")) as T; } catch { return null; } };
 
-/** Run `shipvo test --report` in `cwd`; returns the flows (empty when the report is missing). */
-function runFlows(cwd: string, out: string): FlowLite[] {
-  spawnSync(process.execPath, [cliPath(), "test", "--report", out], { cwd, stdio: "inherit" });
-  return readJson<{ flows?: FlowLite[] }>(join(cwd, out))?.flows ?? [];
+/** What a test run left behind: its flows, or an error when it crashed or wrote no report. */
+export function testOutcome(status: number | null, report: { flows?: FlowLite[] } | null): { flows: FlowLite[]; error: string | null } {
+  if (!report) return { flows: [], error: `\`shipvo test\` wrote no report (exit status ${status ?? "none"}). It may have crashed: check the build and the config in the job log.` };
+  const flows = report.flows ?? [];
+  if (!flows.length && status !== 0) return { flows, error: `\`shipvo test\` ran no flows and exited with status ${status ?? "none"}.` };
+  return { flows, error: null };
+}
+
+/** Run `shipvo test --report` in `cwd`. */
+function runFlows(cwd: string, out: string): { flows: FlowLite[]; error: string | null } {
+  const r = spawnSync(process.execPath, [cliPath(), "test", "--report", out], { cwd, stdio: "inherit" });
+  return testOutcome(r.status, readJson<{ flows?: FlowLite[] }>(join(cwd, out)));
+}
+
+/** Explore result: a non-zero exit with no report is a crash, not a skip. */
+export function exploreOutcome(status: number | null, report: Report | null): { skipped: string | null; error: string | null } {
+  if (report) return { skipped: null, error: null };
+  if (status !== 0) return { skipped: null, error: `\`shipvo explore\` crashed without a report (exit status ${status ?? "none"}).` };
+  return { skipped: "Exploration did not produce a report.", error: null };
+}
+
+/** Post the comment. Never throws: a failure (a fork's read-only token gives 403) is reported in one line. */
+export async function postComment(o: Parameters<typeof upsertComment>[0], log: (s: string) => void = console.log): Promise<void> {
+  try { log(`Comment ${await upsertComment(o)}.`); }
+  catch (e) {
+    const code = /\((\d{3})\)/.exec((e as Error).message)?.[1] ?? "error";
+    log(`could not post the comment (${code}). Fork pull requests get a read-only token; the result is in the job log and shipvo-check/comment.md`);
+  }
 }
 
 /** `shipvo check --changed-from <sha> [--compare-base] [--out dir] [--post]`. Returns the exit code. */
@@ -196,42 +229,47 @@ export async function check(argv: string[]): Promise<number> {
   const out = resolve(a.out && a.out !== "true" ? a.out : "shipvo-check"); const sha = process.env.GITHUB_SHA || undefined;
   execFileSync("mkdir", ["-p", out]);
   const git = (...g: string[]) => execFileSync("git", g, { encoding: "utf8" });
-  const changed = git("diff", "--name-only", `${baseSha}...HEAD`).split("\n").filter(Boolean);
+  let changed: string[];
+  try { changed = git("diff", "--name-only", `${baseSha}...HEAD`).split("\n").filter(Boolean); }
+  catch { console.error("Could not read the git diff. In GitHub Actions, set `fetch-depth: 0` on actions/checkout so the base commit is available."); return 2; }
   const sel = changedScreens(changed, listSources("."), (f) => readFileSync(f, "utf8"));
 
-  const flows = runFlows(process.cwd(), join(out, "flows.json"));
+  const run = runFlows(process.cwd(), join(out, "flows.json"));
+  const flows = run.flows; const testError = run.error; let baseNote: string | null = null;
   let baseFlows: FlowLite[] | undefined;
   if (a["compare-base"] === "true") {
     const dir = mkdtempSync(join(tmpdir(), "shipvo-base-"));
     try {
       git("worktree", "add", "--detach", join(dir, "base"), baseSha);
       if (existsSync("node_modules")) symlinkSync(resolve("node_modules"), join(dir, "base", "node_modules"));
-      baseFlows = runFlows(join(dir, "base"), "flows.json");
-    } catch (e) { console.error(`compare-base skipped: ${(e as Error).message.split("\n")[0]}`); }
+      const b = runFlows(join(dir, "base"), "flows.json");
+      if (b.error) baseNote = `base run failed. ${b.error}`; else baseFlows = b.flows;
+    } catch (e) { baseNote = (e as Error).message.split("\n")[0]!; console.error(`compare-base skipped: ${baseNote}`); }
     finally { try { git("worktree", "remove", "--force", join(dir, "base")); } catch { /* best effort */ } }
   }
 
-  let exploreSkipped: string | null = null; let report: Report | null = null;
+  let exploreSkipped: string | null = null; let exploreErr: string | null = null; let report: Report | null = null;
   if (!sel.routes.length) exploreSkipped = "No screen files changed in this pull request, so nothing was explored.";
   else {
     const prefix = join(out, "explore");
-    spawnSync(process.execPath, [cliPath(), "explore", "--out", prefix, ...(a["skip-build"] === "true" ? ["--skip-build", "true"] : []), ...(a.sim && a.sim !== "true" ? ["--sim", a.sim] : [])], { stdio: "inherit" });
+    const ex = spawnSync(process.execPath, [cliPath(), "explore", "--out", prefix, ...(a["skip-build"] === "true" ? ["--skip-build", "true"] : []), ...(a.sim && a.sim !== "true" ? ["--sim", a.sim] : [])], { stdio: "inherit" });
     report = readJson<Report>(`${prefix}.json`);
-    if (!report) exploreSkipped = "Exploration did not produce a report.";
+    const o = exploreOutcome(ex.status, report); exploreSkipped = o.skipped; exploreErr = o.error;
   }
   const shotDir = join(out, "shots");
   const shots: Shot[] = existsSync(shotDir) ? readdirSync(shotDir).filter((f) => /\.(png|jpe?g)$/.test(f)).sort().slice(0, 4).map((name) => ({ name, style: /iphone/i.test(name) ? "iphone" as const : "android" as const })) : [];
   const env = process.env;
   const artifactsUrl = env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : undefined;
   const recordingUrl = existsSync(join(out, "recording.webm")) && artifactsUrl ? artifactsUrl : undefined;
-  const data: CheckData = { sha, baseSha, flows, baseFlows, findings: report?.findings ?? [], exploreError: report?.error ?? null, exploredRoutes: sel.routes, exploreSkipped, shots, recordingUrl, artifactsUrl };
+  const data: CheckData = { sha, baseSha, flows, baseFlows, findings: report?.findings ?? [], exploreError: report?.error ?? exploreErr, testError, baseNote, shared: sel.shared, exploredRoutes: sel.routes, exploreSkipped, shots, recordingUrl, artifactsUrl };
   const body = renderComment(data);
   writeFileSync(join(out, "comment.md"), body);
   console.log(`Wrote ${join(out, "comment.md")}`);
   if (a.post === "true") {
     const pr = Number(env.SHIPVO_PR_NUMBER); const token = env.GITHUB_TOKEN; const repo = env.GITHUB_REPOSITORY;
     if (!pr || !token || !repo) console.error("--post needs GITHUB_TOKEN, GITHUB_REPOSITORY and SHIPVO_PR_NUMBER; the comment was not posted.");
-    else console.log(`Comment ${await upsertComment({ repo, pr, token, body, api: env.GITHUB_API_URL })}.`);
+    else await postComment({ repo, pr, token, body, api: env.GITHUB_API_URL });
   }
+  if (env.GITHUB_STEP_SUMMARY) { try { appendFileSync(env.GITHUB_STEP_SUMMARY, body); } catch { /* best effort */ } }
   return exitCode(data);
 }

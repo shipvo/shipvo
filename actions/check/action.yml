@@ -1,5 +1,5 @@
 name: Shipvo check
-description: Build the app for web, run it headless on Shipvo Phone, run your @shipvo/test flows, explore the changed screens and post one pull request comment.
+description: Build the app for web, run it headless on Shipvo Phone, run your @shipvo/test flows, explore the app and post one pull request comment.
 inputs:
   compare-base:
     description: Run the same flows on the base commit and report regressions.
@@ -30,7 +30,7 @@ runs:
         EXTRA=""
         if [ "$COMPARE" = "true" ]; then EXTRA="--compare-base"; fi
         npx shipvo check --changed-from "$BASE_SHA" --post $EXTRA
-    - name: Upload screenshots and recording
+    - name: Upload check files
       if: always()
       uses: actions/upload-artifact@v4
       with:

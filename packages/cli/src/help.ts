@@ -38,7 +38,7 @@ Ship
                               Steps to get your 12 testers; add the Shipvo Testers group to the closed track
   store status [--mark <step> [--as waiting|done]]
                               Show each store's steps and what to do next
-  check --changed-from <sha> [--compare-base] [--post]  Pull request check: tests, explore changed screens, write one PR comment
+  check --changed-from <sha> [--compare-base] [--post]  Pull request check: tests, explore the app, write one PR comment
   ci init --check             Write .github/workflows/shipvo-check.yml
   ci init --framework capacitor [--dry-run] [--force]
                               Write .github/workflows/shipvo-build.yml (signed Android and iOS builds)
