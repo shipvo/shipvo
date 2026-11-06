@@ -19,7 +19,7 @@
         <a class="btn" href="/apps">Browse apps agents can use</a>
       </div>
       <div class="cmd reveal"><span class="p">$</span><span>npx -y @shipvo/cli init myshop</span><button type="button" data-copy="npx -y @shipvo/cli init myshop">Copy</button></div>
-      <div class="facts reveal"><span><b>Android</b> OTA today</span><span><b>iOS</b> <a href="/docs/parity-results/">100% actionable parity (role + label), CI</a></span><span><b>Apache-2.0</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
+      <div class="facts reveal"><span><b>Android + iOS</b> signed OTA</span><span><b>100%</b> <a href="/docs/parity-results/">parity on Android + iOS</a></span><span><b>Apache-2.0</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
     </div>
     <div class="phone-stage reveal" id="stage">
       <div class="bubble"><small>YOU ASK YOUR ASSISTANT</small><b>Buy a Surface Popper with mobile money. Tell me if anything breaks.</b></div>
@@ -111,7 +111,24 @@
       <div class="cmd"><code>npm i -D @shipvo/test vitest</code><button type="button" data-copy="npm i -D @shipvo/test vitest">Copy</button></div>
       <a class="btn primary" href="/docs/testing/">Read the testing guide <span aria-hidden="true">→</span></a>
     </div>
-    <p class="ci-note">The simulator renders your app on the web and simulates the device, so it catches logic and flow bugs, not native crashes or slow-phone performance. Where it differs from real Android and iOS, <a href="/docs/parity-results/">we publish the gaps</a>.</p>
+    <p class="ci-note">Every screen is checked against the Android emulator and the iOS Simulator, and the results are published in <a href="/docs/parity-results/">parity results</a>.</p>
+  </div>
+</section>
+
+<section id="phone" class="band">
+  <div class="wrap">
+    <div class="sec-head"><h2>Shipvo Phone. Your app, on a phone, in your browser.</h2><p class="lede">One command opens your app on an Android-style or iPhone-style phone in a browser tab. You use it like a phone, and your coding agent drives the same live phone over MCP while you watch.</p></div>
+    <div class="cmd" style="max-width:560px"><span class="p">$</span><span>npx shipvo run android</span><button type="button" data-copy="npx shipvo run android">Copy</button></div>
+    <div class="bento" style="margin-top:22px">
+      <article class="cell wide"><div class="n">PHONE</div><h3>It behaves like a phone</h3><p>Home screen and gestures (home, recents, switch apps), the notification shade on Android and Notification Center and Control Center on iPhone, a lock screen, restart and power, and settings for dark mode, text size and language. Agents use every one of them through MCP.</p><div class="k"><b>open_notifications</b> · <b>open_control_center</b> · <b>recents</b> · <b>restart</b></div></article>
+      <article class="cell"><div class="n">APPS</div><h3>An app store and a browser inside</h3><p>Install apps from the store on the phone, and open links in the built-in Browser app.</p><div class="k">Same phone for you and your agent</div></article>
+      <article class="cell"><div class="n">SENSORS</div><h3>Real camera, mic and location</h3><p>Uses your browser's real camera, microphone and location, and simulates them when they are not available. <a href="/docs/device-api/">Device API</a>.</p><div class="k">Simulated events are always labelled</div></article>
+      <article class="cell"><div class="n">NETWORK</div><h3>Any network, on demand</h3><p>Pick a network profile and the app's requests follow it, so you see your app the way people on slow connections do.</p><div class="k">Requests follow the profile you pick</div></article>
+      <article class="cell"><div class="n">UPDATES</div><h3>Watch an update land</h3><p>Check, download and apply over-the-air updates on the phone, with the same signature checks and crash-loop revert as a real device.</p><div class="k"><b>check_for_update</b> · <b>apply_update</b></div></article>
+      <article class="cell wide"><div class="n">RECORD</div><h3>Screenshots and demo videos</h3><p>Take screenshots of the live phone, and record an MP4 of any session with markers on the steps that matter: ready for a pull request, a tester, or a launch post. <a href="/docs/record/">Record a demo</a>.</p><div class="k"><b>record_start</b> · <b>record_marker</b> · <b>record_stop</b></div></article>
+      <article class="cell" style="grid-column:auto"><div class="n">LUMI</div><h3>Meet Lumi</h3><p>Shipvo's assistant lives in the phone frame, outside your app's screen, so agents and tests always see exactly your app. One setting turns it off.</p><div class="k">Idle · working · happy · worried</div></article>
+    </div>
+    <p class="lede" style="margin-top:18px"><a class="link" href="/docs/run/">Run on a phone</a> · <a class="link" href="/learn/">Tutorials and videos</a></p>
   </div>
 </section>
 
@@ -227,16 +244,21 @@
       <article class="cell wide"><div class="n">PUBLISH</div><h3>Signed over-the-air updates</h3><p>Ed25519 pointers, SHA-256 bundles, bsdiff patches, cohort bands, <code>min_shell_version</code> gating and one-command rollback. The shell pins your public key; nothing delivered over the air can change it.</p><div class="k">Typical update <b>tens of KB</b> · applied on a 2 GB Redmi 9A <b>without a restart</b></div></article>
       <article class="cell"><div class="n">SIMULATE</div><h3>A phone agents can operate</h3><p>Accessibility-tree screens with refs over MCP. Local with <code>npm run sim</code>, hosted with a key from <code>shipvo login</code>.</p><div class="k">ChatGPT placed a full order in <b>18 steps, 76 s</b></div></article>
       <article class="cell"><div class="n">DEVICE</div><h3>One device API, two truths</h3><p>Camera, location, biometrics, payments, notifications. Real on phones, simulated for agents, labelled <code>simulated</code> every time.</p><div class="k">Receipts say <b>SIMULATED-</b>; logs say <b>simulated: true</b></div></article>
-      <article class="cell"><div class="n">VERIFY</div><h3>Parity, not promises</h3><p>Runs on an Android emulator and an iOS Simulator in CI; every gap published. <a href="/docs/parity-results/">Parity results</a>.</p><div class="k">Same buttons and fields, same names: <b>100 %</b> on 13 purchase screens · text <b>98.6 % / 96.2 %</b></div></article>
-      <article class="cell"><div class="n">MARKETPLACE</div><h3>Listed for every agent</h3><p>Flip <code>listing.public</code> and your app appears on <a href="/apps">shipvo.dev/apps</a> and in every signed-in agent's <code>list_apps</code>.</p><div class="k">Review before listing · <b>3 apps</b> per account in the beta</div></article>
+      <article class="cell"><div class="n">VERIFY</div><h3>Parity, not promises</h3><p>Runs on an Android emulator and an iOS Simulator in CI, with every result published. <a href="/docs/parity-results/">Parity results</a>.</p><div class="k">Same buttons and fields, same names: <b>100 %</b> on 13 purchase screens · text <b>98.6 % / 96.2 %</b></div></article>
+      <article class="cell"><div class="n">MARKETPLACE</div><h3>Listed for every agent</h3><p>Flip <code>listing.public</code> and your app appears on <a href="/apps">shipvo.dev/apps</a> and in every signed-in agent's <code>list_apps</code>.</p><div class="k">Reviewed before listing · opened with <b>list_apps</b> and <b>open_app</b></div></article>
       <article class="cell wide"><div class="n">OWN IT</div><h3>Self-host in ten minutes, or use ours</h3><p>The control plane is a Cloudflare Worker with KV and D1. Run it in your account with your keys, or register on the hosted one with <code>shipvo app create</code>; publish tokens are scoped to one app and every pointer is checked against your public key.</p><div class="k"><b>api.shipvo.dev</b> hosted · <b>Apache-2.0</b> everywhere</div></article>
+      <article class="cell"><div class="n">STORES</div><h3>From working app to both stores</h3><p><code>shipvo store details</code>, <code>setup</code> and <code>screenshots</code> prepare your listings. The Shipvo Testers group covers Google Play's 12-tester rule. <a href="/docs/store/">Store</a>.</p><div class="k"><b>shipvo store testers</b> adds the group in one command</div></article>
+      <article class="cell wide"><div class="n">TEST</div><h3>Tests that explore, repair and gate releases</h3><p>Typed tests in <code>@shipvo/test</code> with plain-English steps. <code>shipvo test --repair</code> fixes broken steps, <code>shipvo promote</code> refuses a release whose flows fail, and <code>shipvo explore</code> walks your app on its own: it picks the next step, fills forms, and reports what breaks. <a href="/docs/testing/">Testing</a>.</p><div class="k">Explore finds <b>crashes, dead ends, failed requests, stuck loading and blank screens</b>, each with exact repro steps</div></article>
+      <article class="cell"><div class="n">GOVERN</div><h3>Release rules and an audit trail</h3><p>Release policy in <code>shipvo.json</code>, enforced on publish. Audit log export, automatic halting, key rotation, and hourly telemetry to your own R2 bucket as Parquet. <a href="/docs/cli-commands/">CLI guide</a>.</p><div class="k"><b>shipvo audit</b> · <b>auto-halt</b> · <b>keys rotate</b></div></article>
+      <article class="cell"><div class="n">FRAMEWORKS</div><h3>Expo, bare React Native, Capacitor</h3><p>Signed updates and the simulator for the stack you already have. Capacitor apps get <code>@shipvo/capacitor</code>, <code>shipvo eas setup</code> and a CI template. <a href="/docs/capacitor/">Capacitor</a>.</p><div class="k"><b>shipvo ci init --framework capacitor</b></div></article>
+      <article class="cell wide"><div class="n">AGENTS</div><h3>Every assistant, local or remote</h3><p>The stdio and remote MCP servers share one tool registry, so Claude, ChatGPT, Cursor and any MCP client get the same tools. Coding agents add the Shipvo skill in one line. <a href="/docs/agents/">Agents</a>.</p><div class="k"><b>npx skills add</b> the Shipvo skill</div></article>
     </div>
   </div>
 </section>
 
 <section id="proof" class="band">
   <div class="wrap">
-    <div class="sec-head"><h2>Numbers, not adjectives.</h2><p class="lede">Parity: an Android emulator and an iOS Simulator in CI. Update timings: a 2 GB Redmi 9A. Method and gaps in <a class="link" href="/docs/parity-results/">parity results</a>.</p></div>
+    <div class="sec-head"><h2>Numbers, not adjectives.</h2><p class="lede">Parity: an Android emulator and an iOS Simulator in CI. Update timings: a 2 GB Redmi 9A. Method in <a class="link" href="/docs/parity-results/">parity results</a>.</p></div>
     <div class="proof">
       <div class="stat"><div class="v">100<small>%</small></div><div class="l">Actionable parity (same role and label) on the 13 purchase screens, Android emulator and iOS Simulator</div><div class="s">parity-results</div></div>
       <div class="stat"><div class="v">18 <small>steps</small></div><div class="l">For ChatGPT to scan, locate, pay by mobile money with a fingerprint and reopen the notification. 76 s. Order confirmed by the backend.</div><div class="s">agents</div></div>

@@ -11,7 +11,7 @@ export type FrameStatus = {
   /** Level 0 to 100, or an object. Default 100. */
   battery?: number | { level?: number; charging?: boolean };
 };
-export type FrameOptions = { skin?: FrameSkin; dark?: boolean; status?: FrameStatus; /** HTML for the screen area. */ screen?: string; /** Draw Lumi beside the cutout. Default: on, off in CI; SHIPVO_LUMI=off|on overrides. */ lumi?: boolean };
+export type FrameOptions = { skin?: FrameSkin; dark?: boolean; status?: FrameStatus; /** HTML for the screen area. */ screen?: string; /** Draw Lumi beside the cutout. Default: on, off in CI; SHIPVO_LUMI=off|on overrides. */ lumi?: boolean; /** Also draw Lumi's first-run guide. Needs lumi. Default: off. */ guide?: boolean };
 export type Frame = {
   skin: FrameSkin;
   /** Screen size in CSS pixels. */
