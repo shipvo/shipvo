@@ -43,6 +43,8 @@ public class ShipvoPlugin: CAPPlugin, CAPBridgedPlugin {
         defaults.set(value, forKey: Self.prefix + key)
         // The boot counter must be on disk before the page runs. Apple discourages synchronize(), but a
         // crash right after this call would otherwise lose the increment and defeat crash-loop detection.
+        // If the write fails, UserDefaults gives no error: the value is lost, the core sees the old counter, and
+        // the worst case is one missed boot count, not a wrong release.
         defaults.synchronize()
         call.resolve()
     }
@@ -81,7 +83,8 @@ public class ShipvoPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.lock.lock(); self.serving = name; self.servingPath = path; self.lock.unlock()
                 vc.setServerBasePath(path: path)
                 // The web view now points at the new directory, so the old ones can go.
-                self.store.retire(keeping: dir)
+                // Deleting a large bundle can be slow, so it runs off the main thread.
+                DispatchQueue.global(qos: .utility).async { self.store.retire(keeping: dir) }
                 call.resolve()
             }
         } catch { call.reject("\(error)") }

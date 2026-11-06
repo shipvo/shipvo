@@ -82,7 +82,9 @@ final class BundleStoreTests: XCTestCase {
         try store.write("release-2.bundle", deflatedZip)
         try store.write("release-3.bundle", storedZip([("index.html", "x")]))
         // The hash of a different, valid bundle must not unlock this one.
-        XCTAssertThrowsError(try store.unpack("release-3.bundle", expectedSha256: sha256Hex(deflatedZip)))
+        XCTAssertThrowsError(try store.unpack("release-3.bundle", expectedSha256: sha256Hex(deflatedZip))) { error in
+            XCTAssertEqual((error as? BundleError)?.description, "bundle hash does not match")
+        }
     }
 
     func testUnpacksStoredEntries() throws {
