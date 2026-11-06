@@ -42,3 +42,5 @@ A test taps `"Place order"`, not a coordinate and not an id. If the label is mis
 - React Native, [Accessibility](https://reactnative.dev/docs/accessibility).
 - Playwright, [Locator API](https://playwright.dev/docs/api/class-locator): `getByRole`, `ariaSnapshot` and auto-waiting.
 - Shipvo, [Agents and Shipvo apps](/docs/agents/#what-the-tree-shows-and-hides-on-purpose).
+
+Related: [test dark mode, large text and right-to-left in a React Native app](/blog/test-dark-mode-large-text-and-rtl-in-react-native/) uses the Settings screen, which is part of this same tree.
