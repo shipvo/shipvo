@@ -7,7 +7,7 @@ Can an agent trust the Shipvo UI simulator? We ran two complete purchases on the
 
 **Result: 100% actionable parity on both Android and iOS across all 13 screens; text coverage 98.6% (Android) and 96.2% (iOS). Both purchases completed on every side.** Bar: ≥ 99% actionable, ≥ 95% text.
 
-**What this measures:** the same actionable elements (role and label) on each screen. It does not yet cover enabled state, element order, bounds or field values. Environments: Android emulator and iOS Simulator in CI (not a physical phone). Known gaps: 18 of 21 screens on the native-feature flow on Android, and the iOS text gap on the order-confirmation screen (89%).
+**What this measures:** the same actionable elements (role and label) on each screen. It does not yet cover enabled state, element order, bounds or field values. Measured on an Android emulator and an iOS Simulator in CI. Known gaps: 18 of 21 screens on the native-feature flow on Android, and the iOS text gap on the order-confirmation screen (89%).
 
 | Flow | Screen | Android: actionable | Android: text | iOS: actionable | iOS: text |
 | --- | --- | --- | --- | --- | --- |
