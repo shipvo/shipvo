@@ -183,7 +183,7 @@ export function renderMarkdown(r: Report): string {
 }
 
 /** Driver for a running simulator. */
-export function simDriver(base: string, app: string, session = `explore-${Date.now().toString(36)}`): Driver {
+export function simDriver(base: string, app: string, session = `explore-${Date.now().toString(36)}`, platform?: Skin): Driver {
   const post = async (path: string, body: Record<string, unknown>) => {
     const r = await fetch(base.replace(/\/$/, "") + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) });
     if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}`);
@@ -191,7 +191,7 @@ export function simDriver(base: string, app: string, session = `explore-${Date.n
   };
   const act = (body: Record<string, unknown>) => post("/act", { session, ...body });
   return {
-    open: () => post("/session", { session, app }),
+    open: () => post("/session", { session, app, ...(platform ? { device: { platform } } : {}) }),
     openUrl: (url) => act({ action: "open_url", url }),
     tap: (ref) => act({ action: "tap", ref }),
     back: () => act({ action: "back" }),

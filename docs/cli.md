@@ -171,16 +171,16 @@ shipvo agents setup --json       # machine-readable result
 Does the app load? Run it after a change, with no test to write.
 
 ```bash
-shipvo smoke [--timeout 30] [--json]
+shipvo smoke [android|ios] [--timeout 30] [--json]
 ```
 
-It starts the simulator the way `shipvo sim` does, opens the app headless and waits for the first screen to settle. It fails when the page throws an error, has an unhandled promise rejection, or the first screen has no elements in the tree. It prints the time to the first screen, the element count and the first 5 errors. It does not check a platform.
+It starts the simulator the way `shipvo sim` does, opens the app headless and waits for the first screen to settle. It fails when the page throws an error, has an unhandled promise rejection, or the first screen has no elements in the tree. It prints the time to the first screen, the element count and the first 5 errors. The optional `android` or `ios` (default `android`) is sent to the simulator as the session's device platform, so the app sees that platform and the phone dialogs use its wording. Any other value is a setup error (exit 2).
 
 With `--json` it prints the envelope of `shipvo status --json`:
 
 ```json
-{ "ok": true, "code": "ok", "summary": "The app loads: first screen in 1945 ms, 30 elements, no errors",
-  "data": { "time_to_first_screen_ms": 1945, "elements": 30, "errors": [], "error_count": 0 },
+{ "ok": true, "code": "ok", "summary": "The app loads on android: first screen in 1945 ms, 30 elements, no errors",
+  "data": { "platform": "android", "time_to_first_screen_ms": 1945, "elements": 30, "errors": [], "error_count": 0 },
   "next": [{ "command": "shipvo test --json", "why": "Run your step files." }] }
 ```
 
