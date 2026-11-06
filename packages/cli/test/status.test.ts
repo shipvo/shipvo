@@ -145,3 +145,17 @@ describe("bands line", () => {
     expect(log.mock.calls.map((c) => String(c[0]))).toContain("bands: b0=8 b1=8 b2=8");
   });
 });
+
+describe("tests line", () => {
+  it("shows failing flows per release when a report was uploaded", async () => {
+    inApp(); vi.stubEnv("SHIPVO_PUBLISH_TOKEN", "sv_publish_x");
+    const f = vi.fn(async (u: string) => String(u).includes("/r/shop/tests")
+      ? resp({ releases: [{ release: 8, passing: 1, failing: 1, failing_flows: [{ name: "checkout", first_failed_release: 7 }] }, { release: 7, passing: 2, failing: 0 }] })
+      : resp(payload));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await status([], f as any);
+    const all = log.mock.calls.map((c) => String(c[0]));
+    expect(all).toContain("tests: release 8: 1 failing (checkout, since release 7)");
+    expect(all).toContain("tests: release 7: all 2 passing");
+  });
+});
