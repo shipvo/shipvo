@@ -2,7 +2,7 @@
 
 Prior art, learned through DeepWiki (ideas only, no code copied): `expo/expo` (expo-updates code signing signs the exact manifest body, and the verifying certificate is embedded in the build) and `theupdateframework/specification` (TUF: metadata versions only go up, clients store the latest trusted version and reject a lower one, and a new root is signed by the old root).
 
-Status: design only (slice 1a of #736, part of #732). No code changes. Slice 1b covers what is listed under "Left for slice 1b".
+Status: design only (slices 1a and 1b of #736, part of #732). No code changes. Sections 6 to 11 are slice 1b: delivery, pending statements, the chain cap, time, abuse, tests and the build plan.
 
 ## 1. Model
 
@@ -41,27 +41,25 @@ A statement is an envelope, the same shape as the pointer envelope that phones v
 
 `body` is a string holding JSON. The signature is Ed25519 by the root key over the exact bytes of that string (UTF-8), base64 encoded. The runtime verifies the signature first, with `Verify.ed25519` (`Verify.kt`, `Verify.swift`), and only then parses `body`. This is how `ShipvoRuntimeModule.kt` and `Updater.swift` check pointers. Native code needs no `canonicalize`, so a signature cannot verify on one platform and fail on the other because of key order or whitespace. The signer keeps the exact string it signed.
 
-Delivery: this slice does not fix how a phone obtains the envelope (endpoint, upload, offline root signing). Whatever carries it is not trusted. Only the root signature makes a statement valid. This is listed under "Left for slice 1b".
+Delivery is in section 6. Whatever carries the envelope is not trusted. Only the root signature makes a statement valid.
 
 The body has these fields:
-
-Fields:
 
 - `type`: the literal `key-rotation`. Anything else is rejected.
 - `appId`: must equal the shell's app id.
 - `sequence`: integer, at least 1. The first statement is 1.
 - `newKey`: 32-byte Ed25519 public key, base64.
-- `validFrom`: ISO 8601 UTC time. It records when the root key holder signed the statement. It is for audit and for the clock-skew check below. It is never used for expiry, and a statement does not become invalid with age.
+- `validFrom`: ISO 8601 UTC time. The statement takes effect when the runtime's clock reaches it (section 7). It is never used for expiry: a statement does not become invalid with age. For an emergency rotation the signer sets it to the signing time or earlier.
 
 The runtime accepts a statement only if all of these hold:
 
 1. The signature over `body` verifies against the pinned root key. A statement signed by a release key or any other key is rejected.
 2. `type` and `appId` match.
 3. `sequence` is higher than the effective sequence: the larger of the stored sequence (0 if none) and the build's minimum sequence (section 4). A statement with a sequence number not higher than the stored one is rejected. This stops replay of old statements.
-4. `validFrom` is not more than 24 hours in the future. This only rejects statements with a wildly wrong time. It is not a delay: the statement takes effect at once when accepted.
+4. `validFrom` is not more than 90 days after the runtime's current time. This bounds how long a statement can stay pending.
 5. `newKey` decodes to 32 bytes.
 
-One statement is accepted at a time in this slice. On accept the runtime writes the new key and the new sequence together, then uses the new key for the next check. The old key is rejected from then on. There is no overlap period.
+A statement that passes these checks is either applied or kept pending, by the rules in section 7. When a statement is applied the runtime writes the new key and the new sequence together, then uses the new key for the next check. The old key is rejected from then on. There is no overlap period.
 
 Sequence numbers only go up. The statement does not carry the previous key, so a runtime that missed statement 1 can still accept statement 2. A phone that has stored 1 and sees sequence 3 accepts it and skips 2. The cost: a phone that missed a statement moves straight to the newest key.
 
@@ -81,7 +79,7 @@ Rules for both:
 - If the stored values are missing or unreadable, the runtime falls back to the pinned release key. It never falls back to "no check".
 - Clearing app data or reinstalling drops the stored key and sequence. The phone returns to the pinned release key, and the effective sequence falls back to the build's `MIN_SEQUENCE`. A replay of any statement at or below `MIN_SEQUENCE` still fails. Statements above it are accepted, which is correct: they are newer than the build.
 
-The names of the storage keys and the new manifest and plist entries are proposals. Slice 1b fixes them in the build plan.
+The names of the storage keys and the new manifest and plist entries are fixed by this design, plus one more storage key, `rotation.pending` (section 7). Slice 2 and slice 3 in section 11 create them.
 
 ## 5. Checks that stay unchanged
 
@@ -108,12 +106,107 @@ In the callers (`ShipvoRuntimeModule.kt`, `packages/runtime/ios/Updater.swift`),
 - `min_shell_version` must not be above the shell version.
 - Patch size and SHA-256, and the patched bundle size and SHA-256, must match.
 
-The only change in the callers is the key passed to `ed25519` for the pointer envelope. That change is slice 1b's build plan, not this document.
+The only change in the callers is the key passed to `ed25519` for the pointer envelope. That change is in the build plan in section 11, not in this document.
 
-## Left for slice 1b
+## 6. Delivery
 
-- How a phone obtains a statement: endpoint, who uploads it, and how the root key signs offline without a publish token
-- Pending statements
-- Emergency rotation
-- Abuse by a stolen publish token
-- Tests and slice plan
+- **Signing.** The root key holder signs offline with `shipvo keys rotate sign` (slice 4). The command reads the root seed from a file the holder gives it, never from the control plane, and prints the envelope.
+- **Upload.** `shipvo keys rotate upload` sends the envelope to `POST /rotation/<app>` on the control plane. The route needs a signed-in owner (an admin session). A publish token gets 403, and so does any agent token, the owner token included (`services/control-plane/src/owner.ts` lets agents hold it). The control plane checks the signature against the root *public* key registered for the app. The owner registers that key once, with `PUT /rotation/<app>/root` (same admin-session rule, slice 5), using the root public key; it is the same value as `dev.shipvo.ROOT_KEY` in the shell build. The registered key cannot be changed over the air (section 2). The server applies only these rules: the signature verifies, `type` is `key-rotation`, `appId` matches, `newKey` decodes to 32 bytes, and `sequence` is above the highest stored for the app. It cannot apply section 3 rules 3 and 4 as written, because it does not know any phone's stored sequence or clock. Then it stores the envelope. It is a courier only: phones verify again and never trust the control plane's check.
+- **Fetch.** The pointer response gains a `rotations` array of envelopes with at most 8 entries (the cap in section 8). If more than 8 are stored, the server sends the 8 with the highest sequences, listed in ascending order, so the newest statement always reaches a phone that is behind. The runtime handles `rotations` before it looks at the pointer, so a release signed by a new key can arrive in the same fetch.
+- **Who may upload.** Only a signed-in owner session, never a token. The abuse analysis in section 10 relies on this.
+
+## 7. Pending statements and emergency rotation
+
+The runtime keeps one ordered list of pending statements in `rotation.pending`, sorted by `sequence`. A statement is pending when it is valid but its `validFrom` is later than the clock.
+
+One rule, run on every fetch and on every launch:
+
+1. Check each delivered statement by the order in section 8, then drop any whose `sequence` is not above the effective sequence.
+2. Among all known statements (delivered and already pending) whose `validFrom` is at or before the clock, pick the one with the **highest sequence**. Apply it: write its key and sequence, and delete every statement in the pending list with a lower or equal sequence. A statement that is applied is never replaced by a lower one.
+3. Keep the rest, which have a later `validFrom` and a higher sequence than the applied one, in the pending list. At most 8 are kept. If more than 8 remain, the lowest sequences are kept and the rest are dropped. Dropped statements are delivered again: the server always sends the 8 highest sequences (section 6), so a phone that holds 8 low pending statements and drops a higher one will see it on a later fetch. Keeping the lowest is safe because the lowest are the ones that come due first, and the newest due statement is never lost, since the server resends it. If the server has more than 8 statements, a phone behind by more than 8 receives only the top 8 and applies the highest due one (section 8).
+4. Two different statements with the same `sequence`: the first one the runtime accepted stays, and the other is rejected. The same bytes delivered twice are a no-op.
+
+What this means:
+
+- **A second statement while one is pending.** Both are kept in sequence order. Each applies when the clock reaches its `validFrom`, lowest sequence first, unless a higher one is already due (then step 2 skips the lower).
+- **Emergency after planned.** Planned statement 1 has `validFrom` in 7 days. The root key holder then signs statement 2 with `validFrom` set to now. Statement 2 is due, has the higher sequence, and applies at once. Statement 1 is dropped, and never applies. This works even when statement 2's `validFrom` is earlier than statement 1's. The emergency statement must always have a higher sequence than every statement it should override. The signer tool picks the next free sequence and refuses to sign an emergency statement with a lower one.
+- **Planned after emergency.** Statement 2 applied, statement 1 arrives late: its sequence is not above 2, so it is rejected.
+- **Relaunch.** `rotation.pending` is written in the same atomic write as the key and sequence. On launch the runtime reads it, checks the clock, and applies due statements before it checks any pointer. A corrupt `rotation.pending` is cleared and the key and sequence are kept.
+
+## 8. Chain cap and order of checks
+
+The cap is **8** statements. It applies to one delivery (the `rotations` array) and to the stored pending list. Sequences may skip, so a phone never needs a long chain: only the newest due statement matters.
+
+The runtime checks in this order, and stops at the first failure:
+
+1. The `rotations` array has at most 8 entries. A longer array is rejected whole **before any signature is verified**, so a long list of junk costs one length check.
+2. The envelope's `body` and `signature` are strings and `body` is at most 1 KB.
+3. The signature over `body` verifies against the pinned root key.
+4. Then the parse and the field rules in section 3.
+
+Slice plan and tests below use the same number.
+
+## 9. Time rule
+
+The runtime takes the time from an injectable clock, `Clock.now()`, with one implementation that reads the wall clock and one that tests set. Android and iOS both have it (slices 2 and 3). No rotation code reads the system time directly. Emulator and simulator tests set the clock and move it forward, so no test sleeps.
+
+The wall clock can be wrong, or changed by the user. The effect is limited, because statements are root-signed:
+
+- A clock set forward applies a pending statement early. The statement is still one the root key holder signed.
+- A clock set backward only delays a pending statement. It never undoes an applied one, because sequences go up.
+- The 90-day bound in section 3 rule 4 uses the same `Clock`, so a wrong clock moves that bound too.
+- A clock far in the past makes check 4 in section 3 pass for a statement that is far in the future. This is accepted.
+
+## 10. Abuse
+
+**A publish token alone can never rotate.** The runtime requires a root signature, the root *private* key is not on the control plane or in CI, and the upload route needs a signed-in owner session (section 6). The control plane holds only the root *public* key. A publish token can upload releases, but phones load them only if they are signed by the current release key. A publish token cannot change which key phones trust.
+
+**M-of-N is not in v1.** One offline root key already blocks the main threat, a stolen CI token. M-of-N would need a new wire format and a signing ceremony, and it does not help a team of one. The format has room for it later (a `signatures` list), which would be a new `type` and a migration note.
+
+**A recovery delay is not in v1 for emergency rotation.** The delay would be the time an attacker with a leaked release key stays trusted, and we want that as short as possible. A *planned* rotation already has a delay: the signer picks `validFrom`. Anyone who steals the root key can rotate at once, which is why a leaked root key needs a new store build (section 2).
+
+**Owner notification is not shipped in v1.** There is no email or webhook when a statement is uploaded. The record is an audit log entry (`key-rotation`, with sequence and `validFrom`) that `shipvo audit <app>` already prints. Owners must look.
+
+Other limits we state plainly:
+
+- Someone who controls the network can withhold a statement. The phone then keeps trusting the old key. There is no freshness proof in v1.
+- A leaked release key stays trusted on a phone until that phone fetches the statement.
+- Replay is stopped by the sequence rule in section 3.
+
+## 11. Tests and build plan
+
+### Tests
+
+Run on the Android emulator and the iOS Simulator in CI, with the test clock from section 9. Each test starts from a fresh install that pins root key R, release key K1, `MIN_SEQUENCE` 0. A test passes only if it passes on both.
+
+| # | Test | Expected |
+| --- | --- | --- |
+| 1 | Statement 1 signed by R, naming K2 | Applied. A pointer signed by K2 is accepted, one signed by K1 is rejected. |
+| 2 | Statement signed by K1 (the old release key) | Rejected. K1 stays current. |
+| 3 | Statement signed by a different, forged root key | Rejected. Nothing stored. |
+| 4 | Statement 1 applied, then the same envelope again | Rejected (sequence not above 1). Key and sequence unchanged. |
+| 5 | Statement 1 (`validFrom` in 7 days) pending, then statement 2 (`validFrom` in 14 days) | Both in `rotation.pending` in order. At day 7 key K2 applies, at day 14 key K3 applies. |
+| 6 | Statement 1 (`validFrom` in 7 days) pending, then statement 2 (`validFrom` now, naming K3) | K3 applies at once. Statement 1 is dropped. At day 7, nothing changes. |
+| 7 | A `rotations` array with 9 entries (the last valid, the rest invalid) | Rejected whole. The test counts signature verifications and expects 0. An 8-entry array with a valid last entry is accepted. |
+| 8 | Statement pending, app killed and relaunched, clock moved past `validFrom` | Pending list survives. The statement applies on launch before the first pointer check. |
+| 9 | Control plane holds 10 statements (sequences 1 to 10); a phone that pinned sequence 0 fetches | The response has 8 entries, sequences 3 to 10 in ascending order. The phone accepts the array and applies sequence 10 (if due). The server side is also tested in `services/control-plane/test/rotation.test.ts`. |
+
+Also in the Android and iOS unit suites: same sequence with different bytes (rule 4 in section 7), a corrupt `rotation.pending`, and `validFrom` more than 90 days ahead.
+
+### Slices
+
+Each is under 400 changed lines. Slice 1 is this document.
+
+| Slice | What | Files it touches |
+| --- | --- | --- |
+| 2 | Android: `Clock`, `Rotation.kt` (checks, pending list, apply), storage in `Store.kt`, manifest entries, wired into the pointer check, instrumented tests 1 to 9 | `packages/runtime/android/src/main/java/dev/shipvo/runtime/Rotation.kt`, `Store.kt`, `ShipvoRuntimeModule.kt`, `AndroidManifest.xml`, `packages/runtime/android/src/androidTest/` |
+| 3 | iOS: the same, with the same test vectors | `packages/runtime/ios/Rotation.swift`, `Store.swift`, `Updater.swift`, `packages/runtime/ios/Tests/` |
+| 4 | CLI: `shipvo keys rotate sign` and `upload`, a shared vector file for slices 2 and 3 | `packages/cli/src/signing.ts` (new commands only, no change to the existing checks in section 5), `packages/cli/src/rotation.ts`, `packages/cli/test/rotation.test.ts` |
+| 5 | Control plane: `POST /rotation/<app>` and `PUT /rotation/<app>/root` (admin session only), migration `0020_...`, storage, `rotations` in the pointer response, audit entry | `services/control-plane/migrations/0020_...sql`, `services/control-plane/src/rotation.ts`, `index.ts`, `audit.ts` (add `key-rotation` to the `action` type), `services/control-plane/test/rotation.test.ts` |
+| 6 | Audit view and docs: a `shipvo audit` test that a `key-rotation` row prints in JSON and CSV, and the user guide | `packages/cli/test/audit.test.ts`, `docs/cli.md`, `docs/threat-model.md` |
+
+The CLI `packages/cli/src/audit.ts` needs no code change: it prints whatever rows the control plane returns. Slice 6 adds the test that proves it.
+
+**Migration needed.** `services/control-plane/migrations/0016_audit_log.sql` has `CHECK (action IN ('publish','rollback','halt'))`, so a `key-rotation` row is refused until a new migration widens it. Slice 5 therefore includes a new migration (`0020_...`) that widens the CHECK to add `key-rotation`. Migrations are guarded code: slice 5 must pass the merge contract (`.github/agents/contract.md`, C4) on its head commit. The upload route does not ship without the audit row.
+
+Slices 2, 3 and 5 change guarded code. Each must pass the merge contract (`.github/agents/contract.md`) on their head commit. Slice 4 changes guarded signing code and the same applies.
