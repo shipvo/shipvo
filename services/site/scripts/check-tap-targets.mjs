@@ -3,7 +3,9 @@
 import { readFileSync } from "node:fs";
 const read = (f) => readFileSync(new URL("../public/" + f, import.meta.url), "utf8");
 const site = read("site.css"), road = read("roadmap.css");
-const phone = site.slice(site.indexOf("@media(max-width:980px){"));
+const start = site.indexOf("@media(max-width:980px){");
+const next = site.indexOf("@media", start + 1);
+const phone = site.slice(start, next === -1 ? undefined : next);
 const fail = (m) => { console.error("tap targets check failed: " + m); process.exit(1); };
 for (const sel of ["pre.term .term-copy", ".edit", ".legal-nav a", ".legal-links a"]) {
   const re = new RegExp("html body " + sel.replace(/[.]/g, "\\.") + "[^{]*\\{[^}]*min-height:44px");
