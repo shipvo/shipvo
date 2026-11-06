@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ci, WORKFLOW_PATH } from "../src/ci";
+import { ci, WORKFLOW_PATH, CHECK_WORKFLOW, CHECK_WORKFLOW_PATH } from "../src/ci";
 
 const yaml = createRequire(import.meta.url)("js-yaml") as { load: (s: string) => any };
 const TEMPLATE = join(__dirname, "..", "..", "..", "templates", "capacitor", "github-actions", "build.yml");
@@ -68,5 +68,19 @@ describe("capacitor build template", () => {
 
   it("has no inline secret values", () => {
     expect(text).not.toMatch(/(PASSWORD|KEY_ALIAS|BASE64)\s*:\s*(?!\$\{\{)\S/);
+  });
+});
+
+describe("shipvo ci init --check", () => {
+  it("writes the embedded workflow without needing a templates/ directory", async () => {
+    quiet();
+    const cwd = mkdtempSync(join(tmpdir(), "shipvo-ci-"));
+    expect(await ci(["init", "--check"], cwd)).toBe(0);
+    expect(readFileSync(join(cwd, CHECK_WORKFLOW_PATH), "utf8")).toBe(CHECK_WORKFLOW);
+  });
+
+  it("embedded text equals the template file in the repo", () => {
+    const tpl = join(__dirname, "..", "..", "..", "templates", "github-action", "shipvo-check.yml");
+    expect(CHECK_WORKFLOW).toBe(readFileSync(tpl, "utf8"));
   });
 });

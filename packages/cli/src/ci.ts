@@ -37,15 +37,28 @@ export async function ci(argv: string[], cwd = process.cwd()): Promise<number> {
   return 0;
 }
 
+/** Embedded so it ships in the npm package. Keep equal to `templates/github-action/shipvo-check.yml` (a test checks this). */
+export const CHECK_WORKFLOW = `name: Shipvo check
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  shipvo-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shipvo/shipvo/actions/check@main
+`;
+
 export const CHECK_WORKFLOW_PATH = join(".github", "workflows", "shipvo-check.yml");
 
 /** `shipvo ci init --check`: copy the pull request check workflow into the app's repo. */
 function initCheck(a: Record<string, string | undefined>, cwd: string): number {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const rel = join("templates", "github-action", "shipvo-check.yml");
-  const src = [join(here, rel), join(here, "..", "..", "..", rel)].find((c) => existsSync(c));
-  if (!src) throw new Error("template for the Shipvo check not found");
-  const body = readFileSync(src, "utf8"); const target = resolve(cwd, CHECK_WORKFLOW_PATH);
+  const body = CHECK_WORKFLOW; const target = resolve(cwd, CHECK_WORKFLOW_PATH);
   if (a["dry-run"] !== undefined && a["dry-run"] !== "false") { console.log(`Would write ${CHECK_WORKFLOW_PATH}. Nothing was written.\n`); console.log(body); return 0; }
   if (existsSync(target) && (a.force === undefined || a.force === "false")) { console.error(`${CHECK_WORKFLOW_PATH} already exists. Use --force to overwrite it.`); return 1; }
   mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, body);

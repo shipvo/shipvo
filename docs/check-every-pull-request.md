@@ -41,6 +41,10 @@ Not yet: screenshots and a recording in the comment, and `shipvo explore --chang
 
 On a pull request from a fork the token is read-only, so the comment cannot be posted. The result is in the job log, the job summary and `shipvo-check/comment.md`.
 
-The template uses `shipvo/shipvo/actions/check@main`, a moving ref. Pin a release tag once one exists.
+The template uses `shipvo/shipvo/actions/check@main`, a moving ref, in a workflow that has `pull-requests: write`. Pin a release tag or a commit SHA once one exists.
+
+The action runs `npx --no-install shipvo`, so add `@shipvo/cli` to your `devDependencies`.
+
+`--compare-base` runs the base commit in a worktree that links the pull request's `node_modules`. If the pull request changed dependencies, the base run may use the wrong versions.
 
 The simulator runs the web build in headless Chromium. See [parity-results](parity-results.md). 
