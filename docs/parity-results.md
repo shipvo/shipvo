@@ -75,7 +75,7 @@ Planned, in this order: enabled/selected state in the match key; element order; 
 
 ## Known differences
 
-1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines; the agent sees the same information, grouped differently. That is the remaining text gap (89% on "Order placed").
+1. **Text grouping on iOS:** the "Order placed" rows (heading, lines, total, address) are separate elements on iOS too, so they already match. The one real grouping gap was the "order confirmed" banner: iOS reads it as one button label, and the simulator also listed its two inner lines as separate text. Fixed in the simulator (issue #589). Found in the [iOS parity run of 2026-11-05](https://github.com/shipvo/shipvo/actions/runs/42015379557) (Order placed text coverage 85%, B 69%, C 77%). The new number is not published yet: it needs a `parity-ios` run on the fixed simulator, and this page will be updated from that run.
 2. **On-screen keyboards** exist only on devices. Fields behave the same, but a device agent may need to dismiss the keyboard; the drivers do this.
 3. **Native-only features** (camera, push, payment sheets) aren't in the simulator. Flows that need them run on the emulator or device lanes.
 

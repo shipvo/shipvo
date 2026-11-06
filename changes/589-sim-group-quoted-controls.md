@@ -1,0 +1,1 @@
+- `@shipvo/sim`: a control whose label contains ": " (for example the order-confirmed banner) now reads as one label, as on iOS. Its inner text lines are no longer listed as separate text. Migration: text matchers that targeted those inner lines should match the control's label.

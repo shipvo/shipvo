@@ -39,7 +39,8 @@ export function filterTree(tree) {
     hideBelow = -1;
     if (/\[aria-hidden\]/.test(l)) { hideBelow = indent; continue; }   // hidden from assistive tech: not on screen
     out.push(l);
-    if (/^\s*- (button|radio|link|checkbox|switch|tab) "[^"]+"/.test(l) && /:\s*$/.test(l)) hideBelow = indent;
+    // The snapshot YAML-quotes a line whose label has ": " in it (`- 'button "Notification: ..." [ref=e1]':`).
+    if (/^\s*- '?(button|radio|link|checkbox|switch|tab) "[^"]+"/.test(l) && /:\s*$/.test(l)) hideBelow = indent;
   }
   return out.join("\n");
 }
