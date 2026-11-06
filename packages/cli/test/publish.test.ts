@@ -469,3 +469,29 @@ describe("isInside (dry-run writes stay under the output dir)", () => {
     expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run/../x", p)).toBe(false);
   });
 });
+
+describe("missing listing files", () => {
+  it("prints an optional note for a missing icon and screenshot, never 'not found'", async () => {
+    const { uploadListingFile } = await import("../src/publish.js");
+    const put = vi.fn();
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await uploadListingFile({ put }, "w/app/store", "/nonexistent/assets/icon.png", "icon")).toBeNull();
+      expect(await uploadListingFile({ put }, "w/app/store", "shots/a.png", "shot-1")).toBeNull();
+      const out = err.mock.calls.map((c) => c.join(" "));
+      expect(out).toEqual([
+        "No app icon yet (optional). Add /nonexistent/assets/icon.png to show one in the store.",
+        "No screenshot yet (optional). Add shots/a.png to show it in the store.",
+      ]);
+      expect(out.join("\n")).not.toContain("not found");
+      expect(put).not.toHaveBeenCalled();
+    } finally { err.mockRestore(); }
+  });
+  it("uploads a file that exists", async () => {
+    const { uploadListingFile } = await import("../src/publish.js");
+    const f = join(mkdtempSync(join(tmpdir(), "lst-")), "icon.PNG"); writeFileSync(f, "x");
+    const put = vi.fn();
+    expect(await uploadListingFile({ put }, "w/app/store", f, "icon")).toBe("icon.png");
+    expect(put).toHaveBeenCalledWith("w/app/store/icon.png", expect.any(Uint8Array), "image/png");
+  });
+});

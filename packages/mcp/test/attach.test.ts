@@ -69,6 +69,8 @@ describe("open_app attach", { timeout: 30_000 }, () => {
     const t = await c.callTool({ name: "tap", arguments: { session: /session: (\S+)/.exec(text)![1], ref: "e1" } }) as { content: { text: string }[] };
     expect(t.content[0].text).toContain(TREE);
     expect(seen.some((m) => m.type === "tap" && m.ref === "e1")).toBe(true);
+    // Lumi is told about the open from the real result (#874); the page captions tap, type, scroll and back itself.
+    expect(seen.some((m) => m.type === "lumi" && m.caption === "Opened menu" && m.state === "working")).toBe(true);
     await c.close();
   });
   it("attaches to the live run's app without a simulator that knows it", async () => {
@@ -95,6 +97,21 @@ describe("open_app attach", { timeout: 30_000 }, () => {
       expect(denied.isError).toBe(true); expect(denied.content[0].text).toContain("unknown_app");
       expect(denied.content[0].text).toContain("this key opens: menu");
     } finally { proc.kill(); }
+  });
+  it("attach_session attaches without an app id, and errors when no run is live", async () => {
+    runJson(process.pid, "tok", "founder");
+    const { c, text } = await open({ attach: "never" });
+    await text; // a headless open first, to get a connected client
+    const r = await c.callTool({ name: "attach_session", arguments: {} }) as { isError?: boolean; content: { text: string }[] };
+    expect(r.isError).toBeFalsy();
+    expect(r.content[0].text).toContain("app: founder");
+    expect(r.content[0].text).toContain("attached to the live shipvo run phone");
+    const other = await c.callTool({ name: "attach_session", arguments: { app: "someotherapp" } }) as { isError?: boolean; content: { text: string }[] };
+    expect(other.isError).toBe(true); expect(other.content[0].text).toContain("no_live_run");
+    runJson(2 ** 22 + 12345);
+    const n = await c.callTool({ name: "attach_session", arguments: {} }) as { isError?: boolean; content: { text: string }[] };
+    expect(n.isError).toBe(true); expect(n.content[0].text).toContain("no_live_run");
+    await c.close();
   });
   it("maps taken_over to a clear tool error", async () => {
     runJson(process.pid);
