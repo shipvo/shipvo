@@ -58,6 +58,10 @@ This section is set by the owner. The Head of Product plans from it and does not
 
 **Risks to watch:** Apple and Google rules on updates (stay on interpreted code and declared capabilities, and document compliance publicly); trust in AI-written code (the merge contract and test evidence are the answer, never hidden); and adoption (only real users prove anything).
 
+### Shipvo for coding agents (owner, 6 Nov 2026)
+
+Any coding agent sets up and uses Shipvo by itself from one line: `npx skills add shipvo/shipvo --skill shipvo -g`, or `curl -fsSL https://shipvo.dev/install.sh | bash`, or "run `npx -y @shipvo/cli agents setup`". Every command answers in JSON with exit codes and the next command to run; packages ship their own skills. Expo has `@expo/agent-cli` and Expo Simulators in preview; Shipvo must be at least as easy for agents and give them more (a whole phone, testing, demos, the store path, signed updates). Epic #533.
+
 ### Shipvo Testers (owner, 5 Nov 2026)
 
 The Shipvo Testers Google Group is live: `shipvo-testers@googlegroups.com` (join: https://groups.google.com/g/shipvo-testers, short link planned at shipvo.dev/testers). Anyone can join; members cannot see each other's addresses; only managers post. Founders on new personal Play accounts add it as a tester group on their closed track to help meet the 12-testers / 14-days rule, and join it themselves to test other founders' apps. Never publish member counts or promise a number of testers.

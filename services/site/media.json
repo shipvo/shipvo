@@ -1,5 +1,6 @@
 [
+  {"slug":"get-your-12-testers","file":"videos/get-your-12-testers-75848c18.mp4","bytes":2733062,"sha256":"75848c18c95fe1e9c328d84a7473a76700a2b1c34fa90aa65da94221bc90e7c4","duration_s":102.3,"title":"Get your 12 Google Play testers with Shipvo Testers","created":"2026-11-06","credits":"/videos/get-your-12-testers.credits.json"},
   {"slug":"test-with-an-assistant","file":"videos/test-with-an-assistant-e368a4d3.mp4","bytes":2485227,"sha256":"e368a4d3d359cbd97c0378f4ffdcac6f2b617ac51b4b6718bd333692f8a7cb4f","duration_s":90.2,"title":"Have an AI assistant test your shop before every release","created":"2026-11-05","credits":"/videos/test-with-an-assistant.credits.json"},
-  {"slug":"first-app","file":"videos/first-app-c7c64eb7.mp4","bytes":1417094,"sha256":"c7c64eb7ee6e095994c3f171f126dceede76d5671e2bb0133ba4626310e6066a","duration_s":97.2,"title":"Create your first app on a simulated phone","created":"2026-11-05"},
+  {"slug":"first-app","file":"videos/first-app-eb0eb0b3.mp4","bytes":2752288,"sha256":"eb0eb0b345c5343551639c6786523074c634d564fea46ed15d3c622d92b6e3ba","duration_s":99.1,"title":"Create your first app on a simulated phone","created":"2026-11-05","credits":"/videos/first-app.credits.json"},
   {"slug":"ship-an-update","file":"videos/ship-an-update-988335b3.mp4","bytes":1337668,"sha256":"988335b3c6e2b8ae57befa6aa15eda3b1c2b9c1e69f040bcf6c7d14d27bcb0ce","duration_s":90.1,"title":"Ship an update to phones in minutes","created":"2026-11-04"}
 ]

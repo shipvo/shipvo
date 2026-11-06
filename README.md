@@ -56,6 +56,16 @@ npx expo run:android             # the native shell; `shipvo publish` ships chan
 
 Guides: [Build your first app](docs/getting-started.md) · [Tutorials](docs/tutorials/index.md) · [CLI](docs/cli.md) · [Test your app in CI](docs/testing.md) · [Test with an assistant](docs/test-with-an-assistant.md) · [Store release](docs/store.md) · [Frameworks and adapters](docs/adapters.md) · [Migrate from CodePush](docs/migrate-from-codepush.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
 
+## Use Shipvo with your coding agent
+
+Install the Shipvo skill. It teaches your agent to set up Shipvo, run the app on Shipvo Phone, test it, publish and roll back signed updates, start the store path and record a demo.
+
+- With npm: `npx skills add shipvo/shipvo --skill shipvo -g`
+- Without: `curl -fsSL https://shipvo.dev/install.sh | bash` (planned, see [#533](https://github.com/shipvo/shipvo/issues/533))
+- Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints." (`agents setup` is planned.)
+
+The skill is in [`skills/shipvo`](skills/shipvo/SKILL.md). A test checks that every command it names exists in `shipvo help`.
+
 ## Use an app as an AI agent (no phone)
 
 [![Shipvo MCP server](https://mcprush.com/badge/shipvo-mcp/card.svg)](https://mcprush.com/to/shipvo-mcp?ref=badge)
