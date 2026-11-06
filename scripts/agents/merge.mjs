@@ -171,6 +171,17 @@ for (const pr of prs) {
     for (const r of cancelled) act(`rerun cancelled job ${r.name} on #${n}`, () => gh("api", "-X", "POST", `repos/${REPO}/actions/jobs/${r.id}/rerun`));
     continue;
   }
+  // An approved PR whose checks failed on an old base: main may already hold the fix (e.g. the
+  // first-run windows leg), and no fixer watches every workflow. Bring main in once and let CI rerun.
+  if (failed.length && !pending.length && quietMin > 30) {
+    let behind = 0;
+    try { behind = api(`repos/${REPO}/compare/${full.base.ref}...${full.head.sha}`).behind_by || 0; } catch {}
+    if (behind > 0) {
+      act(`update branch #${n} (${failed.length} failed check(s) on a base ${behind} commit(s) behind main)`,
+        () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/update-branch`));
+      continue;
+    }
+  }
   if (pending.length || failed.length || !hasCI) {
     log(`#${n}: checks not green (pending ${pending.length}, failed ${failed.length}, ci ${hasCI})`);
     continue;
