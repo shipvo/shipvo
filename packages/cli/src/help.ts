@@ -4,6 +4,7 @@ export const COMMANDS = [
 ] as const;
 
 export const help = `shipvo <command>
+       shipvo --version | -v [--json]   Print the installed @shipvo/cli version
 
 Start
   init <dir> [--json]         Create a new app wired to Shipvo
