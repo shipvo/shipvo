@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import app from "../src/index";
 import { hmacHex } from "../src/installs";
 import { TELEMETRY_LIMITS as T, REGISTER_LIMITS as R } from "../src/ratelimit";
@@ -13,6 +13,10 @@ function env() {
 const ev = (extra: object = {}) => ({ schema_version: "1.0", app_id: "tide", release: 1, event: "applied", ...extra });
 const post = (e: any, body: unknown, ip: string) => app.request("/t", { method: "POST", body: JSON.stringify(body), headers: { "cf-connecting-ip": ip } }, e);
 const reg = (e: any, body: unknown, ip: string) => app.request("/t/register", { method: "POST", body: JSON.stringify(body), headers: { "cf-connecting-ip": ip } }, e);
+
+// The limiter uses fixed windows. Pin the clock to the middle of one so a slow run cannot cross a boundary and reset a count.
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date(1_700_000_000_000 + 17_000)); });
+afterEach(() => vi.useRealTimers());
 
 describe("POST /t rate limits", () => {
   it("passes requests under the limits, including old runtimes with no install id", async () => {
