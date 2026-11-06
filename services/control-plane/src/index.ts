@@ -10,6 +10,7 @@ import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
+import { rotationRoutes, rotationsFor } from "./rotation";
 import { decideOffer, type OfferResult } from "./offer";
 import { TELEMETRY_LIMITS, check as rateCheck } from "./ratelimit";
 import { installs, verifyReport } from "./installs";
@@ -28,6 +29,14 @@ function safeEqual(a: string, b: string) { if (a.length !== b.length) return fal
 async function owner(c: any, appId: string): Promise<string | null> {
   const auth = c.req.header("authorization") ?? "";
   if (c.env.OWNER_TOKEN && auth.startsWith("Bearer ") && safeEqual(auth.slice(7), c.env.OWNER_TOKEN)) return AGENT_ACTOR;
+  const cookie = getCookie(c, "pn_admin");
+  if (!cookie || !c.env.ADMIN_PASSWORD) return null;
+  const [app_, exp, sig] = cookie.split(".");
+  if (app_ !== appId || Number(exp) < Date.now()) return null;
+  return safeEqual(sig ?? "", await hmac(c.env.ADMIN_PASSWORD, `${app_}.${exp}`)) ? "owner (admin)" : null;
+}
+/** The signed admin cookie only. The owner token and publish tokens never pass (used by /rotation). */
+async function adminSession(c: any, appId: string): Promise<string | null> {
   const cookie = getCookie(c, "pn_admin");
   if (!cookie || !c.env.ADMIN_PASSWORD) return null;
   const [app_, exp, sig] = cookie.split(".");
@@ -70,11 +79,19 @@ async function servePointer(c: any, platform: "android" | "ios") {
   if (!offer) return c.json({ error: "corrupt_pointer" }, 500);
   if (!offer.ok) {
     const { ok: _ok, status, ...json } = offer;
-    return c.json(json, status, status === 404 ? { "cache-control": "public, max-age=5" } : undefined);
+    // A halted or out-of-band answer still carries rotations: an emergency statement must reach every phone.
+    const more = c.env.DB ? await rotationsFor(c.env.DB, appId) : { rotations: [], top: 0 };
+    return c.json(more.rotations.length ? { ...json, rotations: more.rotations } : json, status, status === 404 ? { "cache-control": "public, max-age=5" } : undefined);
   }
   const release = offer.release;
   const etag = `"${release}"`;
-  if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
+  // Statements ride along (design section 6). A new statement changes the ETag so phones do not get a stale 304.
+  const rot = c.env.DB ? await rotationsFor(c.env.DB, appId) : { rotations: [], top: 0 };
+  const tag = rot.rotations.length ? `"${release}-r${rot.top}"` : etag;
+  if (c.req.header("if-none-match") === tag) return new Response(null, { status: 304, headers: { ETag: tag } });
+  if (rot.rotations.length) {
+    return new Response(JSON.stringify({ ...JSON.parse(raw), rotations: rot.rotations }), { headers: { "content-type": "application/json", ETag: tag, "cache-control": "public, max-age=5" } });
+  }
   return new Response(raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
 }
 app.get("/p/:app/:major/ios/:band", (c) => servePointer(c, "ios"));
@@ -495,13 +512,14 @@ app.get("/audit/:app", async (c) => {
   if (bq !== undefined && !/^\d+$/.test(bq)) return c.json({ error: "bad_request", message: "before must be a row id" }, 400);
   const n = Math.min(limit, 200);
   const { results } = await c.env.DB.prepare(
-    `SELECT id, app_id, at, actor, actor_kind, action, release, release_id, before, after FROM audit_log WHERE app_id = ?${bq !== undefined ? " AND id < ?" : ""} ORDER BY id DESC LIMIT ?`,
+    `SELECT id, app_id, at, actor, actor_kind, action, release, release_id, before, after FROM audit_log_v2 WHERE app_id = ?${bq !== undefined ? " AND id < ?" : ""} ORDER BY id DESC LIMIT ?`,
   ).bind(...(bq !== undefined ? [appId, Number(bq), n] : [appId, n])).all();
   return c.json({ app: appId, rows: results ?? [] }, 200, { "cache-control": "no-store" });
 });
 
 app.route("/auth", auth);
 app.route("/vault", vaultRoutes(owner));
+app.route("/rotation", rotationRoutes(adminSession));
 app.route("/apps", apps);
 
 /** Hourly cron: copy new telemetry to the owner's R2 bucket as Parquet (only when the EXPORT_BUCKET binding is set). */

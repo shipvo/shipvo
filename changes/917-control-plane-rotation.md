@@ -1,0 +1,2 @@
+- `control-plane`: new `POST /rotation/<app>` and `PUT /rotation/<app>/root` (signed-in owner only; publish tokens and the owner token get 403) store root-signed key rotation statements. Pointer responses gain a `rotations` array (at most 8, ascending). Each upload writes a `key-rotation` audit row.
+- Migration: `0022_key_rotation.sql` adds `rotation_roots`, `rotations` and `audit_log_v2` (the audit table with `key-rotation` allowed; existing rows are copied). `GET /audit/<app>` now reads `audit_log_v2`. Additive and safe to run twice. Deploy the migration before the Worker.
