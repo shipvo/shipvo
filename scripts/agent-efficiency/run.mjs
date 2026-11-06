@@ -18,7 +18,11 @@ const PORT = Number(arg("port", 4751)), AGENT = process.env.BENCH_AGENT_CMD || "
 const TIMEOUT_MS = Number(process.env.BENCH_TIMEOUT_S || 900) * 1000;
 if (!Number.isInteger(RUNS) || RUNS < 1 || RUNS > 5) { console.error("--runs must be a whole number from 1 to 5"); process.exit(2); }
 const app = join(root, "apps/tide-and-tackle");
-if (!existsSync(join(app, "sim-dist/index.html"))) { console.error("No web build found. Run: cd apps/tide-and-tackle && PN_SIM=1 npx expo export --platform web --output-dir sim-dist"); process.exit(2); }
+if (!existsSync(join(app, "sim-dist/index.html"))) {
+  console.error("No web build found; building it with expo export (PN_SIM=1).");
+  const b = spawnSync("npx", ["expo", "export", "--platform", "web", "--output-dir", "sim-dist"], { cwd: app, env: { ...process.env, PN_SIM: "1" }, stdio: "inherit" });
+  if (b.status !== 0 || !existsSync(join(app, "sim-dist/index.html"))) { console.error("The web build failed. Run by hand: cd apps/tide-and-tackle && PN_SIM=1 npx expo export --platform web --output-dir sim-dist"); process.exit(2); }
+}
 const task = JSON.parse(readFileSync(join(app, "agent-eval/tasks.json"), "utf8")).find((t) => t.id === "T1");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -30,18 +34,24 @@ let simDown = false; sim.on("exit", () => { simDown = true; });
 function runAgent(args, env) {
   return new Promise((done) => {
     const t0 = performance.now(); let out = "";
-    const p = spawn(AGENT, args, { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "inherit"] });
-    const timer = setTimeout(() => p.kill("SIGKILL"), TIMEOUT_MS);
+    const p = spawn(AGENT, args, { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "inherit"], detached: true });
+    // Kill the whole process group so the MCP child cannot outlive a hung run.
+    const killGroup = () => { try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch {} } };
+    const timer = setTimeout(killGroup, TIMEOUT_MS);
     p.stdout.on("data", (c) => (out += c));
-    p.on("close", () => { clearTimeout(timer); done({ out, seconds: (performance.now() - t0) / 1000 }); });
+    p.on("close", () => { clearTimeout(timer); killGroup(); done({ out, seconds: (performance.now() - t0) / 1000 }); });
   });
 }
 
 const runs = [];
+let version = null;
+const models = new Set();
+const build = (complete) => ({ date: new Date().toISOString().slice(0, 10), complete, runsPerSide: RUNS, task: task.task, agent: `${AGENT} ${version ?? ""}`.trim(), model: MODEL, modelsUsed: [...models], app: "apps/tide-and-tackle (Tide & Tackle)", node: process.version, runs, summary: summarize(runs) });
+const save = (complete) => { mkdirSync(dirname(resolve(OUT)), { recursive: true }); writeFileSync(OUT, JSON.stringify(build(complete), null, 2) + "\n"); };
 try {
   for (let i = 0; i < 120 && !simDown; i++) { try { if ((await fetch(`${simUrl}/apps`)).ok) break; } catch {} await sleep(500); }
   if (simDown) throw new Error("the simulator exited before it was ready");
-  const version = spawnSync(AGENT, ["--version"], { encoding: "utf8" }).stdout?.trim() || null;
+  version = spawnSync(AGENT, ["--version"], { encoding: "utf8" }).stdout?.trim() || null;
   // Alternate sides inside each round so drift in the service hits both equally.
   for (let n = 1; n <= RUNS; n++) for (const side of ["screenshots", "labelled"]) {
     const session = `bench-${side}-${n}`;
@@ -51,20 +61,21 @@ try {
     const server = side === "screenshots" ? { command: process.execPath, args: [join(root, "scripts/agent-efficiency/baseline-mcp.mjs")], env }
       : { command: process.execPath, args: [join(root, "packages/mcp/dist/server.js")], env };
     const cfg = join(state, `${session}.mcp.json`); writeFileSync(cfg, JSON.stringify({ mcpServers: { phone: server } }));
-    const prompt = `${TASK_PREFIX}${task.task}` + (side === "labelled" ? `\n\n(Your session id is ${session}.)` : "");
+    const prompt = `${TASK_PREFIX}${task.task}` + `\n\n(Your session id is ${session}.)`;
     console.error(`run ${side} ${n}/${RUNS}`);
     const { out, seconds } = await runAgent(claudeArgs({ prompt, mcpConfigPath: cfg, serverName: "phone", model: MODEL }), env);
     const p = parseStream(out);
+    for (const line of out.split("\n")) { try { const ev = JSON.parse(line); if (ev.type === "system" && ev.subtype === "init" && ev.model) models.add(ev.model); } catch {} }
     let sessionState = null; try { sessionState = JSON.parse(readFileSync(join(state, `${session}.json`), "utf8")); } catch {}
     const g = grade(sessionState, task.expect);
     if (!p.finished) g.why.push("agent did not finish (timeout or crash)");
     runs.push({ side, run: n, success: g.success && p.finished, why: g.why, seconds: +seconds.toFixed(1), steps: p.steps, turns: p.turns, tokens: p.tokens, tokensTotal: p.tokensTotal, costUsd: p.costUsd });
+    save(false);   // keep finished runs even if a later one throws
   }
-  const data = { date: new Date().toISOString().slice(0, 10), runsPerSide: RUNS, task: task.task, agent: `${AGENT} ${version ?? ""}`.trim(), model: MODEL, app: "apps/tide-and-tackle (Tide & Tackle)", node: process.version, runs, summary: summarize(runs) };
-  mkdirSync(dirname(resolve(OUT)), { recursive: true });
-  writeFileSync(OUT, JSON.stringify(data, null, 2) + "\n");
+  const data = build(true);
+  save(true);
   mkdirSync(dirname(resolve(DOCS)), { recursive: true });
   writeFileSync(DOCS, renderMarkdown(data));
   console.log(renderMarkdown(data));
-} catch (e) { console.error(`agent-efficiency failed: ${e.message}`); process.exitCode = 1; }
+} catch (e) { console.error(`agent-efficiency failed: ${e.message}`); if (runs.length) { save(false); console.error(`partial results (${runs.length} runs) saved to ${OUT}`); } process.exitCode = 1; }
 finally { sim.kill(); }

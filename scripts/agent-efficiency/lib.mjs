@@ -73,7 +73,7 @@ export function renderMarkdown(data) {
     `One task, done two ways by the same agent with the same model and settings. Measured ${data.date} (${data.runsPerSide} runs per side).`,
     "",
     `- Task: ${data.task}`,
-    `- Agent: \`${data.agent}\`, model setting: ${data.model ?? "default of the CLI"}.`,
+    `- Agent: \`${data.agent}\`, model setting: ${data.model ?? "default of the CLI"}${data.modelsUsed?.length ? ` (model reported by the CLI: ${data.modelsUsed.join(", ")})` : ""}.`,
     `- App: ${data.app}, in the Shipvo phone simulator.`,
     "- **Screenshots side:** the agent gets a screenshot tool and coordinate taps, nothing else.",
     "- **Labelled side:** the agent gets Shipvo's labelled screen tree and typed actions (`@shipvo/mcp`).",

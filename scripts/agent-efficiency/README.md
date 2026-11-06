@@ -5,7 +5,7 @@ One shop task (T1 in `apps/tide-and-tackle/agent-eval/tasks.json`), done twice b
 - **screenshots**: a screenshot tool and coordinate taps (`baseline-mcp.mjs`). The simulator's labelled screen is not returned.
 - **labelled**: `@shipvo/mcp`, the labelled screen tree and typed actions.
 
-Built-in agent tools are off on both sides. Each run gets a fresh simulator session. Success means the app holds exactly one order that matches the task. Steps are tool calls; tokens are summed from the agent's own usage report; cost is the estimate the agent CLI reports.
+Built-in agent tools are off on both sides. Each run gets a fresh simulator session. Success means the app holds exactly one order that matches the task. Steps are tool calls; tokens are summed from the agent's own usage report; cost is the estimate the agent CLI reports. Both sides get the same prompt, including the session id line. If the web build is missing, `run.mjs` builds it first. After each run the partial results are saved and marked incomplete until all runs finish.
 
 ```bash
 pnpm -r --filter "./packages/**" build

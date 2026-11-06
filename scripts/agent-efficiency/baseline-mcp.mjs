@@ -23,7 +23,7 @@ export async function callTool(name, a = {}) {
     return { content: [{ type: "image", data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }] };
   }
   const body = name === "tap" ? { action: "tap_xy", x: a.x, y: a.y } : name === "type_text" ? { action: "type_keys", text: a.text, enter: a.enter === true }
-    : name === "swipe" ? { action: "scroll", ref: a.ref, direction: a.direction } : null;
+    : name === "swipe" ? { action: "scroll", direction: a.direction } : null;
   if (!body) return text(`unknown tool ${name}`, true);
   const r = await act(body);   // the screen tree in the reply is dropped on purpose
   return r.ok ? text("done") : text(r.error ?? "failed", true);
