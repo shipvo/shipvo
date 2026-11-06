@@ -1,0 +1,2 @@
+- cli: `store`, `app` and `sim` take `--json` and print the shared `{ ok, code, summary, data, next }` envelope with documented exit codes.
+- cli: `store testers --json` now prints that envelope; the guide fields moved into `data`. Read `data.optInUrl`, `data.group` and so on instead of the top level.

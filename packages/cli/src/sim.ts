@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
+import { CliFailure, runJson, takeJson, type Done } from "./json-out.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
 export function portFree(port: number): Promise<boolean> {
@@ -119,23 +120,41 @@ export function rebuildInto(opts: { root?: string; command?: string; echo?: bool
   });
 }
 
+const SIM_NEXT = [{ command: "shipvo doctor --json", why: "Check Chromium, the port and your setup." }];
+
+/**
+ * `shipvo sim [--port n] [--watch] [--json]`. With `--json` stdout holds one envelope, printed once the simulator
+ * listens (or once it fails to start). The simulator keeps running after that; its output goes to stderr.
+ */
 export async function sim(argv: string[]) {
+  const { json, rest } = takeJson(argv);
+  if (!json) return simRun(rest, false);
+  await runJson(() => simRun(rest, true) as Promise<Done>, SIM_NEXT);
+}
+
+async function simRun(argv: string[], json: boolean): Promise<Done | void> {
+  // Text mode keeps its plain messages and exit codes. JSON mode throws, so runJson prints the envelope.
+  const die = (msg: string, status: number, code: string): never => {
+    if (json) throw new CliFailure(msg, code, status, SIM_NEXT);
+    console.error(msg); process.exit(status);
+  };
   const a = parse(argv); const cfg = loadConfig();
   const port = a.port || "4545";
   if (!(await portFree(Number(port)))) {
-    console.error(`Port ${port} is in use. Stop the other \`shipvo sim\` or pass --port <n>.`);
-    process.exit(1);
+    die(`Port ${port} is in use. Stop the other \`shipvo sim\` or pass --port <n>.`, 1, "port_in_use");
   }
+  const stdio: "inherit" | ("ignore" | number)[] = json ? ["ignore", 2, 2] : "inherit";
   if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
     console.error(`Building ${cfg.name} for the simulator…`);
-    execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
+    try { execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio, env: { ...process.env, PN_SIM: "1" } }); }
+    catch (e) { if (!json) throw e; die(`The simulator build failed: ${(e as Error).message.split("\n")[0]}`, 1, "build_failed"); }
   }
   try { ensurePlaywright({ cwd: process.cwd() }); }
-  catch (e) { console.error(e instanceof Error ? e.message : String(e)); process.exit(2); }
-  let server: string;
+  catch (e) { die(e instanceof Error ? e.message : String(e), 2, "no_browser"); }
+  let server = "";
   try { server = createRequire(process.cwd() + "/package.json").resolve("@shipvo/sim/server.mjs"); }
-  catch { console.error("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager)."); process.exit(2); }
-  const p = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId, ...(a.dir ? ["--dir", a.dir] : [])], { stdio: "inherit", env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
+  catch { die("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager).", 2, "no_sim"); }
+  const p = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId, ...(a.dir ? ["--dir", a.dir] : [])], { stdio, env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
   let exited = false;
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });
   if (await waitListening(Number(port), () => exited)) {
@@ -144,5 +163,6 @@ export async function sim(argv: string[]) {
       watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto(), verbose: a.verbose === "true" });
       console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");
     }
-  }
+    if (json) return { code: "listening", summary: `Simulator on http://localhost:${port}/app/`, data: { url: `http://localhost:${port}/app/`, port: Number(port), app_id: cfg.appId, watch: a.watch === "true" }, next: [{ command: `shipvo explore --json --sim http://localhost:${port}`, why: "Walk the app in the running simulator." }, { command: "shipvo test --json", why: "Run the app's tests." }] };
+  } else if (json) die("The simulator stopped before it started listening.", 1, "sim_exited");
 }
