@@ -325,6 +325,8 @@ g.__pnDevice = {
   },
 };
 import("./system-settings").then((m) => m.installSystemSettings(g.__pnDevice)).catch(() => { /* no react-native here (tests, SSR) */ });
+// Read by the `shipvo run` network client: the profile to apply, whether the phone is online, and where to log proxied calls.
+g.__pnNet = { profile: () => state.networkProfile, online: () => isOnline(), log: (d: unknown) => log("net", d) };
 export const simState = state;
 export const simLog = log;
 export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });

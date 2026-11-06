@@ -13,6 +13,7 @@
   "exports": {
     "./server.mjs": "./server.mjs",
     "./screen-rules.mjs": "./screen-rules.mjs",
+    "./network-profiles.mjs": "./network-profiles.mjs",
     "./frame.mjs": {
       "types": "./frame.d.mts",
       "default": "./frame.mjs"

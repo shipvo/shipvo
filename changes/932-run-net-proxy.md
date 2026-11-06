@@ -1,0 +1,4 @@
+- `@shipvo/cli`: `shipvo run` sends the app's cross-origin `fetch` and `XMLHttpRequest` calls through `/__shipvo/net` on the run server, so backends without CORS headers answer on the simulated phone. One cookie jar per phone session; network profiles apply; each call is written to the device log.
+- `@shipvo/sim`: exports `network-profiles.mjs`.
+- `@shipvo/device`: the web device exposes `__pnNet` for the run server's network client.
+- Migration: none.
