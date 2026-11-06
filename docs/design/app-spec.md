@@ -250,7 +250,7 @@ The main user is a person in a chat assistant (ChatGPT, Claude, Gemini) connecte
 | Export | To the person's GitHub, a zip link, or PiPilot | The same, plus straight into a local folder |
 | Approvals (new code, new domains, money) | Approval card in the chat | The same approval, in the vault/approval page in the browser; an agent can never approve its own request |
 
-The CLI calls the same engine, so `shipvo app create`, `shipvo app export` and the MCP tools produce identical results.
+The CLI calls the same engine, so `shipvo app create`, `shipvo app export` and the MCP tools run the same code.
 
 ### 15.2 The ladder
 
