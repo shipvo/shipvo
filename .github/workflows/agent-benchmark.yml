@@ -1,0 +1,63 @@
+name: agent-benchmark
+# Owner decision (6 Nov 2026, #837): the agent-efficiency benchmark runs here, once, started by the owner,
+# using the model access the team's Claude jobs already have. No new secret and no separate spend line.
+# The harness lives in scripts/agent-efficiency/ (built and tested without a model in the engineer's PR).
+# It runs each side at most 5 times and opens a PR with the raw runs for the docs and the video.
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Runs per side (1 to 5)"
+        default: "5"
+permissions: { contents: write, pull-requests: write }
+concurrency: { group: agent-benchmark, cancel-in-progress: false }
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Cap the runs
+        id: cap
+        run: |
+          N="${{ inputs.runs }}"
+          case "$N" in 1|2|3|4|5) ;; *) echo "::error::runs must be 1 to 5 (owner cap)"; exit 1;; esac
+          echo "n=$N" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+      - name: Harness present
+        run: |
+          test -f scripts/agent-efficiency/run.mjs || { echo "::error::scripts/agent-efficiency/run.mjs is not on main yet (#837 first slice)"; exit 1; }
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --filter "./packages/**" build
+      - name: Install Chromium and ffmpeg
+        timeout-minutes: 30
+        run: bash scripts/agents/install-chromium.sh && bash scripts/agents/install-ffmpeg.sh
+      - name: Install Claude Code (the agent under test on both sides)
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Run the benchmark
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BENCH_RUNS: ${{ steps.cap.outputs.n }}
+          BENCH_AGENT_CMD: claude
+        run: |
+          # Prefer the subscription token the agent jobs use; fall back to the API key only if no token is set.
+          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then unset ANTHROPIC_API_KEY; fi
+          node scripts/agent-efficiency/run.mjs --runs "$BENCH_RUNS" --out docs/agent-efficiency-runs.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: agent-efficiency-runs, path: "docs/agent-efficiency-runs.json\nscripts/agent-efficiency/out/**", if-no-files-found: ignore }
+      - name: Open a PR with the raw runs
+        env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN || github.token }}" }
+        run: |
+          B="agent/claude/issue-837-runs-${{ github.run_id }}"
+          git config user.name "Anye Happiness Ade"; git config user.email "hans@pipilot.dev"
+          git checkout -b "$B"
+          git add docs/agent-efficiency-runs.json
+          git commit -m "bench: raw agent-efficiency runs (${{ steps.cap.outputs.n }} per side)"
+          git push origin "$B"
+          gh pr create --head "$B" --base main --title "bench: raw agent-efficiency runs for #837" \
+            --body "Raw runs from the owner-started benchmark (run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}). Same model and settings on both sides, ${{ steps.cap.outputs.n }} runs each. The docs page and the video use these numbers. Refs #837"
