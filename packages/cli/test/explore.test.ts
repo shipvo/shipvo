@@ -72,6 +72,15 @@ describe("walk", () => {
     expect(r.screens).toBeGreaterThanOrEqual(3);
   });
 
+  it("walks only the given routes with onlyRoutes", async () => {
+    const { driver } = fixture();
+    const r = await walk(driver, { routes: ["app://settings"], onlyRoutes: true });
+    expect(r.screens).toBeGreaterThanOrEqual(1);
+    const none = await walk(fixture().driver, { onlyRoutes: true });
+    expect(none.steps).toBe(0);
+    expect(none.findings).toEqual([]);
+  });
+
   it("reports a tap that was not delivered", async () => {
     const { driver } = fixture();
     const tap = driver.tap;

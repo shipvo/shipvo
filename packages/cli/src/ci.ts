@@ -35,10 +35,10 @@ type Run = (argv: string[]) => Promise<number>;
 
 /** `shipvo ci check`: run `shipvo test`, then `shipvo explore` (so the report exists even when a flow fails).
  * Fails on a test regression or a crash. Exploration findings alone do not fail it. */
-export async function check(runTest: Run = testCmd, runExplore: Run = explore): Promise<number> {
+export async function check(runTest: Run = testCmd, runExplore: Run = explore, changedFrom?: string): Promise<number> {
   const t = await runTest(["--report", "shipvo-report.json"]);
   let e: number;
-  try { e = await runExplore(["--sim", "http://localhost:4545"]); }
+  try { e = await runExplore(["--sim", "http://localhost:4545", ...(changedFrom ? ["--changed-from", changedFrom] : [])]); }
   catch (err) { console.error(err instanceof Error ? err.message : String(err)); e = 1; }
   return t !== 0 ? t : e;
 }
@@ -55,7 +55,7 @@ function templatePath(framework: string): string {
 /** `shipvo ci init --framework capacitor [--dry-run] [--force]`. Returns the exit code. */
 export async function ci(argv: string[], cwd = process.cwd()): Promise<number> {
   const [sub, ...rest] = argv;
-  if (sub === "check") return check();
+  if (sub === "check") { const i = rest.indexOf("--changed-from"); return check(testCmd, explore, i >= 0 ? rest[i + 1] : undefined); }
   if (sub === "shots") return shotsCmd(rest);
   if (sub === "comment") return commentCmd(rest);
   if (sub !== "init") { console.error("Usage: shipvo ci init --check | --framework capacitor [--dry-run] [--force]\n       shipvo ci check"); return 2; }

@@ -91,6 +91,14 @@ describe("shipvo ci init --check", () => {
 });
 
 describe("shipvo ci check exit code", () => {
+  it("passes --changed-from to explore", async () => {
+    const seen: string[][] = [];
+    await check(async () => 0, async (a) => { seen.push(a); return 0; }, "abc123");
+    expect(seen[0]).toEqual(["--sim", "http://localhost:4545", "--changed-from", "abc123"]);
+    await check(async () => 0, async (a) => { seen.push(a); return 0; });
+    expect(seen[1]).toEqual(["--sim", "http://localhost:4545"]);
+  });
+
   const run = (t: number, e: number | Error) => check(async () => t, async () => { if (e instanceof Error) throw e; return e; });
 
   it("passes when tests pass and exploration has only notes", async () => {

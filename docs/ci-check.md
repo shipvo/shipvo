@@ -23,12 +23,12 @@ steps:
 1. Installs Node 22 and your dependencies.
 2. Builds the app for web.
 3. Runs `shipvo test` on `tests/*.steps`.
-4. Runs `shipvo explore` and writes `explore-report.md` and `explore-report.json`.
+4. On a pull request, runs `shipvo explore --changed-from <base sha>`, which walks only the screens whose files changed (up to four, from `app/` or `screens/`). If no screen changed, it walks nothing. Writes `explore-report.md` and `explore-report.json`.
 5. Uploads the reports as the `shipvo-check` artifact.
 
 The job fails when a flow fails or `shipvo explore` crashes. Findings from exploration are in the report only. A failing flow does not skip exploration, so you still get the report.
 
-Run the same two commands locally with `npx shipvo ci check` while `npx shipvo sim --port 4545` is running.
+Run the same two commands locally with `npx shipvo ci check` (add `--changed-from <sha>` to limit exploration to changed screens) while `npx shipvo sim --port 4545` is running.
 
 Use `--force` to overwrite an existing workflow, and `--dry-run` to see it first.
 

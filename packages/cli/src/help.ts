@@ -15,7 +15,7 @@ Start
   run android|ios [--no-open] [--port n] [--lan]  Open the app in a phone frame in your browser (no Playwright)
                               --lan also serves it to a phone on your Wi-Fi: URL + QR code, token required
   run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
-  explore [--max-depth 3] [--max-steps 100] [--fail-on-findings] [--issues-dir <dir>] [--json]  Walk the app in the simulator, write explore-report.md and .json
+  explore [--max-depth 3] [--max-steps 100] [--fail-on-findings] [--changed-from <sha>] [--issues-dir <dir>] [--json]  Walk the app in the simulator, write explore-report.md and .json
   preview [--json]            Publish a public 24-hour preview link (here.now, no account)
 
 Ship
