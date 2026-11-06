@@ -1,6 +1,6 @@
 // `shipvo publish`: build the Hermes bundle, sign a release pointer, publish bundle + patches + the agent-facing web
 // artifact to the control plane. `shipvo rollback --to N`: republish an earlier bundle as a new release.
-import { execSync } from "node:child_process";
+import { execBinSync, runPython } from "./proc.js";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -127,7 +127,7 @@ export async function publish(argv: string[]) {
   for (const pf of platforms) {
     // Android published alone keeps the original dist-ota/ layout, so existing CI keeps working.
     const root = platforms.length === 1 && pf === "android" ? "dist-ota" : `dist-ota/${pf}`;
-    if (!skipExport) execSync(`npx expo export --platform ${pf} --output-dir ${root} --clear`, { stdio: "inherit" });
+    if (!skipExport) execBinSync("npx", ["expo", "export", "--platform", pf, "--output-dir", root, "--clear"], { stdio: "inherit" });
     const jsDir = `${root}/_expo/static/js/${pf}`;
     const file = readdirSync(jsDir).find((f) => f.endsWith(".hbc")) || readdirSync(jsDir).find((f) => f.endsWith(".js"));
     if (!file) throw new Error("no bundle in " + jsDir);
@@ -148,14 +148,14 @@ export async function publish(argv: string[]) {
       for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); if ((b.platform ?? "android") === pf) bases.set(b.sha256, b.key); } catch {} }
       // Only look for bsdiff4 when there is an older bundle to patch from; a first release needs no patches.
       let bsdiff = false;
-      if (bases.size > 0) { try { execSync("python3 -c 'import bsdiff4'", { stdio: "ignore" }); bsdiff = true; } catch { console.error("Small patches are off because the Python tool bsdiff4 is not installed (pip install bsdiff4). Full bundles are published instead. Updates still work, they are just bigger."); } }
+      if (bases.size > 0) { if (runPython("import bsdiff4")) bsdiff = true; else { console.error("Small patches are off because the Python tool bsdiff4 is not installed (pip install bsdiff4). Full bundles are published instead. Updates still work, they are just bigger."); } }
       if (bsdiff) {
         const work = mkdtempSync(join(tmpdir(), "shipvo-")); writeFileSync(join(work, "new.hbc"), bytes);
         for (const [fromSha, key] of bases) {
           if (fromSha === newSha) continue;
           const base = await kv.getBytes(key); if (!base) continue;
           writeFileSync(join(work, "old.hbc"), base);
-          execSync(`python3 -c "import bsdiff4; bsdiff4.file_diff('${join(work, "old.hbc")}', '${join(work, "new.hbc")}', '${join(work, "p.bsdiff")}')"`);
+          if (!runPython("import sys, bsdiff4; bsdiff4.file_diff(sys.argv[1], sys.argv[2], sys.argv[3])", [join(work, "old.hbc"), join(work, "new.hbc"), join(work, "p.bsdiff")])) continue;
           const patch = new Uint8Array(readFileSync(join(work, "p.bsdiff")));
           if (patch.length >= bytes.length * 0.6) continue;
           const pkey = `b/${APP}/${pf === "ios" ? "ios-" : ""}d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
@@ -215,7 +215,7 @@ export function dryRunSummary(release: number, bytes: number, outDir: string, in
 }
 
 async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number, outDir?: string) {
-  execSync("PN_SIM=1 npx expo export --platform web --output-dir dist-web --clear", { stdio: "inherit" });
+  execBinSync("npx", ["expo", "export", "--platform", "web", "--output-dir", "dist-web", "--clear"], { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
   const base = `w/${APP}/r${release}`; const files: string[] = []; let indexSha = "";
   for (const f of walk("dist-web")) {
     const rel = f.slice("dist-web/".length); if (rel === "metadata.json") continue;

@@ -12,11 +12,10 @@ import { join, resolve } from "node:path";
 
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
-const win = process.platform === "win32";
+const isWin = process.platform === "win32";
 const tarDir = resolve(opt("tarballs", "."));
 const work = resolve(opt("work", mkdtempSync(join(tmpdir(), "shipvo first-run "))));
 const outFile = opt("out", "cross-os.json");
-const isWin = win;
 
 /** Quote for cmd.exe when a shell is needed (npm, npx are .cmd shims on Windows). */
 const q = (s) => (/^[\w@%+=:,./\\-]+$/.test(s) ? s : `"${String(s).replace(/"/g, '""')}"`);
@@ -34,7 +33,7 @@ function run(name, cmd, args, cwd) {
   const t0 = performance.now();
   const r = isWin ? spawnSync(line(cmd, args), { cwd, env, encoding: "utf8", shell: true }) : spawnSync(cmd, args, { cwd, env, encoding: "utf8" });
   const ms = Math.round(performance.now() - t0);
-  if (r.status !== 0) fail(name, [r.stdout, r.stderr, r.error && String(r.error)].filter(Boolean).join("\n"));
+  if (r.status !== 0) fail(name, [r.signal && `killed by ${r.signal}`, r.stdout, r.stderr, r.error && String(r.error)].filter(Boolean).join("\n"));
   steps.push({ step: name, ms });
   return r.stdout;
 }

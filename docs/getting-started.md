@@ -151,9 +151,9 @@ The simulator also runs hosted: one Worker spins up a sandbox per API key and ex
 
 ## Supported systems
 
-Shipvo's first run is meant to work on Windows, macOS and Linux. The check is `scripts/first-run/cross-os.mjs`. It takes the packed npm tarballs of `@shipvo/cli`, `sim`, `test`, `device`, `runtime` and `schema` (what you get from npm), in a folder whose name has a space, and runs: `shipvo init`, `npm install`, `npx shipvo doctor --json`, `npx shipvo sim` (fetches the app page), `npx shipvo publish --dry-run`, and `npx shipvo run android --no-open` (fetches the frame page). It prints the time of each step.
+`scripts/first-run/cross-os.mjs` checks the first run from packed npm tarballs of `@shipvo/cli`, `sim`, `test`, `device`, `runtime` and `schema`, in a folder whose name has a space. It runs `shipvo init`, `npm install`, `npx shipvo doctor --json`, `npx shipvo sim` (fetches the app page), `npx shipvo publish --dry-run`, and `npx shipvo run android --no-open` (fetches the frame page). It prints the time of each step. It does not run store builds, `shipvo login` or a real publish.
 
-What it proves: those commands finish on a GitHub-hosted `windows-latest`, `macos-latest` and `ubuntu-latest` runner with Node 22. It does not run store builds, `shipvo login`, or a real publish. The per-OS results are not recorded here yet: the job that runs the check is proposed in an `agent:escalate` issue, because workflows are changed by a human. Until it is merged, nothing here is measured on Windows or macOS.
+The script is not yet run in CI, so this page records no per-OS result.
 
 On Windows, `shipvo` runs `npm`, `npx` and `pnpm` through the shell, so their `.cmd` shims work and paths with spaces are quoted.
 

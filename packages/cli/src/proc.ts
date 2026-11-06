@@ -7,7 +7,7 @@ import { spawn, spawnSync, type SpawnOptions, type SpawnSyncOptions } from "node
  */
 export function shellForm(cmd: string, args: string[], platform: NodeJS.Platform = process.platform): { command: string; args: string[]; shell: boolean } {
   if (platform !== "win32" || cmd === process.execPath) return { command: cmd, args, shell: false };
-  const q = (s: string) => (/^[\w@%+=:,./\\-]+$/.test(s) ? s : `"${s.replace(/"/g, '""')}"`);
+  const q = (s: string) => (/^[\w@+=:,./\\-]+$/.test(s) ? s : `"${s.replace(/"/g, '""')}"`);
   return { command: [cmd, ...args].map(q).join(" "), args: [], shell: true };
 }
 
@@ -25,4 +25,12 @@ export function execBinSync(cmd: string, args: string[], opts: { cwd?: string; s
   const r = spawnBinSync(cmd, args, opts);
   if (r.error) throw r.error;
   if (r.status !== 0) throw new Error(`${cmd} exited with code ${r.status}`);
+}
+
+/** Names to try for Python 3. Windows usually has `python` or the `py` launcher, not `python3`. */
+export const pythonNames = (platform: NodeJS.Platform = process.platform) => (platform === "win32" ? ["python", "py", "python3"] : ["python3", "python"]);
+
+/** Runs `python -c <code> ...args` with the first Python name that exits 0. Returns false if none does (missing Python, or the code failed). */
+export function runPython(code: string, args: string[] = []): boolean {
+  return pythonNames().some((name) => spawnBinSync(name, ["-c", code, ...args], { stdio: "ignore" }).status === 0);
 }

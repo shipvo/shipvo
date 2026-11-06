@@ -1,6 +1,7 @@
 // `shipvo explore`: a deterministic walker over the simulator's accessibility tree. No LLM call.
 // The walker (`walk`) only needs a `Driver`, so tests run it against a fake app. `explore` wires it to the simulator.
-import { execSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
+import { execBinSync } from "./proc.js";
 import { existsSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
@@ -187,7 +188,7 @@ export async function startSim(a: Record<string, string | undefined>, cfg: { nam
     if (!(await portFree(Number(port)))) throw new Error(`Port ${port} is in use. Stop the other simulator, pass --port <n>, or pass --sim <url> to use one that is running.`);
     if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
       console.error(`Building ${cfg.name} for the simulator…`);
-      execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
+      execBinSync("npx", ["expo", "export", "--platform", "web", "--output-dir", "sim-dist", "--clear"], { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
     }
     ensurePlaywright({ cwd: process.cwd() });
     let server: string;

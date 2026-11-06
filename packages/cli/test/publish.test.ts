@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 const exec = vi.hoisted(() => ({ fn: (_cmd: string) => {} }));
-vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string) => exec.fn(c) }));
+vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), spawnSync: (cmd: string, args: string[] = []) => { try { exec.fn([cmd, ...args].join(" ")); return { status: 0, signal: null, error: undefined }; } catch { return { status: 1, signal: null, error: undefined }; } } }));
 
 const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown }));
 const puts: string[] = [];
@@ -367,7 +367,7 @@ describe("publish and the Hermes bytecode check", () => {
 
   it("iOS patches start only from earlier iOS releases, Android only from Android", async () => {
     // Stand-in for bsdiff4: the import check passes and the diff command writes a small patch file.
-    exec.fn = (c) => { const m = c.match(/'([^']*p\.bsdiff)'/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
+    exec.fn = (c) => { const m = c.match(/(\S*p\.bsdiff)$/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
     const make = (tag: number) => { const b = fakeHbc(96); b[20] = tag; return b; }; // the tag makes each bundle's hash different
     const bundle = (pf: string, tag: number) => {
       mkdirSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}`), { recursive: true });
@@ -388,7 +388,7 @@ describe("publish and the Hermes bytecode check", () => {
   });
 
   it("iOS also patches from a shell's embedded bundle; Android ignores iOS bases", async () => {
-    exec.fn = (c) => { const m = c.match(/'([^']*p\.bsdiff)'/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
+    exec.fn = (c) => { const m = c.match(/(\S*p\.bsdiff)$/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
     const make = (tag: number) => { const b = fakeHbc(96); b[20] = tag; return b; };
     const sha = (tag: number) => createHash("sha256").update(make(tag)).digest("hex");
     for (const pf of ["android", "ios"]) {
