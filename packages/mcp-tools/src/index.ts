@@ -121,6 +121,8 @@ export const tools = {
   title: z.string().optional().describe("Used in the file name"),
   show_taps: z.boolean().optional().describe("Draw a finger dot and ripple on taps and a trail on scrolls (default true)"),
   background: z.string().min(1).optional().describe('Behind the phone: "brand", "plain" (white) or a CSS colour such as "#102030"'),
+  lumi: z.boolean().optional().describe("Include Lumi and its step captions in the video (default true for recordings; set false for a plain phone)."),
+  lumi_voice: z.boolean().optional().describe("Lumi speaks its short step lines with the energetic voice preset (default false). Needs python3, ffmpeg and network access for the voice. Ignored when record_stop gets a narration file."),
 }, WR, []),
   record_marker: def("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, []),
   record_stop: def("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters. With music: true, mixes a ducked music bed under the video and writes a credits JSON next to it (credit the track where you publish).", {
