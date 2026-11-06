@@ -118,7 +118,8 @@ async function newSession(id, opts = {}) {
   const page = await ctx.newPage();
   const errors = []; const consoleErrors = [];
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
-  page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text().split("\n")[0]); });
+  // Chromium reports a failed subresource load (a 404 favicon, say) as console.error. That is not an app error, so leave it out.
+  page.on("console", (m) => { if (m.type() === "error" && !/^Failed to load resource/.test(m.text())) consoleErrors.push(m.text().split("\n")[0]); });
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
   sessions.set(id, { ctx, page, errors, consoleErrors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle() });
@@ -289,9 +290,9 @@ async function act(id, body) {
       return { diag: r, screen: await screen(page) };
     }
     case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
-    // Uncaught page errors since the last call to this action. Reading them clears the list.
     // console.error output since the last call to this action. Reading them clears the list.
     case "console_errors": return { errors: s.consoleErrors.splice(0), screen: await screen(page) };
+    // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.
     case "sizes": {

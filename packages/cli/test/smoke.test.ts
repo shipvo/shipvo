@@ -13,13 +13,13 @@ function driver(o: { screen?: string; errors?: string[]; consoleErrors?: string[
     errors: async () => o.errors ?? [], consoleErrors: async () => o.consoleErrors ?? [], screen: async () => o.screen ?? tree,
   };
 }
-async function run(argv: string[], d: Driver | null, start?: () => Promise<never>) {
+async function run(argv: string[], d: Driver | null, start?: (...a: any[]) => Promise<any>, extra: { now?: () => number } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "shipvo-smoke-"));
   writeFileSync(join(dir, "shipvo.json"), JSON.stringify({ appId: "demo", controlPlane: "http://x", publicKey: "k" }));
   const prev = process.cwd(); process.chdir(dir);
   const lines: string[] = [];
   try {
-    const code = await smoke(argv, { start: start ?? (async () => ({ base: "http://sim", stop: () => {} })), driver: () => d!, sleep: async () => {}, log: (l) => lines.push(l) });
+    const code = await smoke(argv, { start: start ?? (async () => ({ base: "http://sim", stop: () => {} })), driver: () => d!, sleep: async () => {}, ...extra, log: (l) => lines.push(l) });
     return { code, lines };
   } finally { process.chdir(prev); }
 }
@@ -66,6 +66,38 @@ describe("shipvo smoke", () => {
     const { code, lines } = await run(["--json", "--timeout", "1"], driver({ open: () => new Promise(() => {}) }));
     expect(code).toBe(1);
     expect(JSON.parse(lines[0]!).data.errors[0]).toMatch(/within 1 s/);
+  });
+
+  it("stops the simulator on the timeout path and leaves no timer pending", async () => {
+    const stop = vi.fn();
+    const { code } = await run(["--json", "--timeout", "1"], driver({ open: () => new Promise(() => {}) }), async () => ({ base: "http://sim", stop }));
+    expect(code).toBe(1);
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears its timeout timer after a passing run", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { code } = await run(["--json", "--timeout", "30"], driver({}));
+      expect(code).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("fails when the first screen never settles", async () => {
+    let n = 0, t = 0;
+    const d = driver({}); d.screen = async () => `- main:\n  - button "Go ${n++}" [ref=e1]`;
+    const { code, lines } = await run(["--json", "--timeout", "2"], d, undefined, { now: () => (t += 500) });
+    expect(code).toBe(1);
+    expect(JSON.parse(lines[0]!).data.errors.join("\n")).toMatch(/kept changing for 2 s/);
+  });
+
+  it("asks the simulator to send build output to stderr only with --json", async () => {
+    const start = vi.fn(async () => ({ base: "http://sim", stop: () => {} }));
+    await run(["--json"], driver({}), start);
+    expect(start.mock.calls[0]![2]).toEqual({ buildToStderr: true });
+    await run([], driver({}), start);
+    expect(start.mock.calls[1]![2]).toEqual({ buildToStderr: false });
   });
 
   it("exits 2 with an install command when the browser is missing", async () => {

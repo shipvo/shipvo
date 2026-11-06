@@ -13,7 +13,7 @@ export type SmokeJson = {
   next: Next[];
 };
 export type SmokeDeps = {
-  start?: (a: Record<string, string | undefined>, cfg: { name: string; appId: string; controlPlane: string }) => Promise<{ base: string; stop: () => void }>;
+  start?: (a: Record<string, string | undefined>, cfg: { name: string; appId: string; controlPlane: string }, opts?: { buildToStderr?: boolean }) => Promise<{ base: string; stop: () => void }>;
   driver?: (base: string, app: string) => Driver;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -29,6 +29,7 @@ export async function smoke(argv: string[], deps: SmokeDeps = {}): Promise<numbe
   const now = deps.now ?? Date.now, sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const json = argv.includes("--json");
   const a = parse(argv);
+  // The platform is the first word that is not a flag or a flag's value. Boolean flags take no value.
   const positional = argv.filter((x, i) => !x.startsWith("--") && !(argv[i - 1]?.startsWith("--") && !["--json", "--skip-build"].includes(argv[i - 1]!)));
   const platform = positional[0] ?? "android";
   const done = (doc: SmokeJson, exit: number) => {
@@ -54,7 +55,7 @@ export async function smoke(argv: string[], deps: SmokeDeps = {}): Promise<numbe
   let cfg; let sim: { base: string; stop: () => void };
   try {
     cfg = loadConfig();
-    sim = await (deps.start ?? startSim)(a, cfg);
+    sim = await (deps.start ?? startSim)(a, cfg, { buildToStderr: json });   // with --json, stdout is one line: build output goes to stderr
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const next: Next[] = [];
@@ -74,9 +75,12 @@ export async function smoke(argv: string[], deps: SmokeDeps = {}): Promise<numbe
       for (const e of await driver.errors()) errors.push(`Uncaught error: ${e}`);
       for (const e of (await driver.consoleErrors?.()) ?? []) errors.push(`console.error: ${e}`);
     };
-    let tree = ""; let ms: number | null = null; let timedOut = false;
+    let tree = ""; let ms: number | null = null; let timedOut = false; let settled = false;
+    // A timer we can clear, so a passing run does not keep the process alive until the timeout.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadlineP = new Promise<null>((r) => { timer = setTimeout(() => r(null), timeoutS * 1000); timer.unref?.(); });
     try {
-      const open = await Promise.race([driver.open(), sleep(timeoutS * 1000).then(() => null)]);
+      const open = await Promise.race([driver.open(), deadlineP]);
       if (!open) timedOut = true;
       else if (!open.ok) errors.push(`The app did not open: ${open.error ?? "unknown error"}`);
       else {
@@ -86,7 +90,7 @@ export async function smoke(argv: string[], deps: SmokeDeps = {}): Promise<numbe
         for (let prev = ""; now() < deadline; ) {
           await collect();
           prev = tree; tree = driver.screen ? await driver.screen() : tree;
-          if (signature(tree) === signature(prev)) break;
+          if (signature(tree) === signature(prev)) { settled = true; break; }
           await sleep(300);
           ms = now() - t0;
         }
@@ -95,7 +99,9 @@ export async function smoke(argv: string[], deps: SmokeDeps = {}): Promise<numbe
     } catch (e) {
       errors.push(`The simulator failed: ${e instanceof Error ? e.message : String(e)}`);
     }
+    clearTimeout(timer);
     if (timedOut) errors.push(`The app did not open within ${timeoutS} s.`);
+    else if (ms !== null && !settled) errors.push(`The first screen kept changing for ${timeoutS} s.`);
     const elements = countElements(tree);
     if (!timedOut && ms !== null && elements === 0) errors.push("The first screen has no elements in the tree.");
     const uniq = [...new Set(errors)];

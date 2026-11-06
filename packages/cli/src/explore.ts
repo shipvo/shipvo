@@ -205,14 +205,14 @@ export function simDriver(base: string, app: string, session = `explore-${Date.n
 }
 
 /** Use the simulator at `--sim <url>`, or build the app and start one on `--port` (default 4546). `stop` kills the one we started. */
-export async function startSim(a: Record<string, string | undefined>, cfg: { name: string; appId: string; controlPlane: string }): Promise<{ base: string; stop: () => void }> {
+export async function startSim(a: Record<string, string | undefined>, cfg: { name: string; appId: string; controlPlane: string }, opts: { buildToStderr?: boolean } = {}): Promise<{ base: string; stop: () => void }> {
   let base = a.sim; let child: ReturnType<typeof spawn> | undefined;
   if (!base) {
     const port = a.port || "4546";
     if (!(await portFree(Number(port)))) throw new Error(`Port ${port} is in use. Stop the other simulator, pass --port <n>, or pass --sim <url> to use one that is running.`);
     if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
       console.error(`Building ${cfg.name} for the simulator…`);
-      execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
+      execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: opts.buildToStderr ? ["inherit", 2, 2] : "inherit", env: { ...process.env, PN_SIM: "1" } });
     }
     ensurePlaywright({ cwd: process.cwd() });
     let server: string;

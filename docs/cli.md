@@ -196,9 +196,11 @@ shipvo smoke              # android (default)
 shipvo smoke ios --json --timeout 60
 ```
 
-It fails when the page throws, logs `console.error`, has an unhandled rejection, or the first screen has no elements. `--timeout <s>` defaults to 30. It does not take screenshots or tap anything; use `shipvo explore` for that.
+It fails when the page throws, logs `console.error`, has an unhandled rejection, or the first screen has no elements. `--timeout <s>` defaults to 30. If the first screen is still changing when the timeout ends, that is a failure too. Failed resource loads (such as a missing favicon) are not counted. It does not take screenshots or tap anything; use `shipvo explore` for that.
 
-`--json` prints one line, the same envelope as `status --json`:
+`android` and `ios` only change the `platform` label in the result. Both run the same simulator skin.
+
+`--json` prints one line on stdout, the same envelope as `status --json`:
 
 ```json
 { "ok": false, "code": "load_failed", "summary": "...",
@@ -206,6 +208,7 @@ It fails when the page throws, logs `console.error`, has an unhandled rejection,
   "next": [{ "command": "shipvo sim", "why": "..." }] }
 ```
 
+- With `--json`, the app build output goes to stderr so stdout stays one line.
 - `code` is `ok`, `load_failed` or `setup_error`. `data.errors` holds the first 5 errors; `error_count` is the total.
 - A missing browser or Playwright is a setup error. `next` then has the install command.
 
