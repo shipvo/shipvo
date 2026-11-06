@@ -206,12 +206,12 @@ const timeoutMs = z.number().int().min(0).max(30000).optional().describe("How lo
 const settle = z.boolean().optional().describe("Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text.");
 type Wait = { wait_for?: WaitFor; timeout_ms?: number; settle?: boolean };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-// Poll the screen after an action. Returns the latest result and what happened. On timeout the action result is kept as is.
+// Poll the screen after an action. The polling reads are not action spans, so the wait counts as idle time in a recording. Returns the latest result and what happened. On timeout the action result is kept as is.
 async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; waited?: Waited }> {
   if (!r.ok || r.screen == null || (!w.wait_for && !w.settle)) return { r };
   const t0 = Date.now(), limit = w.timeout_ms ?? 2000, left = () => limit - (Date.now() - t0);
   let cur = r, matched = true;
-  const read = async () => { const n = await act({ session, action: "screen" }); if (n.ok && n.screen != null) cur = { ...cur, screen: n.screen }; return n.ok && n.screen != null; };
+  const read = async () => { const n = await act1({ session, action: "screen" }); if (n.ok && n.screen != null) cur = { ...cur, screen: n.screen }; return n.ok && n.screen != null; };
   if (w.wait_for) {
     matched = satisfied(cur.screen!, w.wait_for);
     while (!matched && left() > 0) { await sleep(Math.min(100, left())); if (await read()) matched = satisfied(cur.screen!, w.wait_for); }

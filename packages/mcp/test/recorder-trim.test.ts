@@ -5,6 +5,10 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
+import { createRequire as _cr } from "node:module";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { resolve } from "node:path";
 import { Recorder, RecorderError } from "../src/recorder.js";
 
 const have = (bin: string) => spawnSync(bin, ["-version"]).status === 0;
@@ -83,4 +87,44 @@ describe.skipIf(!ok)("recorder trim and captions", () => {
     await expect(r.start({ url, dir: out, background: bad })).rejects.toBeInstanceOf(RecorderError);
     expect(r.active).toBe(false);
   }, 60000);
+});
+
+describe.skipIf(!ok)("server: action spans and waits", () => {
+  const root = resolve(__dirname, "..");
+  let dist = ""; let sim: http.Server; let simPort = 0;
+  beforeAll(async () => {
+    dist = mkdtempSync(join(root, "dist-test-"));
+    const b = spawnSync(process.execPath, [_cr(join(root, "package.json")).resolve("typescript/bin/tsc"), "-p", root, "--outDir", dist], { encoding: "utf8" });
+    if (b.status !== 0) throw new Error(b.stdout + b.stderr);
+    sim = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, screen: '- button "Pay" [ref=e1]', sessions: [] }));
+    });
+    await new Promise<void>((r) => sim.listen(0, r));
+    simPort = (sim.address() as { port: number }).port;
+  });
+  afterAll(() => { sim?.close(); if (dist) rmSync(dist, { recursive: true, force: true }); });
+
+  it("a wait_for that times out is cut from the video, a plain tap is still a span", async () => {
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${simPort}`, PN_CONTROL: "http://127.0.0.1:1", PN_APPS: JSON.stringify({ shop: { name: "Shop", description: "x" } }), SHIPVO_FRAME_URL: url };
+    const c = new Client({ name: "test", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(dist, "server.js")], env, cwd: out }));
+    await c.callTool({ name: "open_app", arguments: { app: "shop", session: "w" } });
+    await c.callTool({ name: "record_start", arguments: { format: "1:1", title: "wait" } });
+    await sleep(300);
+    const t0 = Date.now();
+    await c.callTool({ name: "tap", arguments: { session: "w", ref: "e1", wait_for: { text: "Never" }, timeout_ms: 3500 } });
+    const wall = (Date.now() - t0) / 1000;
+    expect(wall).toBeGreaterThan(3.3);
+    await c.callTool({ name: "screen", arguments: { session: "w" } });   // an action after the wait, so the wait is not the kept tail
+    await sleep(300);
+    const r: any = await c.callTool({ name: "record_stop", arguments: {} });
+    await c.close();
+    expect(r.isError).toBeFalsy();
+    // The polling reads are not spans: about 3 s of the wait is cut.
+    expect(r.structuredContent.duration_s).toBeLessThan(wall + 0.6 - 2);
+    // The tap itself registered a span (with no tap span, everything before the first action would be idle too).
+    expect(r.structuredContent.duration_s).toBeGreaterThan(0.8);
+  }, 90000);
 });

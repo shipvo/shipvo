@@ -1,6 +1,5 @@
 // Records the phone frame page to an MP4. Playwright takes screenshots while a session runs; ffmpeg encodes them.
 // Waits longer than 0.6 s between agent actions are cut at stop. Frames carry wall-clock timestamps, so the video lasts as long as the recording even when screenshots are slow.
-// The recording clock (duration_s, chapter times) and the video both start at the first frame.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -15,7 +14,8 @@ export class RecorderError extends Error { constructor(public code: string, mess
 
 type Page = { screenshot(o: { type: "jpeg"; quality: number }): Promise<Buffer>; goto(u: string, o?: object): Promise<unknown>; evaluate?(f: string): Promise<unknown> };
 export const MAX_IDLE_S = 0.6;
-export type Background = "brand" | "plain" | string;
+// "brand", "plain" (white) or a CSS colour.
+export type Background = string;
 export type Point = { x: number; y: number };
 
 // Runs in the recorded page. Draws on top of the phone (the first iframe, else the whole page); points are 0..1 of it.

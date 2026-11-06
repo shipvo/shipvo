@@ -18,6 +18,8 @@ Ask your assistant: "Record a 30 second demo of the checkout. Add a chapter at e
 
 The file is written to `.shipvo/recordings/<title>-<yyyymmddhhmmss>.mp4` in the folder where the MCP server runs (H.264, so it plays everywhere).
 
+Waits longer than 0.6 s between actions are cut, including `wait_for` and `settle` waits. So `duration_s` is shorter than wall-clock time. Time inside one action is kept.
+
 ## Options
 
 | Tool | Argument | Values |
