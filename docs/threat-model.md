@@ -76,6 +76,26 @@ Trust boundaries, from least to most trusted:
 - **Android device-side platform check.** See the platform row: not covered.
 - **Anything in the hosted simulator or the sample app.** This page is about signed updates only.
 
+## Secret vault (slice 1)
+
+The vault holds keys that a person gives to an app (for example a restricted Stripe key). Code: `services/control-plane/src/vault.ts`, `vault-crypto.ts`, migration `0021_vault.sql`. Tests: `services/control-plane/test/vault.test.ts`.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| Ticket used twice, or two posts at once | The ticket is marked used in one conditional `UPDATE` before anything is stored. Only one post changes a row. | "is single-use"; "two racing posts store once" |
+| Expired ticket | Tickets last 10 minutes. The page and the post both check. | "refuses an expired ticket" |
+| Ticket used for another app or key name | The ticket is bound to app and name. A post that names others is refused and does not use the ticket up. Only the app's owner can ask for a ticket. | "refuses a ticket bound to another app or name"; "another app's owner cannot get a ticket for this app" |
+| Database read (leak, backup) | Each value is encrypted with its own AES-256-GCM key. That key is encrypted with the master key, a Worker secret that is not in the database or the repo. Ticket ids are stored only as hashes. | "the D1 row holds no plaintext"; "each secret has its own data key and nonce" |
+| Edited or copied ciphertext | App, name and domain are bound in as authenticated data. Decrypting a changed or moved row fails. | "round-trips with the master key, and fails on tampering or the wrong row" |
+| Value returned or logged | No endpoint returns a value. The code never logs one. The form page sets `no-store`, no referrer, and a strict content security policy. | "the value is never in any response or log" |
+| Full-access key | Stripe `sk_` keys are stored with a `full_access_key` warning. The page tells the person to make a restricted read-only key. | "full access key: stored with a warning flag" |
+| A failed save burns the ticket | If encryption or the insert fails after the ticket is claimed, the ticket is given back so the person can retry. | "a failed save gives the ticket back" |
+| Verification call sent to an attacker's host | The test call URL is fixed in code per known service. Unknown services get no call. | "calls only the fixed Stripe URL"; "an unknown service domain is stored unchecked" |
+
+Sealed records carry a `shipvo-vault/v1` tag in their authenticated data. Rotating the master key later needs a new tag and a re-wrap step; that is not built yet.
+
+Not covered in this slice: injection at call time (a later slice), listing, rotating and revoking keys, rate limits on the vault page, and a restricted Stripe key that has write permissions (the check reads the key prefix, not its permissions). A person who opens the link on a compromised browser can be phished by the page's lookalike; the ticket URL is the only credential, so treat it like a password until it is used.
+
 ## How to check these claims
 
 Every path and test name above can be found with `rg`, for example:
