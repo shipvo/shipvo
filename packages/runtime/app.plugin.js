@@ -45,7 +45,7 @@ function formatNativeModules(value) {
 }
 
 module.exports = function withShipvo(config, props) {
-  const { baseUrl, publicKey, appId, shellMajor = 1 } = props || {};
+  const { baseUrl, publicKey, appId, shellMajor = 1, rootKey, minSequence } = props || {};
   if (!baseUrl || !publicKey || !appId) throw new Error("@shipvo/runtime: baseUrl, publicKey and appId are required");
   const hbc = formatBytecodeVersions(props.hermesBytecodeVersions);
   const hbe = formatHermesEngine(props.hermesEngine);
@@ -68,6 +68,8 @@ module.exports = function withShipvo(config, props) {
     set("dev.shipvo.PUBLIC_KEY", publicKey);
     set("dev.shipvo.APP_ID", appId);
     set("dev.shipvo.SHELL_MAJOR", shellMajor);
+    if (rootKey !== undefined) set("dev.shipvo.ROOT_KEY", rootKey);
+    if (minSequence !== undefined) set("dev.shipvo.MIN_SEQUENCE", minSequence);
     if (hbc !== undefined) set("dev.shipvo.HERMES_BYTECODE_VERSIONS", hbc);
     if (hbe !== undefined) set("dev.shipvo.HERMES_ENGINE", hbe);
     if (nm !== undefined) set("dev.shipvo.NATIVE_MODULES", nm);

@@ -45,6 +45,15 @@ describe("config plugin", () => {
     expect(() => load()({}, { ...base, hermesEngine: 5 })).toThrow(/hermesEngine/);
   });
 
+  it("writes the rotation root key and minimum sequence into the Android manifest", () => {
+    load()({}, { ...base, rootKey: "ROOT", minSequence: 3 });
+    expect(meta["dev.shipvo.ROOT_KEY"]).toBe("ROOT");
+    expect(meta["dev.shipvo.MIN_SEQUENCE"]).toBe("3");
+    meta = {};
+    load()({}, base);
+    expect("dev.shipvo.ROOT_KEY" in meta).toBe(false);
+  });
+
   it("writes nothing without the props", () => {
     load()({}, base);
     expect(meta["dev.shipvo.BASE_URL"]).toBe("https://cp.example");
