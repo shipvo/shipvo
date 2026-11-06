@@ -26,3 +26,12 @@ export type Frame = {
 export const SKINS: Record<FrameSkin, { label: string; width: number; height: number; radius: number }>;
 export function normalizeStatus(status?: FrameStatus): { time: string; signal: number; wifi: boolean; airplane: boolean; battery: { level: number; charging: boolean } };
 export function renderFrame(options?: FrameOptions): Frame;
+export type DeviceStatusInput = { online?: boolean; airplane?: boolean; battery?: number | { level?: number; charging?: boolean } };
+/** Maps the simulated device state and a clock to a status object. */
+export function statusFromDevice(device?: DeviceStatusInput, now?: Date): FrameStatus;
+/** True when a CSS colour is dark, so the status text should be light. */
+export function isDarkBackground(color: string): boolean;
+/** The clock text and icons markup, for redrawing the status bar. */
+export function statusParts(status?: FrameStatus): { time: string; icons: string };
+/** Browser script that keeps the status bar live from the app's `pn:status` events. */
+export function statusClientScript(iframeId?: string, skin?: FrameSkin): string;

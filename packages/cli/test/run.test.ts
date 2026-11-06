@@ -47,6 +47,16 @@ describe("frame page", () => {
   });
 });
 
+describe("frame page, live status bar", () => {
+  it("inlines the status script when the renderer has one, and not otherwise", async () => {
+    const sim = await import("../../sim/frame.mjs");
+    const render = Object.assign((o: any) => sim.renderFrame(o), { statusScript: sim.statusClientScript }) as any;
+    const h = runFramePage("android", "Tide", render);
+    expect(h).toContain("pn:status"); expect(h).toContain('getElementById("app")');
+    expect(runFramePage("android", "Tide", renderFrame)).not.toContain("pn:status");
+  });
+});
+
 describe("frame page, shared renderer", () => {
   it("uses the sim frame body, with light and dark status text and a Simulated label", () => {
     for (const p of ["android", "ios"] as const) {
