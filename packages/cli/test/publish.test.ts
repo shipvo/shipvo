@@ -6,10 +6,10 @@ import { createHash } from "node:crypto";
 
 const exec = vi.hoisted(() => ({ fn: (_cmd: string, _opts?: { env?: NodeJS.ProcessEnv }) => {} }));
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string, o?: { env?: NodeJS.ProcessEnv }) => exec.fn(c, o) }));
-const realDiff = vi.hoisted(() => ({ on: false }));
+const realDiff = vi.hoisted(() => ({ on: false, fail: false }));
 vi.mock("../src/bsdiff.js", async (orig) => {
   const actual = await orig<typeof import("../src/bsdiff.js")>();
-  return { ...actual, bsdiff: (a: Uint8Array, b: Uint8Array) => (realDiff.on ? actual.bsdiff(a, b) : new Uint8Array(10).fill(1)) };
+  return { ...actual, bsdiff: (a: Uint8Array, b: Uint8Array) => { if (realDiff.fail) throw new Error("boom"); return (realDiff.on ? actual.bsdiff(a, b) : new Uint8Array(10).fill(1)); } };
 });
 
 const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown, engine: undefined as string | undefined }));
@@ -444,6 +444,18 @@ describe("publish and the Hermes bytecode check", () => {
     const dec = (b: Uint8Array) => { const r = spawnSync("bzip2", ["-dc"], { input: Buffer.from(b) }); if (r.error && !process.env.CI) return null; expect(r.status).toBe(0); return r.stdout; };
     for (const part of [patch.subarray(32, 32 + cl), patch.subarray(32 + cl, 32 + cl + dl), patch.subarray(32 + cl + dl)]) dec(part);
     expect(rd(24)).toBe(next.length);
+  });
+
+  it("a patch failure falls back to the full bundle and publish still succeeds", async () => {
+    const old = fakeHbc(96); old[20] = 1;
+    blobs.set("b/demo/r1.hbc", old);
+    values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: createHash("sha256").update(old).digest("hex") }));
+    const next = fakeHbc(96); next[20] = 2;
+    writeFileSync(join(cwd, "dist-ota/_expo/static/js/android/index.hbc"), next);
+    realDiff.fail = true;
+    try { await publish([...flags, "--release", "2"]); } finally { realDiff.fail = false; }
+    expect(puts.some((k) => k.endsWith(".bsdiff"))).toBe(false);
+    expect(puts.some((k) => k.includes("r2"))).toBe(true);
   });
 
   it("iOS also patches from a shell's embedded bundle; Android ignores iOS bases", async () => {

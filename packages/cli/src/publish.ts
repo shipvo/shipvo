@@ -173,7 +173,9 @@ async function publishRun(argv: string[], json: boolean): Promise<Done> {
         for (const [fromSha, key] of bases) {
           if (fromSha === newSha) continue;
           const base = await kv.getBytes(key); if (!base) continue;
-          const patch = bsdiff(new Uint8Array(base), bytes);
+          let patch: Uint8Array<ArrayBuffer>;
+          try { patch = bsdiff(new Uint8Array(base), bytes); }
+          catch { console.error(`Could not build a small patch from release ${fromSha.slice(0, 8)}; publishing the full bundle`); continue; }
           if (patch.length >= bytes.length * 0.6) continue;
           const pkey = `b/${APP}/${pf === "ios" ? "ios-" : ""}d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
           await kv.put(pkey, patch, "application/octet-stream");

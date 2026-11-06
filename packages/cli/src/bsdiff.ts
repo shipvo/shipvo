@@ -5,39 +5,51 @@
 function suffixSort(s: Uint8Array): Int32Array {
   const n = s.length;
   const I = new Int32Array(n + 1), V = new Int32Array(n + 1);
-  const split = (start: number, len: number, h: number): void => {
-    if (len < 16) {
-      for (let k = start, j; k < start + len; k += j) {
-        j = 1; let x = V[I[k] + h];
-        for (let i = 1; k + i < start + len; i++) {
-          const v = V[I[k + i] + h];
-          if (v < x) { x = v; j = 0; }
-          if (v === x) { const t = I[k + j]; I[k + j] = I[k + i]; I[k + i] = t; j++; }
-        }
-        for (let i = 0; i < j; i++) V[I[k + i]] = k + j - 1;
-        if (j === 1) I[k] = -1;
+  // Iterative, with an explicit stack: periodic input would overflow the call stack if this recursed.
+  // A task with mid >= 0 marks the equal group [start, mid) as sorted; it must run after the left part and before the right part.
+  const split = (start0: number, len0: number, h: number): void => {
+    const stack: number[] = [start0, len0, -1];
+    while (stack.length) {
+      const mid = stack.pop()!, len = stack.pop()!, start = stack.pop()!;
+      if (mid >= 0) {
+        // `start` = jj, `len` = kk
+        for (let m = 0; m < len - start; m++) V[I[start + m]] = len - 1;
+        if (start === len - 1) I[start] = -1;
+        continue;
       }
-      return;
+      if (len < 16) {
+        for (let k = start, j; k < start + len; k += j) {
+          j = 1; let x = V[I[k] + h];
+          for (let i = 1; k + i < start + len; i++) {
+            const v = V[I[k + i] + h];
+            if (v < x) { x = v; j = 0; }
+            if (v === x) { const t = I[k + j]; I[k + j] = I[k + i]; I[k + i] = t; j++; }
+          }
+          for (let i = 0; i < j; i++) V[I[k + i]] = k + j - 1;
+          if (j === 1) I[k] = -1;
+        }
+        continue;
+      }
+      const x = V[I[start + (len >> 1)] + h];
+      let jj = 0, kk = 0;
+      for (let i = start; i < start + len; i++) { const v = V[I[i] + h]; if (v < x) jj++; if (v === x) kk++; }
+      jj += start; kk += jj;
+      let i = start, j = 0, k = 0;
+      while (i < jj) {
+        const v = V[I[i] + h];
+        if (v < x) i++;
+        else if (v === x) { const t = I[i]; I[i] = I[jj + j]; I[jj + j] = t; j++; }
+        else { const t = I[i]; I[i] = I[kk + k]; I[kk + k] = t; k++; }
+      }
+      while (jj + j < kk) {
+        if (V[I[jj + j] + h] === x) j++;
+        else { const t = I[jj + j]; I[jj + j] = I[kk + k]; I[kk + k] = t; k++; }
+      }
+      // Pushed in reverse: left runs first, then the middle update, then right.
+      if (start + len > kk) stack.push(kk, start + len - kk, -1);
+      stack.push(jj, kk, 0);
+      if (jj > start) stack.push(start, jj - start, -1);
     }
-    const x = V[I[start + (len >> 1)] + h];
-    let jj = 0, kk = 0;
-    for (let i = start; i < start + len; i++) { const v = V[I[i] + h]; if (v < x) jj++; if (v === x) kk++; }
-    jj += start; kk += jj;
-    let i = start, j = 0, k = 0;
-    while (i < jj) {
-      const v = V[I[i] + h];
-      if (v < x) i++;
-      else if (v === x) { const t = I[i]; I[i] = I[jj + j]; I[jj + j] = t; j++; }
-      else { const t = I[i]; I[i] = I[kk + k]; I[kk + k] = t; k++; }
-    }
-    while (jj + j < kk) {
-      if (V[I[jj + j] + h] === x) j++;
-      else { const t = I[jj + j]; I[jj + j] = I[kk + k]; I[kk + k] = t; k++; }
-    }
-    if (jj > start) split(start, jj - start, h);
-    for (let m = 0; m < kk - jj; m++) V[I[jj + m]] = kk - 1;
-    if (jj === kk - 1) I[jj] = -1;
-    if (start + len > kk) split(kk, start + len - kk, h);
   };
 
   const buckets = new Int32Array(256);
@@ -193,6 +205,8 @@ export function bsdiff(oldData: Uint8Array, newData: Uint8Array): Uint8Array<Arr
       const a = I[x]; const lim = Math.min(oldSize - a, newSize - nOff);
       let c = 0;
       for (let i = 0; i < lim; i++) { const d = oldData[a + i] - newData[nOff + i]; if (d) { c = d; break; } }
+      // Equal over the shared length: the shorter suffix sorts first, as in the suffix array (keeps long matches reachable on repetitive data).
+      if (c === 0 && oldSize - a < newSize - nOff) c = -1;
       if (c < 0) st = x; else en = x;
     }
     const x = matchLen(I[st], nOff), y = matchLen(I[en], nOff);

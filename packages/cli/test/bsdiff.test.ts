@@ -21,10 +21,32 @@ function bspatch(old: Uint8Array, patch: Uint8Array): Uint8Array {
     n += x; o += x; d += x;
     out.set(extra.subarray(e, e + y), n); n += y; e += y; o += z;
   }
+  expect(n).toBe(nl);
+  expect(d).toBe(diff.length);
+  expect(e).toBe(extra.length);
   return out;
 }
 
-describe.skipIf(!haveBzip2 && !process.env.CI)("bsdiff", () => {
+if (!haveBzip2 && process.env.CI) throw new Error("bzip2 is required to run these tests in CI");
+
+const periodic = (n: number) => { const a = new Uint8Array(n); for (let i = 0; i < n; i++) a[i] = (i % 7) + 65; return a; };
+
+describe.skipIf(!haveBzip2)("bsdiff", () => {
+  it("periodic input does not overflow the stack", () => {
+    const a = periodic(400_000);
+    expect(Buffer.from(unbz(bzip2(a)))).toEqual(Buffer.from(a));
+    const b = a.slice(1);
+    expect(Buffer.from(bspatch(a, bsdiff(a, b)))).toEqual(Buffer.from(b));
+  });
+
+  it("diffs a multi-MB similar pair into a small patch", () => {
+    const old = rnd(3_000_000, 11);
+    const next = old.slice(); next.set(rnd(500, 3), 1_000_000); next.set(rnd(200, 6), 2_500_000);
+    const patch = bsdiff(old, next);
+    expect(patch.length).toBeLessThan(next.length * 0.01);
+    expect(Buffer.from(bspatch(old, patch))).toEqual(Buffer.from(next));
+  }, 60_000);
+
   it("bzip2 output decodes with the standard tool", () => {
     for (const data of [new Uint8Array(0), new Uint8Array([7]), new Uint8Array(5000).fill(9), rnd(3000), rnd(900_000, 3)]) {
       expect(Buffer.from(unbz(bzip2(data)))).toEqual(Buffer.from(data));
