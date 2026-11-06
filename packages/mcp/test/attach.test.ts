@@ -42,14 +42,14 @@ beforeAll(async () => {
 });
 afterAll(() => { sim?.close(); host?.close(); if (out) rmSync(out, { recursive: true, force: true }); if (work) rmSync(work, { recursive: true, force: true }); });
 
-const runJson = (pid: number, token = "tok") => { mkdirSync(join(work, ".shipvo"), { recursive: true }); writeFileSync(join(work, ".shipvo", "run.json"), JSON.stringify({ port: hostPort, platform: "android", app: "menu", token, pid })); };
-async function open(args: Record<string, unknown>) {
+const runJson = (pid: number, token = "tok", app = "menu") => { mkdirSync(join(work, ".shipvo"), { recursive: true }); writeFileSync(join(work, ".shipvo", "run.json"), JSON.stringify({ port: hostPort, platform: "android", app, token, pid })); };
+async function open(args: Record<string, unknown>, app = "menu") {
   const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${simPort}`, PN_CONTROL: "http://127.0.0.1:1" };
   delete env.PN_APPS;
   const sub = join(work, "a", "b"); mkdirSync(sub, { recursive: true }); // a parent holds run.json
   const c = new Client({ name: "t", version: "0" });
   await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env, cwd: sub }));
-  const r = await c.callTool({ name: "open_app", arguments: { app: "menu", ...args } }) as { content: { text: string }[]; isError?: boolean };
+  const r = await c.callTool({ name: "open_app", arguments: { app, ...args } }) as { content: { text: string }[]; isError?: boolean };
   return { c, text: r.content[0].text, isError: r.isError };
 }
 
@@ -63,6 +63,14 @@ describe("open_app attach", () => {
     expect(t.content[0].text).toContain(TREE);
     expect(seen.some((m) => m.type === "tap" && m.ref === "e1")).toBe(true);
     await c.close();
+  });
+  it("attaches to the live run's app without a simulator that knows it", async () => {
+    runJson(process.pid, "tok", "founder");
+    const { c, text } = await open({ attach: "always" }, "founder");
+    expect(text).toContain("attached to the live shipvo run phone");
+    await c.close();
+    const h = await open({ attach: "never" }, "founder");
+    expect(h.text).toContain("unknown_app"); await h.c.close();
   });
   it("falls back to headless when the pid is dead", async () => {
     runJson(2 ** 22 + 12345);

@@ -76,6 +76,8 @@ describe("run bridge actions: sample app shop flow", () => {
 
   it("taps, types, scrolls and goes back", async () => {
     let t = (await r.ask({ type: "tree" })).tree as string;
+    const sc = await r.ask({ type: "screen" }); // what @shipvo/mcp sends
+    expect(sc.ok, sc.error).toBe(true); expect(sc.screen).toBe(t);
     t = ok(await r.ask({ type: "tap", ref: refOf(t, 'button "Open search"') }));
     const box = /textbox[^\n]*\[ref=(\w+)\]/.exec(t);
     expect(box, t).toBeTruthy();

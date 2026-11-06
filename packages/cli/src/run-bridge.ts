@@ -254,7 +254,8 @@ function bridgeMain(win: any, token: string) {
     let m: any; try { m = JSON.parse(String(e.data)); } catch { return; }
     if (!m || typeof m.id !== "number") return;
     try {
-      if (m.type === "tree") ws.send(JSON.stringify({ id: m.id, type: "tree", ok: true, tree: tree() }));
+      if (m.type === "screen") ws.send(JSON.stringify({ id: m.id, type: "screen", ok: true, screen: tree() }));
+      else if (m.type === "tree") ws.send(JSON.stringify({ id: m.id, type: "tree", ok: true, tree: tree() }));
       else if (/^(tap|type|scroll|back)$/.test(m.type)) {
         act(m).then((r) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r })),
           (err: any) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, ...(err && err.code ? { code: err.code } : {}), error: String(err && err.message || err), screen: screenOrUndefined() })));
