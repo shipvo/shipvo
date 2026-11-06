@@ -6,7 +6,7 @@
 export const GUIDE_KEY = "shipvo.lumi.guide";
 
 export const GUIDE_STEPS = [
-  { title: "Your home screen", text: "Press the home button to see your apps. Press it at any time to come back." },
+  { title: "Your home screen", text: "Go home to see your apps. Go home at any time to come back." },
   { title: "The Store", text: "The Store icon on the home screen installs more apps on this phone." },
   { title: "Connect an assistant", text: "To let an AI assistant drive this phone, run: claude mcp add shipvo -- npx -y @shipvo/mcp" },
 ];

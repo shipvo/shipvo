@@ -56,12 +56,43 @@ test("Skip closes the guide at once and it never shows again", async () => {
   } finally { await b.close(); }
 });
 
-import { guideClientScript as _gcs, GUIDE_STEPS as _gs } from "./guide.mjs";
-import { test as _t } from "node:test";
-import _assert from "node:assert/strict";
-_t("guide skips on Escape, keeps focus alone, and its steps do not claim the home screen is showing", () => {
-  const s = _gcs();
-  _assert.match(s, /Escape/);
-  _assert.doesNotMatch(s, /\.focus\(\)/);
-  _assert.doesNotMatch(_gs[0].text, /This is the home screen/);
+test("Escape skips the guide and it does not return after a reload", async () => {
+  const b = await chromium.launch();
+  try {
+    const ctx = await b.newContext({ viewport: { width: 460, height: 960 } });
+    await ctx.route("http://phone.test/**", (r) => r.fulfill({ contentType: "text/html", body: page(renderFrame({ skin: "android", lumi: true, guide: true })) }));
+    const p = await ctx.newPage();
+    await p.goto("http://phone.test/");
+    const g = p.locator('[data-part="lumi-guide"]');
+    assert.equal(await g.isVisible(), true);
+    await p.keyboard.press("Escape");
+    assert.equal(await g.isVisible(), false);
+    await p.reload();
+    assert.equal(await g.isVisible(), false);
+  } finally { await b.close(); }
+});
+
+test("step 1 works on both skins: no home button is named, and it does not claim the home screen is showing", () => {
+  assert.doesNotMatch(GUIDE_STEPS[0].text, /home button|This is the home screen/i);
+  for (const skin of ["android", "ios"]) assert.match(renderFrame({ skin, lumi: true, guide: true }).html, /Go home to see your apps/);
+});
+
+test("step 3 wraps on a narrow phone and is not clipped, in light and dark", async () => {
+  const b = await chromium.launch();
+  try {
+    for (const colorScheme of ["light", "dark"]) {
+      const ctx = await b.newContext({ viewport: { width: 360, height: 760 }, colorScheme });
+      await ctx.route("http://phone.test/**", (r) => r.fulfill({ contentType: "text/html", body: page(renderFrame({ skin: "android", lumi: true, guide: true })) }));
+      const p = await ctx.newPage();
+      await p.goto("http://phone.test/");
+      await p.click('[data-part="guide-next"]');
+      await p.click('[data-part="guide-next"]');
+      const r = await p.$eval(".sf-guide-step:not([hidden]) p", (e) => ({ sw: e.scrollWidth, cw: e.clientWidth }));
+      assert.ok(r.sw <= r.cw, `step 3 is clipped (${colorScheme})`);
+      const fit = await p.$eval('[data-part="lumi-guide"]', (e) => { const a = e.getBoundingClientRect(), f = e.offsetParent.getBoundingClientRect(); return a.left >= f.left && a.right <= f.right; });
+      assert.ok(fit, `guide stays inside the phone (${colorScheme})`);
+      if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/guide-step3-360-${colorScheme}.png` });
+      await ctx.close();
+    }
+  } finally { await b.close(); }
 });
