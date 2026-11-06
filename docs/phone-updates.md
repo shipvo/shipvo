@@ -42,7 +42,7 @@ The same values can come from `PN_UPDATE_URL` and `PN_UPDATE_KEY`. The source mu
 
 ## Crash loop
 
-After `apply_update` a new release has to boot without a page error. After 3 failed boots in a row, the phone drops the release, blocks it, runs the old release again and reports `reverted` with reason `crash_loop`. This is the same rule as in [spike results](spike-results.md). A boot with no page error confirms the release. A blocked release is not offered again.
+After `apply_update` a new release has to boot without a page error. After 3 failed boots in a row, the phone drops the release, blocks it, runs the old release again and reports `reverted` with reason `crash_loop`. This is the same rule as in [spike results](spike-results.md). A boot with no page error confirms the release. Only page errors seen while the page loads count: a crash after the page is idle does not count as a failed boot. A blocked release is not offered again.
 
 ## Run it
 
@@ -53,3 +53,5 @@ pnpm --filter @shipvo/sim exec node --test update-live.test.mjs
 ```
 
 Limits: web bundles only (one `index.html`), and no patch (bsdiff) simulation. In `shipvo run`, the frame page draws the banner from a `pn:update` message; the MCP tools do not feed it yet.
+
+The simulator refuses a signed release that is not newer than every release the session knows: the running one (`13` and `r13` both count as 13), the previous one, ones it ran before and blocked ones. This stops an old signed release being replayed. If the app has no release number and the session has seen none, any validly signed release counts as new.

@@ -59,6 +59,22 @@ test("no_update when the release is not newer, and not_ready before a check", as
   await assert.rejects(checkForUpdate(createUpdate({ release: 1, url: "u" }), {}), (e) => e.code === "no_update");
   cp.close();
 });
+test("a signed older pointer is refused when the running release is not a plain number", async () => {
+  for (const kind of ["seen", "string"]) {
+    const { cp, st, opts } = await setup();          // the pointer is release 2
+    if (kind === "seen") { st.running.release = undefined; st.seen.push(30); }   // a release the session ran before
+    else st.running.release = "r13";
+    await assert.rejects(checkForUpdate(st, opts), (e) => e instanceof UpdateError && e.code === "no_update" && /not newer/.test(e.message));
+    assert.equal(st.state, "idle"); assert.equal(st.pending, null);
+    cp.close();
+  }
+});
+test("with no release known at all, a signed release is accepted", async () => {
+  const { cp, st, opts } = await setup();
+  st.running.release = undefined;
+  assert.equal((await checkForUpdate(st, opts)).state, "ready");
+  cp.close();
+});
 test("three failed boots revert, block the release and say crash_loop", async () => {
   const { cp, st, opts } = await setup();
   await checkForUpdate(st, opts); applyUpdate(st, (n) => `http://x/u/r${n}`);

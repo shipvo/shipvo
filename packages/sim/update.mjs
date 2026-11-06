@@ -15,9 +15,11 @@ export const CRASH_LIMIT = 3;
 
 /** `running` is { release, url }: the bundle the phone runs now (the first one is the app the session opened). */
 export function createUpdate(running) {
-  return { state: "idle", reason: null, running, previous: null, pending: null, trial: null, blocked: [], bundles: new Map(), log: [] };
+  return { state: "idle", reason: null, running, previous: null, pending: null, trial: null, blocked: [], seen: [], bundles: new Map(), log: [] };
 }
 
+/** A release as a number: 13 and "r13" are 13; anything else is unknown (null). */
+const asNumber = (r) => typeof r === "number" ? r : typeof r === "string" && /(\d+)$/.test(r) ? Number(r.match(/(\d+)$/)[1]) : null;
 const set = (st, state, reason = null, extra = {}) => {
   st.state = state; st.reason = reason;
   st.log.push({ at: Date.now(), name: "update_state", state, release: st.running.release, reason, ...extra, source: "simulated" });
@@ -63,7 +65,8 @@ export async function checkForUpdate(st, { url, publicKey, fetchFn = fetch }) {
   if (!pointer || typeof pointer !== "object" || !verifyPointer(pointer, publicKey)) return fail("verify_failed", "the release pointer has no valid signature for this app's key");
   const n = pointer.release;
   if (!Number.isInteger(n) || !pointer.web?.base || !pointer.web?.entry || !/^[0-9a-f]{64}$/.test(String(pointer.web.sha256))) return fail("verify_failed", "the signed pointer has no usable web bundle");
-  if (typeof st.running.release === "number" ? n <= st.running.release : false) { st.state = was.state; st.reason = was.reason; throw new UpdateError("no_update", `release ${n} is not newer than the running release ${st.running.release}`); }
+  const known = [st.running.release, st.previous?.release, ...st.seen, ...st.blocked].map(asNumber).filter(Number.isInteger);
+  if (known.length && n <= Math.max(...known)) { st.state = was.state; st.reason = was.reason; throw new UpdateError("no_update", `release ${n} is not newer than the newest release this session knows (${Math.max(...known)})`); }
   if (st.blocked.includes(n)) { st.state = was.state; st.reason = was.reason; throw new UpdateError("no_update", `release ${n} crashed on this phone and is blocked`); }
   set(st, "downloading", null, { target: n });
   let bytes;
@@ -84,6 +87,7 @@ export async function checkForUpdate(st, { url, publicKey, fetchFn = fetch }) {
 export function applyUpdate(st, urlFor) {
   if (st.state !== "ready" || !st.pending) throw new UpdateError("not_ready", `no update is ready (state: ${st.state}). Call check_for_update first.`);
   st.previous = st.running; st.running = { release: st.pending.release, url: urlFor(st.pending.release) }; st.pending = null;
+  st.seen.push(st.running.release);
   st.trial = { release: st.running.release, fails: 0 };
   set(st, "applied");
   return st.running;
