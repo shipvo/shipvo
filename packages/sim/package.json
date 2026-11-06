@@ -34,6 +34,7 @@
     "settings.mjs",
     "settings-actions.mjs",
     "nav.mjs",
+    "update.mjs",
     "frame.d.mts",
     "mock-rules.mjs",
     "screen-rules.mjs",
