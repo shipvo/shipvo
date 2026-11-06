@@ -105,6 +105,14 @@ describe("shipvo keys rotate", () => {
     await expect(rotate(["sign", "--root-seed-file", f, ...base, "--valid-from", "2027-03-01T00:00:00Z"], cfg, { now })).rejects.toThrow(/90 days/);
     await expect(rotate(["sign", "--root-seed-file", f, "--new-key", "AAAA", "--sequence", "1"], cfg, { now })).rejects.toBeInstanceOf(RotateError);
   });
+  it("refuses a sequence above the safe integer range", async () => {
+    const root = b64(randomBytes(32)), f = seedFile(root);
+    const mk = (sequence: number) => () => signStatement({ appId: "tide", sequence, newKey: V.keys.K2.publicKey, validFrom: now().toISOString() }, root);
+    expect(mk(Number.MAX_SAFE_INTEGER)).not.toThrow();
+    expect(mk(Number.MAX_SAFE_INTEGER + 1)).toThrow(/sequence/);
+    expect(mk(1e21)).toThrow(/sequence/);
+    await expect(rotate(["sign", "--root-seed-file", f, "--new-key", V.keys.K2.publicKey, "--sequence", "100000000000000000000"], cfg, { now })).rejects.toThrow(/--sequence/);
+  });
 
   function signedIn() {
     const h = mkdtempSync(join(tmpdir(), "rot-home-")); process.env.HOME = h;
@@ -162,5 +170,8 @@ describe("shipvo keys rotate sign (process)", () => {
     expect(verifyStatement(JSON.parse(ok.stdout), V.root.publicKey, { appId: "tide", effectiveSequence: 0, now: new Date() }).ok).toBe(true);
     expect(bad.status).not.toBe(0);
     expect(bad.stderr).toMatch(/root seed is not valid/);
+    const big = spawnSync(process.execPath, [join(out, "cli.js"), "keys", "rotate", "sign", "--root-seed-file", join(d, "good.txt"), "--new-key", V.keys.K2.publicKey, "--sequence", "100000000000000000000", "--json"], { cwd: d, encoding: "utf8" });
+    expect(big.status).toBe(1);
+    expect(big.stderr).toMatch(/--sequence/);
   });
 });

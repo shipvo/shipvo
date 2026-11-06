@@ -17,7 +17,7 @@ const enc = new TextEncoder();
 
 /** The body string. Key order is fixed; the signer keeps these exact bytes. */
 export function buildStatementBody(s: { appId: string; sequence: number; newKey: string; validFrom: string }): string {
-  if (!Number.isInteger(s.sequence) || s.sequence < 1) throw new Error("sequence must be an integer, at least 1");
+  if (!Number.isSafeInteger(s.sequence) || s.sequence < 1) throw new Error("sequence must be an integer, at least 1 and at most 9007199254740991");
   if (unb64(s.newKey).length !== 32) throw new Error("the new release key must be a 32-byte Ed25519 public key (base64)");
   const t = Date.parse(s.validFrom);
   if (Number.isNaN(t)) throw new Error("validFrom must be an ISO 8601 UTC time");
@@ -46,7 +46,7 @@ export function verifyStatement(env: unknown, rootPublicKeyB64: string, ctx: { a
   if (!s || typeof s !== "object" || Array.isArray(s)) return { ok: false, reason: "bad_body" };
   if (s.type !== "key-rotation") return { ok: false, reason: "wrong_type" };
   if (s.appId !== ctx.appId) return { ok: false, reason: "wrong_app" };
-  if (!Number.isInteger(s.sequence) || s.sequence < 1) return { ok: false, reason: "bad_sequence" };
+  if (!Number.isSafeInteger(s.sequence) || s.sequence < 1) return { ok: false, reason: "bad_sequence" };
   if (s.sequence <= ctx.effectiveSequence) return { ok: false, reason: "replay" };
   const from = typeof s.validFrom === "string" ? Date.parse(s.validFrom) : NaN;
   if (Number.isNaN(from)) return { ok: false, reason: "bad_body" };
@@ -77,7 +77,7 @@ export async function rotate(argv: string[], cfg: Cfg, deps: { fetchFn?: typeof 
     let rootSeed: string;
     try { rootSeed = readFileSync(file, "utf8").trim(); } catch { throw new RotateError(`Cannot read the root seed file ${file}.`); }
     try { keyFromSeed(rootSeed); } catch { throw new RotateError("The root seed is not valid: it must be a 32-byte value in base64."); }
-    if (!/^\d+$/.test(seq) || Number(seq) < 1) throw new RotateError("--sequence must be a whole number, at least 1.");
+    if (!/^\d+$/.test(seq) || !Number.isSafeInteger(Number(seq)) || Number(seq) < 1) throw new RotateError("--sequence must be a whole number from 1 to 9007199254740991.");
     const validFrom = a["valid-from"] && a["valid-from"] !== "true" ? a["valid-from"] : now.toISOString();
     const t = Date.parse(validFrom);
     if (Number.isNaN(t)) throw new RotateError("--valid-from must be an ISO 8601 UTC time, such as 2026-11-06T00:00:00Z.");
