@@ -6,15 +6,15 @@
 export const GUIDE_KEY = "shipvo.lumi.guide";
 
 export const GUIDE_STEPS = [
-  { title: "Your home screen", text: "This is the home screen. Press home at any time to come back here." },
-  { title: "The Store", text: "Open the Store icon to install more apps on this phone." },
+  { title: "Your home screen", text: "Press the home button to see your apps. Press it at any time to come back." },
+  { title: "The Store", text: "The Store icon on the home screen installs more apps on this phone." },
   { title: "Connect an assistant", text: "To let an AI assistant drive this phone, run: claude mcp add shipvo -- npx -y @shipvo/mcp" },
 ];
 
 /** Markup for the guide. Hidden until the page script finds that this browser has not seen it. */
 export function guideHtml() {
   const steps = GUIDE_STEPS.map((s, i) => `<div class="sf-guide-step" data-step="${i + 1}"${i ? " hidden" : ""}><b>${s.title}</b><p>${s.text.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p></div>`).join("");
-  return `<div class="sf-guide" data-part="lumi-guide" role="dialog" aria-label="Welcome to Shipvo Phone" hidden>`
+  return `<div class="sf-guide" data-part="lumi-guide" role="dialog" aria-live="polite" aria-label="Welcome to Shipvo Phone" hidden>`
     + `<span class="sf-guide-count" data-part="guide-count">1 of ${GUIDE_STEPS.length}</span>${steps}`
     + `<div class="sf-guide-actions"><button type="button" data-part="guide-skip">Skip</button><button type="button" data-part="guide-next">Next</button></div></div>`;
 }
@@ -39,5 +39,6 @@ function draw(){for(var j=0;j<s.length;j++)s[j].hidden=j!==i;c.textContent=(i+1)
 function close(happy){save();g.hidden=true;lumi(happy?"happy":"idle")}
 g.querySelector('[data-part="guide-skip"]').addEventListener("click",function(){close(false)});
 n.addEventListener("click",function(){if(i>=s.length-1)return close(true);i++;draw()});
-if(seen())return;draw();g.hidden=false;n.focus()})();`;
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!g.hidden)close(false)});
+if(seen())return;draw();g.hidden=false})();`;
 }

@@ -55,3 +55,13 @@ test("Skip closes the guide at once and it never shows again", async () => {
     assert.equal(await p.locator('[data-part="lumi-guide"]').isVisible(), false);
   } finally { await b.close(); }
 });
+
+import { guideClientScript as _gcs, GUIDE_STEPS as _gs } from "./guide.mjs";
+import { test as _t } from "node:test";
+import _assert from "node:assert/strict";
+_t("guide skips on Escape, keeps focus alone, and its steps do not claim the home screen is showing", () => {
+  const s = _gcs();
+  _assert.match(s, /Escape/);
+  _assert.doesNotMatch(s, /\.focus\(\)/);
+  _assert.doesNotMatch(_gs[0].text, /This is the home screen/);
+});
