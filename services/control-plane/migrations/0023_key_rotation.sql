@@ -1,6 +1,5 @@
 -- Storage for signing key rotation (docs/design/key-rotation.md sections 3, 6, 7, 10). Additive only: three new tables, no change to audit_log.
--- Deploy procedure: 1) apply this migration; 2) deploy the Worker. The old Worker never reads or writes these tables and keeps
--- writing audit_log as before, so both Worker versions can run during the deploy and no row is lost.
+-- Deploy procedure: apply the migration first, then deploy the Worker. The migration only adds tables; the old Worker ignores them and keeps writing `audit_log`, so both Worker versions can run during the deploy and no row is lost.
 CREATE TABLE IF NOT EXISTS rotation_roots (
   app_id TEXT PRIMARY KEY,
   root_key TEXT NOT NULL,              -- root public key, base64, 32 bytes
