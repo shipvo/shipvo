@@ -202,6 +202,24 @@ shipvo approvals list --json          # one JSON line: { ok, command, app, appro
 - Exit codes: 0 done, 1 refused by a rule, 2 error. With `--json` a failure is `{ ok: false, error, message, rule? }`.
 - MCP tools: `approvals_list(app)` and `approval_approve(app, id)`.
 
+## `--json` for `doctor`, `test` and `explore`
+
+`shipvo doctor --json`, `shipvo test --json` and `shipvo explore --json` print the same envelope as `status --json`: `{ ok, code, summary, data, next }`. Stdout holds only that one JSON line. Progress and logs go to stderr, including the Playwright install notice for `explore` and the progress lines of `test`. The text output is unchanged without `--json`.
+
+| Command | `code` values | `data` |
+| --- | --- | --- |
+| `doctor` | `ok`, `checks_failed`, `usage` | `checks`: `[{ name, ok, fix, note }]` |
+| `test` | `ok`, `tests_failed`, `usage`, `error` | `flows`, `failed`, `repaired`, `unresolved` |
+| `explore` | `ok`, `findings`, `walk_failed`, `error` | `findings`, `steps`, `screens`, `report_files`, `stopped_early` |
+
+`next` has one to three commands. A failed doctor check adds one entry that names the fix.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | ok |
+| 1 | the check or test failed (`explore` exits 1 on findings only with `--fail-on-findings`, and always when the walk fails) |
+| 2 | usage or setup error |
+
 ## `shipvo audit`
 
 Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.

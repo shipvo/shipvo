@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
-const exec = vi.hoisted(() => ({ fn: (_cmd: string) => {} }));
-vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string) => exec.fn(c) }));
+const exec = vi.hoisted(() => ({ fn: (_cmd: string, _opts?: { env?: NodeJS.ProcessEnv }) => {} }));
+vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string, o?: { env?: NodeJS.ProcessEnv }) => exec.fn(c, o) }));
 
 const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown }));
 const puts: string[] = [];
@@ -23,7 +23,8 @@ vi.mock("../src/config.js", async (orig) => ({
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
 }));
-import { publish, rollback, dryRunSummary } from "../src/publish";
+import { publish, rollback, dryRunSummary, isInside } from "../src/publish";
+import path from "node:path";
 
 const fakeHbc = (version: number) => {
   const b = new Uint8Array(64);
@@ -275,6 +276,15 @@ describe("publish and the Hermes bytecode check", () => {
     expect(existsSync(join(cwd, ".shipvo/dry-run/w"))).toBe(false);
   });
 
+  it("the web export sets PN_SIM through env, not a shell prefix cmd.exe rejects", async () => {
+    withBundle(96);
+    let seen: { cmd: string; env?: NodeJS.ProcessEnv } | undefined;
+    exec.fn = (c, o) => { if (c.includes("--platform web")) { seen = { cmd: c, env: o?.env }; mkdirSync(join(cwd, "dist-web"), { recursive: true }); writeFileSync(join(cwd, "dist-web/index.html"), "<p>hi</p>"); } };
+    await publish(["--skip-export", "true", "--skip-web", "false", "--bands", "b0", "--dry-run"]);
+    expect(seen?.cmd.startsWith("npx expo export")).toBe(true);
+    expect(seen?.env?.PN_SIM).toBe("1");
+  });
+
   it("--skip-web false still publishes the web copy", async () => {
     withBundle(96);
     exec.fn = (c) => { if (c.includes("--platform web")) { mkdirSync(join(cwd, "dist-web"), { recursive: true }); writeFileSync(join(cwd, "dist-web/index.html"), "<p>hi</p>"); } };
@@ -403,5 +413,20 @@ describe("publish and the Hermes bytecode check", () => {
     const core = (key: string) => JSON.parse(JSON.parse(values.get(key)!).body).core;
     expect(core("p/demo/1/ios/b0").patches.map((p: any) => p.from_sha256)).toEqual([sha(8)]);
     expect(core("p/demo/1/b0").patches.map((p: any) => p.from_sha256)).toEqual([sha(9)]);
+  });
+});
+
+describe("isInside (dry-run writes stay under the output dir)", () => {
+  it("accepts Windows paths under the root and refuses ones outside it", () => {
+    const w = path.win32;
+    expect(isInside("D:\\a\\app\\.shipvo\\dry-run", "D:\\a\\app\\.shipvo\\dry-run\\b\\myshop\\r1.hbc", w)).toBe(true);
+    expect(isInside("D:\\a\\app\\.shipvo\\dry-run", "D:\\a\\app\\.shipvo\\other\\r1.hbc", w)).toBe(false);
+    expect(isInside("D:\\a\\app\\.shipvo\\dry-run", "D:\\a\\app\\.shipvo\\dry-run", w)).toBe(false);
+  });
+  it("accepts POSIX paths under the root and refuses ones outside it", () => {
+    const p = path.posix;
+    expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run/b/myshop/r1.hbc", p)).toBe(true);
+    expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run-x/r1.hbc", p)).toBe(false);
+    expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run/../x", p)).toBe(false);
   });
 });

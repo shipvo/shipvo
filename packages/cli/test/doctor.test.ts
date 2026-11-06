@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { existsSync, mkdtempSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -306,5 +306,53 @@ describe("shipvo doctor sim checks", () => {
     expect(await portFree(busy)).toBe(false);
     await new Promise((r) => srv.close(r));
     expect(await portFree(busy)).toBe(true);
+  });
+});
+
+describe("doctor --json", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+  it("gives a runnable next command for a busy port", async () => {
+    const { createServer } = await import("node:net");
+    const srv = createServer();
+    await new Promise<void>((r) => srv.listen(0, r));
+    const busy = (srv.address() as { port: number }).port;
+    const seed = makeSeed();
+    const simCwd = withConfig(JSON.stringify({ appId: "a", publicKey: makePub(seed) }), seed);
+    writeFileSync(join(simCwd, "package.json"), JSON.stringify({ scripts: { sim: "shipvo sim" } }));
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(process, "cwd").mockReturnValue(simCwd);
+    vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await expect(doctor(["--json", "--offline", "--port", String(busy)])).rejects.toThrow("exit");
+    await new Promise((r) => srv.close(r));
+    const cmds: string[] = JSON.parse(logs[0]!).next.map((n: { command: string }) => n.command);
+    expect(cmds).toContain(`shipvo doctor --json --port ${busy + 1}`);
+    expect(cmds.join("\n")).not.toContain("<n>");
+  });
+  it("prints one envelope with a fix in next and exits 1 on a failed check", async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(process, "cwd").mockReturnValue(mkdtempSync(join(tmpdir(), "doctor-json-")));
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await expect(doctor(["--json", "--offline"])).rejects.toThrow("exit");
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(logs).toHaveLength(1);
+    const doc = JSON.parse(logs[0]!);
+    expect(doc.ok).toBe(false);
+    expect(doc.code).toBe("checks_failed");
+    expect(doc.data.checks.some((c: { ok: boolean; fix: string }) => !c.ok && c.fix)).toBe(true);
+    expect(doc.next.length).toBeGreaterThanOrEqual(1);
+    expect(doc.next.length).toBeLessThanOrEqual(3);
+    expect(doc.next[0].command).toBe("shipvo init .");
+    vi.restoreAllMocks();
+  });
+  it("exits 2 with an envelope on bad usage", async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await expect(doctor(["--json", "extra"])).rejects.toThrow("exit");
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(JSON.parse(logs[0]!).code).toBe("usage");
+    vi.restoreAllMocks();
   });
 });
