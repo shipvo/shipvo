@@ -21,6 +21,8 @@ const NO_SESSION: Record<string, string> = {
   approvals_list: "owner tool, works on an app",
   approval_approve: "owner tool, works on an app",
   audit_log: "owner tool, works on an app",
+  request_secret: "owner tool, works on an app",
+  secret_status: "owner tool, works on an app",
   list_store_apps: "lists the marketplace, takes no session",
   list_sessions: "lists all sessions, takes no session id",
   record_start: "records the phone frame page, takes no session id",

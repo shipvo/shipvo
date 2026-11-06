@@ -96,6 +96,27 @@ Sealed records carry a `shipvo-vault/v1` tag in their authenticated data. Rotati
 
 Not covered in this slice: injection at call time (a later slice), listing, rotating and revoking keys, rate limits on the vault page, and a restricted Stripe key that has write permissions (the check reads the key prefix, not its permissions). A person who opens the link on a compromised browser can be phished by the page's lookalike; the ticket URL is the only credential, so treat it like a password until it is used.
 
+## Secret vault, MCP tools (slice 2)
+
+Two tools let an assistant start and follow the flow without seeing a key. Code: `request_secret` and `secret_status` in `packages/mcp-tools/src/index.ts` (one registry for the stdio and remote servers), handlers in `packages/mcp/src/server.ts`, and `GET /vault/status/:app/:name` in `services/control-plane/src/vault.ts`.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| A tool result or error carries a key | `request_secret` returns only the link, its lifetime and a notice. `secret_status` returns only `saved`, `valid` and `access`, picked field by field (`valid: null` means not checked). Errors are fixed text. | "no tool output or error contains the stored value" (`packages/mcp/test/vault-tools.test.ts`) |
+| The assistant reads a key through the status call | The status endpoint selects only `access` and `valid` from the row. | "status says saved, valid and access, never the value" |
+| A key without an owner token asks for a link or reads status | Both tools need an owner key for the app, and the control plane checks the same owner rule as for tickets. | "needs the app's owner"; "status ... needs the owner" |
+| Expired or reused link | The page and the JSON post both say the link was used or expired and to ask the assistant for a new one. `request_secret` tells the assistant to call it again. | "a reused ticket gets a plain error that says how to ask again" |
+
+The link is the only credential in a `request_secret` result. The assistant sees it, so it can reach the person only through the chat; treat it like a password until it is used.
+
+## Single sign-on, ID token verification (slice 4a)
+
+The control plane has a verifier for OIDC ID tokens from Okta, Entra ID, Google Workspace and Keycloak. It is not connected to any route yet.
+
+- It checks the signature against the issuer's JWKS (RS256 and ES256 only), then `iss`, `aud`, `exp`, `nbf`, `iat` and `nonce`. `alg: none`, HS256 and any other algorithm are rejected, and the key type must match the algorithm, so a public key cannot be used as an HMAC secret.
+- The issuer and JWKS URL must be https. Keys are cached. An unknown `kid` causes at most one refetch per minute, so forged `kid` values cannot make us hammer the identity provider.
+- A role comes only from a configured group or a verified email domain. The highest matching role wins. No match means no access.
+
 ## How to check these claims
 
 Every path and test name above can be found with `rg`, for example:

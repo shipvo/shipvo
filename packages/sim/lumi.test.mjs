@@ -11,6 +11,14 @@ const APP = `<!doctype html><title>t</title><body style="margin:0;background:#ff
 const page = (f) => `<style>html,body{margin:0}${f.css}</style>${f.html}<script>${statusClientScript("app")}</script>`;
 const withApp = (skin, lumi) => renderFrame({ skin, lumi, screen: `<iframe id="app" srcdoc="${APP.replace(/"/g, "&quot;")}"></iframe>` });
 
+// Chromium sometimes answers "Unable to capture screenshot" while the page is still repainting after a style change (seen once in CI under load). Wait for a frame and try again.
+async function shoot(p, opts) {
+  for (let i = 0; ; i++) {
+    try { await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); return await p.screenshot(opts); }
+    catch (e) { if (i >= 3 || !/Unable to capture screenshot/.test(String(e))) throw e; await p.waitForTimeout(100); }
+  }
+}
+
 test("Lumi is off in CI and on elsewhere, and SHIPVO_LUMI wins", () => {
   assert.equal(lumiDefault({ CI: "true" }), false);
   assert.equal(lumiDefault({}), true);
@@ -57,7 +65,7 @@ test("Lumi's glow stays inside the status bar in every state, so it never touche
         for (const s of lumi ? ["happy", "worried"] : ["off", "off"]) {
           if (lumi) await p.evaluate((x) => window.shipvoLumi.set(x), s);
           await p.addStyleTag({ content: "*{animation:none!important}" });
-          per.push(await p.screenshot({ clip: { ...box, height: 8 } }));
+          per.push(await shoot(p, { clip: { ...box, height: 8 } }));
         }
         shots.push(per); await p.close();
       }

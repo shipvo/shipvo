@@ -1,4 +1,6 @@
 import schema from "./app-spec.v0.schema.json" with { type: "json" };
+import { checkNames, type NameScope } from "./check.js";
+import { estimateCost, MAX_COST } from "./eval.js";
 import { celSyntaxError, expressionSteps, extractExpressions, MAX_EXPRESSION_STEPS } from "./cel.js";
 import { checkSchema } from "./jsonschema.js";
 import { childPath, isObject, type Issue, type ValidationResult } from "./types.js";
@@ -126,7 +128,37 @@ class Run {
       return;
     }
     const err = celSyntaxError(src);
-    if (err) this.error(path, `Expression is not valid CEL: ${err}.`, "Fix the syntax. Expressions use CEL (https://cel.dev), for example money(total, 'EUR').");
+    if (err) {
+      this.error(path, `Expression is not valid CEL: ${err}.`, "Fix the syntax. Expressions use CEL (https://cel.dev), for example money(total, 'EUR').");
+      return;
+    }
+    const cost = estimateCost(src);
+    if (cost !== undefined && cost > MAX_COST) {
+      this.error(path, `Expression costs ${cost}; the limit is ${MAX_COST}.`, "Avoid nesting filter, map, exists and all inside each other. Compute the inner list as a value in \"data\".");
+      return;
+    }
+    for (const p of checkNames(src, this.scopeAt(path))) this.error(path, p.message, p.fix);
+  }
+
+  /** The names an expression may use at this place in the spec. */
+  scopeAt(path: string): NameScope {
+    const keys = (v: unknown) => (isObject(v) ? Object.keys(v) : []);
+    const dataNames = keys(this.spec.data);
+    const stateNames = keys(this.spec.state);
+    const names: NameScope["names"] = { data: dataNames, state: stateNames, route: ["params"] };
+    for (const d of dataNames) names[d] = undefined;
+    if (/^\$\.data\.[^.[]+\.paginate/.test(path) || /^\$\.data\["[^"]+"\]\.paginate/.test(path)) return { names, loose: true };
+    if (path.startsWith("$.screens")) names.item = undefined;
+    const action = /^\$\.actions(?:\.([A-Za-z_][A-Za-z0-9_]*)|\["([^"]+)"\])/.exec(path);
+    if (action && isObject(this.spec.actions)) {
+      const a = this.spec.actions[action[1] ?? action[2]!];
+      names.input = isObject(a) && isObject(a.input) ? Object.keys(a.input) : undefined;
+      names.result = undefined;
+    } else if (path.startsWith("$.schedules")) {
+      names.input = undefined;
+      names.result = undefined;
+    }
+    return { names };
   }
 
   checkTemplate(s: string, path: string) {
@@ -313,7 +345,7 @@ export const appSpecSchema = schema;
 
 /**
  * Checks an app spec. Never throws: any input gives a result.
- * CEL expressions are syntax-checked only; names and types are checked later.
+ * CEL expressions are checked for syntax, cost, and unknown names, fields and functions.
  */
 export function validate(spec: unknown): ValidationResult {
   try {

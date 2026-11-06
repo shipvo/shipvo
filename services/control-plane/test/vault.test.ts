@@ -221,3 +221,25 @@ describe("vault at rest and in responses", () => {
     expect(r.status).toBe(401);
   });
 });
+
+describe("vault status and plain errors", () => {
+  it("status says saved, valid and access, never the value, and needs the owner", async () => {
+    const { ticket, store, req } = setup();
+    const get = (as = "tide") => req("/vault/status/tide/STRIPE_KEY", { headers: { authorization: `Bearer owner-${as}` } });
+    expect(await (await get()).json()).toEqual({ saved: false, valid: null, access: null });
+    expect((await get("other")).status).toBe(401);
+    await store((await ticket()).j.ticket);
+    const r = await get();
+    const text = await r.text();
+    expect(JSON.parse(text)).toEqual({ saved: true, valid: true, access: "read" });
+    expect(text).not.toContain(SECRET);
+  });
+  it("a reused ticket gets a plain error that says how to ask again", async () => {
+    const { ticket, store } = setup();
+    const t = (await ticket()).j.ticket;
+    await store(t);
+    const r = await store(t);
+    expect(r.status).toBe(410);
+    expect(((await r.json()) as any).message).toContain("Ask the assistant for a new one");
+  });
+});
