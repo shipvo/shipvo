@@ -6,7 +6,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-1. Shipvo Testers and `shipvo store testers` (video, blog)
+1. Shipvo Testers and `shipvo store testers` (video)
 2. Shipvo Phone and `shipvo run` (all columns, as slices land)
 3. Store path: `shipvo store` from working app to both stores (video, blog)
 4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
@@ -45,7 +45,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | | | |
 | Assistant attaches to the live `shipvo run` phone (`open_app`) | [run](run.md), [agents](agents.md) | | | |
 | Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md) | | | |
-| Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | | |
+| Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | | [google-play-12-testers-14-days](../blog/google-play-12-testers-14-days.md) |
 | Real camera, microphone and location in the browser | [device-api](device-api.md) | | | |
 | Gate a rollout on test results (`shipvo promote --report`, `--report-md`) | [testing](testing.md), [cli](cli.md) | | | |
 | Test secrets (`secret(name)`, `{secret:NAME}`) | [testing](testing.md) | | | |
