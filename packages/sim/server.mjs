@@ -20,6 +20,7 @@ import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS, applyScheme } from "./shade-actions.mjs";
 import { ShadeError } from "./shade.mjs";
+import { SettingsError, settingPatch, settingRows, pickSettings, describeSettings } from "./settings.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
@@ -248,6 +249,18 @@ async function act(id, body) {
     }
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); if (typeof body.device?.darkMode === "boolean") await applyScheme(page, body.device.darkMode); break;
+    // System settings (the phone's Settings screen). Bad keys and values are typed errors and change nothing.
+    case "get_settings": case "set_setting": {
+      const read = async () => pickSettings(await page.evaluate(() => globalThis.__pnDevice?.settings() ?? null) ?? {});
+      if (!(await page.evaluate(() => !!globalThis.__pnDevice))) throw new SimError("no_device", "the app has no simulated device in this session");
+      if (body.action === "set_setting") {
+        let patch; try { patch = settingPatch(body.key, body.value); } catch (e) { if (e instanceof SettingsError) throw new SimError(e.code, e.message); throw e; }
+        await page.evaluate((p) => globalThis.__pnDevice.set(p), patch);
+        if ("darkMode" in patch) await applyScheme(page, patch.darkMode);
+      }
+      const values = await read();
+      return { settings: values, rows: settingRows(values), screen: describeSettings(values) };
+    }
     case "open_notifications": case "open_control_center": case "close_panels": case "toggle_tile": case "dismiss_notification": {
       try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
     }
@@ -331,7 +344,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, get_settings, set_setting, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

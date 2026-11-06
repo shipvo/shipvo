@@ -90,7 +90,7 @@ export function describePanel(platform, panel, device, list, now = Date.now()) {
 /** Markup for the panels. Hidden until the page opens one. */
 export function shadeHtml(platform = "android") {
   const ios = platform === "ios";
-  const panel = (part, label, inner) => `<div class="sf-panel" data-part="${part}" role="dialog" aria-label="${label}" tabindex="-1" hidden>${inner}<button type="button" class="sf-close" data-part="close">Close</button></div>`;
+  const panel = (part, label, inner) => `<div class="sf-panel" data-part="${part}" role="dialog" aria-label="${label}" tabindex="-1" hidden><button type="button" class="sf-gear" data-part="settings-gear" aria-label="Settings">Settings</button>${inner}<button type="button" class="sf-close" data-part="close">Close</button></div>`;
   const list = `<div class="sf-notes" data-part="notification-list"></div><button type="button" class="sf-clear" data-part="clear-all">Clear all</button>`;
   return `<div class="sf-grab" data-part="top-edge" aria-hidden="true"></div>`
     + (ios ? panel("notification-center", "Notification Center", list) + panel("control-center", "Control Center", `<div class="sf-tiles" data-part="tiles"></div>`)
