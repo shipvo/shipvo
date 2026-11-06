@@ -78,6 +78,25 @@ for (const i of issues.filter((i) => !i.labels.some((l) => STATE.includes(l.name
   } catch (e) { console.log(`skip orphan #${i.number}:`, e.message); }
 }
 
+// 2d. Stalled epics: an open epic with no open slice in the queue (ready, in progress, PR open, waiting or
+// blocked) has nobody working on it. Flag it `agent:epic-next` so the planner files its next slices
+// (or closes it if every goal is shipped). Slices are found as GitHub sub-issues or by "#<epic>" in their body.
+const WORKING = ["agent:ready", "agent:in-progress", "agent:pr-open", "agent:waiting", "agent:blocked"];
+for (const e of issues.filter((i) => has(i, "epic") && !has(i, "agent:epic-next") && mins(i.created_at) > 60)) {
+  try {
+    let kids = [];
+    try { kids = api(`repos/${REPO}/issues/${e.number}/sub_issues?per_page=100`).filter((k) => k.state === "open"); } catch {}
+    const mentions = api(`search/issues?q=${encodeURIComponent(`repo:${REPO} is:issue is:open "#${e.number}" in:body`)}&per_page=50`).items;
+    const open = [...kids, ...mentions].filter((k) => k.number !== e.number && k.labels.some((l) => WORKING.includes(l.name)));
+    if (open.length) continue;
+    act(`epic #${e.number}: no open slice in the queue: add agent:epic-next`, () => {
+      gh("label", "create", "agent:epic-next", "-R", REPO, "--color", "fbca04", "--force");
+      gh("api", "-X", "POST", `repos/${REPO}/issues/${e.number}/labels`, "-f", "labels[]=agent:epic-next");
+    });
+    fixed.push(`Epic ${link(e.number)} had no open slice; asked the planner to file its next slices.`);
+  } catch (err) { console.log(`skip epic #${e.number}:`, err.message); }
+}
+
 // 3. Idle team with work waiting.
 const ready = issues.filter((i) => has(i, "agent:ready") && !["agent:in-progress", "agent:pr-open", "agent:blocked", "needs-human"].some((l) => has(i, l)));
 const lastEngineer = runs.find((r) => /agent-(engineer|aider|mistral|fixer|reviewer)/.test(r.name) && r.conclusion !== "skipped");
