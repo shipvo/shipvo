@@ -352,8 +352,16 @@ Read-only. Run it in an app that uses `expo-updates` or `react-native-code-push`
 
 For `expo-updates`, it lists the entries it finds (dependency, plugin entry, `updates` and `runtimeVersion` keys in `app.json`), the steps to switch, and the order that keeps installed apps safe. See [Migrate from EAS Update](migrate-from-eas-update.md).
 
-For CodePush, it lists the dependency, `codePush()` wrapper and `CodePush.sync` calls, `CodePushDeploymentKey` and `CodePushPublicKey` entries, and `appcenter codepush` commands, each with file and line, then prints ordered steps (`system: "codepush"` in `--json`). `--apply` does not support CodePush. See [Migrate from CodePush](migrate-from-codepush.md).
+For CodePush, it lists the dependency, `codePush()` wrapper and `CodePush.sync` calls, `CodePushDeploymentKey` and `CodePushPublicKey` entries, and `appcenter codepush` commands, each with file and line, then prints ordered steps (`system: "codepush"` in `--json`). See [Migrate from CodePush](migrate-from-codepush.md).
 
 ## shipvo migrate --apply
 
 Makes the safe edits for the switch from EAS Update: removes the `expo-updates` dependency and plugin entry, and the `updates` and `runtimeVersion` keys from `app.json`. Each changed file is copied to `.shipvo/migrate-backup/` first. It refuses a dirty git tree unless you pass `--force`. It does not run `shipvo init`; it prints it as a next step, with the rest of the plan. A second run exits 0 and says there is nothing left to do. `--json` prints the standard envelope with `next` steps. See [Migrate from EAS Update](migrate-from-eas-update.md).
+
+For CodePush apps, `--apply` edits only these things, each file copied to `.shipvo/migrate-backup/` first:
+
+- Single-line `codePush({...})(App)` becomes `App`, `CodePush.sync(...)` becomes `Runtime.checkForUpdate(true)` and `CodePush.notifyAppReady()` becomes `Runtime.markHealthy()`. The `react-native-code-push` import becomes `import { Runtime } from "@shipvo/runtime"`.
+- `CodePushDeploymentKey` and `CodePushPublicKey` are removed from `Info.plist` and `strings.xml`.
+- In `package.json`, `react-native-code-push` is replaced by `@shipvo/runtime` and `@shipvo/device`, with `@shipvo/cli` as a dev dependency. It does not run your package manager.
+
+`appcenter codepush` scripts and CI lines are never edited. Neither are CodePush calls it cannot rewrite (for example a call that spans several lines). It prints each with file and line as a manual step, and lists them under `data.manual` in `--json`. A dirty git tree is refused with code `dirty_tree` unless you pass `--force`. A second run changes nothing and exits 0.
