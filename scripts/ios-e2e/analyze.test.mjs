@@ -86,8 +86,7 @@ test("patch rows reject a run that did not use a patch", () => {
   assert.throws(() => analyzePatch(pl, [{ app_launched: 1, healthy: 2 }]), /missing mark full_bytes/);
 });
 
-test("make-release builds release 2 with patches from the embedded bundle and from release 1", (t) => {
-  if (spawnSync("python3", ["-c", "import bsdiff4"]).status !== 0) return t.skip("python bsdiff4 not installed");
+test("make-release builds release 2 with patches from the embedded bundle and from release 1", () => {
   const dir = mkdtempSync(join(tmpdir(), "mk-")), root = join(dir, "cp");
   const base = Buffer.alloc(20000); for (let i = 0; i < base.length; i++) base[i] = (i * 31 + (i >> 8)) & 255;
   const r1 = Buffer.from(base); r1.write("release-one-headline", 5000);

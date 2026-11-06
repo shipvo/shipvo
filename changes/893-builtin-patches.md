@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo publish` now builds small update patches itself, with no Python or `bsdiff4` install. Patches use the same BSDIFF40 format as before, so devices need no change.
+- Migration: none. The `pip install bsdiff4` step is gone from the workflow that `shipvo init` and `shipvo adopt` write; you can remove it from existing workflows.
