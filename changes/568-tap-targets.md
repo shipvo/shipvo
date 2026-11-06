@@ -1,0 +1,2 @@
+- `@shipvo/site`: footer links, the footer logo and the "Captions and transcript" links on Learn pages are at least 44 px tall on phones.
+- Migration: none; CSS only.

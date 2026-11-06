@@ -109,3 +109,6 @@ export const otherHermesVersion = (shell) => (shell === 1 ? 2 : shell - 1);
  * (`hermes_bytecode_mismatch`), sent under the refused release's id.
  */
 export const refusalReason = (tele, release, since) => tele.find((e) => e.release === release && e.at >= since && e.event === "hermes_bytecode_mismatch")?.event ?? null;
+
+/** Where `release` is in the prefs: "pending" (trial stage seen), "current" (already promoted, stage was too short to see), or null. */
+export const releaseReached = (prefs, release) => (prefs.pending_release === release ? "pending" : prefs.current_release === release ? "current" : null);

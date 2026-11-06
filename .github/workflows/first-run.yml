@@ -15,8 +15,14 @@ permissions:
 concurrency: { group: first-run, cancel-in-progress: true }
 jobs:
   measure:
+    name: measure (${{ matrix.template }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # All three init templates (#592). Each uploads first-run-<template>; blank keeps the old "first-run" name too.
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [blank, shop, content]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -51,15 +57,15 @@ jobs:
           APPLY=(); R="$RUNNER_TEMP/e2e/android-e2e-report.json"
           grep -q -- "--apply-report" scripts/first-run/measure.mjs && [ -f "$R" ] && APPLY=(--apply-report "$R")
           rc=0
-          node scripts/first-run/measure.mjs --with-install --with-export $SESSION "${APPLY[@]}" --control-url http://localhost:8787 \
+          node scripts/first-run/measure.mjs --template "${{ matrix.template }}" --with-install --with-test --with-export $SESSION "${APPLY[@]}" --control-url http://localhost:8787 \
             --out "$RUNNER_TEMP/first-run.json" | tee "$RUNNER_TEMP/first-run.md" || rc=$?
-          { echo "### First run on ubuntu-latest (clean runner, no secrets)"; echo; cat "$RUNNER_TEMP/first-run.md"; echo; \
+          { echo "### First run on ubuntu-latest, template ${{ matrix.template }} (clean runner, no secrets)"; echo; cat "$RUNNER_TEMP/first-run.md"; echo; \
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
           exit $rc
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: first-run
+          name: ${{ matrix.template == 'blank' && 'first-run' || format('first-run-{0}', matrix.template) }}
           path: |
             ${{ runner.temp }}/first-run.json
             ${{ runner.temp }}/first-run.md
