@@ -63,8 +63,11 @@ function driverClient(port, token, WS = globalThis.WebSocket) {
 /** Opens the phone page in chromium (playwright from packages/sim). Returns a closer. */
 async function openPage(url) {
   const req = createRequire(resolve(here, "../../packages/sim/package.json"));
-  let pw; try { pw = req("playwright"); } catch { pw = req("playwright-core"); }
-  const browser = await pw.chromium.launch();
+  let pw;
+  try { pw = req("playwright"); } catch { try { pw = req("playwright-core"); } catch { throw new Error("playwright is not installed (looked in packages/sim). Run pnpm install."); } }
+  let browser;
+  try { browser = await pw.chromium.launch(); }
+  catch (e) { throw new Error(`chromium could not start: ${String(e.message).split("\n")[0]}. Install it with: npx playwright install chromium`); }
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto(url, { waitUntil: "load" });
   return () => browser.close();
