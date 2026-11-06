@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo run --lan` serves the simulated phone on your Wi-Fi and prints a URL with a random token and a QR code. A phone browser shows the app full screen without the phone frame. Requests without the token get 403.
+- Migration: none; new flag. `parseRunArgs` now also returns `lan`.

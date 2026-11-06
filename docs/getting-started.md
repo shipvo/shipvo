@@ -20,7 +20,15 @@ What we measured: on 2026-11-05, on a GitHub Actions Linux runner (4 vCPU, AMD E
 
 ## Supported systems
 
-The first-run path (`shipvo init`, `shipvo sim`, `shipvo run android`, `shipvo publish --dry-run`) is proven on Linux, on a GitHub Actions runner: see the first-run numbers above and [`scripts/first-run/`](../scripts/first-run/). We have no run on Windows or macOS yet, so we do not claim them. The `first-run-cross-os` workflow is where those runs will come from.
+The `first-run-cross-os` workflow packs the CLI and runs the first-run path from the tarballs on three systems. The table is from one run on `main`: [run 42181287584](https://github.com/shipvo/shipvo/actions/runs/42181287584), 2026-11-06, commit `bf6d70e`. All three jobs passed.
+
+| System | Runner image | Node (`setup-node`) | Steps that passed |
+| --- | --- | --- | --- |
+| Windows | `windows-2025-vs2026` (`windows-latest`) | `22` | [`npm create shipvo`, `npm install`, `shipvo doctor --json`, `shipvo publish --dry-run`](https://github.com/shipvo/shipvo/actions/runs/42181287584/job/127771438865) |
+| macOS | `macos-26-arm64` (`macos-latest`) | `22` | [same four steps](https://github.com/shipvo/shipvo/actions/runs/42181287584/job/127771439227) |
+| Linux | `ubuntu-26.04` (`ubuntu-latest`) | `22` | [same four steps](https://github.com/shipvo/shipvo/actions/runs/42181287584/job/127771439219) |
+
+Each step exited with code 0. This run does not cover `shipvo sim` or `shipvo run android` on any system, and the log does not print the exact Node patch version, so we claim neither. No step failed on any system in this run. The Linux simulator run is in the first-run numbers above and in [`scripts/first-run/`](../scripts/first-run/).
 
 ## 1. Create the app
 
