@@ -134,7 +134,7 @@ export function analyzeCrashLoop(events, marks) {
   const { launches } = marks, badRuns = launches - 1;
   const fail = (detail) => ({ pass: false, detail, launches });
   // The app reports crash_loop_revert under the release it runs after the revert (the previous one), not the bad one:
-  // apps/tide-and-tackle/src/runtimeEvents.ts never overrides the release for this event. Accept either.
+  // packages/runtime/src/runtimeEvents.ts never overrides the release for this event. Accept either.
   const revert = events.find((e) => e.event === "crash_loop_revert" && (e.release === marks.release || e.release === marks.previous_release));
   if (!revert) return fail(`no crash_loop_revert event for release ${marks.release} after ${launches} launches`);
   if (!Telemetry.safeParse(revert).success) return fail("revert event does not match the schema Telemetry type");

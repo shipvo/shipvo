@@ -28,20 +28,18 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 `shipvo init` wires all of this for you.
 
-## Events to forward
+## Events
 
-`Runtime.consumeEvents()` returns strings such as `verify_failed:<release>`. Forward `crash_loop_revert`, `rolled_back` and `verify_failed` to telemetry (`POST /t`), once per event. The sample app does this in `apps/tide-and-tackle/src/runtimeEvents.ts`. `verify_failed` is reported under the failed release id. A rejected or corrupt release then shows on the server, not only as repeated downloads.
+The runtime reports refused and reverted releases for you. `Runtime.markHealthy()` and every `Runtime.checkForUpdate()` drain the device's event queue and send each event to `POST {baseUrl}/t`, using `baseUrl` and `appId` from `expo.extra.shipvo`. A refusal found during a background check is reported in the same session, without a restart.
 
-The runtime does not emit `download_failed` yet. The sample app and the control plane accept it, so it can be forwarded once the runtime raises it.
+Forwarded events: `crash_loop_revert`, `rolled_back`, `verify_failed`, `download_failed`, `hermes_bytecode_mismatch`, `native_module_missing`, `native_module_version`. `verify_failed`, `download_failed` and `hermes_bytecode_mismatch` are reported under the failed release id. The native-module reasons arrive as `pointer_rejected:<reason>` and are reported under the reason name. Sending is best effort: a failed send never throws and never blocks.
 
-`Runtime.consumeEvents()` can also return `pointer_rejected:<reason>` on Android when the control plane says this shell cannot run the newest release. It is queued once per reason. `/t` accepts `hermes_bytecode_mismatch`, `native_module_missing` and `native_module_version`. The sample app forwards the two native-module reasons under those names. `hermes_bytecode_mismatch` is its own event and carries a release id.
+```ts
+import { reportRuntimeEvents, onRuntimeEvents } from "@shipvo/runtime";
+reportRuntimeEvents();                       // drain and send now (markHealthy and checkForUpdate already do)
+onRuntimeEvents((events) => console.log(events)); // see the drained strings, for a log
+```
 
-Events are read at launch. A `verify_failed` raised during `checkForUpdate` is reported on the next cold start.
+To turn the automatic report off, pass `reportEvents: false` to the config plugin (it lands in `expo.extra.shipvo`), and call `reportRuntimeEvents()` yourself. `forwardRuntimeEvents(events, send)` and `FORWARDED_EVENTS` are also exported for custom senders. If you call `Runtime.consumeEvents()` yourself, you take events away from the report.
 
-## Crash after `markHealthy`
-
-`markHealthy` means the first screen rendered. It promotes a staged release, but it does not clear the unhealthy-boot count. The count is cleared when the app has stayed in the foreground for 30 seconds, or when it goes to background. If the process dies before that, the next launch counts as an unhealthy boot for that release. After 3 unhealthy boots inside 60 seconds the runtime blocks the release, goes back to the previous one and records `crash_loop_revert`.
-
-A good release that you open and kill in the foreground within 30 seconds, 4 times in 60 seconds, is reverted too. This is rare.
-
-Reverting does not undo changes the bad release made to app storage (files, databases, keychain, preferences). Write migrations so an older release can read newer data.
+The runtime does not emit `download_failed` yet. The control plane accepts it.
