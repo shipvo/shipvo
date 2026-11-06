@@ -58,10 +58,12 @@ export class PhoneBrowser {
   constructor(browser, opts = {}) {
     this.browser = browser; this.opts = { allowPrivate: !!opts.allowPrivate, allowHosts: opts.allowHosts ?? [] };
     this.device = opts.device ?? {}; this.resolve = opts.resolve; this.navigations = [];
-    this.ctx = null; this.page = null; this.refsFrom = null;
+    this.ctx = null; this.page = null; this.pages = []; this.refsFrom = null;
+    this.onDeepLink = opts.onDeepLink ?? null;   // called with a link such as myapp://item/3 that a page tried to open
+    this.cdp = null; this.screencast = null; this.onChange = null;
   }
   async #start() {
-    if (this.page) return;
+    if (this.ctx) { if (!this.page) await this.ctx.newPage(); return; }
     const d = this.device;
     this.ctx = await this.browser.newContext({ ...d, userAgent: `${d.userAgent ?? "Mozilla/5.0 (Linux; Android 11; Pixel 5)"} ${USER_AGENT_TAG}`, hasTouch: true, isMobile: true, viewport: d.viewport ?? { width: 393, height: 851 } });
     // Every request, including redirects and sub-resources, goes through the same host check.
@@ -72,10 +74,24 @@ export class PhoneBrowser {
       }
       return route.continue();
     });
-    this.page = await this.ctx.newPage();
-    this.page.on("framenavigated", (f) => { if (f === this.page.mainFrame()) this.#log(f.url(), true); });
+    // A link to another app's scheme (myapp://...) cannot load in Chromium. Hand it to the phone, which gives it to the app.
+    await this.ctx.exposeFunction("__shipvoDeepLink", (u) => { if (isDeepLink(u)) { this.#log(String(u), true, undefined, "deep_link"); this.onDeepLink?.(String(u)); } });
+    await this.ctx.addInitScript(() => document.addEventListener("click", (e) => {
+      const a = e.target?.closest?.("a[href]"); if (!a) return;
+      const u = a.href; if (/^(https?|about|data|blob|javascript|file|mailto|tel):/i.test(u) || !/^[a-z][a-z0-9+.-]*:/i.test(u)) return;
+      e.preventDefault(); globalThis.__shipvoDeepLink(u);
+    }, true));
+    this.ctx.on("page", (p) => this.#adopt(p));   // a popup or target=_blank link is a new tab
+    await this.ctx.newPage();
   }
-  #log(url, ok, code) { this.navigations.push({ at: Date.now(), kind: "browser_navigation", detail: { url, allowed: ok, ...(code ? { code } : {}) }, source: "real", simulated: false }); }
+  #adopt(p) {
+    if (this.pages.includes(p)) return;
+    this.pages.push(p); this.page = p; this.refsFrom = null;
+    p.on("framenavigated", (f) => { if (f === p.mainFrame()) { this.#log(f.url(), true); this.onChange?.(); } });
+    p.on("close", () => { this.pages = this.pages.filter((x) => x !== p); if (this.page === p) { this.page = this.pages.at(-1) ?? null; this.refsFrom = null; if (this.page) this.#cast(); } this.onChange?.(); });
+    if (this.screencast) this.#cast();
+  }
+  #log(url, ok, code, kind = "browser_navigation") { this.navigations.push({ at: Date.now(), kind, detail: { url, allowed: ok, ...(code ? { code } : {}) }, source: "real", simulated: false }); }
 
   async open(url) {
     try { await checkUrl(url, this.opts, this.resolve); } catch (e) { this.#log(String(url), false, e.code); throw e; }
@@ -113,5 +129,59 @@ export class PhoneBrowser {
     return this.snapshot();
   }
   async screenshot() { return this.#need().screenshot({ type: "png" }); }
-  async close() { await this.ctx?.close().catch(() => {}); this.ctx = this.page = null; }
+  async forward() {
+    const page = this.#need();
+    if (!(await page.goForward({ timeout: 5000 }).catch(() => null))) throw new BrowserError("no_history", "there is no later page to go forward to");
+    return this.snapshot();
+  }
+  async reload() { await this.#need().reload({ timeout: 20000 }).catch((e) => { throw new BrowserError("navigation_failed", String(e.message).split("\n")[0]); }); return this.snapshot(); }
+  async scroll(dy = 400, dx = 0) { await this.#need().mouse.wheel(dx, dy); return this.snapshot(); }
+  /** Waits for text to appear in the page (or to be gone, with gone: true). Resolves with a snapshot. */
+  async waitFor({ text, gone = false, timeoutMs = 5000 } = {}) {
+    const page = this.#need();
+    if (typeof text !== "string" || !text) throw new BrowserError("bad_args", "browser_wait_for needs text");
+    try { await page.waitForFunction(([t, g]) => document.body.innerText.includes(t) !== g, [text, gone], { timeout: Math.min(Math.max(timeoutMs, 100), 30000) }); }
+    catch { throw new BrowserError("timeout", `"${text}" ${gone ? "did not go away" : "did not appear"} within ${timeoutMs} ms`); }
+    return this.snapshot();
+  }
+  async tabs() { return Promise.all(this.pages.map(async (p, index) => ({ index, url: p.url(), title: await p.title().catch(() => ""), active: p === this.page }))); }
+  async selectTab(index) { const p = this.pages[index]; if (!p) throw new BrowserError("no_tab", `no tab ${index}`); this.page = p; this.refsFrom = null; await p.bringToFront(); if (this.screencast) await this.#cast(); this.onChange?.(); }
+  async newTab(url = "about:blank") { await this.#start(); await checkUrl(url, this.opts, this.resolve); const p = await this.ctx.newPage(); await p.goto(url).catch(() => {}); return this.tabs(); }
+  async closeTab(index) {
+    const p = this.pages[index]; if (!p) throw new BrowserError("no_tab", `no tab ${index}`);
+    await p.close(); return this.tabs();
+  }
+
+  // Live view. Chromium pushes JPEG frames (CDP Page.startScreencast); each one is acked once it has been handed on.
+  async #cast() {
+    if (!this.page || !this.ctx) return;
+    try {   // a tab that is closing or not yet attached must not take the server down
+      await this.cdp?.send("Page.stopScreencast").catch(() => {}); this.cdp?.detach().catch(() => {});
+      const c = this.cdp = await this.ctx.newCDPSession(this.page);
+      c.on("Page.screencastFrame", (f) => { c.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {}); this.screencast?.({ data: f.data, width: f.metadata.deviceWidth, height: f.metadata.deviceHeight }); });
+      await c.send("Page.startScreencast", { format: "jpeg", quality: 60, maxWidth: 400, maxHeight: 860, everyNthFrame: 1 });
+    } catch {}
+  }
+  async startScreencast(onFrame) { await this.#need(); this.screencast = onFrame; await this.#cast(); }
+  async stopScreencast() { this.screencast = null; await this.cdp?.send("Page.stopScreencast").catch(() => {}); }
+  /** Input as a finger and keyboard would give it, in CSS px of the viewport. */
+  async input(m) {
+    this.#need(); const c = this.cdp ?? (this.cdp = await this.ctx.newCDPSession(this.page));
+    const touch = (type, x, y) => c.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y }] });
+    const num = (...v) => { if (!v.every((n) => Number.isFinite(n))) throw new BrowserError("bad_args", "coordinates must be numbers"); };
+    if (m.type === "tap") { num(m.x, m.y); await touch("touchStart", m.x, m.y); await touch("touchEnd"); }
+    else if (m.type === "swipe") {
+      num(m.x1, m.y1, m.x2, m.y2); await touch("touchStart", m.x1, m.y1);
+      for (let i = 1; i <= 8; i++) await touch("touchMove", m.x1 + ((m.x2 - m.x1) * i) / 8, m.y1 + ((m.y2 - m.y1) * i) / 8);
+      await touch("touchEnd");
+    }
+    else if (m.type === "text") await c.send("Input.insertText", { text: String(m.text ?? "").slice(0, 2000) });
+    else if (m.type === "key") { const key = String(m.key); const code = { Enter: 13, Backspace: 8, Tab: 9 }[key]; if (!code) throw new BrowserError("bad_args", `unsupported key ${key}`);
+      for (const type of ["keyDown", "keyUp"]) await c.send("Input.dispatchKeyEvent", { type, key, windowsVirtualKeyCode: code, ...(key === "Enter" && type === "keyDown" ? { text: "\r" } : {}) }); }
+    else throw new BrowserError("bad_args", `unknown input ${m.type}`);
+  }
+  async close() { this.screencast = null; await this.ctx?.close().catch(() => {}); this.ctx = this.page = this.cdp = null; this.pages = []; }
 }
+
+/** True for a link into another app: a scheme that is not a web page scheme. */
+export function isDeepLink(u) { return /^[a-z][a-z0-9+.-]*:/i.test(String(u)) && !/^(https?|about|data|blob|javascript|file|ftp|view-source|chrome|devtools|mailto|tel):/i.test(String(u)); }

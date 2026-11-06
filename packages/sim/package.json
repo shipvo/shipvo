@@ -26,6 +26,8 @@
     "app-name.mjs",
     "frame.mjs",
     "phone-browser.mjs",
+    "browser-app.mjs",
+    "ws-lite.mjs",
     "lifecycle.mjs",
     "frame.d.mts",
     "mock-rules.mjs",

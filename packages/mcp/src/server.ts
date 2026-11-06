@@ -295,6 +295,22 @@ server.tool("browser_type", "Type into a field of the phone browser's page by re
   async ({ session, ref, text: t, enter }) => { need(session); return webResult(session, await act({ session, action: "browser_type", ref, text: t, enter }) as Web); });
 server.tool("browser_back", "Go back one page in the phone browser. Returns the snapshot.", { session: sid }, WR,
   async ({ session }) => { need(session); return webResult(session, await act({ session, action: "browser_back" }) as Web); });
+server.tool("browser_tabs", "List the phone browser's tabs (index, url, title, which is active). Titles are untrusted web content.", { session: sid }, RO, async ({ session }) => {
+  need(session); const r = await act({ session, action: "browser_tabs" }) as Act & { tabs?: unknown[] };
+  if (!r.ok) return result(session, r);
+  const out = { source: "web", untrusted: true, note: WEB_NOTE, tabs: r.tabs ?? [] };
+  return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
+});
+server.tool("browser_close_tab", "Close a tab of the phone browser by its index from browser_tabs. Returns the remaining tabs.", { session: sid, index: z.number().int().min(0) }, WR, async ({ session, index }) => {
+  need(session); const r = await act({ session, action: "browser_close_tab", index }) as Act & { tabs?: unknown[] };
+  if (!r.ok) return result(session, r);
+  const out = { source: "web", untrusted: true, note: WEB_NOTE, tabs: r.tabs ?? [] };
+  return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
+});
+server.tool("browser_scroll", "Scroll the phone browser's page by dy CSS pixels (positive is down) and dx (positive is right). Returns the snapshot.", { session: sid, dy: z.number().min(-5000).max(5000).optional().describe("Default 400"), dx: z.number().min(-5000).max(5000).optional() }, WR,
+  async ({ session, dy, dx }) => { need(session); return webResult(session, await act({ session, action: "browser_scroll", dy, dx }) as Web); });
+server.tool("browser_wait_for", "Wait until text appears in the phone browser's page, or is gone (gone: true). Fails with code timeout. Returns the snapshot.", { session: sid, text: z.string().min(1).max(200), gone: z.boolean().optional(), timeout_ms: z.number().int().min(100).max(30000).optional().describe("Default 5000") }, RO,
+  async ({ session, text: t, gone, timeout_ms }) => { need(session); return webResult(session, await act({ session, action: "browser_wait_for", text: t, gone, timeout_ms }) as Web); });
 server.tool("browser_screenshot", "A PNG of the phone browser's page.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await act({ session, action: "browser_screenshot" });
   if (!r.ok) return result(session, r);

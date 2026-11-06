@@ -272,7 +272,7 @@ g.__pnDevice = {
   /** Tap a notification from the shade: same handler as tapping its banner. */
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
-  openUrl: (url: string) => deliverUrl(url),
+  openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
   capabilities: () => device.capabilities(),
   /** What the status bar shows: network, airplane and battery. */
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
@@ -292,7 +292,22 @@ export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });
 /** Call `cb` with each URL opened in the app (deep links). Returns an unsubscribe function. */
 export const onUrl = (cb: (url: string) => void) => { urlSubs.add(cb); return () => { urlSubs.delete(cb); }; };
 /** Deliver a URL to the app. Returns true if an `onUrl` listener received it. */
-function deliverUrl(url: string): boolean {
+function deliverUrl(url: string): boolean | Promise<boolean> {
+  // A web page opens in the phone's Browser app, not in the app. Only when the simulator provides one.
+  // The simulator answers `{ ok: false, code }` (or throws) when it refuses the page, for example a private host.
+  const browse = (g as { __pnOpenBrowser?: (u: string) => unknown }).__pnOpenBrowser;
+  if (browse && /^https?:\/\//i.test(url)) {
+    const refused = (code: unknown) => { log("browser_open_refused", { url, code: String(code ?? "error") }); return false; };
+    let r: unknown;
+    try { r = browse(url); } catch (e) { return refused((e as { code?: string }).code); }
+    if (r && typeof (r as Promise<unknown>).then === "function") {
+      return (r as Promise<{ ok?: boolean; code?: string } | undefined>).then((v) => {
+        if (v && v.ok === false) return refused(v.code);
+        log("browser_opened", { url }); return true;
+      }, (e) => refused((e as { code?: string }).code));
+    }
+    log("browser_opened", { url }); return true;
+  }
   window.dispatchEvent(new CustomEvent("pn:url", { detail: url }));
   urlSubs.forEach((f) => f(url)); log("url_opened", { url, handled: urlSubs.size > 0 });
   return urlSubs.size > 0;
