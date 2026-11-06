@@ -44,6 +44,19 @@
   // live service status in the footer
   var st=document.querySelector('[data-status]');
   if(st){Promise.all([fetch('https://api.shipvo.dev/health',{cache:'no-store'}).then(function(r){return r.ok}).catch(function(){return false}),fetch('https://sim.shipvo.dev/health',{cache:'no-store'}).then(function(r){return r.ok}).catch(function(){return false})]).then(function(a){var ok=a[0]&&a[1];st.classList.add(ok?'ok':a[0]||a[1]?'warn':'down');st.querySelector('span:last-child').textContent=ok?'all systems live':a[0]||a[1]?'partial outage':'services unreachable'})}
-  // copy buttons
+  // copy buttons on command boxes (<pre class="term"><code>...): added here so every page gets them
+  function copyText(t,b,label){
+    var done=function(){b.textContent='Copied';b.classList.add('done');setTimeout(function(){b.textContent=label;b.classList.remove('done')},1400)};
+    if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done,function(){fallback()})}else fallback();
+    function fallback(){var a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();try{document.execCommand('copy');done()}catch(e){}document.body.removeChild(a)}
+  }
+  document.querySelectorAll('pre.term').forEach(function(pre){
+    var code=pre.querySelector('code');if(!code||pre.querySelector('.term-copy'))return;
+    var b=document.createElement('button');b.type='button';b.className='term-copy';b.textContent='Copy';b.setAttribute('aria-label','Copy command');
+    b.addEventListener('click',function(){copyText(code.textContent.trim(),b,'Copy')});
+    // the button is placed against the box; a static box becomes relative, a sticky one stays sticky (both work)
+    if(getComputedStyle(pre).position==='static'){pre.style.position='relative';pre.style.top='auto'}
+    pre.classList.add('has-copy');pre.appendChild(b);
+  });
   document.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){navigator.clipboard&&navigator.clipboard.writeText(b.getAttribute('data-copy')).then(function(){var t=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=t},1400)})})});
 })();
