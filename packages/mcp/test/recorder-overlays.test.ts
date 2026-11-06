@@ -46,6 +46,9 @@ describe.skipIf(!ok)("recorder overlays", () => {
 
   it("a trail changes pixels between its ends", async () => {
     const trail = await centreAfterTap(true, (r) => r.trail({ x: 0.5, y: 0.7 }, { x: 0.5, y: 0.3 }));
+    const none = await centreAfterTap(false, (r) => r.trail({ x: 0.5, y: 0.7 }, { x: 0.5, y: 0.3 }));
+    expect(none.every((v, i) => Math.abs(v - [0x11, 0x33, 0x66][i]) < 12)).toBe(true);
     expect(trail[0]).toBeGreaterThan(80);
+    expect(trail).not.toEqual(none);
   }, 90000);
 });
