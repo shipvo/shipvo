@@ -33,6 +33,8 @@ export function lumiHtml(state = "idle") {
 
 /** Style for Lumi. `top` and `offset` place it beside the cutout. Motion stops for people who ask for less of it. */
 export const lumiCss = (k) => [
+  // The glow must never paint over the app's screen below the status bar.
+  `.sf-status{overflow:hidden}`,
   `.sf-lumi{position:absolute;left:50%;top:${Math.round((k.status - 22) / 2)}px;margin-left:${k.part === "dynamic-island" ? 66 : 20}px;width:22px;height:22px;pointer-events:none;z-index:3;animation:sf-lumi-float 3.6s ease-in-out infinite}`,
   `.sf-lumi svg{display:block;border-radius:50%;box-shadow:0 0 6px 1px #7fd6f5aa;animation:sf-lumi-glow 2.8s ease-in-out infinite}`,
   `.sf-lumi-eyes{transform-box:fill-box;transform-origin:center;animation:sf-lumi-blink 4.5s infinite}`,

@@ -44,6 +44,28 @@ test("with Lumi on, the frame is the same markup as off plus the Lumi element", 
   }
 });
 
+test("Lumi's glow stays inside the status bar in every state, so it never touches the app's pixels", async () => {
+  const b = await chromium.launch();
+  try {
+    for (const skin of ["android", "ios"]) {
+      const shots = [];
+      for (const lumi of [true, false]) {
+        const p = await b.newPage({ viewport: { width: 460, height: 960 } });
+        await p.setContent(page(withApp(skin, lumi)));
+        const box = await p.locator("#app").boundingBox();
+        const per = [];
+        for (const s of lumi ? ["happy", "worried"] : ["off", "off"]) {
+          if (lumi) await p.evaluate((x) => window.shipvoLumi.set(x), s);
+          await p.addStyleTag({ content: "*{animation:none!important}" });
+          per.push(await p.screenshot({ clip: { ...box, height: 8 } }));
+        }
+        shots.push(per); await p.close();
+      }
+      assert.ok(shots[0].every((s, i) => Buffer.compare(s, shots[1][i]) === 0), `${skin}: top rows of the app`);
+    }
+  } finally { await b.close(); }
+});
+
 test("the simulator's own page, screenshots and screen tree never draw Lumi", () => {
   assert.doesNotMatch(readFileSync(new URL("./server.mjs", import.meta.url), "utf8"), /lumi/i);
 });
@@ -75,12 +97,14 @@ test("Lumi on or off: app screenshot, recorded frames and labelled screen tree a
       for (const lumi of [true, false]) {
         const p = await b.newPage({ viewport: { width: 460, height: 960 } });
         await p.setContent(page(withApp(skin, lumi)));
-        await p.waitForTimeout(400);
-        const frame = p.frames().find((x) => x !== p.mainFrame());
+        const frame = await (async () => { for (let i = 0; i < 100; i++) { const f = p.frames().find((x) => x !== p.mainFrame()); if (f && await f.locator("button").count()) return f; await p.waitForTimeout(50); } throw new Error("app frame did not load"); })();
+        await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
         // The app's own area: the same pixels an agent's screenshot of the app shows.
         const box = await p.locator("#app").boundingBox();
         const snap = () => p.screenshot({ clip: box });
-        const shot = await snap();
+        // Wait until the app area stops changing, so a slow first paint cannot look like a Lumi difference.
+        let shot = await snap();
+        for (let i = 0; i < 40; i++) { await p.waitForTimeout(50); const again = await snap(); if (Buffer.compare(shot, again) === 0) break; shot = again; }
         const shots = [await snap(), await snap()];
         out[lumi] = { shot, shots, tree: await frame.locator("body").ariaSnapshot({ mode: "ai" }), page: await p.locator("body").ariaSnapshot({ mode: "ai" }),
           lumiHere: await p.locator('[data-part="lumi"]').count() };
