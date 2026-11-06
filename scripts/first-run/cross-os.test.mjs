@@ -51,6 +51,17 @@ test("withOverrides points both packages at the tarballs and keeps other fields"
   assert.equal(out.overrides["@shipvo/cli"], "$@shipvo/cli");
 });
 
+test("withOverrides uses a $ override for a package the scaffold depends on directly", () => {
+  const t = { ...findTarballs("d", files), all: { "@shipvo/sim": join("d", "shipvo-sim-0.1.0.tgz"), "@shipvo/schema": join("d", "shipvo-schema-0.1.0.tgz"), "@shipvo/test": join("d", "shipvo-test-0.1.0.tgz") } };
+  const out = withOverrides({ dependencies: { "@shipvo/sim": "^0.1.0", react: "19.0.0" }, devDependencies: { "@shipvo/test": "^0.1.0" } }, t);
+  assert.match(out.dependencies["@shipvo/sim"], /^file:\/\/.*shipvo-sim-0\.1\.0\.tgz$/);
+  assert.equal(out.overrides["@shipvo/sim"], "$@shipvo/sim");
+  assert.match(out.devDependencies["@shipvo/test"], /^file:\/\/.*shipvo-test-0\.1\.0\.tgz$/);
+  assert.equal(out.overrides["@shipvo/test"], "$@shipvo/test");
+  assert.match(out.overrides["@shipvo/schema"], /^file:\/\//);
+  assert.equal(out.dependencies.react, "19.0.0");
+});
+
 test("commandLine quotes spaces for a Windows shell and not elsewhere", () => {
   const args = ["create", join("my dir", "a.tgz"), "myshop"];
   assert.deepEqual(commandLine("npm", args, "linux"), { cmd: "npm", args, shell: false });
