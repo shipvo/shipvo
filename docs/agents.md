@@ -86,7 +86,7 @@ device_log → 6 events, all simulated: true
 end_session → { steps: 18, orders: [{ id: "TT-1001", total: 4200, payment: "mobile_money", status: "placed", receipt: "SIMULATED-…" }] }
 ```
 
-18 steps, 76 seconds, no phone. The same flow type runs on an Android emulator with the same actionable elements (role and label) on each screen and the same order placed. Enabled state, element order and bounds are not compared yet ([parity-results.md](parity-results.md)).
+18 steps, 76 seconds, no phone. The same flow runs on an Android emulator with the same actionable elements (role and label) on each screen and the same order placed. Enabled state, element order and bounds are not compared yet ([parity-results.md](parity-results.md)).
 
 ## Turn a session into a test
 

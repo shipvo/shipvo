@@ -1,5 +1,6 @@
 // Issue #737. Public text must not claim "100% parity" or "identical" without a link to parity-results
 // in the same paragraph. Paragraphs are blocks split on blank lines (Markdown) or on HTML block tags.
+// Limit: this matches "100% parity" and "identical" only; other word orders (such as a "parity 100%" chip) are not caught.
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
