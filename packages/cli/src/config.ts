@@ -12,6 +12,8 @@ export type ShipvoConfig = {
   publicKey: string;
   /** Hermes bytecode version(s) the app's shells run. If set, `shipvo publish` refuses bundles that differ. */
   hermesBytecodeVersion?: number | number[];
+  /** Hermes engine build the app's shells run, such as "250829098.0.10". If set, `shipvo publish` refuses to run with another hermes-compiler. */
+  hermesEngine?: string;
   /** What AI agents may do through `@shipvo/mcp` owner commands. "ask" (default): irreversible commands need confirm: true. "deny": they are refused. "allow": no confirm step (the owner must set it). */
   agentPolicy?: "ask" | "deny" | "allow";
   /** Owner commands agents may never run. */

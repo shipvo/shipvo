@@ -1,0 +1,1 @@
+- first-run: new `scripts/first-run/applied-ota.mjs` times init, install, build, publish and publish-to-healthy for a scaffolded app on the Android emulator. Migration: none.

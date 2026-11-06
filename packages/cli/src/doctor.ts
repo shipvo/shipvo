@@ -5,10 +5,11 @@ import { execSync } from "node:child_process";
 import { portFree } from "./sim.js";
 import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
-import { parseDeclared } from "./hermes.js";
+import { installedHermesEngine, parseDeclared, parseEngine } from "./hermes.js";
+import { emit, envelope, type Next } from "./json-out.js";
 
 type CheckResult = { name: string; ok: boolean; fix: string; note?: string };
-type ShipvoConfig = { publicKey?: unknown; controlPlane?: unknown; hermesBytecodeVersion?: unknown };
+type ShipvoConfig = { publicKey?: unknown; controlPlane?: unknown; hermesBytecodeVersion?: unknown; hermesEngine?: unknown };
 type DoctorDeps = {
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -162,20 +163,24 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   }
 
   let healthOk = false;
+  let healthNote: string | undefined;
   let healthFix = "check shipvo.json controlPlane and your network access (5 second timeout)";
   if (!deps.offline && cfg?.controlPlane && typeof cfg.controlPlane === "string") {
     try {
       const res = await deps.fetchFn(cfg.controlPlane.replace(/\/$/, "") + "/health", { signal: AbortSignal.timeout(5000) });
       if (res.status !== 200) healthFix = `/health answered HTTP ${res.status}, expected 200; check the control plane URL and deploy`;
       else {
-        try { await res.json(); healthOk = true; } catch { healthFix = "/health answered 200 but not JSON; controlPlane may point at the wrong service"; }
+        try {
+          const j: any = await res.json(); healthOk = true;
+          if (typeof j?.telemetry_dropped_today === "number") healthNote = `telemetry_dropped_today: ${j.telemetry_dropped_today}${j.telemetry_dropped_today > 0 ? " (D1 refused telemetry writes; see docs/self-hosting.md)" : ""}`;
+        } catch { healthFix = "/health answered 200 but not JSON; controlPlane may point at the wrong service"; }
       }
     } catch (e) {
       healthFix = e instanceof Error && e.name === "TimeoutError" ? "/health did not answer within 5 seconds; check the URL and your network" : healthFix;
     }
   }
   if (deps.offline) results.push({ name: "control plane /health returns JSON", ok: true, fix: "none", note: skipped });
-  else results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix });
+  else results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix, ...(healthOk && healthNote ? { note: healthNote } : {}) });
 
   let hermesOk = true;
   if (cfg && Object.prototype.hasOwnProperty.call(cfg, "hermesBytecodeVersion")) {
@@ -186,6 +191,20 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
     }
   }
   results.push({ name: "hermesBytecodeVersion (if present) is set", ok: hermesOk, fix: "set hermesBytecodeVersion to a positive integer or list (for example 96 or [96, 98])" });
+
+  // Engine build: only shown when the project declares one or has a hermes-compiler, so older setups see no new row.
+  const installedEngine = installedHermesEngine(deps.cwd);
+  let declaredEngine: string | undefined, engineBad = false;
+  try { declaredEngine = cfg ? parseEngine(cfg.hermesEngine) : undefined; } catch { engineBad = true; }
+  if (engineBad) results.push({ name: "Hermes engine build", ok: false, fix: "set hermesEngine in shipvo.json to an id like 250829098.0.10" });
+  else if (declaredEngine || installedEngine) {
+    const mismatch = !!declaredEngine && declaredEngine !== installedEngine;
+    results.push({
+      name: "Hermes engine build", ok: !mismatch,
+      fix: installedEngine ? `shipvo.json declares ${declaredEngine} but hermes-compiler is ${installedEngine}; install the declared build or update hermesEngine if the shell changed` : `shipvo.json declares ${declaredEngine} but hermes-compiler was not found; install it or remove hermesEngine`,
+      note: mismatch ? undefined : declaredEngine ? `${installedEngine}, matches hermesEngine` : `${installedEngine}, hermesEngine not declared in shipvo.json`,
+    });
+  }
 
   // Simulator checks only apply to projects that have a `sim` script.
   if (!deps.skipSim && hasSimScript(deps)) {
@@ -202,14 +221,43 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   return results;
 }
 
+/** The command that fixes a failed check, with the fix text as the reason. */
+function nextFor(r: CheckResult): Next {
+  const why = `${r.name}: ${r.fix}`;
+  if (r.name === "shipvo.json parses") return { command: r.fix.startsWith("run this") ? "shipvo init ." : "shipvo doctor", why };
+  if (r.name.startsWith("signing key matches")) return { command: "shipvo keys import", why };
+  if (r.name === "signing key file is private") return { command: r.fix.match(/`(chmod [^`]+)`/)?.[1] ?? "shipvo doctor", why };
+  if (r.name.startsWith("sim port")) {
+    const n = Number(r.name.match(/\d+/)?.[0]);
+    return { command: `shipvo doctor --json --port ${n < 65535 ? n + 1 : 4546}`, why: `${why}. Try another port.` };
+  }
+  if (r.name === "Browser for the simulator") return { command: "npx playwright install chromium", why };
+  if (r.name.startsWith("control plane")) return { command: "shipvo doctor --json --offline", why: `${why}. Check everything except the network.` };
+  return { command: "shipvo help", why };
+}
+
 export async function doctor(argv: string[]) {
+  const json = argv.includes("--json");
   const a = parseArgs(argv);
   const port = a.port === undefined ? 4545 : Number(a.port);
   const offline = argv.includes("--offline");
   const skipSim = argv.includes("--skip-sim");
   const stray = argv.some((x, i) => !x.startsWith("--") && argv[i - 1] !== "--port");
-  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>] [--offline] [--skip-sim]"); process.exit(2); }
+  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) {
+    const usage = "Usage: shipvo doctor [--port <n>] [--offline] [--skip-sim] [--json]";
+    if (json) emit(envelope("usage", usage, { checks: [] }, [{ command: "shipvo help", why: "See the options for doctor." }], 2));
+    else console.error(usage);
+    process.exit(2);
+  }
   const results = await runDoctorChecks({ port, offline, skipSim });
-  for (const r of results) console.log(`${r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
-  if (results.some((r) => !r.ok)) process.exit(1);
+  const failed = results.filter((r) => !r.ok);
+  if (json) {
+    const checks = results.map((r) => ({ name: r.name, ok: r.ok, fix: r.ok ? null : r.fix, note: r.note ?? null }));
+    emit(failed.length
+      ? envelope("checks_failed", `${failed.length} of ${results.length} checks failed.`, { checks }, failed.map(nextFor), 1)
+      : envelope("ok", `All ${results.length} checks passed.`, { checks }, [{ command: "shipvo status --json", why: "See what to do next." }], 0));
+  } else {
+    for (const r of results) console.log(`${r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
+  }
+  if (failed.length) process.exit(1);
 }

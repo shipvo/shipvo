@@ -67,7 +67,7 @@ shipvo promote --to b1,b2    # widen to more cohorts
 shipvo rollback --to 12      # republish release 12 as a new release
 ```
 
-Always dry-run first. Crash-loop rollback on the phone is automatic. `shipvo auto-halt` shows or sets the crash threshold. Never weaken or skip signing. Back up the key with `shipvo keys export`. Details: `references/publish.md`.
+Always dry-run first. Crash-loop rollback on the phone is automatic. `shipvo auto-halt` shows or sets the crash threshold. Add `--json` to `publish`, `promote`, `rollback` and `auto-halt` to get one envelope on stdout: `{ ok, code, summary, data, next }`. Exit 0 ok, 1 failed, 2 usage error. Run the first command in `next`. `data`: `publish` gives `{ app, release, bands, min_shell_version, bytes, patches }` (`dry_run: true` and `out` for a dry run); `promote` gives `{ dry_run, promoted: [{ platform, release, from, bands }] }`; `rollback` gives `{ app, rolled_back_to_code_of, new_release, min_shell_version, platforms, bands, dry_run }`; `auto-halt` gives `{ enabled, threshold, min_reports, dry_run, changed }`. Full table: `docs/cli.md`. Never weaken or skip signing. Back up the key with `shipvo keys export`. Details: `references/publish.md`.
 
 ## First store release
 
@@ -87,4 +87,4 @@ Over MCP, with a session open: `record_start` → do the steps, calling `record_
 
 ## Planned
 
-`shipvo agents setup`, `shipvo smoke` and `--json` on every command are planned (see issue 533). Today only some commands take `--json`.
+`shipvo agents setup`, `shipvo smoke` and `--json` on every command are planned (see issue 533). Today `doctor`, `test`, `explore`, `status`, `publish`, `promote`, `rollback` and `auto-halt` take `--json`.

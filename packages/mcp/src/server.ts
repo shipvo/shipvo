@@ -281,6 +281,10 @@ server.tool("set_setting", "Change one system setting, like the Settings screen 
   async ({ session, key, value }) => { need(session); const r = await act({ session, action: "set_setting", key, value }) as Act & { settings?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ settings: r.settings, screen: r.screen }, null, 2)); });
 server.tool("toggle_tile", "Flip a quick-settings tile in the open shade or Control Center. It changes the simulated device like set_device: Wi-Fi and mobile data both off take the network offline, dark_mode changes the app's colour scheme, dnd stops banners. Tiles: wifi, mobile_data, airplane, location, dark_mode, dnd, auto_rotate, flashlight (Android); airplane, wifi, mobile_data, focus, orientation_lock, brightness, dark_mode (iPhone). Fails with tile_not_visible if the panel is closed.", { session: sid, tile: z.string(), value: z.union([z.boolean(), z.number()]).optional().describe("true or false; 0 to 100 for brightness. Omit to flip.") }, WR,
   async ({ session, tile, value }) => { need(session); return result(session, await act({ session, action: "toggle_tile", tile, value })); });
+server.tool("get_settings", "Read the phone's system settings from the Settings screen: dark_mode, font_size (small, default, large, largest), bold_text, reduce_motion, language (en, fr, ar) and rtl. Returns each setting and the screen as rows.", { session: sid }, RO,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "get_settings" })); });
+server.tool("set_setting", "Change one system setting, as a person would in the phone's Settings screen. The app sees it through Appearance (dark_mode), PixelRatio.getFontScale (font_size), AccessibilityInfo (bold_text, reduce_motion), I18nManager (rtl) and Intl (language). Setting language to ar turns rtl on; en and fr turn it off. Fails with unknown_setting for a key that does not exist and bad_value for a value it does not take. Logged in device_log as simulated.", { session: sid, key: z.string().describe("dark_mode, font_size, bold_text, reduce_motion, language or rtl"), value: z.union([z.boolean(), z.string()]).describe("true or false for switches; small, default, large or largest for font_size; en, fr or ar for language") }, WR,
+  async ({ session, key, value }) => { need(session); return result(session, await act({ session, action: "set_setting", key, value })); });
 server.tool("dismiss_notification", "Swipe a notification away in the open shade (newest if no id), or Clear all with all: true.", { session: sid, id: z.string().optional(), all: z.boolean().optional() }, WR,
   async ({ session, id, all }) => { need(session); return result(session, await act({ session, action: "dismiss_notification", id, all })); });
 server.tool("close_panels", "Close the notification shade, Notification Center or Control Center (swipe up).", { session: sid }, WR,
@@ -419,6 +423,29 @@ server.tool("owner_command", "Run an owner command against the live app (changes
     const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...agentRules() }, body: JSON.stringify({ name: command, args: { ...Object.fromEntries(Object.entries(args ?? {}).filter(([k]) => k !== "confirm")), ...(confirm === true ? { confirm: true } : {}) } }) });
     return text(await r.text());
   });
+
+// Held promotes: a promote above policy.requireApprovalAbove waits for a second owner (control plane, slice 3a of #295).
+async function approvalsCall(app: string, path: string, method: "GET" | "POST") {
+  const token = ctx.ownerToken || OWNER_TOKEN;
+  if (!token) throw new Error("approvals are not enabled on this server: it needs an owner token (PN_OWNER_TOKEN).");
+  if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": approvals need an owner key`);
+  if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
+  const r = await fetch(`${CONTROL}/apps/${encodeURIComponent(app)}/approvals${path}`, { method, headers: { authorization: `Bearer ${token}` } });
+  const body: any = await r.json().catch(() => ({}));
+  return { r, body };
+}
+server.tool("approvals_list", "List promotes held above the app's policy band, waiting for a second owner: hold id, release, band asked for, proposer and age. Needs an owner token.", { app: z.string() }, RO, async ({ app }) => {
+  const { r, body } = await approvalsCall(app, "", "GET");
+  if (!r.ok) return { ...text(JSON.stringify({ ok: false, status: r.status, ...body })), isError: true };
+  const t = Date.now();
+  const approvals = (body.approvals ?? []).map((h: any) => ({ id: h.id, release: h.release, band: h.band, proposer: h.proposer, proposed_at: h.proposed_at, age_seconds: Number.isFinite(Date.parse(h.proposed_at)) ? Math.max(0, Math.round((t - Date.parse(h.proposed_at)) / 1000)) : null }));
+  return { ...text(JSON.stringify({ ok: true, app, approvals }, null, 2)), structuredContent: { ok: true, app, approvals } };
+});
+server.tool("approval_approve", "Approve a held promote so it goes live. The proposer cannot approve it, and an agent cannot approve an agent's proposal: that is refused with rule self_approval. Ask the owner to approve in that case. Both outcomes are audited.", { app: z.string(), id: z.string().describe("Hold id from approvals_list") }, DEST, async ({ app, id }) => {
+  const { r, body } = await approvalsCall(app, `/${encodeURIComponent(id)}/approve`, "POST");
+  if (!r.ok) return { ...text(JSON.stringify({ ok: false, status: r.status, ...body })), isError: true };
+  return text(JSON.stringify({ ok: true, app, approval_id: body.approval_id ?? id, status: body.status }));
+});
 
 // Read-only: the app's audit log from the control plane (the endpoint `shipvo audit` pages through), newest first.
 const AUDIT_PAGE = 200, AUDIT_MAX_PAGES = 10;
