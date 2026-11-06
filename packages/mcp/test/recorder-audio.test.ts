@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import http from "node:http";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -45,4 +45,48 @@ describe.skipIf(!ok)("record_stop music", () => {
     expect(res.credits).toBeUndefined();
     expect(existsSync(res.file.replace(/\.mp4$/, ".credits.json"))).toBe(false);
   }, 60000);
+});
+
+describe.skipIf(!ok)("record_stop narration", () => {
+  const dur = (f: string, s = "a:0") => parseFloat(spawnSync("ffprobe", ["-v", "error", "-select_streams", s, "-show_entries", "stream=duration", "-of", "csv=p=0", f]).stdout.toString());
+  const wav = (name: string, secs: number) => { const f = join(out, name); spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", `sine=frequency=500:duration=${secs}`, f]); return f; };
+  const audioCount = (f: string) => streams(f).split("\n").filter((l) => l.trim() === "audio").length;
+
+  it("matches the audio length to the video and trims a long wav", async () => {
+    const r = new Recorder(); await r.start({ url, format: "1:1", dir: out, title: "vo-long" });
+    await new Promise((x) => setTimeout(x, 1500));
+    const res = await r.stop({ narration: wav("long.wav", 20) });
+    expect(audioCount(res.file)).toBe(1);
+    expect(Math.abs(dur(res.file) - dur(res.file, "v:0"))).toBeLessThan(0.5);
+    expect(res.notes?.[0]).toContain("trimmed");
+  }, 60000);
+
+  it("pads a short wav to the video length", async () => {
+    const r = new Recorder(); await r.start({ url, format: "1:1", dir: out, title: "vo-short" });
+    await new Promise((x) => setTimeout(x, 1500));
+    const res = await r.stop({ narration: wav("short.wav", 0.3) });
+    expect(Math.abs(dur(res.file) - dur(res.file, "v:0"))).toBeLessThan(0.5);
+    expect(res.notes).toBeUndefined();
+  }, 60000);
+
+  it("gives one mixed audio stream with music and narration", async () => {
+    process.env.SHIPVO_MUSIC_FILE = track;
+    const r = new Recorder(); await r.start({ url, format: "1:1", dir: out, title: "vo-music" });
+    await new Promise((x) => setTimeout(x, 1500));
+    const res = await r.stop({ narration: wav("both.wav", 20), music: true });
+    delete process.env.SHIPVO_MUSIC_FILE;
+    expect(audioCount(res.file)).toBe(1);
+    expect(Math.abs(dur(res.file) - dur(res.file, "v:0"))).toBeLessThan(0.5);
+    expect(existsSync(res.file.replace(/\.mp4$/, ".narration.wav"))).toBe(false);
+  }, 90000);
+
+  it("returns narration_unreadable and keeps the silent video", async () => {
+    const bad = join(out, "bad.wav"); writeFileSync(bad, "not audio");
+    for (const p of [join(out, "missing.wav"), bad]) {
+      const r = new Recorder(); await r.start({ url, format: "1:1", dir: out, title: "vo-bad" });
+      await expect(r.stop({ narration: p })).rejects.toMatchObject({ code: "narration_unreadable" });
+      const f = join(out, "vo-bad.mp4");
+      expect(existsSync(f) ? streams(f) : "video").not.toContain("audio");
+    }
+  }, 90000);
 });

@@ -357,8 +357,9 @@ server.tool("record_marker", "Add a chapter at the current time of the running r
 });
 server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters. With music: true, mixes a ducked music bed under the video and writes a credits JSON next to it (credit the track where you publish).", {
   music: z.boolean().optional().describe("Mix a music bed under the video (default false). Needs python3, ffmpeg and ffprobe; picks a track from Jamendo unless SHIPVO_MUSIC_FILE is set."),
-}, WR, async ({ music }) => {
-  try { const r = await recorder.stop({ music }); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
+  narration: z.string().optional().describe("Path to a wav with a voice track. It is mixed over the video, trimmed to the video length (the result says so), and ducks the music when music is true."),
+}, WR, async ({ music, narration }) => {
+  try { const r = await recorder.stop({ music, narration }); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 
 // Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.
