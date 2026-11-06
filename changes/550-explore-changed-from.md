@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo explore --changed-from <sha>` walks only the screens changed since that commit; the Shipvo check uses it on pull requests.
+- Migration: none; new flag.

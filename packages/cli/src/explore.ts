@@ -1,7 +1,8 @@
 // `shipvo explore`: a deterministic walker over the simulator's accessibility tree. No LLM call.
 // The walker (`walk`) only needs a `Driver`, so tests run it against a fake app. `explore` wires it to the simulator.
 import { execSync, spawn } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
 import { portFree, waitListening } from "./sim.js";
@@ -73,7 +74,7 @@ const label = (e: { role: string; name: string }) => `${e.role} "${e.name}"`;
 /** Steps in plain lines, for the report. */
 export const describeStep = (s: Step) => s.action === "open" ? "open the app" : s.action === "open_url" ? `open_url ${s.url}` : s.action === "tap" ? `tap ${label(s)}${s.nth ? ` (number ${s.nth + 1} with that name)` : ""}` : "back";
 
-export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: number; maxSteps?: number; app?: string; skin?: Skin } = {}): Promise<Report> {
+export async function walk(driver: Driver, o: { routes?: string[]; onlyRoutes?: boolean; maxDepth?: number; maxSteps?: number; app?: string; skin?: Skin } = {}): Promise<Report> {
   const skin = o.skin ?? "android", min = MIN_TARGET[skin];
   const maxDepth = o.maxDepth ?? 3, maxSteps = o.maxSteps ?? 100;
   const findings: Finding[] = []; const seenFinding = new Set<string>();
@@ -152,7 +153,7 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
     }
   }
 
-  const starts: (Step[])[] = [[{ action: "open" }], ...(o.routes ?? []).map((url): Step[] => [{ action: "open" }, { action: "open_url", url }])];
+  const starts: (Step[])[] = [...(o.onlyRoutes ? [] : [[{ action: "open" }] as Step[]]), ...(o.routes ?? []).map((url): Step[] => [{ action: "open" }, { action: "open_url", url }])];
   let error: string | null = null;
   try {
     for (const path of starts) {
@@ -233,6 +234,34 @@ export async function explore(argv: string[]): Promise<number> {
   }
 }
 
+/** The app's URL scheme: `expo.scheme` in app.json, else the scheme of a configured route such as "tide://cart". */
+export function appScheme(routes: string[] | undefined, dir = process.cwd()): string | undefined {
+  try {
+    const j = JSON.parse(readFileSync(join(dir, "app.json"), "utf8")) as { expo?: { scheme?: string | string[] }; scheme?: string };
+    const sc = j.expo?.scheme ?? j.scheme;
+    const first = Array.isArray(sc) ? sc[0] : sc;
+    if (first) return first;
+  } catch { /* no app.json: try the configured routes */ }
+  return routes?.map((r) => /^([a-z][a-z0-9+.-]*):\/\//i.exec(r)?.[1]).find(Boolean);
+}
+
+/**
+ * Deep links to walk for `--changed-from <sha>`: the changed, routable screens (up to four), as `<scheme>://<screen>`.
+ * The walker opens them with the simulator's `open_url` action, which needs a URL the app's `onUrl` listener understands.
+ * If the diff cannot be read (for example a shallow checkout), or the app has no known scheme, say so and fall back to the full walk.
+ */
+export async function routesFromChange(sha: string, log: (s: string) => void = console.error, scheme?: string): Promise<{ routes?: string[]; onlyRoutes: boolean }> {
+  const { changedFiles, changedScreens } = await import("./ci-comment.js");
+  const { routableScreens } = await import("./ci-shots.js");
+  let files: string[];
+  try { files = changedFiles(sha); }
+  catch (e) { log(`could not read the diff: ${e instanceof Error ? e.message : e}. Walking the whole app.`); return { onlyRoutes: false }; }
+  const screens = routableScreens(changedScreens(files));
+  if (!screens.length) return { routes: [], onlyRoutes: true };
+  if (!scheme) { log("could not find the app's URL scheme (expo.scheme in app.json), so changed screens cannot be opened. Walking the whole app."); return { onlyRoutes: false }; }
+  return { routes: screens.map(([, r]) => `${scheme}://${r === "/" ? "" : r.slice(1)}`), onlyRoutes: true };
+}
+
 async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const a = parse(argv); const cfg = loadConfig();
   const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
@@ -240,9 +269,17 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const sim = await startSim(a, cfg, json); const base = sim.base;
   try {
     if (a.skin !== undefined && a.skin !== "ios" && a.skin !== "android") throw new Error("--skin must be android or ios");
-    const report = await walk(simDriver(base, cfg.appId), { routes: cfg.routes, maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
+    let routes = cfg.routes, onlyRoutes = false;
+    if (a["changed-from"] !== undefined) {
+      if (a["changed-from"] === "true") throw new Error("--changed-from needs a commit sha");
+      // With --changed-from, the changed screens replace the configured routes. Only a failed diff falls back to them.
+      ({ routes = cfg.routes, onlyRoutes } = await routesFromChange(a["changed-from"], console.error, appScheme(cfg.routes)));
+    }
+    const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
-    writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
+    const nothingChanged = onlyRoutes && !routes?.length;
+    if (nothingChanged) console.error("No screens changed, nothing explored.");
+    writeFileSync(`${out}.md`, (nothingChanged ? "No screens changed, nothing explored.\n\n" : "") + renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
     let issueInfo: Record<string, unknown> = {};
     const line = `${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`;
     if (a["issues-dir"] !== undefined) {
