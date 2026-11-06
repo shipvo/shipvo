@@ -14,7 +14,7 @@ House style (from the owner): visuals are **handcrafted from scratch in code**, 
 
 Commit (`git add`, `git commit -m "video: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (topic, length, size, how you checked it).
 
-This runs three times a day and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
+This runs every 3 hours and builds a growing library: many videos, one per run, each on a different topic, until every tutorial and key docs page has one. Keep `docs/videos.md` listing every video, grouped by goal, newest first. Never remake an existing video unless the product changed.
 
 ## Content follows code (shared with docs, blog, tutorials and videos)
 
@@ -37,3 +37,7 @@ For product demos, record the real app instead of drawing it: drive the sample a
 
 
 Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (one line, the loop, comparisons as facts, parity as proof).
+
+## Goal: every feature has a video and a tutorial (owner, 6 Nov 2026)
+
+Every row in `docs/content-coverage.md` must end with a link in **both** the Tutorial and the Video column. Each run, take the next empty cell in your column: features that ship to users first, newest and most important first (Shipvo Phone, `shipvo run`, the store path and Shipvo Testers, signed updates and rollback, the agent simulator, Capacitor). One feature per run, done properly, never a thin page to fill a cell. If a feature is too small for its own piece, cover it inside a closely related one and link the same piece in both rows. If a row's feature is not shipped yet (only planned), skip it and say so in the PR.

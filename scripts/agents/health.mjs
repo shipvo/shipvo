@@ -80,6 +80,15 @@ for (const wf of ["agent-blog.yml", "agent-tutorial.yml", "agent-video.yml"]) {
   } catch (e) { console.log(`skip ${wf}:`, e.message); }
 }
 
+// 3d. Content coverage (information only): features still missing a tutorial or a video.
+try {
+  const led = Buffer.from(api(`repos/${REPO}/contents/docs/content-coverage.md`).content, "base64").toString("utf8");
+  const rows = led.split("\n").filter((l) => /^\| /.test(l) && !/^\| (Feature|---)/.test(l)).map((l) => l.split("|").slice(1, -1).map((c) => c.trim()));
+  const noTut = rows.filter((r) => !r[2]).length, noVid = rows.filter((r) => !r[3]).length;
+  console.log(`content coverage: ${rows.length} features, ${noTut} without a tutorial, ${noVid} without a video`);
+  if (noTut || noVid) fixed.push(`Content coverage: ${rows.length} features; ${noTut} still need a tutorial and ${noVid} a video (the tutorial and video agents work through them).`);
+} catch (e) { console.log("skip coverage:", e.message); }
+
 // 4. Failed agent runs in the last 3 hours.
 const recent = runs.filter((r) => r.status === "completed" && mins(r.created_at) < 180 && r.conclusion !== "skipped");
 const failed = recent.filter((r) => r.conclusion === "failure" && r.name !== "ci");

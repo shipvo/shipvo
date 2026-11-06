@@ -15,7 +15,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @shipvo/schema build
+      # The control-plane tests type-check CLI code that imports sibling packages (for example @shipvo/store),
+      # so build every package first, as ci.yml does.
+      - run: pnpm -r --filter "./packages/**" build
       - run: pnpm --filter @shipvo/control-plane test
       - name: Apply D1 migrations
         working-directory: services/control-plane
