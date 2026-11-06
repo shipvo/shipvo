@@ -1,0 +1,2 @@
+- `tide-and-tackle`: add `src/telemetry.ts` with a pure JS crypto adapter and an in-memory storage adapter for signed telemetry (not wired into `App.tsx` yet).
+- Migration: none.
