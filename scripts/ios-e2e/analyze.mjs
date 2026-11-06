@@ -111,6 +111,7 @@ export function analyzeResume(text, { release, bundlePath }) {
   if (!after.length) return { pass: false, detail: "the app did not retry the download" };
   const ranged = after.find((m) => m[2] === "206" && Number(/range=bytes=(\d+)-/.exec(m[3] || "")?.[1]) > 0);
   if (!ranged) return { pass: false, detail: after.some((m) => m[2] === "200") ? "the app re-downloaded from byte 0 (no Range request)" : "no Range request with an offset above 0 got a 206" };
+  if (after.slice(after.indexOf(ranged) + 1).some((m) => m[2] === "200")) return { pass: false, detail: "the app re-downloaded from byte 0 after the ranged request" };
   if (!parseTelemetry(text).some((e) => e.release === release && e.event === "applied")) return { pass: false, detail: `release ${release} never became healthy` };
   return { pass: true, detail: `resumed with ${/range=(\S+)/.exec(ranged[3])[1]}, HTTP 206, release ${release} healthy` };
 }
@@ -143,7 +144,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (!result.pass) process.exitCode = 1;
   }
   // RESUME_MARKS=<json file with {release, bundlePath}> adds the resume check; it reads the text log (fifth argument).
-  if (process.env.RESUME_MARKS && textLogFile) {
+  if (process.env.RESUME_MARKS) {
+    if (!textLogFile) { console.error("resume marks need the text server log as the fifth argument"); process.exit(2); }
     const result = analyzeResume(readFileSync(textLogFile, "utf8"), JSON.parse(readFileSync(process.env.RESUME_MARKS, "utf8")));
     process.stdout.write("\n" + resumeTable(result));
     if (!result.pass) process.exitCode = 1;
