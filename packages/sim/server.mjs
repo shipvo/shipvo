@@ -10,7 +10,7 @@ import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
-import { applyProfile, getProfile } from "./network-profiles.mjs";
+import { installNetworkRoute, setNetworkProfile as applyNetworkProfile, clearNetworkProfile } from "./network-route.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -286,7 +286,13 @@ async function act(id, body) {
       break;
     }
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
-    case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); await syncMedia(page); break;
+    case "set_device": {
+      const { networkProfile, ...rest } = body.device ?? {};
+      await page.evaluate((d) => globalThis.__pnDevice?.set(d), rest);
+      // The fetch layer must agree with the device state, so a network profile goes through set_network_profile.
+      if (networkProfile !== undefined) try { await applyNetworkProfile(s, page, networkProfile, body.seed); } catch (e) { throw new SimError(e.code ?? "unknown_profile", e.message); }
+      await syncMedia(page); break;
+    }
     case "open_notifications": case "open_control_center": case "close_panels": case "toggle_tile": case "dismiss_notification": {
       try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
     }
@@ -306,22 +312,14 @@ async function act(id, body) {
     case "set_network_mocks": {
       let rules; try { rules = parseMockRules(body.rules ?? []); } catch (e) { throw new SimError(e.code ?? "mock_invalid", e.message); }
       s.mocks = rules;
-      if (!s.mockRoute) {
-        s.mockRoute = true;
-        await page.route("**/*", async (route) => {
-          const req = route.request();
-          const type = req.resourceType();
-          const rule = (type === "fetch" || type === "xhr") && (s.mocks ?? []).find((m) => (!m.method || m.method === req.method()) && m.match(req.url()));
-          if (!rule) return route.fallback();
-          if (rule.delayMs) await new Promise((r) => setTimeout(r, rule.delayMs));
-          // The app page may come from another origin, so the stub must pass the browser's CORS check.
-          await route.fulfill({ status: rule.status, body: rule.body, headers: { "access-control-allow-origin": "*", ...rule.headers } }).catch(() => {});
-        });
-      }
+      await installNetworkRoute(s, page);
       break;
     }
     // Run the app's fetch/XHR under a named network profile (default "online": no change). Logged in device_log as simulated.
-    case "set_network_profile": return setNetworkProfile(s, page, body.name ?? body.profile, body.seed);
+    case "set_network_profile": {
+      try { return await applyNetworkProfile(s, page, body.name ?? body.profile, body.seed); }
+      catch (e) { throw new SimError(e.code ?? "unknown_profile", e.message); }
+    }
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
     case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
       if (body.action === "browser_open" && body.url) { await phoneBrowser(s); if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
@@ -352,7 +350,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
+    case "device_reset": clearNetworkProfile(s); await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.
@@ -375,7 +373,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -471,30 +469,3 @@ server.on("upgrade", (req, socket) => {
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
 server.listen(PORT, () => console.log(`Shipvo UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));
 launchBrowser();
-
-// The one entry point for network profiles. Fetch/XHR of the app page go through applyProfile once the profile is not "online".
-// Mock rules still win over the network, but they are slowed and failed like any other request.
-async function setNetworkProfile(s, page, name, seed) {
-  let profile; try { profile = getProfile(name ?? "online"); } catch (e) { throw new SimError(e.code ?? "unknown_profile", e.message); }
-  s.netProfile = profile.name;
-  s.netFetch = profile.name === "online" ? null : applyProfile(async (req) => {
-    const route = req.route; const rule = (s.mocks ?? []).find((m) => (!m.method || m.method === route.request().method()) && m.match(route.request().url()));
-    if (rule) return new Response(rule.body, { status: rule.status, headers: rule.headers });
-    const r = await route.fetch();
-    return new Response(r.status() === 204 || r.status() === 304 ? null : await r.body(), { status: r.status(), headers: r.headers() });
-  }, profile, { seed: Number.isInteger(seed) ? seed : 1 });
-  if (!s.netRoute) {
-    s.netRoute = true;
-    await page.route("**/*", async (route) => {
-      const type = route.request().resourceType();
-      if (!s.netFetch || (type !== "fetch" && type !== "xhr")) return route.fallback();
-      try {
-        const res = await s.netFetch({ route });
-        await route.fulfill({ status: res.status, body: Buffer.from(await res.arrayBuffer()), headers: { "access-control-allow-origin": "*", ...Object.fromEntries(res.headers) } }).catch(() => {});
-      } catch { await route.abort("internetdisconnected").catch(() => {}); }
-    });
-  }
-  await page.evaluate((n) => globalThis.__pnDevice?.set({ networkProfile: n }), profile.name);
-  return { profile: profile.name, ...PROFILE_NUMBERS(profile) };
-}
-const PROFILE_NUMBERS = ({ latencyMs, downKbps, failureRate }) => ({ latencyMs, downKbps: Number.isFinite(downKbps) ? downKbps : null, failureRate, simulated: true });
