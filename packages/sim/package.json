@@ -40,6 +40,8 @@
     "mock-rules.mjs",
     "screen-rules.mjs",
     "push-notification.mjs",
+    "network-profiles.mjs",
+    "apps.mjs",
     "README.md"
   ],
   "peerDependencies": {
