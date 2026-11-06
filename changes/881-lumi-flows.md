@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo explore --flows` recognises sign up, log in, search, add to cart and checkout by control labels and screen text, drives each with valid input and then invalid input, and writes `explore-report-flows.md` and `.json` with each flow passed, failed (with the step) or not found.
+- Migration: none; new option.

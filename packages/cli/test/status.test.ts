@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { status, formatStatus } from "../src/status";
+import { status, formatStatus, describeBands, fetchBands } from "../src/status";
 
 const payload = { releases: [
   { release: 8, events: { applied: 12, reverted: 1 }, apply_ms_median: 410.4, cold_start_ms_median: null },
@@ -54,9 +54,10 @@ describe("shipvo status", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await status([], (async () => resp({ ...payload, halted: null })) as any);
     await status([], (async () => resp(payload)) as any);
-    expect(log).toHaveBeenCalledTimes(2);
-    expect(String(log.mock.calls[0][0])).not.toContain("halted");
-    expect(String(log.mock.calls[1][0])).not.toContain("halted");
+    const lines = log.mock.calls.map((c) => String(c[0])).filter((l) => !l.startsWith("bands:"));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).not.toContain("halted");
+    expect(lines[1]).not.toContain("halted");
     log.mockClear();
     const halted = { release: 8, reports: 40, failed: 12, threshold: 0.2 };
     expect(await status(["--json"], (async () => resp({ ...payload, halted })) as any)).toBe(1);
@@ -93,5 +94,54 @@ describe("shipvo status auto-halt line", () => {
     log.mockClear();
     await status([], (async () => resp(payload)) as any);
     expect(String(log.mock.calls[0][0])).not.toContain("auto-halt");
+  });
+});
+
+describe("bands line", () => {
+  const ptr = (release: number) => resp({ body: JSON.stringify({ release }) });
+  it("reads each band pointer", async () => {
+    const f = vi.fn(async (u: string) => (u.endsWith("/b2") ? resp({ error: "no_release" }, 404) : ptr(u.endsWith("/b0") ? 4 : 3)));
+    const b = await fetchBands("https://cp.test", "shop", 1, f as any);
+    expect(b).toEqual({ b0: 4, b1: 3, b2: null });
+    expect(describeBands(b)).toEqual(["bands: b0=4 b1=3 b2=-", "Bands differ. Run shipvo promote to give every band the newest release (4)."]);
+  });
+  it("an unreadable band is '?' and never triggers the hint", async () => {
+    const f = vi.fn(async (u: string) => (u.endsWith("/b2") ? resp({ error: "boom" }, 503) : ptr(4)));
+    const b = await fetchBands("https://cp.test", "shop", 1, f as any);
+    expect(b).toEqual({ b0: 4, b1: 4, b2: "?" });
+    expect(describeBands(b)).toEqual(["bands: b0=4 b1=4 b2=?"]);
+  });
+  it("a halted band (non-ok, non-404) is '?', not 'no release'", async () => {
+    const f = vi.fn(async (u: string) => (u.endsWith("/b0") ? resp({ error: "release_halted", release: 5 }, 404) : ptr(5)));
+    const b = await fetchBands("https://cp.test", "shop", 1, f as any);
+    expect(b.b0).toBe("?");
+    expect(describeBands(b)).toEqual(["bands: b0=? b1=5 b2=5"]);
+  });
+  it("a 404 with no_release is '-', other 404 errors are '?'", async () => {
+    const f = vi.fn(async (u: string) => (u.endsWith("/b0") ? resp({ error: "no_release" }, 404) : u.endsWith("/b1") ? resp({ error: "hermes_bytecode_mismatch" }, 404) : new Response("nope", { status: 404 })));
+    expect(await fetchBands("https://cp.test", "shop", 1, f as any)).toEqual({ b0: null, b1: "?", b2: "?" });
+  });
+  it("prints the bands line even with no telemetry yet", async () => {
+    inApp();
+    const f = vi.fn(async (u: string) => (u.includes("/p/") ? ptr(3) : resp({ releases: [] })));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    expect(await status([], f as any)).toBe(0);
+    const lines = log.mock.calls.map((c) => String(c[0]));
+    expect(lines).toContain("No telemetry yet for \"shop\".");
+    expect(lines).toContain("bands: b0=3 b1=3 b2=3");
+  });
+  it("a band with no release next to one with a release differs", () => {
+    expect(describeBands({ b0: 4, b1: null, b2: "?" })[1]).toContain("(4)");
+    expect(describeBands({ b0: null, b1: null, b2: null })).toEqual(["bands: b0=- b1=- b2=-"]);
+  });
+  it("no hint when bands match", () => {
+    expect(describeBands({ b0: 4, b1: 4, b2: 4 })).toEqual(["bands: b0=4 b1=4 b2=4"]);
+  });
+  it("status prints the bands line after the table", async () => {
+    inApp();
+    const f = vi.fn(async (u: string) => (u.includes("/p/") ? ptr(8) : resp(payload)));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    expect(await status([], f as any)).toBe(0);
+    expect(log.mock.calls.map((c) => String(c[0]))).toContain("bands: b0=8 b1=8 b2=8");
   });
 });
