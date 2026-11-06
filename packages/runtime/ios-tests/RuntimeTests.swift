@@ -16,8 +16,8 @@ final class RuntimeTests: XCTestCase {
   }
   override func tearDown() { if let tmp { try? FileManager.default.removeItem(at: tmp) } }
 
-  private func store(_ app: String, shell: String = "1.0.0", binary: String = "1.0.0/1", key: String? = nil, hbc: [Int] = [], nm: [String: String] = [:], bundle: Bundle = .main) -> Store {
-    let s = Store(bundle: bundle, overrides: .init(suite: "shipvo.test.\(UUID().uuidString)", dir: tmp, baseUrl: base, publicKey: key ?? pub, appId: app, shellMajor: 1, shellVersion: shell, binaryVersion: binary, hermesBytecodeVersions: hbc, nativeModules: nm))
+  private func store(_ app: String, shell: String = "1.0.0", binary: String = "1.0.0/1", key: String? = nil, hbc: [Int] = [], hbe: String? = nil, nm: [String: String] = [:], bundle: Bundle = .main) -> Store {
+    let s = Store(bundle: bundle, overrides: .init(suite: "shipvo.test.\(UUID().uuidString)", dir: tmp, baseUrl: base, publicKey: key ?? pub, appId: app, shellMajor: 1, shellVersion: shell, binaryVersion: binary, hermesBytecodeVersions: hbc, hermesEngine: hbe, nativeModules: nm))
     s.binaryVersion = binary
     return s
   }
@@ -221,6 +221,9 @@ final class RuntimeTests: XCTestCase {
     let url = Updater.pointerURL(store("good", hbc: [96, 98], nm: ["@scope/pkg": "1.2.3", "other": "2.0.0"]))
     XCTAssertTrue(url.hasSuffix(".json?hbc=96,98&nm=%40scope%2Fpkg%401.2.3,other%402.0.0"), url)
     XCTAssertFalse(Updater.pointerURL(store("good", nm: ["a": "1.0.0"])).contains("hbc="))
+    XCTAssertTrue(Updater.pointerURL(store("good", hbc: [96], hbe: "250829098.0.10", nm: ["a": "1.0.0"])).hasSuffix(".json?hbc=96&hbe=250829098.0.10&nm=a%401.0.0"))
+    XCTAssertFalse(Updater.pointerURL(store("good", hbc: [96])).contains("hbe="))
+    XCTAssertFalse(Updater.pointerURL(store("good", hbe: "  ")).contains("hbe="))
   }
 
   func testPointerUrlIsSentAndAMismatchKeepsTheCurrentRelease() async throws {
