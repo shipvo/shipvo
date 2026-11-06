@@ -1,2 +1,0 @@
-- `@shipvo/cli`: new `shipvo eas setup` and `shipvo eas build` make a Capacitor repo ready for `eas build` and `eas submit` with your own Expo account. See `docs/capacitor.md`.
-- Migration: none; new commands.

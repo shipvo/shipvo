@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo init` now pins `playwright` to `>=1.63.0 <1.65.0` in the scaffolded app. `pnpm install` failed (also under `CI=true`) with `ERR_PNPM_NO_MATCHING_VERSION` because `playwright@1.65.0` needed `playwright-core@1.65.0`, which the registry did not have.
-- Migration: none. Raise the range in your app once a working 1.65 is published.

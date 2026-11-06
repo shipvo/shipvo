@@ -1,2 +1,0 @@
-- `@shipvo/sim`, `@shipvo/cli`: when Chromium cannot launch because the browser is missing ("Executable doesn't exist"), `shipvo sim` and `shipvo doctor` now say to run `npx playwright install chromium` in the app folder, name the playwright version that was resolved, and add the Linux system-package hint.
-- Migration: none.

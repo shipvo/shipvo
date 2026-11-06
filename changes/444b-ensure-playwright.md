@@ -1,2 +1,0 @@
-- `@shipvo/cli`: new `ensurePlaywright` helper installs `playwright` as a dev dependency with the app's package manager (pnpm, yarn, bun or npm). `SHIPVO_NO_AUTO_INSTALL=1` turns it into an error that names the command. Not wired into `shipvo sim` or `explore` yet.
-- Migration: none; not exported from the package.

@@ -1,2 +1,0 @@
-- `@shipvo/mcp`: new tools `record_start`, `record_marker` and `record_stop`. They record the phone frame page to an H.264 MP4 under `.shipvo/recordings/` (9:16, 16:9 or 1:1, at 30 or 60 fps) and return the file, duration, size and chapters. Needs ffmpeg and the optional `playwright` peer. The page is `SHIPVO_FRAME_URL`, default the simulator root.
-- Migration: none. New tools only.
