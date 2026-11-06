@@ -1,0 +1,121 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:02.560
+Want to see your app on a phone?
+
+2
+00:00:02.560 --> 00:00:04.106
+You do not need a phone.
+
+3
+00:00:04.106 --> 00:00:06.746
+You do not need Android Studio, or Xcode.
+
+4
+00:00:06.746 --> 00:00:09.450
+One command opens a phone in your browser.
+
+5
+00:00:11.050 --> 00:00:13.547
+Open a terminal in your app folder.
+
+6
+00:00:13.547 --> 00:00:16.758
+Type npx shipvo run android, and press Enter.
+
+7
+00:00:16.758 --> 00:00:19.398
+Shipvo builds a web copy of your app.
+
+8
+00:00:19.398 --> 00:00:20.825
+It needs no account.
+
+9
+00:00:24.050 --> 00:00:27.603
+Your browser opens on a page with a phone in the middle.
+
+10
+00:00:27.603 --> 00:00:32.298
+A label says Simulated, because this is a copy of a phone, not a real one.
+
+11
+00:00:32.298 --> 00:00:34.075
+Click it like you would tap.
+
+12
+00:00:38.050 --> 00:00:39.628
+Want an iPhone instead?
+
+13
+00:00:39.628 --> 00:00:40.245
+Type ios.
+
+14
+00:00:40.245 --> 00:00:43.607
+You get the iPhone look, with its Dynamic Island.
+
+15
+00:00:43.607 --> 00:00:46.420
+The page scales the phone to your window.
+
+16
+00:00:46.420 --> 00:00:50.125
+Add ?dark=1 to the address for the dark frame.
+
+17
+00:00:51.725 --> 00:00:52.945
+Now the best part.
+
+18
+00:00:52.945 --> 00:00:57.013
+Your AI assistant can drive the same phone while you watch.
+
+19
+00:00:57.013 --> 00:01:03.182
+While shipvo run is up, the assistant calls open_app, and finds your live phone.
+
+20
+00:01:03.182 --> 00:01:05.012
+It taps, types and scrolls.
+
+21
+00:01:05.012 --> 00:01:06.300
+You see every move.
+
+22
+00:01:07.900 --> 00:01:09.141
+Need another port?
+
+23
+00:01:09.141 --> 00:01:10.451
+Add --port.
+
+24
+00:01:10.451 --> 00:01:12.312
+Want a real emulator later?
+
+25
+00:01:12.312 --> 00:01:13.759
+Add --native.
+
+26
+00:01:13.759 --> 00:01:17.275
+When you are done, press Ctrl+C in the terminal.
+
+27
+00:01:19.900 --> 00:01:20.699
+That is it.
+
+28
+00:01:20.699 --> 00:01:23.314
+A phone in your browser, in seconds.
+
+29
+00:01:23.314 --> 00:01:26.654
+Try npx shipvo run android in your app folder.
+
+30
+00:01:26.654 --> 00:01:29.850
+The guide is at shipvo.dev/learn.

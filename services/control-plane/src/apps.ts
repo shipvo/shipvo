@@ -264,7 +264,7 @@ async function recordStaged(kv: KVNamespace, id: string, buf: ArrayBuffer) {
 
 const BAND_RANK = ["b0", "b1", "b2"];
 const approvalKey = (id: string, approvalId: string) => `c/${id}/approval/${approvalId}`;
-type Approval = { id: string; key: string; pointer: string; band: string; release: number; proposer: string; status: "pending" | "approved" | "rejected"; proposed_at: string };
+type Approval = { id: string; key: string; pointer: string; band: string; release: number; proposer: string; proposer_kind?: "agent" | "person"; status: "pending" | "approved" | "rejected"; proposed_at: string };
 
 /** With policy.requireApprovalAbove set, a pointer above that band is stored as a pending approval instead of going live. Returns the 202 body, or null. */
 async function proposeIfApprovalNeeded(c: any, id: string, buf: ArrayBuffer, key: string) {
@@ -274,7 +274,7 @@ async function proposeIfApprovalNeeded(c: any, id: string, buf: ArrayBuffer, key
   const agent = (c.req.header("x-shipvo-actor") ?? "").trim().toLowerCase() === "agent";
   const owner = await c.env.DB.prepare("SELECT acc.github_login AS login FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ?").bind(id).first();
   const proposer = agent ? "agent (publish token)" : String(owner?.login ?? id);
-  const a: Approval = { id: crypto.randomUUID(), key, pointer: new TextDecoder().decode(buf), band: body.band, release: body.release, proposer, status: "pending", proposed_at: now() };
+  const a: Approval = { id: crypto.randomUUID(), key, pointer: new TextDecoder().decode(buf), band: body.band, release: body.release, proposer, proposer_kind: agent ? "agent" : "person", status: "pending", proposed_at: now() };
   await c.env.POINTERS.put(approvalKey(id, a.id), JSON.stringify(a));
   await recordAudit(c.env.DB, { app_id: id, actor: proposer, actor_kind: agent ? "agent" : "person", action: "publish", release: body.release, release_id: key,
     after: JSON.stringify({ approval: "proposed", approval_id: a.id, band: body.band, release: body.release }) });
@@ -295,7 +295,14 @@ async function resolveApproval(c: any, verb: "approve" | "reject") {
   if (!raw) return c.json({ error: "not_found" }, 404);
   const a: Approval = JSON.parse(raw);
   if (a.status !== "pending") return c.json({ error: "not_pending", message: `This approval is already ${a.status}.` }, 409);
-  if (verb === "approve" && who.actor === a.proposer) return c.json({ error: "self_approval", message: "The actor that proposed this release cannot approve it." }, 403);
+  // Holds written before proposer_kind existed fall back to the old name check.
+  const proposerKind = a.proposer_kind ?? (a.proposer.startsWith("agent") ? "agent" : "person");
+  // An agent cannot approve an agent's proposal either: the owner token and the publish token are both agents.
+  if (verb === "approve" && (who.actor === a.proposer || (who.kind === "agent" && proposerKind === "agent"))) {
+    await recordAudit(c.env.DB, { app_id: id, actor: who.actor, actor_kind: who.kind, action: "publish", release: a.release, release_id: a.key,
+      after: JSON.stringify({ approval: "refused", rule: "self_approval", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
+    return c.json({ error: "self_approval", code: "self_approval", rule: "self_approval", message: "The actor that proposed this release cannot approve it. A second owner must." }, 403);
+  }
   const approved = verb === "approve";
   if (approved) {
     // Never roll a band back: if a newer release went live while this waited, refuse and close the approval.
@@ -311,7 +318,7 @@ async function resolveApproval(c: any, verb: "approve" | "reject") {
     // Approval does not override policy: re-check the rules that do not depend on the clock (maxBand, agentMaxBand), as the proposer's kind.
     // blockedWeekdays and requireStageBeforeFull were checked when the proposal was made and are not re-run here. A refusal leaves the approval pending.
     const policy = await loadReleasePolicy({ kv: c.env.POINTERS, appId: id });
-    const verdict = checkPolicy({ maxBand: policy.maxBand, agentMaxBand: policy.agentMaxBand } as typeof policy, { band: a.band as any, actorKind: a.proposer.startsWith("agent") ? "agent" : "human", now: new Date() });
+    const verdict = checkPolicy({ maxBand: policy.maxBand, agentMaxBand: policy.agentMaxBand } as typeof policy, { band: a.band as any, actorKind: proposerKind === "agent" ? "agent" : "human", now: new Date() });
     if (!verdict.ok) return c.json({ error: "policy_refused", code: "policy_refused", rule: verdict.rule, reason: verdict.reason }, 403);
     const buf = new TextEncoder().encode(a.pointer);
     const row: any = await c.env.DB.prepare("SELECT bytes_used FROM apps WHERE app_id = ?").bind(id).first();
@@ -325,6 +332,24 @@ async function resolveApproval(c: any, verb: "approve" | "reject") {
     after: JSON.stringify({ approval: approved ? "approved" : "rejected", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
   return c.json({ ok: true, approval_id: a.id, status: approved ? "approved" : "rejected" });
 }
+/** Pending approvals of an app, oldest first. Readable by an owner or by the app's publish token (an agent may list, never approve its own). */
+apps.get("/:app/approvals", async (c) => {
+  const id = c.req.param("app");
+  if (!(await approver(c, id)) && !(await publisher(c, id))) return c.json({ error: "unauthorized" }, 401);
+  const prefix = approvalKey(id, "");
+  const out: any[] = [];
+  let cursor: string | undefined;
+  do {
+    const listed: any = await c.env.POINTERS.list({ prefix, cursor, limit: 1000 });
+    for (const k of listed.keys) {
+      const raw = await c.env.POINTERS.get(k.name); if (!raw) continue;
+      try { const a: Approval = JSON.parse(raw); if (a.status === "pending") out.push({ id: a.id, release: a.release, band: a.band, proposer: a.proposer, proposed_at: a.proposed_at, status: a.status }); } catch { /* skip unreadable */ }
+    }
+    cursor = listed.list_complete === false ? listed.cursor : undefined;
+  } while (cursor);
+  out.sort((x, y) => String(x.proposed_at).localeCompare(String(y.proposed_at)));
+  return c.json({ app: id, approvals: out });
+});
 apps.post("/:app/approvals/:id/approve", (c) => resolveApproval(c, "approve"));
 apps.post("/:app/approvals/:id/reject", (c) => resolveApproval(c, "reject"));
 

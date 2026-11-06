@@ -5,11 +5,11 @@ import { execSync } from "node:child_process";
 import { portFree } from "./sim.js";
 import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
-import { parseDeclared } from "./hermes.js";
+import { installedHermesEngine, parseDeclared, parseEngine } from "./hermes.js";
 import { emit, envelope, type Next } from "./json-out.js";
 
 type CheckResult = { name: string; ok: boolean; fix: string; note?: string };
-type ShipvoConfig = { publicKey?: unknown; controlPlane?: unknown; hermesBytecodeVersion?: unknown };
+type ShipvoConfig = { publicKey?: unknown; controlPlane?: unknown; hermesBytecodeVersion?: unknown; hermesEngine?: unknown };
 type DoctorDeps = {
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -163,20 +163,24 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   }
 
   let healthOk = false;
+  let healthNote: string | undefined;
   let healthFix = "check shipvo.json controlPlane and your network access (5 second timeout)";
   if (!deps.offline && cfg?.controlPlane && typeof cfg.controlPlane === "string") {
     try {
       const res = await deps.fetchFn(cfg.controlPlane.replace(/\/$/, "") + "/health", { signal: AbortSignal.timeout(5000) });
       if (res.status !== 200) healthFix = `/health answered HTTP ${res.status}, expected 200; check the control plane URL and deploy`;
       else {
-        try { await res.json(); healthOk = true; } catch { healthFix = "/health answered 200 but not JSON; controlPlane may point at the wrong service"; }
+        try {
+          const j: any = await res.json(); healthOk = true;
+          if (typeof j?.telemetry_dropped_today === "number") healthNote = `telemetry_dropped_today: ${j.telemetry_dropped_today}${j.telemetry_dropped_today > 0 ? " (D1 refused telemetry writes; see docs/self-hosting.md)" : ""}`;
+        } catch { healthFix = "/health answered 200 but not JSON; controlPlane may point at the wrong service"; }
       }
     } catch (e) {
       healthFix = e instanceof Error && e.name === "TimeoutError" ? "/health did not answer within 5 seconds; check the URL and your network" : healthFix;
     }
   }
   if (deps.offline) results.push({ name: "control plane /health returns JSON", ok: true, fix: "none", note: skipped });
-  else results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix });
+  else results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix, ...(healthOk && healthNote ? { note: healthNote } : {}) });
 
   let hermesOk = true;
   if (cfg && Object.prototype.hasOwnProperty.call(cfg, "hermesBytecodeVersion")) {
@@ -187,6 +191,20 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
     }
   }
   results.push({ name: "hermesBytecodeVersion (if present) is set", ok: hermesOk, fix: "set hermesBytecodeVersion to a positive integer or list (for example 96 or [96, 98])" });
+
+  // Engine build: only shown when the project declares one or has a hermes-compiler, so older setups see no new row.
+  const installedEngine = installedHermesEngine(deps.cwd);
+  let declaredEngine: string | undefined, engineBad = false;
+  try { declaredEngine = cfg ? parseEngine(cfg.hermesEngine) : undefined; } catch { engineBad = true; }
+  if (engineBad) results.push({ name: "Hermes engine build", ok: false, fix: "set hermesEngine in shipvo.json to an id like 250829098.0.10" });
+  else if (declaredEngine || installedEngine) {
+    const mismatch = !!declaredEngine && declaredEngine !== installedEngine;
+    results.push({
+      name: "Hermes engine build", ok: !mismatch,
+      fix: installedEngine ? `shipvo.json declares ${declaredEngine} but hermes-compiler is ${installedEngine}; install the declared build or update hermesEngine if the shell changed` : `shipvo.json declares ${declaredEngine} but hermes-compiler was not found; install it or remove hermesEngine`,
+      note: mismatch ? undefined : declaredEngine ? `${installedEngine}, matches hermesEngine` : `${installedEngine}, hermesEngine not declared in shipvo.json`,
+    });
+  }
 
   // Simulator checks only apply to projects that have a `sim` script.
   if (!deps.skipSim && hasSimScript(deps)) {

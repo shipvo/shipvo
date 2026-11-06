@@ -139,7 +139,7 @@ Created ${name} in ${dirArg}
 ${seedNote}
 Public key pinned in the shell: ${publicKey}
 
-Phones:  npx expo run:android   (needs Android Studio once). iOS: npx expo run:ios, then shipvo publish --platform all
+Phones:  the browser phone (npx shipvo run android) needs no Android Studio. For a real build use npx expo run:android (needs Android Studio once) or npx expo run:ios, then shipvo publish --platform all
 Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and SHIPVO_KV_ID (self-hosted); then npm run publish
          (self-hosting instead? see docs/self-hosting.md)
 AI agents: npx -y @shipvo/mcp points Claude / Cursor / ChatGPT at the simulator; then open_app("${appId}")
@@ -147,7 +147,7 @@ AI agents: npx -y @shipvo/mcp points Claude / Cursor / ChatGPT at the simulator;
 Next steps:
   1. cd ${dirArg}
   2. npm install                   # or pnpm install / bun install; needed before any shipvo command
-  3. npx shipvo sim                # open the app on a simulated phone in your browser
+  3. npx shipvo run android        # the app on a simulated phone in your browser (npx shipvo run ios for iOS)
   4. npx shipvo doctor             # setup checks
   5. npx shipvo app create ${appId}   # register the app (run npx shipvo login first)
   6. npx shipvo publish            # send your first update
