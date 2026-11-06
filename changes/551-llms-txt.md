@@ -1,0 +1,1 @@
+- site: llms.txt now opens with the positioning line and has "For AI coding agents", "How Shipvo works", "Straight answers" and a generated Packages list. Install lines appear only when they exist.
