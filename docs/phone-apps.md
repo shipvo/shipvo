@@ -36,7 +36,7 @@ Setting `language` to `ar` turns `rtl` on. `en` and `fr` turn it off.
 
 Errors: `unknown_setting` (no such key) and `bad_value` (the key does not take that value).
 
-Each change is recorded in `device_log` as `setting`, with `simulated: true`. You can also set the system switches with `set_device` (`fontSize`, `boldText`, `reduceMotion`, `language`, `rtl`), and in the phone frame you can tap the switches on the Settings screen yourself.
+Each change is recorded in `device_log` as `setting`, with `simulated: true`. Use `set_setting` for all of these keys. `set_device` only takes `darkMode` among them.
 
 ## Open a web page in the phone's Browser
 
@@ -44,8 +44,9 @@ Use this when your app links to a web page (a payment page, a privacy policy) an
 
 1. `browser_open(session, url)` opens the page in the phone's own Chromium, apart from your app, and returns a snapshot with refs.
 2. `browser_click(session, ref)` and `browser_type(session, ref, text, enter?)` use refs from the snapshot.
-3. `browser_scroll(session, dy?, dx?)`, `browser_back(session)`, `browser_wait_for(session, text, gone?, timeout_ms?)`.
-4. `browser_tabs(session)` and `browser_close_tab(session, index)` manage tabs. `browser_screenshot(session)` returns a PNG.
+3. `browser_snapshot(session)` reads the current page again as a tree with refs.
+4. `browser_scroll(session, dy?, dx?)`, `browser_back(session)`, `browser_wait_for(session, text, gone?, timeout_ms?)`.
+5. `browser_tabs(session)` and `browser_close_tab(session, index)` manage tabs. `browser_screenshot(session)` returns a PNG.
 
 In the app, `openUrl` with an http(s) link opens this Browser. A link from a web page to your app's scheme (for example `tide://item/3`) goes back to the app.
 
