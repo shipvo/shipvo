@@ -17,6 +17,7 @@
     }
   },
   "files": [
+    "skills",
     "dist",
     "README.md"
   ],

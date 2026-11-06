@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { routeStore } from "@shipvo/store";
 import { args, loadConfig } from "./config.js";
-import { detectProject } from "./agents.js";
+import { detectProject, skillStatus } from "./agents.js";
 import { portFree } from "./sim.js";
 
 type Row = { release: number; events: Record<string, number>; apply_ms_median: number | null; cold_start_ms_median: number | null };
@@ -40,6 +40,7 @@ export type StatusJson = {
     signing_key: { present: boolean };
     pending_release: { newest: number | null; halted: Halted | null; auto_halt: AutoHalt | null } | null;
     store_step: { id: string; title: string; state: string } | null;
+    skills: { package: string; name: string; synced: boolean }[];
   };
   next: Next[];
 };
@@ -68,7 +69,7 @@ async function localFacts(dir: string, simPort = 4545) {
 export async function statusJson(appArg: string | undefined, fetchFn: typeof fetch, dir = process.cwd()): Promise<{ doc: StatusJson; exit: number }> {
   const kind = detectProject(dir);
   const f = await localFacts(dir);
-  const shared = { sim: f.sim, run_server: f.run, signing_key: { present: f.hasKey }, store_step: f.storeStep };
+  const shared = { sim: f.sim, run_server: f.run, signing_key: { present: f.hasKey }, store_step: f.storeStep, skills: skillStatus(dir) };
   const mk = (code: StatusJson["code"], summary: string, next: Next[], appId: string | null, pending: StatusJson["data"]["pending_release"], exit: number) => ({
     doc: { ok: exit === 0, code, summary, data: { project: { kind, app_id: appId }, ...shared, pending_release: pending }, next } as StatusJson, exit,
   });
