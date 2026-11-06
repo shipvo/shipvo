@@ -6,6 +6,7 @@ import { lockScreenHtml, bootScreenHtml, offScreenHtml } from "./lifecycle.mjs";
 import { shadeHtml, shadeCss, shadeClientScript } from "./shade.mjs";
 import { settingsHtml, settingsIconHtml, settingsCss, settingsClientScript } from "./settings.mjs";
 import { storeIconHtml, storeScreenHtml, storeCss, appsClientScript } from "./apps.mjs";
+import { updateBannerHtml, updateCss, updateClientScript } from "./update.mjs";
 import { homeScreenHtml, recentsHtml, navButtonsHtml, navScreensCss, classifySwipe, setVisibilityInPage } from "./nav.mjs";
 
 export const SKINS = {
@@ -116,6 +117,7 @@ else{show(q("lock-screen"),false);show(q("off-screen"),true);pw.focus()}})})();
 ${shadeClientScript(iframeId, skin)}
 ${settingsClientScript(iframeId)}
 ${appsClientScript(iframeId, phone)}
+${updateClientScript()}
 (function nav(){var r=root();if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')};
 if(!q("home-screen")||!q("recents"))return;
 var classifySwipe=${classifySwipe.toString()},setVisibilityInPage=${setVisibilityInPage.toString()};
@@ -192,7 +194,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     : `<span class="sf-cut sf-hole" data-part="punch-hole"></span>`;
   const html = `<div class="sf-body" data-skin="${skin}" data-theme="${dark ? "dark" : "light"}" data-part="phone-body">`
     + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}<span class="sf-icons">${icons(st)}</span></div>`
-    + `<div class="sf-content">${screen}</div>`
+    + `<div class="sf-content">${screen}</div>` + updateBannerHtml()
     + shadeHtml(skin) + `<span class="sf-edge" data-part="edge-swipe"></span>` + homeScreenHtml().replace(/<\/div>$/, settingsIconHtml() + storeIconHtml() + "</div>") + settingsHtml() + storeScreenHtml() + recentsHtml() + lockScreenHtml(st.time) + bootScreenHtml() + offScreenHtml()
     + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button>${skin === "android" ? `<button role="menuitem" data-act="navstyle" data-part="nav-style-toggle">3-button navigation</button>` : ""}<button role="menuitem" data-act="cancel">Cancel</button></div>`
     + `<div class="sf-bar" data-part="${k.bottom}"><i></i>${skin === "android" ? navButtonsHtml() : ""}</div></div>`
@@ -220,6 +222,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     shadeCss,
     settingsCss,
     storeCss,
+    updateCss,
     `.sf-edge{position:absolute;left:0;top:${k.status}px;bottom:${k.bar}px;width:14px;z-index:3}.sf-home[hidden],.sf-recents[hidden],.sf-navbtns[hidden]{display:none}`,
     navScreensCss(),
     `.sf-bar{position:relative}.sf-navbtns{position:absolute;inset:0;display:flex;justify-content:space-around;align-items:center;background:var(--sf-bg)}.sf-navbtns button{border:0;background:none;color:var(--sf-fg);font-size:16px;padding:2px 24px;cursor:pointer}.sf-body[data-nav="buttons"] .sf-bar i{display:none}`,
