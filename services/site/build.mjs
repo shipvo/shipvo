@@ -239,7 +239,7 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
   s = s.replace(/<!--HEAD (.*?)-->/s, (_, attrs) => { const a = Object.fromEntries([...attrs.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]])); return headTag({ ...a, ld: PAGE_LD[f] || [] }); });
   s = s.replace(/<!--NAV ?(\w*)-->/, (_, k) => navTag(k)).replace("<!--FOOTER-->", footTag()).replace(/<main(?![^>]*\bid=)/, '<main id="main"');
   s = s.replace("<!--CORONA-->", corona({ logoHref: "/logo-256.png", id: "cor" }));
-  const dirPage = ["compare.html", "pricing.html", "setup.html", "features.html"].includes(f);   // served as /compare/, /pricing/ and /setup/
+  const dirPage = ["compare.html", "pricing.html", "setup.html", "features.html"].includes(f);   // served as /compare/, /pricing/, /setup/ and /features/
   if (dirPage) { const d = join(PUB, f.replace(".html", "")); mkdirSync(d, { recursive: true }); writeFileSync(join(d, "index.html"), s); rmSync(join(PUB, f), { force: true }); }
   else writeFileSync(join(PUB, f), s);
 }

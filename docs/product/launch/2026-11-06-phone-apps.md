@@ -31,7 +31,7 @@ Shipvo Phone is a headless phone simulator that AI agents drive over MCP, shown 
 
 ## 30-second demo script (Video Studio)
 
-1. 0-6 s: `npx shipvo run android`; the phone opens in the browser.
+1. 0-6 s: `npx shipvo run android` and `npx shipvo run ios`; the Android and iOS phones open in the browser.
 2. 6-14 s: Agent calls `set_setting dark_mode true` and `font_size largest`; the shop screen changes.
 3. 14-21 s: Agent opens the Store, installs a second app, switches back.
 4. 21-27 s: Agent calls `check_for_update` then `apply_update`; the Simulated banner shows "applied".
