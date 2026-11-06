@@ -32,6 +32,17 @@ All of these must hold:
 
 Unverified reports are still stored and still show on dashboards. They never halt a release.
 
+## Revert alerts
+
+If you set an alert webhook, a revert report can send one alert per release per hour. Reports with a valid install signature and reports without one use separate alert slots. A flood of unsigned or forged reports can use up only the unsigned slots, so alerts for verified reports still reach your webhook. The caps are in `services/control-plane/src/alerts.ts`; the test is `services/control-plane/test/alerts.test.ts` "forged rollbacks do not use up the alert slots for real ones".
+
+## What is not protected
+
+- **Telemetry rate limits and an anomaly guard are not merged yet.** Only install registration is rate limited. Reports to `POST /t` are not.
+- **One install with a valid key** can still vote and can use verified alert slots. It counts as one vote for halting, but a single stolen install key is not stopped from filling the verified alert slots.
+- **Networks you do not control.** An attacker with 3 or more networks and enough registered installs can meet the halt rules.
+- **Unsigned reports** are stored and shown on dashboards, so dashboards can be polluted.
+
 ## Migration
 
 Apps whose installs run a build without the signing runtime will not auto-halt until they update. Until then, use `shipvo rollback` or a manual halt.
