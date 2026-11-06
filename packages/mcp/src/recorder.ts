@@ -11,7 +11,7 @@ export const SIZES: Record<Format, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 }, "16:9": { width: 1920, height: 1080 }, "1:1": { width: 1080, height: 1080 },
 };
 export type Chapter = { t: number; caption: string };
-export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[]; credits?: string; notes?: string[] };
+export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[]; credits?: string; notes?: string[]; lumi?: boolean; lumi_lines?: number };
 export class RecorderError extends Error { constructor(public code: string, message: string) { super(message); } }
 
 type Page = { screenshot(o: { type: "jpeg"; quality: number }): Promise<Buffer>; goto(u: string, o?: object): Promise<unknown>; evaluate?(f: string): Promise<unknown> };
@@ -47,20 +47,37 @@ const backgroundScript = (b: Background) => `(() => { const v = ${JSON.stringify
 const captionScript = (text: string) => `(() => { let e = document.getElementById("shipvo-caption"); if (!e) { e = document.createElement("div"); e.id = "shipvo-caption";
   e.style.cssText = "position:fixed;z-index:2147483647;pointer-events:none;left:50%;bottom:6%;transform:translateX(-50%);max-width:80%;padding:14px 28px;border-radius:14px;background:rgba(0,0,0,.72);color:#fff;font:600 44px/1.2 system-ui,sans-serif;text-align:center"; document.body.appendChild(e); }
   e.textContent = ${JSON.stringify(text)}; })()`;
+// Lumi in the recorded frame. The observer logs only caption changes, so the same text shown twice in a row is logged once. Hidden with a style rule when off. When on, a small observer in the page logs each caption Lumi shows, with the time, so the steps can be spoken.
+const lumiScript = (on: boolean) => `(() => { if (!${on}) { const s = document.createElement("style"); s.id = "shipvo-lumi-off"; s.textContent = '[data-part="lumi"],[data-part="lumi-caption"],.sf-lumi,.sf-lumi-cap{display:none !important}'; document.head.appendChild(s); return false; }
+  const has = !!document.querySelector('[data-part="lumi"]'); const log = window.__shipvoSteps = window.__shipvoSteps || [];
+  const c = document.querySelector('[data-part="lumi-caption"]');
+  if (c) new MutationObserver(() => { const t = (c.textContent || "").trim(); if (t && !c.hidden && t !== (log.at(-1) || {}).text) log.push({ at: Date.now(), text: t }); }).observe(c, { childList: true, characterData: true, subtree: true, attributes: true });
+  return has; })()`;
+export type Step = { at: number; text: string };
+/** Lines Lumi speaks: one per step caption, dropped when the previous line would still be playing (about 0.09 s a character plus a 0.6 s gap). Times are seconds on the final video. */
+export function voiceCues(steps: Step[], t0: number, shift: (ms: number) => number, total: number): [number, string, string][] {
+  const out: [number, string, string][] = []; let free = 0;
+  for (const s of steps) {
+    const t = shift(s.at - t0) / 1000, text = s.text.replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!text || t < 0 || t > total - 0.5 || t < free) continue;
+    out.push([Math.round(t * 1000) / 1000, "lumi", text]); free = t + 0.6 + text.length * 0.09;
+  }
+  return out;
+}
 type Browser = { newPage(o: object): Promise<Page>; close(): Promise<void> };
 
 export class Recorder {
   private browser?: Browser; private page?: Page; private loop?: Promise<void>;
   private t0 = 0; private running = false; private starting = false; private stopping = false; private ffErr = ""; private frames: number[] = []; private framesDir = "";
-  private chapters: Chapter[] = []; private file = ""; private raw = ""; private size = SIZES["9:16"]; private fps = 30; private showTaps = true;
+  private chapters: Chapter[] = []; private file = ""; private raw = ""; private size = SIZES["9:16"]; private fps = 30; private showTaps = true; private lumi = true; private lumiVoice = false; private lumiOn = false;
   private acts: [number, number][] = [];
   get active() { return this.running || this.starting || this.stopping; }
 
-  async start(o: { url: string; format?: Format; fps?: 30 | 60; title?: string; dir?: string; showTaps?: boolean; background?: Background }): Promise<{ file: string; width: number; height: number }> {
+  async start(o: { url: string; format?: Format; fps?: 30 | 60; title?: string; dir?: string; showTaps?: boolean; background?: Background; lumi?: boolean; lumiVoice?: boolean }): Promise<{ file: string; width: number; height: number }> {
     if (this.active) throw new RecorderError("recording_active", "a recording is already running: call record_stop first");
     this.starting = true;
     try {
-      this.size = SIZES[o.format ?? "9:16"]; this.fps = o.fps ?? 30; this.chapters = []; this.acts = []; this.ffErr = ""; this.frames = []; this.showTaps = o.showTaps !== false;
+      this.size = SIZES[o.format ?? "9:16"]; this.fps = o.fps ?? 30; this.chapters = []; this.acts = []; this.ffErr = ""; this.frames = []; this.showTaps = o.showTaps !== false; this.lumi = o.lumi !== false; this.lumiVoice = this.lumi && o.lumiVoice === true; this.lumiOn = false;
       const dir = resolve(o.dir ?? join(process.cwd(), ".shipvo", "recordings")); mkdirSync(dir, { recursive: true });
       const slug = (o.title ?? "recording").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "recording";
       this.file = join(dir, `${slug}-${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}.mp4`); this.raw = this.file.replace(/\.mp4$/, ".raw.mp4"); this.framesDir = this.file.replace(/\.mp4$/, ".frames"); rmSync(this.framesDir, { recursive: true, force: true }); mkdirSync(this.framesDir);
@@ -76,6 +93,7 @@ export class Recorder {
         try { good = await this.page.evaluate(backgroundScript(o.background)); } catch (e) { throw new RecorderError("background_failed", `could not set the background: ${(e as Error).message.split("\n")[0]}`); }
         if (good !== true) throw new RecorderError("invalid_background", `background must be "brand", "plain" or a CSS colour such as "#102030"; got ${JSON.stringify(o.background).slice(0, 60)}`);
       }
+      if (this.page.evaluate) { try { this.lumiOn = (await this.page.evaluate(lumiScript(this.lumi))) === true; } catch {} }
       await this.grab();
       // The video timeline starts at the first frame, not before the first (slow) screenshot.
       this.t0 = this.frames[0] ?? Date.now();
@@ -118,8 +136,10 @@ export class Recorder {
     if (!this.running) throw new RecorderError("no_recording", "no recording is running: call record_start first");
     this.running = false; this.stopping = true;
     try {
-      const { file, raw, size, t0, fps } = this; let chapters = this.chapters;
+      const { file, raw, size, t0, fps } = this; let chapters = this.chapters; let drop = (_t: number) => 0;
       await this.loop;
+      let steps: Step[] = [];
+      if (this.lumiVoice && this.page?.evaluate) { try { const r = await this.page.evaluate("window.__shipvoSteps || []"); if (Array.isArray(r)) steps = r as Step[]; } catch {} }
       await this.grab();
       const total = Date.now() - t0; let duration_s = Math.round(total) / 1000;
       const end = t0 + total;
@@ -131,7 +151,7 @@ export class Recorder {
         const spans = [[0, 0], ...this.acts].sort((x, y) => x[0] - y[0]); const cuts: [number, number][] = []; let busy = 0;
         for (const [a, e] of spans) { if (a - busy > MAX_IDLE_S * 1000 + 50) cuts.push([busy + MAX_IDLE_S * 1000, a]); busy = Math.max(busy, e); }
         if (cuts.length) {
-          const drop = (t: number) => cuts.reduce((n, [a, b]) => n + Math.max(0, Math.min(t, b) - a), 0);
+          drop = (t: number) => cuts.reduce((n, [a, b]) => n + Math.max(0, Math.min(t, b) - a), 0);
           const expr = cuts.map(([a, b]) => `between(t,${a / 1000},${b / 1000})`).join("+");
           const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", raw, "-vf", `select='not(${expr})',setpts=N/(${fps}*TB)`, "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-movflags", "+faststart", file]);
           if (r.status !== 0) { code = r.status ?? -1; err = String(r.stderr); }
@@ -139,13 +159,24 @@ export class Recorder {
         } else if (existsSync(raw)) renameSync(raw, file);
         rmSync(raw, { force: true });
       }
-      const out: Recording = { file, duration_s, ...size, chapters };
+      const out: Recording = { file, duration_s, ...size, chapters, lumi: this.lumiOn };
       if (code !== 0) throw new RecorderError("encode_failed", `ffmpeg failed${code === -1 ? " to start (is it installed?)" : ""}: ${err.trim().slice(0, 300)}`);
-      let vo: string | undefined;
-      if (o.narration) {
-        const r = addNarration(file, o.narration, !!o.music); vo = r.vo;
-        if (r.trimmed) out.notes = [`narration was ${r.alen.toFixed(1)} s and the video is ${r.vlen.toFixed(1)} s: the narration was trimmed to the video length`];
-      }
+      let vo: string | undefined; let narration = o.narration; let voice: string | undefined;
+      if (this.lumiVoice && !narration) {
+        const cues = voiceCues(steps, t0, (ms) => ms - drop(ms), duration_s);
+        if (cues.length) {
+          // A failed voice must not throw away the finished recording: keep the silent video (music still applies) and say why.
+          try { voice = narration = lumiVoice(file, cues, duration_s); out.lumi_lines = cues.length; }
+          catch (e) { if (!(e instanceof RecorderError) || e.code !== "voice_failed") throw e; (out.notes ??= []).push(e.message); }
+        }
+        else (out.notes ??= []).push("lumi_voice was on but Lumi showed no step lines to speak");
+      } else if (this.lumiVoice) (out.notes ??= []).push("lumi_voice was ignored because narration was given");
+      try {
+        if (narration) {
+          const r = addNarration(file, narration, !!o.music); vo = r.vo;
+          if (r.trimmed) (out.notes ??= []).push(`narration was ${r.alen.toFixed(1)} s and the video is ${r.vlen.toFixed(1)} s: the narration was trimmed to the video length`);
+        }
+      } finally { if (voice) rmSync(voice, { force: true }); }
       try { if (o.music) out.credits = addMusic(file, vo); } finally { if (vo) rmSync(vo, { force: true }); }
       return out;
     } finally { rmSync(this.framesDir, { recursive: true, force: true }); this.stopping = false; }
@@ -186,6 +217,22 @@ function addMusic(file: string, narration?: string): string {
     if (r.error || r.status !== 0 || !existsSync(tmp)) throw new RecorderError("music_failed", `could not mix music${r.error ? " (is python3 installed?)" : ""}: ${String(r.error?.message ?? r.stderr).trim().split("\n").slice(-2).join(" ").slice(0, 300)}. The silent video is at ${file}`);
     renameSync(tmp, file);
     return credits;
+  } finally { rmSync(work, { recursive: true, force: true }); }
+}
+
+/** Speak the cues with Lumi's voice: scripts/video/dialogue.py with the `energetic` preset. SHIPVO_DIALOGUE points at the script. Returns the wav path (next to the video). */
+export function lumiVoice(file: string, cues: [number, string, string][], total: number): string {
+  const script = process.env.SHIPVO_DIALOGUE ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "scripts", "video", "dialogue.py");
+  const bad = (why: string) => new RecorderError("voice_failed", `${why}. The silent video is at ${file}`);
+  if (!existsSync(script)) throw bad(`lumi_voice needs dialogue.py, not found at ${script}: set SHIPVO_DIALOGUE`);
+  const work = file.replace(/\.mp4$/, ".voice"); mkdirSync(work, { recursive: true });
+  try {
+    const spec = join(work, "dialogue.json");
+    writeFileSync(spec, JSON.stringify({ cast: { lumi: { voice: "af_jessica", speed: 1.1, fx: "energetic" } }, cues }));
+    const r = spawnSync("python3", ["-I", script, spec, "--total", total.toFixed(3), "--out", work], { encoding: "utf8" });
+    const wav = join(work, "vo.wav");
+    if (r.error || r.status !== 0 || !existsSync(wav)) throw bad(`could not make Lumi's voice${r.error ? " (is python3 installed?)" : ""}: ${String(r.error?.message ?? r.stderr).trim().split("\n").slice(-2).join(" ").slice(0, 300)}`);
+    const out = file.replace(/\.mp4$/, ".lumi-voice.wav"); renameSync(wav, out); return out;
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
 

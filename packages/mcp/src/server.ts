@@ -6,6 +6,7 @@
 // Tools: get_update_state, check_for_update, apply_update (OTA updates on the phone), list_store_apps, install_app, uninstall_app, switch_app (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
 //        owner_describe, owner_command, audit_log (the app's live content, prices, orders: owner token required).
 import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -143,6 +144,8 @@ const need = (_sid: string) => {};
 const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => server.tool(t.name, t.description, t.input, t.annotations, cb);
 type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
 const SERVER_VERSION = "0.0.4";
+// MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
+const TOOLS_LIST_TTL_MS = 60_000;
 const SUPPORTED_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 function makeServer(ctx: Ctx = {}) {
 const server = new McpServer({ name: "shipvo", version: SERVER_VERSION }, { instructions:
@@ -384,8 +387,8 @@ use(server, tools.end_session, async ({ session }) => {
 
 // Record the phone frame page to an MP4 (one recording per server). Page: SHIPVO_FRAME_URL, default the simulator's root.
 const recFail = (e: unknown) => { if (e instanceof RecorderError) return result("", { ok: false, code: e.code, error: e.message }); throw e; };
-use(server, tools.record_start, async ({ format, fps, title, show_taps, background }) => {
-  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
+use(server, tools.record_start, async ({ format, fps, title, show_taps, background, lumi, lumi_voice }) => {
+  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background, lumi, lumiVoice: lumi_voice }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 use(server, tools.record_marker, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
@@ -523,6 +526,10 @@ use(server, tools.secret_status, async ({ app, name }) => {
   return { ...text(JSON.stringify(out)), structuredContent: out };
 });
 
+// Deterministic order: tools/list is sorted by tool name, whatever the registration order.
+const rh = (server.server as any)._requestHandlers as Map<string, (r: unknown, e: unknown) => Promise<{ tools: { name: string }[] }>>;
+const listTools = rh.get("tools/list");
+if (listTools) server.server.setRequestHandler(ListToolsRequestSchema, async (r, e) => { const out = await listTools(r, e); return { ...out, tools: [...out.tools].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) } as any; });
 return server;
 }
 
@@ -550,22 +557,24 @@ if (argi < 0) {
     // MCP 2026-07-28: answer server/discover, and refuse requests whose Mcp-Method/Mcp-Name headers disagree with the body.
     const bad = (code: number, message: string, id: unknown = null) => { res.writeHead(400, { "content-type": "application/json" }); return res.end(JSON.stringify({ jsonrpc: "2.0", error: { code, message }, id })); };
     const msg = body && typeof body === "object" && !Array.isArray(body) ? body as { id?: unknown; method?: unknown; params?: Record<string, unknown> } : undefined;
+    let era2026 = false;
     if (msg && typeof msg.method === "string") {
       const hm = req.headers["mcp-method"] as string | undefined, hn = req.headers["mcp-name"] as string | undefined;
       const meta = (msg.params?._meta ?? {}) as Record<string, unknown>;
       const pv = Object.entries(meta).find(([k]) => /protocolversion$/i.test(k))?.[1];
-      const era2026 = msg.method === "server/discover" || hm !== undefined || (typeof pv === "string" && pv >= "2026-07-28");
+      era2026 = msg.method === "server/discover" || hm !== undefined || (typeof pv === "string" && pv >= "2026-07-28");
       if (era2026) {
-        if (hm === undefined) return bad(-32001, "Missing Mcp-Method header", msg.id ?? null);
-        if (hm !== msg.method) return bad(-32001, `Header mismatch: Mcp-Method is '${hm}' but the body method is '${msg.method}'`, msg.id ?? null);
+        if (typeof pv === "string" && !SUPPORTED_VERSIONS.includes(pv)) return bad(-32022, `Unsupported protocol version '${pv}'. Supported: ${SUPPORTED_VERSIONS.join(", ")}`, msg.id ?? null);
+        if (hm === undefined) return bad(-32020, "Missing Mcp-Method header", msg.id ?? null);
+        if (hm !== msg.method) return bad(-32020, `Header mismatch: Mcp-Method is '${hm}' but the body method is '${msg.method}'`, msg.id ?? null);
         const nameKey = msg.method === "tools/call" || msg.method === "prompts/get" ? "name" : msg.method === "resources/read" ? "uri" : undefined;
         const want = nameKey ? msg.params?.[nameKey] : undefined;
-        if (nameKey && hn === undefined) return bad(-32001, "Missing Mcp-Name header", msg.id ?? null);
-        if (hn !== undefined && hn !== want) return bad(-32001, `Header mismatch: Mcp-Name is '${hn}' but the body says '${String(want)}'`, msg.id ?? null);
+        if (nameKey && hn === undefined) return bad(-32020, "Missing Mcp-Name header", msg.id ?? null);
+        if (hn !== undefined && hn !== want) return bad(-32020, `Header mismatch: Mcp-Name is '${hn}' but the body says '${String(want)}'`, msg.id ?? null);
       }
       if (msg.method === "server/discover") {
         res.writeHead(200, { "content-type": "application/json" });
-        return res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id ?? null, result: { supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "shipvo", version: SERVER_VERSION } } }));
+        return res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id ?? null, result: { resultType: "complete", supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "shipvo", version: SERVER_VERSION } } }));
       }
     }
     // Behind sim.shipvo.dev the Worker has checked the key and says which app and scope it grants; locally
@@ -573,6 +582,11 @@ if (argi < 0) {
     const h = (n: string) => (req.headers[n] as string) || undefined;
     const server = makeServer({ app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    if (era2026 && msg) {
+      // 2026-07-28 results carry resultType, and tools/list also carries ttlMs and cacheScope. 2025-era responses are untouched.
+      const send = transport.send.bind(transport);
+      transport.send = (m, o) => send(("result" in m && m.result && typeof m.result === "object" ? { ...m, result: { resultType: "complete", ...(msg.method === "tools/list" ? { ttlMs: TOOLS_LIST_TTL_MS, cacheScope: "private" } : {}), ...m.result } } : m) as typeof m, o);
+    }
     res.on("close", () => { void transport.close(); void server.close(); });
     try { await server.connect(transport); await transport.handleRequest(req, res, body); }
     catch (e) { if (!res.headersSent) { res.writeHead(500, { "content-type": "application/json" }); res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32603, message: "Internal error" }, id: null })); } }

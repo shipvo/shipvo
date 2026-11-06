@@ -84,6 +84,32 @@ describe("stateless HTTP", () => {
     expect(await names()).toEqual(first);
   });
 
+  it("sorts tools/list by name", async () => {
+    const names = (await rpc("tools/list", {})).body.result.tools.map((t: any) => t.name);
+    expect(names).toEqual([...names].sort((a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)));
+  });
+
+  it("adds ttlMs, cacheScope and resultType for 2026 requests only", async () => {
+    const r26 = (await rpc("tools/list", {}, { "mcp-method": "tools/list" })).body.result;
+    expect(typeof r26.ttlMs).toBe("number");
+    expect(r26.cacheScope).toBe("private");
+    expect(r26.resultType).toBe("complete");
+    const call = await rpc("tools/call", { name: "open_app", arguments: { app: "menu" } }, { "mcp-method": "tools/call", "mcp-name": "open_app" });
+    expect(call.body.result.resultType).toBe("complete");
+    const r25 = (await rpc("tools/list", {})).body.result;
+    expect(r25.ttlMs).toBeUndefined();
+    expect(r25.cacheScope).toBeUndefined();
+    expect(r25.resultType).toBeUndefined();
+  });
+
+  it("uses -32020 for header mismatch and -32022 for an unsupported version", async () => {
+    const m = await rpc("tools/list", {}, { "mcp-method": "tools/call" });
+    expect(m.body.error.code).toBe(-32020);
+    const v = await rpc("tools/list", { _meta: { "io.modelcontextprotocol/protocolVersion": "2027-01-01" } }, { "mcp-method": "tools/list" });
+    expect(v.status).toBe(400);
+    expect(v.body.error.code).toBe(-32022);
+  });
+
   it("still serves a 2025-era client (initialize, then calls)", async () => {
     const c = new Client({ name: "old", version: "0" });
     await c.connect(new StreamableHTTPClientTransport(new URL(base)));

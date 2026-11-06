@@ -11,6 +11,7 @@ import { join, extname, normalize, resolve, sep } from "node:path";
 import { loadConfig } from "./config.js";
 import { AGENT_PATH, hostAllowed, isAgentRole, isLoopback, originAllowed, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
 import { bridgeScript } from "./run-bridge.js";
+import { NET_PATH, createNetProxy, loadProfiles, netClientSource, type NetRecord } from "./run-net.js";
 import { acceptWebSocket, type Peer } from "./run-ws.js";
 import { qrMatrix, qrToTerminal } from "./qr.js";
 import { spawnBin } from "./spawn-bin.js";
@@ -151,7 +152,7 @@ export function ensureShipvoIgnored(dir: string): void {
  * The agent channel is a WebSocket at `/__shipvo/agent?role=screen|driver&token=...`, loopback only. It relays JSON
  * messages between the `screen` and the `driver`. With `projectDir`, `.shipvo/run.json` describes the session while it runs.
  */
-export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string } }): Promise<{ server: Server; port: number; token: string; lanToken?: string; close: () => Promise<void> }> {
+export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string }; onNet?: (r: NetRecord) => void; fetchImpl?: typeof fetch }): Promise<{ server: Server; port: number; token: string; lanToken?: string; netLog: NetRecord[]; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const token = randomBytes(24).toString("hex");
   // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
@@ -162,6 +163,9 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
   // With --lan every request needs this token, in `?t=` or in the cookie the first valid request sets.
   const lanToken = opts.lan ? randomBytes(16).toString("hex") : undefined;
   let boundPort = -1; // set once the server listens; Host and Origin must match it
+  // App requests to other origins go through /__shipvo/net, so the browser applies no CORS (see run-net.ts). Only the page's token opens it.
+  const net = createNetProxy({ tokens: [pageToken, token], port: () => boundPort, profiles: await loadProfiles(), onRecord: opts.onNet, fetchImpl: opts.fetchImpl });
+  const netSnippet = `<script>(${netClientSource()})(window,{token:${JSON.stringify(pageToken)},session:(function(){try{var k="shipvo_net_session";return sessionStorage.getItem(k)||(sessionStorage.setItem(k,crypto.randomUUID()),sessionStorage.getItem(k))}catch(e){return "tab"}})(),profile:function(){return window.__pnNet?window.__pnNet.profile():"online"},online:function(){return window.__pnNet?window.__pnNet.online():true},log:function(d){if(window.__pnNet)window.__pnNet.log(d)}})</script>`;
   const server = createServer((req, res) => {
     if (!hostAllowed(req.headers.host, boundPort) && !(opts.lan && req.headers.host === `${opts.lan.host}:${boundPort}`)) { res.writeHead(403); return void res.end("Forbidden"); }
     if (lanToken) {
@@ -179,6 +183,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
       const bare = isMobileUserAgent(req.headers["user-agent"]);
       res.writeHead(200, { "content-type": TYPES[".html"], vary: "user-agent" }); return void res.end(bare ? runBarePage(opts.name, dark) : dark ? pages.dark : pages.light);
     }
+    if (path === NET_PATH) return void net.handle(req, res);
     if (path === "/__shipvo/bridge.js") { res.writeHead(200, { "content-type": TYPES[".js"], "cache-control": "no-store" }); return void res.end(bridge); }
     let rel = path.startsWith("/app/") ? path.slice(4) : path;
     if (rel.endsWith("/")) rel += "index.html";
@@ -191,7 +196,13 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
       if (!spa || !existsSync(spa)) { res.writeHead(404); return void res.end("Not found"); }
       target = spa;
     }
-    res.writeHead(200, { "content-type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream" });
+    const type = TYPES[extname(target).toLowerCase()] ?? "application/octet-stream";
+    res.writeHead(200, { "content-type": type });
+    if (extname(target).toLowerCase() === ".html") {
+      const html = readFileSync(target, "utf8"); // first script in the page, so it wraps fetch before the app's code runs
+      // A real phone (not loopback) cannot use the route, which only serves the local page: leave its requests direct.
+      if (isLoopback(req.socket.remoteAddress) && /<head[^>]*>/i.test(html)) return void res.end(html.replace(/<head[^>]*>/i, (m) => m + netSnippet));
+    }
     res.end(readFileSync(target));
   });
   const peers: Partial<Record<AgentRole, Peer>> = {};
@@ -228,7 +239,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
         mkdirSync(join(infoPath, ".."), { recursive: true });
         writeFileSync(infoPath, JSON.stringify(info, null, 2) + "\n", { mode: 0o600 });
       }
-      ok({ server, port, token, lanToken, close: () => new Promise<void>((r) => { cleanup(); for (const p of Object.values(peers)) p?.close(); server.close(() => r()); server.closeAllConnections?.(); }) });
+      ok({ server, port, token, lanToken, netLog: net.log, close: () => new Promise<void>((r) => { cleanup(); for (const p of Object.values(peers)) p?.close(); server.close(() => r()); server.closeAllConnections?.(); }) });
     });
   });
 }

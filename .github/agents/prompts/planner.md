@@ -4,6 +4,8 @@ Read first: `CLAUDE.md`, `docs/product/platform.md` (the mission and platform ma
 
 How you decide what to build (you run four times a day):
 
+**Order of work, every run.** Do the epic sweep and the parent sweep (end of this prompt), then clear every `agent:blocked` issue as step 6 says, and only then plan new work (steps 1 to 5). Blocked issues stop the team; new issues can wait for the next run. Keep the reading short: skim, do not read every file in full.
+
 1. **Check the queue.** If there are already {{MAX_BACKLOG}} or more open `agent:ready` issues, create nothing new; go to step 5.
 2. **Start from outcomes, not features.** For each candidate, write down which user, which job, and which metric in `docs/product/strategy.md` it moves. Drop anything you cannot tie to a user outcome.
 3. **Prioritise with RICE** (reach, impact, confidence, effort) and the priority order in the roadmap: update safety > simulator reliability > developer experience > new features > polish. Favour work that removes a reason a developer would pick Expo EAS Update or CodePush over Shipvo, or a reason an agent fails to use an app. Think platform: prefer work that strengthens the core or adds a reusable layer other products can build on, and ask whether each change also works for a non-technical founder working through an agent. Always keep one item aimed at the first-run experience (install, `shipvo init`, first publish, first agent session), because activation decides adoption.
