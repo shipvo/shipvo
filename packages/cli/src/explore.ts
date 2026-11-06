@@ -8,6 +8,7 @@ import { args as parse, loadConfig } from "./config.js";
 import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { writeIssues } from "./explore-issues.js";
+import { writeTests } from "./explore-tests.js";
 import { emit, envelope } from "./json-out.js";
 import { runFlows, renderFlows, parseFlowNames } from "./flows.js";
 
@@ -425,6 +426,13 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
         if (!files.length) console.log("No findings, so no issue files written.");
         else console.log(`Wrote ${files.length} issue file${files.length === 1 ? "" : "s"} to ${a["issues-dir"]}. To file them:\n${commands.join("\n")}`);
       } else issueInfo = { issue_files: files, file_commands: commands };
+    }
+    if (a["save-tests"] !== undefined) {
+      if (a["save-tests"] === "true") throw new Error("--save-tests needs a directory");
+      const { files, skipped } = writeTests(report.findings, a["save-tests"]);
+      issueInfo = { ...issueInfo, test_files: files };
+      const m = files.length ? `Wrote ${files.length} test file${files.length === 1 ? "" : "s"} to ${a["save-tests"]}. Run them with npx vitest run ${a["save-tests"]}${skipped.length ? `. ${skipped.length} finding${skipped.length === 1 ? "" : "s"} cannot be a test (size checks)` : ""}` : "No findings, so no test files written.";
+      if (json) console.error(m); else console.log(m);
     }
     const failOn = a["fail-on-findings"] === "true";
     const { exit, code } = outcome(report, flowsFailed, failOn);

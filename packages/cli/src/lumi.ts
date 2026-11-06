@@ -4,13 +4,14 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { args as parse, loadConfig } from "./config.js";
 import { elements, fieldElements, signature, describeStep, walk, startSim, simDriver, type Driver, type Finding, type Skin, type Step, type WalkOptions } from "./explore.js";
+import { writeTests } from "./explore-tests.js";
 import { portFree } from "./sim.js";
 import { loadFrameRenderer, openBrowser } from "./run.js";
 
 export type Mood = "idle" | "working" | "happy" | "worried";
 export type Command =
   | { kind: "test-all" } | { kind: "test-flow"; flow: string } | { kind: "bad-input"; flow: string }
-  | { kind: "stop" } | { kind: "replay"; n: number } | { kind: "help" } | { kind: "unknown" };
+  | { kind: "stop" } | { kind: "replay"; n: number } | { kind: "save"; n: number } | { kind: "help" } | { kind: "unknown" };
 
 /** Reads a line of text as a command. No AI: a few patterns, case and spacing ignored. */
 export function parseCommand(text: string): Command {
@@ -18,6 +19,7 @@ export function parseCommand(text: string): Command {
   let m: RegExpExecArray | null;
   if (/^(help|\?|commands)$/i.test(t)) return { kind: "help" };
   if (/^(stop|cancel|halt)$/i.test(t)) return { kind: "stop" };
+  if ((m = /^save (?:bug|finding) #?(\d+)(?: as (?:a )?test)?$/i.exec(t))) return { kind: "save", n: Number(m[1]) };
   if ((m = /^replay (?:bug|finding) #?(\d+)$/i.exec(t))) return { kind: "replay", n: Number(m[1]) };
   if (/^test (?:my |the )?(?:whole )?app$/i.test(t) || /^test$/i.test(t)) return { kind: "test-all" };
   if ((m = /^try (.+?) with bad (?:input|data|values)$/i.exec(t))) return { kind: "bad-input", flow: m[1]!.replace(/^(?:the|my) /i, "").replace(/ flow$/i, "") };
@@ -25,7 +27,7 @@ export function parseCommand(text: string): Command {
   return { kind: "unknown" };
 }
 
-export const COMMAND_LIST = ["test my app", "test <flow>", "try <flow> with bad input", "stop", "replay bug <n>", "help"];
+export const COMMAND_LIST = ["test my app", "test <flow>", "try <flow> with bad input", "stop", "replay bug <n>", "save bug <n>", "help"];
 export type FeedItem = { at: string; text: string; kind: "step" | "info" | "bug" };
 export type State = {
   mood: Mood; running: boolean; label: string; feed: FeedItem[];
@@ -34,7 +36,7 @@ export type State = {
 };
 type Known = { n: number; key: string; finding: Finding };
 
-export type LumiOptions = { routes?: string[]; maxDepth?: number; maxSteps?: number; seed?: number; skin?: Skin; app?: string; settleMs?: number; walkDelayMs?: number };
+export type LumiOptions = { routes?: string[]; maxDepth?: number; maxSteps?: number; seed?: number; skin?: Skin; app?: string; settleMs?: number; walkDelayMs?: number; testsDir?: string };
 
 export class Lumi {
   private feed: FeedItem[] = []; private known: Known[] = [];
@@ -83,6 +85,15 @@ export class Lumi {
     if (c.kind === "stop") {
       if (!this.running) return "Nothing is running.";
       this.stopFlag = true; this.say("Stopping after this action."); return "Stopping after this action.";
+    }
+    if (c.kind === "save") {
+      const k = this.known[c.n - 1];
+      if (!k) return this.known.length ? `There is no bug ${c.n}. Bugs so far: 1 to ${this.known.length}.` : "There are no bugs to save yet. Say \"test my app\" first.";
+      const dir = this.o.testsDir ?? "lumi-tests";
+      const { files } = writeTests([k.finding], dir);
+      if (!files.length) return `Bug ${c.n} is a size check, which a test cannot see. It is in the report.`;
+      this.say(`Saved bug ${c.n} as a test: ${files[0]}`);
+      return `Saved bug ${c.n} as ${files[0]}. Run it with npx vitest run ${files[0]}. It fails while the bug is there.`;
     }
     if (this.running) return "I am busy. Say stop first, or wait for the run to end.";
     if (c.kind === "replay") {
@@ -200,7 +211,7 @@ var last=s.feed[s.feed.length-1];$("now").textContent=s.running?(s.label?"Workin
 var f=$("feed");f.textContent="";s.feed.slice(-40).forEach(function(i){f.append(li(i.text,i.kind==="bug"?"bug":""))});f.scrollTop=f.scrollHeight;
 var b=$("findings");b.textContent="";$("bug-count").textContent=s.findings.length;
 s.findings.forEach(function(x){var e=document.createElement("li"),t=document.createElement("span");t.textContent="Bug "+x.n+": "+x.message;
-var r=document.createElement("button");r.type="button";r.textContent="Replay";r.setAttribute("aria-label","Replay bug "+x.n);r.onclick=function(){send("replay bug "+x.n)};e.append(t,r);b.append(e)});
+var r=document.createElement("button");r.type="button";r.textContent="Replay";r.setAttribute("aria-label","Replay bug "+x.n);r.onclick=function(){send("replay bug "+x.n)};var v=document.createElement("button");v.type="button";v.textContent="Save as test";v.setAttribute("aria-label","Save bug "+x.n+" as a test");v.onclick=function(){send("save bug "+x.n)};e.append(t,r,v);b.append(e)});
 $("cov-screens").textContent=s.coverage.screens;$("cov-tried").textContent=s.coverage.controlsTried+" of "+s.coverage.controlsSeen}
 function send(t){fetch("/cmd",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:t})}).then(function(r){return r.json()}).then(function(j){$("reply").textContent=j.reply||j.error||""}).catch(function(){$("reply").textContent="Could not reach Lumi. Is shipvo lumi still running?"})}
 $("command-form").onsubmit=function(e){e.preventDefault();var i=$("command"),v=i.value.trim();if(!v)return;i.value="";send(v)};
@@ -252,7 +263,7 @@ export function startLumiServer(o: LumiServerOptions): Promise<Server> {
   return new Promise((resolve, reject) => { server.once("error", reject); server.listen(o.port, "127.0.0.1", () => resolve(server)); });
 }
 
-const USAGE = "Usage: shipvo lumi [android|ios] [--port 4546] [--ui-port 4547] [--sim <url>] [--skip-build] [--no-open] [--max-steps 100] [--max-depth 3, at least 1] [--seed 1]";
+const USAGE = "Usage: shipvo lumi [android|ios] [--port 4546] [--ui-port 4547] [--sim <url>] [--skip-build] [--no-open] [--max-steps 100] [--max-depth 3, at least 1] [--seed 1] [--tests-dir lumi-tests]";
 
 /** Builds the app, opens it on Shipvo Phone in the browser with the Lumi sidebar. Runs until Ctrl-C. */
 export async function lumi(argv: string[]): Promise<number> {
@@ -266,7 +277,7 @@ export async function lumi(argv: string[]): Promise<number> {
   let server: Server | undefined;
   try {
     const driver = simDriver(sim.base, cfg.appId, "lumi", skin);
-    const engine = new Lumi(driver, { routes: cfg.routes, maxDepth: num("max-depth", 3) || 3, maxSteps: num("max-steps", 100) || 100, seed: a.seed !== undefined ? num("seed", 1) : undefined, skin, app: cfg.appId });
+    const engine = new Lumi(driver, { routes: cfg.routes, maxDepth: num("max-depth", 3) || 3, maxSteps: num("max-steps", 100) || 100, seed: a.seed !== undefined ? num("seed", 1) : undefined, skin, app: cfg.appId, testsDir: a["tests-dir"] && a["tests-dir"] !== "true" ? a["tests-dir"] : undefined });
     const first = await driver.open();
     if (!first.ok) throw new Error(`the app did not open: ${first.error ?? "no screen"}`);
     const frame = (await loadFrameRenderer())({ skin, lumi: true, screen: `<img data-part="screen" alt="The app on the phone, live" draggable="false">` });

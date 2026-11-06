@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo explore --save-tests <dir>` writes each finding as a `@shipvo/test` file that replays its steps and asserts the bug is gone, so it fails while the bug exists. `shipvo lumi` adds a "Save as test" button per finding and the command `save bug <n>` (files go to `lumi-tests/`, or `--tests-dir`).
+- Migration: none.
