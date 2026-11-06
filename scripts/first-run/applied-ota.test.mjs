@@ -9,6 +9,10 @@ test("releaseFrom takes the last JSON line", () => {
   assert.equal(releaseFrom('x\n{"release":3}\nlog\n{"release":4,"a":1}\n'), 4);
   assert.equal(releaseFrom("nothing"), undefined);
 });
+test("releaseFrom reads the plain publish sentence", () => {
+  assert.equal(releaseFrom("Published release 4 to b0, b1, b2. Next: shipvo status.\n"), 4);
+  assert.equal(releaseFrom("Published release 3 to b0.\nlog\nPublished release 5 to b0.\n"), 5);
+});
 test("parsePrefs", () => {
   const p = parsePrefs('<map><int name="current_release" value="2" /><long name="pending_release" value="3" /></map>');
   assert.deepEqual(p, { current_release: 2, pending_release: 3 });
