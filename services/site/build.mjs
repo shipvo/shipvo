@@ -322,7 +322,65 @@ Things to know before answering questions about Shipvo:
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (${PUBLIC_PACKAGES.join(", ")}). Source: https://github.com/shipvo/shipvo`;
 const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");
-writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Learn](${SITE}/learn/): tutorials, videos and a glossary for people who are new to Shipvo\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Roadmap](${SITE}/roadmap/): what is in flight, what shipped and when, and what we are not doing\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
+// ---- llms.txt: description, agent install lines, how it works, straight answers, then the page index and packages ----
+const cliHelp = readFileSync(join(ROOT, "packages/cli/src/help.ts"), "utf8");
+const cliHas = (re) => re.test(cliHelp);
+const platformMd = readFileSync(join(ROOT, "docs/product/platform.md"), "utf8");
+const positioning = (platformMd.match(/\*\*One line:\*\* (.+)/) || [])[1]?.trim().replace(/`/g, "");
+if (!positioning) throw new Error("docs/product/platform.md: Positioning 'One line' not found");
+const pkgInfo = PUBLIC_PACKAGES.map((n) => JSON.parse(readFileSync(join(ROOT, "packages", n, "package.json"), "utf8")));
+const doc = (slug) => `${SITE}/docs/${slug}.md`;
+const installLines = [
+  existsSync(join(ROOT, "skills/shipvo/SKILL.md")) && "npx skills add shipvo/shipvo --skill shipvo -g    # installs the Shipvo skill: exact commands for your agent",
+  existsSync(join(ROOT, "services/site/public/install.sh")) && "curl -fsSL https://shipvo.dev/install.sh | bash",
+  cliHas(/^\s+agents setup\b/m) && "npx -y @shipvo/cli agents setup",
+].filter(Boolean);
+const agentBlock = `## For AI coding agents
+
+Install (only what exists today):
+
+\`\`\`
+${installLines.join("\n")}
+\`\`\`
+
+MCP server (runs on your machine, stdio):
+
+\`\`\`json
+{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
+\`\`\`
+
+Hosted simulator: https://sim.shipvo.dev/mcp (header \`Authorization: Bearer <key>\`; clients that cannot send headers use https://sim.shipvo.dev/mcp/<key>). Get a key with \`npx -y @shipvo/cli login\`. It signs in with GitHub in a browser (device flow), so there is no browser-free way to get a key yet. \`shipvo mcp\` prints the config for Claude, Cursor and ChatGPT.
+
+- [All docs in one file](${SITE}/llms-full.txt)
+- [Docs index](${SITE}/docs.md)
+- [Agents and Shipvo apps](${doc("agents")})`;
+const howBlock = `## How Shipvo works
+
+1. Run the app on Shipvo Phone, a phone frame in your browser. No emulator, no Xcode. Command: \`shipvo run android\` (or \`ios\`). [Docs](${doc("run")})
+2. Test it on that phone: taps, gestures, offline, permissions. Command: \`shipvo test\`, or drive it over MCP. [Docs](${doc("testing")})
+3. Record a demo video of the app in the phone frame, with the MCP tools record_start and record_stop. [Docs](${doc("record")})
+4. Get to the stores: store forms, screenshots and testers. Command: \`shipvo store setup\`. EAS or your own CI builds the native binary. [Docs](${doc("store")})
+5. Ship every later change as a signed over-the-air update with staged rollout and rollback. Commands: \`shipvo publish\`, \`shipvo rollback\`. [Docs](${doc("getting-started")})
+6. Check the measured parity of the simulator against the Android emulator and iOS Simulator. [Results](${doc("parity-results")})`;
+const answersBlock = `## Straight answers
+
+**Do I need a phone or an emulator?** No. \`shipvo run\` opens a phone frame in your browser, and tests run on a plain Linux runner. Use an emulator or device only if you want to check native behaviour.
+
+**Does it replace Expo or EAS?** No. EAS or your own CI still builds the native binary. Shipvo adds the browser phone, agent testing, recording, store steps and signed updates. See [Shipvo vs Expo](${SITE}/compare/).
+
+**Is it free?** The hosted services (api.shipvo.dev and sim.shipvo.dev) are free during the beta. The code is free.
+
+**Can it be self-hosted?** Yes, on Cloudflare. [Docs](${doc("self-hosting")})
+
+**Which frameworks?** Expo, bare React Native and Capacitor, as shipped. [Docs](${doc("capacitor")})
+
+**Is the simulator a real device?** No. Parity with the Android emulator and iOS Simulator is measured, and the known gaps are listed. [Results](${doc("parity-results")})
+
+**Where does my data go?** Updates and release data go to the control plane you use: api.shipvo.dev, or your own Cloudflare account if you self-host. You can export release data to your own R2 bucket. [Docs](${doc("telemetry-export")}) and [Privacy](${SITE}/privacy/)
+
+**Is it open source?** Yes, Apache-2.0: https://github.com/shipvo/shipvo`;
+const packagesBlock = `## Packages\n\n${pkgInfo.map((p) => `- [${p.name}](https://www.npmjs.com/package/${p.name}): ${p.description || ""}`.trimEnd()).join("\n")}`;
+writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${positioning} Shipvo is open source (Apache-2.0).\n\n${agentBlock}\n\n${howBlock}\n\n${answersBlock}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n${packagesBlock}\n\n## Product\n\n- [Learn](${SITE}/learn/): tutorials, videos and a glossary for people who are new to Shipvo\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Roadmap](${SITE}/roadmap/): what is in flight, what shipped and when, and what we are not doing\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
 writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}${url(p)}\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);
 writeFileSync(join(PUB, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /hq/\n\nSitemap: ${SITE}/sitemap.xml\n# For AI tools: ${SITE}/llms.txt and ${SITE}/llms-full.txt\n`);
 const staticPaths = [["/", "services/site/pages/index.html"], ["/apps", "services/site/pages/apps.html"], ["/brand", "services/site/pages/brand.html"], ["/changelog/", "CHANGELOG.md"], ["/roadmap/", "docs/ROADMAP.md"], ["/blog/", "blog"], ["/compare/", "services/site/pages/compare.html"], ["/pricing/", "services/site/pages/pricing.html"],

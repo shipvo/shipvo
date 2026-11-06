@@ -9,7 +9,7 @@ on:
   workflow_run: { workflows: [agent-merger], types: [completed] }
   workflow_dispatch:
 permissions: { contents: read }
-concurrency: { group: agent-release }
+concurrency: { group: "agent-release-${{ github.event_name == 'workflow_dispatch' && 'manual' || 'auto' }}" }   # merge-bot triggers must not bump a manual release out of the queue
 jobs:
   release:
     if: vars.AGENTS_PAUSED != 'true' && vars.AGENT_RELEASES != 'false'
