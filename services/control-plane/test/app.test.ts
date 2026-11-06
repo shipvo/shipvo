@@ -44,6 +44,14 @@ describe("control plane", () => {
     // release without the field is offered to any shell
     expect((await app.request("/p/tide/1/b0.json?hbc=98", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(200);
   });
+  it("refuses a release built by another Hermes engine build", async () => {
+    const withE = JSON.stringify({ body: JSON.stringify({ ...body, hermes_bytecode_version: 96, hermes_engine: "250829098.0.10" }), signature: "AAAA" });
+    const env = { POINTERS: kv({ "p/tide/1/b0": withE }) } as any;
+    const r = await app.request("/p/tide/1/b0.json?hbc=96&hbe=250829098.0.16", {}, env);
+    expect(r.status).toBe(404); expect((await r.json() as any).error).toBe("hermes_bytecode_mismatch");
+    for (const q of ["hbc=96&hbe=250829098.0.10", "hbc=96", "hbe=bad"]) expect((await app.request(`/p/tide/1/b0.json?${q}`, {}, env)).status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json?hbe=250829098.0.16", {}, { POINTERS: kv({ "p/tide/1/b0": envl }) } as any)).status).toBe(200);
+  });
   it("filters releases by the shell's native modules", async () => {
     const withN = JSON.stringify({ body: JSON.stringify({ ...body, required_native_modules: { "@scope/maps": "^2.0.0" } }), signature: "AAAA" });
     const env = { POINTERS: kv({ "p/tide/1/b0": withN }) } as any;
