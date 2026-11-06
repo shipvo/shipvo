@@ -44,7 +44,7 @@ Google Play: personal account. Personal account (25 USD once). Google Play needs
 
 It also writes `store-plan.json`. Run `shipvo store status` later to see which step is next, and mark steps done with `--mark`. The App Store column of the same plan has no tester step. Details are in [Store details](/docs/store/).
 
-If you do have a company, say `--company yes`. The plan then shows an organization account with no tester rule, and a free D-U-N-S number is the thing to get first.
+If you do have a company, say `--company yes`. The plan then shows an organization account with no tester rule, and a D-U-N-S number is the thing to get first.
 
 ## How to get 12 testers on Google Play, step by step
 
@@ -98,8 +98,7 @@ The command opens a Play edit, reads the groups already on the track, adds Shipv
 
 The count must stay at 12 or more for 14 days in a row. If it drops below 12, the clock starts again. These are the usual causes:
 
-- **Testers opt out or uninstall.** Ask for more than 12. Fifteen to twenty opt-ins leave room for people who drop out.
-- **Nothing to test.** Testers lose interest if the build never changes. Push a small update during the 14 days.
+- **Testers opt out or uninstall.** Ask for more than 12, so a few drop-outs do not reset the clock.
 - **Wrong track.** Opt-in links are per track. Check you shared the link for the closed test, not an internal one.
 
 Treat the 14 days as setup time, not dead time. Use it to fill in your store listing and answer the Data safety form. `shipvo store details --dry-run` drafts those answers from your `shipvo.json`; see [Store details](/docs/store/).
@@ -110,4 +109,4 @@ Apply for production access in Play Console. Google reviews the request, which u
 
 ## Next step
 
-Follow the tutorial [Get your 12 testers](/learn/get-your-12-testers/). It takes about 15 minutes of setup, then 14 days of waiting. If you have not built the app yet, start with [build a mobile app without coding](/blog/build-a-mobile-app-without-coding/).
+Join the community at [shipvo.dev/testers](https://shipvo.dev/testers/), then follow the tutorial [Get your 12 testers](/learn/get-your-12-testers/). It takes about 15 minutes of setup, then 14 days of waiting. If you have not built the app yet, start with [build a mobile app without coding](/blog/build-a-mobile-app-without-coding/).
