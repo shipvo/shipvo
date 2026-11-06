@@ -47,6 +47,7 @@ export const END_CARD = { line: "Every assistant can use your app.", url: "shipv
 // The 9:16 cut: ranges of the main cut, in order. Hook, one product beat, the order, the payoff, the end card.
 export const CUT_VERTICAL = [
   { t0: 0, t1: 5.5, focusX: 640 },
+  { t0: 15.5, t1: 20.5, focusX: 900 },
   { t0: 43, t1: 50, focusX: 640 },
   { t0: 59, t1: 68.5, focusX: 880 },
   { t0: 90, t1: 93, focusX: 230 },
@@ -182,6 +183,7 @@ const sceneLayers = {
     { depth: .2, svg: interior(t) },
     { depth: .7, svg: window_(t, true) },
     { depth: 1, svg: counter() + char(mara, t, 330, .95, { ground: 650 }) },
+    { depth: 1.25, svg: problemPhone(t) },
   ],
   jun: (t) => [
     { depth: .2, svg: interior(t) },
@@ -279,6 +281,18 @@ function window_(t, walking = false) {
   const wx = 800, wy = 150;
   return `<g transform="translate(${wx} ${wy})"><svg x="0" y="0" width="400" height="330" viewBox="0 0 400 330">${rect(0, 0, 400, 330, "#f2a65a")}${rect(0, 0, 400, 150, "#ffd37a", 'opacity=".6"')}${rect(0, 230, 400, 100, "#5a4650")}${walker(((t * 60) % 600) - 120, 300, .9, walking ? "#5a6b52" : "#d9534f", t, 0)}</svg>`
     + rect(-8, -8, 416, 346, "none", 'stroke="#5a3a2a" stroke-width="12"') + rect(196, 0, 8, 330, "#5a3a2a") + `</g>`;
+}
+/** The problem, readable without sound (14 to 22 s): a customer's assistant looks for the shop and finds nothing to order from.
+ *  Drawn by us, plain "Assistant" chat, never styled as a Shipvo screen. */
+function problemPhone(t) {
+  const a = progress(t, 14.8, 15.6, EASE.outBack), b = progress(t, 17.2, 18, EASE.outBack), c = progress(t, 19.4, 20.2, EASE.outBack);
+  const bub = (y, k, fill, txt, x = 12, w = 176, col = INK) => `<g transform="translate(0 ${y})" opacity="${f(clamp01(k))}"><rect x="${x}" y="0" width="${w}" height="44" rx="14" fill="${fill}"/>${T(x + 10, 26, txt, 11, col)}</g>`;
+  const inner = rect(0, 0, 200, 52, "#14182b") + T(14, 33, "Assistant", 14, "#fff", 'font-weight="700"')
+    + bub(70, a, "#4b4fa3", "Order a lure from Tide &amp; Tackle", 14, 176, "#fff")
+    + bub(130, b, "#e6e2d8", "I can't find an app for that shop.")
+    + bub(190, c, "#e6e2d8", "I can't order from it.")
+    + `<g opacity="${f(clamp01(c))}" transform="translate(100 300)"><circle r="22" fill="#d9534f"/><path d="M-9 -9 L9 9 M9 -9 L-9 9" stroke="#fff" stroke-width="5" stroke-linecap="round"/></g>`;
+  return phoneBlank(1040, 400 - Math.sin(t * 1.3) * 6, 190, inner, { rot: 4 });
 }
 function counter(wide = false) {
   return rect(-500, 520, 2300, 400, "#5a3a2a") + rect(-500, 505, 2300, 22, "#8a5a3c") + rect(wide ? 300 : 540, 440, 90, 66, "#fff2d6", 'rx="8" opacity=".0"');

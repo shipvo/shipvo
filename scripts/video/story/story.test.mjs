@@ -60,3 +60,10 @@ test("the music dips to near silence for a beat before the payoff and swells on 
   assert.ok(MUSIC_DIP.level < 0.15 && MUSIC_DIP.t1 <= payoff.t && payoff.t - MUSIC_DIP.t1 < 1);
   assert.ok(SFX.some((c) => c.kind === "swell" && c.t > MUSIC_DIP.t0 && c.t < payoff.t));
 });
+
+test("the problem is visible without sound, in both cuts: a customer's assistant cannot order from the shop", () => {
+  assert.match(frameSvg(20.5), /I can&apos;t order from it|I can't order from it/);
+  assert.notEqual(frameSvg(16.5), frameSvg(20.5), "the bubbles arrive one by one");
+  assert.ok(CUT_VERTICAL.some((r) => r.t0 <= 20 && r.t1 > 20), "the vertical cut keeps the problem beat");
+  assert.ok(!/Simulated/.test(frameSvg(20.5)), "the drawn assistant chat is not a Shipvo screen");
+});
