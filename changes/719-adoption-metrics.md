@@ -1,0 +1,1 @@
+- Tooling: `scripts/metrics/adoption.mjs` prints npm last-week downloads, GitHub stars, forks and outside issues as JSON. Failed calls give `null` plus an `errors` entry. Migration: none.
