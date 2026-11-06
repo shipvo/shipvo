@@ -268,16 +268,40 @@ app.get("/c/:app/content.json", async (c) => {
 });
 
 /* ---------- orders placed in the app ---------- */
+const ORDER_LIMIT_IP = 60, ORDER_LIMIT_INSTALL = 20, ORDER_WINDOW_S = 60;
+/** Fixed-window counter in KV. Read-then-put is not atomic, so concurrent bursts can slip a few extra through. */
+async function overLimit(kv: KVNamespace | undefined, key: string, max: number): Promise<boolean> {
+  if (!kv) return false;
+  const k = `rl/o/${key}/${Math.floor(Date.now() / (ORDER_WINDOW_S * 1000))}`;
+  const n = (Number(await kv.get(k)) || 0) + 1;
+  await kv.put(k, String(n), { expirationTtl: ORDER_WINDOW_S * 2 });
+  return n > max;
+}
+const sha256Hex = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+
 app.post("/o/:app", async (c) => {
   const appId = c.req.param("app");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
-  let body: any; try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
+  const raw = await c.req.text();
+  let body: any; try { body = JSON.parse(raw); } catch { return c.json({ error: "bad_json" }, 400); }
   const o = body?.order;
   if (!o || typeof o.id !== "string" || !Array.isArray(o.lines) || !Number.isFinite(o.total)) return c.json({ error: "bad_order" }, 400);
   const json = JSON.stringify({ order: o, content_version: body.content_version ?? null, release: body.release ?? null });
   if (json.length > 20_000) return c.json({ error: "too_large" }, 413);
-  await c.env.DB.prepare("INSERT INTO orders (app_id, order_id, total, json) VALUES (?,?,?,?)").bind(appId, o.id.slice(0, 40), Math.round(o.total), json).run();
-  return c.json({ ok: true }, 202);
+  // Only cf-connecting-ip is trusted: x-forwarded-for can be set by the caller.
+  const ip = c.req.header("cf-connecting-ip");
+  const install = typeof body.install_id === "string" && body.install_id ? body.install_id.slice(0, 64) : "anon";
+  if ((ip && (await overLimit(c.env.POINTERS, `${appId}/ip/${ip}`, ORDER_LIMIT_IP))) || (await overLimit(c.env.POINTERS, `${appId}/i/${install}`, ORDER_LIMIT_INSTALL)))
+    return c.json({ error: "rate_limited" }, { status: 429, headers: { "retry-after": String(ORDER_WINDOW_S) } });
+  const status = body.simulated === true ? "simulated" : "unverified";
+  const orderId = o.id.slice(0, 40);
+  const idem = `i:${install}:${orderId}:${await sha256Hex(raw)}`;
+  const res: any = await c.env.DB.prepare("INSERT OR IGNORE INTO orders (app_id, order_id, total, json, status, idem) VALUES (?,?,?,?,?,?)").bind(appId, orderId, Math.round(o.total), json, status, idem).run();
+  if (res?.meta?.changes === 0) {
+    const first: any = await c.env.DB.prepare("SELECT order_id, status FROM orders WHERE app_id = ? AND idem = ?").bind(appId, idem).first();
+    return c.json({ ok: true, order_id: first?.order_id ?? orderId, status: first?.status ?? status, duplicate: true }, 202);
+  }
+  return c.json({ ok: true, order_id: orderId, status }, 202);
 });
 
 /* ---------- admin ---------- */
