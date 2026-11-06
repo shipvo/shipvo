@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: new `attach_session` tool attaches to the live `shipvo run` phone without an app id.
+- Migration: none; new tool.

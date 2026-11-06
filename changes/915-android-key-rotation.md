@@ -1,0 +1,2 @@
+- `@shipvo/runtime`: Android accepts root-signed key rotation statements. The shell can pin a root key (`rootKey`) and a minimum sequence (`minSequence`) in the config plugin; pointers are then verified against the current release key.
+- Migration: none. Without `rootKey`, no statement is accepted and the pinned `publicKey` is used as before.
