@@ -45,7 +45,7 @@ describe.skipIf(!ok)("recorder trim and captions", () => {
     const c = res.chapters[0];
     expect(c.t).toBeLessThan(2.5);             // 1 + 0.6 + 0.6 kept before the marker, not 6
     expect(c.t).toBeGreaterThan(1);
-    expect(diff(frame(res.file, Math.max(0, c.t - 0.3)), frame(res.file, Math.max(c.t + 0.5, wall - 0.3))).toBeGreaterThan(100);
+    expect(diff(frame(res.file, Math.max(0, c.t - 0.3)), frame(res.file, Math.max(c.t + 0.5, wall - 0.3)))).toBeGreaterThan(100);
     const before = frame(res.file, 0.3); const beforeLater = frame(res.file, Math.max(0.4, c.t - 0.3));
     expect(diff(before, beforeLater)).toBeLessThan(20);
   }, 90000);
