@@ -6,7 +6,7 @@ export const COMMANDS = [
 export const help = `shipvo <command>
 
 Start
-  init <dir>                  Create a new app wired to Shipvo
+  init <dir> [--json]         Create a new app wired to Shipvo
   sim [--port 4545]           Build the app and run it in the simulator
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
                               First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
@@ -31,7 +31,7 @@ Ship
   app create | list | delete  Register, list or remove apps on the hosted control plane
   eas setup [--dry-run] [--run]  Make a Capacitor repo ready for eas build and submit (your own Expo account)
   eas build [args]            Link the iOS scheme, then run eas build
-  login                       Sign in with GitHub and get a key for the hosted simulator
+  login [--json]              Sign in with GitHub and get a key for the hosted simulator
   store details --dry-run     Draft Play Data safety answers and a privacy policy from shipvo.json
   store setup [--company yes|no] [--android-now] [--play-account-before-2023-11-13]
                               Pick the store accounts to open and write store-plan.json
@@ -48,12 +48,12 @@ Ship
   agents setup [--dry-run] [--json]  Write AGENTS.md section and .mcp.json for AI agents, and copy the skills of your @shipvo/* dependencies
   skills sync [--dry-run] [--json]   Only copy the skills of your @shipvo/* dependencies into .agents/skills and .claude/skills
   approvals list|approve <id> [--app id] [--json]  List promotes held for a second owner, or approve one
-  audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
-  test [files] [--repair [--write]] [--report <file> [--release <id>]] [--json]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
+  audit <app> [--format json|csv] [--limit n] [--json]  Export the audit log to stdout
+  test [files] [--repair [--write]] [--report <file> [--release <id>] [--platform android|ios] [--upload]] [--json]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
   doctor [--port <n>] [--json]  Check setup before first publish
   migrate --plan [--json]     Read-only plan to switch from Expo EAS Update (expo-updates) to Shipvo
   migrate --apply [--force] [--json]  Make the safe edits (EAS Update or CodePush) (backups in .shipvo/migrate-backup/)
-  keys                        Show the stored key's status and quota
+  keys [--json]               Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine
   keys rotate sign|upload     Sign a key rotation with the root key (offline), upload it
