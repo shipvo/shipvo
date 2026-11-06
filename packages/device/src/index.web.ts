@@ -293,6 +293,9 @@ export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });
 export const onUrl = (cb: (url: string) => void) => { urlSubs.add(cb); return () => { urlSubs.delete(cb); }; };
 /** Deliver a URL to the app. Returns true if an `onUrl` listener received it. */
 function deliverUrl(url: string): boolean {
+  // A web page opens in the phone's Browser app, not in the app. Only when the simulator provides one.
+  const browse = (g as { __pnOpenBrowser?: (u: string) => unknown }).__pnOpenBrowser;
+  if (browse && /^https?:\/\//i.test(url)) { log("browser_opened", { url }); void Promise.resolve(browse(url)).catch(() => {}); return true; }
   window.dispatchEvent(new CustomEvent("pn:url", { detail: url }));
   urlSubs.forEach((f) => f(url)); log("url_opened", { url, handled: urlSubs.size > 0 });
   return urlSubs.size > 0;

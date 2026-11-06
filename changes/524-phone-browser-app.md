@@ -1,0 +1,4 @@
+- `@shipvo/sim`: the phone has a Browser app. `GET /browser?session=<id>&skin=android|ios` shows it in the phone frame: address bar, back, forward, reload and tabs. Frames stream over a WebSocket (`/browser/ws`, CDP screencast, JPEG, acked); taps, swipes and typing go back as input. The socket accepts only the same origin.
+- `@shipvo/device` (web): `openUrl` with an http(s) URL opens the Browser app instead of the app. A link on a web page to an app scheme (for example `tide://item/3`) goes to the app's `onUrl` listener.
+- `@shipvo/mcp`: new tools `browser_tabs`, `browser_close_tab`, `browser_scroll`, `browser_wait_for`.
+- Migration: none. On the web build, an app that relied on `onUrl` receiving http(s) links now gets them only when no Browser app is present (a hosted embed).

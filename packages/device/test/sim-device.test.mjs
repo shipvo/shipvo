@@ -139,3 +139,17 @@ test("device.set merges nested state and reset clears clipboard, files and log",
   assert.equal(await device.clipboard.get(), "");
   assert.equal(dev.state.biometrics.nextResult, "success");
 });
+
+test("openUrl: a web page goes to the Browser app, an app link goes to the app", async () => {
+  const opened = [], got = [];
+  globalThis.__pnOpenBrowser = (u) => { opened.push(u); return true; };
+  const off = mod.onUrl((u) => got.push(u));
+  try {
+    assert.equal(dev.openUrl("https://shop.test/pay"), true);
+    assert.deepEqual(opened, ["https://shop.test/pay"]); assert.deepEqual(got, []);
+    assert.equal(dev.openUrl("tide://item/3"), true);
+    assert.deepEqual(got, ["tide://item/3"]); assert.equal(opened.length, 1);
+    delete globalThis.__pnOpenBrowser;      // no Browser app (hosted embed): the app gets the link as before
+    dev.openUrl("https://shop.test/x"); assert.equal(got.at(-1), "https://shop.test/x");
+  } finally { off(); delete globalThis.__pnOpenBrowser; }
+});
