@@ -6,7 +6,6 @@ import { screenName } from "./explore-issues.js";
 
 const q = (s: string) => JSON.stringify(s);
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "screen";
-// Same indicator test as `loading()` in explore.ts, so the test checks what the explorer saw.
 
 function stepCode(s: Step): string[] {
   if (s.action === "open") return [];
@@ -43,6 +42,7 @@ function assertion(f: Finding): Check {
       const m = /named "(.*)", so a screen reader/.exec(f.message); const role = /\d+ (\S+?)s are named/.exec(f.message)?.[1];
       return m && role ? { lines: [`expect(phone.nodes().filter((n) => n.role === ${q(role)} && n.name === ${q(m[1]!)}).length).toBeLessThan(2);`] } : { reason: "the name is not in the message" };
     }
+    // Same indicator test as `loading()` in explore.ts, so the test checks what the explorer saw.
     case "stuck_loading": return { lines: [`await phone.waitForGone(${LOADING_RE.toString()}, { timeout: 5000 });`] };
     case "not_delivered": case "action_failed": return { reason: "the app did not take the action, and no state on the screen shows it" };
     default: return { reason: "a size check: the size is not on the screen text" };
@@ -54,6 +54,7 @@ export function exportTest(f: Finding, n = 1): { source: string } | { reason: st
   const check = assertion(f);
   if (!("lines" in check)) return check;
   const name = `lumi finding ${n}: ${f.message}`;
+  // Step text comes from the explorer's own generated inputs. If real user input ever flows here, escape or review it.
   const steps = f.steps.flatMap(stepCode);
   const body = [...(steps.some((l) => l.includes("ref(")) ? REF_HELPER : []), ...steps, ...check.lines];
   return { source: [
@@ -73,15 +74,15 @@ export function findingToTest(f: Finding, n = 1): string | null {
   return "source" in r ? r.source : null;
 }
 
-/** Writes `<n>-<kind>-<screen>.test.ts` per distinct finding. Returns the absolute paths and each finding it could not export, with the reason. */
-export function writeTests(findings: Finding[], dir: string): { files: string[]; skipped: { message: string; reason: string }[] } {
+/** Writes `<n>-<kind>-<screen>.test.ts` per distinct finding. `startAt` is the first file number (Lumi passes the bug number). Returns the absolute paths and each finding it could not export, with the reason. */
+export function writeTests(findings: Finding[], dir: string, startAt = 1): { files: string[]; skipped: { message: string; reason: string }[] } {
   const seen = new Set<string>(); const files: string[] = []; const skipped: { message: string; reason: string }[] = [];
   for (const f of findings) {
     const k = `${f.kind}|${f.message}|${signature(f.screen)}`; if (seen.has(k)) continue; seen.add(k);
-    const r = exportTest(f, files.length + 1);
+    const r = exportTest(f, startAt + files.length);
     if (!("source" in r)) { skipped.push({ message: f.message, reason: r.reason }); continue; }
     mkdirSync(dir, { recursive: true });
-    const file = resolve(dir, `${files.length + 1}-${f.kind}-${slug(screenName(f.screen))}.test.ts`);
+    const file = resolve(dir, `${startAt + files.length}-${f.kind}-${slug(screenName(f.screen))}.test.ts`);
     writeFileSync(file, r.source); files.push(file);
   }
   return { files, skipped };
