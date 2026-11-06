@@ -1,6 +1,6 @@
 // First-run check for Windows, macOS and Linux, from packed tarballs (what a user gets from npm).
 // Usage: node scripts/first-run/cross-os.mjs --tarballs <dir> [--work <dir>] [--out cross-os.json]
-// <dir> holds the .tgz files from `pnpm pack` of @shipvo/cli, sim, test, device, runtime, schema (and any other @shipvo package they need).
+// <dir> holds the .tgz files from `pnpm pack` of @shipvo/cli, sim, test, device, runtime, schema, store (and any other @shipvo package they need).
 // The app is made in a folder whose name has a space, to catch quoting bugs. Steps (each timed, in ms):
 //   init, npm install, doctor --json, sim (background) + GET /app/, publish --dry-run, run android --no-open + GET frame page.
 // Needs network for `npm install`. Exits 1 at the first failed step and prints its output.
@@ -66,20 +66,27 @@ async function get(name, url, mustHave) {
 
 const tgz = readdirSync(tarDir).filter((f) => f.endsWith(".tgz"));
 const find = (n) => { const f = tgz.find((t) => t.startsWith(`${n}-`)); if (!f) { console.error(`No tarball for ${n} in ${tarDir}`); process.exit(2); } return join(tarDir, f); };
-const cli = find("shipvo-cli");
+find("shipvo-cli");
 const pkgNames = tgz.filter((f) => f.startsWith("shipvo-")).map((f) => f.replace(/-\d.*$/, "").replace(/^shipvo-/, ""));
 
 rmSync(work, { recursive: true, force: true }); mkdirSync(work, { recursive: true });
 console.error(`OS ${platform()} ${process.arch}, node ${process.version}, work dir "${work}"`);
 
-// 1. Create the app with the packed CLI, as `npx -y @shipvo/cli init myshop` would.
-run("init", "npm", ["exec", "--yes", `--package=${cli}`, "--", "shipvo", "init", "myshop", "--name", "My Shop"], work);
-const app = join(work, "myshop");
-
-// 2. Make npm install the packed @shipvo/* tarballs instead of the registry copies (overrides pin every nested use too).
-const pj = JSON.parse(readFileSync(join(app, "package.json"), "utf8"));
+// Packed tarball paths as file: specs. Overrides make npm use them for nested @shipvo/* uses too, not the registry copies.
+const spec = (n) => `file:${join(tarDir, tgz.find((t) => t.startsWith(`shipvo-${n}-`))).replace(/\\/g, "/")}`;
 const overrides = {};
-for (const n of pkgNames) overrides[`@shipvo/${n}`] = `file:${join(tarDir, tgz.find((t) => t.startsWith(`shipvo-${n}-`))).replace(/\\/g, "/")}`;
+for (const n of pkgNames) overrides[`@shipvo/${n}`] = spec(n);
+
+// 1. Install the packed CLI with those overrides in a tool folder, then run its init (as `npx -y @shipvo/cli init myshop` would).
+const tool = join(work, "tool"); mkdirSync(tool, { recursive: true });
+writeFileSync(join(tool, "package.json"), JSON.stringify({ name: "tool", version: "0.0.0", private: true, dependencies: { "@shipvo/cli": overrides["@shipvo/cli"] }, overrides }, null, 2));
+run("install cli", "npm", ["install", "--no-audit", "--no-fund"], tool);
+const appParent = join(work, "apps"); mkdirSync(appParent);
+run("init", process.execPath, [join(tool, "node_modules", "@shipvo", "cli", "dist", "cli.js"), "init", "myshop", "--name", "My Shop"], appParent);
+const app = join(appParent, "myshop");
+
+// 2. Pin the app to the packed tarballs too.
+const pj = JSON.parse(readFileSync(join(app, "package.json"), "utf8"));
 for (const sec of ["dependencies", "devDependencies"]) for (const k of Object.keys(pj[sec] ?? {})) if (overrides[k]) pj[sec][k] = overrides[k];
 pj.overrides = { ...(pj.overrides ?? {}), ...overrides };
 writeFileSync(join(app, "package.json"), JSON.stringify(pj, null, 2) + "\n");
