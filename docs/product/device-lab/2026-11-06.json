@@ -1,0 +1,939 @@
+{
+  "env": {
+    "date": "2026-11-06T03:53:18.084Z",
+    "host": {
+      "cpus": 4,
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "node": "v22.23.4"
+    },
+    "device": {
+      "model": "sdk_gphone_x86_64",
+      "android": "11",
+      "api": 30,
+      "abi": "x86_64",
+      "emulator": true,
+      "fingerprint": "google/sdk_gphone_x86_64/generic_x86_64_arm64:11/RSR1.240422.006/12134477:userdebug/dev-keys"
+    },
+    "apk": {
+      "file": "/tmp/shell.apk",
+      "bytes": 31871772
+    },
+    "publicKey": "qmXoRiIJJIi5fIXkX1BhcTY4pWMdm6C8NuqYc10YLvQ=",
+    "trials": 3,
+    "bundles": {
+      "v1": 2004254,
+      "v2": 2004250,
+      "crash": 2004284
+    },
+    "shellVersion": "1.1.0",
+    "embeddedBundleBytes": 1632048
+  },
+  "scenarios": [
+    {
+      "name": "install and cold start on the bundled release",
+      "pass": true,
+      "firstLaunch": {
+        "totalMs": 659,
+        "waitMs": 660,
+        "reportedColdStartMs": 818,
+        "alive": true,
+        "healthy": true
+      },
+      "runs": [
+        {
+          "totalMs": 659,
+          "waitMs": 660,
+          "reportedColdStartMs": 818,
+          "alive": true,
+          "healthy": true
+        },
+        {
+          "totalMs": 640,
+          "waitMs": 655,
+          "reportedColdStartMs": 811,
+          "alive": true,
+          "healthy": true
+        },
+        {
+          "totalMs": 697,
+          "waitMs": 698,
+          "reportedColdStartMs": 788,
+          "alive": true,
+          "healthy": true
+        }
+      ],
+      "median": {
+        "totalMs": 659,
+        "waitMs": 660,
+        "reportedColdStartMs": 811
+      },
+      "devicePolledPointer": false,
+      "cohort": 781,
+      "wallS": 7
+    },
+    {
+      "name": "first update after install: patch against the APK's own bundle",
+      "pass": true,
+      "release": 1,
+      "ok": true,
+      "pointerToHealthyMs": 832,
+      "via": "patch",
+      "downloadBytes": 363136,
+      "downloadMs": 184,
+      "applyMs": 136,
+      "bundleBytes": 2004254,
+      "patchesOffered": [
+        363136
+      ],
+      "timeline": {
+        "pointerSeenMs": 1,
+        "patchReceivedMs": 372,
+        "stagedMs": 570,
+        "healthyMs": 832,
+        "gaps": {
+          "publishToPointerMs": 1,
+          "pointerToPatchMs": 371,
+          "patchToStagedMs": 198,
+          "stagedToHealthyMs": 262
+        },
+        "unaccountedMs": 512
+      },
+      "fullBundleBytes": 2004254,
+      "wallS": 2
+    },
+    {
+      "name": "update: full bundle (no patches offered)",
+      "pass": true,
+      "trials": [
+        {
+          "release": 2,
+          "ok": true,
+          "pointerToHealthyMs": 11182,
+          "via": "full",
+          "downloadBytes": 2004250,
+          "downloadMs": 191,
+          "applyMs": 115,
+          "bundleBytes": 2004250,
+          "patchesOffered": [],
+          "timeline": {
+            "pointerSeenMs": 10266,
+            "patchReceivedMs": 10772,
+            "stagedMs": 10978,
+            "healthyMs": 11182,
+            "gaps": {
+              "publishToPointerMs": 10266,
+              "pointerToPatchMs": 506,
+              "patchToStagedMs": 206,
+              "stagedToHealthyMs": 204
+            },
+            "unaccountedMs": 10876
+          }
+        },
+        {
+          "release": 3,
+          "ok": true,
+          "pointerToHealthyMs": 869,
+          "via": "full",
+          "downloadBytes": 2004248,
+          "downloadMs": 189,
+          "applyMs": 123,
+          "bundleBytes": 2004248,
+          "patchesOffered": [],
+          "timeline": {
+            "pointerSeenMs": 402,
+            "patchReceivedMs": 409,
+            "stagedMs": 612,
+            "healthyMs": 869,
+            "gaps": {
+              "publishToPointerMs": 402,
+              "pointerToPatchMs": 7,
+              "patchToStagedMs": 203,
+              "stagedToHealthyMs": 257
+            },
+            "unaccountedMs": 557
+          }
+        },
+        {
+          "release": 4,
+          "ok": true,
+          "pointerToHealthyMs": 711,
+          "via": "full",
+          "downloadBytes": 2004250,
+          "downloadMs": 161,
+          "applyMs": 107,
+          "bundleBytes": 2004250,
+          "patchesOffered": [],
+          "timeline": {
+            "pointerSeenMs": 354,
+            "patchReceivedMs": 362,
+            "stagedMs": 540,
+            "healthyMs": 711,
+            "gaps": {
+              "publishToPointerMs": 354,
+              "pointerToPatchMs": 8,
+              "patchToStagedMs": 178,
+              "stagedToHealthyMs": 171
+            },
+            "unaccountedMs": 443
+          }
+        }
+      ],
+      "median": {
+        "pointerToHealthyMs": 869,
+        "downloadBytes": 2004250,
+        "downloadMs": 189,
+        "applyMs": 115
+      },
+      "wallS": 13
+    },
+    {
+      "name": "update: bsdiff patch from the running release",
+      "pass": true,
+      "trials": [
+        {
+          "release": 5,
+          "ok": true,
+          "pointerToHealthyMs": 355,
+          "via": "patch",
+          "downloadBytes": 312,
+          "downloadMs": 38,
+          "applyMs": 130,
+          "bundleBytes": 2004251,
+          "patchesOffered": [
+            312
+          ],
+          "timeline": {
+            "pointerSeenMs": 96,
+            "patchReceivedMs": 102,
+            "stagedMs": 166,
+            "healthyMs": 355,
+            "gaps": {
+              "publishToPointerMs": 96,
+              "pointerToPatchMs": 6,
+              "patchToStagedMs": 64,
+              "stagedToHealthyMs": 189
+            },
+            "unaccountedMs": 187
+          }
+        },
+        {
+          "release": 6,
+          "ok": true,
+          "pointerToHealthyMs": 287,
+          "via": "patch",
+          "downloadBytes": 19235,
+          "downloadMs": 48,
+          "applyMs": 124,
+          "bundleBytes": 2004254,
+          "patchesOffered": [
+            19235
+          ],
+          "timeline": {
+            "pointerSeenMs": 1,
+            "patchReceivedMs": 8,
+            "stagedMs": 70,
+            "healthyMs": 287,
+            "gaps": {
+              "publishToPointerMs": 1,
+              "pointerToPatchMs": 7,
+              "patchToStagedMs": 62,
+              "stagedToHealthyMs": 217
+            },
+            "unaccountedMs": 115
+          }
+        },
+        {
+          "release": 7,
+          "ok": true,
+          "pointerToHealthyMs": 283,
+          "via": "patch",
+          "downloadBytes": 19266,
+          "downloadMs": 36,
+          "applyMs": 95,
+          "bundleBytes": 2004250,
+          "patchesOffered": [
+            19266
+          ],
+          "timeline": {
+            "pointerSeenMs": 0,
+            "patchReceivedMs": 6,
+            "stagedMs": 60,
+            "healthyMs": 283,
+            "gaps": {
+              "publishToPointerMs": 0,
+              "pointerToPatchMs": 6,
+              "patchToStagedMs": 54,
+              "stagedToHealthyMs": 223
+            },
+            "unaccountedMs": 152
+          }
+        },
+        {
+          "release": 8,
+          "ok": true,
+          "pointerToHealthyMs": 302,
+          "via": "patch",
+          "downloadBytes": 299,
+          "downloadMs": 28,
+          "applyMs": 129,
+          "bundleBytes": 2004250,
+          "patchesOffered": [
+            299
+          ],
+          "timeline": {
+            "pointerSeenMs": 0,
+            "patchReceivedMs": 7,
+            "stagedMs": 50,
+            "healthyMs": 302,
+            "gaps": {
+              "publishToPointerMs": 0,
+              "pointerToPatchMs": 7,
+              "patchToStagedMs": 43,
+              "stagedToHealthyMs": 252
+            },
+            "unaccountedMs": 145
+          }
+        },
+        {
+          "release": 9,
+          "ok": true,
+          "pointerToHealthyMs": 259,
+          "via": "patch",
+          "downloadBytes": 315,
+          "downloadMs": 33,
+          "applyMs": 120,
+          "bundleBytes": 2004251,
+          "patchesOffered": [
+            315
+          ],
+          "timeline": {
+            "pointerSeenMs": 0,
+            "patchReceivedMs": 7,
+            "stagedMs": 60,
+            "healthyMs": 259,
+            "gaps": {
+              "publishToPointerMs": 0,
+              "pointerToPatchMs": 7,
+              "patchToStagedMs": 53,
+              "stagedToHealthyMs": 199
+            },
+            "unaccountedMs": 106
+          }
+        }
+      ],
+      "trialCount": 5,
+      "trialsInMedian": 5,
+      "median": {
+        "pointerToHealthyMs": 287,
+        "downloadBytes": 315,
+        "downloadMs": 36,
+        "applyMs": 124
+      },
+      "phaseMedianMs": {
+        "publishToPointerMs": 0,
+        "pointerToPatchMs": 7,
+        "patchToStagedMs": 54,
+        "stagedToHealthyMs": 217,
+        "unaccountedMs": 145
+      },
+      "wallS": 4
+    },
+    {
+      "name": "tampered bundle rejected: bad signature",
+      "pass": true,
+      "release": 10,
+      "runningBefore": 9,
+      "currentAfter": 9,
+      "pendingAfter": 0,
+      "devicePolledPointer": true,
+      "deviceDownloadedBundle": false,
+      "appStayedAlive": true,
+      "restartedOnRelease": 9,
+      "wallS": 38
+    },
+    {
+      "name": "tampered bundle rejected: bad hash",
+      "pass": true,
+      "release": 11,
+      "runningBefore": 9,
+      "currentAfter": 9,
+      "pendingAfter": 0,
+      "devicePolledPointer": true,
+      "deviceDownloadedBundle": true,
+      "appStayedAlive": true,
+      "restartedOnRelease": 9,
+      "wallS": 38
+    },
+    {
+      "name": "tampered bundle rejected: bad size",
+      "pass": true,
+      "release": 12,
+      "runningBefore": 9,
+      "currentAfter": 9,
+      "pendingAfter": 0,
+      "devicePolledPointer": true,
+      "deviceDownloadedBundle": true,
+      "appStayedAlive": true,
+      "restartedOnRelease": 9,
+      "wallS": 38
+    },
+    {
+      "name": "hermes bytecode mismatch: a release for another bytecode version is refused",
+      "pass": true,
+      "refusalReason": "hermes_bytecode_mismatch",
+      "release": 13,
+      "shellBytecodeVersion": 99,
+      "releaseBytecodeVersion": 98,
+      "runningBefore": 9,
+      "currentAfter": 9,
+      "pendingAfter": 0,
+      "blockedAfter": 13,
+      "devicePolledPointer": true,
+      "deviceDownloadedBundle": false,
+      "appStayedAlive": true,
+      "restartedOnRelease": 9,
+      "wallS": 28
+    },
+    {
+      "name": "device recovers: valid release after tampered ones",
+      "pass": true,
+      "release": 14,
+      "ok": true,
+      "pointerToHealthyMs": 1123,
+      "via": "full",
+      "downloadBytes": 2004259,
+      "downloadMs": 171,
+      "applyMs": 124,
+      "bundleBytes": 2004259,
+      "patchesOffered": [],
+      "timeline": {
+        "pointerSeenMs": 161,
+        "patchReceivedMs": 714,
+        "stagedMs": 904,
+        "healthyMs": 1123,
+        "gaps": {
+          "publishToPointerMs": 161,
+          "pointerToPatchMs": 553,
+          "patchToStagedMs": 190,
+          "stagedToHealthyMs": 219
+        },
+        "unaccountedMs": 828
+      },
+      "wallS": 1
+    },
+    {
+      "name": "rollback to the previous release",
+      "pass": true,
+      "trials": [
+        {
+          "release": 15,
+          "ok": true,
+          "pointerToHealthyMs": 725,
+          "via": "full",
+          "downloadBytes": 2004251,
+          "downloadMs": 163,
+          "applyMs": 143,
+          "bundleBytes": 2004251,
+          "patchesOffered": [],
+          "timeline": {
+            "pointerSeenMs": 321,
+            "patchReceivedMs": 328,
+            "stagedMs": 512,
+            "healthyMs": 725,
+            "gaps": {
+              "publishToPointerMs": 321,
+              "pointerToPatchMs": 7,
+              "patchToStagedMs": 184,
+              "stagedToHealthyMs": 213
+            },
+            "unaccountedMs": 419
+          },
+          "rolledBackToRelease": 9,
+          "deviceBundleMatches": true
+        },
+        {
+          "release": 16,
+          "ok": true,
+          "pointerToHealthyMs": 781,
+          "via": "full",
+          "downloadBytes": 2004259,
+          "downloadMs": 166,
+          "applyMs": 123,
+          "bundleBytes": 2004259,
+          "patchesOffered": [],
+          "timeline": {
+            "pointerSeenMs": 405,
+            "patchReceivedMs": 413,
+            "stagedMs": 594,
+            "healthyMs": 781,
+            "gaps": {
+              "publishToPointerMs": 405,
+              "pointerToPatchMs": 8,
+              "patchToStagedMs": 181,
+              "stagedToHealthyMs": 187
+            },
+            "unaccountedMs": 492
+          },
+          "rolledBackToRelease": 14,
+          "deviceBundleMatches": true
+        },
+        {
+          "release": 17,
+          "ok": true,
+          "pointerToHealthyMs": 651,
+          "via": "full",
+          "downloadBytes": 2004251,
+          "downloadMs": 155,
+          "applyMs": 121,
+          "bundleBytes": 2004251,
+          "patchesOffered": [],
+          "timeline": {
+            "pointerSeenMs": 252,
+            "patchReceivedMs": 259,
+            "stagedMs": 431,
+            "healthyMs": 651,
+            "gaps": {
+              "publishToPointerMs": 252,
+              "pointerToPatchMs": 7,
+              "patchToStagedMs": 172,
+              "stagedToHealthyMs": 220
+            },
+            "unaccountedMs": 375
+          },
+          "rolledBackToRelease": 15,
+          "deviceBundleMatches": true
+        }
+      ],
+      "median": {
+        "pointerToHealthyMs": 725,
+        "downloadBytes": 2004251,
+        "applyMs": 123
+      },
+      "wallS": 3
+    },
+    {
+      "name": "staged rollout: a device outside the cohort does not get the release",
+      "pass": true,
+      "deviceBand": "b2",
+      "cohort": 781,
+      "publishedToBands": [
+        "b0",
+        "b1"
+      ],
+      "devicePollsWhileOutside": 4,
+      "devicePollStatuses": [
+        200
+      ],
+      "downloadsOfNewRelease": 0,
+      "currentWhileOutside": 17,
+      "joinedAfterWideningMs": 6257,
+      "wallS": 41
+    },
+    {
+      "name": "crash-loop: a release that crashes on start is discarded",
+      "pass": true,
+      "kind": "start",
+      "maxBadRuns": 3,
+      "trials": [
+        {
+          "release": 19,
+          "staged": true,
+          "timeline": [
+            {
+              "what": "force-stop",
+              "ms": 16339,
+              "trial_boots": 1,
+              "unhealthy_boots": 0,
+              "pid": "12669"
+            },
+            {
+              "what": "launch",
+              "ms": 17781,
+              "trial_boots": 2,
+              "unhealthy_boots": 0,
+              "pid": "12924"
+            },
+            {
+              "what": "force-stop",
+              "ms": 33356,
+              "trial_boots": 2,
+              "unhealthy_boots": 0,
+              "pid": "12924"
+            },
+            {
+              "what": "launch",
+              "ms": 34948,
+              "trial_boots": 3,
+              "unhealthy_boots": 0,
+              "pid": "13080"
+            },
+            {
+              "what": "force-stop",
+              "ms": 50533,
+              "trial_boots": 3,
+              "unhealthy_boots": 0,
+              "pid": "13080"
+            },
+            {
+              "what": "launch",
+              "ms": 52035,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "13236"
+            }
+          ],
+          "boots": 3,
+          "badRuns": 2,
+          "restoredRelease": 18,
+          "restoredMs": 52327,
+          "blocked": 19,
+          "currentAfter": 18,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        },
+        {
+          "release": 20,
+          "staged": true,
+          "timeline": [
+            {
+              "what": "force-stop",
+              "ms": 18222,
+              "trial_boots": 1,
+              "unhealthy_boots": 0,
+              "pid": "13236"
+            },
+            {
+              "what": "launch",
+              "ms": 19694,
+              "trial_boots": 2,
+              "unhealthy_boots": 0,
+              "pid": "13444"
+            },
+            {
+              "what": "force-stop",
+              "ms": 35191,
+              "trial_boots": 2,
+              "unhealthy_boots": 0,
+              "pid": "13444"
+            },
+            {
+              "what": "launch",
+              "ms": 36652,
+              "trial_boots": 3,
+              "unhealthy_boots": 0,
+              "pid": "13601"
+            },
+            {
+              "what": "force-stop",
+              "ms": 52202,
+              "trial_boots": 3,
+              "unhealthy_boots": 0,
+              "pid": "13601"
+            },
+            {
+              "what": "launch",
+              "ms": 53658,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "13753"
+            }
+          ],
+          "boots": 3,
+          "badRuns": 2,
+          "restoredRelease": 18,
+          "restoredMs": 53922,
+          "blocked": 20,
+          "currentAfter": 18,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        },
+        {
+          "release": 21,
+          "staged": true,
+          "timeline": [
+            {
+              "what": "force-stop",
+              "ms": 16614,
+              "trial_boots": 1,
+              "unhealthy_boots": 0,
+              "pid": "13753"
+            },
+            {
+              "what": "launch",
+              "ms": 18086,
+              "trial_boots": 2,
+              "unhealthy_boots": 0,
+              "pid": "13940"
+            },
+            {
+              "what": "force-stop",
+              "ms": 33621,
+              "trial_boots": 2,
+              "unhealthy_boots": 0,
+              "pid": "13940"
+            },
+            {
+              "what": "launch",
+              "ms": 35137,
+              "trial_boots": 3,
+              "unhealthy_boots": 0,
+              "pid": "14092"
+            },
+            {
+              "what": "force-stop",
+              "ms": 50662,
+              "trial_boots": 3,
+              "unhealthy_boots": 0,
+              "pid": "14092"
+            },
+            {
+              "what": "launch",
+              "ms": 52037,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "14245"
+            }
+          ],
+          "boots": 3,
+          "badRuns": 2,
+          "restoredRelease": 18,
+          "restoredMs": 52457,
+          "blocked": 21,
+          "currentAfter": 18,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        }
+      ],
+      "median": {
+        "restoredMs": 52457,
+        "boots": 3,
+        "badRuns": 2
+      },
+      "wallS": 160
+    },
+    {
+      "name": "crash-loop: a release that crashes 5 s after markHealthy is reverted",
+      "pass": true,
+      "kind": "late",
+      "maxBadRuns": 3,
+      "trials": [
+        {
+          "release": 22,
+          "staged": false,
+          "timeline": [
+            {
+              "what": "force-stop",
+              "ms": 75584,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "14245"
+            },
+            {
+              "what": "launch",
+              "ms": 77091,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "14889"
+            },
+            {
+              "what": "force-stop",
+              "ms": 92177,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "14889"
+            },
+            {
+              "what": "launch",
+              "ms": 93637,
+              "trial_boots": 0,
+              "unhealthy_boots": 2,
+              "pid": "15053"
+            },
+            {
+              "what": "force-stop",
+              "ms": 109204,
+              "trial_boots": 0,
+              "unhealthy_boots": 2,
+              "pid": "15053"
+            },
+            {
+              "what": "launch",
+              "ms": 110743,
+              "trial_boots": 0,
+              "unhealthy_boots": 3,
+              "pid": "15216"
+            },
+            {
+              "what": "force-stop",
+              "ms": 126329,
+              "trial_boots": 0,
+              "unhealthy_boots": 3,
+              "pid": "15216"
+            },
+            {
+              "what": "launch",
+              "ms": 127823,
+              "trial_boots": 0,
+              "unhealthy_boots": 0,
+              "pid": "15380"
+            }
+          ],
+          "boots": 4,
+          "badRuns": 3,
+          "restoredRelease": 18,
+          "restoredMs": 128135,
+          "blocked": 22,
+          "currentAfter": 18,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        },
+        {
+          "release": 23,
+          "staged": false,
+          "timeline": [
+            {
+              "what": "force-stop",
+              "ms": 75619,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "15380"
+            },
+            {
+              "what": "launch",
+              "ms": 77146,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "16022"
+            },
+            {
+              "what": "force-stop",
+              "ms": 92737,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "16022"
+            },
+            {
+              "what": "launch",
+              "ms": 94250,
+              "trial_boots": 0,
+              "unhealthy_boots": 2,
+              "pid": "16185"
+            },
+            {
+              "what": "force-stop",
+              "ms": 109830,
+              "trial_boots": 0,
+              "unhealthy_boots": 2,
+              "pid": "16185"
+            },
+            {
+              "what": "launch",
+              "ms": 111414,
+              "trial_boots": 0,
+              "unhealthy_boots": 3,
+              "pid": "16350"
+            },
+            {
+              "what": "force-stop",
+              "ms": 126977,
+              "trial_boots": 0,
+              "unhealthy_boots": 3,
+              "pid": "16350"
+            },
+            {
+              "what": "launch",
+              "ms": 128488,
+              "trial_boots": 0,
+              "unhealthy_boots": 0,
+              "pid": "16518"
+            }
+          ],
+          "boots": 4,
+          "badRuns": 3,
+          "restoredRelease": 18,
+          "restoredMs": 128791,
+          "blocked": 23,
+          "currentAfter": 18,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        },
+        {
+          "release": 24,
+          "staged": true,
+          "timeline": [
+            {
+              "what": "force-stop",
+              "ms": 16310,
+              "trial_boots": 0,
+              "unhealthy_boots": 1,
+              "pid": "16518"
+            },
+            {
+              "what": "launch",
+              "ms": 17910,
+              "trial_boots": 0,
+              "unhealthy_boots": 2,
+              "pid": "16708"
+            },
+            {
+              "what": "force-stop",
+              "ms": 33011,
+              "trial_boots": 0,
+              "unhealthy_boots": 2,
+              "pid": "16708"
+            },
+            {
+              "what": "launch",
+              "ms": 34561,
+              "trial_boots": 0,
+              "unhealthy_boots": 3,
+              "pid": "16869"
+            },
+            {
+              "what": "force-stop",
+              "ms": 50105,
+              "trial_boots": 0,
+              "unhealthy_boots": 3,
+              "pid": "16869"
+            },
+            {
+              "what": "launch",
+              "ms": 51526,
+              "trial_boots": 0,
+              "unhealthy_boots": 0,
+              "pid": "17032"
+            }
+          ],
+          "boots": 3,
+          "badRuns": 2,
+          "restoredRelease": 18,
+          "restoredMs": 51857,
+          "blocked": 24,
+          "currentAfter": 18,
+          "revertEventReported": true,
+          "redownloaded": false,
+          "pass": true
+        }
+      ],
+      "median": {
+        "restoredMs": 128135,
+        "boots": 4,
+        "badRuns": 3
+      },
+      "wallS": 310
+    }
+  ],
+  "allPassed": true,
+  "firstRun": {
+    "source": "update: full bundle (no patches offered)",
+    "publishToHealthyMs": 869,
+    "downloadMs": 189,
+    "applyMs": 115
+  },
+  "serverLog": "/tmp/android-e2e/server.log"
+}

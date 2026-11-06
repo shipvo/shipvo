@@ -1,0 +1,2 @@
+- `site`: new page shipvo.dev/setup ("Set up with your agent") with the skill, curl and paste-to-your-agent lines, linked from home, Docs and Learn. `https://shipvo.dev/install.sh` is now served (`text/x-shellscript`, cached 5 minutes): it checks Node 22+ and npm, then runs `npx -y @shipvo/cli agents setup` in the current folder.
+- Migration: none.

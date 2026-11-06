@@ -8,7 +8,7 @@ An AI agent uses a Shipvo app the way a person with a screen reader does: it get
 npx skills add shipvo/shipvo --skill shipvo -g
 ```
 
-The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. `shipvo agents setup` and `https://shipvo.dev/install.sh` are planned ([#533](https://github.com/shipvo/shipvo/issues/533)).
+The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. Without npm: `curl -fsSL https://shipvo.dev/install.sh | bash`. Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints." All three lines are on [shipvo.dev/setup](https://shipvo.dev/setup/).
 
 ## Three ways to connect
 
@@ -41,6 +41,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `screenshot(session)` | PNG of the phone |
 | `set_device(...)` · `device_reset(...)` | What the simulated phone has: platform, permissions, location, barcode in view, biometrics, payment outcome, network |
 | `lock` · `unlock` · `restart` | Press the power button (lock screen), swipe up to unlock, or restart the phone (boot screen, the app starts fresh, storage is kept). While locked, tap, type, scroll and back fail with `phone_locked` |
+| `press_home` · `open_recents` · `resume_app` · `kill_app` | Home (app gets `AppState` background, home screen shows the app icon), app switcher card, bring the app back (`active`), swipe the card away (next open is a cold start). While away, tap, type, scroll, back, `open_url` and `open_notification` fail with `app_not_foreground`; `screenshot` shows the home screen or switcher |
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |

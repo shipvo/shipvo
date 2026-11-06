@@ -1,0 +1,1 @@
+- ios-e2e: the iOS simulator end-to-end can cut a bundle download short once (`CUT_ONCE=<path>:<n>` on `scripts/ios-e2e/server.mjs`) and `analyze.mjs` reports "Interrupted download resumed" (Range request with an offset above 0, HTTP 206, release applied). Test tooling only; no package API change (#647).

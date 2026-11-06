@@ -270,6 +270,14 @@ server.tool("unlock", "Swipe up on the lock screen. Returns to the same screen a
   async ({ session }) => { need(session); return result(session, await act({ session, action: "unlock" })); });
 server.tool("restart", "Restart the simulated phone from the power menu: a boot screen, then the app starts fresh (cold start). Storage is kept. Returns the first screen. Logged in device_log as simulated.", { session: sid }, WR,
   async ({ session }) => { need(session); return result(session, await act({ session, action: "restart" })); });
+server.tool("press_home", "Press Home: the app goes to the background (it receives AppState \"background\") and the phone shows the home screen with the app icon. While there, tap, type, scroll and back fail with app_not_foreground. Call resume_app to bring the app back (AppState \"active\"). Logged as simulated.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "press_home" })); });
+server.tool("open_recents", "Open the app switcher: the app goes to the background and its card is shown. resume_app opens the card again; kill_app swipes it away.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "open_recents" })); });
+server.tool("resume_app", "Tap the app icon on the home screen, or its card in the app switcher: the app comes back (AppState \"active\") with its screen kept. Fails with app_in_foreground if it is already in front.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "resume_app" })); });
+server.tool("kill_app", "Swipe the app's card away in the app switcher (call open_recents first). The app is killed: the next resume_app is a cold start, with storage kept. Fails with recents_not_open otherwise.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "kill_app" })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
@@ -355,8 +363,11 @@ server.tool("record_start", "Start recording the phone frame to an MP4 under .sh
 server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
 });
-server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters.", {}, WR, async () => {
-  try { const r = await recorder.stop(); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
+server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters. With music: true, mixes a ducked music bed under the video and writes a credits JSON next to it (credit the track where you publish).", {
+  music: z.boolean().optional().describe("Mix a music bed under the video (default false). Needs python3, ffmpeg and ffprobe; picks a track from Jamendo unless SHIPVO_MUSIC_FILE is set."),
+  narration: z.string().optional().describe("Path to a wav with a voice track. It is mixed over the video, trimmed to the video length (the result says so), and ducks the music when music is true."),
+}, WR, async ({ music, narration }) => {
+  try { const r = await recorder.stop({ music, narration }); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 
 // Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.

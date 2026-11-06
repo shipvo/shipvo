@@ -104,6 +104,7 @@ export default {
     const res = await env.ASSETS.fetch(req);
     const h = new Headers(res.headers);
     if (url.pathname.endsWith(".md")) h.set("content-type", "text/markdown; charset=utf-8");
+    else if (url.pathname === "/install.sh") { h.set("content-type", "text/x-shellscript; charset=utf-8"); h.set("cache-control", "public, max-age=300"); }
     else if (url.pathname.endsWith(".txt")) h.set("content-type", "text/plain; charset=utf-8");
     h.set("x-content-type-options", "nosniff"); h.set("referrer-policy", "strict-origin-when-cross-origin");
     return new Response(res.body, { status: res.status, headers: h });

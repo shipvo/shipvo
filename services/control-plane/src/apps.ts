@@ -261,6 +261,72 @@ async function recordStaged(kv: KVNamespace, id: string, buf: ArrayBuffer) {
   } catch { console.warn(`stage record failed: app=${id}`); }
 }
 
+const BAND_RANK = ["b0", "b1", "b2"];
+const approvalKey = (id: string, approvalId: string) => `c/${id}/approval/${approvalId}`;
+type Approval = { id: string; key: string; pointer: string; band: string; release: number; proposer: string; status: "pending" | "approved" | "rejected"; proposed_at: string };
+
+/** With policy.requireApprovalAbove set, a pointer above that band is stored as a pending approval instead of going live. Returns the 202 body, or null. */
+async function proposeIfApprovalNeeded(c: any, id: string, buf: ArrayBuffer, key: string) {
+  const policy = await loadReleasePolicy({ kv: c.env.POINTERS, appId: id });
+  const body = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body);
+  if (!policy.requireApprovalAbove || BAND_RANK.indexOf(body.band) <= BAND_RANK.indexOf(policy.requireApprovalAbove)) return null;
+  const agent = (c.req.header("x-shipvo-actor") ?? "").trim().toLowerCase() === "agent";
+  const owner = await c.env.DB.prepare("SELECT acc.github_login AS login FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ?").bind(id).first();
+  const proposer = agent ? "agent (publish token)" : String(owner?.login ?? id);
+  const a: Approval = { id: crypto.randomUUID(), key, pointer: new TextDecoder().decode(buf), band: body.band, release: body.release, proposer, status: "pending", proposed_at: now() };
+  await c.env.POINTERS.put(approvalKey(id, a.id), JSON.stringify(a));
+  await recordAudit(c.env.DB, { app_id: id, actor: proposer, actor_kind: agent ? "agent" : "person", action: "publish", release: body.release, release_id: key,
+    after: JSON.stringify({ approval: "proposed", approval_id: a.id, band: body.band, release: body.release }) });
+  return { status: "pending_approval", approval_id: a.id, band: body.band, release: body.release, requireApprovalAbove: policy.requireApprovalAbove };
+}
+
+/** Owner auth for approvals: a signed-in owner of the app, or the owner token. Returns the actor, or null. */
+async function approver(c: any, id: string): Promise<{ actor: string; kind: "person" | "agent" } | null> {
+  if (c.env.OWNER_TOKEN && bearer(c) === c.env.OWNER_TOKEN) return { actor: "agent (owner token)", kind: "agent" };
+  const dev = await developer(c); if (!dev) return null;
+  const row: any = await c.env.DB.prepare("SELECT account_id FROM apps WHERE app_id = ?").bind(id).first();
+  return row && row.account_id === dev.account_id ? { actor: dev.login, kind: "person" } : null;
+}
+
+async function resolveApproval(c: any, verb: "approve" | "reject") {
+  const id = c.req.param("app"); const who = await approver(c, id); if (!who) return c.json({ error: "unauthorized" }, 401);
+  const aid = c.req.param("id"); const raw = await c.env.POINTERS.get(approvalKey(id, aid));
+  if (!raw) return c.json({ error: "not_found" }, 404);
+  const a: Approval = JSON.parse(raw);
+  if (a.status !== "pending") return c.json({ error: "not_pending", message: `This approval is already ${a.status}.` }, 409);
+  if (verb === "approve" && who.actor === a.proposer) return c.json({ error: "self_approval", message: "The actor that proposed this release cannot approve it." }, 403);
+  const approved = verb === "approve";
+  if (approved) {
+    // Never roll a band back: if a newer release went live while this waited, refuse and close the approval.
+    // Note: KV read-then-put is not atomic, so two concurrent approves could both apply. Fine for a first slice.
+    let cur: any = null;
+    try { const live = await c.env.POINTERS.get(a.key); cur = live ? JSON.parse(JSON.parse(live).body) : null; } catch { /* unreadable pointer: nothing to compare */ }
+    if (cur && typeof cur.release === "number" && cur.release > a.release) {
+      await c.env.POINTERS.put(approvalKey(id, aid), JSON.stringify({ ...a, status: "rejected", resolved_by: who.actor, resolved_at: now(), reason: "stale" }));
+      await recordAudit(c.env.DB, { app_id: id, actor: who.actor, actor_kind: who.kind, action: "publish", release: a.release, release_id: a.key,
+        after: JSON.stringify({ approval: "rejected", reason: "stale", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
+      return c.json({ error: "stale", message: `Release ${cur.release} is already live at this band; release ${a.release} was not applied.` }, 409);
+    }
+    // Approval does not override policy: re-check the rules that do not depend on the clock (maxBand, agentMaxBand), as the proposer's kind.
+    // blockedWeekdays and requireStageBeforeFull were checked when the proposal was made and are not re-run here. A refusal leaves the approval pending.
+    const policy = await loadReleasePolicy({ kv: c.env.POINTERS, appId: id });
+    const verdict = checkPolicy({ maxBand: policy.maxBand, agentMaxBand: policy.agentMaxBand } as typeof policy, { band: a.band as any, actorKind: a.proposer.startsWith("agent") ? "agent" : "human", now: new Date() });
+    if (!verdict.ok) return c.json({ error: "policy_refused", code: "policy_refused", rule: verdict.rule, reason: verdict.reason }, 403);
+    const buf = new TextEncoder().encode(a.pointer);
+    const row: any = await c.env.DB.prepare("SELECT bytes_used FROM apps WHERE app_id = ?").bind(id).first();
+    if ((row?.bytes_used ?? 0) + buf.byteLength > MAX_APP_BYTES) return c.json({ error: "app_storage_exceeded", message: `This app has used its ${MAX_APP_BYTES / 1048576} MB beta storage.` }, 413);
+    await c.env.POINTERS.put(a.key, buf);
+    await recordStaged(c.env.POINTERS, id, buf.buffer as ArrayBuffer);
+    await c.env.DB.prepare("UPDATE apps SET bytes_used = bytes_used + ? WHERE app_id = ?").bind(buf.byteLength, id).run();
+  }
+  await c.env.POINTERS.put(approvalKey(id, aid), JSON.stringify({ ...a, status: approved ? "approved" : "rejected", resolved_by: who.actor, resolved_at: now() }));
+  await recordAudit(c.env.DB, { app_id: id, actor: who.actor, actor_kind: who.kind, action: "publish", release: a.release, release_id: a.key,
+    after: JSON.stringify({ approval: approved ? "approved" : "rejected", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
+  return c.json({ ok: true, approval_id: a.id, status: approved ? "approved" : "rejected" });
+}
+apps.post("/:app/approvals/:id/approve", (c) => resolveApproval(c, "approve"));
+apps.post("/:app/approvals/:id/reject", (c) => resolveApproval(c, "reject"));
+
 apps.put("/:id/kv/*", async (c) => {
   const id = c.req.param("id"); const app = await publisher(c, id); if (!app) return c.json({ error: "unauthorized" }, 401);
   const k = keyOf(c, id); if (!keyAllowed(id, k)) return c.json({ error: "forbidden_key", message: `Keys must start with one of ${PREFIXES.map((p) => `${p}/${id}/`).join(", ")}` }, 403);
@@ -270,6 +336,7 @@ apps.put("/:id/kv/*", async (c) => {
   if (k.startsWith(`p/${id}/`)) { const why = await pointerProblem(id, k, app.public_key, buf); if (why) return c.json({ error: "bad_pointer", message: why }, 422); }
   const isPtr = k.startsWith(`p/${id}/`);
   if (isPtr) { const no = await policyRefusal(c, id, buf, k); if (no) return c.json({ error: "policy_refused", code: "policy_refused", rule: no.rule, reason: no.reason }, 403); }
+  if (isPtr) { const pending = await proposeIfApprovalNeeded(c, id, buf, k); if (pending) return c.json(pending, 202); }
   let prev: string | null = null;
   if (isPtr) { try { prev = (await c.env.POINTERS.get(k)) ?? null; } catch { /* before is optional */ } }
   await c.env.POINTERS.put(k, buf);

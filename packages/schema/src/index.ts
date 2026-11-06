@@ -259,6 +259,8 @@ export function checkNativeModules(required: Record<string, string> | undefined,
 export const PolicyWeekday = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 /** The optional `policy` section of shipvo.json. Every rule is optional; an empty section means no rules. */
 export const ShipvoPolicy = z.object({
+  /** Widest band a publish may reach without a second owner's approval. A promote above it waits as a pending approval (control plane). Off by default. */
+  requireApprovalAbove: Band.optional(),
   /** Widest cohort band any publish may reach. */
   maxBand: Band.optional(),
   /** Widest cohort band a publish run by an agent may reach. */

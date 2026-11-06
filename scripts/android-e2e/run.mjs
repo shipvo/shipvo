@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { startServer } from "./server.mjs";
 import { publishRelease } from "./release.mjs";
-import { FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
+import { FULL_BUNDLE_SCENARIO, ROLLBACK_SCENARIO, resumeFacts, rollbackVerdict, rolledBackEvent, tapTarget, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, releaseReached, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const APK = resolve(arg("apk", "shell.apk")), BUNDLES = resolve(arg("bundles", "bundles")), KEY = JSON.parse(readFileSync(arg("key", "key.json"), "utf8"));
@@ -37,6 +37,7 @@ function launch() {
 const healthy = (rel, since) => tele().find((e) => e.event === "applied" && e.release === rel && e.at >= since && e.bytes_downloaded === undefined);
 const fatal = () => /FATAL EXCEPTION/.test(adb("logcat", "-d", "-b", "crash"));
 let nextRel = 1;
+const APP_POLL_MS = 10_000; // the sample app checks in every 10 s
 const history = []; // { rel, bytes } of releases published and applied, in order
 
 async function publish(bytes, o = {}) {
@@ -64,7 +65,8 @@ const scenario = async (name, fn) => {
   results.push({ name, ...r, wallS: Math.round((Date.now() - t0) / 1000) }); console.log(`${r.pass ? "PASS" : "FAIL"} ${name}`, JSON.stringify(r).slice(0, 400));
 };
 
-const server = await startServer(TREE, PORT, LOG);
+const cut = { path: null, fraction: 0.5, done: false }; // armed by the resumed-download scenario only
+const server = await startServer(TREE, PORT, LOG, { cutFirst: cut });
 const env = {
   date: new Date().toISOString(), host: { cpus: os.cpus().length, cpu: os.cpus()[0]?.model, node: process.version },
   device: { model: sh("getprop ro.product.model").trim(), android: sh("getprop ro.build.version.release").trim(), api: Number(sh("getprop ro.build.version.sdk")), abi: sh("getprop ro.product.cpu.abi").trim(), emulator: sh("getprop ro.kernel.qemu").trim() === "1" || /sdk|emulator/i.test(sh("getprop ro.product.model")), fingerprint: sh("getprop ro.build.fingerprint").trim() },
@@ -136,8 +138,7 @@ await scenario("hermes bytecode mismatch: a release for another bytecode version
   if (!pid()) launch(); // the app only polls while it is open
   const cur = good().rel, releaseVersion = otherHermesVersion(shellVersion), before = prefs();
   const p = await publish(withHermesVersion(bundle("v" + AFTER_PATCH), releaseVersion), { bases: [], hermesBytecodeVersion: releaseVersion });
-  const reason = await waitFor(() => refusalReason(tele(), p.release, p.at), 60_000);
-  await sleep(15_000); // more poll cycles: the release must stay refused
+  await sleep(25_000); // several poll cycles: the release must stay refused
   const e = entries().filter((x) => x.t >= p.at), after = prefs();
   const sawPointer = e.some((x) => x.path === `/p/${APP}/1/${BAND}.json` && x.status === 200);
   const downloaded = e.some((x) => x.path.startsWith("/b/") && x.path.includes(`r${p.release}.`));
@@ -145,6 +146,9 @@ await scenario("hermes bytecode mismatch: a release for another bytecode version
   const alive = !!pid();
   stop(); await sleep(800); const t1 = Date.now(); launch();
   const again = await waitFor(() => healthy(cur, t1), 30_000);
+  // The sample app reads the runtime's queued events only when it starts (`consumeEvents` on mount), so the typed
+  // reason reaches telemetry on this relaunch, not while the app stays open.
+  const reason = await waitFor(() => refusalReason(tele(), p.release, p.at), 30_000);
   return { pass: reason === "hermes_bytecode_mismatch" && sawPointer && !downloaded && !ranIt && alive && after.current_release === cur && !after.pending_release && !!again && !fatal(),
     refusalReason: reason, release: p.release, shellBytecodeVersion: shellVersion, releaseBytecodeVersion: releaseVersion, runningBefore: cur, currentAfter: after.current_release, pendingAfter: after.pending_release ?? 0,
     blockedAfter: after.blocked_release ?? 0, devicePolledPointer: sawPointer, deviceDownloadedBundle: downloaded, appStayedAlive: alive, restartedOnRelease: again?.release ?? null };
@@ -161,6 +165,36 @@ await scenario("rollback to the previous release", async () => {
     trials.push({ ...t, rolledBackToRelease: target.rel, deviceBundleMatches: onDevice === sha256(target.bytes) });
   }
   return { pass: trials.every((t) => t.ok && t.deviceBundleMatches), trials, median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "applyMs"]) };
+});
+
+await scenario(ROLLBACK_SCENARIO, async () => {
+  // A and B are both healthy releases. A is the one running before the last update, so the runtime keeps it as `previous`.
+  let a = null;
+  try {
+    a = await updateTrial(bundle("v" + AFTER_PATCH), []); if (!a.ok) throw new Error("release A did not become healthy");
+    const b = await updateTrial(bundle("v1"), []); if (!b.ok) throw new Error("release B did not become healthy");
+    if (!pid()) launch();
+    const dump = () => { sh("uiautomator dump /sdcard/ui.xml"); return sh("cat /sdcard/ui.xml"); };
+    let target = null; await waitFor(() => (target = tapTarget(dump(), "Roll back to previous release")), 20_000, 1000);
+    if (!target) throw new Error("the rollback button was not found on screen");
+    const t0 = Date.now(); sh(`input tap ${target.x} ${target.y}`);
+    const goodEv = await waitFor(() => healthy(a.release, t0), 30_000);
+    const goodActiveMs = goodEv ? goodEv.at - t0 : null;
+    await sleep(2.5 * APP_POLL_MS); // two or more check-ins while the pointer still names B
+    const badRefetched = entries().some((e) => e.t >= t0 && e.path.startsWith("/b/") && e.path.includes(`r${b.release}.`));
+    stop(); await sleep(800); const t1 = Date.now(); launch();
+    const again = await waitFor(() => healthy(a.release, t1), 30_000);
+    const wrong = tele().find((e) => e.event === "applied" && e.release === b.release && e.at >= t1 && e.bytes_downloaded === undefined);
+    // The app reports `rolled_back` under the release that is running when it is sent, which is A.
+    const ev = await waitFor(() => rolledBackEvent(tele(), a.release, t0), 15_000);
+    const prefsAfter = prefs(), running = wrong ? b.release : again ? a.release : null;
+    const v = rollbackVerdict({ good: a.release, bad: b.release, prefs: prefsAfter, runningAfterRelaunch: running, badRefetched, telemetryEvent: ev, goodActiveMs });
+    return { pass: v.pass && !fatal(), failures: v.failures, goodRelease: a.release, rolledBackRelease: b.release, rollbackToGoodActiveMs: goodActiveMs, runningAfterRelaunch: running, currentAfter: prefsAfter.current_release, blockedAfter: prefsAfter.blocked_release ?? 0, badRefetched, telemetryEvent: ev?.event ?? null };
+  } finally {
+    // Later scenarios use history.at(-1) and at(-2): drop releases newer than the one the device now runs, on every exit path.
+    const cur = prefs().current_release;
+    if (cur != null && history.some((h) => h.rel === cur)) while (history.at(-1).rel !== cur) history.pop();
+  }
 });
 
 // Runs before the crash-loop scenarios: a crash-loop failure can leave the app open but dead (see the late-crash notes), and
@@ -182,6 +216,22 @@ await scenario("staged rollout: a device outside the cohort does not get the rel
   return { pass: outsideOk && !!ev, deviceBand: BAND, cohort: prefs().cohort, publishedToBands: others, devicePollsWhileOutside: ownPolls.length, devicePollStatuses: [...new Set(ownPolls.map((x) => x.status))], downloadsOfNewRelease: fetched, currentWhileOutside: after.current_release, joinedAfterWideningMs: ev ? ev.at - q.at : null };
 });
 
+// The server cuts the first full-bundle response in half. The runtime must keep the partial file, ask again with
+// `Range: bytes=<n>-`, get a 206, and still apply the release. Runs before the crash-loop scenarios (needs a polling app).
+await scenario("resumed download: an interrupted bundle download resumes with Range", async () => {
+  if (!pid()) launch();
+  const rel = nextRel, path = `/b/${APP}/r${rel}.hbc`, bytes = bundle("v2");
+  cut.path = path; cut.done = false;
+  const p = await publish(bytes, { bases: [] });
+  const ev = await waitFor(() => healthy(p.release, p.at), 180_000);
+  cut.path = null;
+  if (ev) history.push({ rel: p.release, bytes });
+  const f = resumeFacts({ entries: entries(), path, since: p.at, healthyAt: ev?.at ?? null });
+  const why = !f.firstCut ? "the server never cut the first response" : f.requests < 2 ? "the app did not retry the download" : !f.usedRange ? "the second request did not use Range" : f.secondStatus !== 206 ? `the second request got HTTP ${f.secondStatus}, not 206` : !ev ? "the release did not report healthy" : null;
+  return { pass: !why, ...(why ? { failure: why } : {}), release: p.release, bundleBytes: bytes.length, bytesSentTotal: f.bytesSent, firstResponseBytes: f.firstBytes, requests: f.requests,
+    secondRequestUsedRange: f.usedRange, secondRequestRange: f.secondRange, secondRequestStatus: f.secondStatus, firstRequestToHealthyMs: f.firstToHealthyMs };
+});
+
 for (const [kind, file, title, maxBadRuns] of [
   ["start", "crash", "crash-loop: a release that crashes on start is discarded", 3],
   // Reports healthy, is promoted, then dies 5 s later. The stability window must keep counting these boots: the bad release runs 3 times (the promoting boot counts as the first), and the 4th launch is the revert. That is the same rule as crash-on-start. `maxBadRuns` is how many times the bad release may run (the issue's "within 3 launches"); the last launch is the revert to the previous release, so `badRuns = boots - 1`.
@@ -191,7 +241,8 @@ for (const [kind, file, title, maxBadRuns] of [
   for (let i = 0; i < TRIALS; i++) {
     const prev = good().rel, crashBytes = bundle(file);
     const p = await publish(crashBytes, { bases: [] });
-    const staged = await waitFor(() => prefs().pending_release === p.release, 60_000);
+    // The runtime stages, reloads and promotes in well under one poll step, so `pending_release` can be missed. Stop waiting once the release is pending or already current; otherwise the harness idles for the full 60 s while the app crashes unobserved.
+    const staged = await waitFor(() => releaseReached(prefs(), p.release), 60_000);
     let boots = 0, restored = null; const timeline = []; // per launch: time since publish and the runtime's counters
     const mark = (what) => { const q = prefs(); timeline.push({ what, ms: Date.now() - p.at, trial_boots: q.trial_boots ?? 0, unhealthy_boots: q.unhealthy_boots ?? 0, pid: pid() || null }); };
     for (let k = 0; k < 10 && !restored; k++) {
@@ -204,7 +255,7 @@ for (const [kind, file, title, maxBadRuns] of [
     const pr = prefs(), after = entries().filter((e) => e.t >= (restored?.at ?? Infinity) && e.path.includes(`r${p.release}.hbc`)).length;
     const revertEvent = tele().some((e) => e.event === "crash_loop_revert" && e.at >= p.at);
     const badRuns = boots - 1;
-    trials.push({ release: p.release, staged: !!staged, timeline, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
+    trials.push({ release: p.release, staged: staged === "pending", reached: staged || null, timeline, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
       revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 && badRuns <= maxBadRuns });
   }
   return { pass: trials.every((t) => t.pass), kind, maxBadRuns, trials, median: summarize(trials, ["restoredMs", "boots", "badRuns"]) };
