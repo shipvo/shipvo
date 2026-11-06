@@ -45,6 +45,8 @@ This repository, its issues and PRs, the site, docs, blog, tutorials, videos, ll
 
 Public content (site, README, docs, blog, tutorials, videos, llms.txt, release notes, launch posts) says what Shipvo does and what was measured. Never add "what this does not replace", "what it does not do", "not yet", "known gaps", "limitations" or "caveats" sections or sentences, and never describe Shipvo or a feature as basic, partial or early. If something is not built or not measured yet, leave it out of public content and track it in an issue. This never permits a false or rounded-up claim: every number stays exact and linked to where it was measured.
 
+Present Android and iOS together. Wherever a feature works on both, say "Android and iOS" (or "Android + iOS") in the same line, with equal weight, in headings, facts, cards and posts. Never write one platform as the main one and the other as an extra, a later step or a footnote. Write with confidence: plain, direct statements of what Shipvo does.
+
 ## Device testing standard
 
 Android emulators and the iOS Simulator in CI are our device test standard. Prove features there and ship on that evidence. Never block work, mark an issue `needs-human`, or file an issue because something has not been tried on a physical phone, and do not add "not tested on a real device" notes to docs, the site, the README or release notes. Report what CI measured, on what, as it is.

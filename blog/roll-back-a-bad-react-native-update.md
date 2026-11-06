@@ -52,11 +52,13 @@ Use this command when you know which release was good:
 shipvo rollback --to 7
 ```
 
-Say release 8 is bad and release 7 was fine. The command takes release 7's bundle from storage and publishes it again as a new release, release 9. It prints a line like this (the fields come from `packages/cli/src/publish.ts`):
+Say release 8 is bad and release 7 was fine. The command takes release 7's bundle from storage and publishes it again as a new release, release 9. It prints one plain sentence:
 
-```json
-{"app":"myshop","rolled_back_to_code_of":7,"new_release":9,"min_shell_version":"1.0.0","issued_at":"..."}
+```text
+Rolled back to the code of release 7 as new release 9. Next: shipvo status.
 ```
+
+Add `--json` if a script or an agent reads the result. You then get one JSON line with `app`, `rolled_back_to_code_of`, `new_release` and more.
 
 `rollback` publishes the old code under the next release number.
 

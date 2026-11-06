@@ -208,7 +208,7 @@ async function publishRun(argv: string[], json: boolean): Promise<Done> {
     const an = summary.android as { bytes: number; patches: unknown }; Object.assign(summary, { bytes: an.bytes, patches: an.patches }); delete summary.android;
   }
   if (dry) console.log(dryRunSummary(release, totalBytes, outDir, patchInfo));
-  else console.log(JSON.stringify(summary));
+  else console.log(publishedSummary(release, bands));
   const flags = [a.bands ? `--bands ${a.bands}` : "", a.platform ? `--platform ${a.platform}` : ""].filter(Boolean).join(" ");
   const data = { ...summary, platforms, total_bytes: totalBytes };
   if (dry) return { code: "dry_run", summary: `Dry run complete: release ${release}, ${formatSize(totalBytes)}. Nothing was sent.`, data, next: [{ command: `shipvo publish ${flags} --json`.replace(/ +/g, " "), why: "Publish for real." }] };
@@ -223,6 +223,18 @@ function refused(verdict: { rule?: unknown; reason?: unknown }, json: boolean): 
   if (json) throw new CliFailure(msg, "policy_refused", 1, [{ command: "shipvo publish --dry-run-policy --json", why: "Check the policy for other --bands." }]);
   console.error(msg); process.exitCode = 1;
   return { code: "policy_refused", summary: msg, data: {}, next: [] };
+}
+
+/** The publish result in plain words. `--json` carries the full detail. */
+export function publishedSummary(release: number, bands: string[]) {
+  const rest = ["b0", "b1", "b2"].filter((b) => !bands.includes(b));
+  const next = rest.length ? `Next: shipvo status, then shipvo promote --to ${rest.join(",")}.` : "Next: shipvo status.";
+  return `Published release ${release} to ${bands.join(", ")}. ${next}`;
+}
+
+/** The rollback result in plain words. */
+export function rolledBackSummary(to: number, release: number) {
+  return `Rolled back to the code of release ${to} as new release ${release}. Next: shipvo status.`;
 }
 
 /** Bytes in plain units: KB below 1 MB, so a small bundle never reads as 0.00 MB. */
@@ -313,6 +325,6 @@ async function rollbackRun(argv: string[], json: boolean): Promise<Done> {
     const real = argv.filter((x) => x !== "--dry-run").join(" ");
     return { code: "dry_run", summary: `Rollback preview: release ${to} code becomes release ${release}. Nothing was written.`, data, next: [{ command: `shipvo rollback ${real}`, why: "Do the rollback." }] };
   }
-  console.log(JSON.stringify({ app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at }));
+  console.log(rolledBackSummary(to, release));
   return { code: "rolled_back", summary: `Rolled back to the code of release ${to} as release ${release}.`, data, next: [{ command: "shipvo status --json", why: "Check that phones pick up the rollback." }] };
 }
