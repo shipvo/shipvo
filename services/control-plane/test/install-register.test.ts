@@ -8,7 +8,7 @@ const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 
 function setup() {
   const sql = new DatabaseSync(":memory:");
-  sql.exec("CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT, app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via)");
+  sql.exec("CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT, received_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via)");
   sql.exec(readFileSync(new URL("../migrations/0019_install_identity.sql", import.meta.url), "utf8"));
   sql.exec(readFileSync(new URL("../migrations/0020_telemetry_install_id.sql", import.meta.url), "utf8"));
   const db = { prepare: (q: string) => { const st = sql.prepare(q); let b: any[] = []; const o: any = {
@@ -114,6 +114,8 @@ describe("auto-halt on real rows", () => {
   const cfg = { "halt-config/tide": JSON.stringify({ threshold: 0.2 }) };
   async function fleet(n: number, ips: string[], per = 1, sign = true) {
     const { sql, env } = setup();
+    // These installs registered two days ago, so the failures look like a real fleet and halt.
+    sql.exec("CREATE TRIGGER age_installs AFTER INSERT ON installs BEGIN UPDATE installs SET created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days') WHERE rowid = NEW.rowid; END");
     const kv: Record<string, string> = { ...cfg };
     env.POINTERS = { get: async (k: string) => kv[k] ?? null, put: async (k: string, v: string) => { kv[k] = v; } };
     for (let i = 0; i < n; i++) {
