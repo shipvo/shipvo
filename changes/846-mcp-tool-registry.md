@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: the tool definitions now live in one shared registry (`@shipvo/mcp-tools`, private, bundled into `@shipvo/mcp`). The stdio and remote servers build their tool lists from it, and a test fails if they differ. The tool list is unchanged.
+- Migration: none.

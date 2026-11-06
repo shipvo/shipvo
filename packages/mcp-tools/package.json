@@ -1,0 +1,23 @@
+{
+  "name": "@shipvo/mcp-tools",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The one registry of Shipvo MCP tool definitions (names, descriptions, input schemas, error codes, approval steps). The stdio and remote MCP servers both build their tool lists from it. Not published: @shipvo/mcp bundles it.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.8.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}
