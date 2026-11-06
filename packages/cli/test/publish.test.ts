@@ -459,3 +459,13 @@ describe("isInside (dry-run writes stay under the output dir)", () => {
     expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run/../x", p)).toBe(false);
   });
 });
+
+describe("missing listing files", () => {
+  it("says the icon is optional and what to do, with no bare 'not found'", async () => {
+    const { missingListingNote } = await import("../src/publish.js");
+    const icon = missingListingNote("assets/icon.png", "icon");
+    expect(icon).toBe("No app icon yet (optional). Add assets/icon.png to show one in the store.");
+    expect(icon).not.toContain("not found");
+    expect(missingListingNote("shots/a.png", "shot-1")).not.toContain("not found");
+  });
+});
