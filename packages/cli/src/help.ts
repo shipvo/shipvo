@@ -11,7 +11,8 @@ Start
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
                               First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
                               Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.
-  run android|ios [--no-open] [--port n]  Open the app in a phone frame in your browser (no Playwright)
+  run android|ios [--no-open] [--port n] [--lan]  Open the app in a phone frame in your browser (no Playwright)
+                              --lan also serves it to a phone on your Wi-Fi: URL + QR code, token required
   run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
   explore [--max-depth 3] [--max-steps 100] [--fail-on-findings] [--issues-dir <dir>] [--json]  Walk the app in the simulator, write explore-report.md and .json
   preview [--json]            Publish a public 24-hour preview link (here.now, no account)

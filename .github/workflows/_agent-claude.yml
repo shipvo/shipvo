@@ -119,8 +119,8 @@ jobs:
       - name: Prepare branch
         if: steps.chk.outputs.ok == 'true'
         run: |
-          git config user.name "Shipvo Agent (Claude)"
-          git config user.email "agents@shipvo.dev"
+          git config user.name "Anye Happiness Ade"
+          git config user.email "hans@pipilot.dev"
           mkdir -p /tmp/agent
           if [ "${{ inputs.mode }}" = "branch" ]; then git checkout -b "${{ inputs.branch }}"; fi
           git rev-parse HEAD > /tmp/agent/start_sha
@@ -177,6 +177,7 @@ jobs:
           allowed_bots: ${{ inputs.allowed_bots }}
           claude_args: >-
             --max-turns ${{ inputs.max_turns }}
+            --settings '{"includeCoAuthoredBy":false,"attribution":{"commit":"","pr":""}}' 
             --model ${{ inputs.model || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
             --mcp-config '{"mcpServers":{"deepwiki":{"type":"http","url":"https://mcp.deepwiki.com/mcp"}}}'
             --allowedTools "${{ inputs.mode != 'read' && 'Bash,' || '' }}mcp__deepwiki__read_wiki_structure,mcp__deepwiki__read_wiki_contents,mcp__deepwiki__ask_wiki_question,Read,Glob,Grep,Edit,MultiEdit,Write,TodoWrite,WebFetch,WebSearch,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*),Bash(gh search:*),Bash(pnpm:*),Bash(npx:*),Bash(node:*),Bash(corepack:*),Bash(python3:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git rm:*),Bash(git mv:*),Bash(git restore:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(find:*),Bash(wc:*),Bash(mkdir:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(sort:*),Bash(diff:*),Bash(jq:*),Bash(adb:*),Bash(bash:*),Bash(sh:*),Bash(curl:*),Bash(sleep:*),Bash(timeout:*),Bash(date:*),Bash(java:*),Bash(./gradlew:*),Bash(tar:*),Bash(unzip:*),Bash(pip:*),Bash(echo:*),Bash(cd:*),Bash(kill:*),Bash(pkill:*),Bash(ps:*)"
@@ -231,7 +232,7 @@ jobs:
             printf -- '- name: %s\n  edit_format: diff\n  use_temperature: 0.2\n  extra_params:\n    top_p: 1\n    max_tokens: 32000\n' "$LLM" > /tmp/agent/aider-models.yml
             echo "running Aider with $WHO"
             set +e
-            aider --model "$LLM" --weak-model "$LLM" --model-settings-file /tmp/agent/aider-models.yml --timeout 900 --message-file /tmp/agent/prompt.md --read CLAUDE.md \
+            aider --no-attribute-author --no-attribute-committer --model "$LLM" --weak-model "$LLM" --model-settings-file /tmp/agent/aider-models.yml --timeout 900 --message-file /tmp/agent/prompt.md --read CLAUDE.md \
               --yes-always --auto-commits --no-check-update --no-show-model-warnings --no-analytics --no-gitignore \
               --edit-format diff --no-detect-urls --test-cmd "pnpm -r test" --auto-test --map-tokens 2048 "${FILES[@]}" > /tmp/agent/aider.log 2>&1
             set -e
