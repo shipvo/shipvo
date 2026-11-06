@@ -1,0 +1,1 @@
+- cli: `shipvo promote --dry-run` and `shipvo rollback --to N --dry-run` now work with no login or token. They read the files `shipvo publish --dry-run` wrote to `.shipvo/dry-run`. With a login or Cloudflare keys set, they behave as before.
