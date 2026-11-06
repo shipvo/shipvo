@@ -435,7 +435,7 @@ ${tcmd([{ t: "shipvo store details --dry-run", tt: 1.8, d: 1, out: "Filled witho
   stShots: () => `
 ${chip("Step 4")}
 <h2 class="abs in" style="left:72px;top:100px;--d:.3s">Store screenshots</h2>
-${tcmd([{ t: "shipvo store screenshots", tt: 1.6, d: 1, out: "fast mode: simulator render, not the native UI", od: 2.8 }], 72, 200, 1130, .6, 30)}
+${tcmd([{ t: "shipvo store screenshots", tt: 1.6, d: 1, out: "store-assets/raw/iphone/01-start.jpg: ok", od: 2.8 }], 72, 200, 1130, .6, 30)}
 ${["iPhone", "iPad", "Play phone", "Play tablets"].map((t, k) => `<div class="abs card pop" style="left:${72 + k * 280}px;top:400px;width:250px;padding:22px 24px;--d:${4.6 + k * 1.2}s"><div class="mono sky" style="font-size:16px">SIZE CHECKED</div><div style="font-size:28px;font-weight:700;margin-top:8px">${t}</div></div>`).join("")}`,
 
   stTesters: () => `

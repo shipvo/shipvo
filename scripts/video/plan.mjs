@@ -26,3 +26,8 @@ export function buildPlan(script, man) {
 
 const ts = (x) => { const h = Math.floor(x / 3600), m = Math.floor((x % 3600) / 60), s = (x % 60).toFixed(3).padStart(6, "0"); return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${s}`; };
 export function vtt(plan) { return "WEBVTT\n\n" + plan.cues.map((c, i) => `${i + 1}\n${ts(c.start)} --> ${ts(c.end)}\n${c.text}\n`).join("\n"); }
+
+/** Flash cards from script scene.flashes ([{at, text}], seconds from scene start). Each lasts 1.5 s and never runs past its scene. */
+export function flashes(script, plan) {
+  return plan.scenes.flatMap((sc, i) => (script.scenes[i].flashes || []).map((x) => ({ start: sc.start + x.at, end: Math.min(sc.end, sc.start + x.at + 1.5), text: x.text })));
+}

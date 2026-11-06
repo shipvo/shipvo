@@ -56,7 +56,7 @@ window.seek=(t)=>{
   const fl=(P.flashes||[]).find(x=>t>=x.start&&t<x.end),fe=document.getElementById('flash');
   fe.style.display=fl?'flex':'none';
   if(fl){const k=Math.min(1,(t-fl.start)/.25),e=1-Math.pow(1-k,3);fe.firstChild.textContent=fl.text;fe.firstChild.style.transform='scale('+(.86+.14*e+.04*(t-fl.start))+')';}
-  window.scenes[i].style.transform='scale('+(1+.05*lt/(s.end-s.start))+')';
+  window.scenes.forEach((e,k)=>{e.style.transform=(P.pushIn&&k===i)?'scale('+(1+.05*lt/(s.end-s.start))+')':'';});
   const c=P.cues.find(c=>t>=c.start&&t<c.end);
   document.getElementById('cap').innerHTML=c?`<span>${c.text}</span>`:'';
   document.getElementById('bar').style.width=(t/P.total*1280)+'px';

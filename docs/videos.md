@@ -6,9 +6,9 @@ Short videos for people who are new to Shipvo. Each one has captions and a writt
 
 ### From working app to Google Play and the App Store
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 4 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-6ada6c3a.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 4 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-14f89377.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
-2 minutes 4 seconds. The store path in four commands: `shipvo store setup` for your plan, `shipvo store status` for one timeline per store, `shipvo store details --dry-run` for draft data safety answers and a privacy policy, and `shipvo store screenshots` for checked store sizes. It ends on the Google Play tester rule and `shipvo store testers`. It follows [Store details](store.md).
+2 minutes 4 seconds. The store path in four steps: `shipvo store setup` for your plan, `shipvo store status` for one timeline per store, `shipvo store details --dry-run` for draft data safety answers and a privacy policy, and `shipvo store screenshots` for checked store sizes. It ends on the Google Play tester rule and `shipvo store testers`, with a link to the [testers video](#get-your-12-google-play-testers-with-shipvo-testers). It follows [Store details](store.md).
 
 [Captions (.vtt)](/videos/from-app-to-both-stores.vtt)
 

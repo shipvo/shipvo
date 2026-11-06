@@ -9,7 +9,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCENES } from "./scenes.mjs";
 import { mark, symbol } from "../../services/site/brand.mjs";
-import { buildPlan, vtt } from "./plan.mjs";
+import { buildPlan, vtt, flashes } from "./plan.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -26,7 +26,8 @@ const man = JSON.parse(readFileSync(resolve(opt("manifest", "vo.json")), "utf8")
 const vo = resolve(opt("vo", "vo.wav"));
 const plan = buildPlan(script, man);
 // Pattern interrupts: a short full-frame card per flash (script scene.flashes: [{at, text}], seconds from scene start).
-plan.flashes = plan.scenes.flatMap((sc, i) => (script.scenes[i].flashes || []).map((x) => ({ start: sc.start + x.at, end: sc.start + x.at + 1.5, text: x.text })));
+plan.pushIn = !!script.pushIn;
+plan.flashes = flashes(script, plan);
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, slug + ".vtt"), vtt(plan));
 

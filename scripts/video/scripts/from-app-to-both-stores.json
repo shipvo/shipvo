@@ -1,6 +1,7 @@
 {
   "slug": "from-app-to-both-stores",
   "posterAt": 4.5,
+  "pushIn": true,
   "title": "From working app to Google Play and the App Store",
   "tutorial": "docs/store.md",
   "voice": "af_heart",
