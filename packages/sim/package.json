@@ -12,6 +12,7 @@
   },
   "exports": {
     "./server.mjs": "./server.mjs",
+    "./screen-rules.mjs": "./screen-rules.mjs",
     "./frame.mjs": {
       "types": "./frame.d.mts",
       "default": "./frame.mjs"

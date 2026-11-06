@@ -20,6 +20,16 @@ export function isLoopback(addr: string | undefined): boolean {
   return addr === "127.0.0.1" || addr === "::1" || (addr?.startsWith("::ffff:127.") ?? false);
 }
 
+/** True when the `Host` header names this server on loopback. Blocks DNS rebinding. */
+export function hostAllowed(host: string | undefined, port: number): boolean {
+  return host === `127.0.0.1:${port}` || host === `localhost:${port}`;
+}
+
+/** True when there is no `Origin` (not a browser) or it is this server's own origin. */
+export function originAllowed(origin: string | undefined, port: number): boolean {
+  return origin === undefined || origin === `http://127.0.0.1:${port}` || origin === `http://localhost:${port}`;
+}
+
 export function tokenMatches(given: string | null, token: string): boolean {
   if (!given) return false;
   const a = Buffer.from(given), b = Buffer.from(token);

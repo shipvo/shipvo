@@ -136,6 +136,9 @@ importers:
       '@shipvo/schema':
         specifier: workspace:*
         version: link:../schema
+      '@shipvo/sim':
+        specifier: workspace:^
+        version: link:../sim
       '@shipvo/store':
         specifier: workspace:^
         version: link:../store
