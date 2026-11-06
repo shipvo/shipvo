@@ -268,3 +268,70 @@ ${tcmd([{ t: "npm test && npx shipvo publish --dry-run --skip-web true", tt: 2.6
 <div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/docs/test-with-an-assistant</div>
 <div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">Tested on a simulator. Run it before every release.</div>`,
 });
+
+// --- get-your-12-testers ---
+const dayCell = (k, d) => `<div class="fade" style="--d:${d + k * .22}s;width:62px;height:62px;border-radius:12px;background:#12382b;color:var(--green);font:700 22px/62px 'JetBrains Mono','DejaVu Sans Mono',monospace;text-align:center">${k + 1}</div>`;
+const person = (k, d) => `<div class="pop" style="--d:${d + k * .15}s;width:54px;height:54px;border-radius:50%;background:#1a2540;border:2px solid #22304d;position:relative"><div style="position:absolute;left:18px;top:10px;width:18px;height:18px;border-radius:50%;background:var(--sky)"></div><div style="position:absolute;left:11px;top:31px;width:32px;height:16px;border-radius:16px 16px 4px 4px;background:var(--sky)"></div></div>`;
+
+Object.assign(SCENES, {
+  gtHook: () => `
+${chip("Google Play")}
+<h1 class="abs in" style="left:72px;top:130px;width:700px;--d:.5s">12 testers.<br><span class="or">14 days in a row.</span></h1>
+<div class="abs in mute" style="left:72px;top:440px;width:560px;font-size:30px;line-height:1.35;--d:2.4s">The rule for new personal accounts.</div>
+<div class="abs" style="left:760px;top:250px;width:440px;display:flex;flex-wrap:wrap;gap:14px">${Array.from({ length: 12 }, (_, k) => person(k, 1.6)).join("")}</div>
+<div class="abs flight" style="left:820px;top:110px;width:130px;--fx:-100px;--fy:120px;--tx:120px;--ty:-20px;--d:3.4s">${plane(130)}</div>`,
+
+  gtRule: () => `
+${chip("The rule")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Opted in. Every day.</h2>
+<div class="abs" style="left:72px;top:210px;width:1100px;display:flex;flex-wrap:wrap;gap:12px">${Array.from({ length: 14 }, (_, k) => dayCell(k, 1.2)).join("")}</div>
+<div class="abs in mute" style="left:72px;top:300px;font-size:24px;--d:4.6s">12 or more testers, 14 days in a row</div>
+<div class="abs card in" style="left:72px;top:400px;width:520px;padding:20px 28px;--d:6s;border-color:#5a2230"><div class="mono" style="color:var(--red);font-size:18px">DROPS BELOW 12</div><div style="font-size:28px;margin-top:6px">The clock starts again.</div></div>
+<div class="abs card in" style="left:640px;top:400px;width:540px;padding:20px 28px;--d:9s"><div class="mono sky" style="font-size:18px">NO RULE FOR</div><div style="font-size:26px;margin-top:6px;line-height:1.35">Company accounts, and personal accounts made before 13 Nov 2023</div></div>`,
+
+  gtJoin: () => `
+${chip("Step 1")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Join Shipvo Testers</h2>
+<div class="abs card in" style="left:72px;top:220px;width:700px;padding:28px 32px;--d:1s">
+  <div class="mono sky" style="font-size:18px">A GROUP OF FOUNDERS</div>
+  <div style="font-size:30px;margin-top:8px;line-height:1.35">Everyone tests each other's apps.</div>
+  <div class="mono" style="font-size:30px;margin-top:22px"><span class="sky">shipvo.dev</span>/testers</div></div>
+<div class="abs pop" style="left:72px;top:500px;--d:4.6s"><span class="badge" style="background:#12382b;color:var(--green)">Anyone can join</span></div>
+<div class="abs pop" style="left:340px;top:500px;--d:6.4s"><span class="badge" style="background:#1a2540;color:var(--paper)">Emails stay private</span></div>
+<div class="abs" style="left:850px;top:240px;width:330px;display:flex;flex-wrap:wrap;gap:14px">${Array.from({ length: 12 }, (_, k) => person(k, 2.4)).join("")}</div>`,
+
+  gtTrack: () => `
+${chip("Step 2")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Make a closed test</h2>
+<div class="abs card in" style="left:72px;top:210px;width:1100px;padding:24px 32px;font-size:28px;line-height:1.9;--d:.9s">
+  <div class="mono sky" style="font-size:18px">PLAY CONSOLE &gt; TESTING &gt; CLOSED TESTING</div>
+  <div class="fade" style="--d:2s">1. Make a track.</div>
+  <div class="fade" style="--d:4s">2. Upload your first build <span class="or">by hand</span>.</div>
+  <div class="fade" style="--d:8s">3. Add the Google Group:</div>
+  <div class="mono fade" style="--d:9.4s;font-size:26px;margin-left:34px;color:var(--sky)">shipvo-testers@googlegroups.com</div></div>
+<div class="abs in mute" style="left:72px;top:540px;font-size:24px;--d:5.4s">Play does not allow the upload through the API.</div>`,
+
+  gtCli: () => `
+${chip("Or let Shipvo do it")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">One command</h2>
+${tcmd([{ t: "shipvo store testers --package com.example.shop", tt: 2.4, d: 1.2, out: "Steps for your app: closed test, group, opt-in link", od: 4 }, { t: "shipvo store testers --play-key play-key.json", tt: 2.4, d: 5.4, out: "Added the Shipvo Testers group. Nothing removed.", od: 8.2 }], 72, 210, 1130, .8, 28)}
+<div class="abs in mute" style="left:72px;top:480px;width:1000px;font-size:26px;line-height:1.4;--d:9.2s">Without a key, no network call is made. The key is read once and not stored.</div>`,
+
+  gtLink: () => `
+${chip("Step 3")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Share your opt-in link</h2>
+<div class="abs card in mono" style="left:72px;top:230px;width:1100px;padding:24px 30px;font-size:30px;--d:1s"><span class="sky">play.google.com</span>/apps/testing/<span class="or">your.package.name</span></div>
+${["Open the link", "Opt in", "Install the app"].map((t, k) => `<div class="abs card pop" style="left:${72 + k * 370}px;top:400px;width:330px;padding:22px 26px;--d:${3 + k * 1.6}s"><div class="mono or" style="font-size:20px">${k + 1}</div><div style="font-size:30px;margin-top:6px;font-weight:700">${t}</div></div>`).join("")}`,
+
+  gtGive: () => `
+${chip("Step 4")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Test other apps</h2>
+<div class="abs in" style="left:72px;top:220px;width:620px;font-size:34px;line-height:1.4;--d:1s">The community works<br>because <span class="or">everyone tests</span>.</div>
+${["Open an app another founder shared", "Opt in", "Keep it installed for 14 days"].map((t, k) => `<div class="abs card in" style="left:740px;top:${200 + k * 110}px;width:440px;padding:20px 26px;font-size:26px;--d:${3 + k * 1.6}s">${t}</div>`).join("")}`,
+
+  gtCta: () => `
+<div class="abs pop" style="left:72px;top:140px;width:330px;--d:.3s">{{MARK}}</div>
+<h1 class="abs in" style="left:470px;top:130px;--d:.8s">Get your 12<br><span class="or">testers.</span></h1>
+<div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/testers</div>
+<div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">We cannot promise how many people will opt in.</div>`,
+});

@@ -1,0 +1,137 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:02.323
+Want your app on Google Play?
+
+2
+00:00:02.323 --> 00:00:04.460
+New personal accounts have a rule.
+
+3
+00:00:04.460 --> 00:00:07.729
+You need twelve testers, for fourteen days in a row.
+
+4
+00:00:07.729 --> 00:00:09.300
+Here is how to find them.
+
+5
+00:00:10.900 --> 00:00:14.654
+Google asks for twelve people to opt in to a closed test.
+
+6
+00:00:14.654 --> 00:00:18.014
+They must stay opted in for fourteen days in a row.
+
+7
+00:00:18.014 --> 00:00:21.702
+If the count drops below twelve, the clock starts again.
+
+8
+00:00:21.702 --> 00:00:23.810
+Company accounts skip this rule.
+
+9
+00:00:23.810 --> 00:00:28.750
+So do personal accounts made before November thirteen, twenty twenty three.
+
+10
+00:00:30.350 --> 00:00:30.986
+Step one.
+
+11
+00:00:30.986 --> 00:00:32.398
+Join Shipvo Testers.
+
+12
+00:00:32.398 --> 00:00:36.141
+It is a group of founders who test each other's apps.
+
+13
+00:00:36.141 --> 00:00:37.271
+Anyone can join.
+
+14
+00:00:37.271 --> 00:00:40.025
+Members cannot see each other's emails.
+
+15
+00:00:42.350 --> 00:00:42.949
+Step two.
+
+16
+00:00:42.949 --> 00:00:45.745
+In Play Console, make a closed test track.
+
+17
+00:00:45.745 --> 00:00:47.876
+Upload your first build by hand.
+
+18
+00:00:47.876 --> 00:00:51.071
+Play does not allow that step through the A P I.
+
+19
+00:00:51.071 --> 00:00:54.200
+Then add the Shipvo Testers group to the track.
+
+20
+00:00:56.350 --> 00:00:57.663
+Or let Shipvo do it.
+
+21
+00:00:57.663 --> 00:00:59.303
+Run shipvo store testers.
+
+22
+00:00:59.303 --> 00:01:01.469
+It prints the steps for your app.
+
+23
+00:01:01.469 --> 00:01:04.684
+Add your Play key, and it adds the group for you.
+
+24
+00:01:04.684 --> 00:01:06.325
+It never removes a group.
+
+25
+00:01:08.350 --> 00:01:09.032
+Step three.
+
+26
+00:01:09.032 --> 00:01:11.759
+Share your opt-in link with your own people.
+
+27
+00:01:11.759 --> 00:01:14.425
+They open it, opt in, and install your app.
+
+28
+00:01:18.350 --> 00:01:19.032
+Step four.
+
+29
+00:01:19.032 --> 00:01:20.124
+Test other apps.
+
+30
+00:01:20.124 --> 00:01:23.059
+The community works because everyone tests.
+
+31
+00:01:23.059 --> 00:01:25.925
+Keep them installed for the fourteen days.
+
+32
+00:01:28.350 --> 00:01:31.555
+We cannot promise how many people will opt in.
+
+33
+00:01:31.555 --> 00:01:33.227
+But now you have a plan.
+
+34
+00:01:33.227 --> 00:01:35.875
+Join at shipvo.dev/testers.
