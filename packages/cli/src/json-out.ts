@@ -78,3 +78,16 @@ export async function captureLog(fn: () => Promise<unknown>): Promise<string[]> 
   try { await fn(); } finally { console.log = log; }
   return lines;
 }
+
+/** True when `--json` is on the command line; `rest` is argv without it. */
+export function takeJson(argv: string[]): { json: boolean; rest: string[] } {
+  return { json: argv.includes("--json"), rest: argv.filter((a) => a !== "--json") };
+}
+
+/** Turn a text-mode exit (status and the stderr text) into a CliFailure with a stable code. */
+export function classifyExit(rules: [RegExp, string][], next: Next[]): (message: string, status: number) => CliFailure {
+  return (message, status) => {
+    const code = rules.find(([re]) => re.test(message))?.[1] ?? (status === EXIT.usage ? "usage" : "failed");
+    return new CliFailure(message || `exited with status ${status}`, code, status === EXIT.usage ? EXIT.usage : EXIT.failed, next);
+  };
+}

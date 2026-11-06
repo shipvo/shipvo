@@ -55,7 +55,7 @@ async function reach(env: OwnerEnv): Promise<string> {
  * command and a hash of its arguments. Only the signed-in owner (admin session) can approve it. It works once, for 10 minutes. */
 export const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 export type Challenge = { id: string; app_id: string; command: string; args_hash: string; requester: string; plan: string[]; status: "pending" | "approved" | "denied" | "used";
-  created_at: string; expires_at: string; approved_by?: string; approved_how?: string; resolved_at?: string };
+  created_at: string; expires_at: string; release?: number; approved_by?: string; approved_how?: string; resolved_at?: string };
 const challengeKey = (appId: string, id: string) => `c/${appId}/challenge/${id}`;
 const canon = (v: unknown): unknown => Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, canon((v as any)[k])])) : v;
 /** SHA-256 of the command name and its arguments in key-sorted JSON, so the same action always hashes the same. */
@@ -76,6 +76,26 @@ export async function listChallenges(env: { kv: KVNamespace; appId: string }): P
     cursor = l.list_complete === false ? l.cursor : undefined;
   } while (cursor);
   return out.sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+export const HOLD_COMMAND = "halt_release";
+/** KV key remembering that the owner dismissed the hold for a release, so later failures do not ask again. */
+export const holdDismissedKey = (appId: string, release: number) => `hold-dismissed/${appId}/${release}`;
+/**
+ * The telemetry looks attacked: instead of halting, keep the release at its band and add an owner approval entry.
+ * Confirm halts it, dismiss clears the hold and is remembered (see `holdDismissedKey`), so the owner is not asked again.
+ * One pending hold per release. An unanswered hold expires after CHALLENGE_TTL_MS; the next failure then asks again.
+ * KV has no compare-and-set, so two simultaneous failures can both pass the check below and create two pending entries.
+ * Either one can be answered; the owner sees at most a duplicate row.
+ */
+export async function holdRelease(env: { kv: KVNamespace; appId: string; actor: string }, release: number, reason: "fresh_installs" | "burst", seen: { reports: number; failed: number }): Promise<void> {
+  const prefix = `Release ${release}:`;
+  if (await env.kv.get(holdDismissedKey(env.appId, release))) return;
+  if ((await listChallenges(env)).some((c) => c.command === HOLD_COMMAND && c.release === release)) return;
+  const why = reason === "fresh_installs" ? "most failing installs registered in the last hour" : "failures are far above the normal rate";
+  const now = Date.now();
+  await saveChallenge(env, { id: crypto.randomUUID(), app_id: env.appId, command: HOLD_COMMAND, args_hash: await argsHash(HOLD_COMMAND, { release }), requester: env.actor, release,
+    plan: [`${prefix} held, not halted. ${why[0]!.toUpperCase()}${why.slice(1)} (${seen.failed} of ${seen.reports} reports failed). Approve to halt this release, deny to clear the hold.`],
+    status: "pending", created_at: new Date(now).toISOString(), expires_at: new Date(now + CHALLENGE_TTL_MS).toISOString() });
 }
 /** Owner decision on a challenge. Callers must have checked that this is a signed-in owner, never a token. */
 export async function resolveChallenge(env: OwnerEnv, id: string, verb: "approve" | "deny", approver: string, how = "admin session"): Promise<{ ok: true; challenge: Challenge } | { ok: false; error: { code: string; message: string } }> {
