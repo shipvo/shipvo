@@ -1,1 +1,0 @@
-- cli: `shipvo smoke [android|ios]` (default `android`) passes the platform to the simulator session as its device platform. `data.platform` is new and the summary reads "The app loads on <platform>". Any other value exits 2. Migration: none; scripts that match the old summary text should match "The app loads".

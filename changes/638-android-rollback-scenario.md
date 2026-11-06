@@ -1,1 +1,0 @@
-- android-e2e: new scenario proves on-device `Runtime.rollback()` restores the previous release, keeps it after a restart, does not re-apply the rolled-back release on later check-ins, and reports `rolled_back` telemetry. The report gives the time from the call to the previous release being active.

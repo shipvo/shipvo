@@ -1,7 +1,8 @@
 // `shipvo explore`: a deterministic walker over the simulator's accessibility tree. No LLM call.
 // The walker (`walk`) only needs a `Driver`, so tests run it against a fake app. `explore` wires it to the simulator.
 import { execSync, spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
@@ -128,7 +129,18 @@ export type WalkOptions = {
   onEvent?: (e: WalkEvent) => void;
   /** Checked before every action. When it returns true the walk ends and says it was stopped. */
   shouldStop?: () => boolean;
+  /** Called once per action with features and outcome only: roles, counts, types and hashes. Never text. See docs/explore-features.md. */
+  onAction?: (r: ActionRecord) => void;
 };
+/** One line of `--record-features`. Version 1. */
+export type ActionRecord = {
+  v: 1; n: number; seed: number;
+  screen: { hash: string; depth: number; roles: Record<string, number>; field_types: Record<string, number>; actions: number; tried: number };
+  action: { kind: "tap" | "type"; role: string; label_hash: string; nth: number; risky: boolean; invalid_input: boolean; enter: boolean };
+  outcome: { new_screen: boolean; screen_hash: string; flow_finished: boolean; finding: boolean; findings: number; failed: boolean };
+};
+const hash = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
+const countBy = (xs: string[]) => { const o: Record<string, number> = {}; for (const x of xs.sort()) o[x] = (o[x] ?? 0) + 1; return o; };
 export type WalkEvent =
   | { type: "step"; n: number; step: Step; text: string }
   | { type: "screen"; screens: number; sig: string; controls: { role: string; name: string }[] }
@@ -262,6 +274,8 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
       if (!target) { at = node; continue; }
       const step: Step = a.kind === "type" ? { action: "type", role: a.el.role, name: a.el.name, nth: a.el.nth, text: a.text!, ...(a.enter ? { enter: true } : {}) } : { action: "tap", role: a.el.role, name: a.el.name, nth: a.el.nth };
       const here = [...node.path, step]; steps++; node.n++;
+      const before = findings.length, tried = node.acts.filter((x) => x.done).length - 1;
+      const sigBefore = node.sig, fieldEls = parseEls(screen, FIELDS);
       o.onEvent?.({ type: "step", n: steps, step, text: describeStep(step) });
       const r = a.kind === "type" ? await driver.type!(target.ref, a.text!, a.enter) : await driver.tap(target.ref);
       if (r.delivery === "not_delivered") add({ kind: "not_delivered", message: `Not delivered (${r.reason ?? "unknown reason"}): ${r.error ?? "the app did not receive the tap"}`, screen, steps: here });
@@ -270,6 +284,13 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
       await checkErrors(after, here);
       const crashed = !r.ok || r.screen == null || !!redScreen(after);
       const next = signature(after);
+      const isNew = !crashed && next !== node.sig && !seen.has(next);
+      o.onAction?.({
+        v: 1, n: steps, seed: o.seed ?? 1,
+        screen: { hash: hash(sigBefore), depth: node.depth, roles: countBy(elements(screen).map((e) => e.role)), field_types: countBy(fieldEls.map((e) => e.role)), actions: node.acts.length, tried },
+        action: { kind: a.kind, role: a.el.role, label_hash: hash(a.el.name), nth: a.el.nth, risky: a.risky, invalid_input: a.kind === "type" && !!a.enter, enter: !!a.enter },
+        outcome: { new_screen: isNew, screen_hash: hash(next), flow_finished: !crashed && elements(after).length === 0, finding: findings.length > before, findings: findings.length - before, failed: crashed },
+      });
       if (crashed) { screen = null; at = null; continue; }
       if (next !== node.sig && !seen.has(next)) {
         node.reward++;
@@ -401,7 +422,13 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     let seed: number | undefined;
     if (a.seed !== undefined) { seed = Number(a.seed); if (!Number.isInteger(seed) || seed < 0) throw new Error("--seed must be a whole number of 0 or more"); }
     const flowNames = a.flows !== undefined ? parseFlowNames(a.flows) : undefined;
-    const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, seed, app: cfg.appId, skin: a.skin as Skin | undefined });
+    let onAction: WalkOptions["onAction"];
+    if (a["record-features"] !== undefined) {
+      if (a["record-features"] === "true") throw new Error("--record-features needs a file");
+      const file = a["record-features"]; writeFileSync(file, "");
+      onAction = (r) => appendFileSync(file, JSON.stringify(r) + "\n");
+    }
+    const report = await walk(simDriver(base, cfg.appId), { onAction, routes, onlyRoutes, maxDepth, maxSteps, seed, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
     const nothingChanged = onlyRoutes && !routes?.length;
     if (nothingChanged) console.error("No screens changed, nothing explored.");
