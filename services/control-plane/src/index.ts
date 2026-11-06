@@ -282,9 +282,12 @@ app.post("/o/:app", async (c) => {
   const ip = await sha(c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "unknown");
   const install = typeof body.install_id === "string" && body.install_id ? body.install_id.slice(0, 64) : null;
   // Idempotency key. Order ids are not unique across customers (the Tide app starts every customer at TT-1001),
-  // so the key is the client's idempotency_key, else install_id + order id, else IP hash + order id.
+  // so the key is the client's idempotency_key, else install_id + order id, else IP hash + order id + a hash of the
+  // order body. Without the body hash, two customers behind one IP who both place TT-1001 would collide and the second order would be lost.
+  // With it, only a byte-identical retry is a duplicate.
   // Another install or key can never collide with it, so nobody can squat an id to block a real order.
-  const idem = typeof body.idempotency_key === "string" && body.idempotency_key ? "k:" + body.idempotency_key.slice(0, 64) : `${install ? "i:" + install : "p:" + ip}:${o.id}`;
+  const idem = typeof body.idempotency_key === "string" && body.idempotency_key ? "k:" + body.idempotency_key.slice(0, 64)
+    : install ? `i:${install}:${o.id}` : `p:${ip}:${o.id}:${(await sha(json)).slice(0, 16)}`;
   const first = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND idem = ?").bind(appId, idem).first<{ status: string }>();
   if (first) return reply(first.status, true);
   // Rate limits per IP and per install, over the last minute. The count and the insert are not atomic,

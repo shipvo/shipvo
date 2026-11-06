@@ -42,10 +42,10 @@ describe("POST /o/:app trust rules", () => {
     expect(((await r.json()) as any).status).toBe("unverified");
     expect(rows[0].status).toBe("unverified");
   });
-  it("returns the first result for a duplicate id and stores nothing new", async () => {
+  it("returns the first result for a reused idempotency_key with a different order and stores nothing new", async () => {
     const { env, rows } = fake();
-    await place(env, good());
-    const r = await place(env, { ...good(), total: 1 });
+    await place(env, good(), { idempotency_key: "k1" });
+    const r = await place(env, { ...good(), total: 1 }, { idempotency_key: "k1" });
     expect(r.status).toBe(202);
     expect(((await r.json()) as any).duplicate).toBe(true);
     expect(rows).toHaveLength(1);
@@ -58,6 +58,23 @@ describe("POST /o/:app trust rules", () => {
     expect(((await r.json()) as any).duplicate).toBe(false);
     expect(rows).toHaveLength(2);
     expect(rows.every((x) => x.status === "unverified")).toBe(true);
+  });
+  it("stores two different orders with the same id from one IP with no install_id or key; an identical retry is a duplicate", async () => {
+    const { env, rows } = fake();
+    const h = { "cf-connecting-ip": "1.2.3.4" };
+    const other = { ...good("TT-1001"), lines: [{ product_id: "line", quantity: 1, unit_price: 500 }], subtotal: 500, discount: 0, delivery_fee: 200, total: 700, promo: undefined };
+    expect(((await (await place(env, good("TT-1001"), {}, h)).json()) as any).duplicate).toBe(false);
+    expect(((await (await place(env, other, {}, h)).json()) as any).duplicate).toBe(false);
+    expect(rows).toHaveLength(2);
+    expect(((await (await place(env, good("TT-1001"), {}, h)).json()) as any).duplicate).toBe(true);
+    expect(rows).toHaveLength(2);
+  });
+  it("accepts the exact payload Tide sends today (order, content_version, release) as unverified", async () => {
+    const { env, rows } = fake();
+    const r = await app.request("/o/tide", { method: "POST", body: JSON.stringify({ order: good("TT-1001"), content_version: 3, release: "1.0.0" }) }, env);
+    expect(r.status).toBe(202);
+    expect(((await r.json()) as any).status).toBe("unverified");
+    expect(rows[0].status).toBe("unverified");
   });
   it("lets a client idempotency_key tell orders apart, and repeats of it are duplicates", async () => {
     const { env, rows } = fake();
