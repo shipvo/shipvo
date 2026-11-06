@@ -66,6 +66,19 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 
 `GET /p/:app/:major/:band` pointer · `GET /b/:app/:file` bundle · `GET /w/:app/releases.json`, `GET /w/:app/:rel/*` web artifact · `GET /c/:app/content.json` live content · `POST /o/:app` orders · `POST /t` telemetry, `GET /t/:app` summary · `GET /app/:id/admin` admin · `GET /app/:id/api/describe`, `POST /app/:id/api/command` owner API (bearer `OWNER_TOKEN` or admin session).
 
+## Roles
+
+The control plane defines four roles. **Roles are not enforced yet.** Today the existing tokens and admin session decide access. A later change will tie roles to tokens and SSO.
+
+| Action | viewer | developer | release_manager | admin |
+|---|---|---|---|---|
+| `read_summary`, `read_audit` | yes | yes | yes | yes |
+| `publish` (lowest band) | no | yes | yes | yes |
+| `promote`, `approve_hold`, `rollback`, `halt` | no | no | yes | yes |
+| `manage_tokens`, `manage_app` | no | no | no | yes |
+
+Each role has everything the one before it has. Unknown roles and actions are denied. The table is in `services/control-plane/src/roles.ts`.
+
 ## Revert alerts (webhook)
 
 An app owner can set one `https://` URL that is called when devices revert a release. With the owner token:
