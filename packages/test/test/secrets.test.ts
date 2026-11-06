@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { secret, redact, parseSteps, runSteps, PhoneError } from "../src/index.js";
+import { secret, redact, parseScreen, parseSteps, runSteps, PhoneError } from "../src/index.js";
 import { Phone } from "../src/index.js";
 import "../src/vitest.js";
 
@@ -99,5 +99,47 @@ describe("Phone errors", () => {
     process.env.SHIPVO_TEST_PASSWORD = "12";
     secret("PASSWORD");
     expect(redact("code 12")).toBe("code 12");
+  });
+});
+
+describe('log in as "name"', () => {
+  const SCREEN = '- textbox "Email" [ref=e1]\n- textbox "Password" [ref=e2]\n- button "Log in" [ref=e3]';
+  const make = () => {
+    const calls: string[] = [];
+    const phone = {
+      screen: SCREEN,
+      nodes: () => parseScreen(SCREEN),
+      type: async (t: { ref: string }, x: string) => { calls.push(`type ${t.ref} ${x}`); },
+      tap: async (t: { ref: string }) => { calls.push(`tap ${t.ref}`); },
+    } as unknown as Phone;
+    return { phone, calls };
+  };
+  const clean = () => { for (const k of Object.keys(process.env)) if (k.startsWith("SHIPVO_TEST_ACCOUNT_")) delete process.env[k]; };
+  afterEach(clean);
+
+  it("types the values by name and taps Log in", async () => {
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_USER = "buyer@example.test";
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD = "pw-Zx81-secret";
+    const steps = parseSteps('log in as "buyer"');
+    expect(JSON.stringify(steps)).not.toContain("pw-Zx81-secret");
+    const { phone, calls } = make();
+    await runSteps(phone, steps);
+    expect(calls).toEqual(["type e1 buyer@example.test", "type e2 pw-Zx81-secret", "tap e3"]);
+  });
+  it("fails naming the variable when it is not set", async () => {
+    const { phone, calls } = make();
+    await expect(runSteps(phone, parseSteps('log in as "buyer"'))).rejects.toThrow(/SHIPVO_TEST_ACCOUNT_BUYER_USER/);
+    expect(calls).toEqual([]);
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_USER = "buyer@example.test";
+    await expect(runSteps(phone, parseSteps('log in as "buyer"'))).rejects.toThrow(/SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD/);
+  });
+  it("the password is in no error, even when the app echoes it", async () => {
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_USER = "buyer@example.test";
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD = "pw-Zx81-secret";
+    const { phone } = make();
+    phone.type = async (_t: unknown, x: string) => { throw new Error(`rejected ${x}`); };
+    const err = await runSteps(phone, parseSteps('log in as "buyer"')).catch((e) => e as Error) as Error;
+    expect(err.message).not.toContain("buyer@example.test");
+    expect(redact("echo pw-Zx81-secret")).toBe("echo ***");
   });
 });

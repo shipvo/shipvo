@@ -40,3 +40,19 @@ describe("writeIssues", () => {
     expect(() => readdirSync(dir)).toThrow();
   });
 });
+
+describe("test account secrets", () => {
+  it("writes no account value into issue files", () => {
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD = "pw-Zx81-secret";
+    try {
+      const dir = mkdtempSync(join(tmpdir(), "issues-"));
+      const f = mk("error", "Uncaught error: login rejected pw-Zx81-secret");
+      f.steps = [{ action: "open" }, { action: "type", role: "textbox", name: "Password", text: "pw-Zx81-secret" }];
+      f.screen += '\n- textbox "Password": pw-Zx81-secret';
+      const { files } = writeIssues([f], "android", dir);
+      const text = readFileSync(files[0]!, "utf8");
+      expect(text).not.toContain("pw-Zx81-secret");
+      expect(text).toContain("***");
+    } finally { delete process.env.SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD; }
+  });
+});
