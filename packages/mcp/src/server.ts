@@ -4,7 +4,7 @@
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
 // Tools: list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
-//        owner_describe, owner_command (the app's live content, prices, orders: owner token required).
+//        owner_describe, owner_command, audit_log (the app's live content, prices, orders: owner token required).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -403,6 +403,35 @@ server.tool("owner_command", "Run an owner command against the live app (changes
     if (!token) throw new Error("owner commands are not enabled on this server.");
     const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...agentRules() }, body: JSON.stringify({ name: command, args: { ...Object.fromEntries(Object.entries(args ?? {}).filter(([k]) => k !== "confirm")), ...(confirm === true ? { confirm: true } : {}) } }) });
     return text(await r.text());
+  });
+
+// Read-only: the app's audit log from the control plane (the endpoint `shipvo audit` pages through), newest first.
+const AUDIT_PAGE = 200, AUDIT_MAX_PAGES = 10;
+server.tool("audit_log", "Read the app's release audit log, newest first: who (actor) did what (action) to which release (subject) and when (at). Read-only. Needs an owner token.", { app: z.string(), limit: z.number().int().optional().describe("Rows to return (default 50, max 200; values outside are clamped)"), action: z.string().optional().describe("Only rows with this action, for example rollback") }, RO,
+  async ({ app, limit, action }) => {
+    const fail = (code: string, error: string) => ({ ...text(`Error [${code}]: ${error}`), isError: true as const, structuredContent: { ok: false, code, error } });
+    if (ctx.scope && ctx.scope !== "owner") return fail("unauthorized", `this key has scope "${ctx.scope}": the audit log needs an owner key`);
+    if (keyApps && !keyApps.includes(app)) return fail("unauthorized", `this key is for: ${keyApps.join(", ")}`);
+    const token = ctx.ownerToken || OWNER_TOKEN;
+    if (!token) return fail("unauthorized", "the audit log is not enabled on this server (no owner token).");
+    const want = Math.min(200, Math.max(1, Math.trunc(limit ?? 50)));
+    const rows: Array<{ actor: unknown; action: unknown; subject: unknown; at: unknown }> = [];
+    let before: number | undefined;
+    for (let page = 0; page < AUDIT_MAX_PAGES && rows.length < want; page++) {
+      const url = `${CONTROL}/audit/${encodeURIComponent(app)}?limit=${action ? AUDIT_PAGE : want}${before !== undefined ? `&before=${before}` : ""}`;
+      let r: Response;
+      try { r = await fetch(url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(simTimeoutMs()) }); }
+      catch { return fail("unreachable", "could not reach the control plane."); }
+      if (r.status === 401 || r.status === 403) return fail("unauthorized", "the token was not accepted for this app.");
+      if (r.status === 404) return fail("not_found", `no app "${app}".`);
+      if (!r.ok) return fail("audit_failed", `the control plane answered HTTP ${r.status}.`);
+      const got = ((await r.json()) as { rows?: Array<Record<string, unknown> & { id: number }> }).rows ?? [];
+      for (const g of got) if (!action || g.action === action) rows.push({ actor: g.actor, action: g.action, subject: g.release ?? g.release_id ?? null, at: g.at });
+      if (got.length < (action ? AUDIT_PAGE : want)) break;
+      before = got[got.length - 1].id;
+    }
+    const out = rows.slice(0, want);
+    return { ...text(JSON.stringify(out, null, 2)), structuredContent: { app, rows: out } };
   });
 
 return server;

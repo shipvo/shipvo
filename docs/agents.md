@@ -139,6 +139,16 @@ The header lists what the simulator cannot show. A clean run says "No findings i
 
 With an owner token, the same MCP server exposes the app's typed owner commands: change content, prices and offers, read orders, publish to every phone. Every change is audited with who made it. `owner_describe("tide")` lists the commands with their arguments; the admin at `/app/<id>/admin` is the same API with a form on top.
 
+**Read the audit log.** `audit_log` is a read-only tool. It returns the app's audit rows newest first, so an agent can check "was this release already rolled back?" before it acts. Inputs: `app`, `limit` (default 50, clamped to 1..200) and `action` (only rows with that action). It needs the owner token, and it never calls `owner_command`. Errors carry a `code`: `unauthorized` or `not_found`.
+
+```json
+{ "name": "audit_log", "arguments": { "app": "tide", "action": "rollback", "limit": 5 } }
+```
+
+```json
+{ "app": "tide", "rows": [{ "actor": "agent", "action": "rollback", "subject": "r42", "at": "2026-11-05T10:12:00Z" }] }
+```
+
 **Confirm before anything that cannot be undone.** These owner commands reach customers or cannot be undone: `publish`, `update_product` with a new price, `remove_product`, `upsert_promo`, `set_promo_active`, `remove_home_block`, `discard_draft` (when the draft has changes), `create_api_key` and `revoke_api_key`. When an agent calls one without `confirm: true`, nothing changes and the result is `{ ok: false, code: "needs_confirm", plan: [...] }`. The plan says what would change and who it reaches; for `publish` it includes how many update reports the server has received (telemetry has no device id, so the number of phones is not known). The control plane cannot check that the plan was shown to the owner, so the agent must show it. Show it to the owner, then call again with the same arguments and `confirm: true`. Every call that ran after `confirm: true` is written to the audit log (`audit_log`) with who, what and when, and `"confirmed": true`. A refused call is logged with `"denied": true`. A call that ran under `agentPolicy: "allow"` is logged without `confirmed`. Changes to the policy (`set_agent_policy`) are logged with the admin as actor. No owner command sends notifications today.
 
 Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_policy` command, which only a signed-in owner can run:
