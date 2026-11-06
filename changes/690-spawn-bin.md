@@ -1,0 +1,1 @@
+- `@shipvo/cli`: internal helper `spawnBin` that builds a Windows-safe spawn call (`.cmd` shims, `shell: true`, cmd.exe quoting). Not used yet and not exported. Migration: none.

@@ -1,5 +1,6 @@
 // `shipvo sim`: build the app's web bundle with the simulated device and serve it in the simulator.
 import { execSync, spawn } from "node:child_process";
+import { spawnBin } from "./spawn-bin.js";
 import { existsSync, mkdirSync, renameSync, rmSync, watch } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -81,12 +82,15 @@ export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>;
  */
 export function rebuildInto(opts: { root?: string; command?: string; echo?: boolean } = {}): Promise<void> {
   const root = opts.root ?? process.cwd();
-  const command = opts.command ?? "npx expo export --platform web --clear --output-dir";
   const next = join(root, ".shipvo", "sim-next"), live = join(root, "sim-dist"), prev = join(root, ".shipvo", "sim-prev");
   return new Promise((resolve, reject) => {
     mkdirSync(join(root, ".shipvo"), { recursive: true });
     rmSync(next, { recursive: true, force: true });
-    const p = spawn(`${command} "${next}"`, { cwd: root, shell: true, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+    // A custom command is a shell string. The default goes through spawnBin so Windows runs npx.cmd.
+    const call = opts.command
+      ? { command: `${opts.command} "${next}"`, args: [] as string[], shell: true }
+      : spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", next]);
+    const p = spawn(call.command, call.args, { cwd: root, shell: call.shell, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "pipe", "pipe"] });
     let tail = "";
     // Metro and Expo print resolve errors to either stream, so keep both. `echo` also shows them.
     for (const [stream, out] of [[p.stdout!, process.stdout], [p.stderr!, process.stderr]] as const) {
@@ -124,7 +128,7 @@ export async function sim(argv: string[]) {
   }
   if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
     console.error(`Building ${cfg.name} for the simulator…`);
-    execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
+    execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
   }
   try { ensurePlaywright({ cwd: process.cwd() }); }
   catch (e) { console.error(e instanceof Error ? e.message : String(e)); process.exit(2); }
