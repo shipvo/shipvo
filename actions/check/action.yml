@@ -31,6 +31,7 @@ runs:
         rc=0
         npx shipvo ci check || rc=$?
         if [ "$EVENT_NAME" = "pull_request" ]; then
+          npx shipvo ci shots --changed-from "$BASE_SHA" || true
           npx shipvo ci comment --changed-from "$BASE_SHA" --pr "$PR_NUMBER" || true
         fi
         exit $rc
