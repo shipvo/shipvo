@@ -50,6 +50,8 @@ Run it by hand with `npx shipvo ci comment --changed-from <sha> --pr <number>`. 
 
 ### Compared with base
 
-The action also builds the base commit in a second folder and runs the same flows there. The comment then has a "Compared with base" section: regressions first (flows that passed on base and fail now, with the first failing step), then fixed, then still failing. Flows only on the pull request are not regressions. The check fails on a regression because the action passes `--fail-on-regression`; by hand, use `npx shipvo ci comment --base-report base.json --report shipvo-report.json --fail-on-regression`. If the base report is missing, the comment has no such section.
+The action also builds the base commit in a second folder and runs the same flows there. The comment then has a "Compared with base" section: regressions first (flows that passed on base and fail now, with the first failing step), then fixed, then still failing. Flows only on the pull request are not regressions. The check fails on a regression because the action passes `--fail-on-regression`; by hand, use `npx shipvo ci comment --base-report base.json --report shipvo-report.json --fail-on-regression`. If the base report is missing or unreadable, the comment has no such section and the check does not fail. If the pull request report is missing, there is no comparison and no failure either. If the base commit cannot be checked out, the action prints a line saying so and skips the comparison.
+
+A flaky flow can fail on the pull request and pass on base, and then the check fails. Re-run the job to see if the failure repeats. Flows that are new on the pull request and fail are listed under "New flows" but do not fail the check.
 
 Not yet covered: recordings and running `shipvo explore` on the base.

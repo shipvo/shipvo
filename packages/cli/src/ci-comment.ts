@@ -41,12 +41,13 @@ const flowLine = (f: FlowResult) => {
 };
 
 function compareSection(c: Comparison): string[] {
-  if (!c.regressions.length && !c.fixed.length && !c.stillFailing.length) return ["### Compared with base", "", "No change in results.", ""];
+  if (!c.regressions.length && !c.fixed.length && !c.stillFailing.length && !c.newFlows.some((f) => f.status === "failed")) return ["### Compared with base", "", "No change in results.", ""];
   const L = ["### Compared with base", ""];
   const part = (title: string, flows: FlowResult[]) => { if (flows.length) L.push(`**${title} (${flows.length})**`, "", ...flows.map(flowLine), ""); };
   part("Regressions: passed on base, fail here", c.regressions);
   part("Fixed", c.fixed);
   part("Still failing", c.stillFailing);
+  part("New flows (not on base)", c.newFlows.filter((f) => f.status === "failed"));
   return L;
 }
 

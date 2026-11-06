@@ -29,6 +29,9 @@ describe("comment section", () => {
     expect(c.indexOf("Regressions")).toBeLessThan(c.indexOf("Fixed"));
     expect(c.indexOf("Fixed")).toBeLessThan(c.indexOf("Still failing"));
   });
+  it("lists failing new flows", () => {
+    expect(renderComment({ test: pr, compare: diffReports(base, pr) })).toContain("- new (boom)");
+  });
   it("omits the section with no comparison", () => {
     expect(renderComment({ test: pr, compare: diffReports(null, pr) })).not.toContain("Compared with base");
   });
@@ -55,5 +58,26 @@ describe("shipvo ci comment exit code", () => {
     const { rc, err } = await run(null, pr, ["--fail-on-regression"]);
     expect(rc).toBe(0);
     expect(err.mock.calls.some((c) => String(c[0]).includes("No comparison with base"))).toBe(true);
+  });
+  it("missing PR report: no comparison, exit 0", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cmp-"));
+    const bf = join(dir, "base.json");
+    writeFileSync(bf, JSON.stringify(base));
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    delete process.env.GITHUB_TOKEN;
+    expect(await commentCmd(["--base-report", bf, "--report", join(dir, "nope.json"), "--screenshots", join(dir, "none"), "--fail-on-regression"])).toBe(0);
+  });
+  it("corrupt base file: no section, exit 0", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cmp-"));
+    const bf = join(dir, "base.json"), pf = join(dir, "pr.json");
+    writeFileSync(bf, "{not json");
+    writeFileSync(pf, JSON.stringify(pr));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    delete process.env.GITHUB_TOKEN;
+    expect(await commentCmd(["--base-report", bf, "--report", pf, "--screenshots", join(dir, "none"), "--fail-on-regression"])).toBe(0);
+    expect(err.mock.calls.some((c) => String(c[0]).includes("No comparison with base"))).toBe(true);
+    expect(log.mock.calls.some((c) => String(c[0]).includes("Compared with base"))).toBe(false);
   });
 });
