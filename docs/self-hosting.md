@@ -128,7 +128,9 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 
 ## Roles
 
-The control plane defines four roles. **Roles are not enforced yet.** Today the existing tokens and admin session decide access. A later change will tie roles to tokens and SSO.
+The control plane defines four roles, and **publish tokens are checked against them**. A token with no role acts as `admin`, so tokens made before roles existed work as before. The owner token and the admin session are not role-limited. A token with an unknown role is denied everything. A denied call returns `403` with `{"error":"forbidden","action":"<action>","role":"<role>"}`.
+
+On a publish token: writing a pointer for the lowest band is `publish`; a pointer for a wider band is `promote`; a pointer with an older release number than the live one is `rollback`; any other upload is `publish`. Changing auto-halt settings is `halt`. Reading auto-halt settings and the approval list is `read_summary`; reading `/audit/:app` is `read_audit`. `/t/:app/summary` stays public, but a request that sends a publish token is checked too. Approving a hold needs the owner (a signed-in owner or the owner token), as before. There is no way to create a token with a role from the CLI yet; set the `role` column on `publish_tokens` for now.
 
 | Action | viewer | developer | release_manager | admin |
 |---|---|---|---|---|

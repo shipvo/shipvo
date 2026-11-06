@@ -38,7 +38,9 @@ export function loadConfig(dir = process.cwd()): ShipvoConfig {
   return { shellMajor: 1, name: c.appId, ...c };
 }
 
-const argPairs = (argv: string[]) => Object.fromEntries(argv.reduce<string[][]>((a, x, i, all) => (x.startsWith("--") ? [...a, [x.slice(2), all[i + 1] === undefined || all[i + 1].startsWith("--") ? "true" : all[i + 1]]] : a), []));
+/** Flags that never take a value, so the word after one stays a positional. Add new boolean flags here. */
+export const BOOLEAN_FLAGS: ReadonlySet<string> = new Set(["json", "skip-build", "fail-on-findings"]);
+const argPairs = (argv: string[]) => Object.fromEntries(argv.reduce<string[][]>((a, x, i, all) => (x.startsWith("--") ? [...a, [x.slice(2), BOOLEAN_FLAGS.has(x.slice(2)) || all[i + 1] === undefined || all[i + 1].startsWith("--") ? "true" : all[i + 1]]] : a), []));
 export const args = (argv: string[]) => argPairs(argv) as Record<string, string | undefined>;
 
 /** Signing seed: SHIPVO_SIGNING_SEED (PURENATIVE_SIGNING_SEED still accepted) or a *_FILE path. */

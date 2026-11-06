@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { BAND_PERCENT, ReleasePointerBody, checkPolicy } from "@shipvo/schema";
 import { recordAudit } from "./audit";
 import { loadReleasePolicy } from "./owner";
+import { forbidden, type Action } from "./roles";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; OWNER_TOKEN?: string };
 export const apps = new Hono<{ Bindings: Env }>();
@@ -335,7 +336,10 @@ async function resolveApproval(c: any, verb: "approve" | "reject") {
 /** Pending approvals of an app, oldest first. Readable by an owner or by the app's publish token (an agent may list, never approve its own). */
 apps.get("/:app/approvals", async (c) => {
   const id = c.req.param("app");
-  if (!(await approver(c, id)) && !(await publisher(c, id))) return c.json({ error: "unauthorized" }, 401);
+  if (!(await approver(c, id))) {
+    const pub = await publisher(c, id); if (!pub) return c.json({ error: "unauthorized" }, 401);
+    const no = forbidden(pub.role, "read_summary"); if (no) return c.json(no, 403);
+  }
   const prefix = approvalKey(id, "");
   const out: any[] = [];
   let cursor: string | undefined;
@@ -361,6 +365,18 @@ apps.put("/:id/kv/*", async (c) => {
   if (app.bytes_used + buf.byteLength > MAX_APP_BYTES) return c.json({ error: "app_storage_exceeded", message: `This app has used its ${MAX_APP_BYTES / 1048576} MB beta storage.` }, 413);
   if (k.startsWith(`p/${id}/`)) { const why = await pointerProblem(id, k, app.public_key, buf); if (why) return c.json({ error: "bad_pointer", message: why }, 422); }
   const isPtr = k.startsWith(`p/${id}/`);
+  if (app.role !== null) {
+    // A pointer above the lowest band is a promote; one older than the live release is a rollback; anything else is a publish.
+    let action: Action = "publish";
+    if (isPtr) {
+      const body = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body);
+      let live: any = null;
+      try { const raw = await c.env.POINTERS.get(k); live = raw ? JSON.parse(JSON.parse(raw).body) : null; } catch { /* no live release to compare */ }
+      if (BAND_RANK.indexOf(body.band) > 0) action = "promote";
+      else if (live && typeof live.release === "number" && body.release < live.release) action = "rollback";
+    }
+    const no = forbidden(app.role, action); if (no) return c.json(no, 403);
+  }
   if (isPtr) { const no = await policyRefusal(c, id, buf, k); if (no) return c.json({ error: "policy_refused", code: "policy_refused", rule: no.rule, reason: no.reason }, 403); }
   if (isPtr) { const pending = await proposeIfApprovalNeeded(c, id, buf, k); if (pending) return c.json(pending, 202); }
   let prev: string | null = null;

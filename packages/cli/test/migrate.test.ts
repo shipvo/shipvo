@@ -38,10 +38,23 @@ it("--json uses the envelope with next steps", async () => {
   vi.mocked(console.log).mockRestore();
   vi.spyOn(console, "log").mockImplementation((...a) => { lines.push(a.join(" ")); });
   await migrate(["--plan", "--json"], tmp);
-  const doc = JSON.parse(lines[lines.length - 1]);
+  expect(lines.length).toBe(1);
+  const doc = JSON.parse(lines[0]);
   expect(doc).toMatchObject({ ok: true, code: "plan" });
   expect(doc.next.length).toBeGreaterThan(0);
   expect(doc.data.found.length).toBeGreaterThan(0);
+});
+
+it("--json for nothing to migrate prints one envelope", async () => {
+  w("package.json", JSON.stringify({ name: "a", dependencies: { expo: "~58.0.0" } })); w("app.json", JSON.stringify({ expo: { slug: "a" } }));
+  const lines: string[] = [];
+  vi.mocked(console.log).mockRestore();
+  vi.spyOn(console, "log").mockImplementation((...a) => { lines.push(a.join(" ")); });
+  await migrate(["--plan", "--json"], tmp);
+  expect(lines.length).toBe(1);
+  const doc = JSON.parse(lines[0]);
+  expect(doc).toMatchObject({ ok: true, code: "nothing_to_migrate" });
+  expect(doc.next.length).toBeGreaterThan(0);
 });
 
 it("needs --plan", async () => {

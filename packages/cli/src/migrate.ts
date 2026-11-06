@@ -48,6 +48,8 @@ export function buildPlan(dir: string): MigratePlan {
   return { system, found, steps };
 }
 
+const buildPlanPm = (dir: string) => detectProject(dir).packageManager;
+
 export async function migrate(argv: string[], dir = process.cwd()): Promise<number> {
   dir = resolve(dir);
   const json = argv.includes("--json");
@@ -55,18 +57,20 @@ export async function migrate(argv: string[], dir = process.cwd()): Promise<numb
     if (!argv.includes("--plan")) throw new UsageError("shipvo migrate needs --plan. Slice 1 only reads your app and prints the steps; it changes no files.");
     const plan = buildPlan(dir);
     if (!plan.system) {
-      console.log("Nothing to migrate: this app has no expo-updates or CodePush.");
+      if (!json) console.log("Nothing to migrate: this app has no expo-updates or CodePush.");
       return { code: "nothing_to_migrate", summary: "Nothing to migrate: no expo-updates or CodePush found.", data: plan, next: [{ command: "shipvo init", why: "Add Shipvo to this app." }] };
     }
-    console.log(`Found ${plan.system === "expo-updates" ? "expo-updates (EAS Update)" : "CodePush"}:`);
-    for (const f of plan.found) console.log(`  - ${f.where}: ${f.entry}`);
-    console.log("\nSteps, in this order:");
-    plan.steps.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
-    console.log(`\nNo files were changed. Details: ${DOC}`);
+    if (!json) {
+      console.log(`Found ${plan.system === "expo-updates" ? "expo-updates (EAS Update)" : "CodePush"}:`);
+      for (const f of plan.found) console.log(`  - ${f.where}: ${f.entry}`);
+      console.log("\nSteps, in this order:");
+      plan.steps.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
+      console.log(`\nNo files were changed. Details: ${DOC}`);
+    }
     return {
       code: "plan", summary: `${plan.found.length} entries found, ${plan.steps.length} steps. No files changed.`, data: plan,
       next: plan.system === "expo-updates"
-        ? [{ command: "pnpm remove expo-updates", why: "Step 1 of the plan (use your package manager)." }, { command: "shipvo init --dry-run", why: "Preview what init adds once expo-updates is gone." }]
+        ? [{ command: `${buildPlanPm(dir)} remove expo-updates`, why: "Step 1 of the plan." }, { command: "shipvo init --dry-run", why: "Preview what init adds once expo-updates is gone." }]
         : [{ command: "cat docs/migrate-from-codepush.md", why: "Follow the CodePush guide." }],
     };
   };

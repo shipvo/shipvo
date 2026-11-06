@@ -8,7 +8,7 @@ An AI agent uses a Shipvo app the way a person with a screen reader does: it get
 npx skills add shipvo/shipvo --skill shipvo -g
 ```
 
-The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. Without npm: `curl -fsSL https://shipvo.dev/install.sh | bash`. Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints." All three lines are on [shipvo.dev/setup](https://shipvo.dev/setup/).
+The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. Without the skill tool: `curl -fsSL https://shipvo.dev/install.sh | bash` on macOS and Linux, or `irm https://shipvo.dev/install.ps1 | iex` in Windows PowerShell. Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints." All three lines are on [shipvo.dev/setup](https://shipvo.dev/setup/).
 
 ## Skills that ship with each package
 
