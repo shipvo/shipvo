@@ -9,6 +9,8 @@ import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+// @ts-ignore plain .mjs helper in the sim package, no types
+import { pickPort } from "../../sim/test-port.mjs";
 
 const root = resolve(__dirname, "..");
 const repo = resolve(root, "../..");
@@ -16,7 +18,8 @@ const app = join(repo, "apps/tide-and-tackle");
 const require_ = createRequire(join(root, "package.json"));
 let out = ""; let work = ""; let sim: ChildProcess | undefined; let simErr = "";
 const SIM_START_MS = 180_000;
-const port = 4900 + Math.floor(Math.random() * 300);
+// pickPort skips ports (5060, 5061) that Node fetch refuses, which made the readiness poll never succeed.
+const port: number = pickPort(4900, 300);
 
 beforeAll(async () => {
   out = mkdtempSync(join(root, "dist-test-"));
