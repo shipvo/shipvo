@@ -150,6 +150,43 @@ shipvo auto-halt --threshold 0.2 --dry-run         # print the change, write not
 - `shipvo status` shows the setting: `auto-halt: off` or `auto-halt: on at 20% after 20 reports`.
 - The route behind it is `GET`, `PUT` and `DELETE` on `/app/<app>/api/halt-config`. A bad value is a 400 with `error: "bad_halt_config"`.
 
+## `shipvo agents setup`
+
+Sets a project up for AI coding agents.
+
+```bash
+shipvo agents setup              # write the files
+shipvo agents setup --dry-run    # show what would change, write nothing
+shipvo agents setup --json       # machine-readable result
+```
+
+- It detects the project: Shipvo app (`shipvo.json`), Capacitor, Expo, bare React Native.
+- It writes a section to `AGENTS.md` between `<!-- shipvo:begin -->` and `<!-- shipvo:end -->`. A missing file is created. Text outside the markers is never changed.
+- It adds the `shipvo` server (`npx -y @shipvo/mcp`) to `.mcp.json`, and to `.cursor/mcp.json` if `.cursor/` exists. Other servers stay. A file that is not valid JSON is left alone and the command exits 2.
+- It prints the skill install line.
+- Running it again changes nothing.
+
+## `shipvo status --json`
+
+The agent's "what next" command. It prints one JSON line:
+
+```json
+{ "ok": true, "code": "ok", "summary": "...",
+  "data": { "project": {}, "sim": {}, "run_server": {}, "signing_key": {}, "pending_release": {}, "store_step": {} },
+  "next": [{ "command": "shipvo sim", "why": "..." }] }
+```
+
+- `data.project`: `{ kind, app_id }`. `sim`: is something on port 4545. `run_server`: is `shipvo run` up (from `.shipvo/run.json`). `signing_key.present`: a seed in the environment or `.shipvo/seed.txt`. `pending_release`: `{ newest, halted, auto_halt }`. `store_step`: the next open step of `store-plan.json`, or `null`.
+- `code` is one of `ok`, `no_release`, `no_project`, `no_signing_key`, `release_halted`, `error`.
+- `next` lists commands to run, most urgent first.
+- Without `--json` the output is the same table as before.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | ok: nothing needs doing (`next` may still have optional steps) |
+| 1 | action needed: no project, no signing key, or a halted release |
+| 2 | error: shipvo.json is invalid or the control plane could not be reached |
+
 ## `shipvo audit`
 
 Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.

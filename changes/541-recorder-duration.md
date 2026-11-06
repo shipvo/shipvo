@@ -1,0 +1,1 @@
+- recorder: `duration_s` and chapter times now start at the first frame, so they match the video length when the first screenshot is slow. Reported durations get shorter by the first-screenshot delay (#541).
