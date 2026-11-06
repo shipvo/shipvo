@@ -1,0 +1,82 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import http from "node:http";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+
+const root = resolve(__dirname, "..");
+let out = ""; let fake: http.Server; let port = 0;
+const seen: any[] = [];
+
+// A tiny simulator that follows the phone's rules for installed apps: enough to check what the tools send and how they report typed errors.
+const installed = new Map<string, string>(); let current: string | null = null;
+beforeAll(async () => {
+  out = mkdtempSync(join(root, "dist-test-"));
+  const b = spawnSync(process.execPath, [createRequire(join(root, "package.json")).resolve("typescript/bin/tsc"), "-p", root, "--outDir", out], { encoding: "utf8" });
+  if (b.status !== 0) throw new Error(b.stdout + b.stderr);
+  fake = http.createServer(async (req, res) => {
+    let raw = ""; for await (const c of req) raw += c;
+    res.writeHead(200, { "content-type": "application/json" });
+    const body = raw ? JSON.parse(raw) : {};
+    if (req.url !== "/act") return res.end(JSON.stringify({ ok: true }));
+    seen.push(body);
+    const fail = (code: string, error: string) => res.end(JSON.stringify({ ok: false, code, error }));
+    const ok = () => res.end(JSON.stringify({ ok: true, screen: `Home screen\ninstalled: ${[...installed.keys()].join(",")} current: ${current}` }));
+    if (body.action === "install_app") {
+      const app = (body.catalog ?? []).find((a: any) => a.id === body.id);
+      if (!app) return fail("unknown_app", "no such app");
+      if (installed.has(body.id)) return fail("already_installed", "already");
+      installed.set(body.id, app.name); return ok();
+    }
+    if (!installed.has(body.id)) return fail("not_installed", "not installed");
+    if (body.action === "switch_app") { current = body.id; return ok(); }
+    if (body.action === "uninstall_app") { installed.delete(body.id); if (current === body.id) current = null; return ok(); }
+    fail("x", "x");
+  });
+  await new Promise<void>((r) => fake.listen(0, r));
+  port = (fake.address() as { port: number }).port;
+});
+afterAll(() => { fake?.close(); if (out) rmSync(out, { recursive: true, force: true }); });
+
+async function connect(extra: Record<string, string> = {}) {
+  const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1", ...extra };
+  delete env.PN_APPS; if (!extra.PN_STORE_FIXTURE) delete env.PN_STORE_FIXTURE;
+  const c = new Client({ name: "test", version: "0" });
+  await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+  return c;
+}
+const call = async (c: Client, name: string, args: Record<string, unknown> = {}) => (await c.callTool({ name, arguments: args })) as any;
+
+describe("phone app tools", () => {
+  it("lists the four tools with their schemas", async () => {
+    const c = await connect();
+    const tools = (await c.listTools()).tools.filter((t) => ["list_store_apps", "install_app", "uninstall_app", "switch_app"].includes(t.name)).sort((a, b) => a.name.localeCompare(b.name));
+    expect(tools.map((t) => ({ name: t.name, inputSchema: t.inputSchema }))).toMatchSnapshot();
+    await c.close();
+  });
+  it("list_store_apps is store_unreachable offline and lists the fixture when asked", async () => {
+    const c = await connect();
+    const r = await call(c, "list_store_apps");
+    expect(r.isError).toBe(true); expect(r.structuredContent.code).toBe("store_unreachable");
+    await c.close();
+    const f = await connect({ PN_STORE_FIXTURE: "1" });
+    const ok = await call(f, "list_store_apps");
+    expect(ok.structuredContent.apps.map((a: any) => a.id)).toEqual(["tide", "notes", "weather"]);
+    await f.close();
+  });
+  it("install, switch and uninstall return typed codes", async () => {
+    const c = await connect({ PN_STORE_FIXTURE: "1" });
+    const s = "s1";
+    expect((await call(c, "install_app", { session: s, id: "ghost" })).structuredContent.code).toBe("unknown_app");
+    expect((await call(c, "install_app", { session: s, id: "notes" })).isError).toBeFalsy();
+    expect((await call(c, "install_app", { session: s, id: "notes" })).structuredContent.code).toBe("already_installed");
+    expect((await call(c, "switch_app", { session: s, id: "weather" })).structuredContent.code).toBe("not_installed");
+    expect((await call(c, "uninstall_app", { session: s, id: "weather" })).structuredContent.code).toBe("not_installed");
+    expect((await call(c, "switch_app", { session: s, id: "notes" })).content[0].text).toMatch(/current: notes/);
+    expect((await call(c, "uninstall_app", { session: s, id: "notes" })).content[0].text).toMatch(/current: null/);
+    await c.close();
+  });
+});

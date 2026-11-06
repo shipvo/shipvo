@@ -34,4 +34,4 @@ export function isDarkBackground(color: string): boolean;
 /** The clock text and icons markup, for redrawing the status bar. */
 export function statusParts(status?: FrameStatus): { time: string; icons: string };
 /** Browser script that keeps the status bar live from the app's `pn:status` events. */
-export function statusClientScript(iframeId?: string, skin?: FrameSkin): string;
+export function statusClientScript(iframeId?: string, skin?: FrameSkin, phone?: object): string;
