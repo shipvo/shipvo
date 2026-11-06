@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { startServer } from "./server.mjs";
 import { publishRelease } from "./release.mjs";
-import { FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
+import { FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, releaseReached, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const APK = resolve(arg("apk", "shell.apk")), BUNDLES = resolve(arg("bundles", "bundles")), KEY = JSON.parse(readFileSync(arg("key", "key.json"), "utf8"));
@@ -191,7 +191,8 @@ for (const [kind, file, title, maxBadRuns] of [
   for (let i = 0; i < TRIALS; i++) {
     const prev = good().rel, crashBytes = bundle(file);
     const p = await publish(crashBytes, { bases: [] });
-    const staged = await waitFor(() => prefs().pending_release === p.release, 60_000);
+    // The runtime stages, reloads and promotes in well under one poll step, so `pending_release` can be missed. Stop waiting once the release is pending or already current; otherwise the harness idles for the full 60 s while the app crashes unobserved.
+    const staged = await waitFor(() => releaseReached(prefs(), p.release), 60_000);
     let boots = 0, restored = null; const timeline = []; // per launch: time since publish and the runtime's counters
     const mark = (what) => { const q = prefs(); timeline.push({ what, ms: Date.now() - p.at, trial_boots: q.trial_boots ?? 0, unhealthy_boots: q.unhealthy_boots ?? 0, pid: pid() || null }); };
     for (let k = 0; k < 10 && !restored; k++) {
@@ -204,7 +205,7 @@ for (const [kind, file, title, maxBadRuns] of [
     const pr = prefs(), after = entries().filter((e) => e.t >= (restored?.at ?? Infinity) && e.path.includes(`r${p.release}.hbc`)).length;
     const revertEvent = tele().some((e) => e.event === "crash_loop_revert" && e.at >= p.at);
     const badRuns = boots - 1;
-    trials.push({ release: p.release, staged: !!staged, timeline, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
+    trials.push({ release: p.release, staged: staged === "pending", reached: staged || null, timeline, boots, badRuns, restoredRelease: restored?.release ?? null, restoredMs: restored ? restored.at - p.at : null, blocked: pr.blocked_release, currentAfter: pr.current_release,
       revertEventReported: revertEvent, redownloaded: after > 0, pass: !!restored && pr.blocked_release >= p.release && pr.current_release === prev && after === 0 && badRuns <= maxBadRuns });
   }
   return { pass: trials.every((t) => t.pass), kind, maxBadRuns, trials, median: summarize(trials, ["restoredMs", "boots", "badRuns"]) };
