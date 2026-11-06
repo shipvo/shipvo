@@ -22,6 +22,20 @@ describe("run net client", () => {
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ method: "POST", host: "localhost:3000", status: 200 });
   });
+  it("leaves a same-origin POST with a Request input unread", async () => {
+    const { win, calls } = make();
+    const req = new Request("http://127.0.0.1:1/api", { method: "POST", body: "payload" });
+    await win.fetch(req);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("http://127.0.0.1:1/api");
+    expect(req.bodyUsed).toBe(false);
+  });
+  it("sends a cross-origin Request input with its body through the route", async () => {
+    const { win, calls } = make();
+    await win.fetch(new Request("http://api.test/x", { method: "POST", body: "payload" }));
+    expect(calls[0].url).toBe("/__shipvo/net");
+    expect(new TextDecoder().decode(calls[0].init.body)).toBe("payload");
+  });
   it("fails like a native network error when the phone is offline", async () => {
     const { win, calls } = make(false);
     await expect(win.fetch("http://api.test/")).rejects.toThrow(TypeError);

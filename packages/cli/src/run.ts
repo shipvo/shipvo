@@ -200,7 +200,8 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     res.writeHead(200, { "content-type": type });
     if (extname(target).toLowerCase() === ".html") {
       const html = readFileSync(target, "utf8"); // first script in the page, so it wraps fetch before the app's code runs
-      if (/<head[^>]*>/i.test(html)) return void res.end(html.replace(/<head[^>]*>/i, (m) => m + netSnippet));
+      // A real phone (not loopback) cannot use the route, which only serves the local page: leave its requests direct.
+      if (isLoopback(req.socket.remoteAddress) && /<head[^>]*>/i.test(html)) return void res.end(html.replace(/<head[^>]*>/i, (m) => m + netSnippet));
     }
     res.end(readFileSync(target));
   });

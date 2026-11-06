@@ -98,12 +98,27 @@ export function createNetProxy(o: { tokens: string[]; port: () => number; profil
     let jar = jars.get(session); if (!jar) jars.set(session, jar = new CookieJar());
     const headers = new Headers();
     for (const [k, v] of Object.entries(spec.headers ?? {})) if (!HOP.has(k.toLowerCase()) && !["cookie", "origin", "referer"].includes(k.toLowerCase())) headers.set(k, v);
-    const cookie = jar.header(url); if (cookie) headers.set("cookie", cookie);
-    let up: Response;
-    try { up = await doFetch(url, { method, headers, body: method === "GET" || method === "HEAD" || body.length === 0 ? undefined : new Uint8Array(body), redirect: "follow" }); }
+    let up: Response; let cur = url; let curMethod = method; let curBody: Uint8Array<ArrayBuffer> | undefined = method === "GET" || method === "HEAD" || body.length === 0 ? undefined : new Uint8Array(body) as Uint8Array<ArrayBuffer>;
+    try {
+      // Redirects are followed here so each hop's Set-Cookie reaches the jar and its cookies go out on the next hop.
+      for (let hop = 0; ; hop++) {
+        const h = new Headers(headers); h.delete("cookie");
+        const c = jar.header(cur); if (c) h.set("cookie", c);
+        up = await doFetch(cur, { method: curMethod, headers: h, body: curBody, redirect: "manual" });
+        for (const sc of up.headers.getSetCookie()) jar.set(cur, sc);
+        const loc = up.headers.get("location");
+        if (![301, 302, 303, 307, 308].includes(up.status) || !loc) break;
+        if (hop >= 20) throw new Error("too many redirects");
+        const next = new URL(loc, cur);
+        if (next.protocol !== "http:" && next.protocol !== "https:") throw new Error("redirect to an unsupported address");
+        void up.body?.cancel().catch(() => {});
+        if (next.origin !== cur.origin) headers.delete("authorization");
+        if (up.status === 303 ? curMethod !== "HEAD" : (up.status === 301 || up.status === 302) && curMethod === "POST") { curMethod = "GET"; curBody = undefined; }
+        cur = next;
+      }
+    }
     catch (e) { record(599, (e as Error).message); res.writeHead(599, { "x-shipvo-net-error": "1", "content-type": "text/plain" }); return void res.end(`network request failed: ${(e as Error).message}`); }
-    for (const sc of up.headers.getSetCookie()) jar.set(new URL(up.url || url.href), sc);
-    const out: Record<string, string> = { "x-shipvo-final-url": up.url || url.href, "cache-control": "no-store" };
+    const out: Record<string, string> = { "x-shipvo-final-url": cur.href, "cache-control": "no-store" };
     up.headers.forEach((v, k) => { if (!HOP.has(k)) out[k] = v; });
     res.writeHead(up.status, out);
     record(up.status);
@@ -133,8 +148,9 @@ function netClientMain(win: any, cfg: { token: string; session: string; profile:
   });
   const origFetch = win.fetch.bind(win);
   win.fetch = async function (input: any, init?: any) {
-    const plain = typeof input === "string" || input instanceof win.URL;
-    if (plain && !proxied(input)) return origFetch(input, init);
+    const isReq = input instanceof win.Request;
+    // Decide before building a Request: building one from a Request with a body would use up the original.
+    if (!proxied(isReq ? input.url : input)) return origFetch(input, init);
     const req = new win.Request(input, init);
     const url = proxied(req.url);
     if (!url) return origFetch(input, init);

@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startRunServer } from "../src/run";
+import { lanAddress, startRunServer } from "../src/run";
 import { CookieJar } from "../src/run-net";
 import { renderFrame } from "../../sim/frame.mjs";
 
@@ -12,6 +12,8 @@ const backend = () => new Promise<{ s: Server; base: string }>((ok) => {
   const s = createServer(async (req, res) => {
     if (req.url === "/echo") { const b: Buffer[] = []; for await (const c of req) b.push(c as Buffer); res.writeHead(201, { "content-type": "application/octet-stream", "x-seen-method": req.method! }); return void res.end(Buffer.concat(b)); }
     if (req.url === "/count") { const n = Number(/n=(\d+)/.exec(req.headers.cookie ?? "")?.[1] ?? 0) + 1; res.writeHead(200, { "set-cookie": `n=${n}; Path=/` }); return void res.end(String(n)); }
+    if (req.url === "/login") { res.writeHead(302, { "set-cookie": "sid=abc; Path=/", location: "/me" }); return void res.end(); }
+    if (req.url === "/me") { res.writeHead(200); return void res.end(`sid=${/sid=(\w+)/.exec(req.headers.cookie ?? "")?.[1] ?? "none"} method=${req.method}`); }
     if (req.url === "/stream") { res.writeHead(200, { "content-type": "text/plain" }); let i = 0; const t = setInterval(() => { res.write(`chunk${i++};`); if (i === 3) { clearInterval(t); res.end(); } }, 80); return; }
     res.writeHead(200); res.end("hello");
   }).listen(0, "127.0.0.1", () => ok({ s, base: `http://127.0.0.1:${(s.address() as { port: number }).port}` }));
@@ -50,6 +52,26 @@ describe("run net proxy", () => {
     const html = await (await fetch(origin + "/app/")).text();
     expect(html).toContain("/__shipvo/net");
     expect(html.indexOf("__shipvo/net")).toBeLessThan(html.indexOf("<title>"));
+    await s.close();
+  });
+  it("keeps the cookie a redirect sets and sends it on the next hop", async () => {
+    const { s, call } = await start("android"); const b = await backend();
+    const r = await call(b.base + "/login", { method: "POST", body: "x" });
+    expect(await r.text()).toBe("sid=abc method=GET");
+    expect(r.headers.get("x-shipvo-final-url")).toBe(b.base + "/me");
+    expect(await (await call(b.base + "/me", { session: "a" })).text()).toBe("sid=abc method=GET");
+    await s.close(); b.s.close();
+  });
+  it("does not inject the client for a request from the LAN address", async () => {
+    const host = lanAddress(); if (!host) return;
+    const dir = mkdtempSync(join(tmpdir(), "shipvo-net-"));
+    writeFileSync(join(dir, "index.html"), "<!doctype html><html><head><title>x</title></head><body></body></html>");
+    const s = await startRunServer({ dir, platform: "android", name: "Tide", render: renderFrame, lan: { host } });
+    const html = await (await fetch(`http://${host}:${s.port}/app/?t=${s.lanToken}`)).text();
+    expect(html).toContain("<title>");
+    expect(html).not.toContain("__shipvo/net");
+    const local = await (await fetch(`http://127.0.0.1:${s.port}/app/?t=${s.lanToken}`)).text();
+    expect(local).toContain("__shipvo/net");
     await s.close();
   });
   it("keeps cookies within a session and apart between sessions", async () => {
