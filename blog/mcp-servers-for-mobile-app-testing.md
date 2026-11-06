@@ -36,3 +36,5 @@ Run `npx -y @shipvo/cli login`, then `npx -y @shipvo/cli mcp`, and ask your assi
 ## Sources
 
 - [ios-simulator-mcp](https://docsearch.algolia.com/mcp/docs/repo/joshuayoes/ios-simulator-mcp), project documentation
+
+To watch the simulated phone your assistant drives, see [seeing your app on a phone in your browser](/blog/see-your-react-native-app-on-a-phone-in-your-browser/).
