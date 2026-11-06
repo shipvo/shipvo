@@ -3,7 +3,7 @@
 //   PN_SIM=http://localhost:4545  PN_CONTROL=https://api.shipvo.dev  PN_OWNER_TOKEN=...  shipvo-mcp
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
-// Tools: list_store_apps, install_app, uninstall_app, switch_app (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
+// Tools: get_update_state, check_for_update, apply_update (OTA updates on the phone), list_store_apps, install_app, uninstall_app, switch_app (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
 //        owner_describe, owner_command, audit_log (the app's live content, prices, orders: owner token required).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -324,6 +324,19 @@ server.tool("uninstall_app", "Remove an installed app from the phone. If it was 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "uninstall_app", id })); });
 server.tool("switch_app", "Open an installed app (tap its icon on the home screen): it becomes current_app and comes to the front. Fails with not_installed. Logged in device_log as simulated.", { session: sid, id: z.string().describe("Installed app id") }, WR,
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "switch_app", id })); });
+// Simulated OTA updates on the phone: the sim checks a signed pointer from its update source, holds the release, and applies it with a restart.
+type UpdateAct = Act & { update?: unknown; banner?: string | null };
+const updateResult = (session: string, r: UpdateAct) => {
+  if (!r.ok) return result(session, r);
+  const head = JSON.stringify({ update: r.update, banner: r.banner ?? null, simulated: true }, null, 2);
+  return { ...text(`${head}\n\n${r.screen ?? ""}`), structuredContent: { update: r.update, banner: r.banner ?? null, simulated: true } };
+};
+server.tool("get_update_state", "The phone's OTA update state: idle, checking, downloading, ready, applied or reverted, the running release, the held release, and the last reason (verify_failed, download_failed or crash_loop). Simulated and logged in device_log.", { session: sid }, RO,
+  async ({ session }) => { need(session); return updateResult(session, await act({ session, action: "get_update_state" })); });
+server.tool("check_for_update", "Ask the update source for a newer release: checks its signature and hash and downloads it. Ends in ready, or idle with reason verify_failed or download_failed (the release is never applied). Fails with no_update when nothing newer exists or no source is set. Simulated; each state change is logged in device_log.", { session: sid }, WR,
+  async ({ session }) => { need(session); return updateResult(session, await act({ session, action: "check_for_update" })); });
+server.tool("apply_update", "Apply the ready release: the app restarts on the new bundle, like restart. After 3 boots that throw, the phone goes back to the old release and the state is reverted with reason crash_loop. Fails with not_ready unless the state is ready. Simulated; logged in device_log.", { session: sid }, WR,
+  async ({ session }) => { need(session); return updateResult(session, await act({ session, action: "apply_update" })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 

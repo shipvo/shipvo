@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`phone update tools > lists the three tools with their schemas 1`] = `
+[
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "description": "Session from open_app",
+          "type": "string",
+        },
+      },
+      "required": [
+        "session",
+      ],
+      "type": "object",
+    },
+    "name": "apply_update",
+  },
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "description": "Session from open_app",
+          "type": "string",
+        },
+      },
+      "required": [
+        "session",
+      ],
+      "type": "object",
+    },
+    "name": "check_for_update",
+  },
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "description": "Session from open_app",
+          "type": "string",
+        },
+      },
+      "required": [
+        "session",
+      ],
+      "type": "object",
+    },
+    "name": "get_update_state",
+  },
+]
+`;
