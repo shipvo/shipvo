@@ -46,3 +46,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Test.** A small file that repeats the steps a customer takes and fails if the result changes. It runs on your computer in seconds.
 
+**Attach.** When your assistant uses the phone you already have open in your browser, instead of starting its own hidden one. It happens when `shipvo run` is up.
+
+**Frame.** The phone-shaped picture around your app in the browser, Android style or iPhone style. It says "Simulated" so nobody mistakes it for a real phone.
+
+**MP4.** A common video file. Shipvo can record the simulated phone to one.
+
+**Shipvo Testers.** A group of founders who test each other's apps on Google Play, to help each other reach the 12 testers Google asks for.

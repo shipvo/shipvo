@@ -1,0 +1,27 @@
+{
+  "slug": "get-your-12-testers",
+  "posterAt": 4.5,
+  "title": "Get your 12 Google Play testers with Shipvo Testers",
+  "tutorial": "docs/tutorials/get-your-12-testers.md",
+  "voice": "af_heart",
+  "music": { "id": 1178100, "bed": 0.35, "credits": "services/site/public/videos/get-your-12-testers.credits.json" },
+  "scenes": [
+    { "id": "hook", "visual": "gtHook", "min": 9,
+      "narration": "Want your app on Google Play? New personal accounts have a rule. You need twelve testers, for fourteen days in a row. Here is how to find them." },
+    { "id": "rule", "visual": "gtRule", "min": 14,
+      "narration": "Google asks for twelve people to opt in to a closed test. They must stay opted in for fourteen days in a row. If the count drops below twelve, the clock starts again. Company accounts skip this rule. So do personal accounts made before November thirteen, twenty twenty three." },
+    { "id": "join", "visual": "gtJoin", "min": 12,
+      "narration": "Step one. Join Shipvo Testers. It is a group of founders who test each other's apps. Anyone can join. Members cannot see each other's emails." },
+    { "id": "track", "visual": "gtTrack", "min": 14,
+      "narration": "Step two. In Play Console, make a closed test track. Upload your first build by hand. Play does not allow that step through the A P I. Then add the Shipvo Testers group to the track." },
+    { "id": "cli", "visual": "gtCli", "min": 12,
+      "narration": "Or let Shipvo do it. Run shipvo store testers. It prints the steps for your app. Add your Play key, and it adds the group for you. It never removes a group." },
+    { "id": "link", "visual": "gtLink", "min": 10,
+      "narration": "Step three. Share your opt-in link with your own people. They open it, opt in, and install your app." },
+    { "id": "give", "visual": "gtGive", "min": 10,
+      "narration": "Step four. Test other apps. The community works because everyone tests. Keep them installed for the fourteen days." },
+    { "id": "cta", "visual": "gtCta", "min": 11,
+      "narration": "We cannot promise how many people will opt in. But now you have a plan. Join at shipvo dot dev, slash testers.",
+      "caption": "We cannot promise how many people will opt in. But now you have a plan. Join at shipvo.dev/testers." }
+  ]
+}

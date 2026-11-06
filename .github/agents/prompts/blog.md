@@ -20,3 +20,5 @@ Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (on
 ## Goal: every feature has a blog post (owner, 6 Nov 2026)
 
 Every row in `docs/content-coverage.md` must end with a link in the Blog column. Alternate: one run takes the next empty Blog cell (a practical post about that feature: the problem it solves, how to use it, real commands and output, measured numbers with links), the next run writes for search demand as before. Shipped features only.
+
+Always read the "Priority now" list at the top of `docs/content-coverage.md` first and take the first item that still has an empty cell in your column.
