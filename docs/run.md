@@ -43,13 +43,14 @@ The assistant sees the same list of buttons and text as in the simulator, with `
 ## Options
 
 ```bash
-shipvo run android|ios [--no-open] [--port <n>] [--native]
+shipvo run android|ios [--no-open] [--port <n>] [--native] [--lan]
 ```
 
 | Option | What it does |
 | --- | --- |
 | `--no-open` | Print the address and do not open a browser. |
 | `--port <n>` | Use port `n`, 0 to 65535. Default: any free port. |
+| `--lan` | Also serve the phone on your Wi-Fi. Prints a URL with a random token (`?t=...`) and a QR code. On a phone browser the app fills the screen with no frame; on a desktop browser the frame stays. Every request needs the token, otherwise the answer is 403. Anyone on the network who has the address can open the page. Plain HTTP; no camera or sensors from the phone. |
 | `--native` | Run on a real emulator or simulator with `npx expo run:android` or `run:ios` instead. Needs Android Studio or Xcode. |
 
 ## Troubleshooting
