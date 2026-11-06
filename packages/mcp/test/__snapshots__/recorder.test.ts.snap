@@ -46,6 +46,14 @@ exports[`MCP tools > lists the three tools with their schemas 1`] = `
           ],
           "type": "number",
         },
+        "lumi": {
+          "description": "Include Lumi and its step captions in the video (default true for recordings; set false for a plain phone).",
+          "type": "boolean",
+        },
+        "lumi_voice": {
+          "description": "Lumi speaks its short step lines with the energetic voice preset (default false). Needs python3, ffmpeg and network access for the voice. Ignored when record_stop gets a narration file.",
+          "type": "boolean",
+        },
         "show_taps": {
           "description": "Draw a finger dot and ripple on taps and a trail on scrolls (default true)",
           "type": "boolean",
