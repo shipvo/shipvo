@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "audit", "test", "keys", "mcp",
+  "init", "sim", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "audit", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -40,7 +40,8 @@ Ship
                               Show each store's steps and what to do next
   ci init --framework capacitor [--dry-run] [--force]
                               Write .github/workflows/shipvo-build.yml (signed Android and iOS builds)
-  status [--app id] [--json]  Show how the newest releases are doing on phones
+  status [--app id] [--json]  Show how the newest releases are doing on phones; --json lists next steps (exit 0 ok, 1 action needed, 2 error)
+  agents setup [--dry-run] [--json]  Write AGENTS.md and .mcp.json so coding agents use shipvo
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
   test [files] [--repair [--write]] [--report <file> [--release <id>]]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
   doctor [--port <n>]         Check setup before first publish

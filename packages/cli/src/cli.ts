@@ -15,6 +15,7 @@ import { keys, login, mcp } from "./login.js";
 import { verifyPointer } from "./verify.js";
 import { signingKey } from "./signing.js";
 import { appCmd } from "./app.js";
+import { agentsSetup } from "./agents.js";
 import { status } from "./status.js";
 import { doctor } from "./doctor.js";
 import { audit } from "./audit.js";
@@ -38,6 +39,7 @@ switch (cmd) {
   case "rollback": await rollback(rest); break;
   case "login": await login(rest); break;
   case "doctor": await doctor(rest); break;
+  case "agents": process.exitCode = agentsSetup(rest); break;
   case "status": process.exitCode = await status(rest); break;
   case "audit": await audit(rest); break;
   case "test": process.exitCode = await testCmd(rest); break;

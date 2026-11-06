@@ -8,7 +8,7 @@ An AI agent uses a Shipvo app the way a person with a screen reader does: it get
 npx skills add shipvo/shipvo --skill shipvo -g
 ```
 
-The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. `shipvo agents setup` and `https://shipvo.dev/install.sh` are planned ([#533](https://github.com/shipvo/shipvo/issues/533)).
+The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. `shipvo agents setup` writes `AGENTS.md` and `.mcp.json` for you ([CLI](cli.md#shipvo-agents-setup)). `https://shipvo.dev/install.sh` is planned ([#533](https://github.com/shipvo/shipvo/issues/533)).
 
 ## Three ways to connect
 
