@@ -348,7 +348,11 @@ Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `n
 
 ## shipvo migrate --plan
 
-Read-only. Run it in an app that uses `expo-updates` or `react-native-code-push`. For CodePush it lists the dependency, `codePush()` wrapper and `CodePush.sync` calls, `CodePushDeploymentKey` and `CodePushPublicKey` entries, and `appcenter codepush` commands, each with file and line, then prints ordered steps (`system: "codepush"` in `--json`). `--apply` does not support CodePush; see [Migrate from CodePush](migrate-from-codepush.md). For `expo-updates`: It lists the `expo-updates` entries it finds (dependency, plugin entry, `updates` and `runtimeVersion` keys in `app.json`), the steps to switch, and the order that keeps installed apps safe. It changes no files. With `--json` it prints the standard envelope with `next` steps. In an app without `expo-updates` or CodePush it exits 0 and says there is nothing to migrate. See [Migrate from EAS Update](migrate-from-eas-update.md).
+Read-only. Run it in an app that uses `expo-updates` or `react-native-code-push`. It changes no files. With `--json` it prints the standard envelope with `next` steps. In an app with neither it exits 0 and says there is nothing to migrate.
+
+For `expo-updates`, it lists the entries it finds (dependency, plugin entry, `updates` and `runtimeVersion` keys in `app.json`), the steps to switch, and the order that keeps installed apps safe. See [Migrate from EAS Update](migrate-from-eas-update.md).
+
+For CodePush, it lists the dependency, `codePush()` wrapper and `CodePush.sync` calls, `CodePushDeploymentKey` and `CodePushPublicKey` entries, and `appcenter codepush` commands, each with file and line, then prints ordered steps (`system: "codepush"` in `--json`). `--apply` does not support CodePush. See [Migrate from CodePush](migrate-from-codepush.md).
 
 ## shipvo migrate --apply
 

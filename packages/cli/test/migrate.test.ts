@@ -129,3 +129,25 @@ it("plans a CodePush app with file and line and changes nothing", async () => {
   expect(doc.data.steps.join("\n")).toContain("no direct equivalent");
   expect(tree()).toBe(before); expect(files()).toEqual(contents);
 });
+
+it("CodePush plan finds sync calls, the public key and CI commands, and ignores comments", async () => {
+  const { mkdirSync: mk } = await import("node:fs");
+  w("package.json", JSON.stringify({ name: "a", dependencies: { "react-native-code-push": "^8.0.0" } }, null, 2));
+  w("App.tsx", "// codePush({ old: true })(App);\nimport CodePush from 'react-native-code-push';\nCodePush.sync({});\n");
+  mk(join(tmp, "ios/App"), { recursive: true });
+  w("ios/App/Info.plist", "<dict>\n<key>CodePushPublicKey</key>\n<string>k</string>\n</dict>\n");
+  mk(join(tmp, ".github/workflows"), { recursive: true });
+  w(".github/workflows/release.yml", "jobs:\n  r:\n    steps:\n      - run: appcenter codepush release-react -a o/a\n");
+  mk(join(tmp, "fastlane"), { recursive: true });
+  w("fastlane/Fastfile", "lane :cp do\n  sh 'appcenter codepush release-react'\nend\n");
+  const lines: string[] = [];
+  vi.mocked(console.log).mockRestore();
+  vi.spyOn(console, "log").mockImplementation((...a) => { lines.push(a.join(" ")); });
+  expect(await migrate(["--plan", "--json"], tmp)).toBe(0);
+  const found = JSON.parse(lines[0]).data.found.map((f: any) => `${f.kind} ${f.where}`);
+  expect(found).toContain("sync App.tsx:3");
+  expect(found).toContain("public-key ios/App/Info.plist:2");
+  expect(found).toContain("command .github/workflows/release.yml:4");
+  expect(found).toContain("command fastlane/Fastfile:2");
+  expect(found.some((f: string) => f.startsWith("wrapper"))).toBe(false);
+});
