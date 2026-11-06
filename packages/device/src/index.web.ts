@@ -30,6 +30,8 @@ export type DeviceState = {
   airplane: boolean;
   /** Quick-settings switches (notification shade and Control Center). Wi-Fi and mobile data both off means no network. */
   wifi: boolean; mobileData: boolean; locationServices: boolean; darkMode: boolean; dnd: boolean; autoRotate: boolean; flashlight: boolean; orientationLock: boolean; brightness: number;
+  /** System appearance and language settings the app reads through Appearance, PixelRatio, AccessibilityInfo, I18nManager and Intl. */
+  fontSize: "small" | "default" | "large" | "largest"; boldText: boolean; reduceMotion: boolean; language: "en" | "fr" | "ar"; rtl: boolean;
   /** The battery the status bar shows. */
   battery: { level: number; charging: boolean };
   clipboard: string;
@@ -52,6 +54,7 @@ const state: DeviceState = {
   biometrics: { enrolled: true, nextResult: "success" },
   payment: { nextResult: "approve", pin: "1234" },
   online: true, airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70,
+  fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false,
   battery: { level: 100, charging: false }, clipboard: "", log: [],
   ...(cfg.device ?? {}),
 };
@@ -62,6 +65,16 @@ const log = (kind: string, detail?: unknown, source: Source = "simulated") => st
 const isOnline = () => state.online && !state.airplane && (state.wifi || state.mobileData);
 const SETTINGS = ["wifi", "mobileData", "locationServices", "darkMode", "dnd", "autoRotate", "flashlight", "orientationLock", "brightness", "airplane"] as const;
 const settings = () => Object.fromEntries(SETTINGS.map((k) => [k, state[k]]));
+const SYSTEM = ["darkMode", "fontSize", "boldText", "reduceMotion", "language", "rtl"] as const;
+const system = () => Object.fromEntries(SYSTEM.map((k) => [k, state[k]]));
+const systemKey = () => JSON.stringify(system());
+/** Logs each changed system setting (simulated) and tells the page, so the app's Appearance, PixelRatio, AccessibilityInfo and I18nManager follow. */
+function announceSystem(before: string, record = true) {
+  if (systemKey() === before) return;
+  const was = JSON.parse(before); const now = system();
+  if (record) for (const k of SYSTEM) if (was[k] !== (now as any)[k]) log("setting", { key: k, value: (now as any)[k] });
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pn:system", { detail: now }));
+}
 const settingsKey = () => JSON.stringify(settings());
 const statusKey = () => JSON.stringify([state.online, state.airplane, isOnline(), state.battery.level, state.battery.charging]);
 function announceStatus(before: string, record = true, beforeSettings = "") {
@@ -273,7 +286,7 @@ function showBanner(n: Notification, popup = true) {
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
 g.__pnDevice = {
   state,
-  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), wasOnline = isOnline(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (isOnline() !== wasOnline) netSubs.forEach((f) => f(isOnline())); announceStatus(before, true, bs); },
+  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasOnline = isOnline(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (isOnline() !== wasOnline) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
   /** Push a notification to the app. Returns its id, or null when permission is not granted. */
   push(n: Omit<Notification, "id">) { return deliver(n); },
   log: () => state.log,
@@ -285,6 +298,8 @@ g.__pnDevice = {
   clearAll() { const n = recent.length; recent.length = 0; log("notifications_cleared", { count: n }); return n; },
   /** The quick-settings switches: Wi-Fi, mobile data, airplane, location, dark mode, Do Not Disturb, auto-rotate, flashlight, orientation lock, brightness. */
   settings,
+  /** Dark mode, font size, bold text, reduce motion, language and RTL. */
+  system,
   /** Tap a notification from the shade: same handler as tapping its banner. */
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
@@ -294,14 +309,15 @@ g.__pnDevice = {
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
-    const before = statusKey(), bs = settingsKey();
+    const before = statusKey(), bs = settingsKey(), sk = systemKey();
     Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: (profile?.platform ?? state.platform) === "android" && (profile?.api ?? state.api) < 33 ? "granted" : "undetermined" },
-      source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
+      source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
     recent.length = 0; seq = 0;
-    announceStatus(before, false, bs);
+    announceSystem(sk, false); announceStatus(before, false, bs);
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
 };
+import("./system-settings").then((m) => m.installSystemSettings(g.__pnDevice)).catch(() => { /* no react-native here (tests, SSR) */ });
 export const simState = state;
 export const simLog = log;
 export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });
