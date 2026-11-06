@@ -117,4 +117,13 @@ describe("run bridge screenshot", () => {
     expect(r.ok, r.error).toBe(true); expect(r.source).toBe("rendered");
     await expect(page.locator("#shipvo-capture").isVisible()).resolves.toBe(true);
   }, 30_000);
+
+  it("falls back to rendered when the shared surface is not this tab", async () => {
+    const { page, ask } = await connect(`const g = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices); navigator.mediaDevices.getDisplayMedia = async (o) => { const s = await g(o); const t = s.getVideoTracks()[0]; t.getSettings = () => ({ displaySurface: "monitor" }); return s; };`);
+    await ask({ type: "screenshot" });
+    await page.click("#shipvo-capture button:text('Allow')");
+    await page.waitForFunction(() => document.querySelector("#shipvo-log")?.textContent?.includes("not this tab"));
+    const r = await ask({ type: "screenshot" });
+    expect(r.ok, r.error).toBe(true); expect(r.source).toBe("rendered");
+  }, 30_000);
 });

@@ -234,7 +234,7 @@ function bridgeMain(win: any, token: string) {
   const css = doc.createElement("style");
   css.textContent = "#shipvo-agent{position:fixed;left:50%;top:40px;transform:translateX(-50%);z-index:2147483000;display:none;align-items:center;gap:8px;padding:4px 12px;border-radius:14px;background:#4f46e5;color:#fff;font:12px system-ui,sans-serif}" +
     "#shipvo-agent.paused{background:#b45309}#shipvo-agent button{border:0;border-radius:10px;padding:2px 10px;font:inherit;cursor:pointer;display:none}#shipvo-agent.paused button{display:inline-block}" +
-    "#shipvo-capture{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:14px;background:#111;color:#fff;font:12px system-ui,sans-serif}#shipvo-capture button{border:0;border-radius:10px;padding:2px 10px;font:inherit;cursor:pointer}" +
+    "#shipvo-capture{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:14px;background:#111;color:#fff;font:12px system-ui,sans-serif;white-space:nowrap;max-width:calc(100vw - 24px);box-sizing:border-box}#shipvo-capture button{border:0;border-radius:10px;padding:2px 10px;font:inherit;cursor:pointer}#shipvo-capture button:focus-visible{outline:2px solid #fff;outline-offset:2px}" +
     "#shipvo-dot{position:fixed;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#4f46e5aa;border:2px solid #fff;box-shadow:0 0 0 2px #4f46e5;pointer-events:none;z-index:2147483000;display:none}" +
     "#shipvo-outline{position:fixed;border:2px solid #4f46e5;border-radius:4px;pointer-events:none;z-index:2147483000;display:none}" +
     "#shipvo-log{position:fixed;right:12px;bottom:44px;width:240px;max-width:calc(100vw - 24px);box-sizing:border-box;max-height:25%;overflow:auto;margin:0;padding:8px 8px 8px 26px;border-radius:8px;background:#111d;color:#fff;font:12px system-ui,sans-serif;z-index:2147483000;display:none}#shipvo-log li{margin:2px 0}" +
@@ -334,6 +334,8 @@ function bridgeMain(win: any, token: string) {
       stream = await win.navigator.mediaDevices.getDisplayMedia({ video: true, audio: false, preferCurrentTab: true });
       video = doc.createElement("video"); video.muted = true; video.srcObject = stream;
       await video.play();
+      const surface = stream.getVideoTracks()[0]?.getSettings?.().displaySurface;
+      if (surface && surface !== "browser") { for (const t of stream.getTracks()) t.stop(); stream = undefined; capture = "refused"; step("The shared surface is not this tab. Screenshots are drawn from the page."); return; }
       for (const t of stream.getTracks()) t.addEventListener("ended", () => { capture = "ask"; asked = false; stream = undefined; step("Tab sharing stopped. Screenshots are drawn from the page; the next agent action asks again."); });
       capture = "granted"; step("The agent can see this tab.");
     } catch { capture = "refused"; step("Tab capture was refused. Screenshots are drawn from the page."); }
