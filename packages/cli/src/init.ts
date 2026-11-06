@@ -352,7 +352,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm ci
-      - run: pip install --break-system-packages bsdiff4
       - name: Build, sign and publish over the air
         env:
           SHIPVO_PUBLISH_TOKEN: \${{ secrets.SHIPVO_PUBLISH_TOKEN }}   # from \`shipvo app create\`; self-hosting instead: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, SHIPVO_KV_ID
