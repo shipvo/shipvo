@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo publish --dry-run` works on Windows. It refused every file with "refusing to write outside .shipvo/dry-run" because the path check assumed `/`.
+- Migration: none.

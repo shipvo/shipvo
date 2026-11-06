@@ -18,7 +18,9 @@ import { PhoneBrowser } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
 import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
-import { shadeAction, SHADE_ACTIONS, applyScheme } from "./shade-actions.mjs";
+import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
+import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
+import { SettingsError } from "./settings.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
@@ -187,7 +189,7 @@ async function act(id, body) {
     if (covered) throw fail("covered", String(body.ref));
   };
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification", ...SHADE_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   // Home screen or app switcher showing: the app is in the background and takes no input.
   if (["tap", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
   // An open panel covers the app on a phone, so input to the app is refused until it is closed.
@@ -247,9 +249,12 @@ async function act(id, body) {
       break;
     }
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
-    case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); if (typeof body.device?.darkMode === "boolean") await applyScheme(page, body.device.darkMode); break;
+    case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); await syncMedia(page); break;
     case "open_notifications": case "open_control_center": case "close_panels": case "toggle_tile": case "dismiss_notification": {
       try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
+    }
+    case "get_settings": case "set_setting": {
+      try { return { ...(await settingsAction(page, body)) }; } catch (e) { if (e instanceof SettingsError) throw new SimError(e.code, e.message); throw e; }
     }
     case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
     case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
@@ -308,7 +313,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await applyScheme(page, !!body.device?.darkMode); s.shade.open = "none"; break;
+    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.
@@ -331,7 +336,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

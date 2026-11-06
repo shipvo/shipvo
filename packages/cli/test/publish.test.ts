@@ -23,7 +23,8 @@ vi.mock("../src/config.js", async (orig) => ({
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
 }));
-import { publish, rollback, dryRunSummary } from "../src/publish";
+import { publish, rollback, dryRunSummary, isInside } from "../src/publish";
+import path from "node:path";
 
 const fakeHbc = (version: number) => {
   const b = new Uint8Array(64);
@@ -403,5 +404,20 @@ describe("publish and the Hermes bytecode check", () => {
     const core = (key: string) => JSON.parse(JSON.parse(values.get(key)!).body).core;
     expect(core("p/demo/1/ios/b0").patches.map((p: any) => p.from_sha256)).toEqual([sha(8)]);
     expect(core("p/demo/1/b0").patches.map((p: any) => p.from_sha256)).toEqual([sha(9)]);
+  });
+});
+
+describe("isInside (dry-run writes stay under the output dir)", () => {
+  it("accepts Windows paths under the root and refuses ones outside it", () => {
+    const w = path.win32;
+    expect(isInside("D:\\a\\app\\.shipvo\\dry-run", "D:\\a\\app\\.shipvo\\dry-run\\b\\myshop\\r1.hbc", w)).toBe(true);
+    expect(isInside("D:\\a\\app\\.shipvo\\dry-run", "D:\\a\\app\\.shipvo\\other\\r1.hbc", w)).toBe(false);
+    expect(isInside("D:\\a\\app\\.shipvo\\dry-run", "D:\\a\\app\\.shipvo\\dry-run", w)).toBe(false);
+  });
+  it("accepts POSIX paths under the root and refuses ones outside it", () => {
+    const p = path.posix;
+    expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run/b/myshop/r1.hbc", p)).toBe(true);
+    expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run-x/r1.hbc", p)).toBe(false);
+    expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run/../x", p)).toBe(false);
   });
 });
