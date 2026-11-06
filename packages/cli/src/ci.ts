@@ -5,6 +5,7 @@ import { args } from "./config.js";
 import { explore } from "./explore.js";
 import { testCmd } from "./test.js";
 import { commentCmd } from "./ci-comment.js";
+import { shotsCmd } from "./ci-shots.js";
 
 export const WORKFLOW_PATH = join(".github", "workflows", "shipvo-build.yml");
 export const CHECK_WORKFLOW_PATH = join(".github", "workflows", "shipvo-check.yml");
@@ -55,6 +56,7 @@ function templatePath(framework: string): string {
 export async function ci(argv: string[], cwd = process.cwd()): Promise<number> {
   const [sub, ...rest] = argv;
   if (sub === "check") return check();
+  if (sub === "shots") return shotsCmd(rest);
   if (sub === "comment") return commentCmd(rest);
   if (sub !== "init") { console.error("Usage: shipvo ci init --check | --framework capacitor [--dry-run] [--force]\n       shipvo ci check"); return 2; }
   const a = args(rest);

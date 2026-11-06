@@ -66,7 +66,7 @@ export function setVisibilityInPage(state) {
 /** Home screen markup: the app icon. Hidden until the phone goes home. */
 export function homeScreenHtml(appName = "App") {
   const n = String(appName).replace(/[<>&"'\\]/g, "").slice(0, 40) || "App";
-  return `<div class="sf-home" data-part="home-screen" role="region" aria-label="Home screen" hidden><button type="button" class="sf-icon" data-part="app-icon" aria-label="${n}"><b>${n.slice(0, 1).toUpperCase()}</b><span>${n}</span></button><button type="button" class="sf-icon sf-settings-icon" data-part="settings-icon" aria-label="Settings"><b>S</b><span>Settings</span></button></div>`;
+  return `<div class="sf-home" data-part="home-screen" role="region" aria-label="Home screen" hidden><button type="button" class="sf-icon" data-part="app-icon" aria-label="${n}"><b>${n.slice(0, 1).toUpperCase()}</b><span>${n}</span></button></div>`;
 }
 
 /** App switcher markup: one card for the app. Click the card to open it, the close button (or swipe it up) to kill the app. */

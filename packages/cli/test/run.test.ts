@@ -8,7 +8,7 @@ vi.mock("node:child_process", async (orig) => {
   return { ...m, spawnSync: vi.fn((...a: Parameters<typeof m.spawnSync>) => (process.env.RUN_TEST_FAKE_NATIVE ? ({ status: 0 } as never) : m.spawnSync(...a))) };
 });
 import { renderFrame } from "../../sim/frame.mjs";
-import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, describeWebBuildFailure, buildWeb, run } from "../src/run";
+import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, describeWebBuildFailure, buildWeb, run, isFirstBuild } from "../src/run";
 
 describe("parseRunArgs", () => {
   it("parses platform and flags", () => {
@@ -21,6 +21,26 @@ describe("parseRunArgs", () => {
     expect(() => parseRunArgs(["windows"])).toThrow(/Unknown argument/);
     expect(() => parseRunArgs(["ios", "--port", "abc"])).toThrow(/--port/);
     expect(() => parseRunArgs(["ios", "--port"])).toThrow(/--port/);
+  });
+});
+
+describe("run --help", () => {
+  it("prints usage and exits 0 for --help and -h", async () => {
+    for (const flag of ["--help", "-h"]) {
+      const out: string[] = [];
+      const spy = vi.spyOn(console, "log").mockImplementation((...a) => { out.push(a.join(" ")); });
+      try { expect(await run([flag])).toBe(0); } finally { spy.mockRestore(); }
+      expect(out.join("\n")).toMatch(/Usage: shipvo run android\|ios[\s\S]*--no-open[\s\S]*--port <n>[\s\S]*--native/);
+    }
+  });
+  it("tells a missing platform how to fix it", () => {
+    expect(() => parseRunArgs([])).toThrow(/Try: shipvo run android/);
+  });
+  it("detects a first build by the missing sim-dist", () => {
+    const d = mkdtempSync(join(tmpdir(), "run-fb-"));
+    expect(isFirstBuild(d)).toBe(true);
+    mkdirSync(join(d, "sim-dist"));
+    expect(isFirstBuild(d)).toBe(false);
   });
 });
 

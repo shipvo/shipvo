@@ -90,7 +90,7 @@ export function describePanel(platform, panel, device, list, now = Date.now()) {
 /** Markup for the panels. Hidden until the page opens one. */
 export function shadeHtml(platform = "android") {
   const ios = platform === "ios";
-  const panel = (part, label, inner) => `<div class="sf-panel" data-part="${part}" role="dialog" aria-label="${label}" tabindex="-1" hidden><button type="button" class="sf-gear" data-part="settings-gear" aria-label="Settings">Settings</button>${inner}<button type="button" class="sf-close" data-part="close">Close</button></div>`;
+  const panel = (part, label, inner) => `<div class="sf-panel" data-part="${part}" role="dialog" aria-label="${label}" tabindex="-1" hidden>${inner}<button type="button" class="sf-gear" data-part="settings-gear" aria-label="Settings">⚙ Settings</button><button type="button" class="sf-close" data-part="close">Close</button></div>`;
   const list = `<div class="sf-notes" data-part="notification-list"></div><button type="button" class="sf-clear" data-part="clear-all">Clear all</button>`;
   return `<div class="sf-grab" data-part="top-edge" aria-hidden="true"></div>`
     + (ios ? panel("notification-center", "Notification Center", list) + panel("control-center", "Control Center", `<div class="sf-tiles" data-part="tiles"></div>`)
@@ -125,9 +125,9 @@ function pull(x){var e=r.getBoundingClientRect();show(panelFor(P,x,e.width,open)
 var sy=null,sx=0;edge.addEventListener("mousedown",function(e){e.preventDefault()});edge.addEventListener("pointerdown",function(e){try{edge.setPointerCapture(e.pointerId)}catch(x){}sy=e.clientY;sx=e.clientX-r.getBoundingClientRect().left});
 document.addEventListener("pointerup",function(e){if(sy!=null&&e.clientY-sy>40)pull(sx);sy=null});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&open!=="none")show("none")});
-var closeY=null;r.addEventListener("pointerdown",function(e){if(open!=="none"&&!e.target.closest(".sf-tile,.sf-note,.sf-dismiss,.sf-clear,.sf-close"))closeY=e.clientY});
+var closeY=null;r.addEventListener("pointerdown",function(e){if(open!=="none"&&!e.target.closest(".sf-tile,.sf-note,.sf-dismiss,.sf-clear,.sf-close,.sf-gear"))closeY=e.clientY});
 document.addEventListener("pointerup",function(e){if(closeY!=null&&closeY-e.clientY>60)show("none");closeY=null});
-r.addEventListener("click",function(e){if(swiped){swiped=false;return}if(e.target.closest(".sf-close")){show("none");return}var d=dev();if(!d)return;var tl=e.target.closest(".sf-tile");
+r.addEventListener("click",function(e){if(swiped){swiped=false;return}if(e.target.closest(".sf-close,.sf-gear")){show("none");return}var d=dev();if(!d)return;var tl=e.target.closest(".sf-tile");
 if(tl){var id=tl.getAttribute("data-tile");try{d.set(tilePatch(P,id,d.settings(),undefined))}catch(x){}draw();return}
 if(e.target.closest(".sf-clear")){d.clearAll();draw();return}
 var dm=e.target.closest(".sf-dismiss");if(dm){var did=dm.getAttribute("data-dismiss"),rows=[].slice.call(r.querySelectorAll(".sf-dismiss")),at=rows.indexOf(dm);d.dismiss(did);draw();var nx=r.querySelectorAll(".sf-dismiss")[at]||r.querySelectorAll(".sf-dismiss")[at-1],pn=r.querySelector('[data-part="'+partOf(open)+'"]');(nx||pn).focus({preventScroll:true});return}

@@ -1,105 +1,95 @@
 // The phone's Settings screen: dark mode, font size, bold text, reduce motion, language and RTL.
-// Pure helpers (validation, rows, text for an agent) plus the screen's markup, css and browser script.
-// Our own artwork and wording. The values live in the simulated device (`@shipvo/device`); this file never keeps its own copy.
+// Pure: no DOM, no timers. The frame page draws the screen; the server uses the same rules for the MCP tools get_settings and set_setting.
+// Each setting is a field of the simulated device (@shipvo/device), so the app sees it through Appearance, PixelRatio, AccessibilityInfo, I18nManager and Intl.
 
-export class SettingsError extends Error {
-  constructor(code, message) { super(message); this.code = code; }
+/** Typed error for a setting that cannot be read or changed. */
+export class SettingsError extends Error { constructor(code, message) { super(message); this.code = code; } }
+
+export const FONT_SIZES = ["small", "default", "large", "largest"];
+export const LANGUAGES = { en: "English", fr: "Français", ar: "العربية" };
+
+/** Setting key -> label, device field and kind. */
+export const SETTINGS = {
+  dark_mode: { label: "Dark mode", field: "darkMode", kind: "boolean" },
+  font_size: { label: "Font size", field: "fontSize", kind: "choice", values: FONT_SIZES },
+  bold_text: { label: "Bold text", field: "boldText", kind: "boolean" },
+  reduce_motion: { label: "Reduce motion", field: "reduceMotion", kind: "boolean" },
+  language: { label: "Language", field: "language", kind: "choice", values: Object.keys(LANGUAGES) },
+  rtl: { label: "Right-to-left layout", field: "rtl", kind: "boolean" },
+};
+export const SETTING_KEYS = Object.keys(SETTINGS);
+
+/** The settings as an object keyed by setting name, from the device's `system()`. */
+export function readSettings(device = {}) {
+  const defaults = { dark_mode: false, font_size: "default", bold_text: false, reduce_motion: false, language: "en", rtl: false };
+  return Object.fromEntries(SETTING_KEYS.map((k) => [k, device[SETTINGS[k].field] ?? defaults[k]]));
 }
 
-export const FONT_SIZES = ["small", "default", "large", "extra-large"];
-export const LANGUAGES = ["en", "fr", "ar"];
-const LANGUAGE_NAMES = { en: "English", fr: "Français", ar: "العربية" };
-const SIZE_NAMES = { small: "Small", default: "Default", large: "Large", "extra-large": "Largest" };
-
-/** What each setting is called, its kind and allowed values. Keys are the device's own field names. */
-export const SETTING_DEFS = [
-  { key: "darkMode", label: "Dark mode", kind: "boolean" },
-  { key: "fontSize", label: "Font size", kind: "choice", options: FONT_SIZES },
-  { key: "boldText", label: "Bold text", kind: "boolean" },
-  { key: "reduceMotion", label: "Reduce motion", kind: "boolean" },
-  { key: "language", label: "Language", kind: "choice", options: LANGUAGES },
-  { key: "rtl", label: "Right-to-left layout", kind: "boolean" },
-];
-export const SETTING_KEYS = SETTING_DEFS.map((d) => d.key);
-
-/** The settings subset of the device's settings object, with defaults for anything missing. */
-export function pickSettings(device = {}) {
-  return {
-    darkMode: device.darkMode === true, fontSize: FONT_SIZES.includes(device.fontSize) ? device.fontSize : "default",
-    boldText: device.boldText === true, reduceMotion: device.reduceMotion === true,
-    language: LANGUAGES.includes(device.language) ? device.language : "en", rtl: device.rtl === true,
-  };
-}
-
-/**
- * Checks one change and returns the device patch for it. Unknown keys and bad values throw SettingsError
- * (`unknown_setting`, `bad_value`) before anything changes. Language "ar" turns RTL on and the others turn it off.
- */
+/** The `set_device` patch for one setting. Setting the language to Arabic turns RTL on, and to any other language turns it off. Throws SettingsError. */
 export function settingPatch(key, value) {
-  const def = SETTING_DEFS.find((d) => d.key === key);
-  if (!def) throw new SettingsError("unknown_setting", `unknown setting '${key}'. Settings: ${SETTING_KEYS.join(", ")}`);
-  if (def.kind === "boolean" && typeof value !== "boolean") throw new SettingsError("bad_value", `'${key}' must be true or false, got ${JSON.stringify(value)}`);
-  if (def.kind === "choice" && !def.options.includes(value)) throw new SettingsError("bad_value", `'${key}' must be one of ${def.options.join(", ")}, got ${JSON.stringify(value)}`);
-  return key === "language" ? { language: value, rtl: value === "ar" } : { [key]: value };
+  const s = Object.prototype.hasOwnProperty.call(SETTINGS, key) ? SETTINGS[key] : null;
+  if (!s) throw new SettingsError("unknown_setting", `unknown setting '${key}'. Settings: ${SETTING_KEYS.join(", ")}`);
+  if (s.kind === "boolean") {
+    if (typeof value !== "boolean") throw new SettingsError("bad_value", `'${key}' takes true or false`);
+    return { [s.field]: value };
+  }
+  if (typeof value !== "string" || !s.values.includes(value)) throw new SettingsError("bad_value", `'${key}' takes one of: ${s.values.join(", ")}`);
+  return key === "language" ? { language: value, rtl: value === "ar" } : { [s.field]: value };
 }
 
-/** Rows for the screen and the agent: `{ key, label, kind, value, options? }`. */
-export function settingRows(values) {
-  const v = pickSettings(values);
-  return SETTING_DEFS.map((d) => ({ key: d.key, label: d.label, kind: d.kind, value: v[d.key], ...(d.options ? { options: d.options } : {}) }));
-}
-
-/** Plain-text view of the screen, like the accessibility tree an agent reads. */
+/** Plain-text view of the Settings screen for an agent: one row per setting. */
 export function describeSettings(values) {
   const lines = ["Settings"];
-  for (const r of settingRows(values)) lines.push(r.kind === "boolean" ? `- switch "${r.label}" (${r.key}): ${r.value ? "on" : "off"}` : `- choice "${r.label}" (${r.key}): ${r.value} [${r.options.join(", ")}]`);
+  for (const k of SETTING_KEYS) { const s = SETTINGS[k], v = values[k]; lines.push(`- ${s.kind === "boolean" ? "switch" : "choice"} ${k} (${s.label}): ${s.kind === "boolean" ? (v ? "on" : "off") : v}`); }
   return lines.join("\n");
 }
 
-/** Markup for the screen. Hidden until opened. The rows are drawn by the page script. */
+/** Markup for the Settings screen. Hidden until opened. The rows are drawn by the client script. */
 export function settingsHtml() {
-  return `<div class="sf-settings" data-part="settings-screen" role="dialog" aria-label="Settings" tabindex="-1" hidden><h1>Settings</h1><div class="sf-srows" data-part="settings-rows"></div><button type="button" class="sf-sclose" data-part="close-settings">Done</button></div>`;
+  return `<div class="sf-settings" data-part="settings-screen" role="dialog" aria-label="Settings" tabindex="-1" hidden><h2 class="sf-sh">Settings</h2><div data-part="settings-rows" role="group" aria-label="Settings"></div><button type="button" class="sf-close" data-part="settings-close">Close</button></div>`;
+}
+/** The Settings icon for the home screen. */
+export function settingsIconHtml() {
+  return `<button type="button" class="sf-icon" data-part="settings-icon" aria-label="Settings" style="left:124px"><b>⚙</b><span>Settings</span></button>`;
+}
+/** The gear for the shade panels. */
+export function gearHtml() {
+  return `<button type="button" class="sf-gear" data-part="settings-gear" aria-label="Settings">⚙ Settings</button>`;
 }
 
 export const settingsCss = [
-  `.sf-settings{position:absolute;inset:0;z-index:5;overflow:auto;padding:52px 16px 16px;box-sizing:border-box;background:#f2f4f7;color:#111;font:calc(15px * var(--sf-fs,1)) system-ui,sans-serif}.sf-settings[hidden]{display:none}`,
-  `.sf-settings[data-dark="true"]{background:#0e1116;color:#f2f4f7}.sf-settings h1{margin:0 0 14px;font-size:calc(24px * var(--sf-fs,1))}.sf-settings[data-bold="true"] *{font-weight:700}`,
-  `.sf-srow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:6px 14px;margin-bottom:6px;border-radius:12px;background:#fff;color:inherit;border:0;width:100%;font:inherit;text-align:start}.sf-settings[data-dark="true"] .sf-srow{background:#1b1f27}`,
-  `.sf-srow select{font:inherit;padding:6px;border-radius:8px}.sf-knob{flex:none;width:44px;height:26px;border-radius:13px;background:#9aa3ad;position:relative}.sf-knob::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff}[aria-checked="true"] .sf-knob{background:#2f7de1}[aria-checked="true"] .sf-knob::after{inset-inline-start:21px}`,
-  `.sf-icon.sf-settings-icon{left:124px}`,
-  `.sf-sclose,.sf-gear,.sf-settings-icon{cursor:pointer}.sf-sclose{margin-top:10px;padding:10px 22px;border:0;border-radius:999px;background:#2f7de1;color:#fff;font:600 15px system-ui,sans-serif}`,
-  `.sf-gear{position:absolute;top:10px;inset-inline-end:14px;padding:4px 12px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:12px system-ui,sans-serif}`,
+  `.sf-settings{position:absolute;inset:0;z-index:8;overflow:auto;padding:48px 14px 14px;background:#10151c;color:#fff;font:15px system-ui,sans-serif}.sf-settings[hidden]{display:none}.sf-sh{margin:0 0 12px;font-size:22px}`,
+  `.sf-srow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;box-sizing:border-box;margin:6px 0;padding:12px;border:0;border-radius:14px;background:#2c3036;color:#fff;font:inherit;text-align:start}.sf-srow[role=switch]::after{content:"Off";opacity:.7}.sf-srow[aria-checked=true]::after{content:"On";color:#4da3ff;font-weight:700}`,
+  `.sf-group2{margin:6px 0;padding:8px 12px;border-radius:14px;background:#2c3036}.sf-group2 b{display:block;margin-bottom:6px}.sf-opts{display:flex;flex-wrap:wrap;gap:6px}.sf-opt{padding:8px 12px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:inherit}.sf-opt[aria-checked=true]{background:#4da3ff;color:#001;border-color:#4da3ff}`,
+  `.sf-gear{margin:0 8px 8px 0;padding:8px 16px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff}`,
+  `.sf-settings :focus-visible,.sf-gear:focus-visible{outline:3px solid #4da3ff;outline-offset:2px}`,
 ].join("\n");
 
-/** Browser script for the frame page. Opens from the home-screen icon and the shade gear; changes go to the app's `__pnDevice`. */
+/** Browser script for the frame page: opens Settings from the home icon or the shade gear, draws the rows, and writes changes to the app's `__pnDevice`. */
 export function settingsClientScript(iframeId = "app") {
   return `(function(){
+var SETTINGS=${JSON.stringify(SETTINGS)},SETTING_KEYS=${JSON.stringify(SETTING_KEYS)},LANGS=${JSON.stringify(LANGUAGES)},FONT=${JSON.stringify(FONT_SIZES)},settingPatch=${settingPatch.toString()},readSettings=${readSettings.toString()};
+function SettingsError(c,m){var e=new Error(m);e.code=c;return e}
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("settings-screen");if(!sc)return;
-var SETTING_DEFS=${JSON.stringify(SETTING_DEFS)},FONT_SIZES=${JSON.stringify(FONT_SIZES)},LANGUAGES=${JSON.stringify(LANGUAGES)},LANGUAGE_NAMES=${JSON.stringify(LANGUAGE_NAMES)},SIZE_NAMES=${JSON.stringify(SIZE_NAMES)},SIZE_SCALES={small:.85,"default":1,large:1.3,"extra-large":1.6};
-var pickSettings=${pickSettings.toString()},settingPatch=${settingPatch.toString()},settingRows=${settingRows.toString()};
-function SettingsError(c,m){var e=new Error(m);e.code=c;return e}
-function dev(){var f=document.getElementById(${JSON.stringify(iframeId)});var w=f&&f.contentWindow;return w&&w.__pnDevice?w.__pnDevice:null}
+function dev(){var f=document.getElementById(${JSON.stringify(iframeId)});var w=f&&f.contentWindow;return w&&w.__pnDevice&&w.__pnDevice.system?w.__pnDevice:null}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-var back=null,focusKey=null;
-function draw(){var d=dev();if(!d||sc.hidden)return;var v=pickSettings(d.settings()),rows=settingRows(v),h="";
-sc.setAttribute("data-dark",String(v.darkMode));sc.setAttribute("data-bold",String(v.boldText));sc.setAttribute("dir",v.rtl?"rtl":"ltr");sc.setAttribute("lang",v.language);sc.style.setProperty("--sf-fs",SIZE_SCALES[v.fontSize]);
-rows.forEach(function(x){
-if(x.kind==="boolean")h+='<button type="button" role="switch" class="sf-srow" data-setting="'+x.key+'" aria-checked="'+x.value+'"><span>'+esc(x.label)+'</span><i class="sf-knob"></i></button>';
-else{var id="sf-s-"+x.key;h+='<div class="sf-srow"><label for="'+id+'">'+esc(x.label)+'</label><select id="'+id+'" data-setting="'+x.key+'">'+x.options.map(function(o){return '<option value="'+o+'"'+(o===x.value?' selected':'')+'>'+esc(x.key==="language"?LANGUAGE_NAMES[o]:SIZE_NAMES[o])+'</option>'}).join("")+'</select></div>'}});
-var keep=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-setting");
-q("settings-rows").innerHTML=h;if(keep){var n=sc.querySelector('[data-setting="'+keep+'"]');if(n)n.focus({preventScroll:true})}}
-function open(from){back=from||document.activeElement;sc.hidden=false;draw();sc.focus({preventScroll:true})}
-function close(){if(sc.hidden)return;sc.hidden=true;var b=back;back=null;if(b&&b.focus)b.focus({preventScroll:true})}
-function change(key,value){var d=dev();if(!d)return;try{d.set(settingPatch(key,value))}catch(x){}draw()}
-r.addEventListener("click",function(e){
-var ic=e.target.closest&&e.target.closest('[data-part="settings-icon"]');if(ic){open(ic);return}
-var g=e.target.closest&&e.target.closest('[data-part="settings-gear"]');if(g){var p=g.closest('[role="dialog"]'),c=p&&p.querySelector('[data-part="close"]');if(c)c.click();open(document.querySelector('[data-part="top-edge"]'));return}
-if(e.target.closest('[data-part="close-settings"]')){close();return}
-var sw=e.target.closest&&e.target.closest('button[data-setting]');if(sw&&sc.contains(sw)){var k=sw.getAttribute("data-setting"),d=dev();if(d)change(k,!pickSettings(d.settings())[k])}});
-r.addEventListener("change",function(e){var s=e.target;if(s&&s.matches&&s.matches("select[data-setting]")&&sc.contains(s))change(s.getAttribute("data-setting"),s.value)});
-document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)close()});
-var f=document.getElementById(${JSON.stringify(iframeId)});function wire(){var w=f&&f.contentWindow;if(w&&!w.__shipvoSettingsHooked){w.__shipvoSettingsHooked=true;w.addEventListener("pn:settings",draw)}}
+var SIZE={small:"Small",default:"Default",large:"Large",largest:"Largest"};
+function draw(){var d=dev(),rows=q("settings-rows");if(!d||!rows||sc.hidden)return;var v=readSettings(d.system()),h="";
+SETTING_KEYS.forEach(function(k){var s=SETTINGS[k];
+if(s.kind==="boolean")h+='<button type="button" class="sf-srow" role="switch" data-setting="'+k+'" aria-checked="'+(!!v[k])+'">'+esc(s.label)+'</button>';
+else{h+='<div class="sf-group2" role="radiogroup" aria-label="'+esc(s.label)+'"><b>'+esc(s.label)+'</b><div class="sf-opts">'+s.values.map(function(o){return '<button type="button" class="sf-opt" role="radio" data-setting="'+k+'" data-value="'+o+'" aria-checked="'+(v[k]===o)+'">'+esc(k==="language"?LANGS[o]:SIZE[o])+'</button>'}).join("")+'</div></div>'}});
+var keep=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-setting"),kv=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-value");
+rows.innerHTML=h;if(keep){var again=rows.querySelector('[data-setting="'+keep+'"]'+(kv?'[data-value="'+kv+'"]':''));if(again)again.focus({preventScroll:true})}}
+var back=null;
+function show(on){if(on){back=document.activeElement;sc.hidden=false;draw();sc.focus({preventScroll:true});try{window.parent.postMessage({type:"pn:settings-open",open:true},"*")}catch(x){}}else{sc.hidden=true;if(back&&back.focus)back.focus({preventScroll:true});back=null}}
+r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
+if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){show(true);return}
+if(t.closest('[data-part="settings-close"]')){show(false);return}
+var row=t.closest("[data-setting]");if(row){var d=dev();if(!d)return;var k=row.getAttribute("data-setting"),s=SETTINGS[k],val=s.kind==="boolean"?row.getAttribute("aria-checked")!=="true":row.getAttribute("data-value");
+try{d.set(settingPatch(k,val))}catch(x){}draw()}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)show(false)});
+var f=document.getElementById(${JSON.stringify(iframeId)});function wire(){var w=f&&f.contentWindow;if(w&&!w.__shipvoSettingsHooked){w.__shipvoSettingsHooked=true;w.addEventListener("pn:system",draw)}}
 if(f){f.addEventListener("load",wire);wire()}
 })();`;
 }
