@@ -21,7 +21,8 @@ window.go = async (path) => {
   catch (e) { document.getElementById("h").textContent = "Failed " + e; }
 };
 </script>
-<button onclick="go('/items')">Load items</button><button onclick="go('/other')">Load other</button><button onclick="go('/big')">Load big</button></body></html>`;
+<script>window.__pnDevice = { on: true, set(p) { if (p.networkProfile) this.on = p.networkProfile !== "offline"; }, reset() { this.on = true; }, status() { return { online: this.on }; }, log: () => [], capabilities: () => null };</script>
+<button onclick="document.getElementById('h').textContent = 'Got 200 dev online=' + window.__pnDevice.status().online">Device state</button><button onclick="go('/items')">Load items</button><button onclick="go('/other')">Load other</button><button onclick="go('/big')">Load big</button></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
 function ensureChromium() {
@@ -107,4 +108,18 @@ test("2g applies the bandwidth limit to the response and still returns the real 
   assert.match(await press("e", "Load items"), /Got 200 real/);
   await act("e", { action: "set_network_profile", profile: "2g" });
   assert.match(await press("e", "Load items"), /Got 200 real/);
+});
+
+test("the page's device follows the profile, and device_reset brings it back online", async () => {
+  assert.ok((await call("/session", { session: "f" })).ok);
+  assert.match(await press("f", "Device state"), /dev online=true/);
+  await act("f", { action: "set_network_profile", profile: "offline" });
+  assert.match(await press("f", "Device state"), /dev online=false/);
+  await act("f", { action: "set_network_profile", profile: "online" });
+  assert.match(await press("f", "Device state"), /dev online=true/);
+  await act("f", { action: "set_network_profile", profile: "offline" });
+  await act("f", { action: "device_reset" });
+  assert.match(await press("f", "Device state"), /dev online=true/);
+  assert.match(await press("f", "Load items"), /Got 200 real/);
+  assert.equal((await netLog("f")).at(-1).profile, "online");
 });

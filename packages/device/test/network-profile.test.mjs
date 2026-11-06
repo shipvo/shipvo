@@ -33,3 +33,11 @@ test("cellular profiles report the matching generation", () => {
   dev.set({ networkProfile: "online" });
   assert.deepEqual(device.net.connection(), { isConnected: true, type: "wifi" });
 });
+
+test("reset puts the network profile back to online", () => {
+  dev.set({ networkProfile: "offline" });
+  assert.equal(device.net.online(), false);
+  dev.reset();
+  assert.equal(device.net.online(), true);
+  assert.deepEqual(device.net.connection(), { isConnected: true, type: "wifi" });
+});
