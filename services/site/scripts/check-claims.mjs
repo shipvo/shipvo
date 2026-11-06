@@ -1,24 +1,27 @@
 // Issue #737. Public text must not claim "100% parity" or "identical" without a link to parity-results
 // in the same paragraph. Paragraphs are blocks split on blank lines (Markdown) or on HTML block tags.
-// Limit: other word orders are not caught.
+// "100% parity" and "parity 100%" must say "actionable", even with a link. Limit: other word orders are not caught.
+// docs/product and docs/fr are not scanned, so those two folders are a known hole.
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(fileURLToPath(new URL("..", import.meta.url)), "../..");
 const CLAIM = /100\s?%\s+(actionable\s+)?parity|parity\s+100\s?%|\bidentical\b/i;
+const UNSCOPED = /100\s?%\s+parity|parity\s+100\s?%/i;
 const LINK = /parity-results/;
 
 export function findViolations(text, isHtml = false) {
   const blocks = isHtml ? text.split(/<\/?(?:p|li|article|div|tr|td|h\d|section)\b[^>]*>|\n\s*\n/i) : text.split(/\n\s*\n/);
-  return blocks.filter((b) => CLAIM.test(b) && !LINK.test(b)).map((b) => b.trim().replace(/\s+/g, " ").slice(0, 120));
+  return blocks.filter((b) => UNSCOPED.test(b) || (CLAIM.test(b) && !LINK.test(b))).map((b) => b.trim().replace(/\s+/g, " ").slice(0, 120));
 }
 
 // Self-test.
 const bad = findViolations("We have 100% parity.\n\nOther text.");
 const ok = findViolations("100% actionable parity, see [results](parity-results.md).");
 const bad2 = findViolations("<p>Screens are identical.</p><p><a href=\"/docs/parity-results/\">x</a></p>", true);
-if (bad.length !== 1 || ok.length !== 0 || bad2.length !== 1) { console.error("check-claims self-test failed"); process.exit(1); }
+const bad3 = findViolations("iOS parity 100% (see parity-results)");
+if (bad3.length !== 1 || bad.length !== 1 || ok.length !== 0 || bad2.length !== 1) { console.error("check-claims self-test failed"); process.exit(1); }
 
 function walk(dir, out = []) {
   for (const n of readdirSync(dir)) {
