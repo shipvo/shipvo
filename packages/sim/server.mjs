@@ -14,6 +14,7 @@ import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
+import { PhoneBrowser } from "./phone-browser.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
@@ -62,7 +63,7 @@ const sessions = new Map();
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
 
 async function newSession(id, opts = {}) {
-  if (sessions.has(id)) await sessions.get(id).ctx.close();
+  if (sessions.has(id)) { await sessions.get(id).browser?.close(); await sessions.get(id).ctx.close(); }
   const target = await resolveApp(opts.app);
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
   const browser = await browserReady;
@@ -212,7 +213,24 @@ async function act(id, body) {
       }
       break;
     }
-    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
+    case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": {
+      if (body.action === "browser_open" && body.url && !s.browser) s.browser = new PhoneBrowser(await browserReady, { allowPrivate: body.allow_private === true, allowHosts: Array.isArray(body.allow_hosts) ? body.allow_hosts.map(String) : [], device: phone });
+      else if (body.action === "browser_open" && s.browser) { if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
+      if (!s.browser) { if (body.action === "browser_open") throw new SimError("bad_url", "browser_open needs a url"); throw new SimError("no_page", "no page is open: call browser_open first"); }
+      const b = s.browser;
+      try {
+        switch (body.action) {
+          case "browser_open": return { ...(await b.open(String(body.url ?? ""))) };
+          case "browser_snapshot": return { ...(await b.snapshot()) };
+          case "browser_click": return { ...(await b.click(body.ref)) };
+          case "browser_type": return { ...(await b.type(body.ref, body.text, body.enter)) };
+          case "browser_back": return { ...(await b.back()) };
+          default: { const p = join(DIR, `${id}-web-${Date.now()}.png`); writeFileSync(p, await b.screenshot()); return { path: p, source: "web", untrusted: true }; }
+        }
+      } catch (e) { throw e.code ? new SimError(e.code, e.message) : e; }
+    }
+    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log, ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
@@ -242,7 +260,7 @@ async function act(id, body) {
       const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
