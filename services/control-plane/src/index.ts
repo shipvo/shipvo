@@ -11,7 +11,7 @@ import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
 import { installs, verifyReport } from "./installs";
-import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, anomalyReason, ANOMALY_COMMAND, SPIKE_WINDOW_MINUTES, SPIKE_BASELINE_HOURS, type InstallVote } from "./halt";
+import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, anomalyReason, ANOMALY_COMMAND, ANOMALY_HOLD_TTL_MS, SPIKE_WINDOW_MINUTES, SPIKE_BASELINE_HOURS, type InstallVote } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string };
 const app = new Hono<{ Bindings: Env }>();
@@ -178,6 +178,7 @@ async function applyHalt(env: Env, appId: string, release: number, reports: numb
 /** Do not halt. Create one owner approval entry per release while it is pending. */
 async function holdRelease(env: Env, appId: string, release: number, reason: string, reports: number, failed: number, threshold: number | undefined): Promise<void> {
   const key = `anomaly-hold/${appId}`;
+  // KV has no compare-and-set: two concurrent failures may both create an entry.
   const raw = await env.POINTERS.get(key);
   if (raw) {
     try {
@@ -187,7 +188,7 @@ async function holdRelease(env: Env, appId: string, release: number, reason: str
     } catch { /* bad value: replace it */ }
   }
   const ch = await createChallenge({ kv: env.POINTERS, appId }, { command: ANOMALY_COMMAND, args_hash: `release:${release}`, requester: "halt-rule",
-    plan: [`Release ${release} looks attacked: ${reason}. It was not halted and stays at its current band.`, "Confirm to halt it, or dismiss to clear the hold."] });
+    plan: [`Release ${release} looks attacked: ${reason}. It was not halted and stays at its current band.`, "Confirm to halt it, or dismiss to clear the hold."] }, ANOMALY_HOLD_TTL_MS);
   await env.POINTERS.put(key, JSON.stringify({ release, challenge_id: ch.id, reports, failed, threshold, reason, held_at: ch.created_at }));
 }
 
@@ -199,7 +200,13 @@ async function settleHold(env: Env, appId: string, ch: { id: string; command: st
   let h: any = null;
   try { h = raw ? JSON.parse(raw) : null; } catch { /* corrupt: nothing to settle */ }
   if (!h || h.challenge_id !== ch.id) return;
-  if (verb === "approve") await applyHalt(env, appId, h.release, h.reports, h.failed, h.threshold, ch.approved_by ?? "owner", "person");
+  if (verb === "approve") {
+    // If a different release was halted meanwhile, leave that halt alone.
+    const cur = await env.POINTERS.get(`halt/${appId}`);
+    let other = false;
+    try { other = !!cur && JSON.parse(cur).release !== h.release; } catch { /* bad value: overwrite */ }
+    if (!other) await applyHalt(env, appId, h.release, h.reports, h.failed, h.threshold, ch.approved_by ?? "owner", "person");
+  }
   await env.POINTERS.delete(key);
 }
 

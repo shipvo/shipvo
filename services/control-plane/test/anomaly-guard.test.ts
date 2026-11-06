@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import app from "../src/index";
 
 async function cookie(pw: string, appId: string) {
@@ -28,7 +28,40 @@ const fail = (e: any) => app.request("/t", { method: "POST", body: JSON.stringif
 const list = (e: any) => app.request("/app/tide/api/approvals", { headers: { authorization: "Bearer owner-secret" } }, e).then((r) => r.json() as Promise<any>);
 const decide = async (e: any, id: string, verb: string) => app.request(`/app/tide/api/approvals/${id}/${verb}`, { method: "POST", headers: { cookie: await cookie("pw", "tide") } }, e);
 
+afterEach(() => vi.restoreAllMocks());
+const later = (ms: number) => { const t = Date.now() + ms; vi.spyOn(Date, "now").mockReturnValue(t); };
+
 describe("anomaly guard", () => {
+  it("the hold is still pending after 30 minutes and no second entry is added", async () => {
+    const { e } = setup(old, { recent: 60, baseline: 144 });
+    await fail(e);
+    later(30 * 60_000);
+    expect((await list(e)).approvals).toHaveLength(1);
+    await fail(e);
+    expect((await list(e)).approvals).toHaveLength(1);
+  });
+  it("an expired hold is replaced by a fresh entry on the next failure, and approving the old one does not halt", async () => {
+    const { m, e } = setup(old, { recent: 60, baseline: 144 });
+    await fail(e);
+    const oldId = (await list(e)).approvals[0].id;
+    later(25 * 3600_000);
+    expect((await list(e)).approvals).toHaveLength(0);
+    await fail(e);
+    const { approvals } = await list(e);
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0].id).not.toBe(oldId);
+    expect((await decide(e, oldId, "approve")).status).toBe(409);
+    expect(m["halt/tide"]).toBeUndefined();
+  });
+  it("confirming a hold leaves a halt of a different release alone", async () => {
+    const { m, e } = setup(fresh);
+    await fail(e);
+    const id = (await list(e)).approvals[0].id;
+    m["halt/tide"] = JSON.stringify({ release: 9 });
+    expect((await decide(e, id, "approve")).status).toBe(200);
+    expect(JSON.parse(m["halt/tide"]).release).toBe(9);
+    expect(m["anomaly-hold/tide"]).toBeUndefined();
+  });
   it("a burst of fresh-install failures is held, not halted, with an approval entry", async () => {
     const { m, e } = setup(fresh);
     expect((await fail(e)).status).toBe(202);

@@ -57,6 +57,8 @@ export const SPIKE_BASELINE_HOURS = 24;
 export const SPIKE_FACTOR = 5;
 /** ...and at least this many in absolute terms, so a quiet app is not held on three reports. */
 export const SPIKE_MIN_FAILURES = 20;
+/** How long a hold waits for the owner. A person decides it, so this is hours, not minutes. */
+export const ANOMALY_HOLD_TTL_MS = 24 * 60 * 60 * 1000;
 /** Command name of the owner approval entry the guard creates. */
 export const ANOMALY_COMMAND = "anomaly_hold";
 

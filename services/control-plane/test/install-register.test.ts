@@ -6,9 +6,9 @@ import { hmacHex, netPrefix, netHash, signingSecret } from "../src/installs";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 
-function setup() {
+function setup(receivedDefault = "'2026-01-01T00:00:00.000Z'") {
   const sql = new DatabaseSync(":memory:");
-  sql.exec("CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT, app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via)");
+  sql.exec("CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT, app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via, received_at TEXT NOT NULL DEFAULT (" + receivedDefault + "))");
   sql.exec(readFileSync(new URL("../migrations/0019_install_identity.sql", import.meta.url), "utf8"));
   sql.exec(readFileSync(new URL("../migrations/0020_telemetry_install_id.sql", import.meta.url), "utf8"));
   const db = { prepare: (q: string) => { const st = sql.prepare(q); let b: any[] = []; const o: any = {
@@ -112,8 +112,8 @@ describe("net hash", () => {
 
 describe("auto-halt on real rows", () => {
   const cfg = { "halt-config/tide": JSON.stringify({ threshold: 0.2 }) };
-  async function fleet(n: number, ips: string[], per = 1, sign = true, established = true) {
-    const { sql, env } = setup();
+  async function fleet(n: number, ips: string[], per = 1, sign = true, established = true, now = false) {
+    const { sql, env } = setup(now ? "strftime('%Y-%m-%dT%H:%M:%fZ','now')" : undefined);
     const kv: Record<string, string> = { ...cfg };
     env.POINTERS = { get: async (k: string) => kv[k] ?? null, put: async (k: string, v: string) => { kv[k] = v; } };
     for (let i = 0; i < n; i++) {
@@ -141,5 +141,11 @@ describe("auto-halt on real rows", () => {
   it("20 verified installs across 3 networks halt", async () => {
     const kv = await fleet(20, ["203.0.113.9", "198.51.100.7", "192.0.2.55"]);
     expect(JSON.parse(kv["halt/tide"])).toMatchObject({ release: 3, reports: 20, failed: 20 });
+  });
+  it("the failure-rate query holds a spike of 20 fresh failure reports (real SQLite)", async () => {
+    const kv = await fleet(20, ["203.0.113.9", "198.51.100.7", "192.0.2.55"], 1, true, true, true);
+    expect(kv["halt/tide"]).toBeUndefined();
+    expect(JSON.parse(kv["anomaly-hold/tide"])).toMatchObject({ release: 3 });
+    expect(JSON.parse(kv["anomaly-hold/tide"]).reason).toContain("failure reports in 10 minutes");
   });
 });

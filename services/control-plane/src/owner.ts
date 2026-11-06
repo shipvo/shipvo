@@ -65,13 +65,13 @@ export async function argsHash(command: string, args: Record<string, unknown>): 
 export async function loadChallenge(env: { kv: KVNamespace; appId: string }, id: string): Promise<Challenge | null> {
   try { const raw = await env.kv.get(challengeKey(env.appId, id)); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
-const saveChallenge = (env: { kv: KVNamespace }, c: Challenge) => env.kv.put(challengeKey(c.app_id, c.id), JSON.stringify(c), { expirationTtl: 86400 });
+const saveChallenge = (env: { kv: KVNamespace }, c: Challenge, ttlMs = CHALLENGE_TTL_MS) => env.kv.put(challengeKey(c.app_id, c.id), JSON.stringify(c), { expirationTtl: Math.max(86400, Math.ceil(ttlMs / 1000) + 3600) });
 const expired = (c: Challenge) => Date.parse(c.expires_at) <= Date.now();
 /** Create a pending owner approval entry. The owner decides it with the same approve/deny routes as any challenge. */
-export async function createChallenge(env: { kv: KVNamespace; appId: string }, c: { command: string; args_hash: string; requester: string; plan: string[] }): Promise<Challenge> {
+export async function createChallenge(env: { kv: KVNamespace; appId: string }, c: { command: string; args_hash: string; requester: string; plan: string[] }, ttlMs = CHALLENGE_TTL_MS): Promise<Challenge> {
   const now = Date.now();
-  const ch: Challenge = { id: crypto.randomUUID(), app_id: env.appId, ...c, status: "pending", created_at: new Date(now).toISOString(), expires_at: new Date(now + CHALLENGE_TTL_MS).toISOString() };
-  await saveChallenge(env, ch);
+  const ch: Challenge = { id: crypto.randomUUID(), app_id: env.appId, ...c, status: "pending", created_at: new Date(now).toISOString(), expires_at: new Date(now + ttlMs).toISOString() };
+  await saveChallenge(env, ch, ttlMs);
   return ch;
 }
 /** Pending, unexpired challenges, oldest first. */
