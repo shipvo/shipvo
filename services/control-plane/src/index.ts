@@ -11,7 +11,7 @@ import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
 import { installs, verifyReport } from "./installs";
-import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
+import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, type InstallVote } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string };
 const app = new Hono<{ Bindings: Env }>();
@@ -124,30 +124,27 @@ app.get("/b/:app/:file", async (c) => {
  * Write KV `halt/<app>` when a release fails on too many devices. Settings live in KV `halt-config/<app>`:
  * {"threshold": number, "min_reports": number}. No config key means halting is off.
  */
-async function maybeHalt(env: Env, appId: string, release: number, kv?: { failed: number; healthy: number }): Promise<void> {
+async function maybeHalt(env: Env, appId: string, release: number): Promise<void> {
   if (!env.POINTERS) return;
   const raw = await env.POINTERS.get(`halt-config/${appId}`);
   if (!raw) return;
-  let cfg: { threshold?: unknown; min_reports?: unknown };
+  let cfg: { threshold?: unknown; min_reports?: unknown; min_installs?: unknown };
   try { cfg = JSON.parse(raw); } catch { return; }
   if (!cfg || typeof cfg !== "object") return;
   const threshold = typeof cfg.threshold === "number" ? cfg.threshold : undefined;
-  const minReports = typeof cfg.min_reports === "number" ? cfg.min_reports : 20;
-  let results: { event: string; n: number }[] = [];
-  try {
-    results = (await env.DB.prepare("SELECT event, COUNT(*) AS n FROM telemetry WHERE app_id = ? AND release = ? GROUP BY event").bind(appId, release).all<{ event: string; n: number }>()).results ?? [];
-  } catch (e) {
-    // D1 over its limit: fall back to the KV count so auto-halt still works.
-    if (!kv) throw e;
-    console.error("halt count read failed, using KV fallback", e);
-  }
-  const counts = { healthy: 0, failed: 0 };
-  for (const r of results) {
-    if (HEALTHY_EVENTS.includes(r.event)) counts.healthy += r.n;
-    else if (FAILED_EVENTS.includes(r.event)) counts.failed += r.n;
-  }
-  if (kv) { counts.failed = Math.max(counts.failed, kv.failed); counts.healthy = Math.max(counts.healthy, kv.healthy); }
-  const verdict = shouldHalt(counts, { threshold, minReports });
+  const minReports = typeof cfg.min_reports === "number" ? cfg.min_reports : DEFAULT_MIN_REPORTS;
+  const minInstalls = typeof cfg.min_installs === "number" ? cfg.min_installs : DEFAULT_MIN_INSTALLS;
+  // Only verified reports count. If D1 cannot be read there is nothing verified to count, so the error propagates and no halt happens.
+  const failedList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
+  const healthyList = HEALTHY_EVENTS.map((e) => `'${e}'`).join(",");
+  const rows = (await env.DB.prepare(
+    `SELECT t.install_id AS install_id, i.net_hash AS net_hash, MAX(t.event IN (${failedList})) AS failed, MAX(t.event IN (${healthyList})) AS healthy ` +
+    "FROM telemetry t LEFT JOIN installs i ON i.app_id = t.app_id AND i.install_id = t.install_id " +
+    "WHERE t.app_id = ? AND t.release = ? AND t.verified = 1 AND t.install_id IS NOT NULL GROUP BY t.install_id, i.net_hash"
+  ).bind(appId, release).all<{ install_id: string; net_hash: string | null; failed: number; healthy: number }>()).results ?? [];
+  const votes: InstallVote[] = rows.map((r) => ({ install_id: r.install_id, net_hash: r.net_hash, failed: !!r.failed, healthy: !!r.healthy }));
+  const counts = tallyVotes(votes);
+  const verdict = shouldHalt(counts, { threshold, minReports, minInstalls });
   if (!verdict.halt) return;
   const key = `halt/${appId}`;
   // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
@@ -176,12 +173,12 @@ app.post("/t", async (c) => {
   const verified = extra.install_id !== undefined && sig !== undefined && await verifyReport(c.env.DB, d.app_id, extra.install_id, sig, signed) ? 1 : 0;
   try {
   await c.env.DB.prepare(
-    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via, verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via, verified, install_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(d.app_id, d.release, d.event, d.cold_start_ms ?? null, d.bytes_downloaded ?? null, d.apply_ms ?? null, d.device_class ?? null,
     typeof extra.published_at === "string" ? extra.published_at.slice(0, 40) : null,
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
-    extra.via === "patch" || extra.via === "full" ? extra.via : null, verified).run();
+    extra.via === "patch" || extra.via === "full" ? extra.via : null, verified, verified ? extra.install_id : null).run();
   } catch (e) {
     // D1 can refuse writes (for example the Free plan daily limit). Never send a 5xx to the phone.
     stored = false;
@@ -205,7 +202,7 @@ app.post("/t", async (c) => {
     } catch (e) { console.error("telemetry fallback counter failed", e); }
   }
   // Halting is a best-effort side effect: never fail the response.
-  if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release, kv); } catch (e) { console.error("halt check failed", e); } }
+  if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release); } catch (e) { console.error("halt check failed", e); } }
   if (stored && REVERT_EVENTS.has(d.event)) {
     const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
     try { c.executionCtx.waitUntil(job); } catch { /* no execution context (tests, local): the job runs on its own */ }
@@ -253,7 +250,7 @@ app.get("/t/:app/summary", async (c) => {
   // The auto-halt setting, so `shipvo status` can show it. Not secret. Null means off.
   let auto_halt: { threshold: number; min_reports: number } | null = null;
   const cfgRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt-config/${appId}`) : null;
-  if (cfgRaw) { try { const v = JSON.parse(cfgRaw); if (v && typeof v.threshold === "number" && v.threshold > 0 && v.threshold <= 1) auto_halt = { threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : 20 }; } catch { /* corrupt: off */ } }
+  if (cfgRaw) { try { const v = JSON.parse(cfgRaw); if (v && typeof v.threshold === "number" && v.threshold > 0 && v.threshold <= 1) auto_halt = { threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS }; } catch { /* corrupt: off */ } }
   return c.json({ releases, halted, auto_halt });
 });
 
@@ -450,7 +447,7 @@ app.get("/app/:id/api/halt-config", async (c) => {
   if (raw) {
     try {
       const v = JSON.parse(raw);
-      if (v && typeof v.threshold === "number") return c.json({ enabled: true, threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : 20 });
+      if (v && typeof v.threshold === "number") return c.json({ enabled: true, threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS });
     } catch { /* corrupt: treated as off */ }
   }
   return c.json({ enabled: false });
@@ -461,11 +458,12 @@ app.put("/app/:id/api/halt-config", async (c) => {
   if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
   { const no = await roleDenied(c, appId, "halt"); if (no) return no; }
   let body: any; try { body = await c.req.json(); } catch { return bad(c, "body must be JSON like {\"threshold\": 0.2}"); }
-  const t = body?.threshold, m = body?.min_reports === undefined ? 20 : body.min_reports;
+  const t = body?.threshold, m = body?.min_reports === undefined ? DEFAULT_MIN_REPORTS : body.min_reports, mi = body?.min_installs;
   if (typeof t !== "number" || !Number.isFinite(t) || t <= 0 || t > 1) return bad(c, "threshold must be a number above 0 and at most 1");
   if (typeof m !== "number" || !Number.isInteger(m) || m < 1 || m > 10000) return bad(c, "min_reports must be an integer from 1 to 10000");
-  await c.env.POINTERS.put(`halt-config/${appId}`, JSON.stringify({ threshold: t, min_reports: m }));
-  return c.json({ enabled: true, threshold: t, min_reports: m });
+  if (mi !== undefined && (typeof mi !== "number" || !Number.isInteger(mi) || mi < 1 || mi > 10000)) return bad(c, "min_installs must be an integer from 1 to 10000");
+  await c.env.POINTERS.put(`halt-config/${appId}`, JSON.stringify({ threshold: t, min_reports: m, ...(mi === undefined ? {} : { min_installs: mi }) }));
+  return c.json({ enabled: true, threshold: t, min_reports: m, ...(mi === undefined ? {} : { min_installs: mi }) });
 });
 app.delete("/app/:id/api/halt-config", async (c) => {
   const appId = c.req.param("id");

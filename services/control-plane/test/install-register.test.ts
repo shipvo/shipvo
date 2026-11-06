@@ -10,6 +10,7 @@ function setup() {
   const sql = new DatabaseSync(":memory:");
   sql.exec("CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT, app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via)");
   sql.exec(readFileSync(new URL("../migrations/0019_install_identity.sql", import.meta.url), "utf8"));
+  sql.exec(readFileSync(new URL("../migrations/0020_telemetry_install_id.sql", import.meta.url), "utf8"));
   const db = { prepare: (q: string) => { const st = sql.prepare(q); let b: any[] = []; const o: any = {
     bind: (...a: any[]) => { b = a; return o; }, first: async () => st.get(...b) ?? null, all: async () => ({ results: st.all(...b) }), run: async () => ({ meta: { changes: st.run(...b).changes } }) }; return o; } } as any;
   const m: Record<string, string> = {};
@@ -106,5 +107,38 @@ describe("net hash", () => {
     expect(a).toBe(await netHash("k", "tide", "203.0.113.77"));
     expect(a).not.toBe(await netHash("k", "other", "203.0.113.9"));
     expect(await netHash(undefined, "tide", "203.0.113.9")).toBeNull();
+  });
+});
+
+describe("auto-halt on real rows", () => {
+  const cfg = { "halt-config/tide": JSON.stringify({ threshold: 0.2 }) };
+  async function fleet(n: number, ips: string[], per = 1, sign = true) {
+    const { sql, env } = setup();
+    const kv: Record<string, string> = { ...cfg };
+    env.POINTERS = { get: async (k: string) => kv[k] ?? null, put: async (k: string, v: string) => { kv[k] = v; } };
+    for (let i = 0; i < n; i++) {
+      const id = `inst-${String(i).padStart(8, "0")}`;
+      const ip = ips[i % ips.length].replace(/\.\d+$/, "." + (i + 1)); // same /24, different host
+      const j: any = await (await reg(env, { app_id: "tide", install_id: id, shell_version: "1" }, ip)).json();
+      const secret = await signingSecret(j.key);
+      for (let j = 0; j < per; j++) {
+        const body = JSON.stringify({ ...report, install_id: id });
+        await send(env, body, sign ? { "x-shipvo-sig": await hmacHex(secret, body) } : {});
+      }
+    }
+    return kv;
+  }
+  it("1000 unverified failures never halt", async () => {
+    expect((await fleet(1, ["203.0.113.9"], 1000, false))["halt/tide"]).toBeUndefined();
+  });
+  it("one install voting many times never halts", async () => {
+    expect((await fleet(1, ["203.0.113.9"], 200))["halt/tide"]).toBeUndefined();
+  });
+  it("many installs from one network never halt", async () => {
+    expect((await fleet(25, ["203.0.113.9"]))["halt/tide"]).toBeUndefined();
+  });
+  it("20 verified installs across 3 networks halt", async () => {
+    const kv = await fleet(20, ["203.0.113.9", "198.51.100.7", "192.0.2.55"]);
+    expect(JSON.parse(kv["halt/tide"])).toMatchObject({ release: 3, reports: 20, failed: 20 });
   });
 });

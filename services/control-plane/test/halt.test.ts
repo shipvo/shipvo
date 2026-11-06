@@ -27,3 +27,33 @@ describe("shouldHalt", () => {
     expect(HEALTHY_EVENTS).toEqual(["applied", "content_applied"]);
   });
 });
+
+import { tallyVotes } from "../src/halt";
+const vote = (id: string, net: string | null, failed = true) => ({ install_id: id, net_hash: net, failed, healthy: !failed });
+const decide = (votes: ReturnType<typeof vote>[]) => shouldHalt(tallyVotes(votes), { threshold: 0.2, minReports: 20 }).halt;
+
+describe("corroboration", () => {
+  it("1000 unverified failures never halt (no verified votes)", () => {
+    expect(decide([])).toBe(false);
+  });
+  it("one install voting many times never halts", () => {
+    expect(decide(Array.from({ length: 1000 }, () => vote("a", "n1")))).toBe(false);
+  });
+  it("many installs from one network never halt", () => {
+    expect(decide(Array.from({ length: 100 }, (_, i) => vote("i" + i, "n1")))).toBe(false);
+  });
+  it("20 verified installs across 3 networks halt", () => {
+    expect(decide(Array.from({ length: 20 }, (_, i) => vote("i" + i, "n" + (i % 3))))).toBe(true);
+  });
+  it("19 installs across 3 networks do not halt", () => {
+    expect(decide(Array.from({ length: 19 }, (_, i) => vote("i" + i, "n" + (i % 3))))).toBe(false);
+  });
+  it("an install that failed and applied counts once, as failed", () => {
+    const t = tallyVotes([vote("a", "n1"), vote("a", "n1", false)]);
+    expect(t).toMatchObject({ failed: 1, healthy: 0, installs: 1 });
+  });
+  it("min_installs is configurable", () => {
+    const t = tallyVotes(Array.from({ length: 5 }, (_, i) => vote("i" + i, "n" + (i % 3))));
+    expect(shouldHalt(t, { threshold: 0.2, minReports: 5, minInstalls: 5 }).halt).toBe(true);
+  });
+});

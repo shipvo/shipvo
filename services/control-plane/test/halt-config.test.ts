@@ -14,7 +14,7 @@ function setup(healthy = 14, failed = 6, tokens: Record<string, Tok> = {}) {
       if (sql.includes("FROM apps")) return { public_key: "k", bytes_used: 0 };
       return null;
     },
-    all: async () => ({ results: sql.includes("GROUP BY event") ? [{ event: "applied", n: healthy }, { event: "rolled_back", n: failed }] : [] }),
+    all: async () => ({ results: sql.includes("verified = 1") ? [...Array.from({ length: healthy }, (_, i) => ({ install_id: "h" + i, net_hash: "n" + (i % 3), failed: 0, healthy: 1 })), ...Array.from({ length: failed }, (_, i) => ({ install_id: "f" + i, net_hash: "n" + (i % 3), failed: 1, healthy: 0 }))] : [] }),
   }) }) } as any;
   return { env: { POINTERS, DB, OWNER_TOKEN: "tok" } as any, store };
 }
