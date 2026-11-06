@@ -28,7 +28,14 @@ runs:
       run: |
         npx shipvo sim --port 4545 > sim.log 2>&1 &
         for i in $(seq 1 90); do curl -sf http://localhost:4545/app/ > /dev/null && break; sleep 2; done
-        npx shipvo ci check
+        rc=0
+        npx shipvo ci check || rc=$?
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          npx shipvo ci comment --changed-from "${{ github.event.pull_request.base.sha }}" --pr "${{ github.event.pull_request.number }}" || true
+        fi
+        exit $rc
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
     - uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -37,4 +44,5 @@ runs:
           explore-report.md
           explore-report.json
           shipvo-report.json
+          shipvo-shots/
         if-no-files-found: ignore
