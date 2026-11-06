@@ -115,6 +115,7 @@ describe("check --changed-from", () => {
     quiet();
     expect(await ci(["check", "--changed-from"])).toBe(2);
     expect(await ci(["check", "--changed-from", "--foo"])).toBe(2);
+    expect(await ci(["check", "--changed-from", "-x"])).toBe(2);
   });
   it("passes extra flags to explore only", async () => {
     const { check } = await import("../src/ci");
