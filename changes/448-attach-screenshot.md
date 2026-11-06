@@ -1,0 +1,2 @@
+- `@shipvo/cli`, `@shipvo/mcp`: `screenshot` works on the live `shipvo run` phone. The frame page asks once "Let the agent see this tab?" and uses tab capture cropped to the phone if you allow it. Without permission it draws the app page to an image and lists what it could not draw (video, iframes, cross-origin images). Headless sessions keep the Playwright screenshot. Every result starts with `source: tab-capture | rendered | headless` and includes the screen tree.
+- Migration: none. The text part of the `screenshot` result now begins with a `source:` line before the tree.

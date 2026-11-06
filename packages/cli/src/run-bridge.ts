@@ -234,6 +234,7 @@ function bridgeMain(win: any, token: string) {
   const css = doc.createElement("style");
   css.textContent = "#shipvo-agent{position:fixed;left:50%;top:40px;transform:translateX(-50%);z-index:2147483000;display:none;align-items:center;gap:8px;padding:4px 12px;border-radius:14px;background:#4f46e5;color:#fff;font:12px system-ui,sans-serif}" +
     "#shipvo-agent.paused{background:#b45309}#shipvo-agent button{border:0;border-radius:10px;padding:2px 10px;font:inherit;cursor:pointer;display:none}#shipvo-agent.paused button{display:inline-block}" +
+    "#shipvo-capture{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:8px;padding:6px 12px;border-radius:14px;background:#111;color:#fff;font:12px system-ui,sans-serif}#shipvo-capture button{border:0;border-radius:10px;padding:2px 10px;font:inherit;cursor:pointer}" +
     "#shipvo-dot{position:fixed;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#4f46e5aa;border:2px solid #fff;box-shadow:0 0 0 2px #4f46e5;pointer-events:none;z-index:2147483000;display:none}" +
     "#shipvo-outline{position:fixed;border:2px solid #4f46e5;border-radius:4px;pointer-events:none;z-index:2147483000;display:none}" +
     "#shipvo-log{position:fixed;right:12px;bottom:44px;width:240px;max-width:calc(100vw - 24px);box-sizing:border-box;max-height:25%;overflow:auto;margin:0;padding:8px 8px 8px 26px;border-radius:8px;background:#111d;color:#fff;font:12px system-ui,sans-serif;z-index:2147483000;display:none}#shipvo-log li{margin:2px 0}" +
@@ -281,7 +282,7 @@ function bridgeMain(win: any, token: string) {
   };
   function takeOver(e: any) {
     if (!e.isTrusted || taken || !seenAgent) return;
-    if (e.target && e.target.closest && e.target.closest("#shipvo-agent, #shipvo-log-toggle")) return;
+    if (e.target && e.target.closest && e.target.closest("#shipvo-agent, #shipvo-log-toggle, #shipvo-capture")) return;
     taken = true; showBanner(); step("You took over. The agent is paused.");
   }
   handBack.onclick = () => { taken = false; showBanner(); step("You handed back. The agent can continue."); };
@@ -317,12 +318,93 @@ function bridgeMain(win: any, token: string) {
     return { delivery: "delivered", screen: tree() };
   }
 
+  // Screenshots (slice 5 of #448). Order: tab capture if the person said yes, else the iframe drawn to an image.
+  // The permission is asked once, on the first request from the agent. getDisplayMedia needs a click, so the question is a button.
+  let capture: "ask" | "granted" | "refused" = "ask", stream: any, video: any, asked = false;
+  const bar = make("div", "shipvo-capture");
+  bar.setAttribute("role", "group"); bar.setAttribute("aria-label", "Let the agent see this tab?");
+  const barText = doc.createElement("span"); barText.textContent = "Let the agent see this tab?"; bar.appendChild(barText);
+  const allow = doc.createElement("button"); allow.type = "button"; allow.textContent = "Allow"; bar.appendChild(allow);
+  const deny = doc.createElement("button"); deny.type = "button"; deny.textContent = "Not now"; bar.appendChild(deny);
+  const askCapture = () => { if (asked) return; asked = true; bar.style.display = "flex"; };
+  deny.onclick = () => { capture = "refused"; bar.style.display = "none"; step("The agent cannot see this tab. Screenshots are drawn from the page."); };
+  allow.onclick = async () => {
+    bar.style.display = "none";
+    try {
+      stream = await win.navigator.mediaDevices.getDisplayMedia({ video: true, audio: false, preferCurrentTab: true });
+      video = doc.createElement("video"); video.muted = true; video.srcObject = stream;
+      await video.play();
+      for (const t of stream.getTracks()) t.addEventListener("ended", () => { capture = "refused"; stream = undefined; });
+      capture = "granted"; step("The agent can see this tab.");
+    } catch { capture = "refused"; step("Tab capture was refused. Screenshots are drawn from the page."); }
+  };
+  const png = (c: any): Promise<string> => new Promise((ok, fail) => c.toBlob((b: any) => {
+    if (!b) return fail(new Error("could not make a PNG"));
+    const r = new win.FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.onerror = () => fail(new Error("could not read the PNG")); r.readAsDataURL(b);
+  }, "image/png"));
+  /** A frame of the live tab, cropped to the phone. */
+  async function tabShot() {
+    for (let i = 0; i < 20 && !video.videoWidth; i++) await sleep(50);
+    await new Promise((r) => win.requestAnimationFrame(() => r(0))); await sleep(60);
+    const k = video.videoWidth / win.innerWidth, r = doc.getElementById("phone").getBoundingClientRect();
+    const c = doc.createElement("canvas"); c.width = Math.max(1, Math.round(r.width * k)); c.height = Math.max(1, Math.round(r.height * k));
+    c.getContext("2d").drawImage(video, r.left * k, r.top * k, r.width * k, r.height * k, 0, 0, c.width, c.height);
+    return { image: await png(c), width: c.width, height: c.height };
+  }
+  /** The app iframe's DOM drawn to a canvas through an SVG foreignObject. Says what it could not draw. */
+  async function renderedShot() {
+    const d = appDoc(); if (!d) throw new Error("the app is not loaded");
+    const w = d.defaultView, W = w.innerWidth, H = w.innerHeight, skipped = new Set<string>();
+    const clone = d.documentElement.cloneNode(true) as any;
+    const pair = (sel: string): [any, any][] => { const a = Array.from(d.querySelectorAll(sel)) as any[], b = Array.from(clone.querySelectorAll(sel)) as any[]; return a.map((x, i) => [x, b[i]]); };
+    const placeholder = (src: any, dst: any, what: string) => {
+      skipped.add(what);
+      const ph = d.createElement("div"); const r = src.getBoundingClientRect();
+      ph.setAttribute("style", "display:inline-block;width:" + r.width + "px;height:" + r.height + "px;background:#8883");
+      dst.replaceWith(ph);
+    };
+    for (const n of Array.from(clone.querySelectorAll("script, noscript, template"))) (n as any).remove();
+    for (const [a, b] of pair("video")) placeholder(a, b, "video");
+    for (const [a, b] of pair("iframe")) placeholder(a, b, "iframe");
+    for (const [a, b] of pair("canvas")) { try { b.replaceWith(Object.assign(d.createElement("img"), { src: a.toDataURL(), width: a.width, height: a.height })); } catch { placeholder(a, b, "canvas"); } }
+    for (const [a, b] of pair("img")) {
+      try {
+        if (!a.complete || !a.naturalWidth) throw new Error("not loaded");
+        const c = d.createElement("canvas"); c.width = a.naturalWidth; c.height = a.naturalHeight;
+        c.getContext("2d").drawImage(a, 0, 0); b.removeAttribute("srcset"); b.setAttribute("src", c.toDataURL());
+      } catch { skipped.add("cross-origin images"); b.removeAttribute("srcset"); b.removeAttribute("src"); }
+    }
+    for (const [a, b] of pair("link[rel~=stylesheet]")) {
+      try { const st = d.createElement("style"); st.textContent = Array.from(a.sheet.cssRules).map((r: any) => r.cssText).join("\n"); b.replaceWith(st); }
+      catch { skipped.add("cross-origin stylesheets"); b.remove(); }
+    }
+    for (const [a, b] of pair("input, textarea")) { if (a.tagName === "TEXTAREA") b.textContent = a.value; else b.setAttribute("value", a.value); if (a.checked) b.setAttribute("checked", ""); }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '"><foreignObject width="100%" height="100%">' + new win.XMLSerializer().serializeToString(clone) + "</foreignObject></svg>";
+    const img = new win.Image();
+    await new Promise((ok, fail) => { img.onload = ok; img.onerror = () => fail(new Error("the page could not be drawn")); img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
+    const c = doc.createElement("canvas"); c.width = W; c.height = H;
+    const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.drawImage(img, 0, 0);
+    return { image: await png(c), width: W, height: H, unsupported: Array.from(skipped) };
+  }
+  async function shot() {
+    if (capture === "granted" && stream) {
+      try { return { source: "tab-capture", ...(await tabShot()) }; } catch { capture = "refused"; }
+    }
+    return { source: "rendered", ...(await renderedShot()) };
+  }
+
   const ws = new win.WebSocket((win.location.protocol === "https:" ? "wss://" : "ws://") + win.location.host + "/__shipvo/agent?role=screen&token=" + encodeURIComponent(token));
   ws.onmessage = (e: any) => {
     let m: any; try { m = JSON.parse(String(e.data)); } catch { return; }
     if (!m || typeof m.id !== "number") return;
     // Reading the screen changes nothing, so it neither counts as the agent arriving nor is blocked by a take-over.
     if (m.type !== "tree") seenAgent = true;
+    if (m.type !== "tree" && m.type !== "screen") askCapture();
+    if (m.type === "screenshot") {
+      shot().then((r) => ws.send(JSON.stringify({ id: m.id, type: "screenshot", ok: true, ...r, screen: screenOrUndefined() })),
+        (err: any) => ws.send(JSON.stringify({ id: m.id, type: "screenshot", ok: false, error: String(err && err.message || err), screen: screenOrUndefined() })));
+      return;
+    }
     if (taken && m.type !== "tree") { ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, code: "taken_over", error: "the person took over" })); return; }
     const words = /^(tap|type|scroll|back)$/.test(m.type) ? (showBanner(), describe(m)) : "";
     try {
