@@ -3,7 +3,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import path, { dirname, join, relative, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
 import { checkBundle, parseDeclared } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
@@ -48,6 +48,14 @@ function switchFlag(a: Record<string, string | undefined>, name: string): boolea
   throw new Error(`--${name} is an on/off flag: use --${name}, --${name} true or --${name} false (got "${v}")`);
 }
 
+/** Resolve key `k` under `root`, or return null if it would land outside. Takes the path module so Windows paths can be tested on any OS. */
+export function insideRoot(root: string, k: string, p: Pick<typeof path, "resolve" | "relative" | "isAbsolute" | "sep"> = path): string | null {
+  const f = p.resolve(root, k);
+  const rel = p.relative(root, f);
+  if (!rel || rel === ".." || rel.startsWith(".." + p.sep) || p.isAbsolute(rel)) return null;
+  return f;
+}
+
 /** A store that only writes files under `dir` (key `p/app/1/b0` becomes `dir/p/app/1/b0`). It reads back only what this run wrote (kept in memory), never old files, so the iOS pass can find the web artifact and a dry run never needs a control plane. */
 function localKv(dir: string) {
   const root = resolve(dir);
@@ -58,8 +66,8 @@ function localKv(dir: string) {
     async getBytes(k: string): Promise<Uint8Array<ArrayBuffer> | null> { return mem.get(k) ?? null; },
     async keys(prefix: string): Promise<string[]> { return [...mem.keys()].filter((k) => k.startsWith(prefix)); },
     async put(k: string, body: BodyInit, _type: string) {
-      const f = resolve(root, k);
-      if (!f.startsWith(root + "/")) throw new Error(`refusing to write outside ${dir}: ${k}`);
+      const f = insideRoot(root, k);
+      if (!f) throw new Error(`refusing to write outside ${dir}: ${k}`);
       const bytes = typeof body === "string" ? enc.encode(body) : new Uint8Array(body as Uint8Array);
       mkdirSync(dirname(f), { recursive: true });
       writeFileSync(f, bytes);

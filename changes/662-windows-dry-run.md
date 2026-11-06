@@ -1,0 +1,1 @@
+- `shipvo publish --dry-run` no longer refuses every file on Windows. The check that keeps writes inside the output dir now uses the platform path separator; `../` and absolute keys are still refused. Migration: none.
