@@ -19,9 +19,9 @@
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
+    "@types/node": "^22.8.0",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.4",
-    "@types/node": "^22.8.0"
+    "vitest": "^2.1.4"
   },
   "keywords": [
     "shipvo",
@@ -51,5 +51,8 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@bufbuild/cel": "^0.6.2"
   }
 }
