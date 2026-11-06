@@ -109,6 +109,14 @@ Two tools let an assistant start and follow the flow without seeing a key. Code:
 
 The link is the only credential in a `request_secret` result. The assistant sees it, so it can reach the person only through the chat; treat it like a password until it is used.
 
+## Single sign-on, ID token verification (slice 4a)
+
+The control plane has a verifier for OIDC ID tokens from Okta, Entra ID, Google Workspace and Keycloak. It is not connected to any route yet.
+
+- It checks the signature against the issuer's JWKS (RS256 and ES256 only), then `iss`, `aud`, `exp`, `nbf`, `iat` and `nonce`. `alg: none`, HS256 and any other algorithm are rejected, and the key type must match the algorithm, so a public key cannot be used as an HMAC secret.
+- The issuer and JWKS URL must be https. Keys are cached. An unknown `kid` causes at most one refetch per minute, so forged `kid` values cannot make us hammer the identity provider.
+- A role comes only from a configured group or a verified email domain. The highest matching role wins. No match means no access.
+
 ## How to check these claims
 
 Every path and test name above can be found with `rg`, for example:
