@@ -2,7 +2,7 @@
 // with the customer's own Expo account. Shipvo writes files; it never holds Expo credentials.
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnBinSync } from "./proc.js";
 
 export const ANDROID_IMAGE = "latest";
 export const IOS_IMAGE = "macos-tahoe-26.5-xcode-26.6";
@@ -196,7 +196,7 @@ export const ONE_TIME_STEPS = [
 export const IOS_UNPROVEN = "Note: the iOS signing steps in .eas/build/ios.yml are unproven. The step names were not checked against Expo's custom build functions (https://docs.expo.dev/custom-builds/schema/), so your first iOS build is the check.";
 
 export type Runner = (cmd: string, args: string[], cwd: string) => number;
-const defaultRunner: Runner = (cmd, args, cwd) => spawnSync(cmd, args, { cwd, stdio: "inherit" }).status ?? 1;
+const defaultRunner: Runner = (cmd, args, cwd) => spawnBinSync(cmd, args, { cwd, stdio: "inherit" }).status ?? 1;
 
 export interface EasOptions { cwd?: string; log?: (s: string) => void; runner?: Runner }
 

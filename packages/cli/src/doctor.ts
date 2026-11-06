@@ -207,9 +207,11 @@ export async function doctor(argv: string[]) {
   const port = a.port === undefined ? 4545 : Number(a.port);
   const offline = argv.includes("--offline");
   const skipSim = argv.includes("--skip-sim");
+  const json = argv.includes("--json");
   const stray = argv.some((x, i) => !x.startsWith("--") && argv[i - 1] !== "--port");
-  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>] [--offline] [--skip-sim]"); process.exit(2); }
+  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>] [--offline] [--skip-sim] [--json]"); process.exit(2); }
   const results = await runDoctorChecks({ port, offline, skipSim });
+  if (json) { console.log(JSON.stringify({ ok: results.every((r) => r.ok), checks: results }, null, 2)); if (results.some((r) => !r.ok)) process.exit(1); return; }
   for (const r of results) console.log(`${r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
   if (results.some((r) => !r.ok)) process.exit(1);
 }

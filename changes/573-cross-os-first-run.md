@@ -1,0 +1,3 @@
+- `@shipvo/cli`: on Windows, `shipvo sim`, `run --native`, `preview`, `eas`, adopt mode and the Playwright auto-install now start `npm`, `npx` and `pnpm` through the shell with quoted arguments. Before, `PN_SIM=1 npx ...` and bare `npx` spawns failed in cmd.exe. Other systems are unchanged.
+- `@shipvo/cli`: `shipvo doctor --json` prints `{ ok, checks }` as one JSON document.
+- Migration: none.

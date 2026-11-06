@@ -149,6 +149,14 @@ Agents open the exact release phones run with `open_app("myshop@r8")` or `open_a
 
 The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config (signed out, it prints the local config for `shipvo sim`). Your key opens the sample app and every app you registered with `shipvo app create`: after a publish, `open_app("myshop@latest")` opens the exact release phones run. The beta allows 3 apps per account and 500 MB each; self-hosting is always open. See [agents.md](agents.md).
 
+## Supported systems
+
+Shipvo's first run is meant to work on Windows, macOS and Linux. The check is `scripts/first-run/cross-os.mjs`. It takes the packed npm tarballs of `@shipvo/cli`, `sim`, `test`, `device`, `runtime` and `schema` (what you get from npm), in a folder whose name has a space, and runs: `shipvo init`, `npm install`, `npx shipvo doctor --json`, `npx shipvo sim` (fetches the app page), `npx shipvo publish --dry-run`, and `npx shipvo run android --no-open` (fetches the frame page). It prints the time of each step.
+
+What it proves: those commands finish on a GitHub-hosted `windows-latest`, `macos-latest` and `ubuntu-latest` runner with Node 22. It does not run store builds, `shipvo login`, or a real publish. The per-OS results are not recorded here yet: the job that runs the check is proposed in an `agent:escalate` issue, because workflows are changed by a human. Until it is merged, nothing here is measured on Windows or macOS.
+
+On Windows, `shipvo` runs `npm`, `npx` and `pnpm` through the shell, so their `.cmd` shims work and paths with spaces are quoted.
+
 ## Where things are measured
 
 Everything above is claimed from measurements on real hardware, published in this repo: OTA sizes and timings on a 2 GB Redmi 9A ([spike-results.md](spike-results.md)), and simulator-vs-device parity on an Android emulator and an iPhone simulator, including what the score does not cover ([parity-results.md](parity-results.md)).

@@ -1,4 +1,5 @@
-import { execFileSync, execSync } from "node:child_process";
+import { execSync } from "node:child_process";
+import { execBinSync } from "./proc.js";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -57,7 +58,7 @@ export function ensurePlaywright(deps: Partial<EnsurePlaywrightDeps> & { cwd: st
   const { cwd } = deps;
   const env = deps.env ?? process.env;
   const exists = deps.exists ?? existsSync;
-  const run = deps.run ?? ((cmd, args, dir) => { execFileSync(cmd, args, { cwd: dir, stdio: "inherit" }); });
+  const run = deps.run ?? ((cmd, args, dir) => { execBinSync(cmd, args, { cwd: dir, stdio: "inherit" }); });
   const log = deps.log ?? ((line) => console.log(line));
   if ((deps.resolves ?? playwrightResolves)(cwd)) return;
 

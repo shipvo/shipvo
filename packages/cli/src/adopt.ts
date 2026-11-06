@@ -3,7 +3,7 @@
 // it writes the Shipvo values into AndroidManifest.xml and Info.plist (adopt-bare.ts).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawnBinSync } from "./proc.js";
 import { createInterface } from "node:readline/promises";
 import { join, resolve } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
@@ -53,11 +53,11 @@ export type AdoptDeps = { install: (pm: PackageManager, pkgs: string[], dir: str
 const defaultDeps: AdoptDeps = {
   install(pm, pkgs, dir, dev = false) {
     const devFlag = dev ? [pm === "npm" ? "--save-dev" : pm === "yarn" || pm === "bun" ? "--dev" : "-D"] : [];
-    const r = spawnSync(pm, [pm === "npm" ? "install" : "add", ...devFlag, ...pkgs], { cwd: dir, stdio: "inherit" });
+    const r = spawnBinSync(pm, [pm === "npm" ? "install" : "add", ...devFlag, ...pkgs], { cwd: dir, stdio: "inherit" });
     if (r.status !== 0) throw new Error(`${pm} could not install ${pkgs.join(", ")}`);
   },
   installExpoModules(dir) {
-    const r = spawnSync("npx", ["install-expo-modules@latest", "--non-interactive"], { cwd: dir, stdio: "inherit" });
+    const r = spawnBinSync("npx", ["install-expo-modules@latest", "--non-interactive"], { cwd: dir, stdio: "inherit" });
     if (r.status !== 0) throw new Error("npx install-expo-modules@latest failed");
   },
   async confirm(q) {
