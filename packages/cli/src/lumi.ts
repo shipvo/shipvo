@@ -135,7 +135,7 @@ export class Lumi {
     let screen = ""; let ok = true;
     await this.driver.errors().catch(() => []);
     for (const s of k.finding.steps) {
-      if (this.stopFlag) { this.say("Replay stopped."); return; }
+      if (this.stopFlag) { this.mood = this.known.length ? "worried" : "idle"; this.say("Replay stopped."); return; }
       this.say(describeStep(s), "step");
       let r;
       if (s.action === "open") r = await this.driver.open();
@@ -147,7 +147,7 @@ export class Lumi {
         r = s.action === "type" ? await this.driver.type?.(el.ref, s.text, s.enter) ?? { ok: false, error: "this simulator cannot type" } : await this.driver.tap(el.ref);
       }
       if (r.screen != null) screen = r.screen;
-      if (!r.ok && s.action !== "back") { this.say(`Action failed: ${r.error ?? "unknown"}`, "bug"); break; }
+      if (!r.ok && s.action !== "back") { this.say(`Action failed: ${r.error ?? "unknown"}`, "bug"); ok = false; break; }
       if (this.o.walkDelayMs) await new Promise((res) => setTimeout(res, this.o.walkDelayMs));
     }
     const errs = await this.driver.errors().catch(() => []);
@@ -236,8 +236,9 @@ export function startLumiServer(o: LumiServerOptions): Promise<Server> {
       if (req.method === "GET" && path === "/shot") { const b = await o.shot().catch(() => null); return b ? send(200, b, "image/jpeg") : send(204, ""); }
       if (req.method === "GET" && path === "/events") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
-        const push = (s: unknown) => res.write(`data: ${JSON.stringify(s)}\n\n`);
-        push(o.lumi.state()); const off = o.lumi.subscribe(push); req.on("close", off); return;
+        let off = (): void => {};
+        const push = (s: unknown) => { try { res.write(`data: ${JSON.stringify(s)}\n\n`); } catch { off(); } };
+        push(o.lumi.state()); off = o.lumi.subscribe(push); req.on("close", off); res.on("close", off); return;
       }
       if (req.method === "POST" && path === "/cmd") {
         const origin = req.headers.origin; let oh: string | null = null; try { oh = origin ? new URL(origin).host : null; } catch { oh = "bad"; }

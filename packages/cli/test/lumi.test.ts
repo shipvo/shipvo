@@ -116,6 +116,26 @@ describe("Lumi", () => {
     expect(after.feed.at(-1)!.text).toMatch(new RegExp(`Bug ${n} is still there`));
     expect(after.mood).toBe("worried");
   });
+  it("stopping a replay does not leave Lumi on working", async () => {
+    const l = new Lumi(shop().driver, { ...opts, walkDelayMs: 20 });
+    await l.command("test my app"); await l.idle();
+    const n = l.state().findings.find((f) => /Network failed/.test(f.message))!.n;
+    await l.command(`replay bug ${n}`);
+    await l.command("stop"); await l.idle();
+    expect(l.state().mood).not.toBe("working");
+    expect(l.state().feed.at(-1)!.text).toBe("Replay stopped.");
+  });
+  it("a replay whose action fails says it could not reach the end", async () => {
+    const s = shop(); const l = new Lumi(s.driver, opts);
+    await l.command("test my app"); await l.idle();
+    const n = l.state().findings.find((f) => /Network failed/.test(f.message))!.n;
+    s.driver.openUrl = async () => ({ ok: false, error: "boom", screen: SCREENS.home });
+    s.driver.tap = async () => ({ ok: false, error: "boom", screen: SCREENS.home });
+    await l.command(`replay bug ${n}`); await l.idle();
+    const text = l.state().feed.map((f) => f.text);
+    expect(text.at(-1)).toBe(`Could not replay bug ${n} to the end.`);
+    expect(text.join("\n")).not.toMatch(/did not show up/);
+  });
   it("help and unknown text give the short list", async () => {
     const l = new Lumi(shop().driver, opts);
     for (const t of ["help", "dance"]) {
