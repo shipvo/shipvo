@@ -8,6 +8,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 
 1. Shipvo Testers and `shipvo store testers` (blog; video done)
 2. Shipvo Phone and `shipvo run` (tutorial, blog; docs and video done)
+1. ~~Shipvo Testers and `shipvo store testers`~~ (done)
+2. Shipvo Phone and `shipvo run` (tutorial, video, blog; docs done)
 3. Store path: `shipvo store` from working app to both stores (video, blog)
 4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
 5. Signed over-the-air updates, staged rollout and rollback (tutorial, video)
@@ -48,7 +50,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | | [See your app on a phone in your browser](videos.md#see-your-app-on-a-phone-in-your-browser-with-shipvo-run) | |
 | Assistant attaches to the live `shipvo run` phone (`open_app`) | [run](run.md), [agents](agents.md) | | | |
 | Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md), [worked example](record-a-demo-video.md) | | | |
-| Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | [Get your 12 Google Play testers](videos.md) | |
+| Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | [Get your 12 Google Play testers](videos.md) | [google-play-12-testers-14-days](../blog/google-play-12-testers-14-days.md) |
 | Real camera, microphone and location in the browser | [device-api](device-api.md) | | | |
 | Gate a rollout on test results (`shipvo promote --report`, `--report-md`) | [testing](testing.md), [cli](cli.md) | | | |
 | Test secrets (`secret(name)`, `{secret:NAME}`) | [testing](testing.md) | | | |
