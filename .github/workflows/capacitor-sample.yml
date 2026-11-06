@@ -4,7 +4,7 @@ name: capacitor-sample
 # The android job also runs the JVM unit tests, and android-emulator runs the instrumented tests
 # (src/androidTest of the app and of the @shipvo/capacitor plugin when linked) on an API 34 emulator (#934, #941, #947).
 # The ios job also builds the plugin's Swift package (ShipvoPlugin against Capacitor) and runs its Swift tests
-# on the iOS Simulator when packages/capacitor/Package.swift exists (escalation #1003).
+# on the iOS Simulator when packages/capacitor/ios/Package.swift exists (escalations #1003, #1013).
 on:
   workflow_dispatch:
   pull_request:
@@ -126,8 +126,8 @@ jobs:
             -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build 2>&1 \
             | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|BUILD (SUCCEEDED|FAILED)" | head -40
       - name: Swift package tests on the iOS Simulator (@shipvo/capacitor)
-        if: hashFiles('packages/capacitor/Package.swift') != ''
-        working-directory: packages/capacitor
+        if: hashFiles('packages/capacitor/ios/Package.swift') != ''
+        working-directory: packages/capacitor/ios
         run: |
           set -o pipefail
           SIM=$(xcrun simctl list devices available | awk -F' [(]' '!f && /^ +iPhone [0-9]/ { sub(/^ +/, "", $1); print $1; f=1 }')
@@ -135,12 +135,12 @@ jobs:
           # SwiftPM names the scheme <package>-Package when there are several products, else the product name.
           SCHEME=$(xcodebuild -list -json | python3 -c 'import json,sys; d=json.load(sys.stdin); w=d.get("workspace") or d.get("project") or {}; s=w.get("schemes",[]); print(next((x for x in s if x.endswith("-Package")), s[0] if s else ""))')
           echo "scheme: $SCHEME"
-          [ -n "$SCHEME" ] || { echo "::error::no scheme in packages/capacitor"; xcodebuild -list; exit 1; }
+          [ -n "$SCHEME" ] || { echo "::error::no scheme in packages/capacitor/ios"; xcodebuild -list; exit 1; }
           xcodebuild test -scheme "$SCHEME" -destination "platform=iOS Simulator,name=$SIM" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/xcodetest.log" \
             | grep -E "error:|Test Suite|Test Case.*(passed|failed)|TEST (SUCCEEDED|FAILED)"
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: capacitor-sample-xcodebuild-log
           path: |
