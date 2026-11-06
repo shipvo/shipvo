@@ -10,6 +10,7 @@ import { ensurePlaywright } from "./ensure-playwright.js";
 import { writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
 import { features, parseSamples, train, Ranker, type ActionInfo, type Sample } from "./explore-ranker.js";
+import { runFlows, renderFlows, parseFlowNames } from "./flows.js";
 
 export type Step =
   | { action: "open" }
@@ -396,6 +397,12 @@ export function readRanker(file: string): Ranker {
   try { return Ranker.from(JSON.parse(raw)); } catch { throw new Error(`--ranker: ${file} is not a ranker model`); }
 }
 
+/** Exit code and `--json` code. A failed flow counts as a finding for `--fail-on-findings`; it has its own code when the walk found nothing. */
+export function outcome(report: { error?: string | null; findings: unknown[] }, flowsFailed: boolean, failOn: boolean): { exit: number; code: string } {
+  const code = report.error ? "walk_failed" : report.findings.length ? "findings" : flowsFailed ? "flows_failed" : "ok";
+  return { exit: report.error ? 1 : (report.findings.length || flowsFailed) && failOn ? 1 : 0, code };
+}
+
 async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const a = parse(argv);
   if (a.train !== undefined) { trainCommand(a); return 0; }
@@ -413,6 +420,7 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     }
     let seed: number | undefined;
     if (a.seed !== undefined) { seed = Number(a.seed); if (!Number.isInteger(seed) || seed < 0) throw new Error("--seed must be a whole number of 0 or more"); }
+    const flowNames = a.flows !== undefined ? parseFlowNames(a.flows) : undefined;
     for (const k of ["ranker", "record-features"]) if (a[k] === "true") throw new Error(`--${k} needs a file`);
     const ranker = a.ranker ? readRanker(a.ranker) : undefined;
     // Opt-in only: one JSON line per action, with numbers and flags. No labels, text or values.
@@ -422,6 +430,16 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     const nothingChanged = onlyRoutes && !routes?.length;
     if (nothingChanged) console.error("No screens changed, nothing explored.");
     writeFileSync(`${out}.md`, (nothingChanged ? "No screens changed, nothing explored.\n\n" : "") + renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
+    let flowsFailed = false; let flowInfo: Record<string, unknown> = {}; let flowFiles: string[] = [];
+    if (flowNames) {
+      const fr = await runFlows(simDriver(base, cfg.appId), { flows: flowNames!, app: cfg.appId });
+      writeFileSync(`${out}-flows.md`, renderFlows(fr)); writeFileSync(`${out}-flows.json`, JSON.stringify(fr, null, 2) + "\n");
+      flowsFailed = fr.flows.some((f) => f.status === "failed");
+      flowFiles = [`${out}-flows.md`, `${out}-flows.json`];
+      flowInfo = { flows: fr.flows.map((f) => ({ flow: f.flow, status: f.status, invalid_status: f.invalid.status, message: f.message })) };
+      const msg = `Flows: ${fr.flows.map((f) => `${f.flow} ${f.status}`).join(", ")}. Wrote ${out}-flows.md and ${out}-flows.json`;
+      if (json) console.error(msg); else console.log(msg);
+    }
     let issueInfo: Record<string, unknown> = {};
     const line = `${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`;
     if (a["issues-dir"] !== undefined) {
@@ -433,12 +451,11 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
       } else issueInfo = { issue_files: files, file_commands: commands };
     }
     const failOn = a["fail-on-findings"] === "true";
-    const exit = report.error ? 1 : report.findings.length && failOn ? 1 : 0;
+    const { exit, code } = outcome(report, flowsFailed, failOn);
     if (json) {
-      const data = { ...issueInfo, report_files: [`${out}.md`, `${out}.json`], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
-      const code = report.error ? "walk_failed" : report.findings.length ? "findings" : "ok";
+      const data = { ...issueInfo, ...flowInfo, report_files: [`${out}.md`, `${out}.json`, ...flowFiles], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
       const next = report.error ? [{ command: "shipvo doctor --json", why: "Check the simulator setup." }]
-        : report.findings.length ? [{ command: `open ${out}.md`, why: "Read the steps to reproduce each finding." }, { command: "shipvo explore --json", why: "Run again after fixing to confirm." }]
+        : report.findings.length || flowsFailed ? [{ command: `open ${out}.md`, why: "Read the steps to reproduce each finding." }, { command: "shipvo explore --json", why: "Run again after fixing to confirm." }]
         : [{ command: "shipvo test --json", why: "Run your step files." }];
       emit(envelope(code, report.error ?? line, data, next, exit));
     } else console.log(line);

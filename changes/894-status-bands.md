@@ -1,0 +1,1 @@
+- status: `shipvo status` prints a `bands: b0=4 b1=4 b2=4` line with the release each band serves, and, when readable bands differ, a hint to run `shipvo promote` that names the newest release. A band that cannot be read (including a halted release) shows `?`. Migration: none.
