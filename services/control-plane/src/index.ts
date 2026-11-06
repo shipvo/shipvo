@@ -279,6 +279,30 @@ async function overLimit(kv: KVNamespace | undefined, key: string, max: number):
 }
 const sha256Hex = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
+type PriceCheck = { ok: true } | { ok: false; reason: string };
+/** Recompute the total from the published content the order names. Mirrors the app's `totals`. */
+function checkPrice(o: any, content: any): PriceCheck {
+  const products: any[] = Array.isArray(content?.products) ? content.products : [];
+  let subtotal = 0;
+  const priced: { department: string; total: number }[] = [];
+  for (const l of o.lines) {
+    const p = products.find((x) => x.id === (l?.product_id ?? l?.sku));
+    if (!p) return { ok: false, reason: "unknown_product" };
+    if (!Number.isInteger(l.quantity) || l.quantity < 1) return { ok: false, reason: "bad_quantity" };
+    if (l.unit_price !== undefined && l.unit_price !== p.price) return { ok: false, reason: "line_price" };
+    subtotal += p.price * l.quantity; priced.push({ department: p.department, total: p.price * l.quantity });
+  }
+  let discount = 0;
+  if (o.promo) {
+    const promo = (content.promos ?? []).find((x: any) => x.active && x.code === o.promo);
+    if (!promo) return { ok: false, reason: "unknown_promo" };
+    const base = promo.departments ? priced.filter((l) => promo.departments.includes(l.department)).reduce((a, l) => a + l.total, 0) : subtotal;
+    discount = subtotal >= promo.min_subtotal ? Math.round((base * promo.percent) / 100) : 0;
+  }
+  const fee = o.slot_id ? ((content.slots ?? []).find((x: any) => x.id === o.slot_id)?.fee ?? 0) : 0;
+  return Math.round(o.total) === subtotal - discount + fee ? { ok: true } : { ok: false, reason: "total" };
+}
+
 app.post("/o/:app", async (c) => {
   const appId = c.req.param("app");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
@@ -293,8 +317,21 @@ app.post("/o/:app", async (c) => {
   const install = typeof body.install_id === "string" && body.install_id ? body.install_id.slice(0, 64) : "anon";
   if ((ip && (await overLimit(c.env.POINTERS, `${appId}/ip/${ip}`, ORDER_LIMIT_IP))) || (await overLimit(c.env.POINTERS, `${appId}/i/${install}`, ORDER_LIMIT_INSTALL)))
     return c.json({ error: "rate_limited" }, { status: 429, headers: { "retry-after": String(ORDER_WINDOW_S) } });
-  const status = body.simulated === true ? "simulated" : "unverified";
   const orderId = o.id.slice(0, 40);
+  // Prices come from the published content version the order names, never from the caller.
+  const version = Number(body.content_version ?? body.release);
+  const row: any = Number.isInteger(version) && version >= 0
+    ? await c.env.DB.prepare("SELECT json FROM content_versions WHERE app_id = ? AND version = ?").bind(appId, version).first() : null;
+  if (!row) return c.json({ error: "unknown_release", reason: "unknown_release" }, 422);
+  let content: any; try { content = JSON.parse(row.json); } catch { content = null; }
+  if (!Array.isArray(content?.products) || !content.products.length) return c.json({ error: "missing_catalogue", reason: "missing_catalogue" }, 422);
+  const check = checkPrice(o, content);
+  if (!check.ok) {
+    // idem stays NULL, so this row never answers for an idempotency key and a corrected retry is stored.
+    await c.env.DB.prepare("INSERT INTO orders (app_id, order_id, total, json, status, idem) VALUES (?,?,?,?,?,?)").bind(appId, orderId, Math.round(o.total), json, "price_mismatch", null).run();
+    return c.json({ error: "price_mismatch", reason: check.reason, order_id: orderId, status: "price_mismatch" }, 422);
+  }
+  const status = body.simulated === true ? "simulated" : "unverified";
   const idem = `i:${install}:${orderId}:${await sha256Hex(raw)}`;
   const res: any = await c.env.DB.prepare("INSERT OR IGNORE INTO orders (app_id, order_id, total, json, status, idem) VALUES (?,?,?,?,?,?)").bind(appId, orderId, Math.round(o.total), json, status, idem).run();
   if (res?.meta?.changes === 0) {

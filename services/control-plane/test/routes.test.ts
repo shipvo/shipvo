@@ -8,7 +8,8 @@ const kv = (m: Record<string, string>) => ({
 
 function db() {
   const calls: { sql: string; args: unknown[] }[] = [];
-  const d = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({ run: async () => { calls.push({ sql, args }); return {}; }, all: async () => ({ results: [{ id: 1 }] }) }) }) } as any;
+  const content = JSON.stringify({ products: [{ id: "a", price: 100, department: "d" }], promos: [], slots: [] });
+  const d = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({ first: async () => (/content_versions/.test(sql) ? { json: content } : null), run: async () => { calls.push({ sql, args }); return {}; }, all: async () => ({ results: [{ id: 1 }] }) }) }) } as any;
   return { d, calls };
 }
 const post = (path: string, body: unknown, env: any) => app.request(path, { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body) }, env);
@@ -66,10 +67,11 @@ describe("POST /t telemetry", () => {
 
 describe("POST /o/:app orders", () => {
   const order = { id: "TT-1", lines: [], total: 12.6 };
+  const ok = { content_version: 1 };
   it("stores a valid order with a rounded total", async () => {
     const { d, calls } = db();
-    expect((await post("/o/tide", { order }, { DB: d } as any)).status).toBe(202);
-    expect(calls[0].args.slice(0, 3)).toEqual(["tide", "TT-1", 13]);
+    expect((await post("/o/tide", { order: { ...order, total: 100, lines: [{ sku: "a", quantity: 1 }] }, ...ok }, { DB: d } as any)).status).toBe(202);
+    expect(calls[0].args.slice(0, 3)).toEqual(["tide", "TT-1", 100]);
   });
   it("rejects malformed orders and oversized bodies", async () => {
     const { d, calls } = db();
