@@ -1,0 +1,3 @@
+- `@shipvo/cli`: `shipvo publish`, `promote`, `rollback` and `auto-halt` (including `--dry-run`) take `--json` and print the `{ ok, code, summary, data, next }` envelope on stdout. Text and build output go to stderr. Exit codes: 0 ok, 1 failed, 2 usage error. The `data` shape of each is in `docs/cli.md`.
+- `@shipvo/cli`: `runJson`, `CliFailure` and `UsageError` added to `src/json-out.ts`. Output without `--json` is unchanged.
+- Migration: none.
