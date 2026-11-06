@@ -13,14 +13,14 @@ const parse = (src: string) => ts.createSourceFile("t.ts", src, ts.ScriptTarget.
 describe("exportTest", () => {
   for (const h of HOSTILE) {
     it(`keeps ${JSON.stringify(h)} inside string literals`, () => {
-      const f: Finding = { kind: "error", message: h, screen: h, steps: [
+      const f: Finding = { kind: "error", message: h, screen: h + " Something went wrong", steps: [
         { action: "open" }, { action: "open_url", url: h },
         { action: "tap", role: "button", name: h, nth: 1 }, { action: "type", role: "textbox", name: h, nth: 0, text: h, enter: true }, { action: "back" },
       ] };
-      const src = exportTest(f);
+      const src = exportTest(f)!;
       const sf = parse(src);
       expect((sf as any).parseDiagnostics).toEqual([]);
-      // Top level: two imports and one test call. Nothing else.
+      // Top level: one import and one test call. Nothing else.
       expect(sf.statements.map((s) => ts.SyntaxKind[s.kind])).toEqual(["ImportDeclaration", "ExpressionStatement"]);
       const body = ((sf.statements[1] as ts.ExpressionStatement).expression as ts.CallExpression).arguments[1] as ts.ArrowFunction;
       const calls = (body.body as ts.Block).statements.map((s) => s.getText(sf).replace(/\(.*$/s, ""));
@@ -35,7 +35,7 @@ describe("exportTest", () => {
   }
 
   it("does not trust a kind that is not in the closed list", () => {
-    const src = exportTest({ kind: "x\nevil();" as any, message: "", screen: "", steps: [] });
+    const src = exportTest({ kind: "x\nevil();" as any, message: "", screen: "Something went wrong", steps: [] })!;
     expect(src).toContain("// Finding kind: error");
     expect(src).not.toContain("evil");
   });
@@ -54,6 +54,8 @@ describe("exportTest", () => {
         this.taps.push(n.ref);
         if (screens.after !== undefined) this.screen = screens.after;
       },
+      async refresh() { return this; },
+      async waitForGone(re: RegExp) { if (re.test(this.screen)) throw new Error("still on screen"); return this; },
       taps: [] as string[],
     };
     const g = globalThis as any; g.__t = { phone };
@@ -65,7 +67,7 @@ describe("exportTest", () => {
     await g.__t.run({ phone });
     return phone.taps;
   }
-  const finding = (kind: Finding["kind"], steps: Finding["steps"] = []): Finding => ({ kind, message: "m", screen: "s", steps: [{ action: "open" }, ...steps] });
+  const finding = (kind: Finding["kind"], steps: Finding["steps"] = []): Finding => ({ kind, message: "m", screen: kind === "error" ? "Something went wrong" : kind === "network_failed" ? "Network request failed" : "s", steps: [{ action: "open" }, ...steps] });
 
   it("error: fails on the buggy app and passes on the fixed one", async () => {
     const f = finding("error", [{ action: "tap", role: "button", name: "Pay", nth: 0 }]);
@@ -108,6 +110,18 @@ describe("exportTest", () => {
     const f = finding("network_failed");
     await expect(run(f, { start: '- text "Network request failed" [ref=e1]' })).rejects.toThrow();
     await expect(run(f, { start: '- heading "Feed" [ref=e1]' })).resolves.toEqual([]);
+  });
+
+  it("stuck_loading: fails on a spinner role even with no loading text; a Loading heading passes", async () => {
+    const f = finding("stuck_loading");
+    await expect(run(f, { start: "- progressbar [ref=e1]" })).rejects.toThrow();
+    await expect(run(f, { start: '- heading "Loading history" [ref=e1]' })).resolves.toEqual([]);
+  });
+
+  it("returns null when an error or network finding came from a page error not on its screen", () => {
+    expect(exportTest({ kind: "error", message: "Uncaught error: x", screen: '- heading "Home"', steps: [] })).toBeNull();
+    expect(exportTest({ kind: "network_failed", message: "Network failed: x", screen: '- heading "Home"', steps: [] })).toBeNull();
+    expect(exportTest({ kind: "network_failed", message: "m", screen: "Network request failed", steps: [] })).toContain("network_failed");
   });
 
   it("returns null for kinds that a screen check cannot prove", () => {
