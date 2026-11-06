@@ -80,3 +80,16 @@ test("releaseReached stops waiting when the stage was too short to see", () => {
   assert.equal(releaseReached({ current_release: 4 }, 5), null);
   assert.equal(releaseReached({}, 5), null);
 });
+
+import { resumeFacts } from "./lib.mjs";
+test("resumeFacts reads a cut first request and a Range second request", () => {
+  const entries = [{ t: 50, method: "GET", path: "/b/tide/r9.hbc", status: 200, bytes: 99 }, // before publish: ignored
+    { t: 1000, method: "GET", path: "/b/tide/r9.hbc", status: 200, bytes: 500, cut: true }, { t: 6000, method: "GET", path: "/b/tide/r9.hbc", status: 206, bytes: 500, range: "bytes=500-" }];
+  const f = resumeFacts({ entries, path: "/b/tide/r9.hbc", since: 100, healthyAt: 7500 });
+  assert.deepEqual(f, { requests: 2, firstCut: true, bytesSent: 1000, firstBytes: 500, secondRange: "bytes=500-", secondStatus: 206, usedRange: true, resumed: true, firstToHealthyMs: 6500 });
+});
+test("resumeFacts flags a second request without Range", () => {
+  const entries = [{ t: 1000, method: "GET", path: "/b", status: 200, bytes: 5, cut: true }, { t: 2000, method: "GET", path: "/b", status: 200, bytes: 10 }];
+  const f = resumeFacts({ entries, path: "/b" });
+  assert.equal(f.usedRange, false); assert.equal(f.resumed, false); assert.equal(f.secondRange, null); assert.equal(f.firstToHealthyMs, null);
+});
