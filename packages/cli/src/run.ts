@@ -2,6 +2,7 @@
 // open a phone frame page in the default browser. No browser automation. `--native` runs `npx expo run:<platform>`.
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { networkInterfaces } from "node:os";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { createRequire } from "node:module";
@@ -11,11 +12,12 @@ import { loadConfig } from "./config.js";
 import { AGENT_PATH, hostAllowed, isAgentRole, isLoopback, originAllowed, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
 import { bridgeScript } from "./run-bridge.js";
 import { acceptWebSocket, type Peer } from "./run-ws.js";
+import { qrMatrix, qrToTerminal } from "./qr.js";
 import { spawnBin } from "./spawn-bin.js";
 import { portFree, rebuildInto } from "./sim.js";
 
 export type Platform = "android" | "ios";
-export type RunOptions = { platform: Platform; open: boolean; port?: number; native: boolean };
+export type RunOptions = { platform: Platform; open: boolean; port?: number; native: boolean; lan: boolean };
 
 export const RUN_USAGE = `Usage: shipvo run android|ios [options]
 
@@ -31,20 +33,22 @@ export const isFirstBuild = (root: string): boolean => !existsSync(join(root, "s
 
 /** Parses `run` arguments. Throws a plain message for anything it does not know. */
 export function parseRunArgs(argv: string[]): RunOptions {
-  let platform: Platform | undefined; let open = true; let port: number | undefined; let native = false;
+  let platform: Platform | undefined; let open = true; let port: number | undefined; let native = false; let lan = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "android" || a === "ios") platform = a;
     else if (a === "--no-open") open = false;
     else if (a === "--native") native = true;
+    else if (a === "--lan") lan = true;
     else if (a === "--port") {
       const v = argv[++i];
       if (!v || !/^\d+$/.test(v) || Number(v) > 65535) throw new Error(`--port needs a number from 0 to 65535, got "${v ?? ""}".`);
       port = Number(v);
-    } else throw new Error(`Unknown argument "${a}". Usage: shipvo run android|ios [--no-open] [--port <n>] [--native]`);
+    } else throw new Error(`Unknown argument "${a}". Usage: shipvo run android|ios [--no-open] [--port <n>] [--native] [--lan]`);
   }
   if (!platform) throw new Error("Say which phone: shipvo run android or shipvo run ios. Try: shipvo run android");
-  return { platform, open, port, native };
+  if (lan && native) throw new Error("--lan serves the simulated phone; it cannot be combined with --native.");
+  return { platform, open, port, native, lan };
 }
 
 /** The command `--native` runs. */
@@ -107,6 +111,26 @@ addEventListener("resize",fit);fit();
 </script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
 
+/** True for a phone or tablet browser, by user agent. */
+export const isMobileUserAgent = (ua: string | undefined): boolean => /Android|iPhone|iPad|iPod|Mobile/i.test(ua ?? "");
+
+/** The page for a real phone's browser: the app fills the screen, no phone frame. */
+export function runBarePage(name: string, dark = false): string {
+  const title = name.replace(/[<>&"']/g, "");
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>${title}</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:${dark ? "#15171a" : "#fff"}}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head><body>
+<iframe id="app" src="/app/" title="${title}" data-part="bare-app"></iframe>
+</body></html>`;
+}
+
+/** The first private IPv4 address of this machine (or any non-internal one), or undefined. */
+export function lanAddress(ifaces: ReturnType<typeof networkInterfaces> = networkInterfaces()): string | undefined {
+  const all = Object.values(ifaces).flatMap((l) => l ?? []).filter((i) => i.family === "IPv4" && !i.internal).map((i) => i.address);
+  return all.find((a) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a)) ?? all[0];
+}
+
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json",
   ".png": "image/png", ".jpg": "image/jpeg", ".gif": "image/gif", ".svg": "image/svg+xml", ".webp": "image/webp", ".ico": "image/x-icon",
@@ -127,7 +151,7 @@ export function ensureShipvoIgnored(dir: string): void {
  * The agent channel is a WebSocket at `/__shipvo/agent?role=screen|driver&token=...`, loopback only. It relays JSON
  * messages between the `screen` and the `driver`. With `projectDir`, `.shipvo/run.json` describes the session while it runs.
  */
-export async function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string; render?: RenderFrame }): Promise<{ server: Server; port: number; token: string; close: () => Promise<void> }> {
+export async function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string } }): Promise<{ server: Server; port: number; token: string; lanToken?: string; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const token = randomBytes(24).toString("hex");
   // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
@@ -135,16 +159,25 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
   const render = opts.render ?? await loadFrameRenderer();
   const pages = { light: runFramePage(opts.platform, opts.name, render, false, pageToken), dark: runFramePage(opts.platform, opts.name, render, true, pageToken) };
   const bridge = bridgeScript();
+  // With --lan every request needs this token, in `?t=` or in the cookie the first valid request sets.
+  const lanToken = opts.lan ? randomBytes(16).toString("hex") : undefined;
   let boundPort = -1; // set once the server listens; Host and Origin must match it
   const server = createServer((req, res) => {
-    if (!hostAllowed(req.headers.host, boundPort)) { res.writeHead(403); return void res.end("Forbidden"); }
+    if (!hostAllowed(req.headers.host, boundPort) && !(opts.lan && req.headers.host === `${opts.lan.host}:${boundPort}`)) { res.writeHead(403); return void res.end("Forbidden"); }
+    if (lanToken) {
+      const given = new URL(req.url ?? "/", "http://x").searchParams.get("t");
+      const cookie = /(?:^|;\s*)shipvo_t=([0-9a-f]+)/.exec(req.headers.cookie ?? "")?.[1] ?? null;
+      if (tokenMatches(given, lanToken)) res.setHeader("set-cookie", `shipvo_t=${lanToken}; Path=/; HttpOnly; SameSite=Lax`);
+      else if (!tokenMatches(cookie, lanToken)) { res.writeHead(403); return void res.end("Forbidden: open the address shipvo run printed, it has the token."); }
+    }
     let path: string;
     try { path = decodeURIComponent((req.url ?? "/").split("?")[0]); }
     catch { res.writeHead(400); return void res.end("Bad request"); }
     if (path === "/app") { res.writeHead(302, { location: "/app/" }); return void res.end(); }
     if (path === "/" || path === "/index.html") {
       const dark = new URL(req.url ?? "/", "http://x").searchParams.get("dark") === "1";
-      res.writeHead(200, { "content-type": TYPES[".html"] }); return void res.end(dark ? pages.dark : pages.light);
+      const bare = isMobileUserAgent(req.headers["user-agent"]);
+      res.writeHead(200, { "content-type": TYPES[".html"], vary: "user-agent" }); return void res.end(bare ? runBarePage(opts.name, dark) : dark ? pages.dark : pages.light);
     }
     if (path === "/__shipvo/bridge.js") { res.writeHead(200, { "content-type": TYPES[".js"], "cache-control": "no-store" }); return void res.end(bridge); }
     let rel = path.startsWith("/app/") ? path.slice(4) : path;
@@ -187,7 +220,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
   const cleanup = () => { if (infoPath) rmSync(infoPath, { force: true }); };
   return new Promise((ok, fail) => {
     server.once("error", fail);
-    server.listen(opts.port ?? 0, "127.0.0.1", () => {
+    server.listen(opts.port ?? 0, opts.lan ? "0.0.0.0" : "127.0.0.1", () => {
       const port = (server.address() as { port: number }).port;
       boundPort = port;
       if (infoPath) {
@@ -195,7 +228,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
         mkdirSync(join(infoPath, ".."), { recursive: true });
         writeFileSync(infoPath, JSON.stringify(info, null, 2) + "\n", { mode: 0o600 });
       }
-      ok({ server, port, token, close: () => new Promise<void>((r) => { cleanup(); for (const p of Object.values(peers)) p?.close(); server.close(() => r()); server.closeAllConnections?.(); }) });
+      ok({ server, port, token, lanToken, close: () => new Promise<void>((r) => { cleanup(); for (const p of Object.values(peers)) p?.close(); server.close(() => r()); server.closeAllConnections?.(); }) });
     });
   });
 }
@@ -243,8 +276,19 @@ export async function run(argv: string[]): Promise<number> {
   console.error(`Building ${name} for web with the simulated device…`);
   try { await buildWeb(process.cwd()); } catch (e) { console.error((e as Error).message); return 1; }
   try { ensureShipvoIgnored(process.cwd()); } catch { /* read-only project: the session still works */ }
-  const s = await startRunServer({ dir: out, platform: o.platform, name, port: o.port, projectDir: process.cwd() });
-  const url = `http://127.0.0.1:${s.port}/`;
+  let lan: { host: string } | undefined;
+  if (o.lan) {
+    const host = lanAddress();
+    if (!host) { console.error("--lan needs a network address and this computer has none. Connect to Wi-Fi and try again."); return 1; }
+    lan = { host };
+  }
+  const s = await startRunServer({ dir: out, platform: o.platform, name, port: o.port, projectDir: process.cwd(), lan });
+  const url = `http://127.0.0.1:${s.port}/${s.lanToken ? `?t=${s.lanToken}` : ""}`;
+  if (lan && s.lanToken) {
+    const lanUrl = `http://${lan.host}:${s.port}/?t=${s.lanToken}`;
+    console.error(`\nOpen this on your phone (same Wi-Fi):\n${lanUrl}\n\n${qrToTerminal(qrMatrix(lanUrl))}\n`);
+    console.error("Warning: anyone on this network who has this address can open the page. The token in it is the only lock. Press Ctrl+C to stop sharing.");
+  }
   console.error(`Simulated ${FRAMES[o.platform].label} phone at ${url}  (Ctrl+C to stop)`);
   if (o.open) openBrowser(url);
   await new Promise<void>((done) => { for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, done); });
