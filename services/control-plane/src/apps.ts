@@ -33,12 +33,13 @@ async function developer(c: any): Promise<{ account_id: number; login: string } 
 }
 
 /** The publish token of one app. */
-export async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number } | null> {
+export async function publisher(c: any, appId: string): Promise<{ public_key: string; bytes_used: number; role: string | null } | null> {
   const k = bearer(c); if (!k.startsWith("sv_publish_")) return null;
-  const key = await c.env.DB.prepare("SELECT id, expires_at FROM publish_tokens WHERE key_hash = ? AND app_id = ? AND revoked_at IS NULL").bind(await sha256(k), appId).first();
+  const key = await c.env.DB.prepare("SELECT id, expires_at, role FROM publish_tokens WHERE key_hash = ? AND app_id = ? AND revoked_at IS NULL").bind(await sha256(k), appId).first();
   if (!key || (key.expires_at && key.expires_at < now())) return null;
   c.env.DB.prepare("UPDATE publish_tokens SET last_used_at = ? WHERE id = ?").bind(now(), key.id).run().catch(() => {});
-  return (await c.env.DB.prepare("SELECT public_key, bytes_used FROM apps WHERE app_id = ?").bind(appId).first()) ?? null;
+  const app = await c.env.DB.prepare("SELECT public_key, bytes_used FROM apps WHERE app_id = ?").bind(appId).first();
+  return app ? { ...app, role: key.role ?? null } : null;
 }
 
 function newPublishToken() {
