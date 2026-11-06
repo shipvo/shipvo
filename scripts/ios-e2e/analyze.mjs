@@ -124,7 +124,7 @@ export function resumeTable(result) {
 
 /**
  * "Crash-loop reverted": a release that crashes on start was relaunched until the runtime gave it up. Passes only if the
- * app reported `crash_loop_revert` for that release (checked against the @shipvo/schema Telemetry type), the bad release
+ * app reported `crash_loop_revert` for that release or the previous one (checked against the @shipvo/schema Telemetry type), the bad release
  * ran at most 3 times, and the app ends on the previous release.
  * marks: {release, previous_release, running_release, launches}. `launches` is every launch the harness used; the last
  * one is the revert, so the bad release ran launches - 1 times. Returns {pass, detail, launches}.
@@ -133,7 +133,9 @@ export function analyzeCrashLoop(events, marks) {
   for (const k of ["release", "previous_release", "running_release", "launches"]) if (typeof marks[k] !== "number") throw new Error(`crash-loop marks: missing ${k}`);
   const { launches } = marks, badRuns = launches - 1;
   const fail = (detail) => ({ pass: false, detail, launches });
-  const revert = events.find((e) => e.event === "crash_loop_revert" && e.release === marks.release);
+  // The app reports crash_loop_revert under the release it runs after the revert (the previous one), not the bad one:
+  // apps/tide-and-tackle/src/runtimeEvents.ts never overrides the release for this event. Accept either.
+  const revert = events.find((e) => e.event === "crash_loop_revert" && (e.release === marks.release || e.release === marks.previous_release));
   if (!revert) return fail(`no crash_loop_revert event for release ${marks.release} after ${launches} launches`);
   if (!Telemetry.safeParse(revert).success) return fail("revert event does not match the schema Telemetry type");
   if (badRuns > 3) return fail(`release ${marks.release} ran ${badRuns} times before the revert, at most 3 allowed`);

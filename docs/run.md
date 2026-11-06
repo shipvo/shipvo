@@ -67,4 +67,5 @@ shipvo run android|ios [--no-open] [--port <n>] [--native]
 
 - [Test with an assistant](test-with-an-assistant.md)
 - [Record a demo video of the phone](record.md)
+- [Record a demo video: a worked example](record-a-demo-video.md)
 - [CLI guide](cli.md)

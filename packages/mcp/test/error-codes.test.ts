@@ -30,6 +30,8 @@ beforeAll(async () => {
       if (body.action === "unlock") { if (!st.v) return res.end(JSON.stringify({ ok: false, code: "not_locked", error: "the phone is not locked" })); st.v = false; return res.end(JSON.stringify({ ok: true, locked: false, screen: "heading Menu" })); }
       if (st.v) return res.end(JSON.stringify({ ok: false, code: "phone_locked", error: "the phone is locked, so nothing was sent to the app. Call unlock first." }));
     }
+    if (req.url === "/act" && body.action === "kill_app") return res.end(JSON.stringify({ ok: false, code: "recents_not_open", error: "open the app switcher first (open_recents), then kill_app" }));
+    if (req.url === "/act" && ["press_home", "open_recents", "resume_app"].includes(body.action)) return res.end(JSON.stringify({ ok: true, appState: body.action === "resume_app" ? "active" : "background", screen: "Home screen" }));
     if (req.url === "/act" && body.action === "type") return res.end(JSON.stringify({ ok: true, delivery: "delivered", value: body.text, screen: "- textbox \"Name\" [ref=e1]: ignored" }));
     if (req.url === "/act" && body.action === "push_notification") return res.end(JSON.stringify({ ok: true, delivered: body.title !== "blocked", screen: "heading Menu" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Menu" }));
@@ -74,6 +76,18 @@ describe("lock and unlock", () => {
     const b = await call("lock"); expect(b.isError).toBe(true); expect(b.structuredContent.code).toBe("already_locked");
     const t = await call("tap", { ref: "e1" }); expect(t.isError).toBe(true); expect(t.structuredContent.code).toBe("phone_locked");
     expect((await call("unlock")).isError).toBeFalsy();
+    await c.close();
+  });
+});
+
+describe("home, recents and kill", () => {
+  it("send the navigation actions and pass typed errors through", async () => {
+    const c = await connect();
+    const call = (name: string) => c.callTool({ name, arguments: { session: "live" } }) as Promise<any>;
+    expect((await call("press_home")).isError).toBeFalsy();
+    expect((await call("open_recents")).isError).toBeFalsy();
+    expect((await call("resume_app")).isError).toBeFalsy();
+    const k = await call("kill_app"); expect(k.isError).toBe(true); expect(k.structuredContent.code).toBe("recents_not_open");
     await c.close();
   });
 });

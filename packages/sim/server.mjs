@@ -18,6 +18,7 @@ import { PhoneBrowser } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
 import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
+import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -120,7 +121,7 @@ async function newSession(id, opts = {}) {
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle() });
+  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), nav: createNav() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -185,14 +186,26 @@ async function act(id, body) {
   };
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
   if (["tap", "type", "scroll", "back", "open_url", "open_notification"].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  // Home screen or app switcher showing: the app is in the background and takes no input.
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
   switch (body.action) {
+    // Home, recents, resume and kill. The app hears them as AppState changes (document.visibilityState). Kill is a cold start.
+    case "press_home": case "open_recents": case "resume_app": case "kill_app": {
+      let ev;
+      try { ev = body.action === "press_home" ? pressHome(s.nav) : body.action === "open_recents" ? openRecents(s.nav) : body.action === "resume_app" ? resume(s.nav) : (killApp(s.nav), null); }
+      catch (e) { if (e instanceof NavError) throw new SimError(e.code, e.message); throw e; }
+      if (ev) await page.evaluate(setVisibilityInPage, ev);
+      if (body.action === "kill_app") { s.life.reloads++; await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300); await page.evaluate(setVisibilityInPage, "background"); }
+      const where = s.nav.where;
+      return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
+    }
     // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
     case "lock": case "unlock": {
       try { (body.action === "lock" ? lock : unlock)(s.life); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
       return { locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
     }
     case "restart": {
-      restart(s.life);
+      restart(s.life); s.nav.where = "app";
       await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
       return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
     }
@@ -304,10 +317,13 @@ async function act(id, body) {
     case "screenshot": {
       // format "jpeg" has no alpha channel, which the stores require. inline: true also returns the bytes as base64 for clients on another machine.
       const jpeg = body.format === "jpeg"; const p = join(DIR, `${id}-${Date.now()}.${jpeg ? "jpg" : "png"}`);
-      const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
+      // Home screen or switcher showing: draw it over the app for the shot, then take it away. The app stays loaded underneath.
+      const away = s.nav.where !== "app";
+      if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME));
+      let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
