@@ -2,6 +2,39 @@
 
 Short videos for people who are new to Shipvo. Each one has captions and a written transcript.
 
+## Get your app on Google Play
+
+### Get your 12 Google Play testers with Shipvo Testers
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="Get your 12 Google Play testers with Shipvo Testers" data-length="1 min 42 s" poster="/videos/get-your-12-testers.jpg" src="/media/videos/get-your-12-testers-75848c18.mp4"><track kind="captions" src="/videos/get-your-12-testers.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+1 minute 42 seconds. The Google Play rule for new personal accounts (12 testers, 14 days in a row), how to join Shipvo Testers, set up a closed test, let `shipvo store testers` add the group, share your opt-in link and test other founders' apps. It follows [Get your 12 testers](tutorials/get-your-12-testers.md).
+
+[Captions (.vtt)](/videos/get-your-12-testers.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Beyond time" by InternalEye (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>). Source: <a href="https://www.jamendo.com/track/1178100">https://www.jamendo.com/track/1178100</a></details>
+
+<details>
+<summary>Transcript</summary>
+
+Want your app on Google Play? New personal accounts have a rule. You need twelve testers, for fourteen days in a row. Here is how to find them.
+
+Google asks for twelve people to opt in to a closed test. They must stay opted in for fourteen days in a row. If the count drops below twelve, the clock starts again. Company accounts skip this rule. So do personal accounts made before 13 November 2023.
+
+Step one. Join Shipvo Testers. It is a group of founders who test each other's apps. Anyone can join. Members cannot see each other's emails.
+
+Step two. In Play Console, make a closed test track. Upload your first build by hand. Play does not allow that step through the API. Then add the Shipvo Testers group to the track.
+
+Or let Shipvo do it. Run shipvo store testers. It prints the steps for your app. Add your Play key, and it adds the group for you. It never removes a group.
+
+Step three. Share your opt-in link with your own people. They open it, opt in, and install your app.
+
+Step four. Test other apps. The community works because everyone tests. Keep them installed for the fourteen days.
+
+We cannot promise how many people will opt in. But now you have a plan. Join at shipvo.dev/testers.
+
+</details>
+
 ## Test your app
 
 ### Have an AI assistant test your shop before every release
