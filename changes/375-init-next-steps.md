@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo init` now prints the next steps with your real app id: `doctor`, `app create <id>`, `publish` and `sim`.
-- Migration: none.

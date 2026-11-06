@@ -28,6 +28,17 @@ const has = (i, l) => i.labels.some((x) => x.name === l);
 // 1. Main CI.
 const mainCI = runs.find((r) => r.name === "ci" && r.head_branch === "main" && r.status === "completed");
 if (mainCI && mainCI.conclusion === "failure") problems.push(`Main CI is red: ${mainCI.html_url}`);
+// 1b. Main CI is green again: close any open "CI is failing on main" issue (label ci-main), or the release
+// train keeps refusing to release.
+if (mainCI && mainCI.conclusion === "success") {
+  for (const i of issues.filter((i) => has(i, "ci-main"))) {
+    act(`close ci-main issue #${i.number}: main is green`, () => {
+      gh("api", "-X", "POST", `repos/${REPO}/issues/${i.number}/comments`, "-f", `body=Main CI is green again (${mainCI.html_url}, commit ${mainCI.head_sha.slice(0, 7)}). Closed by the health check so the release train can run.`);
+      gh("api", "-X", "PATCH", `repos/${REPO}/issues/${i.number}`, "-f", "state=closed", "-f", "state_reason=completed");
+    });
+    fixed.push(`Closed ${link(i.number)}: main CI is green again.`);
+  }
+}
 
 // 2. Stale in-progress labels: no engineer run is working on the issue any more.
 for (const i of issues.filter((i) => has(i, "agent:in-progress") && mins(i.updated_at) > 90)) {

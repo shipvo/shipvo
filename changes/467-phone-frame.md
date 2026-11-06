@@ -1,3 +1,0 @@
-- `@shipvo/sim`: new `@shipvo/sim/frame.mjs` with `renderFrame({ skin, dark, status })`, a pure renderer for the phone body (Android 412x915 with a punch-hole camera, iPhone 393x852 with an island cutout, status bar, "Simulated" label).
-- `@shipvo/cli`: `shipvo run android|ios` draws its frame with `renderFrame`. It loads `@shipvo/sim` from the app, so the app needs `@shipvo/sim` installed (apps from `shipvo init` have it). `/?dark=1` shows the dark frame.
-- Migration: none for apps from `shipvo init`. Older apps without `@shipvo/sim` get a message with the install command.

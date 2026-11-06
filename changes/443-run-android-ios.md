@@ -1,2 +1,0 @@
-- `@shipvo/cli`: new `shipvo run android|ios` builds the web export with the simulated device and opens an Android or iOS phone frame in your default browser. No Playwright. `--no-open`, `--port`, `--native` (runs `npx expo run:android|ios`).
-- Migration: none.
