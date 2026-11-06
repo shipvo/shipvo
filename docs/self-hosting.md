@@ -51,7 +51,7 @@ When D1 refuses a telemetry write, Shipvo:
 
 - answers the phone `202` with `{"ok":true,"stored":false}`, never a 5xx;
 - adds one to the KV counter `telemetry_dropped/<app>/<yyyy-mm-dd>`;
-- for failure and healthy events, keeps KV counts per release (kept for one hour); auto-halt uses the larger of each KV count and the D1 count, so a halt still needs the failure ratio over the threshold;
+- for failure and healthy events, keeps KV counts per release (kept for one hour); auto-halt does not use them, because they are not verified (see [auto-halt](auto-halt.md));
 - reports the day's total (one KV key, `telemetry_dropped_total/<day>`) as `telemetry_dropped_today` in `GET /health` and in `shipvo doctor`.
 
 Release pointers come from KV, so updates keep flowing. Dropped events are not stored, and a dropped revert event does not send a revert alert, so dashboards undercount until the limit resets or you move to a paid plan.

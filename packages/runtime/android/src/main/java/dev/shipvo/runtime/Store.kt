@@ -91,6 +91,8 @@ internal class Store(private val ctx: Context) : BootCounts {
   val appId: String get() = meta("dev.shipvo.APP_ID") ?: ""
   /** Hermes bytecode versions this shell runs, e.g. "96,98". Null when the shell does not declare them. */
   val hermesBytecodeVersions: String? get() = metaAny("dev.shipvo.HERMES_BYTECODE_VERSIONS")?.takeIf { it.isNotBlank() }
+  /** Hermes engine build id this shell runs, e.g. "250829098.0.10". Null when the shell does not declare it. */
+  val hermesEngine: String? get() = metaAny("dev.shipvo.HERMES_ENGINE")?.takeIf { it.isNotBlank() }
   /** Native modules in this shell, e.g. "react-native-mmkv@3.1.0,@scope/pkg@1.0.0". Null when not declared. */
   val nativeModules: String? get() = metaAny("dev.shipvo.NATIVE_MODULES")?.takeIf { it.isNotBlank() }
   val shellMajor: Int get() = (meta("dev.shipvo.SHELL_MAJOR") ?: "1").toIntOrNull() ?: 1

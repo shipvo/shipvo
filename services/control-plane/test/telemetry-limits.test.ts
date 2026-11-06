@@ -23,15 +23,11 @@ describe("telemetry when D1 refuses writes", () => {
     const h = await (await app.request("/health", {}, { DB: failingDb, POINTERS: kv } as any)).json() as any;
     expect(h.telemetry_dropped_today).toBe(1);
   });
-  it("still halts from the KV count", async () => {
+  it("does not halt from the KV count: those reports are not verified", async () => {
     const { m, kv } = kvStore({ "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 5 }) });
-    for (let i = 0; i < 5; i++) {
-      const r = await post({ schema_version: "1.0", app_id: "tide", release: 7, event: "rolled_back" }, { DB: failingDb, POINTERS: kv });
-      expect(r.status).toBe(202);
-      if (i < 4) expect(m["halt/tide"]).toBeUndefined();
-    }
-    expect(JSON.parse(m["halt/tide"]).release).toBe(7);
-    expect(m[`telemetry_dropped/tide/${day}`]).toBe("5");
+    for (let i = 0; i < 50; i++) await post({ schema_version: "1.0", app_id: "tide", release: 7, event: "rolled_back" }, { DB: failingDb, POINTERS: kv });
+    expect(m["halt/tide"]).toBeUndefined();
+    expect(m[`telemetry_dropped/tide/${day}`]).toBe("50");
   });
   it("does not halt a healthy release when D1 is down and healthy events dominate", async () => {
     const { m, kv } = kvStore({ "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 5 }) });
@@ -41,8 +37,8 @@ describe("telemetry when D1 refuses writes", () => {
       expect(r.status).toBe(202);
     }
     expect(m["halt/tide"]).toBeUndefined();
-    expect(m["telemetry_failed/tide/9"]).toBe("6");
-    expect(m["telemetry_healthy/tide/9"]).toBe("95");
+    expect(m["telemetry_failed/tide/9"]).toBeUndefined();
+    expect(m[`telemetry_dropped/tide/${day}`]).toBe("101");
   });
   it("a dropped non-failure event writes no telemetry_failed key", async () => {
     const { m, kv } = kvStore();

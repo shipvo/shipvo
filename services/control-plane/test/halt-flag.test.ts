@@ -9,7 +9,7 @@ function setup(cfg: unknown, healthy: number, failed: number, initial: Record<st
   const binds: unknown[][] = [];
   const DB = { prepare: (sql: string) => ({ bind: (...a: unknown[]) => (binds.push(a), {
     run: async () => ({}),
-    all: async () => ({ results: sql.includes("GROUP BY event") ? [{ event: "applied", n: healthy }, { event: "rolled_back", n: failed }] : [] }),
+    all: async () => ({ results: sql.includes("verified = 1") ? [...Array.from({ length: healthy }, (_, i) => ({ install_id: "h" + i, net_hash: "n" + (i % 3), failed: 0, healthy: 1 })), ...Array.from({ length: failed }, (_, i) => ({ install_id: "f" + i, net_hash: "n" + (i % 3), failed: 1, healthy: 0 }))] : [] }),
   }) }) } as any;
   return { env: { POINTERS, DB } as any, store, puts, binds };
 }
@@ -66,5 +66,22 @@ describe("halt flag on POST /t", () => {
     const s = setup({ threshold: 0.2 }, 14, 6);
     s.env.POINTERS.get = async () => { throw new Error("kv down"); };
     expect((await fail(s.env)).status).toBe(202);
+  });
+});
+
+describe("halt query", () => {
+  it("counts only verified rows", async () => {
+    const sqls: string[] = [];
+    const s = setup({ threshold: 0.2 }, 14, 6);
+    const prepare = s.env.DB.prepare;
+    s.env.DB.prepare = (sql: string) => (sqls.push(sql), prepare(sql));
+    await fail(s.env);
+    expect(sqls.some((q) => q.includes("t.verified = 1") && q.includes("GROUP BY t.install_id"))).toBe(true);
+  });
+  it("does not halt when failures come from fewer than 3 networks", async () => {
+    const s = setup({ threshold: 0.2 }, 0, 0);
+    s.env.DB.prepare = () => ({ bind: () => ({ run: async () => ({}), all: async () => ({ results: Array.from({ length: 30 }, (_, i) => ({ install_id: "f" + i, net_hash: "n" + (i % 2), failed: 1, healthy: 0 })) }) }) });
+    await fail(s.env);
+    expect(s.store["halt/tide"]).toBeUndefined();
   });
 });

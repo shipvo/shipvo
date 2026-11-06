@@ -22,6 +22,26 @@ describe("decideOffer: hbc", () => {
   });
 });
 
+describe("decideOffer: hbe", () => {
+  const rel = body({ hermes_bytecode_version: 96, hermes_engine: "250829098.0.10" });
+  it("404 hermes_bytecode_mismatch when the engine differs", () => {
+    expect(decideOffer({ body: rel, hbc: "96", hbe: "250829098.0.16" })).toEqual({ ok: false, status: 404, error: "hermes_bytecode_mismatch" });
+  });
+  it("offers on a match, or when either side is absent, or when hbe is malformed", () => {
+    for (const input of [{ hbe: "250829098.0.10" }, {}, { hbe: "nope" }, { hbe: "" }, { hbe: "1.2" }]) {
+      expect(decideOffer({ body: rel, hbc: "96", ...input }).ok).toBe(true);
+    }
+    expect(decideOffer({ body: body({ hermes_bytecode_version: 96 }), hbc: "96", hbe: "250829098.0.16" }).ok).toBe(true);
+  });
+  it("checks bytecode first, then engine, then native modules", () => {
+    const b = body({ hermes_bytecode_version: 96, hermes_engine: "1.0.0", required_native_modules: { "m": "^2.0.0" } });
+    expect(decideOffer({ body: b, hbc: "98", hbe: "2.0.0", nm: "m@1.0.0" })).toMatchObject({ error: "hermes_bytecode_mismatch" });
+    expect(decideOffer({ body: b, hbc: "96", hbe: "2.0.0", nm: "m@1.0.0", haltedRelease: halt(7) })).toMatchObject({ error: "hermes_bytecode_mismatch" });
+    expect(decideOffer({ body: b, hbc: "96", hbe: "1.0.0", nm: "m@1.0.0" }).ok).toBe(false);
+    expect((decideOffer({ body: b, hbc: "96", hbe: "1.0.0", nm: "m@1.0.0" }) as any).error).not.toBe("hermes_bytecode_mismatch");
+  });
+});
+
 describe("decideOffer: nm", () => {
   const required = { "@scope/pkg": "^1.2.0" };
   it("offers without ?nm= or without required modules", () => {
