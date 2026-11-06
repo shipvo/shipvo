@@ -25,18 +25,38 @@ export const SERVICES: Record<string, Service> = {
         const r = await f("https://api.stripe.com/v1/balance", { headers: { authorization: `Bearer ${value}` }, signal: AbortSignal.timeout(5000) });
         valid = r.ok ? true : r.status === 401 ? false : null;
       } catch { valid = null; }
-      return { valid, access: full ? "write" : "read", warning: full ? "full_access_key: this key can change data and move money. Replace it with a restricted read-only key." : undefined };
+      return { valid, access: full ? "write" : "read", warning: full ? "full_access_key" : undefined };
     },
   },
 };
 
+/** Plain-English text for the codes that JSON clients get. */
+const WARNINGS: Record<string, string> = { full_access_key: "This key can change data and move money. Replace it with a restricted read-only key." };
+const FAILURES: Record<string, string> = {
+  bad_request: "We could not read that form. Go back and try again.",
+  ticket_not_valid: "This link has already been used or has expired. Ask the assistant for a new one.",
+  ticket_mismatch: "This link was made for a different app or key. Ask the assistant for a new one.",
+  too_large: "That key is too long. Check that you copied only the key, then try again.",
+  bad_value: "The key must not contain spaces or line breaks. Copy it again and paste only the key.",
+  vault_not_configured: "The vault is not set up on this server yet, so nothing was saved. Tell the owner of this server.",
+  save_failed: "Something went wrong and the key was not saved. Your link still works: go back and try again.",
+};
 const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const newTicketId = () => { const r = crypto.getRandomValues(new Uint8Array(32)); return "vt_" + btoa(String.fromCharCode(...r)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, ""); };
 const TICKET = /^vt_[A-Za-z0-9_-]{43}$/;
 const PAGE_HEADERS = { "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" };
 
-const page = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(title)}</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:2rem auto;padding:0 1rem}input,button{font:inherit;padding:.6rem;width:100%;box-sizing:border-box;margin:.4rem 0}dl{display:grid;grid-template-columns:auto 1fr;gap:.2rem 1rem}dt{color:#555}.warn{background:#fff3cd;padding:.6rem;border-radius:6px}</style></head><body>${body}</body></html>`;
+const CSS = `:root{color-scheme:light dark;--bg:#fff;--fg:#1a1a1a;--muted:#4a4a4a;--line:#767676;--accent:#1b4fd8;--on-accent:#fff;--warn-bg:#fff3cd;--warn-fg:#4d3b00}
+@media (prefers-color-scheme:dark){:root{--bg:#121316;--fg:#f0f0f0;--muted:#c4c4c4;--line:#8a8a8a;--accent:#8ab0ff;--on-accent:#0b1020;--warn-bg:#4a3b00;--warn-fg:#ffecb3}}
+body{font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:2rem auto;padding:0 1rem;background:var(--bg);color:var(--fg)}
+input,button{font:inherit;padding:.6rem;width:100%;box-sizing:border-box;margin:.4rem 0;border-radius:8px;min-height:44px}
+input{background:var(--bg);color:var(--fg);border:1px solid var(--line)}
+button{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);font-weight:600;cursor:pointer}
+input:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:.2rem 1rem}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
+.warn{background:var(--warn-bg);color:var(--warn-fg);padding:.6rem;border-radius:6px}`;
+const page = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="robots" content="noindex"><title>${esc(title)}</title><style>${CSS}</style></head><body>${body}</body></html>`;
 
 export function vaultRoutes(who: Who, deps: { fetch?: typeof fetch } = {}) {
   const v = new Hono<{ Bindings: Env }>();
@@ -81,14 +101,14 @@ export function vaultRoutes(who: Who, deps: { fetch?: typeof fetch } = {}) {
     return c.html(page("Save a key", `<h1>Save a key for ${esc(t.app_id)}</h1>
 <dl><dt>App</dt><dd>${esc(t.app_id)}</dd><dt>Key name</dt><dd>${esc(t.name)}</dd><dt>Service</dt><dd>${esc(s?.label ?? t.domain)} (${esc(t.domain)})</dd><dt>Purpose</dt><dd>${esc(t.purpose || "Not given")}</dd></dl>
 <p>${esc(help)}</p>
-<form method="post" autocomplete="off"><label>Key<input name="value" type="password" required maxlength="${MAX_VALUE}" autocomplete="off" spellcheck="false"></label><button type="submit">Save key</button></form>
+<form method="post" autocomplete="off"><label>Key<input name="value" type="password" required maxlength="${MAX_VALUE}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label><button type="submit">Save key</button></form>
 <p>The key goes straight into the vault. The assistant is told only that it was saved. This link works once and expires in 10 minutes.</p>`), 200, PAGE_HEADERS);
   });
 
   /** The only way a value enters the vault. */
   v.post("/t/:ticket", async (c) => {
     const asJson = (c.req.header("content-type") ?? "").includes("application/json");
-    const fail = (status: 400 | 410 | 413 | 503, error: string) => asJson ? c.json({ error }, status, { "cache-control": "no-store" }) : c.html(page("Not saved", `<h1>Not saved</h1><p>${esc(error)}</p>`), status, PAGE_HEADERS);
+    const fail = (status: 400 | 410 | 413 | 500 | 503, error: string) => asJson ? c.json({ error }, status, { "cache-control": "no-store" }) : c.html(page("Not saved", `<h1>Not saved</h1><p>${esc(FAILURES[error] ?? FAILURES.save_failed)}</p>`), status, PAGE_HEADERS);
     let value = "", claimApp: unknown, claimName: unknown;
     try {
       if (asJson) { const b: any = await c.req.json(); value = b?.value; claimApp = b?.app; claimName = b?.name; }
@@ -106,16 +126,23 @@ export function vaultRoutes(who: Who, deps: { fetch?: typeof fetch } = {}) {
     const used = await c.env.DB.prepare("UPDATE vault_tickets SET used_at = ? WHERE id_hash = ? AND used_at IS NULL AND expires_at >= ?").bind(nowIso, t.id_hash, nowIso).run();
     if ((used as any)?.meta?.changes !== 1) return fail(410, "ticket_not_valid");
 
-    const svc = SERVICES[t.service];
-    const check = svc ? await svc.check(value, doFetch) : { valid: null as boolean | null, access: t.access as "read" | "write", warning: undefined as string | undefined };
+    let check: { valid: boolean | null; access: "read" | "write"; warning?: string } = { valid: null, access: t.access };
+    let sealed: Awaited<ReturnType<typeof encryptSecret>>;
     const id = { app: t.app_id, name: t.name, domain: t.domain };
-    let sealed;
-    try { sealed = await encryptSecret(c.env.VAULT_MASTER_KEY, id, value); } catch { return fail(503, "vault_not_configured"); }
-    await c.env.DB.prepare("INSERT INTO vault_secrets (owner, app_id, name, domain, access, warning, valid, wrapped_key, ciphertext, created_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(app_id, name) DO UPDATE SET owner = excluded.owner, domain = excluded.domain, access = excluded.access, warning = excluded.warning, valid = excluded.valid, wrapped_key = excluded.wrapped_key, ciphertext = excluded.ciphertext, created_at = excluded.created_at, last_used_at = NULL, use_count = 0")
-      .bind(t.requested_by, t.app_id, t.name, t.domain, check.access, check.warning ?? null, check.valid === null ? null : check.valid ? 1 : 0, sealed.wrapped_key, sealed.ciphertext, nowIso).run();
-    const out = { saved: true, app: t.app_id, name: t.name, valid: check.valid, access: check.access, ...(check.warning ? { warning: check.warning } : {}) };
+    // If anything after the claim fails, give the ticket back so the person does not start over.
+    const release = () => c.env.DB.prepare("UPDATE vault_tickets SET used_at = NULL WHERE id_hash = ?").bind(t.id_hash).run().catch(() => undefined);
+    try {
+      const svc = SERVICES[t.service];
+      check = svc ? await svc.check(value, doFetch) : check;
+      sealed = await encryptSecret(c.env.VAULT_MASTER_KEY, id, value);
+    } catch { await release(); return fail(503, "vault_not_configured"); }
+    try {
+      await c.env.DB.prepare("INSERT INTO vault_secrets (owner, app_id, name, domain, access, warning, valid, wrapped_key, ciphertext, created_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(app_id, name) DO UPDATE SET owner = excluded.owner, domain = excluded.domain, access = excluded.access, warning = excluded.warning, valid = excluded.valid, wrapped_key = excluded.wrapped_key, ciphertext = excluded.ciphertext, created_at = excluded.created_at, last_used_at = NULL, use_count = 0")
+        .bind(t.requested_by, t.app_id, t.name, t.domain, check.access, check.warning ?? null, check.valid === null ? null : check.valid ? 1 : 0, sealed.wrapped_key, sealed.ciphertext, nowIso).run();
+    } catch { await release(); return fail(500, "save_failed"); }
+    const out = { saved: true, app: t.app_id, name: t.name, valid: check.valid, access: check.access, ...(check.warning ? { warning: check.warning, warning_text: WARNINGS[check.warning] } : {}) };
     if (asJson) return c.json(out, 201, { "cache-control": "no-store" });
-    return c.html(page("Saved", `<h1>Saved</h1><p>The key ${esc(t.name)} for ${esc(t.app_id)} is in the vault. You can close this page.</p>${check.valid === false ? "<p class=warn>The service refused this key. Save a working one with a new link.</p>" : ""}${check.warning ? `<p class=warn>${esc(check.warning)}</p>` : ""}`), 201, PAGE_HEADERS);
+    return c.html(page("Saved", `<h1>Saved</h1><p>The key ${esc(t.name)} for ${esc(t.app_id)} is in the vault. You can close this page.</p>${check.valid === false ? "<p class=warn>The service refused this key. Save a working one with a new link.</p>" : ""}${check.valid === null && SERVICES[t.service] ? "<p class=warn>We could not check this key with the service. It is saved, but it may not work.</p>" : ""}${check.warning ? `<p class=warn>${esc(WARNINGS[check.warning] ?? "")}</p>` : ""}`), 201, PAGE_HEADERS);
   });
 
   return v;

@@ -139,6 +139,42 @@ describe("vault verification", () => {
   });
 });
 
+describe("vault page copy and recovery", () => {
+  const form = (req: any, t: string, value: string) => req(`/vault/t/${t}`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "value=" + encodeURIComponent(value) });
+  it("shows plain English, not error codes, on the HTML pages", async () => {
+    const { ticket, req, env } = setup();
+    const { j } = await ticket();
+    const bad = await (await form(req, j.ticket, "a b")).text();
+    expect(bad).toContain("must not contain spaces or line breaks"); expect(bad).not.toContain("bad_value");
+    const nope = await (await form(req, "vt_" + "A".repeat(43), "x")).text();
+    expect(nope).toContain("Ask the assistant for a new one"); expect(nope).not.toContain("ticket_not_valid");
+    const nokey = await (await req(`/vault/t/${j.ticket}`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "value=" + SECRET }, { ...env, VAULT_MASTER_KEY: undefined })).text();
+    expect(nokey).not.toContain("vault_not_configured");
+  });
+  it("shows the full-access warning as a sentence, and says when a key could not be checked", async () => {
+    const s = setup(async () => new Response("x", { status: 503 }));
+    const html = await (await form(s.req, (await s.ticket()).j.ticket, "sk_live_FULLACCESS123")).text();
+    expect(html).toContain("can change data and move money"); expect(html).not.toContain("full_access_key");
+    expect(html).toContain("could not check this key");
+  });
+  it("the form has dark mode, focus and phone-keyboard hints", async () => {
+    const { ticket, req } = setup();
+    const html = await (await req(`/vault/t/${(await ticket()).j.ticket}`)).text();
+    expect(html).toContain("color-scheme:light dark"); expect(html).toContain(":focus-visible"); expect(html).toContain('autocapitalize="off"');
+  });
+  it("a failed save gives the ticket back", async () => {
+    const { ticket, req, env, sql } = setup();
+    const { j } = await ticket();
+    const real = env.DB;
+    const flaky = { prepare: (q: string) => (q.startsWith("INSERT INTO vault_secrets") ? { bind: () => ({ run: async () => { throw new Error("d1 down"); } }) } : real.prepare(q)) };
+    const r = await form((p: string, i: any) => req(p, i, { ...env, DB: flaky }), j.ticket, SECRET);
+    expect(r.status).toBe(500); expect(await r.text()).toContain("not saved");
+    expect(sql.prepare("SELECT used_at FROM vault_tickets").get().used_at).toBeNull();
+    expect((await form(req, j.ticket, SECRET)).status).toBe(201);
+    expect(sql.prepare("SELECT COUNT(*) n FROM vault_secrets").get().n).toBe(1);
+  });
+});
+
 describe("vault at rest and in responses", () => {
   it("the D1 row holds no plaintext, and the value is never in any response or log", async () => {
     const logs: string[] = [];
