@@ -1,0 +1,1 @@
+- cli: `shipvo publish` and `shipvo rollback` now print one plain sentence (release number and next step) instead of a JSON line. `--json` is unchanged. Migration: scripts that parsed the old stdout line should pass `--json` and read the `data` field.

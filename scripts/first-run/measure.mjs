@@ -115,6 +115,7 @@ async function realPublish(cli, app, controlUrl, withExport, controlLog) {
     const pointer = (exit, msg) => ({ step: "pointer", ms: Math.round(performance.now() - t0), exit, stderr: msg });
     let released;
     try { released = JSON.parse(pub.stderr.trim().split("\n").filter((l) => l.startsWith("{")).pop()).release; } catch {}
+    if (released === undefined) { const m = /Published release (\d+)/.exec(pub.stderr); if (m) released = Number(m[1]); }
     try {
       const r = await fetch(`${base}/p/${cfg.appId}/${cfg.shellMajor ?? 1}/b0`);
       const text = await r.text();
