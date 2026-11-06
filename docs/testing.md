@@ -158,6 +158,27 @@ In GitHub Actions, map a repository secret to the variable:
     SHIPVO_TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
 ```
 
+### Test accounts
+
+For a login, name an account instead of typing its values:
+
+```
+log in as "buyer"
+```
+
+The step reads `SHIPVO_TEST_ACCOUNT_BUYER_USER` and `SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD`. It types the user into the username or email field, the password into the password field, and taps the **Log in** or **Sign in** button. If a variable is not set, the step fails and the message names the variable, never a value. Both values are masked as `***` in step logs, `--report` files and errors. `shipvo explore --issues-dir` and the explore report mask the value of every `SHIPVO_TEST_*` variable (values of 4 or more characters).
+
+In GitHub Actions, store the user and password as repository secrets and map them:
+
+```yaml
+- run: npx shipvo test
+  env:
+    SHIPVO_TEST_ACCOUNT_BUYER_USER: ${{ secrets.BUYER_USER }}
+    SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD: ${{ secrets.BUYER_PASSWORD }}
+```
+
+Use the same `env:` block on the `shipvo explore` step.
+
 ## Repair broken steps
 
 Plain-language tests live in `tests/*.steps`. When a label changes, run:

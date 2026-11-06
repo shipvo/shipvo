@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
 import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
-import { writeIssues } from "./explore-issues.js";
+import { redactTestSecrets, writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
 import { runFlows, renderFlows, parseFlowNames } from "./flows.js";
 
@@ -432,7 +432,7 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     const out = a.out ?? "explore-report";
     const nothingChanged = onlyRoutes && !routes?.length;
     if (nothingChanged) console.error("No screens changed, nothing explored.");
-    writeFileSync(`${out}.md`, (nothingChanged ? "No screens changed, nothing explored.\n\n" : "") + renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
+    writeFileSync(`${out}.md`, redactTestSecrets((nothingChanged ? "No screens changed, nothing explored.\n\n" : "") + renderMarkdown(report))); writeFileSync(`${out}.json`, redactTestSecrets(JSON.stringify(report, null, 2) + "\n"));
     let flowsFailed = false; let flowInfo: Record<string, unknown> = {}; let flowFiles: string[] = [];
     if (flowNames) {
       const fr = await runFlows(simDriver(base, cfg.appId), { flows: flowNames!, app: cfg.appId });

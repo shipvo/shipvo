@@ -163,8 +163,8 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string
   else log(failed ? `${failed} failed` : "all steps passed");
   if (reportPath || reportMdPath) {
     const report = { app: appIdFromConfig(), commit: gitCommit(), release: release ?? null, platform, time: new Date().toISOString(), parityLimits: PARITY_LIMITS, flows };
-    if (reportPath) { writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n"); log(`wrote report ${reportPath}`); }
-    if (reportMdPath) { writeFileSync(reportMdPath, renderReportMarkdown(report)); log(`wrote Markdown report ${reportMdPath}`); }
+    if (reportPath) { writeFileSync(reportPath, scrub(JSON.stringify(report, null, 2) + "\n")); log(`wrote report ${reportPath}`); }
+    if (reportMdPath) { writeFileSync(reportMdPath, scrub(renderReportMarkdown(report))); log(`wrote Markdown report ${reportMdPath}`); }
   }
   let uploadError: string | null = null;
   if (upload && reportPath) {
