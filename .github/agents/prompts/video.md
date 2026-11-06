@@ -23,9 +23,13 @@ This runs every 3 hours and builds a growing library: many videos, one per run, 
 ## Background music (every video)
 
 Every video gets a quiet music bed that ducks under the narration, mixed with `scripts/video/bgmusic.py` (loudness-matched, sidechain-ducked by the voice, fades in and out; the picture is untouched):
-1. Pick the mood from the video (explainer or tech: `--want tech,documentary,ambient --avoid upbeat`; calm tutorial: `ambient,acoustic`; launch teaser: `upbeat,cinematic`).
-2. **Tracks.** Owner decision (5 Nov 2026): any Jamendo track from the corpus may be used, always credited. Prefer tracks you have not used yet so videos do not all sound the same.
-3. `python3 scripts/video/bgmusic.py analyze --ids ...` and pick the flattest (lowest LRA, 3 to 7 LU), then `mix --video ... --narration <full-length narration wav> --music music/<id>.mp3 --out ... --credits services/site/public/videos/<slug>.credits.json`. Default `--bed 0.5`; 0.35 for dense narration.
+1. **Pick with `scripts/video/musicpick.py`, never by hand or at random.** Write a brief for the cut and run
+   `python3 scripts/video/musicpick.py --brief brief.json --out pick.json --record <slug>`.
+   The brief: `{"duration": <s>, "want": [moods], "avoid": [moods], "bpm": [lo, hi], "energy": "story|build|steady|calm", "hits": [{"t": <s>, "type": "reveal|payoff|drop"}], "narration": true|false}`.
+   Moods: explainer or tech `tech,documentary,ambient` avoid `upbeat`; calm tutorial `ambient,acoustic` with `energy: calm`; launch teaser `upbeat,cinematic` with `energy: build`; story ad `cinematic,inspiring,upbeat` with `energy: story`, `bpm: [118, 134]` and a `payoff` hit at the payoff shot. Put every reveal and payoff time from your storyboard in `hits`.
+   It searches the full 33,921-track corpus (`scripts/video/data/jamendo_moodtheme.jsonl.gz`), measures the best candidates (loudness, dynamics, tempo, energy over time), slides each one to find the start point where its energy curve best follows your storyboard and swells on your hits, and writes the winner with its `offset` to `pick.json`. `--record` logs it in `scripts/video/music-used.json` (commit that file) so later videos pick something else.
+2. **Tracks.** Owner decision (5 Nov 2026): any Jamendo track from the corpus may be used, always credited.
+3. Mix with `python3 scripts/video/bgmusic.py mix --video ... --narration <full-length narration wav> --music <pick.path> --offset <pick.offset> --out ... --credits services/site/public/videos/<slug>.credits.json`. Default `--bed 0.5`; 0.35 for dense narration. For a no-voiceover story cut, omit `--narration` and use `--music-lufs -14`. Keep `brief.json` next to the script in `scripts/video/scripts/<slug>.brief.json` so the pick can be rebuilt.
 4. **Credits ship with every video.** `--credits` writes `services/site/public/videos/<slug>.credits.json` (track id, title, artist, licence, licence link, source link and a ready `credit_line`), read from the track's own tags. Commit it with the video. Show the credit in a closed info box under the video in `docs/videos.md` (and wherever the video is embedded), never as a visible line:
    `<details class="credits"><summary>ⓘ Copyright credits</summary>` + the `credit_line` with the source and licence as links + `</details>`.
    Style it as a small, muted info box (`services/site/site.css`, class `credits`) that matches the transcript box. In descriptions where the video is posted elsewhere, put the `credit_line` at the end. Add `"credits": "/videos/<slug>.credits.json"` to the video's entry in `services/site/media.json`. Record the track id in `scripts/video/scripts/<slug>.json` so the mix can be rebuilt. Never commit MP3 files.
@@ -74,7 +78,7 @@ The short 9:16 cut keeps the hook, one product beat and the payoff; it is edited
 - Typography: one display font for captions, animated in (mask reveal or kinetic type), never more than 7 words on screen.
 
 **Sound:**
-- Music: an energetic bed around 125 to 130 BPM for no-voiceover cuts (louder mix is fine without narration, around -14 LUFS for social), a calmer bed under narration as usual (`bgmusic.py`, ducked). Hit points: the music swells on the reveal and the payoff; a beat of near-silence before the payoff lands. Over 90 s, the music needs at least two sections (build and payoff) so it does not loop flat.
+- Music: an energetic bed around 125 to 130 BPM for no-voiceover cuts (louder mix is fine without narration, around -14 LUFS for social), a calmer bed under narration as usual (`bgmusic.py`, ducked). Both cuts pick their track with `musicpick.py`, each with its own brief and hit times. Hit points: the music swells on the reveal and the payoff; a beat of near-silence before the payoff lands. Over 90 s, the music needs at least two sections (build and payoff) so it does not loop flat.
 - Sound effects on every action that matters (tap, whoosh on transitions, notification ping on an order, a door bell, crowd murmur). Credit every music track and any effects library as usual.
 - Narration, when used: the cast's voices (distinct voice per character), short lines, natural pauses.
 
