@@ -293,20 +293,14 @@ Most apps never leave the spec. Those that need more climb one step and keep the
 
 Only for real phones (Bluetooth devices, background location, custom native SDKs). On Shipvo Phone a native-only feature needs a web fallback or a simulated version in `@shipvo/device`; publish checks flag anything that will not work there.
 
-### 15.7 The Shipvo Runner (decided 6 Nov 2026)
+### 15.7 The Shipvo Runner
 
-One Cloudflare account runs everything. Owner decision: **start on the Workers Free plan** (100,000 requests a day, 10 ms CPU per invocation) and move to Workers Paid ($5 a month: 10 million calls and 30 million CPU-ms included, then $0.30 per million calls and $0.02 per million CPU-ms) only when usage reaches the free limits. Prices from Cloudflare's published pricing, checked 6 Nov 2026.
+App specs run on Shipvo's edge in one shared runner: it reads each app's spec and executes its data sources (vault keys added server-side), CEL expressions, actions, schedules and webhooks.
 
-Free-plan rules for the runner:
-- Stay inside 10 ms CPU per call: time spent waiting on upstream APIs does not count; trim upstream responses to the fields the spec uses before evaluating CEL; reject specs whose expressions exceed the CEL cost limit.
-- One dispatcher Cron Trigger for all schedules: it runs every minute, reads due schedules from D1 and runs them, instead of one trigger per app.
-- Batch and cache upstream calls; keep per-person data in D1 within the free limits; keep KV writes rare.
-- The health check reports daily usage against every free limit and opens an issue at 70% of any of them, so the upgrade to Paid happens before people hit a limit.
-
-- **Shared spec runner (levels 0 and 1).** One Worker that reads each app's spec and executes it: data sources with vault keys added server-side, CEL, actions, schedules (Cron Triggers), webhooks. It never runs code written by users or assistants, so it needs no per-person scripts: cost is calls and CPU only. Data calls use the spec's `cache` so repeated questions hit the upstream service once.
-- **Custom code (levels 2 and 3) waits for its own tier.** User-written code is never run inside the shared runner (no `eval`, no dynamic import): it would run with our credentials and see other people's data. When we enable levels 2 and 3, custom code runs in Workers for Platforms ($25 a month, 20 million calls, 60 million CPU-ms and 1,000 scripts included, then $0.02 per script) with one script per person who writes code, not one per function; heavy jobs go to E2B, metered.
-- **Quotas.** A free monthly allowance of runner calls per person, then metered, so cost follows revenue.
-- **Stdio parity.** The local stdio MCP runs the same runner with `workerd` (the open-source Workers runtime), so a coding agent tests exactly what will run on the edge.
+- **It never runs code written by users or assistants.** No `eval`, no dynamic import: such code would run with Shipvo's credentials and could see other people's data. User-written code (levels 2 and 3) runs only in a separate isolated tier, one isolate per person, never in the shared runner.
+- **Built to be efficient:** each call does little CPU work (upstream responses are trimmed to the fields the spec uses; CEL has a cost limit), all schedules go through one dispatcher instead of one timer per app, and upstream calls are cached per the spec's `cache` setting.
+- **Fair use.** Each person and app has usage quotas. When a quota is reached, the person sees a plain message and how to get more; quota numbers are set in configuration, not in this document.
+- **Stdio parity.** The local stdio MCP runs the same runner with `workerd` (the open-source Workers runtime), so a coding agent tests exactly what runs on the edge.
 
 ### 15.8 Specs on real phones: the Shipvo player app
 
