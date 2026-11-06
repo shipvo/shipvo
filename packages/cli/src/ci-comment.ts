@@ -58,9 +58,13 @@ export function renderComment(i: CommentInput): string {
     }
   }
   const shots = (i.screenshots ?? []).slice(0, MAX_SHOTS);
-  if (shots.length) {
-    L.push("### Changed screens", "", ...(i.changed?.length ? [`From this diff: ${i.changed.slice(0, MAX_SHOTS).map((c) => `\`${c}\``).join(", ")}`, ""] : []));
-    L.push(...shots.map((s) => `- \`${s}\``), "", `Screenshots are in the \`shipvo-check\` artifact of ${i.runUrl ? `[this run](${i.runUrl})` : "this run"}, in your repository.`, "");
+  const changed = (i.changed ?? []).slice(0, MAX_SHOTS);
+  if (changed.length || shots.length) {
+    L.push("### Changed screens", "");
+    if (changed.length) L.push(`From this diff: ${changed.map((c) => `\`${c}\``).join(", ")}`, "");
+    const where = i.runUrl ? `the \`shipvo-check\` artifact of [this run](${i.runUrl})` : "the `shipvo-check` artifact of this run";
+    if (shots.length) L.push(`${shots.length} screenshot${shots.length === 1 ? "" : "s"} saved. Open ${where} and download the zip to see them.`, "");
+    else L.push("No screenshots were captured for these screens.", "");
   }
   L.push("<sub>Built in your workflow. Nothing was sent to Shipvo.</sub>");
   return L.join("\n");
@@ -75,12 +79,12 @@ export async function upsertComment(o: { repo: string; pr: number; token: string
   const headers = { authorization: `Bearer ${o.token}`, accept: "application/vnd.github+json", "content-type": "application/json" };
   const call = async (url: string, method: string, body?: unknown) => {
     const r = await f(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-    if (!r.ok) throw new Error(`GitHub ${method} ${url} answered ${r.status}`);
+    if (!r.ok) throw new Error(`GitHub ${method} ${url} answered ${r.status}${r.status === 403 ? ". The token is read-only (for example on a pull request from a fork), so the comment was not posted" : ""}`);
     return r.json();
   };
   for (let page = 1; ; page++) {
-    const list = (await call(`${base}/issues/${o.pr}/comments?per_page=100&page=${page}`, "GET")) as { id: number; body?: string }[];
-    const mine = list.find((c) => typeof c.body === "string" && c.body.includes(MARKER));
+    const list = (await call(`${base}/issues/${o.pr}/comments?per_page=100&page=${page}`, "GET")) as { id: number; body?: string; user?: { type?: string } }[];
+    const mine = list.find((c) => typeof c.body === "string" && c.body.startsWith(MARKER) && (!c.user?.type || c.user.type === "Bot"));
     if (mine) { await call(`${base}/issues/comments/${mine.id}`, "PATCH", { body: o.body }); return "updated"; }
     if (list.length < 100) break;
   }
@@ -103,6 +107,7 @@ export async function commentCmd(argv: string[]): Promise<number> {
     runUrl: env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : undefined });
   const pr = Number(val("--pr") ?? /refs\/pull\/(\d+)\//.exec(env.GITHUB_REF ?? "")?.[1]);
   if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY || !pr) { console.log(body); console.error("Not posted: needs GITHUB_TOKEN, GITHUB_REPOSITORY and a pull request number."); return 0; }
-  console.log(`Comment ${await upsertComment({ repo: env.GITHUB_REPOSITORY, pr, token: env.GITHUB_TOKEN, body })}.`);
+  try { console.log(`Comment ${await upsertComment({ repo: env.GITHUB_REPOSITORY, pr, token: env.GITHUB_TOKEN, body })}.`); }
+  catch (e) { console.error(`Not posted: ${e instanceof Error ? e.message : e}`); }
   return 0;
 }

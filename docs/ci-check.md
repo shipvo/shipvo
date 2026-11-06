@@ -40,9 +40,11 @@ The comment shows:
 
 - pass or fail for each flow;
 - new crashes or runtime errors, dead ends and other problems from `shipvo explore`;
-- up to four screenshots of the screens your diff changed, picked from files under `app/` or `screens/` since the base commit (`--changed-from <sha>`).
+- the screens your diff changed (up to four), picked from files under `app/` or `screens/` since the base commit (`--changed-from <sha>`).
 
-Screenshots are uploaded in the `shipvo-check` artifact of your own workflow run. The comment is built and posted by your workflow with its `GITHUB_TOKEN`. Nothing is sent to Shipvo. The workflow needs `pull-requests: write` for the comment; without it the check still runs and the comment is skipped.
+Screenshots, when there are any, are uploaded in the `shipvo-check` artifact of your own workflow run. Open the run, scroll to Artifacts and download the zip. Nothing in Shipvo takes per-screen screenshots in CI yet, so the screen list shows even when there are none. The comment is built and posted by your workflow with its `GITHUB_TOKEN`. Nothing is sent to Shipvo. The workflow needs `pull-requests: write` for the comment; without it the check still runs and the comment is skipped.
+
+The workflow must check out the full history (`fetch-depth: 0`) so the diff against the base commit works. The generated workflow does this. On pull requests from forks the token is read-only, so the comment is skipped and the check prints a notice.
 
 Run it by hand with `npx shipvo ci comment --changed-from <sha> --pr <number>`. Without a token it prints the comment.
 

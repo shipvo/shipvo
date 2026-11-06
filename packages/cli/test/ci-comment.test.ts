@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MARKER, changedScreens, renderComment, upsertComment } from "../src/ci-comment";
+import { MARKER, changedScreens, commentCmd, renderComment, upsertComment } from "../src/ci-comment";
 
 const ok = { name: "login.steps", status: "passed" };
 const bad = { name: "checkout.steps", status: "failed", message: "could not find \"Pay\"" };
@@ -28,13 +28,51 @@ describe("renderComment", () => {
     expect(c).toContain("Shipvo check: failed");
     expect(c).toContain("New crashes or runtime errors: 1");
     expect(c).toContain("Dead ends: 1");
-    expect(c).toContain("`d.png`");
+    expect(c).toContain("4 screenshots saved");
     expect(c).not.toContain("e.png");
     expect(c).toContain("[this run](https://github.com/o/r/actions/runs/1)");
   });
 });
 
+describe("changed screens without screenshots", () => {
+  it("lists the changed screens and says none were captured", () => {
+    const c = renderComment({ test: { flows: [ok] }, changed: ["cart", "home"] });
+    expect(c).toContain("### Changed screens");
+    expect(c).toContain("`cart`, `home`");
+    expect(c).toContain("No screenshots were captured");
+  });
+  it("has no section when nothing changed", () => {
+    expect(renderComment({ test: { flows: [ok] } })).not.toContain("Changed screens");
+  });
+});
+
+describe("commentCmd", () => {
+  it("returns 0 and prints the body when there is no token", async () => {
+    const saved = { ...process.env };
+    delete process.env.GITHUB_TOKEN;
+    const out: string[] = [];
+    const log = console.log, err = console.error;
+    console.log = (m: string) => { out.push(String(m)); }; console.error = () => {};
+    try { expect(await commentCmd(["--pr", "3"])).toBe(0); } finally { console.log = log; console.error = err; process.env = saved; }
+    expect(out.join("\n")).toContain(MARKER);
+  });
+});
+
 describe("upsertComment", () => {
+  it("does not overwrite a human comment that quotes the marker", async () => {
+    const calls: string[] = [];
+    const fetch = async (url: string, init: any = {}) => {
+      const m = init.method ?? "GET"; calls.push(m);
+      if (m === "GET") return { ok: true, status: 200, json: async () => [{ id: 1, body: `quote ${MARKER}`, user: { type: "User" } }, { id: 2, body: `${MARKER}\nold`, user: { type: "Bot" } }] };
+      return { ok: true, status: 200, json: async () => ({}) };
+    };
+    expect(await upsertComment({ repo: "o/r", pr: 3, token: "t", body: `${MARKER}\nnew`, fetch })).toBe("updated");
+    expect(calls).toEqual(["GET", "PATCH"]);
+  });
+  it("explains a 403", async () => {
+    const fetch = async () => ({ ok: false, status: 403, json: async () => ({}) });
+    await expect(upsertComment({ repo: "o/r", pr: 3, token: "t", body: MARKER, fetch })).rejects.toThrow(/read-only/);
+  });
   it("the second run updates the first comment", async () => {
     const store: { id: number; body: string }[] = [{ id: 7, body: "someone else" }];
     const calls: string[] = [];

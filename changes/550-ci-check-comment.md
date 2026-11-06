@@ -1,2 +1,2 @@
 - `@shipvo/cli`: `shipvo ci comment` renders one pull request comment for the Shipvo check (pass or fail per flow, explore findings, changed screens) and updates it in place on each push. The check workflow now asks for `pull-requests: write`. Docs: `docs/ci-check.md`.
-- Migration: existing `shipvo-check.yml` files need `pull-requests: write` under `permissions` to get the comment. Re-run `shipvo ci init --check --force` or add it by hand.
+- Migration: existing `shipvo-check.yml` files need `pull-requests: write` under `permissions` to get the comment. Also add `with: { fetch-depth: 0 }` to the `actions/checkout` step, or changed screens cannot be found. Re-run `shipvo ci init --check --force` or add both by hand.

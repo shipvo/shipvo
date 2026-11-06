@@ -30,12 +30,15 @@ runs:
         for i in $(seq 1 90); do curl -sf http://localhost:4545/app/ > /dev/null && break; sleep 2; done
         rc=0
         npx shipvo ci check || rc=$?
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          npx shipvo ci comment --changed-from "${{ github.event.pull_request.base.sha }}" --pr "${{ github.event.pull_request.number }}" || true
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          npx shipvo ci comment --changed-from "$BASE_SHA" --pr "$PR_NUMBER" || true
         fi
         exit $rc
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
     - uses: actions/upload-artifact@v4
       if: always()
       with:
