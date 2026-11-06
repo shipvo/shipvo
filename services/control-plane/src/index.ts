@@ -177,27 +177,30 @@ async function applyHalt(env: Env, appId: string, release: number, reports: numb
 
 /** Do not halt. Create one owner approval entry per release while it is pending. */
 async function holdRelease(env: Env, appId: string, release: number, reason: string, reports: number, failed: number, threshold: number | undefined): Promise<void> {
-  const key = `anomaly-hold/${appId}`;
+  // One hold per release, so a hold for another release is never overwritten and stays decidable.
+  const key = `anomaly-hold/${appId}/${release}`;
   // KV has no compare-and-set: two concurrent failures may both create an entry.
   const raw = await env.POINTERS.get(key);
   if (raw) {
     try {
       const h = JSON.parse(raw);
-      const ch = h.release === release ? await loadChallenge({ kv: env.POINTERS, appId }, h.challenge_id) : null;
+      const ch = await loadChallenge({ kv: env.POINTERS, appId }, h.challenge_id);
       if (ch && ch.status === "pending" && Date.parse(ch.expires_at) > Date.now()) return;
     } catch { /* bad value: replace it */ }
   }
   const ch = await createChallenge({ kv: env.POINTERS, appId }, { command: ANOMALY_COMMAND, args_hash: `release:${release}`, requester: "halt-rule",
-    plan: [`Release ${release} looks attacked: ${reason}. It was not halted and stays at its current band.`, "Confirm to halt it, or dismiss to clear the hold."] }, ANOMALY_HOLD_TTL_MS);
+    plan: [`Release ${release} looks unusual: ${reason}. It was not halted and stays at its current band.`, "Confirm to halt it, or dismiss to clear the hold."] }, ANOMALY_HOLD_TTL_MS);
   await env.POINTERS.put(key, JSON.stringify({ release, challenge_id: ch.id, reports, failed, threshold, reason, held_at: ch.created_at }));
 }
 
 /** After the owner decides a hold: confirm halts the release, dismiss clears. Either way the hold record goes. */
-async function settleHold(env: Env, appId: string, ch: { id: string; command: string; approved_by?: string }, verb: "approve" | "deny"): Promise<void> {
+async function settleHold(env: Env, appId: string, ch: { id: string; command: string; args_hash: string; approved_by?: string }, verb: "approve" | "deny"): Promise<void> {
   if (ch.command !== ANOMALY_COMMAND) return;
-  const key = `anomaly-hold/${appId}`;
+  const rel = /^release:(\d+)$/.exec(ch.args_hash)?.[1];
+  if (!rel) return;
+  const key = `anomaly-hold/${appId}/${rel}`;
   const raw = await env.POINTERS.get(key);
-  let h: any = null;
+  let h: { release: number; challenge_id: string; reports: number; failed: number; threshold?: number } | null = null;
   try { h = raw ? JSON.parse(raw) : null; } catch { /* corrupt: nothing to settle */ }
   if (!h || h.challenge_id !== ch.id) return;
   if (verb === "approve") {

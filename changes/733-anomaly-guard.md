@@ -1,2 +1,2 @@
-- `@shipvo/control-plane`: when failure reports jump far above the normal rate, or most failing installs registered in the last hour, the auto-halt rule holds the release and asks the owner in the approvals list instead of halting. Confirm halts; dismiss clears the hold.
+- `@shipvo/control-plane`: when failure reports jump far above the normal rate, or most failing installs registered in the last hour, the auto-halt rule holds the release and asks the owner in the approvals list instead of halting. Confirm halts; dismiss clears the hold. The admin shows a hold as "Release N may be under attack" with "Halt release" and "Keep rolling out".
 - Migration: none.

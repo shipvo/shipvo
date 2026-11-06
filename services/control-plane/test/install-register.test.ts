@@ -145,7 +145,7 @@ describe("auto-halt on real rows", () => {
   it("the failure-rate query holds a spike of 20 fresh failure reports (real SQLite)", async () => {
     const kv = await fleet(20, ["203.0.113.9", "198.51.100.7", "192.0.2.55"], 1, true, true, true);
     expect(kv["halt/tide"]).toBeUndefined();
-    expect(JSON.parse(kv["anomaly-hold/tide"])).toMatchObject({ release: 3 });
-    expect(JSON.parse(kv["anomaly-hold/tide"]).reason).toContain("failure reports in 10 minutes");
+    expect(JSON.parse(kv["anomaly-hold/tide/3"])).toMatchObject({ release: 3 });
+    expect(JSON.parse(kv["anomaly-hold/tide/3"]).reason).toContain("failure reports in 10 minutes");
   });
 });

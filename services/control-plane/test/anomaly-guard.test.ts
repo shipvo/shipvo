@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import app from "../src/index";
+import { adminPage } from "../src/admin";
 
 async function cookie(pw: string, appId: string) {
   const exp = Date.now() + 3600_000;
@@ -53,6 +54,21 @@ describe("anomaly guard", () => {
     expect((await decide(e, oldId, "approve")).status).toBe(409);
     expect(m["halt/tide"]).toBeUndefined();
   });
+  it("a hold for release B does not break the pending hold for release A", async () => {
+    const { m, e } = setup(fresh);
+    await fail(e);
+    const idA = (await list(e)).approvals[0].id;
+    await app.request("/t", { method: "POST", body: JSON.stringify({ schema_version: "1.0", app_id: "tide", release: 6, event: "rolled_back" }) }, e);
+    const { approvals } = await list(e);
+    expect(approvals).toHaveLength(2);
+    expect((await decide(e, idA, "approve")).status).toBe(200);
+    expect(JSON.parse(m["halt/tide"]).release).toBe(5);
+    expect(m["anomaly-hold/tide/6"]).toBeDefined();
+  });
+  it("the admin shows a hold in plain words, not as a command to run", () => {
+    const html = adminPage("tide");
+    for (const t of ["may be under attack", "Halt release", "Keep rolling out", "Release halted.", "Hold cleared."]) expect(html).toContain(t);
+  });
   it("confirming a hold leaves a halt of a different release alone", async () => {
     const { m, e } = setup(fresh);
     await fail(e);
@@ -60,7 +76,7 @@ describe("anomaly guard", () => {
     m["halt/tide"] = JSON.stringify({ release: 9 });
     expect((await decide(e, id, "approve")).status).toBe(200);
     expect(JSON.parse(m["halt/tide"]).release).toBe(9);
-    expect(m["anomaly-hold/tide"]).toBeUndefined();
+    expect(m["anomaly-hold/tide/5"]).toBeUndefined();
   });
   it("a burst of fresh-install failures is held, not halted, with an approval entry", async () => {
     const { m, e } = setup(fresh);
@@ -85,7 +101,7 @@ describe("anomaly guard", () => {
     const id = (await list(e)).approvals[0].id;
     expect((await decide(e, id, "approve")).status).toBe(200);
     expect(JSON.parse(m["halt/tide"]).release).toBe(5);
-    expect(m["anomaly-hold/tide"]).toBeUndefined();
+    expect(m["anomaly-hold/tide/5"]).toBeUndefined();
   });
   it("owner dismiss clears the hold and halts nothing", async () => {
     const { m, e } = setup(fresh);
@@ -93,7 +109,7 @@ describe("anomaly guard", () => {
     const id = (await list(e)).approvals[0].id;
     expect((await decide(e, id, "deny")).status).toBe(200);
     expect(m["halt/tide"]).toBeUndefined();
-    expect(m["anomaly-hold/tide"]).toBeUndefined();
+    expect(m["anomaly-hold/tide/5"]).toBeUndefined();
     expect((await list(e)).approvals).toHaveLength(0);
   });
   it("the owner token cannot confirm a hold", async () => {
