@@ -1,0 +1,2 @@
+- `@shipvo/sim`: `/act` accepts `tap_xy` (x, y) and `type_keys` (text, enter) for coordinate input. They are not MCP tools; agents using the labelled screen keep tapping by ref.
+- Migration: none; new actions.
