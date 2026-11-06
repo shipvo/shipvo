@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { renderScreen, describeTree, unlabelled } from "../src/index.js";
+import { renderScreen, describeTree, unlabelled, toSnapshot } from "../src/index.js";
 import type { ScreenNode } from "../src/index.js";
 
 const spec = JSON.parse(readFileSync(new URL("./fixtures/render-demo.json", import.meta.url), "utf8"));
@@ -71,5 +71,56 @@ describe("renderScreen", () => {
     const r = renderScreen(s, { data });
     if (!r.ok) throw new Error("render failed");
     expect(r.html).not.toContain("<script>");
+  });
+
+  it("cannot be broken out of by a hostile font family", () => {
+    const evil = structuredClone(spec);
+    evil.theme.font = { ...(evil.theme.font ?? {}), family: `x";"><img src=x onerror=alert(1)>`, display: `y'"><script>alert(1)</script>` };
+    for (const style of ["android", "ios"] as const) {
+      const r = renderScreen(evil, { style, data });
+      if (!r.ok) throw new Error(JSON.stringify(r.errors));
+      expect(r.html).not.toContain("<img src=x");
+      expect(r.html).not.toContain("onerror=alert(1)>");
+      expect(r.html.match(/<img /g)?.length ?? 0).toBe((JSON.stringify(spec).match(/"type":\s*"image"/g) ?? []).length);
+      expect(r.html).not.toContain("<script");
+      expect(r.html).not.toContain("onerror=alert(1)>");
+    }
+  });
+
+  it("does not accept row as a direction", () => {
+    const s = structuredClone(spec);
+    s.screens[0].body = [{ type: "stack", direction: "row", children: [{ type: "text", value: "a" }] }];
+    const r = renderScreen(s, { data });
+    if (r.ok) expect(r.html).toContain("flex-direction:column");
+  });
+
+  it("reads when with and without {{ }}, and from as a {{ }} expression", () => {
+    const s = structuredClone(spec);
+    s.screens[0].body = [
+      { type: "text", value: "plain-on", when: "1 == 1" },
+      { type: "text", value: "braced-on", when: "{{ 1 == 1 }}" },
+      { type: "text", value: "plain-off", when: "1 == 2" },
+      { type: "text", value: "braced-off", when: "{{ 1 == 2 }}" },
+      { type: "list", label: "Big", from: "{{ data.catches.filter(c, c.weight > 2) }}", item: { title: "{{ item.species }}" } }
+    ];
+    const r = renderScreen(s, { data });
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    const names = all(r.tree).map((n) => n.name);
+    expect(names).toContain("plain-on");
+    expect(names).toContain("braced-on");
+    expect(names).not.toContain("plain-off");
+    expect(names).not.toContain("braced-off");
+    expect(names).toContain("Bass");
+    expect(names).not.toContain("Mackerel");
+  });
+
+  it("writes the tree in the simulator's screen format that @shipvo/test parses", () => {
+    const r = renderScreen(spec, { data });
+    if (!r.ok) throw new Error("render failed");
+    const snap = toSnapshot(r.tree);
+    const lines = snap.split("\n");
+    expect(lines[0]).toMatch(/^- main ".+" \[ref=e1\]$/);
+    expect(lines.every((l) => /^ *- [\w-]+( "(?:[^"\\]|\\.)*")? \[ref=e\d+\]$/.test(l))).toBe(true);
+    expect(snap).toContain('listitem "Mackerel, North pier, 1.3 kg"');
   });
 });

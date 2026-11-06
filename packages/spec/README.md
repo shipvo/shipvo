@@ -75,4 +75,4 @@ else {
 }
 ```
 
-`style` is `"android"` or `"ios"`; the same spec gives the same tree in both. Blocks: `stack` (`direction: "horizontal"` for a row), `grid`, `scroll`, `text`, `image`, `icon`, `badge` and `list`. Options: `screen`, `data` (values for `http` and `collection` sources), `state`, `params`, `locale`, `timeZone`, `now`. Theme tokens (`palette`, `radius`, `density`, `elevation`, `font`) set colours, corners, spacing and type.
+`style` is `"android"` or `"ios"`; the same spec gives the same tree in both. Blocks: `stack` (`direction: "horizontal"` for a row), `grid`, `scroll`, `text`, `image`, `icon`, `badge` and `list`. Options: `screen`, `data` (values for `http` and `collection` sources), `state`, `params`, `locale`, `timeZone`, `now`. `toSnapshot(r.tree)` writes the tree in the simulator's screen format (`- role "name" [ref=e1]`), which `@shipvo/test` parses. Font names keep only letters, digits, spaces, `-` and `_`. `theme.mode` `"system"` renders the light palette. Theme tokens (`palette`, `radius`, `density`, `elevation`, `font`) set colours, corners, spacing and type.

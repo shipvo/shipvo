@@ -86,7 +86,7 @@ export function renderScreen(spec: unknown, options: RenderOptions = {}): Render
     const label = typeof b.label === "string" ? str(b.label, scope) : "";
     switch (b.type) {
       case "stack":
-        return { role: "group", name: label, block: "stack", children: kids(), props: { direction: b.direction === "horizontal" || b.direction === "row" ? "row" : "column", gap: b.gap, align: b.align } };
+        return { role: "group", name: label, block: "stack", children: kids(), props: { direction: b.direction === "horizontal" ? "row" : "column", gap: b.gap, align: b.align } };
       case "grid":
         return { role: "grid", name: label, block: "grid", children: kids(), props: { columns: Number(b.columns) > 0 ? Number(b.columns) : 2, gap: b.gap } };
       case "scroll":
@@ -94,7 +94,7 @@ export function renderScreen(spec: unknown, options: RenderOptions = {}): Render
       case "text": {
         const variant = String(b.variant ?? "body");
         const value = str(b.value ?? b.text, scope);
-        return { role: variant === "display" || variant === "title" ? "heading" : "text", name: value, block: "text", children: [], props: { variant } };
+        return { role: variant === "display" || variant === "title" ? "heading" : "paragraph", name: value, block: "text", children: [], props: { variant } };
       }
       case "image": {
         const name = label || str(b.alt, scope) || "Image";
@@ -151,6 +151,22 @@ export function describeTree(node: ScreenNode, depth = 0): string {
   return [line, ...node.children.map((c) => describeTree(c, depth + 1))].join("\n");
 }
 
+/**
+ * The tree in the simulator's screen format (what `@shipvo/test` parses): `- role "name" [ref=e1]`,
+ * two spaces per level, refs numbered in reading order. Layout-only nodes without a name have no quotes.
+ */
+export function toSnapshot(root: ScreenNode): string {
+  let n = 0;
+  const lines: string[] = [];
+  const walk = (node: ScreenNode, depth: number) => {
+    const name = node.name ? ` "${node.name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"` : "";
+    lines.push(`${"  ".repeat(depth)}- ${node.role}${name} [ref=e${++n}]`);
+    for (const c of node.children) walk(c, depth + 1);
+  };
+  walk(root, 0);
+  return lines.join("\n");
+}
+
 /** Every node with no role or no name where one is needed (all except plain layout groups). */
 export function unlabelled(node: ScreenNode): ScreenNode[] {
   const own = !node.role || (!node.name && !["group", "grid", "main"].includes(node.role)) ? [node] : [];
@@ -159,17 +175,25 @@ export function unlabelled(node: ScreenNode): ScreenNode[] {
 
 interface Tokens { p: typeof DEFAULT_PALETTE; radius: number; unit: number; scale: number; font: string; display: string; dark: boolean; shadow: string }
 
+/** Keeps letters, digits, space, `-` and `_`. Anything else is dropped, so a font name cannot leave its quotes. */
+function fontName(v: unknown): string {
+  return typeof v === "string" ? v.replace(/[^A-Za-z0-9 _-]/g, "").trim() : "";
+}
+
 function themeTokens(theme: Obj, style: PhoneStyle): Tokens {
   const dark = theme.mode === "dark";
   const p = { ...(dark ? DARK_PALETTE : DEFAULT_PALETTE), ...(theme.palette ?? {}) };
-  const family = theme.font?.family as string | undefined;
+  const family = fontName(theme.font?.family);
+  const display = fontName(theme.font?.display);
   const sys = style === "ios" ? "-apple-system, 'SF Pro Text', system-ui, sans-serif" : "Roboto, system-ui, sans-serif";
   // iPhone style rounds a little more; Android style uses the token as written.
   const radius = (RADII[theme.radius as string] ?? RADII.md!) * (style === "ios" ? 1.25 : 1);
   const shadows: Record<string, string> = { flat: "none", soft: "0 1px 3px rgba(0,0,0,.18)", raised: "0 4px 12px rgba(0,0,0,.28)" };
+  // Every value below goes into a style="..." attribute, so each one is escaped.
+  const safeP = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, esc(v)])) as typeof DEFAULT_PALETTE;
   return {
-    p, radius, unit: DENSITY[theme.density as string] ?? 1, scale: Number(theme.font?.scale) || 1,
-    font: family ? `'${family}', ${sys}` : sys, display: theme.font?.display ? `'${theme.font.display}', ${sys}` : sys,
+    p: safeP, radius, unit: DENSITY[theme.density as string] ?? 1, scale: Number(theme.font?.scale) || 1,
+    font: esc(family ? `'${family}', ${sys}` : sys), display: esc(display ? `'${display}', ${sys}` : sys),
     dark, shadow: shadows[theme.elevation as string] ?? shadows.soft!
   };
 }
@@ -231,6 +255,6 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
   const bar = ios
     ? `<header style="padding:54px 16px 10px;text-align:center;font:600 17px ${t.font};color:${t.p.text}">${esc(root.name)}</header>`
     : `<header style="padding:40px 16px 14px;font:500 22px ${t.font};color:${t.p.text};background:${t.p.surface};box-shadow:${t.shadow}">${esc(root.name)}</header>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(appName || root.name)}</title></head>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(appName || root.name)}</title><style>[tabindex]:focus-visible{outline:2px solid ${t.p.primary};outline-offset:2px}</style></head>
 <body data-style="${style}" style="margin:0;background:${t.p.background}"><main role="main" aria-label="${esc(root.name)}" style="min-height:100vh;box-sizing:border-box;background:${t.p.background}">${bar}<div style="padding:16px;display:flex;flex-direction:column;gap:${gap("md")}px">${root.children.map(node).join("")}</div></main></body></html>`;
 }
