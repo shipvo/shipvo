@@ -1,0 +1,1 @@
+- cli: `shipvo migrate --plan` now plans a CodePush switch. It lists the dependency, `codePush()` and `CodePush.sync` calls, native deployment and public keys, and `appcenter codepush` commands with file and line, then prints ordered steps. It changes no files. `--apply` is still EAS Update only.

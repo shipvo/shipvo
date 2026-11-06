@@ -2,7 +2,11 @@
 
 This guide moves a React Native app that used `react-native-code-push` to Shipvo over-the-air (OTA) updates. Every command and flag below comes from `packages/cli` (`src/help.ts`, `src/init.ts`, `src/publish.ts`). The dry-run output was captured by running the CLI on the sample app in this repo.
 
-Shipvo has no migration tool. You do the steps by hand, and you ship one new store build.
+Run `shipvo migrate --plan` in your app first. It is read-only. It lists what it finds with file and line (the `react-native-code-push` dependency, `codePush()` and `CodePush.sync` calls, `CodePushDeploymentKey` and `CodePushPublicKey` in `Info.plist` and `strings.xml`, and `appcenter codepush` commands in `package.json` and CI files) and prints the steps in order. `--json` returns the same data.
+
+Apply is manual for CodePush: `shipvo migrate --apply` only supports EAS Update. You do the steps by hand, and you ship one new store build.
+
+`--rollout <n>` has no direct equivalent. Shipvo uses cohort bands (`--bands`, then `shipvo promote`).
 
 ## What maps to what
 

@@ -63,6 +63,21 @@ for (const i of issues.filter((i) => has(i, "agent:waiting"))) {
   fixed.push(`${link(i.number)} was waiting for ${deps.map(link).join(", ")}, which are done; it is back in the queue.`);
 }
 
+// 2c. Orphans: open work issues with no state label (no ready, in-progress, pr-open, waiting, blocked), no open
+// slices that mention them, and not an epic. With no merged PR they go back in the queue; with merged PRs they get
+// `agent:parent-check` so the planner decides: close as done, or file what remains.
+const STATE = ["agent:ready", "agent:in-progress", "agent:pr-open", "agent:waiting", "agent:blocked", "agent:parent-check", "needs-human"];
+for (const i of issues.filter((i) => !i.labels.some((l) => STATE.includes(l.name) || ["epic", "launch", "agent:log", "agent:health", "agent:escalate", "ci-main", "device-lab"].includes(l.name)) && mins(i.created_at) > 60)) {
+  try {
+    const kids = api(`search/issues?q=${encodeURIComponent(`repo:${REPO} is:issue is:open "#${i.number}" in:body -is:pr`)}&per_page=20`).items.filter((k) => k.number !== i.number);
+    if (kids.length) continue;
+    const prs = api(`search/issues?q=${encodeURIComponent(`repo:${REPO} is:pr is:merged "#${i.number}"`)}&per_page=1`).total_count;
+    const label = prs ? "agent:parent-check" : "agent:ready";
+    act(`#${i.number}: no state label, ${prs} merged PRs: add ${label}`, () => gh("api", "-X", "POST", `repos/${REPO}/issues/${i.number}/labels`, "-f", `labels[]=${label}`));
+    fixed.push(prs ? `${link(i.number)} had no state label and its slices are merged; asked the planner to close it or file what remains.` : `${link(i.number)} had no state label and no PR; put it back in the queue.`);
+  } catch (e) { console.log(`skip orphan #${i.number}:`, e.message); }
+}
+
 // 3. Idle team with work waiting.
 const ready = issues.filter((i) => has(i, "agent:ready") && !["agent:in-progress", "agent:pr-open", "agent:blocked", "needs-human"].some((l) => has(i, l)));
 const lastEngineer = runs.find((r) => /agent-(engineer|aider|mistral|fixer|reviewer)/.test(r.name) && r.conclusion !== "skipped");
