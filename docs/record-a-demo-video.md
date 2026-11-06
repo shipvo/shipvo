@@ -12,7 +12,7 @@ For founders working through an AI assistant. You get a short MP4 of your app wi
 
 ## Ask your assistant
 
-> Open the Tide and Tackle app. Record a vertical demo. Add a chapter at each screen. Open search. Stop and add music and my voice from `narration.wav`.
+> Open the Tide and Tackle app. Record a vertical demo. Add a chapter at each screen. Tap the search button. Stop and add music and my voice from `narration.wav`.
 
 It makes these calls, in this order. Tap refs such as `e9` come from the `screen` tool: your assistant reads them from the latest screen, so yours will differ.
 
@@ -38,7 +38,7 @@ end_session     { session: "tide-1a2b3c" }
 }
 ```
 
-(Shortened. The run on the sample app had no waits between steps, so the video is under a second. Waits longer than 0.6 s are cut, so a real demo needs real actions.)
+(Shortened. The ffprobe length is a little longer than `duration_s` because the audio mux adds a few hundredths of a second. The run on the sample app had no waits between steps, so the video is under a second. Waits longer than 0.6 s are cut, so a real demo needs real actions.)
 
 ## Music
 
