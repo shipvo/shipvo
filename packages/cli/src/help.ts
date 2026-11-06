@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "smoke", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "approvals", "test", "keys", "mcp",
+  "init", "sim", "smoke", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "migrate", "approvals", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -11,7 +11,7 @@ Start
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
                               First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
                               Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.
-  smoke [--timeout 30] [--json]  Check the app loads in the simulator: no thrown errors, a first screen with elements (exit 0 ok, 1 failed, 2 setup error)
+  smoke [android|ios] [--timeout 30] [--json]  Check the app loads in the simulator as the Android (default) or iPhone-style phone: no thrown errors, a first screen with elements (exit 0 ok, 1 failed, 2 setup error)
   run android|ios [--no-open] [--port n] [--lan]  Open the app in a phone frame in your browser (no Playwright)
                               --lan also serves it to a phone on your Wi-Fi: URL + QR code, token required
   run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
@@ -50,6 +50,7 @@ Ship
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
   test [files] [--repair [--write]] [--report <file> [--release <id>]] [--json]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
   doctor [--port <n>] [--json]  Check setup before first publish
+  migrate --plan [--json]     Read-only plan to switch from Expo EAS Update (expo-updates) to Shipvo
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine

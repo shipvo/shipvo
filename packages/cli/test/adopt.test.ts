@@ -88,7 +88,7 @@ it("refuses an app with expo-updates", async () => {
   w("package.json", pkg({ "expo-updates": "~58.0.0" })); w("app.json", JSON.stringify({ expo: { slug: "x" } }));
   const before = snapshot();
   await expect(adopt(["--yes"], tmp, noop)).rejects.toThrow("exit 1");
-  expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("migrate-from-codepush.md");
+  expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("shipvo migrate --plan");
   expect(snapshot()).toEqual(before);
 });
 

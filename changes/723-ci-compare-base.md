@@ -1,0 +1,3 @@
+- `@shipvo/cli`: `shipvo ci comment` takes `--base-report <file>` and `--report <file>`. The comment gets a "Compared with base" section (regressions, fixed, still failing). `--fail-on-regression` exits 1 only when a flow passed on base and fails on the PR.
+- `actions/check` runs the flows on the base commit and passes both flags.
+- Migration: none; new flags.

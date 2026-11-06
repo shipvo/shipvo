@@ -1,15 +1,15 @@
 // `shipvo smoke`: does the app load? Starts the simulator (startSim), opens the app, waits for the first screen to settle.
 import { existsSync } from "node:fs";
-import { args as parse, loadConfig } from "./config.js";
-import { simDriver, startSim, type Driver } from "./explore.js";
+import { args as parse, BOOLEAN_FLAGS, loadConfig } from "./config.js";
+import { simDriver, startSim, type Driver, type Skin } from "./explore.js";
 import { detectPackageManager, installCommand } from "./ensure-playwright.js";
 import { emit, envelope, type Envelope, type Next } from "./json-out.js";
 
-export type SmokeData = { time_to_first_screen_ms: number | null; elements: number; errors: string[]; error_count: number };
+export type SmokeData = { platform?: Skin; time_to_first_screen_ms: number | null; elements: number; errors: string[]; error_count: number };
 /** What smoke needs from the environment. Tests replace it. */
 export type SmokeDeps = {
   start: () => Promise<{ base: string; stop: () => void }>;
-  driver: (base: string, app: string, session: string) => Driver;
+  driver: (base: string, app: string, session: string, platform: Skin) => Driver;
   /** Current accessibility tree. Defaults to the simulator's `screen` action. */
   screen: (base: string, session: string) => Promise<string>;
 };
@@ -26,10 +26,16 @@ async function screenOf(base: string, session: string): Promise<string> {
 
 const installNext = (): Next => { const { cmd, args } = installCommand(detectPackageManager(process.cwd(), existsSync)); return { command: `${cmd} ${args.join(" ")} && npx playwright install chromium`, why: "Install the browser the simulator needs." }; };
 
+/** Words that are not flags or flag values: the platform. */
+const positionals = (argv: string[]) => { const out: string[] = []; for (let i = 0; i < argv.length; i++) { const x = argv[i]; if (x.startsWith("--")) { if (!BOOLEAN_FLAGS.has(x.slice(2)) && argv[i + 1] !== undefined && !argv[i + 1].startsWith("--")) i++; } else out.push(x); } return out; };
+
 /** Runs the check and returns the envelope and exit code. Never prints. */
 export async function smokeCheck(argv: string[], deps?: Partial<SmokeDeps>): Promise<{ doc: Envelope<string, unknown>; exit: number }> {
   const a = parse(argv);
   const setup = (msg: string, next: Next[] = [{ command: "shipvo doctor --json", why: "Check the setup." }]) => ({ doc: envelope("setup_error", msg, {}, next, 2), exit: 2 });
+  const pos = positionals(argv);
+  if (pos.length > 1 || (pos[0] !== undefined && pos[0] !== "android" && pos[0] !== "ios")) return setup(`Unknown platform "${pos.join(" ")}". Use android or ios.`, [{ command: "shipvo smoke android", why: "Pick android or ios." }, { command: "shipvo smoke ios", why: "Or the iPhone style." }]);
+  const platform: Skin = pos[0] === "ios" ? "ios" : "android";
   const t = a.timeout === undefined ? 30 : Number(a.timeout);
   if (!(t > 0) || !Number.isFinite(t)) return setup("--timeout must be a number of seconds above 0", [{ command: "shipvo smoke --timeout 30", why: "Use a positive number." }]);
   let cfg;
@@ -45,7 +51,7 @@ export async function smokeCheck(argv: string[], deps?: Partial<SmokeDeps>): Pro
   let timer: NodeJS.Timeout | undefined;
   try {
     const session = `smoke-${Date.now().toString(36)}`;
-    const driver = (deps?.driver ?? simDriver)(sim.base, cfg.appId, session);
+    const driver = (deps?.driver ?? simDriver)(sim.base, cfg.appId, session, platform);
     const get = deps?.screen ?? screenOf;
     const started = Date.now();
     const timedOut = new Promise<"timeout">((ok) => { timer = setTimeout(() => ok("timeout"), t * 1000); });
@@ -60,14 +66,14 @@ export async function smokeCheck(argv: string[], deps?: Partial<SmokeDeps>): Pro
     run.catch(() => {});
     const r = await Promise.race([run, timedOut]);
     if (r === "timeout") {
-      const data: SmokeData = { time_to_first_screen_ms: null, elements: 0, errors: [], error_count: 0 };
-      return { doc: envelope("timeout", `The app did not show a first screen within ${t} s`, data, [{ command: `shipvo smoke --timeout ${Math.ceil(t * 2)} --json`, why: "Try a longer timeout." }], 1), exit: 1 };
+      const data: SmokeData = { platform, time_to_first_screen_ms: null, elements: 0, errors: [], error_count: 0 };
+      return { doc: envelope("timeout", `The app did not show a first screen within ${t} s`, data, [{ command: `shipvo smoke ${platform} --timeout ${Math.ceil(t * 2)} --json`, why: "Try a longer timeout." }], 1), exit: 1 };
     }
     const elements = countElements(r.tree);
-    const data: SmokeData = { time_to_first_screen_ms: r.ms, elements, errors: r.errors.slice(0, MAX_ERRORS), error_count: r.errors.length };
-    if (r.errors.length) return { doc: envelope("errors", `The app threw ${r.errors.length} error${r.errors.length === 1 ? "" : "s"} while loading: ${r.errors[0]}`, data, [{ command: "shipvo smoke --json", why: "Run again after fixing." }], 1), exit: 1 };
-    if (!elements) return { doc: envelope("empty_screen", "The first screen has no elements", data, [{ command: "shipvo smoke --json", why: "Run again after fixing." }], 1), exit: 1 };
-    return { doc: envelope("ok", `The app loads: first screen in ${r.ms} ms, ${elements} element${elements === 1 ? "" : "s"}, no errors`, data, [{ command: "shipvo test --json", why: "Run your step files." }], 0), exit: 0 };
+    const data: SmokeData = { platform, time_to_first_screen_ms: r.ms, elements, errors: r.errors.slice(0, MAX_ERRORS), error_count: r.errors.length };
+    if (r.errors.length) return { doc: envelope("errors", `The app threw ${r.errors.length} error${r.errors.length === 1 ? "" : "s"} while loading: ${r.errors[0]}`, data, [{ command: `shipvo smoke ${platform} --json`, why: "Run again after fixing." }], 1), exit: 1 };
+    if (!elements) return { doc: envelope("empty_screen", "The first screen has no elements", data, [{ command: `shipvo smoke ${platform} --json`, why: "Run again after fixing." }], 1), exit: 1 };
+    return { doc: envelope("ok", `The app loads on ${platform}: first screen in ${r.ms} ms, ${elements} element${elements === 1 ? "" : "s"}, no errors`, data, [{ command: "shipvo test --json", why: "Run your step files." }], 0), exit: 0 };
   } catch (e) {
     return setup(e instanceof Error ? e.message : String(e));
   } finally { clearTimeout(timer); sim.stop(); }

@@ -23,7 +23,7 @@ Adopt mode: run it inside an Expo app (package.json with expo, plus app.json or 
 It shows a plan, then applies it after you confirm. It installs @shipvo/runtime, adds the config plugin
 and a signing key, writes shipvo.json, adds sim/publish/rollback scripts, and adds a publish workflow if
 there is none. It never overwrites a file and never touches ios/ or android/. It refuses apps that use
-expo-updates or CodePush. See docs/cli.md.
+expo-updates or CodePush; for expo-updates, run shipvo migrate --plan. See docs/cli.md.
 
 In a bare React Native app (ios/ and android/ committed, no Expo config plugins) it also writes the Shipvo
 values into AndroidManifest.xml and Info.plist, and runs npx install-expo-modules@latest if Expo Modules are
