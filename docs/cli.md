@@ -166,6 +166,36 @@ shipvo agents setup --json       # machine-readable result
 - It prints the skill install line.
 - Running it again changes nothing.
 
+## `shipvo smoke`
+
+Does the app load? Run it after a change, with no test to write.
+
+```bash
+shipvo smoke [--timeout 30] [--json]
+```
+
+It starts the simulator the way `shipvo sim` does, opens the app headless and waits for the first screen to settle. It fails when the page throws an error, has an unhandled promise rejection, or the first screen has no elements in the tree. It prints the time to the first screen, the element count and the first 5 errors. It does not check a platform.
+
+With `--json` it prints the envelope of `shipvo status --json`:
+
+```json
+{ "ok": true, "code": "ok", "summary": "The app loads: first screen in 1945 ms, 30 elements, no errors",
+  "data": { "time_to_first_screen_ms": 1945, "elements": 30, "errors": [], "error_count": 0 },
+  "next": [{ "command": "shipvo test --json", "why": "Run your step files." }] }
+```
+
+- `data.errors` holds the first 5 error messages. `error_count` is the full count.
+- `code` is one of `ok`, `errors`, `empty_screen`, `timeout` (exit 1) or `setup_error` (exit 2).
+- A missing browser or Playwright is a setup error. `next` then holds the install command.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | The app loads |
+| 1 | It threw, showed no elements, or did not show a first screen before `--timeout` seconds |
+| 2 | Setup error: no `shipvo.json`, no browser, a bad flag |
+
+Console messages are not checked, only thrown errors and unhandled rejections.
+
 ## `shipvo status --json`
 
 The agent's "what next" command. It prints one JSON line:
