@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { walk, elements, renderMarkdown, explore, routesFromChange, appScheme, type Driver, type Reply } from "../src/explore.js";
+import { walk, elements, renderMarkdown, explore, routesFromChange, appScheme, outcome, type Driver, type Reply } from "../src/explore.js";
 
 const changed = vi.hoisted(() => ({ files: [] as string[], fail: false }));
 vi.mock("../src/ci-comment.js", async (orig) => ({
@@ -243,5 +243,45 @@ describe("routesFromChange", () => {
     expect(appScheme(undefined, d)).toBeUndefined();
     writeFileSync(join(d, "app.json"), JSON.stringify({ expo: { scheme: "shop" } }));
     expect(appScheme(["tide://cart"], d)).toBe("shop");
+  });
+});
+
+describe("explore --flows wiring", () => {
+  const setup = () => {
+    const dir = mkdtempSync(join(tmpdir(), "explore-flows-"));
+    writeFileSync(join(dir, "shipvo.json"), JSON.stringify({ appId: "a", name: "A", controlPlane: "https://example.com", publicKey: "k" }));
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "cwd").mockReturnValue(dir);
+    vi.spyOn(globalThis, "fetch").mockImplementation((async () => Response.json({ ok: true, screen: '- heading "Home" [ref=e1]', errors: [] })) as never);
+    return { dir, logs };
+  };
+  it("writes the flows files and lists them and the flow statuses in --json", async () => {
+    const { dir, logs } = setup();
+    const code = await explore(["--json", "--sim", "http://sim.test", "--out", join(dir, "r"), "--flows", "search,add-to-cart"]);
+    vi.restoreAllMocks();
+    expect(code).toBe(0);
+    const doc = JSON.parse(logs[0]!);
+    expect(doc.data.flows.map((f: { flow: string }) => f.flow)).toEqual(["search", "add_to_cart"]);
+    expect(doc.data.report_files).toEqual(expect.arrayContaining([join(dir, "r-flows.md"), join(dir, "r-flows.json")]));
+    expect(JSON.parse(readFileSync(join(dir, "r-flows.json"), "utf8")).flows).toHaveLength(2);
+  });
+  it("rejects an unknown flow name with exit 2", async () => {
+    const { dir, logs } = setup();
+    const code = await explore(["--json", "--sim", "http://sim.test", "--out", join(dir, "r"), "--flows", "bogus"]);
+    vi.restoreAllMocks();
+    expect(code).toBe(2);
+    expect(JSON.parse(logs[0]!).summary).toContain("--flows: unknown flow");
+  });
+});
+
+describe("outcome", () => {
+  it("fails with --fail-on-findings when only a flow failed, with its own code", () => {
+    expect(outcome({ findings: [] }, true, true)).toEqual({ exit: 1, code: "flows_failed" });
+    expect(outcome({ findings: [] }, true, false)).toEqual({ exit: 0, code: "flows_failed" });
+    expect(outcome({ findings: [] }, false, true)).toEqual({ exit: 0, code: "ok" });
+    expect(outcome({ findings: [1] }, true, false).code).toBe("findings");
+    expect(outcome({ error: "x", findings: [] }, false, false)).toEqual({ exit: 1, code: "walk_failed" });
   });
 });

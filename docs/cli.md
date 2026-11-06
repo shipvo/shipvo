@@ -234,7 +234,7 @@ shipvo approvals list --json          # one JSON line: { ok, code, summary, data
 
 ## `shipvo explore --flows`
 
-`shipvo explore --flows` also looks for sign up, log in, search, add to cart and checkout. It drives each with valid input and then invalid input, and writes `explore-report-flows.md` and `explore-report-flows.json`. Each flow is passed, failed (with the step) or not found. Pass a list to run some: `--flows search,add-to-cart`. A failed flow counts as a finding for `--fail-on-findings`; a flow that is not found does not.
+`shipvo explore --flows` also looks for sign up, log in, search, add to cart and checkout. It drives each with valid input and then invalid input, and writes `explore-report-flows.md` and `explore-report-flows.json`. Each flow is passed, failed (with the step) or not found. Pass a list to run some: `--flows search,add-to-cart`. A failed flow counts as a finding for `--fail-on-findings`; a flow that is not found does not. With `--json`, `data.flows` lists each flow with `status`, `invalid_status` and `message`, and `report_files` includes the two `-flows` files. When the walk has no findings and a flow failed, `code` is `flows_failed`.
 
 ## `--json` for `doctor`, `test` and `explore`
 
@@ -244,7 +244,7 @@ shipvo approvals list --json          # one JSON line: { ok, code, summary, data
 | --- | --- | --- |
 | `doctor` | `ok`, `checks_failed`, `usage` | `checks`: `[{ name, ok, fix, note }]` |
 | `test` | `ok`, `tests_failed`, `usage`, `error` | `flows`, `failed`, `repaired`, `unresolved` |
-| `explore` | `ok`, `findings`, `walk_failed`, `error` | `findings`, `steps`, `screens`, `report_files`, `stopped_early` |
+| `explore` | `ok`, `findings`, `flows_failed`, `walk_failed`, `error` | `findings`, `flows`, `steps`, `screens`, `report_files`, `stopped_early` |
 
 `next` has one to three commands. A failed doctor check adds one entry that names the fix.
 

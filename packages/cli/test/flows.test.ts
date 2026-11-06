@@ -141,3 +141,21 @@ describe("runFlows with a driver that throws", () => {
     expect(r.flows[0]!.message).toContain("driver gone");
   });
 });
+
+describe("search checks", () => {
+  it("fails the invalid run when an error is raised on the empty search", async () => {
+    const d = shop(); let typed = false;
+    const w: Driver = { ...d, async type(r, t, e) { const x = await d.type!(r, t, e); typed = true; return x; }, async errors() { return typed ? ["boom"] : []; } };
+    const f = (await runFlows(w, { flows: ["search"] })).flows[0]!;
+    expect(f.invalid.status).toBe("failed");
+    expect(f.invalid.message).toContain("raised an error");
+  });
+  it("does not pass search just because the field shows the typed text", async () => {
+    const d = shop("search_noop"); let typed = "";
+    const w: Driver = { ...d,
+      async type(r, t, e) { const x = await d.type!(r, t, e); typed = t; return { ...x, screen: (x.screen ?? "").replace(/- searchbox "([^"]+)"/, `- searchbox "$1": ${typed}`) }; },
+      async tap(r) { const x = await d.tap(r); return { ...x, screen: (x.screen ?? "").replace(/- searchbox "([^"]+)"/, `- searchbox "$1": ${typed}`) }; } };
+    const f = (await runFlows(w, { flows: ["search"] })).flows[0]!;
+    expect(f.status).toBe("failed");
+  });
+});

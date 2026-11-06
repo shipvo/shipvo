@@ -14,7 +14,7 @@ const FIELD_ROLES = new Set(["textbox", "searchbox"]);
 const RISKY = /\b(log ?out|sign ?out|delete|remove|cancel|erase|deactivate|clear all|unsubscribe)\b/i;
 const RED = /Uncaught (\w*Error)|Unhandled Runtime Error|Application error|Something went wrong/i;
 const NET = /network request failed|network error|failed to fetch|no internet|(?:can't|cannot|couldn't|unable to) connect|connection (?:failed|lost|error)/i;
-const REJECTED = /invalid|incorrect|wrong|required|must be|not valid|too short|try again|error|can't be empty|enter a/i;
+const REJECTED = /invalid|incorrect|wrong|required|must be|not valid|too short|try again|\berror\b|can't be empty|enter a/i;
 const ORDER_DONE = /\border\b[^\n]{0,40}\b(placed|confirmed|complete|successful)|payment (?:approved|successful|complete)|thank you|receipt/i;
 const ADDED = /\badded\b|in (?:your )?(?:cart|bag|basket)/i;
 const ADD_BTN = /^add\b.*\b(cart|bag|basket)\b|^add (?:\d+ )?to (?:cart|bag|basket)/i;
@@ -113,13 +113,15 @@ async function searchFlow(s: Session, invalid: boolean): Promise<FlowRun> {
   await s.open();
   const f = await locate(s, isSearch, /search|find/i);
   if (!f) return { status: "not_found", message: "No search field found on the first screen or one tap away", steps: s.steps };
-  const before = signature(s.screen);
+  // The typed text shows in the field itself, so leave the field lines out of every check.
+  const noFields = (t: string) => signature(t.split("\n").filter((l) => !/^\s*- (textbox|searchbox)\b/.test(l)).join("\n"));
+  const before = noFields(s.screen);
   const field = isSearch(s.screen)!;
   await s.type(field, sampleValue(field.name, invalid), true);
   if (invalid) return { status: "passed", message: "An empty search did not crash the app", steps: s.steps };
-  const go = signature(s.screen) === before ? submitBtn(s, /^(search|find|go)$/i) : undefined;
+  const go = noFields(s.screen) === before ? submitBtn(s, /^(search|find|go)$/i) : undefined;
   if (go) await s.tap(go);
-  return signature(s.screen) !== before || s.screen.includes(sampleValue(field.name, false))
+  return noFields(s.screen) !== before || noFields(s.screen).includes(sampleValue(field.name, false))
     ? { status: "passed", message: "The screen responded to the search", steps: s.steps }
     : { status: "failed", message: "The screen did not change after searching", step: describeStep(s.steps[s.steps.length - 1]!), steps: s.steps };
 }
