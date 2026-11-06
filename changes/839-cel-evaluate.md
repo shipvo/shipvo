@@ -1,0 +1,2 @@
+- `@shipvo/spec`: new `evaluate(expression, scope, options)` and `evaluateTemplate(text, scope, options)` run CEL with the Shipvo function library (lists, dates, `money`/`number`/`percent`/`compact` in the person's locale, text, `orElse`), with a length limit and a cost limit. `validate()` now reports unknown names, fields and functions with a JSON path and a "did you mean" suggestion, and expressions over the cost limit.
+- Migration: none for callers of `validate()` except that specs which refer to unknown names now get errors. New dependency: `@bufbuild/cel`.
