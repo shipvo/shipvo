@@ -11,7 +11,7 @@ const payload = { releases: [
 const resp = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
 
 let cwd = process.cwd();
-afterEach(() => { process.chdir(cwd); vi.restoreAllMocks(); });
+afterEach(() => { process.chdir(cwd); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 function inApp() {
   const d = mkdtempSync(join(tmpdir(), "shipvo-status-"));
   writeFileSync(join(d, "shipvo.json"), JSON.stringify({ appId: "shop", controlPlane: "https://cp.test/", publicKey: "k" }));
@@ -31,13 +31,15 @@ describe("shipvo status", () => {
     expect(out.split("\n")[1]).toMatch(/^8\s+12\s+1\s+410\s+-$/);
     expect(out.split("\n")[2]).toMatch(/^7\s+30\s+0\s+380\s+900$/);
   });
-  it("--app overrides the app id; --json prints the payload unchanged", async () => {
-    inApp();
+  it("--app overrides the app id; --json prints the agent shape", async () => {
+    inApp(); vi.stubEnv("SHIPVO_SIGNING_SEED", "x");
     const f = vi.fn(async () => resp(payload));
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     expect(await status(["--app", "other", "--json"], f as any)).toBe(0);
     expect(f).toHaveBeenCalledWith("https://cp.test/t/other/summary");
-    expect(JSON.parse(String(log.mock.calls[0][0]))).toEqual(payload);
+    const doc = JSON.parse(String(log.mock.calls[0][0]));
+    expect(doc.data.project.app_id).toBe("other");
+    expect(doc.data.pending_release.newest).toBe(8);
   });
   it("prints one halt line above the table when halted is set", async () => {
     inApp();
@@ -57,8 +59,8 @@ describe("shipvo status", () => {
     expect(String(log.mock.calls[1][0])).not.toContain("halted");
     log.mockClear();
     const halted = { release: 8, reports: 40, failed: 12, threshold: 0.2 };
-    await status(["--json"], (async () => resp({ ...payload, halted })) as any);
-    expect(JSON.parse(String(log.mock.calls[0][0])).halted).toEqual(halted);
+    expect(await status(["--json"], (async () => resp({ ...payload, halted })) as any)).toBe(1);
+    expect(JSON.parse(String(log.mock.calls[0][0])).data.pending_release.halted).toEqual(halted);
   });
   it("says no telemetry yet and exits 0 when empty", async () => {
     inApp();
