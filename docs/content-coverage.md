@@ -55,3 +55,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | The `shipvo` skill for coding agents | [agents](agents.md) | | | |
 | Policy enforced by the control plane (weekday, staged rollout, max band) | [cli](cli.md) | | | |
 | Hosted MCP `server/discover` support | [mcp](../packages/mcp/README.md) | | | |
+| Phone Settings screen (`get_settings`, `set_setting`) | [phone-apps](phone-apps.md) | | | |
+| Phone Browser app (`browser_*` tools) | [phone-apps](phone-apps.md) | | | |
+| Phone home, recents, shade and power controls | [agents](agents.md), [phone-apps](phone-apps.md) | | | |
