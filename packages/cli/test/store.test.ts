@@ -167,7 +167,9 @@ it("store testers prints the steps and makes no Play call without --play-key", a
 it("store testers --json is parseable", async () => {
   const log = vi.spyOn(console, "log"); log.mockClear();
   await store(["testers", "--package", "com.example.shop", "--json"]);
-  const j = JSON.parse(log.mock.calls.map((c) => c.join(" ")).join("\n"));
+  const doc = JSON.parse(log.mock.calls.map((c) => c.join(" ")).join("\n"));
+  expect(doc.ok).toBe(true); expect(doc.code).toBe("testers_guide");
+  const j = doc.data;
   expect(j.optInUrl).toBe("https://play.google.com/apps/testing/com.example.shop");
   expect(j.group).toBe("shipvo-testers@googlegroups.com");
   expect(j.api).toBeUndefined();

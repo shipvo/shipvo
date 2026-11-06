@@ -405,3 +405,40 @@ Native bootstrap code is never edited: `MainApplication.java`/`.kt`, `AppDelegat
 `shipvo lumi [android|ios] [--ui-port 4547] [--no-open]` builds the app, opens it in your browser on Shipvo Phone and shows the Lumi sidebar: a live feed of each action, findings as they appear, coverage (screens and controls tried) and a command box. It runs on your machine and answers only requests from its own page.
 
 Commands (plain text, no AI): `test my app`, `test <flow>`, `try <flow> with bad input`, `stop`, `replay bug <n>`, `help`. A flow is a name from `routes` in `shipvo.json` or a control on the start screen, such as `cart`. Unknown text gets the list of commands.
+
+## `--json` for `store`, `app` and `sim`
+
+Every `store` subcommand (`setup`, `status`, `details`, `screenshots`, `testers`), every `app` subcommand (`create`, `list`, `delete`) and `sim` take `--json` and print the same `{ ok, code, summary, data, next }` envelope. Stdout holds one JSON line; text and build output go to stderr. Without `--json` nothing changes. `sim` prints its envelope once the simulator is listening and keeps running. `store testers --json` now returns the guide inside `data`.
+
+Exit codes: 0 ok, 1 failed, 2 usage error.
+
+| Command | `code` on success | `data` |
+|---|---|---|
+| `store setup` | `plan_written` | `{ file, answers }` |
+| `store status` | `in_progress`, `live` | `{ done, total, marks, steps: [{ id, title, state }] }` |
+| `store details --dry-run` | `details_written` | `{ app, rows, unknown, filled, total }` |
+| `store screenshots` | `screenshots_ready` | `{ out }` |
+| `store testers` | `testers_guide`, `testers_updated` | the guide, plus `api` when `--play-key` is used |
+| `app create` | `created` | `{ app_id, created, expires_at, token_file }` |
+| `app list` | `listed` | `{ count, apps }` |
+| `app delete <id> --yes` | `deleted` | `{ app_id }` |
+| `sim` | `listening` | `{ url, port, app_id, watch }` |
+
+Failure codes and their exit codes:
+
+| `code` | Exit | Meaning |
+|---|---|---|
+| `usage` | 2 | Bad flag, value or subcommand |
+| `no_plan` | 2 | `store status` found no `store-plan.json` |
+| `unknown_step` | 2 | `store status --mark` named a step that does not exist |
+| `no_browser`, `no_sim` | 2 | `sim` could not find Chromium or `@shipvo/sim` |
+| `no_config` | 1 | `store` ran in a folder with no `shipvo.json` |
+| `not_signed_in` | 1 | `app` needs `shipvo login` first |
+| `not_found` | 1 | `app delete` found no such app on your account |
+| `register_failed` | 1 | `app create` was refused by the control plane |
+| `remote_failed` | 1 | `store testers` could not update the Play track |
+| `screenshots_failed` | 1 | A store screenshot failed its size or format check |
+| `port_in_use`, `build_failed`, `sim_exited` | 1 | `sim` could not start |
+| `failed` | 1 | Any other error; `summary` holds the message |
+
+On failure `data` is `{}`. No envelope holds a token or key.
