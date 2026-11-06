@@ -129,7 +129,7 @@ class ShipvoRuntimeModule : Module() {
     val s = Store(ctx)
     require(s.baseUrl.isNotEmpty() && s.publicKey.isNotEmpty() && s.appId.isNotEmpty()) { "runtime not configured" }
     val known = maxOf(s.currentRelease, s.pendingRelease, s.blockedRelease)
-    val conn = http(PointerQuery.url(s.baseUrl, s.appId, s.shellMajor, s.band, s.hermesBytecodeVersions, s.nativeModules), if (known > 0) "\"$known\"" else null)
+    val conn = http(PointerQuery.url(s.baseUrl, s.appId, s.shellMajor, s.band, s.hermesBytecodeVersions, s.nativeModules, s.hermesEngine), if (known > 0) "\"$known\"" else null)
     val code = conn.responseCode
     if (code == 404) {
       // The shell cannot run the newest release. Keep the current one and say why.
