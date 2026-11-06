@@ -44,3 +44,38 @@ export function shouldHalt(
   const halt = valid && reports > 0 && reports >= opts.minReports && installsOk && netsOk && failureShare > t;
   return { halt, reports, failureShare };
 }
+
+/** "Most" failing installs: more than this share registered within the fresh window. */
+export const FRESH_INSTALL_SHARE = 0.5;
+/** An install is fresh if it registered within this many milliseconds (one hour). */
+export const FRESH_INSTALL_WINDOW_MS = 60 * 60 * 1000;
+/** Recent failures are a burst when they exceed the normal rate by this factor. */
+export const BURST_FACTOR = 5;
+/** Failures needed in the last 10 minutes before a burst counts, so tiny numbers never trigger it. */
+export const BURST_MIN_REPORTS = 10;
+
+export type AttackInput = {
+  /** Failing installs with their registration time (ms since epoch). */
+  failingInstalls: { install_id: string; registered_at: number }[];
+  /** Failure reports in the last 10 minutes. */
+  recentReports: number;
+  /** The app's normal failure reports per 10 minutes; 0 or undefined when there is no history. */
+  normalRate?: number;
+  /** Current time in ms; defaults to Date.now(). */
+  now?: number;
+};
+
+/** Pure check: do the failures look like fake fresh installs or a sudden burst? */
+export function looksLikeAttack(input: AttackInput): { suspicious: boolean; reason: "fresh_installs" | "burst" | null } {
+  const now = input.now ?? Date.now();
+  const list = input.failingInstalls;
+  if (list.length > 0) {
+    const fresh = list.filter((i) => now - i.registered_at <= FRESH_INSTALL_WINDOW_MS).length;
+    if (fresh / list.length > FRESH_INSTALL_SHARE) return { suspicious: true, reason: "fresh_installs" };
+  }
+  const rate = input.normalRate ?? 0;
+  if (rate > 0 && input.recentReports >= BURST_MIN_REPORTS && input.recentReports > rate * BURST_FACTOR) {
+    return { suspicious: true, reason: "burst" };
+  }
+  return { suspicious: false, reason: null };
+}

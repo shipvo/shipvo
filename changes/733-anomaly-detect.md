@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: new pure `looksLikeAttack` in `halt.ts` spots fresh-install and burst anomalies in failure reports. It is not wired into halting yet.
+- Migration: none; `shouldHalt` is unchanged.
