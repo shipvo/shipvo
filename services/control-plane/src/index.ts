@@ -5,6 +5,8 @@ import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { vaultRoutes } from "./vault";
+import { peopleRoutes } from "./people";
+import { phoneRoutes } from "./phone";
 import { forbidden, type Action } from "./roles";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
@@ -15,7 +17,7 @@ import { TELEMETRY_LIMITS, check as rateCheck } from "./ratelimit";
 import { installs, verifyReport } from "./installs";
 import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, type InstallVote } from "./halt";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string; VAULT_MASTER_KEY?: string };
+type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string; VAULT_MASTER_KEY?: string; MAIL_WEBHOOK_URL?: string; PEOPLE_LOGIN_URL?: string; PHONE_APP_DATA_MAX_BYTES?: string };
 const app = new Hono<{ Bindings: Env }>();
 
 /* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
@@ -502,6 +504,8 @@ app.get("/audit/:app", async (c) => {
 
 app.route("/auth", auth);
 app.route("/vault", vaultRoutes(owner));
+app.route("/people", peopleRoutes());
+app.route("/phone", phoneRoutes());
 app.route("/apps", apps);
 
 /** Hourly cron: copy new telemetry to the owner's R2 bucket as Parquet (only when the EXPORT_BUCKET binding is set). */

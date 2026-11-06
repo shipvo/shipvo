@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: people sign in with an email magic link (`POST /people/login`, `POST /people/verify`) and get one phone each: `GET/PUT /phone` for installed apps and `GET/PUT /phone/apps/:app/data/:key` for per-app data. Another person's phone and data read as 404. The per-app data cap is set by `PHONE_APP_DATA_MAX_BYTES`. Sign-in mail goes to `MAIL_WEBHOOK_URL`.
+- Migration: run `0022_people_phone.sql` (additive). No exported API changes.
