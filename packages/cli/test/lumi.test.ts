@@ -165,6 +165,11 @@ describe("page and server", () => {
     for (const p of ["feed", "findings", "coverage", "command", "now"]) expect(html).toContain(`data-part="${p}"`);
     expect(html).toContain("<title>Lumi: Tide b</title>");
   });
+  it("keeps the stage a fixed share of the height on narrow screens and refits when it resizes", () => {
+    const html = lumiPage(frame, "Tide");
+    expect(html).toMatch(/@media \(max-width:900px\)[^`]*\.lm-stage\{flex:none;height:70vh\}/);
+    expect(html).toContain("new ResizeObserver(fit).observe(stage)");
+  });
   it("serves the page, a command, state and a screenshot", async () => {
     const { lumi, base } = await boot();
     expect(await (await fetch(base + "/")).text()).toContain("Tell Lumi what to do");

@@ -125,7 +125,7 @@ export class Lumi {
       },
     });
     const found = this.known.length - before;
-    this.mood = this.known.length ? "worried" : "happy";
+    this.mood = this.known.length ? "worried" : r.error || r.stoppedEarly ? "idle" : "happy";
     const why = r.stoppedEarly ? ` Stopped: ${r.stoppedEarly}.` : "";
     this.say(`Done. ${r.steps} action${r.steps === 1 ? "" : "s"}, ${r.screens} screen${r.screens === 1 ? "" : "s"}, ${found} new bug${found === 1 ? "" : "s"}.${why}${r.error ? ` Error: ${r.error}` : ""}`);
   }
@@ -185,12 +185,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px sy
 .lm-cmd label{display:block;margin-bottom:4px;font-weight:600}.lm-cmd div{display:flex;gap:6px}.lm-cmd input{flex:1;min-width:0;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
 .lm-cmd button{font:inherit;padding:8px 14px;border:0;border-radius:8px;background:var(--accent);color:var(--bg);font-weight:600;cursor:pointer}.lm-reply{margin-top:6px;color:var(--muted);min-height:1.2em}
 .lm button:focus-visible,.lm input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-@media (max-width:900px){.lm-page{flex-direction:column;overflow:auto}.lm{width:auto}}`;
+@media (max-width:900px){.lm-page{flex-direction:column;overflow:auto}.lm{width:auto}.lm-stage{flex:none;height:70vh}}`;
 
 const CLIENT = `(function(){var $=function(p){return document.querySelector('[data-part="'+p+'"]')};
 var phone=document.querySelector('[data-part="phone-body"]'),stage=document.querySelector(".lm-stage");
 function fit(){var k=Math.min(1,(stage.clientWidth-8)/phone.offsetWidth,(stage.clientHeight-8)/phone.offsetHeight);phone.style.transform="scale("+k+")";phone.style.transformOrigin="center"}
-addEventListener("resize",fit);fit();
+addEventListener("resize",fit);if(window.ResizeObserver)new ResizeObserver(fit).observe(stage);fit();
 var LABEL={idle:"Lumi",working:"Lumi is testing",happy:"Lumi is happy",worried:"Lumi found something"};
 function li(t,c){var e=document.createElement("li");if(c)e.className=c;e.textContent=t;return e}
 function render(s){
@@ -252,7 +252,7 @@ export function startLumiServer(o: LumiServerOptions): Promise<Server> {
   return new Promise((resolve, reject) => { server.once("error", reject); server.listen(o.port, "127.0.0.1", () => resolve(server)); });
 }
 
-const USAGE = "Usage: shipvo lumi [android|ios] [--port 4546] [--ui-port 4547] [--sim <url>] [--skip-build] [--no-open] [--max-steps 100] [--max-depth 3] [--seed 1]";
+const USAGE = "Usage: shipvo lumi [android|ios] [--port 4546] [--ui-port 4547] [--sim <url>] [--skip-build] [--no-open] [--max-steps 100] [--max-depth 3, at least 1] [--seed 1]";
 
 /** Builds the app, opens it on Shipvo Phone in the browser with the Lumi sidebar. Runs until Ctrl-C. */
 export async function lumi(argv: string[]): Promise<number> {

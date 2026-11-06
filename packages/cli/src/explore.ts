@@ -102,8 +102,8 @@ function parseEls(tree: string, roles: Set<string>): El[] {
   }
   return out;
 }
-/** The tree without refs, to tell whether two screens are the same. */
 export const fieldElements = (tree: string): El[] => parseEls(tree, FIELDS);
+/** The tree without refs, to tell whether two screens are the same. */
 export const signature = (tree: string) => tree.replace(/\s*\[ref=\w+\]/g, "");
 const redScreen = (tree: string) => /Uncaught (\w*Error)|Unhandled Runtime Error|Application error|Something went wrong/i.exec(tree)?.[0];
 // Accepts "close" too, but the sim `back` action only clicks a button named exactly "Back"; the replay fallback covers the rest.
