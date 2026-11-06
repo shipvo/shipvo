@@ -22,7 +22,7 @@ export function parseWebhookUrl(raw: string): string {
 
 /** Send the alert if the app has a webhook and none was sent for this release in the last hour,
  *  and the app is under its hourly cap. Verified and unverified reports use separate slots and separate caps. A slot is claimed before the POST, so a failed POST is not retried. Never throws. */
-export async function sendRevertAlert(db: D1Database, appId: string, release: number, event: string, verified = false): Promise<void> {
+export async function sendRevertAlert(db: D1Database, appId: string, release: number, event: string, verified: boolean): Promise<void> {
   try {
     const row = await db.prepare("SELECT webhook FROM app_alerts WHERE app_id = ?").bind(appId).first<{ webhook: string }>();
     if (!row?.webhook) return;
