@@ -10,7 +10,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 2. Shipvo Phone and `shipvo run` (Phone's own features and attach still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
 3. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
 4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
-5. Signed over-the-air updates, staged rollout and rollback (tutorial, video)
+5. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
 6. Record demo videos (`record_*`) (tutorial, video, blog; docs done)
 7. The `shipvo` skill for coding agents (tutorial, blog; docs done)
 8. Capacitor support (all columns, as slices land)
@@ -19,10 +19,10 @@ Content agents take their next item from this list first (top to bottom, skippin
 | --- | --- | --- | --- | --- |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
-| Signed over-the-air updates | [getting-started](getting-started.md) | | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
+| Signed over-the-air updates | [getting-started](getting-started.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
 | Small patches (bsdiff) | [spike-results](spike-results.md) | | | [react-native-ota-update-size-bsdiff-patches](../blog/react-native-ota-update-size-bsdiff-patches.md) |
-| Staged rollout by cohort | [cli](cli.md) | | | [staged-rollouts](../blog/staged-rollouts.md) |
-| Rollback and crash-loop protection | [cli](cli.md) | | | [roll-back-a-bad-react-native-update](../blog/roll-back-a-bad-react-native-update.md) |
+| Staged rollout by cohort | [cli](cli.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | [staged-rollouts](../blog/staged-rollouts.md) |
+| Rollback and crash-loop protection | [cli](cli.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | [roll-back-a-bad-react-native-update](../blog/roll-back-a-bad-react-native-update.md) |
 | Agent simulator over MCP | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [mcp-servers-for-mobile-app-testing](../blog/mcp-servers-for-mobile-app-testing.md) |
 | Test your app with Claude, ChatGPT or Cursor | [test-with-an-assistant](test-with-an-assistant.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [your-assistant-can-test-your-app](../blog/your-assistant-can-test-your-app.md) |
 | Typed tests (`@shipvo/test`) and `export_test` | [testing](testing.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | [the-bug-our-first-typed-test-found](../blog/the-bug-our-first-typed-test-found.md) |
@@ -43,7 +43,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | `shipvo test --repair`, `--report`, plain steps | [testing](testing.md) | | | |
 | Release policy and `--dry-run-policy` | [CLI guide](cli.md) | | | |
 | Audit log and `shipvo audit` | [CLI guide](cli.md) | | | |
-| `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | | | |
+| `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | |
 | MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | [run-your-app-on-a-phone](tutorials/run-your-app-on-a-phone.md) | [See your app on a phone in your browser](videos.md#see-your-app-on-a-phone-in-your-browser-with-shipvo-run) | [see-your-react-native-app-on-a-phone-in-your-browser](../blog/see-your-react-native-app-on-a-phone-in-your-browser.md) |
 | Assistant attaches to the live `shipvo run` phone (`open_app`) | [run](run.md), [agents](agents.md) | | | |

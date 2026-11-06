@@ -86,9 +86,9 @@ describe("publish --json", () => {
     expect(process.exitCode).toBe(1);
     expect(env()).toMatchObject({ ok: false, code: "failed" });
   });
-  it("without --json nothing changes: the summary is plain JSON, no exit code", async () => {
+  it("without --json the result is plain English, no exit code", async () => {
     await publish(["--skip-export", "--skip-web", "--bands", "b0"]);
-    expect(JSON.parse(out[0]).release).toBe(1);
+    expect(out[0]).toMatch(/^Published release 1 to b0\./);
     expect(process.exitCode).toBeUndefined();
   });
 });
