@@ -1,5 +1,6 @@
 name: android-runtime
-# Runs the Android OTA runtime's JVM unit tests (packages/runtime/android/src/test) on every change to the runtime.
+# Runs the Android OTA runtime's JVM unit tests (packages/runtime/android/src/test) on every change to the runtime,
+# and its instrumented tests (packages/runtime/android/src/androidTest) on an API 34 emulator when there are any (#934).
 # The runtime is an Expo module, so it is built inside the sample app's prebuilt Android project.
 on:
   workflow_dispatch:
@@ -53,3 +54,68 @@ jobs:
           path: |
             **/build/reports/tests/testDebugUnitTest/
           if-no-files-found: ignore
+
+  instrumented:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - id: has
+        run: |
+          if [ -d packages/runtime/android/src/androidTest ]; then echo "yes=true" >> "$GITHUB_OUTPUT"
+          else echo "No instrumented tests in packages/runtime/android/src/androidTest." >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Enable KVM
+        if: steps.has.outputs.yes == 'true'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: pnpm/action-setup@v4
+        if: steps.has.outputs.yes == 'true'
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        if: steps.has.outputs.yes == 'true'
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-java@v4
+        if: steps.has.outputs.yes == 'true'
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.has.outputs.yes == 'true'
+      - if: steps.has.outputs.yes == 'true'
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter "@shipvo/cli..." build
+      - name: Prebuild the sample app's Android project
+        if: steps.has.outputs.yes == 'true'
+        working-directory: apps/tide-and-tackle
+        run: CI=1 npx expo prebuild -p android --no-install
+      - name: Build the runtime's test APK before the emulator starts
+        if: steps.has.outputs.yes == 'true'
+        id: proj
+        working-directory: apps/tide-and-tackle/android
+        run: |
+          P=$(./gradlew -q projects --no-daemon | grep -oE "':?[^']*shipvo[^']*runtime[^']*'" | tr -d "'" | head -1)
+          [ -n "$P" ] || { echo "::error::could not find the @shipvo/runtime Gradle project"; exit 1; }
+          case "$P" in :*) ;; *) P=":$P" ;; esac
+          echo "p=$P" >> "$GITHUB_OUTPUT"
+          ./gradlew "$P:assembleDebugAndroidTest" --no-daemon -PreactNativeArchitectures=x86_64
+      - name: Instrumented tests on the Android emulator (API 34, x86_64)
+        if: steps.has.outputs.yes == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          working-directory: apps/tide-and-tackle/android
+          script: ./gradlew "${{ steps.proj.outputs.p }}:connectedDebugAndroidTest" --no-daemon -PreactNativeArchitectures=x86_64
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.has.outputs.yes == 'true'
+        with:
+          name: android-runtime-instrumented-reports
+          path: |
+            **/build/reports/androidTests/
+            **/build/outputs/androidTest-results/
+          if-no-files-found: ignore
+          retention-days: 14

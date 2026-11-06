@@ -18,6 +18,7 @@ npx -y @shipvo/cli sim                  # serve the app in the simulator for age
 | `sim [--port 4545]` | Build for the simulator and serve it |
 | `publish [--bands b0,b1,b2]` | Build, sign and publish a release plus the agent-facing web artifact |
 | `rollback --to <release>` | Republish an earlier release's code as a new release |
+| `test [files] --report <file> --release <n> [--platform android\|ios] --upload` | Run plain-language tests and send the results to the control plane; `status` then shows "tests: N failing" per release |
 | `login` | Sign in with GitHub; issues a 30-day key |
 | `app create` / `list` / `delete <id> --yes` | Register the app (publish token), list yours, or remove one |
 | `keys` | Status and quota of the stored sign-in key |

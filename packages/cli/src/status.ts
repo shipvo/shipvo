@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { routeStore } from "@shipvo/store";
-import { args, loadConfig } from "./config.js";
+import { args, loadConfig, publishToken } from "./config.js";
 import { detectProject, skillStatus } from "./agents.js";
 import { portFree } from "./sim.js";
 import { emit, type Next } from "./json-out.js";
@@ -67,6 +67,24 @@ export function describeAutoHalt(c: AutoHalt | undefined): string {
   return `auto-halt: on at ${Math.round(c.threshold * 1000) / 10}% after ${n} report${n === 1 ? "" : "s"}`;
 }
 
+export type TestRelease = { release: number; passing: number; failing: number; failing_flows?: { name: string; first_failed_release: number }[] };
+
+/** Test results the app uploaded with shipvo test --upload. Empty when none exist or the control plane cannot say. */
+export async function fetchTestResults(base: string, appId: string, fetchFn: typeof fetch): Promise<TestRelease[]> {
+  const token = publishToken(); if (!token) return [];
+  try {
+    const r = await fetchFn(`${base}/r/${encodeURIComponent(appId)}/tests`, { headers: { authorization: `Bearer ${token}` } });
+    if (!r.ok) return [];
+    const d = (await r.json()) as { releases?: TestRelease[] };
+    return Array.isArray(d.releases) ? d.releases : [];
+  } catch { return []; }
+}
+
+/** "tests: release 3: 2 failing (checkout, since release 2)" lines, newest first. */
+export function describeTests(tests: TestRelease[]): string[] {
+  return tests.map((t) => `tests: release ${t.release}: ${t.failing ? `${t.failing} failing (${(t.failing_flows ?? []).map((f) => `${f.name}${f.first_failed_release === t.release ? "" : `, since release ${f.first_failed_release}`}`).join("; ")})` : `all ${t.passing} passing`}`);
+}
+
 export type StatusJson = {
   ok: boolean;
   code: "ok" | "no_project" | "no_signing_key" | "release_halted" | "no_release" | "error";
@@ -79,6 +97,7 @@ export type StatusJson = {
     pending_release: { newest: number | null; halted: Halted | null; auto_halt: AutoHalt | null } | null;
     store_step: { id: string; title: string; state: string } | null;
     skills: { package: string; name: string; synced: boolean }[];
+    tests: TestRelease[];
   };
   next: Next[];
 };
@@ -108,8 +127,9 @@ export async function statusJson(appArg: string | undefined, fetchFn: typeof fet
   const kind = detectProject(dir);
   const f = await localFacts(dir);
   const shared = { sim: f.sim, run_server: f.run, signing_key: { present: f.hasKey }, store_step: f.storeStep, skills: skillStatus(dir) };
+  let tests: TestRelease[] = [];
   const mk = (code: StatusJson["code"], summary: string, next: Next[], appId: string | null, pending: StatusJson["data"]["pending_release"], exit: number) => ({
-    doc: { ok: exit === 0, code, summary, data: { project: { kind, app_id: appId }, ...shared, pending_release: pending }, next } as StatusJson, exit,
+    doc: { ok: exit === 0, code, summary, data: { project: { kind, app_id: appId }, ...shared, pending_release: pending, tests }, next } as StatusJson, exit,
   });
   if (!existsSync(join(dir, "shipvo.json"))) {
     return mk("no_project", "No shipvo.json here.", [{ command: kind === "unknown" ? "shipvo init myapp" : "shipvo init .", why: "This folder is not set up for Shipvo yet." }], null, null, 1);
@@ -127,6 +147,7 @@ export async function statusJson(appArg: string | undefined, fetchFn: typeof fet
     return mk("error", `Could not reach the control plane at ${baseUrl} (${e instanceof Error ? e.message : String(e)}).`, [{ command: "shipvo doctor", why: "Check the control plane URL and network." }], appId, null, 2);
   }
   const releases = data.releases ?? [];
+  tests = await fetchTestResults(baseUrl, appId, fetchFn);
   const pending = { newest: releases.length ? Math.max(...releases.map((r) => r.release)) : null, halted: data.halted ?? null, auto_halt: data.auto_halt ?? null };
   const next: Next[] = [];
   let code: StatusJson["code"] = "ok", exit = 0;
@@ -176,6 +197,7 @@ export async function status(argv: string[], fetchFn: typeof fetch = fetch): Pro
     console.log(`Release ${h.release} is halted: ${h.failed} of ${h.reports} devices failed (limit ${pct}%). Publish a new release or run shipvo rollback to clear.`);
   }
   console.log(formatStatus(releases));
+  for (const l of describeTests(await fetchTestResults(base, appId, fetchFn))) console.log(l);
   await printBands();
   return 0;
 }
