@@ -1,0 +1,55 @@
+{
+  "name": "@shipvo/spec",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The Shipvo app spec (shipvo.app/v0): JSON Schema and a validator that returns errors and warnings with a JSON path and a suggested fix.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema.json": "./dist/app-spec.v0.schema.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4",
+    "@types/node": "^22.8.0"
+  },
+  "keywords": [
+    "shipvo",
+    "app-spec",
+    "json-schema",
+    "validator",
+    "mcp",
+    "cel",
+    "typescript"
+  ],
+  "homepage": "https://github.com/shipvo/shipvo#readme",
+  "bugs": {
+    "url": "https://github.com/shipvo/shipvo/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipvo/shipvo.git",
+    "directory": "packages/spec"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

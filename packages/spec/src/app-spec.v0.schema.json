@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shipvo.dev/schemas/app-spec.v0.json",
+  "title": "Shipvo app spec, shipvo.app/v0",
+  "type": "object",
+  "required": ["spec", "app", "screens"],
+  "additionalProperties": false,
+  "properties": {
+    "spec": { "const": "shipvo.app/v0" },
+    "app": {
+      "type": "object",
+      "required": ["id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "icon": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "description": { "type": "string", "maxLength": 280 }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["light", "dark", "system"] },
+        "palette": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/color" },
+          "properties": {
+            "primary": { "$ref": "#/$defs/color" },
+            "accent": { "$ref": "#/$defs/color" },
+            "background": { "$ref": "#/$defs/color" },
+            "surface": { "$ref": "#/$defs/color" },
+            "text": { "$ref": "#/$defs/color" },
+            "muted": { "$ref": "#/$defs/color" },
+            "danger": { "$ref": "#/$defs/color" },
+            "success": { "$ref": "#/$defs/color" }
+          }
+        },
+        "font": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "family": { "type": "string", "minLength": 1 },
+            "display": { "type": "string", "minLength": 1 },
+            "scale": { "type": "number", "minimum": 0.8, "maximum": 1.6 }
+          }
+        },
+        "radius": { "enum": ["none", "sm", "md", "lg", "xl", "full"] },
+        "density": { "enum": ["compact", "comfortable", "spacious"] },
+        "elevation": { "enum": ["flat", "soft", "raised"] },
+        "motion": { "enum": ["none", "calm", "lively"] }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "network": { "type": "array", "items": { "$ref": "#/$defs/domain" } },
+        "write": { "type": "array", "items": { "$ref": "#/$defs/domain" } },
+        "device": {
+          "type": "array",
+          "items": { "enum": ["notifications", "camera", "location", "contacts", "calendar", "photos", "files"] }
+        }
+      }
+    },
+    "secrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+          "service": { "type": "string", "minLength": 1 },
+          "access": { "enum": ["read", "write"] },
+          "help": { "type": "string", "maxLength": 500 }
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "patternProperties": { "^[A-Za-z_][A-Za-z0-9_]*$": { "$ref": "#/$defs/dataSource" } },
+      "additionalProperties": false
+    },
+    "state": {
+      "type": "object",
+      "patternProperties": { "^[A-Za-z_][A-Za-z0-9_]*$": { "$ref": "#/$defs/field" } },
+      "additionalProperties": false
+    },
+    "screens": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/screen" } },
+    "navigation": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["tabs", "stack", "drawer", "single"] },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["screen"],
+            "additionalProperties": false,
+            "properties": { "screen": { "type": "string" }, "icon": { "type": "string" }, "label": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "object",
+      "patternProperties": { "^[a-z][a-z0-9_]{0,63}$": { "$ref": "#/$defs/action" } },
+      "additionalProperties": false
+    },
+    "schedules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "cron", "do"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
+          "cron": { "type": "string", "pattern": "^\\S+( \\S+){4}$" },
+          "tz": { "type": "string", "minLength": 1 },
+          "do": { "type": "array", "items": { "$ref": "#/$defs/step" } }
+        }
+      }
+    },
+    "strings": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }
+    }
+  },
+  "$defs": {
+    "color": { "type": "string", "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$" },
+    "domain": {
+      "type": "string",
+      "pattern": "^(\\*\\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+    },
+    "fieldType": { "enum": ["text", "number", "money", "date", "datetime", "bool", "enum", "image", "file", "ref"] },
+    "field": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "$ref": "#/$defs/fieldType" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "default": {},
+        "to": { "type": "string" }
+      }
+    },
+    "dataSource": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": { "enum": ["http", "collection", "computed"] },
+        "get": { "type": "string", "minLength": 1 },
+        "post": { "type": "string", "minLength": 1 },
+        "query": { "type": "object" },
+        "auth": {
+          "type": "object",
+          "required": ["secret"],
+          "additionalProperties": false,
+          "properties": {
+            "secret": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+            "type": { "enum": ["bearer", "basic", "header", "query"] },
+            "name": { "type": "string" }
+          }
+        },
+        "select": { "type": "string" },
+        "cache": { "type": "string", "pattern": "^[0-9]+(s|m|h|d)$" },
+        "paginate": {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "enum": ["cursor", "offset", "page"] },
+            "param": { "type": "string" },
+            "next": { "type": "string" },
+            "until": { "type": "string" },
+            "limit": { "type": "number", "minimum": 1 }
+          }
+        },
+        "fields": {
+          "type": "object",
+          "patternProperties": { "^[A-Za-z_][A-Za-z0-9_]*$": { "$ref": "#/$defs/fieldType" } },
+          "additionalProperties": false
+        },
+        "seed": { "type": "array" },
+        "value": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "required": ["source"], "properties": { "source": { "const": "http" } } },
+          "then": { "required": ["get"] }
+        },
+        {
+          "if": { "required": ["source"], "properties": { "source": { "const": "collection" } } },
+          "then": { "required": ["fields"] }
+        },
+        {
+          "if": { "required": ["source"], "properties": { "source": { "const": "computed" } } },
+          "then": { "required": ["value"] }
+        }
+      ]
+    },
+    "screen": {
+      "type": "object",
+      "required": ["id", "body"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
+        "title": { "type": "string" },
+        "params": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/fieldType" }
+        },
+        "presentation": { "enum": ["push", "sheet", "modal", "fullscreen"] },
+        "body": { "type": "array", "items": { "$ref": "#/$defs/block" } }
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": [
+            "stack", "grid", "scroll", "section", "card", "tabs", "carousel", "split", "spacer", "divider",
+            "text", "stat", "image", "avatar", "badge", "icon", "progress", "empty", "markdown",
+            "list", "table", "chart", "calendar", "kanban", "timeline", "map",
+            "form", "button", "toggle", "segmented", "slider", "search", "date", "picker", "chips", "rating", "camera", "scanner", "file",
+            "vector", "custom"
+          ]
+        },
+        "id": { "type": "string", "minLength": 1 },
+        "when": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "style": { "type": "object" },
+        "motion": { "type": "object" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/block" } }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["do"],
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "input": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/field" }
+        },
+        "returns": { "type": "object" },
+        "effect": { "enum": ["none", "external"] },
+        "do": { "type": "array", "items": { "$ref": "#/$defs/step" } }
+      }
+    },
+    "step": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "refresh": { "type": "string" },
+        "insert": { "type": "string" },
+        "update": { "type": "string" },
+        "delete": { "type": "string" },
+        "where": { "type": "string" },
+        "value": {},
+        "http": { "type": "object" },
+        "set": { "type": "string" },
+        "navigate": { "type": "string" },
+        "params": { "type": "object" },
+        "notify": { "type": "object" },
+        "toast": { "type": "string" },
+        "confirm": { "type": ["string", "object"] },
+        "if": { "type": "string" },
+        "then": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+        "else": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+        "return": {},
+        "call": { "type": "string" },
+        "with": { "type": "object" }
+      }
+    }
+  }
+}

@@ -1,0 +1,2 @@
+- `@shipvo/spec`: new package with the JSON Schema for `shipvo.app/v0` and `validate(spec)`, which returns errors and warnings with a JSON path and a suggested fix.
+- Migration: none; new package.
