@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import http from "node:http";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -70,7 +70,24 @@ describe("open_app attach", () => {
     expect(text).toContain("attached to the live shipvo run phone");
     await c.close();
     const h = await open({ attach: "never" }, "founder");
-    expect(h.text).toContain("unknown_app"); await h.c.close();
+    expect(h.isError).toBe(true); expect(h.text).toContain("unknown_app"); await h.c.close();
+  });
+  it("a key scoped to another app cannot open the live run's app", async () => {
+    runJson(process.pid, "tok", "founder");
+    const port = await new Promise<number>((ok) => { const s = http.createServer().listen(0, () => { const p = (s.address() as { port: number }).port; s.close(() => ok(p)); }); });
+    const env = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${simPort}`, PN_CONTROL: "http://127.0.0.1:1", PN_API_KEYS: "", PN_APPS: "" };
+    const sub = join(work, "a", "b"); mkdirSync(sub, { recursive: true });
+    const proc = spawn(process.execPath, [join(out, "server.js"), "--http", String(port)], { env, cwd: sub, stdio: "pipe" });
+    try {
+      for (let i = 0; i < 100; i++) { try { if ((await fetch(`http://127.0.0.1:${port}/health`)).ok) break; } catch {} await new Promise((r) => setTimeout(r, 100)); }
+      const call = async (app: string) => {
+        const r = await fetch(`http://127.0.0.1:${port}/mcp`, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "x-shipvo-app": "menu" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "open_app", arguments: { app } } }) });
+        return ((await r.json()) as any).result;
+      };
+      const denied = await call("founder");
+      expect(denied.isError).toBe(true); expect(denied.content[0].text).toContain("unknown_app");
+      expect(denied.content[0].text).toContain("this key opens: menu");
+    } finally { proc.kill(); }
   });
   it("falls back to headless when the pid is dead", async () => {
     runJson(2 ** 22 + 12345);
