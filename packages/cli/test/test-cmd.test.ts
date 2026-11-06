@@ -150,3 +150,57 @@ describe("secrets in logs", () => {
     expect(text).not.toContain("hunter2-value");
   });
 });
+
+describe("shipvo test --json", () => {
+  it("prints one envelope on stdout and exits 1 when a flow fails", async () => {
+    const f = project(); const logs: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const code = await testCmd([f, "--json"], kit());
+    log.mockRestore();
+    expect(code).toBe(1);
+    expect(logs).toHaveLength(1);
+    const doc = JSON.parse(logs[0]!);
+    expect(doc).toMatchObject({ ok: false, code: "tests_failed" });
+    expect(doc.data.flows[0].status).toBe("failed");
+    expect(doc.next.length).toBeGreaterThan(0);
+    expect(err.mock.calls.flat().join("\n")).toContain("FAIL");
+    err.mockRestore();
+  });
+  it("exits 0 with ok when every step passes", async () => {
+    const f = project(); const logs: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const code = await testCmd([f, "--json"], kit('- button "Add to cart" [ref=e1]\n- text "Cart" [ref=e2]'));
+    log.mockRestore(); err.mockRestore();
+    expect(code).toBe(0);
+    expect(JSON.parse(logs[0]!)).toMatchObject({ ok: true, code: "ok" });
+  });
+  it("exits 2 with an envelope on a usage error", async () => {
+    const logs: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    const code = await testCmd(["--json", "--write"], kit());
+    log.mockRestore();
+    expect(code).toBe(2);
+    expect(JSON.parse(logs[0]!)).toMatchObject({ ok: false, code: "usage" });
+  });
+});
+
+describe("shipvo test --json errors", () => {
+  it("emits an error envelope and exits 2 when a steps file is missing", async () => {
+    const out: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a) => { out.push(a.join(" ")); });
+    try {
+      const code = await testCmd([join(tmpdir(), "shipvo-no-such-file.steps"), "--json"], kit(), () => {});
+      expect(code).toBe(2);
+      expect(out).toHaveLength(1);
+      const doc = JSON.parse(out[0]!);
+      expect(doc.ok).toBe(false);
+      expect(doc.code).toBe("error");
+      expect(doc.next.length).toBeGreaterThanOrEqual(1);
+    } finally { spy.mockRestore(); }
+  });
+  it("still throws without --json", async () => {
+    await expect(testCmd([join(tmpdir(), "shipvo-no-such-file.steps")], kit(), () => {})).rejects.toThrow();
+  });
+});

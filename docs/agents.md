@@ -44,6 +44,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `open_notifications` · `open_control_center` · `toggle_tile` · `dismiss_notification` · `close_panels` | Pull down the notification shade (Android: first call shows a few tiles and notifications, second call all tiles) or Notification Center (iPhone), open Control Center (iPhone only), flip a tile (`wifi`, `mobile_data`, `airplane`, `location`, `dark_mode`, `dnd`, `auto_rotate`, `flashlight`; iPhone: `airplane`, `wifi`, `mobile_data`, `focus`, `orientation_lock`, `brightness`, `dark_mode`), swipe away a notification or clear all. A tile changes the simulated device like `set_device`: Wi-Fi and mobile data both off take the network offline, `dark_mode` sets the app's `prefers-color-scheme`, `dnd` stops heads-up banners. Typed errors: `tile_not_visible`, `unknown_tile`, `no_control_center`, `no_such_notification`, `panel_closed`. While a panel is open, `tap`, `type` and `scroll` fail with `panel_open` (call `close_panels` first), as the panel covers the app. Panel actions need the app in the foreground. `dismiss_notification` without an `id` removes the newest notification. |
 | `press_home` · `open_recents` · `resume_app` · `kill_app` | Home (app gets `AppState` background, home screen shows the app icon), app switcher card, bring the app back (`active`), swipe the card away (next open is a cold start). While away, tap, type, scroll, back, `open_url` and `open_notification` fail with `app_not_foreground`; `screenshot` shows the home screen or switcher |
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
+| `get_settings` · `set_setting` · `browser_open` · `browser_snapshot` · `browser_click` · `browser_type` · `browser_scroll` · `browser_back` · `browser_wait_for` · `browser_tabs` · `browser_close_tab` · `browser_screenshot` | Read and change the phone's system settings, and drive its separate web Browser. See [the phone's Browser and Settings](phone-apps.md) |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
@@ -123,7 +124,10 @@ shipvo explore --max-steps 100 --max-depth 3
 shipvo explore --sim http://localhost:4545   # use a simulator that is already running
 shipvo explore --skin ios                   # small-target minimum 44 instead of 48
 shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
+shipvo explore --issues-dir issues           # one ready-to-file issue per finding
 ```
+
+With `--issues-dir <dir>`, it also writes one Markdown file per distinct finding, `<n>-<kind>.md`. The first line is the title (`explore: <kind> on <screen>`), then the message, the numbered steps, the platform skin and the simulator limits. It does not call GitHub. It prints one `gh issue create --title ... --body-file ...` line per file for you or your agent to run. With no findings it writes nothing and says so.
 
 It writes `explore-report.md` and `explore-report.json`. The report has six kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `back`):
 

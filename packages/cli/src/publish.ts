@@ -5,9 +5,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync
 import { tmpdir } from "node:os";
 import path, { dirname, join, relative, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
-import { checkBundle, parseDeclared } from "./hermes.js";
+import { checkBundle, checkEngine, installedHermesEngine, parseDeclared, parseEngine } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
 import { checkPublishPolicy } from "./policy.js";
+import { CliFailure, UsageError, runJson, type Done, type Next } from "./json-out.js";
 import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
 
 const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".css": "text/css", ".ico": "image/x-icon", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ttf": "font/ttf", ".svg": "image/svg+xml" };
@@ -27,7 +28,7 @@ const platformsOf = (a: Record<string, string | undefined>): Platform[] => {
   const p = (a.platform || "android").toLowerCase();
   if (p === "all") return ["android", "ios"];
   if (p === "android" || p === "ios") return [p];
-  throw new Error(`--platform must be android, ios or all (got "${a.platform}")`);
+  throw new UsageError(`--platform must be android, ios or all (got "${a.platform}")`);
 };
 
 /** Unknown flags are errors: a typo like --dryrun must not fall through to a real publish. */
@@ -36,7 +37,7 @@ function checkFlags(argv: string[], known: string[]) {
   if (bad.length) {
     const eq = bad.find((x) => x.includes("="));
     const hint = eq ? ` Write "${eq.replace("=", " ")}" (a space, not =).` : "";
-    throw new Error(`Unknown flag ${bad.join(", ")}.${hint} Known flags: ${known.map((k) => "--" + k).join(" ")}`);
+    throw new UsageError(`Unknown flag ${bad.join(", ")}.${hint} Known flags: ${known.map((k) => "--" + k).join(" ")}`);
   }
 }
 
@@ -45,7 +46,7 @@ function switchFlag(a: Record<string, string | undefined>, name: string): boolea
   const v = a[name];
   if (v === undefined || v === "false") return false;
   if (v === "true") return true;
-  throw new Error(`--${name} is an on/off flag: use --${name}, --${name} true or --${name} false (got "${v}")`);
+  throw new UsageError(`--${name} is an on/off flag: use --${name}, --${name} true or --${name} false (got "${v}")`);
 }
 
 /** True when `file` is strictly inside `root`. Uses the platform's separator, so it works with Windows paths too. */
@@ -74,7 +75,7 @@ function localKv(dir: string) {
   };
 }
 
-const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-bytecode-version", "max-bases", "skip-export", "skip-web", "dry-run", "dry-run-policy", "out"];
+const PUBLISH_FLAGS = ["bands", "platform", "release", "min-shell", "hermes-bytecode-version", "max-bases", "skip-export", "skip-web", "dry-run", "dry-run-policy", "out", "json"];
 
 export const PUBLISH_HELP = `Usage: shipvo publish [flags]
 
@@ -92,28 +93,42 @@ Flags (write a value after a space, not =; on/off flags can be bare, or true/fal
   --dry-run                    Build and sign, write files locally, send nothing
   --dry-run-policy             Check the policy in shipvo.json for these --bands, print the result, publish nothing
   --out <dir>                  Where --dry-run writes files (default .shipvo/dry-run)
+  --json                       Print one JSON envelope on stdout; text and build output go to stderr
   --help                       Show this help
 `;
 
+const DOCTOR: Next[] = [{ command: "shipvo doctor --json", why: "Check your setup." }];
+
 export async function publish(argv: string[]) {
   if (argv.includes("--help") || argv.includes("-h")) { console.log(PUBLISH_HELP); return; }
+  if (argv.includes("--json")) return runJson(() => publishRun(argv, true), DOCTOR);
+  await publishRun(argv, false);
+}
+
+async function publishRun(argv: string[], json: boolean): Promise<Done> {
+  // In --json mode the build tools must not write to stdout either.
+  const io: "inherit" | ["inherit", 2, 2] = json ? ["inherit", 2, 2] : "inherit";
   checkFlags(argv, PUBLISH_FLAGS);
   const a = parse(argv), cfg = loadConfig(), SEED = seed();
   if (switchFlag(a, "dry-run-policy")) {
     const verdict = checkPublishPolicy(cfg.policy, (a.bands || "b0,b1,b2").split(","));
-    if (verdict.ok) console.log(cfg.policy === undefined ? "No policy in shipvo.json: nothing to check." : "Policy allows this publish.");
-    else { console.error(`Refused by policy rule ${verdict.rule}: ${verdict.reason}`); process.exitCode = 1; }
-    return;
+    if (verdict.ok) {
+      const msg = cfg.policy === undefined ? "No policy in shipvo.json: nothing to check." : "Policy allows this publish.";
+      console.log(msg);
+      return { code: "policy_ok", summary: msg, data: { policy: cfg.policy === undefined ? "none" : "allowed", bands: (a.bands || "b0,b1,b2").split(",") }, next: [{ command: "shipvo publish --dry-run --json", why: "Build and sign without sending." }] };
+    }
+    return refused(verdict, json);
   }
   const dry = switchFlag(a, "dry-run"), skipExport = switchFlag(a, "skip-export"), skipWeb = switchFlag(a, "skip-web");
-  if (a.out !== undefined && !dry) throw new Error("--out only works with --dry-run");
-  if (a.out === "true") throw new Error("--out needs a directory: pass --out <dir>");
+  if (a.out !== undefined && !dry) throw new UsageError("--out only works with --dry-run");
+  if (a.out === "true") throw new UsageError("--out needs a directory: pass --out <dir>");
   const outDir = a.out || ".shipvo/dry-run";
   const kv = dry ? localKv(outDir) : kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor;
   const MIN_SHELL = a["min-shell"] || JSON.parse(readFileSync("app.json", "utf8")).expo.version; // a bundle needs the shell it was built against
-  if (a["hermes-bytecode-version"] === "true") throw new Error("--hermes-bytecode-version needs a value: pass a value like 96 (or 96,98)");
+  if (a["hermes-bytecode-version"] === "true") throw new UsageError("--hermes-bytecode-version needs a value: pass a value like 96 (or 96,98)");
   const declaredHermes = parseDeclared(a["hermes-bytecode-version"] ?? cfg.hermesBytecodeVersion);
+  const hermesEngine = checkEngine(installedHermesEngine(process.cwd()), parseEngine(cfg.hermesEngine)); // fails before anything is uploaded
   const skippedNative: string[] = [];
   const nativeModules = requiredNativeModules(".", skippedNative);
   if (skippedNative.length) console.error(`native modules not recorded (the range is not a plain numeric semver range, so the control plane cannot check it): ${skippedNative.join(", ")}`);
@@ -121,7 +136,7 @@ export async function publish(argv: string[]) {
   const bands = (a.bands || "b0,b1,b2").split(",");
   if (dry) {
     const verdict = checkPublishPolicy(cfg.policy, bands);
-    if (!verdict.ok) { console.error(`Refused by policy rule ${verdict.rule}: ${verdict.reason}`); process.exitCode = 1; return; }
+    if (!verdict.ok) return refused(verdict, json);
   }
   const platforms = platformsOf(a);
   const release = Number(a.release || 0) || (await currentRelease(kv, APP, MAJOR)) + 1;
@@ -133,10 +148,10 @@ export async function publish(argv: string[]) {
   for (const pf of platforms) {
     // Android published alone keeps the original dist-ota/ layout, so existing CI keeps working.
     const root = platforms.length === 1 && pf === "android" ? "dist-ota" : `dist-ota/${pf}`;
-    if (!skipExport) execSync(`npx expo export --platform ${pf} --output-dir ${root} --clear`, { stdio: "inherit" });
+    if (!skipExport) execSync(`npx expo export --platform ${pf} --output-dir ${root} --clear`, { stdio: io });
     const jsDir = `${root}/_expo/static/js/${pf}`;
     const file = readdirSync(jsDir).find((f) => f.endsWith(".hbc")) || readdirSync(jsDir).find((f) => f.endsWith(".js"));
-    if (!file) throw new Error("no bundle in " + jsDir);
+    if (!file) throw new CliFailure("no bundle in " + jsDir, "no_bundle", 1, [{ command: "shipvo publish --json", why: "Run again without --skip-export so the bundle is built." }]);
     const bytes = new Uint8Array(readFileSync(join(jsDir, file)));
     const hermesVersion = checkBundle(file, bytes, declaredHermes); // fails before anything is uploaded
     const name = bundleName(release, pf), newSha = sha256Hex(bytes);
@@ -176,7 +191,7 @@ export async function publish(argv: string[]) {
     // The agent-facing web artifact of the same commit, served at /w/<app>/r<N>/ for the simulator (built once, with the first platform).
     let web: { base: string; entry: string; sha256: string; files: number } | null = null;
     if (!skipWeb && pf === platforms[0]) {
-      web = await publishWeb(kv, cfg, APP, release, dry ? outDir : undefined);
+      web = await publishWeb(kv, cfg, APP, release, dry ? outDir : undefined, io);
     } else if (!skipWeb) {
       try { web = JSON.parse((await kv.get(`h/${APP}/r${release}`))!)?.web ?? null; } catch {}
     }
@@ -185,10 +200,10 @@ export async function publish(argv: string[]) {
     for (const band of bands) {
       const body = JSON.stringify({ schema_version: "1.0", app_id: APP, shell_major: MAJOR, band, ...(pf === "ios" ? { platform: "ios" } : {}), release, issued_at,
         core: { version: `1.0.${release}`, sha256: newSha, size: bytes.length, url: `b/${APP}/${name}`, patches },
-        addons: [], screens: [], min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), ...(web ? { web } : {}) });
+        addons: [], screens: [], min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(hermesVersion && hermesEngine ? { hermes_engine: hermesEngine } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), ...(web ? { web } : {}) });
       await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
-    await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), web }), "application/json");
+    await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(hermesVersion && hermesEngine ? { hermes_engine: hermesEngine } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), web }), "application/json");
     totalBytes += bytes.length;
     summary[pf] = { bytes: bytes.length, patches: patches.map((p) => ({ from: p.from_sha256.slice(0, 12), kb: +(p.size / 1024).toFixed(1) })) };
     if (web) summary.web = web;
@@ -198,6 +213,20 @@ export async function publish(argv: string[]) {
   }
   if (dry) console.log(dryRunSummary(release, totalBytes, outDir, patchInfo));
   else console.log(JSON.stringify(summary));
+  const flags = [a.bands ? `--bands ${a.bands}` : "", a.platform ? `--platform ${a.platform}` : ""].filter(Boolean).join(" ");
+  const data = { ...summary, platforms, total_bytes: totalBytes };
+  if (dry) return { code: "dry_run", summary: `Dry run complete: release ${release}, ${formatSize(totalBytes)}. Nothing was sent.`, data, next: [{ command: `shipvo publish ${flags} --json`.replace(/ +/g, " "), why: "Publish for real." }] };
+  const rest = ["b0", "b1", "b2"].filter((b) => !bands.includes(b));
+  const next: Next[] = [{ command: "shipvo status --json", why: "See how the release does on phones." }];
+  if (rest.length) next.push({ command: `shipvo promote --to ${rest.join(",")} --json`, why: `Widen release ${release} to ${rest.join(", ")} when it looks healthy.` });
+  return { code: "published", summary: `Published release ${release} to ${bands.join(", ")} (${platforms.join(", ")}).`, data, next };
+}
+
+function refused(verdict: { rule?: unknown; reason?: unknown }, json: boolean): Done {
+  const msg = `Refused by policy rule ${verdict.rule}: ${verdict.reason}`;
+  if (json) throw new CliFailure(msg, "policy_refused", 1, [{ command: "shipvo publish --dry-run-policy --json", why: "Check the policy for other --bands." }]);
+  console.error(msg); process.exitCode = 1;
+  return { code: "policy_refused", summary: msg, data: {}, next: [] };
 }
 
 /** Bytes in plain units: KB below 1 MB, so a small bundle never reads as 0.00 MB. */
@@ -220,8 +249,8 @@ export function dryRunSummary(release: number, bytes: number, outDir: string, in
   return lines.join("\n");
 }
 
-async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number, outDir?: string) {
-  execSync("PN_SIM=1 npx expo export --platform web --output-dir dist-web --clear", { stdio: "inherit" });
+async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number, outDir?: string, io: "inherit" | ["inherit", 2, 2] = "inherit") {
+  execSync("npx expo export --platform web --output-dir dist-web --clear", { stdio: io, env: { ...process.env, PN_SIM: "1" } });
   const base = `w/${APP}/r${release}`; const files: string[] = []; let indexSha = "";
   for (const f of walk("dist-web")) {
     const rel = f.slice("dist-web/".length); if (rel === "metadata.json") continue;
@@ -249,15 +278,28 @@ async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof l
 }
 
 export async function rollback(argv: string[]) {
-  checkFlags(argv, ["to", "bands", "platform", "dry-run"]);
+  if (argv.includes("--json")) return runJson(() => rollbackRun(argv, true), [...DOCTOR, { command: "shipvo status --json", why: "See the newest releases." }]);
+  await rollbackRun(argv, false);
+}
+
+async function rollbackRun(argv: string[], json: boolean): Promise<Done> {
+  checkFlags(argv, ["to", "bands", "platform", "dry-run", "json"]);
   const a = parse(argv), dry = a["dry-run"] !== undefined, cfg = loadConfig(), SEED = seed(), kv = kvFor(cfg);
   const APP = cfg.appId, MAJOR = cfg.shellMajor, to = Number(a.to);
-  if (!to) { console.error("Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all] [--dry-run]"); process.exit(2); }
+  if (!to) {
+    const usage = "Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all] [--dry-run] [--json]";
+    if (json) throw new UsageError(usage);
+    console.error(usage); process.exit(2);
+  }
   const release = (await currentRelease(kv, APP, MAJOR)) + 1, issued_at = new Date().toISOString();
   let minShell = "1.0.0";
   const platforms = platformsOf(a), bands = (a.bands || "b0,b1,b2").split(",");
   for (const pf of platforms) {
-    const bytes = await kv.getBytes(`b/${APP}/${bundleName(to, pf)}`); if (!bytes) { console.error(`Release ${to} ${pf} bundle not found`); process.exit(1); }
+    const bytes = await kv.getBytes(`b/${APP}/${bundleName(to, pf)}`);
+    if (!bytes) {
+      if (json) throw new CliFailure(`Release ${to} ${pf} bundle not found`, "not_found", 1, [{ command: "shipvo status --json", why: "See which releases exist." }]);
+      console.error(`Release ${to} ${pf} bundle not found`); process.exit(1);
+    }
     let web: unknown = undefined;
     try { const h = JSON.parse((await kv.get(pf === "ios" ? `h/${APP}/ios-r${to}` : `h/${APP}/r${to}`))!); minShell = h.min_shell_version || minShell; web = h.web ?? undefined; } catch {}
     for (const band of bands) {
@@ -266,9 +308,12 @@ export async function rollback(argv: string[]) {
       if (!dry) await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
   }
+  const data = { app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at, platforms, bands, dry_run: dry };
   if (dry) {
     console.log([`Rollback preview for ${APP}:`, `  Rolling back to the code of release ${to}`, `  New release number: ${release}`, `  Platforms: ${platforms.join(", ")}`, `  Bands: ${bands.join(", ")}`, `  Min shell version: ${minShell}`, `Dry run: nothing was written.`].join("\n"));
-    return;
+    const real = argv.filter((x) => x !== "--dry-run").join(" ");
+    return { code: "dry_run", summary: `Rollback preview: release ${to} code becomes release ${release}. Nothing was written.`, data, next: [{ command: `shipvo rollback ${real}`, why: "Do the rollback." }] };
   }
   console.log(JSON.stringify({ app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at }));
+  return { code: "rolled_back", summary: `Rolled back to the code of release ${to} as release ${release}.`, data, next: [{ command: "shipvo status --json", why: "Check that phones pick up the rollback." }] };
 }

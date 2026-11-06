@@ -32,7 +32,16 @@ async function owner(c: any, appId: string): Promise<string | null> {
 }
 const ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
-app.get("/health", (c) => c.json({ ok: true, service: "shipvo-control", time: new Date().toISOString() }, 200, { "access-control-allow-origin": "*", "cache-control": "no-store" }));
+/** Today's UTC date, used in the dropped-telemetry counter key. */
+const utcDay = () => new Date().toISOString().slice(0, 10);
+
+/** Events dropped today across all apps (D1 write failures). One KV read; null when KV cannot be read. */
+async function droppedToday(env: Env): Promise<number | null> {
+  if (!env.POINTERS) return null;
+  try { return Number(await env.POINTERS.get(`telemetry_dropped_total/${utcDay()}`)) || 0; } catch { return null; }
+}
+
+app.get("/health", async (c) => c.json({ ok: true, service: "shipvo-control", time: new Date().toISOString(), telemetry_dropped_today: await droppedToday(c.env) }, 200, { "access-control-allow-origin": "*", "cache-control": "no-store" }));
 
 /** Static hot path: signed release pointer envelope per app / shell major / (platform /) band. No device registry. Android pointers live at /p/<app>/<major>/<band>, iOS at /p/<app>/<major>/ios/<band>. */
 async function servePointer(c: any, platform: "android" | "ios") {
@@ -113,7 +122,7 @@ app.get("/b/:app/:file", async (c) => {
  * Write KV `halt/<app>` when a release fails on too many devices. Settings live in KV `halt-config/<app>`:
  * {"threshold": number, "min_reports": number}. No config key means halting is off.
  */
-async function maybeHalt(env: Env, appId: string, release: number): Promise<void> {
+async function maybeHalt(env: Env, appId: string, release: number, kv?: { failed: number; healthy: number }): Promise<void> {
   if (!env.POINTERS) return;
   const raw = await env.POINTERS.get(`halt-config/${appId}`);
   if (!raw) return;
@@ -122,12 +131,20 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   if (!cfg || typeof cfg !== "object") return;
   const threshold = typeof cfg.threshold === "number" ? cfg.threshold : undefined;
   const minReports = typeof cfg.min_reports === "number" ? cfg.min_reports : 20;
-  const { results } = await env.DB.prepare("SELECT event, COUNT(*) AS n FROM telemetry WHERE app_id = ? AND release = ? GROUP BY event").bind(appId, release).all<{ event: string; n: number }>();
+  let results: { event: string; n: number }[] = [];
+  try {
+    results = (await env.DB.prepare("SELECT event, COUNT(*) AS n FROM telemetry WHERE app_id = ? AND release = ? GROUP BY event").bind(appId, release).all<{ event: string; n: number }>()).results ?? [];
+  } catch (e) {
+    // D1 over its limit: fall back to the KV count so auto-halt still works.
+    if (!kv) throw e;
+    console.error("halt count read failed, using KV fallback", e);
+  }
   const counts = { healthy: 0, failed: 0 };
-  for (const r of results ?? []) {
+  for (const r of results) {
     if (HEALTHY_EVENTS.includes(r.event)) counts.healthy += r.n;
     else if (FAILED_EVENTS.includes(r.event)) counts.failed += r.n;
   }
+  if (kv) { counts.failed = Math.max(counts.failed, kv.failed); counts.healthy = Math.max(counts.healthy, kv.healthy); }
   const verdict = shouldHalt(counts, { threshold, minReports });
   if (!verdict.halt) return;
   const key = `halt/${appId}`;
@@ -147,6 +164,8 @@ app.post("/t", async (c) => {
   const t = Telemetry.safeParse(body);
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
+  let stored = true;
+  try {
   await c.env.DB.prepare(
     "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(d.app_id, d.release, d.event, d.cold_start_ms ?? null, d.bytes_downloaded ?? null, d.apply_ms ?? null, d.device_class ?? null,
@@ -154,13 +173,35 @@ app.post("/t", async (c) => {
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
     extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
-  // Halting is a best-effort side effect: the event is stored, so never fail the response.
-  if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release); } catch (e) { console.error("halt check failed", e); } }
-  if (REVERT_EVENTS.has(d.event)) {
+  } catch (e) {
+    // D1 can refuse writes (for example the Free plan daily limit). Never send a 5xx to the phone.
+    stored = false;
+    console.error("telemetry insert failed (event dropped; if D1 is not at its limit, check for schema errors)", e);
+  }
+  let kv: { failed: number; healthy: number } | undefined;
+  if (!stored && c.env.POINTERS) {
+    try {
+      const bump = async (k: string, ttl: number) => { const n = (Number(await c.env.POINTERS.get(k)) || 0) + 1; await c.env.POINTERS.put(k, String(n), { expirationTtl: ttl }); return n; };
+      // KV read-then-put is not atomic: concurrent drops can undercount. Fine for an operator signal.
+      await bump(`telemetry_dropped/${d.app_id}/${utcDay()}`, 7 * 86400);
+      await bump(`telemetry_dropped_total/${utcDay()}`, 7 * 86400);
+      const isFailed = FAILED_EVENTS.includes(d.event), isHealthy = HEALTHY_EVENTS.includes(d.event);
+      if (isFailed || isHealthy) {
+        // Count both sides per release (1h TTL) so the fallback ratio is not failures against zero.
+        const fk = `telemetry_failed/${d.app_id}/${d.release}`, hk = `telemetry_healthy/${d.app_id}/${d.release}`;
+        const f = isFailed ? await bump(fk, 3600) : Number(await c.env.POINTERS.get(fk)) || 0;
+        const h = isHealthy ? await bump(hk, 3600) : Number(await c.env.POINTERS.get(hk)) || 0;
+        kv = { failed: f, healthy: h };
+      }
+    } catch (e) { console.error("telemetry fallback counter failed", e); }
+  }
+  // Halting is a best-effort side effect: never fail the response.
+  if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release, kv); } catch (e) { console.error("halt check failed", e); } }
+  if (stored && REVERT_EVENTS.has(d.event)) {
     const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
     try { c.executionCtx.waitUntil(job); } catch { /* no execution context (tests, local): the job runs on its own */ }
   }
-  return c.json({ ok: true }, 202);
+  return c.json(stored ? { ok: true } : { ok: true, stored: false }, 202);
 });
 
 /** Spike read-out: latest telemetry rows for an app. Public on purpose for the spike; behind Access later. */
