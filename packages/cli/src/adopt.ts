@@ -97,7 +97,7 @@ export async function adopt(argv: string[], dir = process.cwd(), overrides: Part
   }
   if (p.expoUpdates || p.codePush) {
     const what = p.expoUpdates ? "expo-updates" : "react-native-code-push";
-    return fail(`shipvo: this app uses ${what}. Two over-the-air systems would fight over the bundle, so I stopped and changed nothing.\nRemove ${what} first. Steps: docs/migrate-from-codepush.md`);
+    return fail(`shipvo: this app uses ${what}. Two over-the-air systems would fight over the bundle, so I stopped and changed nothing.\n${p.expoUpdates ? "Run `shipvo migrate --plan` to see the steps. Guide: docs/migrate-from-eas-update.md" : "Remove react-native-code-push first. Steps: docs/migrate-from-codepush.md"}`);
   }
   let manifest: string | null = null, infoPlist: string | undefined;
   if (bare) {
