@@ -144,15 +144,14 @@ Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TO
          (self-hosting instead? see docs/self-hosting.md)
 AI agents: npx -y @shipvo/mcp points Claude / Cursor / ChatGPT at the simulator; then open_app("${appId}")
 
-Install first: npm install (or pnpm / bun), then npx playwright install chromium
-
 Next steps:
   1. cd ${dirArg}
-  2. npx shipvo doctor             # setup checks
-  3. npx shipvo app create ${appId}   # register the app (run shipvo login first)
-  4. npx shipvo publish            # send your first update
-  5. npx shipvo sim                # open the app in the simulator, for you or an agent
-  6. npx shipvo preview            # get a link you can open on any phone
+  2. npm install                   # or pnpm install / bun install; needed before any shipvo command
+  3. npx shipvo sim                # open the app on a simulated phone in your browser
+  4. npx shipvo doctor             # setup checks
+  5. npx shipvo app create ${appId}   # register the app (run npx shipvo login first)
+  6. npx shipvo publish            # send your first update
+  7. npx shipvo preview            # get a link you can open on any phone
 `);
 }
 
