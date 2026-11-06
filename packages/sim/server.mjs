@@ -10,6 +10,7 @@ import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
+import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -169,6 +170,42 @@ async function boot(s, url) {
   if (r.revert) { await s.page.goto(r.url, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); }
   await showBanner(s);
 }
+// Fetch layer. Mock rules win; otherwise fetch/XHR run under the session's network profile (default online, untouched).
+async function ensureNetworkRoute(s, page) {
+  if (s.mockRoute) return;
+  s.mockRoute = true;
+  await page.route("**/*", async (route) => {
+    const req = route.request();
+    const type = req.resourceType();
+    if (type !== "fetch" && type !== "xhr") return route.fallback();
+    const rule = (s.mocks ?? []).find((m) => (!m.method || m.method === req.method()) && m.match(req.url()));
+    if (rule) {
+      if (rule.delayMs) await new Promise((r) => setTimeout(r, rule.delayMs));
+      // The app page may come from another origin, so the stub must pass the browser's CORS check.
+      return route.fulfill({ status: rule.status, body: rule.body, headers: { "access-control-allow-origin": "*", ...rule.headers } }).catch(() => {});
+    }
+    if (!s.profiled) return route.fallback();
+    try {
+      const { res } = await s.profiled(req.url(), { method: req.method(), body: req.postDataBuffer() ?? undefined, route });
+      await route.fulfill({ response: res }).catch(() => {});
+    } catch { await route.abort("internetdisconnected").catch(() => {}); }
+  });
+}
+
+// Set the session's network profile. Throws unknown_profile for a bad name. Logged in device_log as simulated.
+async function setNetworkProfile(s, page, name) {
+  let profile; try { profile = getProfile(name); } catch (e) { throw new SimError(e.code, e.message); }
+  const from = s.netProfile ?? "online";
+  s.netProfile = name;
+  s.profiled = name === "online" ? null : applyProfile(async (_url, init) => {
+    // Playwright's APIResponse has headers() as a method. A chunked reply has no content-length, so use the body size.
+    const res = await init.route.fetch(); const headers = res.headers(); const size = String((await res.body()).length);
+    return { res, headers: { get: (n) => { const k = String(n).toLowerCase(); return headers[k] ?? (k === "content-length" ? size : null); } } };
+  }, profile, { clock: { sleep: (ms) => new Promise((r) => setTimeout(r, ms)) } });
+  if (s.profiled) await ensureNetworkRoute(s, page);
+  (s.netLog ??= []).push({ at: Date.now(), name: "network_profile", profile: name, from, source: "simulated" });
+}
+
 class SimError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
 async function screen(page) {
@@ -339,20 +376,10 @@ async function act(id, body) {
     case "set_network_mocks": {
       let rules; try { rules = parseMockRules(body.rules ?? []); } catch (e) { throw new SimError(e.code ?? "mock_invalid", e.message); }
       s.mocks = rules;
-      if (!s.mockRoute) {
-        s.mockRoute = true;
-        await page.route("**/*", async (route) => {
-          const req = route.request();
-          const type = req.resourceType();
-          const rule = (type === "fetch" || type === "xhr") && (s.mocks ?? []).find((m) => (!m.method || m.method === req.method()) && m.match(req.url()));
-          if (!rule) return route.fallback();
-          if (rule.delayMs) await new Promise((r) => setTimeout(r, rule.delayMs));
-          // The app page may come from another origin, so the stub must pass the browser's CORS check.
-          await route.fulfill({ status: rule.status, body: rule.body, headers: { "access-control-allow-origin": "*", ...rule.headers } }).catch(() => {});
-        });
-      }
+      await ensureNetworkRoute(s, page);
       break;
     }
+    case "set_network_profile": { await setNetworkProfile(s, page, body.profile); break; }
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
     case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
       if (body.action === "browser_open" && body.url) { await phoneBrowser(s); if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
@@ -373,7 +400,7 @@ async function act(id, body) {
         }
       } catch (e) { throw e.code ? new SimError(e.code, e.message) : e; }
     }
-    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log, ...s.apps.log, ...s.update.log, ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log, ...s.apps.log, ...s.update.log, ...(s.netLog ?? []), ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
@@ -406,7 +433,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
