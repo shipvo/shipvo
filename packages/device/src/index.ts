@@ -135,6 +135,8 @@ export const device: Device = {
 };
 export const setOnline = (o: boolean) => { online = o; netSubs.forEach((f) => f(o)); };
 export const openUrl = (url: string) => Linking.openURL(url);
+/** The URL that opened the app, or null. */
+export const getInitialUrl = async (): Promise<string | null> => (await Linking.getInitialURL()) ?? null;
 /** Call `cb` with each URL opened in the app (deep links). Returns an unsubscribe function. */
 export const onUrl = (cb: (url: string) => void) => { const s = Linking.addEventListener("url", (e) => cb(e.url)); return () => s.remove(); };
 

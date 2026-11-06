@@ -168,3 +168,15 @@ test("openUrl: a page the Browser app refuses is logged as refused and openUrl a
   assert.match(entries, /browser_open_refused[^}]*host_not_allowed/); assert.match(entries, /bad_url/);
   assert.equal((entries.match(/browser_opened/g) ?? []).length, 1);   // only the accepted page
 });
+
+test("openUrl: through the phone, no_handler and invalid_url reject with a code; the app sees getInitialUrl", async () => {
+  try {
+    globalThis.__pnOpenApp = async (u) => (u.startsWith("good") ? true : { code: u.startsWith("junk") ? "invalid_url" : "no_handler", message: "x" });
+    await dev.openLink("good://a");
+    await assert.rejects(dev.openLink("nope://a"), { code: "no_handler" });
+    await assert.rejects(dev.openLink("junk"), { code: "invalid_url" });
+  } finally { delete globalThis.__pnOpenApp; }
+  assert.match(JSON.stringify(dev.log()), /url_refused[^}]*no_handler/);
+  dev.openUrl("myapp://item/1");
+  assert.equal(dev.initialUrl(), "myapp://item/1");
+});

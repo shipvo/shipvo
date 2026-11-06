@@ -70,12 +70,12 @@ test("act for an unknown session: no_session", async () => {
   assert.match(r.error, /no session 'nobody'/);
 });
 
-test("empty or missing url: bad_url", async () => {
+test("empty or missing url: invalid_url", async () => {
   assert.ok((await call("/session", { session: "c" })).ok);
   for (const body of [{ action: "open_url" }, { action: "open_url", url: "" }, { action: "open_url", url: 5 }]) {
     const r = await act("c", body);
     assert.equal(r.ok, false);
-    assert.equal(r.code, "bad_url");
+    assert.equal(r.code, "invalid_url");
   }
 });
 

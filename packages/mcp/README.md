@@ -33,7 +33,8 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `unknown_app` | The app id is not one this server or key can open. | Call `list_apps` and use an id from it. |
 | `sim_timeout` | The simulator did not answer in time. The action may have run. | Call `screen` to see where the app is. Do not repeat the action blindly. |
 | `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan and a one-time `challenge`. | Show the plan to the owner and ask them to approve it at `challenge.approval_url` in the admin. Then call again with the same args and `approval: <challenge id>`. `confirm: true` does nothing. |
-| `bad_url` | `open_url` got a URL the app cannot take. | Fix the URL and call again. |
+| `invalid_url` | `open_url` got text that is not a URL with a scheme. | Fix the URL and call again. |
+| `no_handler` | No installed app declares the URL's scheme in `phone.json`. | Install the app, or use a scheme an installed app declares. |
 | `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
 | `already_locked` | `lock` was called on a locked phone. | Call `unlock` if you want to use the app. |

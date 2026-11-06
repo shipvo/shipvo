@@ -22,7 +22,7 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
-import { AppsError, loadProfile, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
+import { AppsError, loadProfile, profilePatch, resolveUrl, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -129,6 +129,8 @@ async function newSession(id, opts = {}) {
   const ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
+  // Linking.openURL for another app's scheme lands here: the owning app comes to the front and gets the URL (see openUrlOnPhone).
+  await ctx.exposeFunction("__pnOpenApp", async (url) => { const s = sessions.get(id); return s ? openUrlOnPhone(s, String(url)) : { code: "no_session", message: "no session" }; });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
   const errors = [];
@@ -224,6 +226,36 @@ async function screen(page) {
 
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
 
+// Bring an installed app to the front (tap its icon). Shared by switch_app and deep links.
+async function switchToApp(s, id) {
+  const { page } = s;
+  const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
+  // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
+  // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
+  let dest = null;
+  const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
+  if (am) dest = (await resolveApp(am[1])).url;
+  else if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^fixture:/i.test(url)) {
+    try { dest = (await checkUrl(url, { allowPrivate: false, allowHosts: [] })).href; }
+    catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
+  }
+  switchApp(s.apps, id, s.nav);
+  if (dest && s.page.url() !== dest) { await s.page.goto(dest, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); }
+  await s.page.evaluate(setVisibilityInPage, "active");
+}
+// A deep link from outside the app (open_url) or from inside it (Linking.openURL). Resolves true, or { code, message }.
+// An installed app that declares the scheme comes to the front and gets the URL; the app sees it as getInitialURL and the url event.
+async function openUrlOnPhone(s, url) {
+  let target;
+  try { target = resolveUrl(s.apps, url); } catch (e) { if (e instanceof AppsError) return { code: e.code, message: e.message }; throw e; }
+  try { if (target && target.id !== s.apps.current_app) await switchToApp(s, target.id); }
+  catch (e) { if (e instanceof AppsError || e instanceof SimError) return { code: e.code, message: e.message }; throw e; }
+  const handled = await s.page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), url);
+  if (!handled) return { code: "no_url_listener", message: `the app has no URL listener, so it did not handle ${url}. Register one with onUrl from @shipvo/device.` };
+  if (target) s.apps.log.push({ at: Date.now(), name: "open_url", app: target.id, url, source: "simulated" });
+  return true;
+}
+
 async function act(id, body) {
   const s = sessions.get(id); if (!s) throw new SimError("no_session", `no session '${id}': call /session first`);
   const { page } = s;
@@ -280,21 +312,7 @@ async function act(id, body) {
       try {
         if (body.action === "install_app") installApp(s.apps, id, Array.isArray(body.catalog) ? body.catalog : s.apps.store);
         else if (body.action === "uninstall_app") uninstallApp(s.apps, id, s.nav);
-        else {
-          const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
-          // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
-          // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
-          let dest = null;
-          const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
-          if (am) dest = (await resolveApp(am[1])).url;
-          else if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^fixture:/i.test(url)) {
-            try { dest = (await checkUrl(url, { allowPrivate: false, allowHosts: [] })).href; }
-            catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
-          }
-          switchApp(s.apps, id, s.nav);
-          if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
-          await page.evaluate(setVisibilityInPage, "active");
-        }
+        else await switchToApp(s, id);
       } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       if (body.action === "uninstall_app" && s.nav.where === "home") await page.evaluate(setVisibilityInPage, "background");
       const where = s.nav.where;
@@ -371,9 +389,7 @@ async function act(id, body) {
     case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
     case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {
-      if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
-      const handled = await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url);
-      if (!handled) throw new SimError("no_url_listener", `the app has no URL listener, so it did not handle ${body.url}. Register one with onUrl from @shipvo/device.`);
+      const r = await openUrlOnPhone(s, body.url); if (r !== true) throw new SimError(r.code, r.message);
       await page.waitForTimeout(400); break;
     }
     // Stub fetch/XHR on the page. Rules live on the session; unmatched requests continue untouched.

@@ -1,0 +1,3 @@
+- sim: installed apps declare URL schemes in `phone.json` (`schemes`). `open_url` and `Linking.openURL` switch to the owning app and deliver the URL through `Linking.getInitialURL` and the `url` event.
+- mcp: `open_url` has two new typed errors, `no_handler` and `invalid_url`. An empty or malformed URL now returns `invalid_url` instead of `bad_url`; change any code that checks for `bad_url` from `open_url`.
+- device: new `getInitialUrl` export. `openUrl` in the simulator rejects with `no_handler` or `invalid_url`.

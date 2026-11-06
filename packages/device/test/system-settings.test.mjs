@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
-register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { if (s === "react-native") return { url: "data:text/javascript,export const Appearance={},PixelRatio={},AccessibilityInfo={},I18nManager={}", shortCircuit: true }; try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
+register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { if (s === "react-native") return { url: "data:text/javascript,export const Appearance={},PixelRatio={},AccessibilityInfo={},I18nManager={},Linking={}", shortCircuit: true }; try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
 
 const listeners = {};
 const win = { dispatchEvent: (e) => { (listeners[e.type] ?? []).forEach((f) => f(e)); return true; }, addEventListener: (t, f) => { (listeners[t] ??= []).push(f); } };
@@ -50,4 +50,15 @@ test("each change is logged as simulated; reset restores the defaults", () => {
   assert.ok(l.some((e) => e.detail.key === "fontSize" && e.detail.value === "largest" && e.source === "simulated"));
   dev.reset(); assert.deepEqual(dev.system(), { darkMode: false, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false });
   assert.equal(rn.I18nManager.getConstants().isRTL, false);
+});
+
+test("Linking: openURL goes through the phone; getInitialURL and the url event see delivered links", async () => {
+  const L = {}, seen = [];
+  const calls = [];
+  installSystemSettings({ system: () => ({}), openLink: async (u) => { calls.push(u); }, initialUrl: () => "myapp://item/42" }, { Linking: L }, win);
+  await L.openURL("appb://x"); assert.deepEqual(calls, ["appb://x"]);
+  assert.equal(await L.getInitialURL(), "myapp://item/42");
+  L.addEventListener("url", (e) => seen.push(e.url));
+  win.dispatchEvent({ type: "pn:url", detail: "myapp://item/43" });
+  assert.deepEqual(seen, ["myapp://item/43"]);
 });

@@ -92,6 +92,7 @@ function announceStatus(before: string, record = true, beforeSettings = "") {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pn:status", { detail }));
 }
 const urlSubs = new Set<(url: string) => void>();
+let initialUrl: string | null = null;
 const netSubs = new Set<(o: boolean) => void>(); const openSubs = new Set<(n: Notification) => void>(); const recvSubs = new Set<(n: Notification) => void>();
 
 // ---- system sheets (plain DOM so they sit above the app and read as dialogs) ----
@@ -311,6 +312,9 @@ g.__pnDevice = {
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
+  /** What the app's Linking.openURL does: through the phone, so other apps can take the link. */
+  openLink: (url: string) => openUrl(url),
+  initialUrl: () => initialUrl,
   capabilities: () => device.capabilities(),
   /** What the status bar shows: network, airplane and battery. */
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
@@ -347,10 +351,25 @@ function deliverUrl(url: string): boolean | Promise<boolean> {
     }
     log("browser_opened", { url }); return true;
   }
+  initialUrl = url;
   window.dispatchEvent(new CustomEvent("pn:url", { detail: url }));
   urlSubs.forEach((f) => f(url)); log("url_opened", { url, handled: urlSubs.size > 0 });
   return urlSubs.size > 0;
 }
-export const openUrl = async (url: string) => { deliverUrl(url); };
+/** The URL that opened the app (Linking.getInitialURL), or null. Set when the phone delivers a deep link. */
+export const getInitialUrl = async (): Promise<string | null> => initialUrl;
+/**
+ * Linking.openURL. A link to another app's scheme goes through the phone: the owning app comes to the front and gets it.
+ * Rejects with `code` no_handler (no installed app has the scheme) or invalid_url. Web pages open in the Browser app.
+ */
+export const openUrl = async (url: string) => {
+  const phone = (g as { __pnOpenApp?: (u: string) => Promise<true | { code: string; message: string }> }).__pnOpenApp;
+  if (phone && !/^https?:\/\//i.test(url)) {
+    const r = await phone(url);
+    if (r !== true && (r.code === "no_handler" || r.code === "invalid_url")) { log("url_refused", { url, code: r.code }); throw Object.assign(new Error(r.message), { code: r.code }); }
+    return;
+  }
+  deliverUrl(url);
+};
 // UI-owned bridges exist on native; on the simulated device the sheets are the UI, so they resolve immediately.
 export const scanBridge = { subscribe: () => () => {}, current: () => null, finish: () => {} };

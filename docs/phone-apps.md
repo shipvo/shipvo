@@ -55,6 +55,18 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 
 **Private addresses are refused.** `localhost`, `127.x`, `10.x`, `192.168.x`, `169.254.x`, CGNAT addresses, `.local` and `.internal` fail with `host_not_allowed`. To allow them, pass `allow_private: true` (all of them) or `allow_hosts: ["my-dev-box.local"]` (only these). Each navigation is logged in `device_log`. In the app, `openUrl` logs `browser_open_refused` and returns `false` when the Browser refuses a page, so `await` it.
 
+## Open links between installed apps
+
+Give each app in `phone.json` the URL schemes it handles:
+
+```json
+{ "apps": [{ "id": "shop", "name": "Shop", "url": "app://shop", "schemes": ["myshop"] }] }
+```
+
+`open_url(session, url)` and `Linking.openURL(url)` in an app do the same thing. The app that declares the scheme comes to the front and gets the URL through `Linking.getInitialURL` and the `url` event. It works the same in the Android and iPhone skins. The open is recorded in `device_log` with `simulated: true`.
+
+Errors: `no_handler` (no installed app declares the scheme) and `invalid_url` (the text is not a URL with a scheme). When no installed app declares a scheme, the link goes to the running app as before.
+
 ## Troubleshooting
 
 | You see | Why | Fix |

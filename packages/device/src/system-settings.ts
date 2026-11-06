@@ -1,11 +1,11 @@
 // Makes the app see the simulated system settings: Appearance (dark mode), PixelRatio.getFontScale (font size),
 // AccessibilityInfo (bold text, reduce motion), I18nManager (RTL) and Intl (language). It patches the app's own
 // react-native objects in place, then fires the same events a phone would.
-import { Appearance, PixelRatio, AccessibilityInfo, I18nManager } from "react-native";
+import { Appearance, PixelRatio, AccessibilityInfo, I18nManager, Linking } from "react-native";
 
 export const FONT_SCALES = { small: 0.85, default: 1, large: 1.15, largest: 1.3 } as const;
 
-export function installSystemSettings(dev: { system(): any }, rn: any = { Appearance, PixelRatio, AccessibilityInfo, I18nManager }, w: any = globalThis) {
+export function installSystemSettings(dev: { system(): any; openLink?(u: string): Promise<void>; initialUrl?(): string | null }, rn: any = { Appearance, PixelRatio, AccessibilityInfo, I18nManager, Linking }, w: any = globalThis) {
   const cur = () => dev.system();
   const subs: Record<string, Set<(v: any) => void>> = { colorScheme: new Set(), boldTextChanged: new Set(), reduceMotionChanged: new Set() };
   const { Appearance: A, PixelRatio: P, AccessibilityInfo: AI, I18nManager: I } = rn;
@@ -21,6 +21,18 @@ export function installSystemSettings(dev: { system(): any }, rn: any = { Appear
     AI.addEventListener = (name: string, fn: (v: any) => void) => {
       if (subs[name] && name !== "colorScheme") { subs[name].add(fn); return { remove: () => subs[name].delete(fn) }; }
       return orig ? orig(name, fn) : { remove() {} };
+    };
+  }
+  // Deep links: Linking.openURL goes through the phone; getInitialURL and the "url" event see links the phone delivers.
+  const L = rn.Linking;
+  if (L && dev.openLink) {
+    L.openURL = (u: string) => dev.openLink!(u);
+    L.getInitialURL = async () => dev.initialUrl?.() ?? null;
+    const origAdd = L.addEventListener?.bind(L);
+    L.addEventListener = (name: string, fn: (e: { url: string }) => void) => {
+      if (name !== "url") return origAdd ? origAdd(name, fn) : { remove() {} };
+      const h = (e: any) => fn({ url: e.detail }); w.addEventListener?.("pn:url", h);
+      return { remove: () => w.removeEventListener?.("pn:url", h) };
     };
   }
   const applyRtl = () => {

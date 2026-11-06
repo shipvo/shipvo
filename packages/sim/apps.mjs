@@ -14,7 +14,8 @@ export const STORE_FIXTURE = [
 ];
 
 const text = (v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n);
-const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20) });
+const schemeOf = (s) => String(s).toLowerCase().replace(/:\/*$/, "");
+const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), schemes: (Array.isArray(a.schemes) ? a.schemes : []).map(schemeOf).filter((s) => /^[a-z][a-z0-9+.-]*$/.test(s)) });
 
 /** Phone state for apps. `installed_apps` is a list of { id, name, url, version }; `current_app` is an id or null (the app the phone was started with). */
 export function createApps(profile = {}) {
@@ -37,6 +38,7 @@ export function loadProfile(json) {
   for (const a of apps) {
     if (!a || typeof a.id !== "string" || !/^[a-z0-9-]+$/.test(a.id)) throw new AppsError("bad_profile", "every app needs an id of lowercase letters, digits and dashes");
     if (seen.has(a.id)) throw new AppsError("bad_profile", `app '${a.id}' is listed twice`);
+    if (a.schemes !== undefined && (!Array.isArray(a.schemes) || a.schemes.some((x) => typeof x !== "string" || !/^[a-z][a-z0-9+.-]*(:\/*)?$/i.test(x)))) throw new AppsError("bad_profile", `app '${a.id}': 'schemes' must be a list of URL schemes such as "myapp"`);
     seen.add(a.id); st.installed_apps.push(entry(a));
   }
   if (p.current_app != null) { if (!seen.has(p.current_app)) throw new AppsError("bad_profile", `current_app '${p.current_app}' is not in 'apps'`); st.current_app = p.current_app; }
@@ -74,6 +76,22 @@ export function uninstallApp(st, id, nav) {
 export function switchApp(st, id, nav) {
   if (!st.installed_apps.some((a) => a.id === id)) throw new AppsError("not_installed", `'${id}' is not installed`);
   st.current_app = id; if (nav) nav.where = "app"; note(st, "switch_app", id); return st;
+}
+
+/**
+ * Who gets a deep link. Returns { id } for the installed app that declares the URL's scheme, or null when no installed app
+ * declares any scheme (the caller keeps the old behaviour: the running app gets it). Throws invalid_url or no_handler.
+ */
+export function resolveUrl(st, url) {
+  const m = typeof url === "string" ? /^([a-z][a-z0-9+.-]*):\/\/\S*$/i.exec(url) : null;
+  if (!m) throw new AppsError("invalid_url", `not a URL with a scheme, such as myapp://item/3: ${String(url).slice(0, 80)}`);
+  const scheme = m[1].toLowerCase();
+  if (scheme === "http" || scheme === "https") return null;
+  const declared = st.installed_apps.filter((a) => a.schemes?.length);
+  if (!declared.length) return null;
+  const app = declared.find((a) => a.schemes.includes(scheme));
+  if (!app) throw new AppsError("no_handler", `no installed app handles '${scheme}://'. Schemes: ${declared.flatMap((a) => a.schemes).join(", ")}`);
+  return { id: app.id };
 }
 
 /** Plain text for an agent: the installed apps, then the Store. */
@@ -117,7 +135,7 @@ export const storeCss = [
 export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
 var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=${JSON.stringify(STORE_FIXTURE)};
-var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
+var schemeOf=${schemeOf.toString()},entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;

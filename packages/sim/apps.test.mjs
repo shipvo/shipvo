@@ -72,3 +72,15 @@ test("the Store screen lists the fixture apps and a tap installs one, in both sk
     }
   } finally { await b.close(); }
 });
+
+test("resolveUrl: the app that declares the scheme, no_handler, invalid_url", async () => {
+  const { resolveUrl } = await import("./apps.mjs");
+  const st = loadProfile({ apps: [{ id: "a", schemes: ["appa"] }, { id: "b", schemes: ["Appb://", "bee"] }] });
+  assert.deepEqual(resolveUrl(st, "bee://x/1"), { id: "b" });
+  assert.deepEqual(resolveUrl(st, "APPB://x"), { id: "b" });
+  assert.equal(resolveUrl(st, "https://example.com"), null);
+  assert.equal(code(() => resolveUrl(st, "nope://x")), "no_handler");
+  for (const bad of ["x", "", "a b://c", null]) assert.equal(code(() => resolveUrl(st, bad)), "invalid_url");
+  assert.equal(resolveUrl(loadProfile({ apps: [{ id: "a" }] }), "myapp://x"), null);   // no schemes declared: old behaviour
+  assert.equal(code(() => loadProfile({ apps: [{ id: "a", schemes: [5] }] })), "bad_profile");
+});
