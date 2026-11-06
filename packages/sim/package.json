@@ -26,6 +26,7 @@
     "app-name.mjs",
     "frame.mjs",
     "lumi.mjs",
+    "guide.mjs",
     "phone-browser.mjs",
     "browser-app.mjs",
     "ws-lite.mjs",
@@ -40,6 +41,8 @@
     "mock-rules.mjs",
     "screen-rules.mjs",
     "push-notification.mjs",
+    "network-profiles.mjs",
+    "apps.mjs",
     "README.md"
   ],
   "peerDependencies": {

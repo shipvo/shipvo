@@ -67,6 +67,11 @@ describe("frame page", () => {
     expect(h).toContain('data-part="dynamic-island"'); expect(h).toContain('data-part="home-indicator"');
     expect(h).not.toContain("punch-hole"); expect(h).toContain("Allow While Using App");
   });
+  it("adds Lumi's first-run guide only when Lumi is on", () => {
+    const withLumi = (lumi: boolean) => ((o: any) => renderFrame({ ...o, lumi })) as any;
+    expect(runFramePage("android", "Tide", withLumi(true))).toContain('data-part="lumi-guide"');
+    expect(runFramePage("android", "Tide", withLumi(false))).not.toContain('data-part="lumi-guide"');
+  });
 });
 
 describe("frame page, live status bar", () => {
