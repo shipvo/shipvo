@@ -84,7 +84,7 @@ Three kinds of data: remote sources, local collections and computed values.
   "charges": {
     "source": "http",
     "get": "https://api.stripe.com/v1/charges",
-    "query": { "limit": 100, "created[gte]": "{{ startOf('day', now()) | unix }}" },
+    "query": { "limit": 100, "created[gte]": "{{ unix(startOf('day', now)) }}" },
     "auth": { "secret": "STRIPE_KEY", "type": "bearer" },
     "select": "data",
     "cache": "5m",
@@ -97,7 +97,7 @@ Three kinds of data: remote sources, local collections and computed values.
   },
   "revenueToday": {
     "source": "computed",
-    "value": "{{ sum(filter(charges, c => c.status == 'succeeded'), 'amount') / 100 }}"
+    "value": "{{ sum(charges.filter(c, c.status == 'succeeded').map(c, c.amount)) / 100 }}"
   }
 }
 ```
@@ -114,16 +114,19 @@ Screen-independent values the app keeps while running (filters, selected tab, fo
 "state": { "period": { "type": "enum", "options": ["day", "week", "month"], "default": "day" } }
 ```
 
-## 7. Expressions
+## 7. Expressions (CEL)
 
-A small, safe expression language inside `{{ }}`, like spreadsheet formulas. It cannot loop forever, call the network or reach anything undeclared. Evaluation has a step limit.
+Expressions inside `{{ }}` are [CEL, the Common Expression Language](https://cel.dev) (decided 6 Nov 2026), evaluated with [`@bufbuild/cel`](https://github.com/bufbuild/cel-es). CEL has no loops or recursion, cannot reach the network or anything undeclared, and its evaluation cost is bounded. Every expression is type-checked during validation against the app's data, state and route types, so a wrong field name is an error with a suggestion before anything runs.
 
-- Values: numbers, strings, booleans, null, lists, objects, dates, money.
-- Operators: `+ - * / %`, comparisons, `&& || !`, `? :`, `??`.
-- Access: `data.charges`, `state.period`, `item.amount`, `route.params.id`.
-- Lambdas only as arguments: `c => c.status == 'paid'`.
-- Pipes for formatting: `{{ revenueToday | money('EUR') }}`.
-- Functions (v0): `sum avg min max count filter map sort group first last unique`, `now today startOf endOf addDays diff formatDate unix`, `money number percent compact`, `lower upper trim contains split join`, `if coalesce`.
+- Names in scope: `data.<name>` (or the bare name for data entries), `state.<name>`, `item` (inside list templates), `input` (inside actions), `result` (after a `call` step), `route.params`, `now`, `person` (locale, time zone, language).
+- CEL macros for lists: `charges.filter(c, c.status == 'succeeded')`, `charges.map(c, c.amount)`, `charges.exists(c, c.status == 'failed')`, `charges.all(c, c.paid)`.
+- Shipvo function library, registered with types so the checker knows them:
+  - numbers and lists: `sum(list<num>)`, `avg`, `min`, `max`, `count(list)`, `unique(list, field?)`, `sortBy(list, field, 'asc'|'desc')`, `groupBy(list, field)`, `first`, `last`, `take(list, n)`;
+  - dates: `today()`, `startOf(unit, ts)`, `endOf(unit, ts)`, `addDays(ts, n)`, `diffDays(a, b)`, `formatDate(ts, pattern)`, `unix(ts)`;
+  - formatting (uses the person's locale): `money(amount, currency)`, `number(x, decimals?)`, `percent(x)`, `compact(x)`;
+  - text: `lower`, `upper`, `trim`, `split`, `join`, plus CEL's built-in `contains`, `startsWith`, `matches`;
+  - fallbacks: `orElse(value, fallback)`, or CEL's `has(x.field) ? x.field : fallback`.
+- Limits: 2,000 characters per expression and a cost limit per evaluation (CEL cost estimation); over-limit expressions are validation errors.
 
 ## 8. Screens and navigation
 
@@ -165,11 +168,11 @@ Example, the "Today" screen:
 
 ```json
 { "type": "stack", "gap": "lg", "children": [
-  { "type": "stat", "label": "Revenue today", "value": "{{ revenueToday | money('EUR') }}", "delta": "{{ percent(revenueToday / revenueYesterday - 1) }}", "variant": "hero" },
+  { "type": "stat", "label": "Revenue today", "value": "{{ money(revenueToday, 'EUR') }}", "delta": "{{ percent(revenueToday / revenueYesterday - 1) }}", "variant": "hero" },
   { "type": "segmented", "label": "Period", "bind": "state.period", "options": ["day", "week", "month"] },
-  { "type": "chart", "kind": "area", "from": "charges", "x": "created | formatDate('day')", "y": "sum(amount) / 100", "label": "Revenue by day" },
-  { "type": "list", "label": "Failed payments", "from": "{{ filter(charges, c => c.status == 'failed') }}",
-    "item": { "title": "{{ item.billing_details.name ?? 'Unknown' }}", "subtitle": "{{ item.failure_message }}", "trailing": "{{ item.amount / 100 | money(item.currency) }}" },
+  { "type": "chart", "kind": "area", "from": "charges", "x": "{{ formatDate(item.created, 'day') }}", "y": "{{ item.amount / 100 }}", "aggregate": "sum", "label": "Revenue by day" },
+  { "type": "list", "label": "Failed payments", "from": "{{ charges.filter(c, c.status == 'failed') }}",
+    "item": { "title": "{{ orElse(item.billing_details.name, 'Unknown') }}", "subtitle": "{{ item.failure_message }}", "trailing": "{{ money(item.amount / 100, item.currency) }}" },
     "onPress": { "navigate": "charge", "params": { "id": "{{ item.id }}" } },
     "empty": { "message": "No failed payments today" } }
 ] }
@@ -185,7 +188,7 @@ Actions are named operations. Each one is callable from the UI and is automatica
     "description": "Revenue, new customers and failed payments for a period.",
     "input": { "period": { "type": "enum", "options": ["day", "week", "month"], "default": "day" } },
     "returns": { "revenue": "money", "customers": "number", "failed": "number" },
-    "do": [ { "refresh": "charges" }, { "return": { "revenue": "{{ revenueToday }}", "customers": "{{ count(unique(charges, 'customer')) }}", "failed": "{{ count(filter(charges, c => c.status == 'failed')) }}" } } ]
+    "do": [ { "refresh": "charges" }, { "return": { "revenue": "{{ revenueToday }}", "customers": "{{ count(unique(charges, 'customer')) }}", "failed": "{{ count(charges.filter(c, c.status == 'failed')) }}" } } ]
   },
   "add_goal": {
     "description": "Add a revenue goal.",
@@ -205,7 +208,7 @@ Rules:
 ## 11. Schedules and notifications
 
 ```json
-"schedules": [ { "id": "morning", "cron": "0 8 * * *", "tz": "person", "do": [ { "call": "stripe_summary", "with": { "period": "day" } }, { "notify": { "title": "Stripe today", "body": "{{ result.revenue | money('EUR') }}, {{ result.failed }} failed" } } ] } ]
+"schedules": [ { "id": "morning", "cron": "0 8 * * *", "tz": "person", "do": [ { "call": "stripe_summary", "with": { "period": "day" } }, { "notify": { "title": "Stripe today", "body": "{{ money(result.revenue, 'EUR') }}, {{ result.failed }} failed" } } ] } ]
 ```
 
 Schedules run on Shipvo's edge in the person's time zone. Results can notify the phone and post back to the assistant's chat where the platform supports it.
@@ -234,7 +237,7 @@ Warnings (shown, not refused): touch targets under 44 px, more than three type s
 
 ## 16. Open questions
 
-1. Expression language: write our own, or adopt an existing safe one (CEL, JSONata) with our functions added?
+1. ~~Expression language~~: decided, CEL with `@bufbuild/cel` and the Shipvo function library (section 7).
 2. How much custom styling per block before apps become inconsistent: tokens only, or limited per-block overrides?
 3. Sharing: can a person publish a personal app as a template for others (with secrets removed)?
 4. Real phones: ship the engine inside the native shell so specs run natively, or only export to code?
