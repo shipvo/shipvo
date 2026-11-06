@@ -94,7 +94,9 @@ export function createNetProxy(o: { tokens: string[]; port: () => number; profil
     const failed = profile.failureRate >= 1 || random() < profile.failureRate;
     const bytesMs = (n: number) => (n && Number.isFinite(profile.downKbps) && profile.downKbps > 0 ? (n * 8) / profile.downKbps : 0);
     await sleep(profile.latencyMs + bytesMs(body.length));
-    if (failed) { record(599, "network request failed"); res.writeHead(599, { "x-shipvo-net-error": "1", "content-type": "text/plain" }); return void res.end("network request failed"); }
+    // XMLHttpRequest cannot tell a 599 from a reply, so drop the connection and let the browser raise its own `error` event.
+    const dropForXhr = () => { if (req.headers["x-shipvo-xhr"]) { req.socket.destroy(); return true; } return false; };
+    if (failed) { record(599, "network request failed"); if (dropForXhr()) return; res.writeHead(599, { "x-shipvo-net-error": "1", "content-type": "text/plain" }); return void res.end("network request failed"); }
     let jar = jars.get(session); if (!jar) jars.set(session, jar = new CookieJar());
     const headers = new Headers();
     for (const [k, v] of Object.entries(spec.headers ?? {})) if (!HOP.has(k.toLowerCase()) && !["cookie", "origin", "referer"].includes(k.toLowerCase())) headers.set(k, v);
@@ -117,7 +119,7 @@ export function createNetProxy(o: { tokens: string[]; port: () => number; profil
         cur = next;
       }
     }
-    catch (e) { record(599, (e as Error).message); res.writeHead(599, { "x-shipvo-net-error": "1", "content-type": "text/plain" }); return void res.end(`network request failed: ${(e as Error).message}`); }
+    catch (e) { record(599, (e as Error).message); if (dropForXhr()) return; res.writeHead(599, { "x-shipvo-net-error": "1", "content-type": "text/plain" }); return void res.end(`network request failed: ${(e as Error).message}`); }
     const out: Record<string, string> = { "x-shipvo-final-url": cur.href, "cache-control": "no-store" };
     up.headers.forEach((v, k) => { if (!HOP.has(k)) out[k] = v; });
     res.writeHead(up.status, out);
@@ -176,7 +178,7 @@ function netClientMain(win: any, cfg: { token: string; session: string; profile:
       const n = this.__net; if (!n) return send.call(this, body);
       const t0 = Date.now();
       if (!cfg.online()) { cfg.log({ method: n.method, host: n.url.host, status: 0, ms: 0 }); win.setTimeout(() => { this.dispatchEvent(new win.ProgressEvent("error")); }, 0); return; }
-      const m = meta(n.url, n.method, n.headers); for (const k of Object.keys(m)) setH.call(this, k, (m as any)[k]);
+      const m = { ...meta(n.url, n.method, n.headers), "x-shipvo-xhr": "1" }; for (const k of Object.keys(m)) setH.call(this, k, (m as any)[k]);
       this.addEventListener("loadend", () => cfg.log({ method: n.method, host: n.url.host, status: this.status, ms: Date.now() - t0 }));
       return send.call(this, n.method === "GET" || n.method === "HEAD" ? null : body);
     };

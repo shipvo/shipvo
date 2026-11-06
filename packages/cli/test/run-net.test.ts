@@ -27,8 +27,8 @@ const start = async (platform: "android" | "ios") => {
   // The page's own token is in the frame page; read it the way the browser would.
   const page = await (await fetch(origin + "/")).text();
   const token = /data-token="([0-9a-f]+)"/.exec(page)![1];
-  const call = (target: string, o: { method?: string; body?: string; session?: string; profile?: string; token?: string | null; headers?: Record<string, string> } = {}) => {
-    const h: Record<string, string> = { origin, "x-shipvo-session": o.session ?? "a", "x-shipvo-profile": o.profile ?? "online", "x-shipvo-req": encodeURIComponent(JSON.stringify({ url: target, method: o.method ?? "GET", headers: o.headers ?? {} })) };
+  const call = (target: string, o: { method?: string; body?: string; session?: string; profile?: string; token?: string | null; headers?: Record<string, string>; extra?: Record<string, string> } = {}) => {
+    const h: Record<string, string> = { ...(o.extra ?? {}), origin, "x-shipvo-session": o.session ?? "a", "x-shipvo-profile": o.profile ?? "online", "x-shipvo-req": encodeURIComponent(JSON.stringify({ url: target, method: o.method ?? "GET", headers: o.headers ?? {} })) };
     if (o.token !== null) h["x-shipvo-token"] = o.token ?? token;
     return fetch(origin + "/__shipvo/net", { method: "POST", headers: h, body: o.body });
   };
@@ -47,6 +47,14 @@ describe("run net proxy", () => {
       await s.close(); b.s.close();
     });
   }
+  it("drops the connection for an XMLHttpRequest the profile fails, so the browser raises error", async () => {
+    const { s, call } = await start("android");
+    const r = call("http://127.0.0.1:9/", { profile: "offline", headers: {} });
+    expect((await r).status).toBe(599);
+    const x = await call("http://127.0.0.1:9/", { profile: "offline", extra: { "x-shipvo-xhr": "1" } } as never).then(() => "reply", () => "error");
+    expect(x).toBe("error");
+    await s.close();
+  });
   it("injects the client into the app page", async () => {
     const { s, origin } = await start("android");
     const html = await (await fetch(origin + "/app/")).text();

@@ -41,4 +41,37 @@ describe("run net client", () => {
     await expect(win.fetch("http://api.test/")).rejects.toThrow(TypeError);
     expect(calls).toHaveLength(0);
   });
+  const makeXhr = (online = true) => {
+    const sent: any = { headers: {}, events: [] };
+    class FakeX {
+      open(m: string, u: string) { sent.open = [m, u]; }
+      setRequestHeader(k: string, v: string) { sent.headers[k] = v; }
+      send(b: any) { sent.body = b; }
+      addEventListener() {}
+      dispatchEvent(e: any) { sent.events.push(e.type); }
+    }
+    const win: any = { location: { origin: "http://127.0.0.1:1", href: "http://127.0.0.1:1/app/" }, URL, Request, ProgressEvent: class { constructor(public type: string) {} }, setTimeout: (f: () => void) => f(),
+      fetch: async () => new Response("x"), XMLHttpRequest: FakeX };
+    (0, eval)(netClientSource())(win, { token: "t", session: "s", profile: () => "spotty", online: () => online, log: () => {} });
+    return { x: new win.XMLHttpRequest(), sent };
+  };
+  it("rewrites a cross-origin XMLHttpRequest to the route and marks it as XHR", () => {
+    const { x, sent } = makeXhr();
+    x.open("post", "http://api.test/a"); x.setRequestHeader("content-type", "text/plain"); x.send("b");
+    expect(sent.open).toEqual(["POST", "/__shipvo/net"]);
+    expect(sent.headers["x-shipvo-xhr"]).toBe("1");
+    expect(sent.headers["x-shipvo-token"]).toBe("t");
+    expect(JSON.parse(decodeURIComponent(sent.headers["x-shipvo-req"])).headers).toEqual({ "content-type": "text/plain" });
+  });
+  it("leaves a same-origin XMLHttpRequest alone", () => {
+    const { x, sent } = makeXhr();
+    x.open("GET", "/local"); x.send();
+    expect(sent.open).toEqual(["GET", "/local"]);
+    expect(sent.headers["x-shipvo-token"]).toBeUndefined();
+  });
+  it("raises an error event for an XMLHttpRequest when offline", () => {
+    const { x, sent } = makeXhr(false);
+    x.open("GET", "http://api.test/"); x.send();
+    expect(sent.events).toEqual(["error"]);
+  });
 });

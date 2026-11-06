@@ -38,13 +38,14 @@ The page scales the phone to your window. Add `?dark=1` to the address to see th
 
 ## Your app reaches its backend, with no CORS errors
 
-On a real Android or iOS phone, an app calls its backend directly and there is no CORS. In the simulated phone the app runs in a browser tab, so Shipvo sends every request to another origin (`fetch` and `XMLHttpRequest`) through the `shipvo run` server at `/__shipvo/net`. The server makes the real request from Node and returns the status, headers and body unchanged. Requests to the app's own origin go straight through.
+On Android and iOS, an app calls its backend directly and there is no CORS. In the simulated phone the app runs in a browser tab, so Shipvo sends every request to another origin (`fetch` and `XMLHttpRequest`) through the `shipvo run` server at `/__shipvo/net`. The server makes the real request from Node and returns the status, headers and body unchanged. Requests to the app's own origin go straight through.
 
 - Every method, request bodies, binary data and streaming responses work. A streamed response arrives in chunks.
 - `http://localhost:<port>` and backends on your network work, and `http` backends work from the page.
 - Each phone session has one cookie jar, kept by the server, the way each installed app has its own cookies. Two browser tabs have two jars.
 - The phone's network profile (offline, 2g, 3g, slow-4g, spotty) applies to these requests too.
-- Only the phone page can use the route, with its session token, on the loopback address. Every proxied request is added to the device log with its method, host, status and time.
+- The route is added to pages you open on your own computer. Only that page can use it, with its session token, on the loopback address. A phone you open with `--lan` and the QR code calls your backend directly, as it does on a real network.
+- A request the network profile fails ends in the same network error on `fetch` and `XMLHttpRequest`. Every proxied request is added to the device log with its method, host, status and time.
 
 ## Let your assistant drive the phone you are watching
 
