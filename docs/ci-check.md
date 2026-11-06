@@ -54,4 +54,4 @@ The action also builds the base commit in a second folder and runs the same flow
 
 A flaky flow can fail on the pull request and pass on base, and then the check fails. Re-run the job to see if the failure repeats. Flows that are new on the pull request and fail are listed under "New flows" but do not fail the check.
 
-Not yet covered: recordings and running `shipvo explore` on the base.
+

@@ -26,8 +26,6 @@ The tools are few and plain:
 
 The screen is what a customer sees. An app can also offer commands meant for the owner: change a price, read orders, publish. Shipvo's owner API exposes these as typed commands (`owner_describe`, `owner_command`), with an owner token, and audits every change. So an assistant can help run a shop, not only test one.
 
-We are careful about the line here. Today, agents test and demonstrate Shipvo apps. They do not yet buy things for real people through them, which would need consent, spend limits and a checkout contract that does not exist yet.
-
 ## Try it
 
 Connecting takes four steps and is in [Test with an assistant](https://shipvo.dev/docs/test-with-an-assistant/). The tools are listed in full in [Agents and Shipvo apps](https://shipvo.dev/docs/agents/#the-tools).

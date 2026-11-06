@@ -22,7 +22,7 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 ### 2. Simulator and MCP reliability
 - Stable element refs across scroll, re-render and navigation.
 - More device capabilities simulated (contacts, calendar, file picker, deep links, push payloads), each with a declared support level.
-- Simulator-vs-device parity: close every gap listed in `docs/parity-results.md`.
+- Simulator-vs-device parity at 100% on every flow, on the Android emulator and the iOS Simulator.
 - Faster session start and lower memory per session on the hosted simulator.
 - Clear, typed errors from every MCP tool.
 
@@ -45,6 +45,12 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 
 The planner keeps this list current: the epics in flight, newest owner direction first. Each line links its epic; open the epic for its slices.
 
+**Lumi (owner direction, 6 Nov 2026):**
+- Lumi in every Shipvo Phone: the assistant that shows each step live, reacts to results, appears in recordings and guides new users (#872)
+- Lumi Autotest: `npx shipvo lumi` builds your app, opens it on Shipvo Phone, and Lumi tests it from start to finish while you watch, free and on your own machine, learning from its own test runs (#878)
+- Story episodes: a weekly Shipvo series with Amara and Lumi, drawn in code, voiced and lip-synced (#859, #860)
+- Same task, two ways: screenshots against Shipvo's labelled screen, measured (#837)
+
 **Win the lane (owner direction, 5 to 6 Nov 2026):**
 - Shipvo Phone: a native-feeling simulated phone, Android style and iPhone style, with gestures, notification shade and Control Center, Settings, restart, an app store inside the phone, a built-in Browser app, real browser camera, mic and location with simulated fallback, and agent control of everything over MCP (#466)
 - `shipvo run android|ios`: the app on Shipvo Phone in your own browser in seconds, no Playwright needed; your coding agent drives the same live phone while you watch, with screenshots and demo-video recording (#442)
@@ -66,6 +72,14 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-06: Lumi lives in the Shipvo Phone frame (idle, working, happy, worried), with an off switch ([Run on a phone](run.md), #885)
+- 2026-11-06: `shipvo explore` picks smarter next steps, fills forms, finds failed network calls, stuck loading and blank screens, and repeats runs with `--seed` ([Agents](agents.md), #886)
+- 2026-11-06: Screenshots of the live phone in `shipvo run` ([Run on a phone](run.md), #834)
+- 2026-11-06: Network profiles on Shipvo Phone: the app's requests follow the chosen network ([Device API](device-api.md), #833, #855)
+- 2026-11-06: Over-the-air updates on Shipvo Phone: update state, check, apply and crash-loop revert, driven over MCP ([Agents](agents.md), #796)
+- 2026-11-06: The stdio and remote MCP servers share one tool registry, so both offer the same tools ([Agents](agents.md), #854)
+- 2026-11-06: `@shipvo/spec`: the app spec JSON Schema and validator ([App spec](design/app-spec.md), #853)
+- 2026-11-06: `shipvo keys rotate` signs and uploads a new update key ([Key rotation](key-rotation.md), #812)
 - 2026-11-06: `shipvo run android|ios` opens a phone frame in your browser; your assistant attaches to it with `open_app` ([Run on a phone](run.md), #454, #500, #510, #519, #540)
 - 2026-11-06: `record_start`, `record_marker` and `record_stop` write an MP4 of the phone ([Record a demo video](record.md), #525)
 - 2026-11-06: `shipvo promote` refuses releases with failing test flows; `shipvo test --report-md`; `secret()` in tests ([Testing](testing.md), #489, #490, #493)
