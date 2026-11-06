@@ -63,11 +63,16 @@ describe("POST /rotation/:app", () => {
     expect(m.audits[0].slice(0, 3)).toEqual(["tide", expect.any(String), "owner (admin)"]);
     expect(JSON.parse(m.audits[0][3])).toEqual({ sequence: 1, validFrom: JSON.parse(stmt(1).body).validFrom });
   });
-  it("accepts a login key whose account owns the app", async () => {
+  it("refuses a login key even when its account owns the app (403), and stores nothing", async () => {
     const m = mkEnv({ keys: { [await sha("sv_test_abc")]: { account_id: 7 } }, owner: { tide: 7 } });
-    const r = await post({ DB: m.DB }, { authorization: "Bearer sv_test_abc" }, stmt(1));
-    expect(r.status).toBe(200);
-    expect(m.audits[0][2]).toBe("ann");
+    expect((await post({ DB: m.DB }, { authorization: "Bearer sv_test_abc" }, stmt(1))).status).toBe(403);
+    const put = await app.request("/rotation/tide/root", { method: "PUT", headers: { authorization: "Bearer sv_test_abc", "content-type": "application/json" }, body: JSON.stringify({ root_key: "A".repeat(43) }) }, { DB: m.DB });
+    expect(put.status).toBe(403);
+    expect(m.rows).toHaveLength(0); expect(m.audits).toHaveLength(0);
+  });
+  it("refuses a malformed Authorization header with 403", async () => {
+    const m = mkEnv();
+    for (const auth of ["Bearer", "Basic abc", "sv_test_"]) expect((await post({ DB: m.DB }, { authorization: auth }, stmt(1))).status).toBe(403);
   });
   it("refuses a publish token, the owner token and a login key of another account (403), and stores nothing", async () => {
     const m = mkEnv({ keys: { [await sha("sv_test_other")]: { account_id: 9 } }, owner: { tide: 7 } });

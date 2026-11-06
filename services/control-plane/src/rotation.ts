@@ -26,29 +26,17 @@ export async function rotationsFor(db: any, appId: string): Promise<{ rotations:
 
 /**
  * `adminSession(c, appId)` must accept only the signed admin cookie, never a bearer token.
- * A login key (sv_test_...) counts only when its account owns the app. Publish tokens and the owner token never do.
+ * Login keys (sv_test_...), publish tokens and the owner token never do: agents hold them, and the design says admin session only.
  */
 export function rotationRoutes(adminSession: (c: any, appId: string) => Promise<string | null>) {
   const r = new Hono<{ Bindings: Env }>();
 
-  async function session(c: any, appId: string): Promise<{ actor: string } | null> {
-    const cookie = await adminSession(c, appId);
-    if (cookie) return { actor: cookie };
-    const k = (c.req.header("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-    if (!k.startsWith("sv_test_")) return null;
-    try {
-      const row: any = await c.env.DB.prepare("SELECT k.account_id, k.expires_at, a.github_login FROM api_keys k JOIN accounts a ON a.id = k.account_id WHERE k.key_hash = ? AND k.scope = 'test' AND k.revoked_at IS NULL").bind(await sha256(k)).first();
-      if (!row || (row.expires_at && row.expires_at < new Date().toISOString())) return null;
-      const own: any = await c.env.DB.prepare("SELECT account_id FROM apps WHERE app_id = ?").bind(appId).first();
-      return own && own.account_id === row.account_id ? { actor: String(row.github_login) } : null;
-    } catch { return null; }
-  }
   async function gate(c: any, appId: string) {
     if (!ID.test(appId)) return { res: c.json({ error: "bad_request" }, 400) };
-    const s = await session(c, appId);
-    if (s) return { s };
+    const actor = await adminSession(c, appId);
+    if (actor) return { s: { actor } };
     // A token is known but not allowed: 403. No credentials at all: 401.
-    return { res: (c.req.header("authorization") ?? "") ? c.json({ error: "forbidden", message: "Rotation needs a signed-in owner session. Tokens cannot rotate keys." }, 403) : c.json({ error: "unauthorized" }, 401) };
+    return { res: (c.req.header("authorization") ?? "") ? c.json({ error: "forbidden", message: "Rotation needs a signed-in admin session. Tokens cannot rotate keys." }, 403) : c.json({ error: "unauthorized" }, 401) };
   }
   const bad = (c: any, error: string, message: string, status = 400) => c.json({ error, message }, status);
 
@@ -103,6 +91,7 @@ export function rotationRoutes(adminSession: (c: any, appId: string) => Promise<
       ]);
     } catch (e) {
       // A concurrent upload of the same sequence hits the primary key: that is a replay, not a server error.
+      // Relies on D1's message, e.g. "UNIQUE constraint failed: rotations.app_id, rotations.sequence".
       if (/UNIQUE|constraint/i.test(String((e as any)?.message ?? e))) {
         const t: any = await c.env.DB.prepare("SELECT MAX(sequence) AS top FROM rotations WHERE app_id = ?").bind(appId).first();
         const now = Number(t?.top ?? 0) || 0;
