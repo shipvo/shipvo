@@ -62,7 +62,7 @@ Install the Shipvo skill. It teaches your agent to set up Shipvo, run the app on
 
 - With npm: `npx skills add shipvo/shipvo --skill shipvo -g`
 - Without: `curl -fsSL https://shipvo.dev/install.sh | bash` (more on [shipvo.dev/setup](https://shipvo.dev/setup/))
-- Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints." (`agents setup` is planned.)
+- Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints."
 
 The skill is in [`skills/shipvo`](skills/shipvo/SKILL.md). A test checks that every command it names exists in `shipvo help`.
 

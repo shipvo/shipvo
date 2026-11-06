@@ -32,7 +32,7 @@ fi
 say "Shipvo setup in: $(pwd)"
 say "About to run: npx -y @shipvo/cli agents setup"
 say "It writes an AGENTS.md section and .mcp.json in this folder. Nothing is installed outside the project."
-npx -y @shipvo/cli agents setup
+npx -y @shipvo/cli agents setup || { say "Setup failed. See the output above."; exit 1; }
 
 say ""
 say "Next:"

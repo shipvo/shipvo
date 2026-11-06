@@ -61,6 +61,8 @@ const lines = [
 for (const l of lines) for (const [name, txt] of [["setup page", page], ["README.md", readFileSync(join(root, "README.md"), "utf8")], ["docs/agents.md", readFileSync(join(root, "docs/agents.md"), "utf8")]])
   if (!txt.includes(l)) fail.push(`${name} lacks: ${l}`);
 
+if (/agents setup` is planned/.test(readFileSync(join(root, "README.md"), "utf8"))) fail.push("README.md still says agents setup is planned");
+
 // Links to the page from home, Docs and Learn.
 for (const f of ["index.html", "docs/overview/index.html", "learn/index.html"])
   if (!readFileSync(join(site, "public", f), "utf8").includes('href="/setup/"')) fail.push(`${f} does not link to /setup/`);
