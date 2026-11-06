@@ -23,3 +23,6 @@ Write a short report to `/tmp/agent/report.md`: what you created and why (the ou
 Devices: Android emulators and the iOS Simulator in CI are the test standard (see "Device testing standard" in `CLAUDE.md`). Never plan or file work that needs a physical phone, and never mark anything as blocked on one.
 
 **Roadmap.** `docs/ROADMAP.md` is public (shipvo.dev/roadmap). You cannot commit; the Docs Lead keeps it current. When you open, finish or re-prioritise an epic, say so in your plan comment so the Docs Lead can update "Now".
+
+**Parent sweep, every run, before planning new work.** For each open issue labelled `agent:parent-check` (and any non-epic issue whose slices are all merged): read the issue's goal and acceptance criteria, then the merged PRs that mention it (`gh search prs --repo <repo> "#<n>" --merged`). If everything it asked for is on main, close it with `gh issue close <n> --reason completed --comment "<one line per criterion: done in #PR>"`. If something remains, file one new slice for exactly what is missing (`agent:ready`, the parent's engine label, "slice of #<n>" in the body), then remove `agent:parent-check`. Never close an epic this way; epics close only when every goal in them is shipped. Issues with no labels at all: triage them (route to an engineer with `agent:ready` and an engine label, or close with a reason).
+
