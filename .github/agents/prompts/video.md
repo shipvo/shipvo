@@ -23,9 +23,13 @@ This runs every 3 hours and builds a growing library: many videos, one per run, 
 ## Background music (every video)
 
 Every video gets a quiet music bed that ducks under the narration, mixed with `scripts/video/bgmusic.py` (loudness-matched, sidechain-ducked by the voice, fades in and out; the picture is untouched):
-1. Pick the mood from the video (explainer or tech: `--want tech,documentary,ambient --avoid upbeat`; calm tutorial: `ambient,acoustic`; launch teaser: `upbeat,cinematic`).
-2. **Tracks.** Owner decision (5 Nov 2026): any Jamendo track from the corpus may be used, always credited. Prefer tracks you have not used yet so videos do not all sound the same.
-3. `python3 scripts/video/bgmusic.py analyze --ids ...` and pick the flattest (lowest LRA, 3 to 7 LU), then `mix --video ... --narration <full-length narration wav> --music music/<id>.mp3 --out ... --credits services/site/public/videos/<slug>.credits.json`. Default `--bed 0.5`; 0.35 for dense narration.
+1. **Pick with `scripts/video/musicpick.py`, never by hand or at random.** Write a brief for the cut and run
+   `python3 scripts/video/musicpick.py --brief brief.json --out pick.json --record <slug>`.
+   The brief: `{"duration": <s>, "want": [moods], "avoid": [moods], "bpm": [lo, hi], "energy": "story|build|steady|calm", "hits": [{"t": <s>, "type": "reveal|payoff|drop"}], "narration": true|false}`.
+   Moods: explainer or tech `tech,documentary,ambient` avoid `upbeat`; calm tutorial `ambient,acoustic` with `energy: calm`; launch teaser `upbeat,cinematic` with `energy: build`; story ad `cinematic,inspiring,upbeat` with `energy: story`, `bpm: [118, 134]` and a `payoff` hit at the payoff shot. Put every reveal and payoff time from your storyboard in `hits`.
+   It searches the full 33,921-track corpus (`scripts/video/data/jamendo_moodtheme.jsonl.gz`), measures the best candidates (loudness, dynamics, tempo, energy over time), slides each one to find the start point where its energy curve best follows your storyboard and swells on your hits, and writes the winner with its `offset` to `pick.json`. `--record` logs it in `scripts/video/music-used.json` (commit that file) so later videos pick something else.
+2. **Tracks.** Owner decision (5 Nov 2026): any Jamendo track from the corpus may be used, always credited.
+3. Mix with `python3 scripts/video/bgmusic.py mix --video ... --narration <full-length narration wav> --music <pick.path> --offset <pick.offset> --out ... --credits services/site/public/videos/<slug>.credits.json`. Default `--bed 0.5`; 0.35 for dense narration. For a no-voiceover story cut, omit `--narration` and use `--music-lufs -14`. Keep `brief.json` next to the script in `scripts/video/scripts/<slug>.brief.json` so the pick can be rebuilt.
 4. **Credits ship with every video.** `--credits` writes `services/site/public/videos/<slug>.credits.json` (track id, title, artist, licence, licence link, source link and a ready `credit_line`), read from the track's own tags. Commit it with the video. Show the credit in a closed info box under the video in `docs/videos.md` (and wherever the video is embedded), never as a visible line:
    `<details class="credits"><summary>ⓘ Copyright credits</summary>` + the `credit_line` with the source and licence as links + `</details>`.
    Style it as a small, muted info box (`services/site/site.css`, class `credits`) that matches the transcript box. In descriptions where the video is posted elsewhere, put the `credit_line` at the end. Add `"credits": "/videos/<slug>.credits.json"` to the video's entry in `services/site/media.json`. Record the track id in `scripts/video/scripts/<slug>.json` so the mix can be rebuilt. Never commit MP3 files.
@@ -46,3 +50,76 @@ Always read the "Priority now" list at the top of `docs/content-coverage.md` fir
 
 
 Follow "Internal details stay private" in `CLAUDE.md`: never write hosting plans, vendor tiers, limits, quota numbers or costs in anything public.
+
+## Retention: hold the viewer to the last second (every video, owner, 6 Nov 2026)
+
+Tutorials, demos and story ads all follow these rules. A viewer decides in 3 seconds whether to stay, and again every few seconds after that. Plan for both.
+
+**Before you write the script, write the retention map** in `scripts/video/scripts/<slug>.json` under `"retention"`: the hook, the promise, each open loop with the time it opens and the time it pays off, the re-hooks, and the payoff. A video with no map does not get rendered.
+
+1. **Hook in the first 3 seconds, no logo, no "hi, in this video".** Open on the most striking moment: the end result, the problem at its worst, or a surprising claim you can prove later in the video. Movement and sound from frame one.
+2. **Promise by second 8.** Say plainly what the viewer will have or see by the end ("By the end, this app is installed on your phone, and you never left the chat."). Then keep it.
+3. **Open loops.** Raise a question early and answer it late: show the result, then "here is how we got there"; tease the hard part ("the tricky bit is the payment, we'll get there"). At least one loop stays open until the last third. Never open a loop you do not close.
+4. **Something changes every 2 to 4 seconds.** A cut, a camera move, a zoom on the tap, a caption, a sound. Screen recordings too: zoom in on the area being used, highlight the tap, cut the waiting (no spinners, no typing in real time; speed up or jump-cut).
+5. **Re-hook every 20 to 30 seconds** with a pattern interrupt: a change of scene, angle or music section, a quick "wait, watch this", a before-and-after, or a new stake. The retention map lists where each one falls.
+6. **Escalate.** Each beat should be bigger than the last: one order, then ten; one app, then the agent using it. Save the best moment for the payoff, not the start.
+7. **Cut every dead second.** No silence over 0.7 s unless it is a planned beat before the payoff. Trim breaths, "so", "now", "okay". If a line can go and the video still makes sense, it goes.
+8. **Show, then say.** The picture does the work; narration adds what the picture cannot. The video must still make sense on mute (captions on every spoken line).
+9. **End strong and short.** Pay off the promise, then the next-episode trailer (see Series), one clear next step (`npx shipvo run`, a link), end card 3 to 5 s. No long goodbye; the payoff is the last thing they remember.
+10. **Title and thumbnail match the hook.** The first frame and the thumbnail show the same moment the title promises, so the viewer who clicks gets what they came for in the first seconds.
+
+**Measured gate (all videos).** Run `python3 scripts/video/pacing.py <video.mp4> --json <slug>.pacing.json` on the final render. Story ads use the defaults (no frozen picture over 2 s, no stretch over 6 s without a cut, motion in the first 3 s). Tutorials and demos use `--max-static 3 --max-gap 10`. It exits 1 on failure: fix the edit and re-render; do not loosen the numbers. Put its one-line result and the retention map in the PR.
+
+**Review pass (all videos).** The second Claude review watches the 10-frame contact sheet, the retention map and the pacing report, and answers each with yes or no and the time code: hook in 3 s; promise by 8 s; every opened loop closed; a re-hook at least every 30 s; nothing dull in any 10 s window; makes sense on mute; ends on the payoff then a next-episode trailer; previous and next episodes linked. Any "no" sends it back.
+
+## Series: every video is an episode (owner, 6 Nov 2026)
+
+Our videos run like a show with many episodes, so each one sells the next and viewers binge.
+
+- **Series bible:** `scripts/video/series.json` lists seasons and episodes in order: number, title, slug, one-line logline, the cliffhanger it ends on, and status (planned, rendering, published). Season 1 follows the recurring cast from "no app" to "the shop runs on agents"; tutorials form their own season ("Shipvo in 60 seconds"). The planner keeps at least the next 3 episodes planned; add them as `type:video` issues.
+- **Stay one episode ahead.** When an episode ships, the next episode's hook and its two best shots are already rendered, so the trailer is real footage, never a promise of something we have not made.
+- **Each episode's shape:**
+  - **Recap first (episodes 2 and later), 4 to 8 s:** "Previously on Shipvo", fast cuts from the last episode that set up this one. The viewer can skip it: the site shows "◀ Watch <previous episode>" and "Skip recap ›" over the player while the recap plays (`services/site/public/shell.js`). Mark it on the episode's `<video>` in `docs/videos.md` with `data-recap-end="<seconds the recap ends>"`, `data-prev="<link to the previous episode>"` and `data-prev-title="E<n> · <title>"` (`scripts/check-episodes.mjs` checks these). The recap must end on a clean cut so the skip lands on the cold open.
+  - Cold open right after the recap (episode 1 starts here): the hook (Retention rule 1). The hook rule counts from the end of the recap.
+  - Title card with the episode number, 1 to 2 s ("S1 · E3 · The rush hour").
+  - The episode.
+  - End on a cliffhanger or open question that the next episode answers.
+  - **Next-episode trailer, 8 to 12 s:** "Next on Shipvo", 3 or 4 fast cuts from the next episode, one line of narration or caption, the episode title, then the end card. A season finale ends with a season 2 teaser.
+- **When the next episode ships, re-cut the trailer** at the end of the previous episode with final footage if it changed, re-upload it under a new R2 key and update the links.
+- **Name and link them as a series:** titles start "S1 · E<n> ·"; `docs/videos.md` groups episodes by season in order; each episode's page and description link to the previous and next episode, and to a playlist where the video is posted elsewhere.
+- **Where the video is posted elsewhere**, put the recap end time as the first chapter in the description (`0:00 Previously`, `0:06 Episode`) so players there offer the same skip.
+- **Continuity:** cast, palettes, sound logo and the music theme stay the same across a season (keep one recurring motif in `music-used.json` notes; a story ad may reuse the season theme). The 9:16 cut ends on a 3 s "next episode" tease too.
+- The retention map lists the "previously" section, the cliffhanger and the trailer.
+
+## Story ads: the craft standard (owner, 6 Nov 2026)
+
+Our videos must never feel boring. Besides tutorials and demos, the Video Studio makes **story ads**: short films where a person has a real problem, uses Shipvo, and we see the result. Benchmark: a 70-second co-branded AI product ad built as a mini film (a struggling roadside diner, the product used inside the story, a full car park at sunset). Take its structure and energy; never its footage, music, characters or text.
+
+**Structure (main cut 1:30 to 1:45, 16:9; plus a 30 to 45 s 9:16 cut for short-video feeds):**
+1. Hook, 0 to 5 s: a striking cinematic shot and the problem in one line ("Our shop has no app. Customers ask their assistants, not Google.").
+2. Set-up, about 5 to 25 s: the world and the character's stakes, so the viewer cares (a day in the shop, the empty counter, a customer walking away).
+3. The product inside the story, about 25 to 75 s: the character asks their assistant; the real Shipvo moments appear on screen (spec app on the phone in the chat, the vault form, install, an agent ordering). Every Shipvo screen is a real recording made with `record_start`/`record_stop`, composited into the scene (on a laptop, a phone in hand, a shop window).
+4. A second beat of tension, about 75 to 85 s: something nearly goes wrong (a rush of orders, a question the assistant must answer) and Shipvo handles it.
+5. Two or three feature captions in the whole film, each one beat: short, bold, on screen for about 1.5 s ("From idea to app in one chat." "Your assistant's phone.").
+6. Payoff the viewer can see, about 85 to 100 s (orders arriving, a busy shop at sunset). Any number shown must come from a real, measured demo run, with the source in the description.
+7. Next-episode trailer (see Series), then the end card: logo, one line, shipvo.dev, 3 to 5 s.
+
+The short 9:16 cut keeps the hook, one product beat and the payoff; it is edited from the main cut, not a separate story.
+
+**Characters: hand-crafted, anime-inspired, original.**
+- A recurring Shipvo cast, designed once and reused so viewers recognise them: for example a small-shop owner, a young founder, a busy parent, and the assistant shown as a soft light or small companion shape (never a robot cliché). Write the cast bible in `scripts/video/cast/README.md` (names, personalities, palettes, silhouettes, expressions, outfits).
+- Drawn by us in code (SVG/canvas rigs with layered parts: head, eyes, mouth shapes, brows, hair, arms, hands, torso), anime-inspired proportions and line work, our own designs. Never draw known characters, mascots or anything that recalls a specific studio's characters; no AI-generated images or footage (owner preference: hand-crafted visuals built from scratch).
+- Expressive acting: blinks, eye direction, mouth shapes synced to narration, brow and head tilts, secondary motion in hair and clothes, hand gestures on key words.
+
+**Motion and cinematography:**
+- Camera language: establishing wide shot, push-ins on emotion, cut to close-ups for reveals, a slow dolly or parallax on every shot (3 to 5 depth layers), whip-pans or match cuts between scenes. No static frame longer than 2 s.
+- Easing everywhere (no linear moves), anticipation and follow-through, overshoot on pop-ins, 30 fps minimum (60 fps for the 9:16 cut when smooth motion matters).
+- Light and atmosphere: time-of-day palettes (dawn, golden hour, neon night), soft glows, light rays, particles (dust, sparks, confetti on the payoff), subtle film grain and vignette.
+- Typography: one display font for captions, animated in (mask reveal or kinetic type), never more than 7 words on screen.
+
+**Sound:**
+- Music: an energetic bed around 125 to 130 BPM for no-voiceover cuts (louder mix is fine without narration, around -14 LUFS for social), a calmer bed under narration as usual (`bgmusic.py`, ducked). Both cuts pick their track with `musicpick.py`, each with its own brief and hit times. Hit points: the music swells on the reveal and the payoff; a beat of near-silence before the payoff lands. Over 90 s, the music needs at least two sections (build and payoff) so it does not loop flat.
+- Sound effects on every action that matters (tap, whoosh on transitions, notification ping on an order, a door bell, crowd murmur). Credit every music track and any effects library as usual.
+- Narration, when used: the cast's voices (distinct voice per character), short lines, natural pauses.
+
+**Quality gate before any story ad ships:** a 10-frame contact sheet and the full video watched end to end by a second Claude review pass with this checklist: `pacing.py` passes, the retention checks above pass, hook in 3 s, problem clear without sound, product used not described, every Shipvo screen real, at most three captions, visible payoff, no static frame over 2 s, characters on-model, credits present. Fix and re-render until it passes; put the checklist result in the PR.

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ensureInstallIdentity } from "../../../packages/runtime/src/install";
-import { createTelemetryStorage, rnCrypto, rnStorage, telemetryDeps } from "./telemetry";
+import { ensureInstallIdentity, signReport } from "../../../packages/runtime/src/install";
+import { createReportSigner, createTelemetryStorage, hmacSha256, rnCrypto, rnStorage, sha256, telemetryDeps } from "./telemetry";
 
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -52,5 +52,40 @@ describe("telemetryDeps with ensureInstallIdentity", () => {
     const b = await ensureInstallIdentity(telemetryDeps.storage, telemetryDeps.crypto, "https://x.test/register");
     expect(b).toEqual(a);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("createReportSigner", () => {
+  const body = { schema_version: "1.0", app_id: "tide", release: 3, event: "applied", device_class: "low" };
+  // The control plane's rule (services/control-plane/src/installs.ts): sig = HMAC-SHA256(sha256hex(key), body without the sig field).
+  const serverCheck = (key: string, sent: string) => {
+    const m = /^(.*),"sig":"([0-9a-f]{64})"\}$/.exec(sent)!;
+    const secret = Array.from(sha256(new TextEncoder().encode(key)), (x) => x.toString(16).padStart(2, "0")).join("");
+    const want = Array.from(hmacSha256(new TextEncoder().encode(secret), new TextEncoder().encode(`${m[1]}}`)), (x) => x.toString(16).padStart(2, "0")).join("");
+    return want === m[2];
+  };
+  const deps = () => ({ storage: createTelemetryStorage(), crypto: rnCrypto });
+
+  it("registers once and signs every report so the server rule accepts it", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ key: "ab".repeat(32) }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const sign = createReportSigner({ ensureInstallIdentity, signReport }, deps());
+    const first = await sign("https://x.test", body);
+    const second = await sign("https://x.test", { ...body, event: "content_applied" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((fetchMock.mock.calls[0] as any)[0]).toBe("https://x.test/t/register");
+    for (const sent of [first, second]) {
+      expect(JSON.parse(sent).install_id).toMatch(/^[0-9a-f]{32}$/);
+      expect(serverCheck("ab".repeat(32), sent)).toBe(true);
+    }
+    expect(serverCheck("cd".repeat(32), first)).toBe(false);
+  });
+
+  it("sends the report unsigned, without throwing, when registering fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    const sign = createReportSigner({ ensureInstallIdentity, signReport }, deps());
+    expect(await sign("https://x.test", body)).toBe(JSON.stringify(body));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 500 })));
+    expect(await sign("https://x.test", body)).toBe(JSON.stringify(body));
   });
 });

@@ -1,0 +1,2 @@
+- `@shipvo/sim`: adds a network profile table (`online`, `offline`, `2g`, `3g`, `slow-4g`, `spotty`, `low-end-4g`) and a seeded, deterministic `applyProfile` engine. Not wired into the simulator yet.
+- Migration: none; new internal module.

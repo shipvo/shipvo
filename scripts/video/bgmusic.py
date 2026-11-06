@@ -7,7 +7,7 @@
   python3 bgmusic.py auto --video in.mp4 --narration vo.wav --want cinematic,documentary --out out.mp4   # search+analyze+mix
 
 Corpus: the full Jamendo mood/theme JSONL (33,921 tracks) if given with --corpus or found as
-jamendo_moodtheme.jsonl next to this script; otherwise the built-in 155-track curated subset (8 clusters).
+jamendo_moodtheme.jsonl next to this script; otherwise the built-in 155-track curated subset (8 clusters). For a pick that fits a specific film (tempo, energy curve, hit points, start offset) use musicpick.py, which searches all 33,921 tracks in data/jamendo_moodtheme.jsonl.gz.
 Downloads come from https://mp3d.jamendo.com/download/track/<id>/mp32/ . Needs ffmpeg/ffprobe.
 Credit the Jamendo track wherever the video is published.
 Owner decision (5 Nov 2026): any Jamendo track may be used, always credited. `mix --credits PATH` writes the credit
@@ -256,7 +256,7 @@ def mix(a):
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", a.narration, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-ar", "48000", vo], check=True)
     I, L = loudness(a.music); gain = a.music_lufs - I
     loops = int(D // max(1.0, ffprobe_dur(a.music))) + 1
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-stream_loop", str(loops), "-i", a.music, "-t", f"{D:.2f}",
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-stream_loop", str(loops), "-ss", f"{a.offset:.2f}", "-i", a.music, "-t", f"{D:.2f}",
                     "-af", f"volume={gain:.2f}dB", "-ar", "48000", mus], check=True)
     fo = max(0.0, min(vlen, alen) - a.fade_out)
     if a.narration:
@@ -325,6 +325,7 @@ def main():
         p.add_argument("--ratio", type=float, default=10); p.add_argument("--music-lufs", dest="music_lufs", type=float, default=-20)
         p.add_argument("--fade-in", dest="fade_in", type=float, default=2.0); p.add_argument("--fade-out", dest="fade_out", type=float, default=3.5)
         p.add_argument("--work", default=None)
+        p.add_argument("--offset", type=float, default=0.0, help="start the track this many seconds in (from musicpick.py)")
         p.add_argument("--credits", default=None, help="write the music credit JSON here (e.g. services/site/public/videos/<slug>.credits.json)")
     m = sub.add_parser("mix"); mixargs(m); m.add_argument("--music", required=True)
     li = sub.add_parser("license"); li.add_argument("--ids", required=True)
