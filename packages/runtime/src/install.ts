@@ -1,7 +1,11 @@
 /**
  * Install identity for signed telemetry. On first launch the app makes a random install id and registers it once
  * (`POST registerUrl` with `{ install_id }`, answer `{ key }`). The key is a secret string. Reports are signed with
- * HMAC-SHA256 over the exact body string, using the UTF-8 bytes of the key, and the signature is lower-case hex.
+ * HMAC-SHA256, using the UTF-8 bytes of the key, and the signature is lower-case hex.
+ *
+ * Signing rule: the sent body is `<unsigned>` with its last `}` replaced by `,"sig":"<hex>"}`. The HMAC covers the
+ * unsigned JSON string, including its closing `}`. To verify, the server cuts the suffix `,"sig":"<hex>"}` from the
+ * received string, appends `}`, and checks the HMAC of that string.
  */
 export type InstallIdentity = { install_id: string; key: string };
 
@@ -42,7 +46,8 @@ export async function ensureInstallIdentity(
   try {
     const raw = await storage.getItem(IDENTITY_STORAGE_KEY);
     if (raw) {
-      const s = JSON.parse(raw);
+      let s: any = null;
+      try { s = JSON.parse(raw); } catch {} // corrupted: register again
       if (typeof s?.install_id === "string" && typeof s?.key === "string") return { install_id: s.install_id, key: s.key };
     }
     const install_id = hex(await crypto.randomBytes(16));
@@ -59,7 +64,7 @@ export async function ensureInstallIdentity(
   }
 }
 
-/** Sign the exact body string that will be sent. */
+/** Sign `body`, the unsigned JSON string (with its closing `}`). See the signing rule at the top of this file. */
 export async function signReport(
   identity: InstallIdentity, body: string, crypto: TelemetryCrypto = webCrypto,
 ): Promise<{ install_id: string; sig: string }> {

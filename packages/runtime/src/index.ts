@@ -69,7 +69,8 @@ let identity: InstallIdentity | null = null;
 let identityCrypto: TelemetryCrypto = webCrypto;
 /**
  * Turn on signed telemetry. Registers this install once (see `ensureInstallIdentity`); until that finishes, and if it
- * fails, reports are sent unsigned. Pass your own `crypto` on React Native. Never throws.
+ * fails, reports are sent unsigned. Pass your own `crypto` on React Native. Never throws. The identity is module-global:
+ * calling this again replaces the previous identity and crypto.
  */
 export async function enableSignedTelemetry(opts: { storage: TelemetryStorage; registerUrl: string; crypto?: TelemetryCrypto }): Promise<InstallIdentity | null> {
   identityCrypto = opts.crypto ?? webCrypto;
@@ -116,8 +117,8 @@ export function reportRuntimeEvents(): string[] {
       const id = identity;
       if (!id) { post(JSON.stringify(body)); return; }
       const plain = JSON.stringify(body);
-      // `sig` signs the sent string without its last member: the server cuts `,"sig":"<hex>"}` off the end and
-      // checks the rest as is. If signing fails, send unsigned.
+      // `sig` is the HMAC of `signed`, closing `}` included. We send `signed` with that `}` replaced by
+      // `,"sig":"<hex>"}`. The server cuts that suffix, appends `}` and checks the HMAC. If signing fails, send unsigned.
       const signed = JSON.stringify({ ...body, install_id: id.install_id });
       signReport(id, signed, identityCrypto).then(
         (r) => post(`${signed.slice(0, -1)},"sig":"${r.sig}"}`),
