@@ -240,6 +240,12 @@ export function changedRoutes(sha: string, diff: (sha: string) => string[] = cha
   return changedScreens(diff(sha)).map(screenRoute).filter((r): r is string => r !== null);
 }
 
+/** Like `changedRoutes`, but a diff that cannot be read (for example a shallow clone without the base commit) gives `undefined`, so the caller walks the whole app. */
+export function changedRoutesOrAll(sha: string, diff: (sha: string) => string[] = changedFiles, warn: (m: string) => void = (m) => console.error(m)): string[] | undefined {
+  try { return changedRoutes(sha, diff); }
+  catch (e) { warn(`shipvo explore: could not read the diff since ${sha} (${e instanceof Error ? e.message.split("\n")[0] : String(e)}). Exploring the whole app instead.`); return undefined; }
+}
+
 async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const a = parse(argv); const cfg = loadConfig();
   const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
@@ -250,7 +256,7 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     // --changed-from <sha>: visit only the changed, non-dynamic screens, and do not follow links off them.
     const from = a["changed-from"];
     if (from === "true") throw new Error("--changed-from needs a commit sha");
-    const changed = from !== undefined ? changedRoutes(from) : undefined;
+    const changed = from !== undefined ? changedRoutesOrAll(from) : undefined;
     const report = await walk(simDriver(base, cfg.appId), { routes: changed ?? cfg.routes, onlyRoutes: changed !== undefined, maxDepth: changed ? 1 : maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
     writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");

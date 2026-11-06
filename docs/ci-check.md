@@ -28,7 +28,7 @@ steps:
 
 The job fails when a flow fails or `shipvo explore` crashes. Findings from exploration are in the report only. A failing flow does not skip exploration, so you still get the report.
 
-On pull requests the action runs `shipvo explore --changed-from <base sha>`, so the report covers only the screens your diff changed. Unchanged screens and dynamic screens (`[id]`, layouts) are not visited, and exploration does not follow links off a changed screen. Screens are picked the same way as for the comment and the screenshots. On other events the whole app is explored. If the diff touches no screen, the report is empty. Without `--changed-from`, `shipvo explore` works as before.
+On pull requests the action runs `shipvo explore --changed-from <base sha>`, so the report covers only the screens your diff changed. Unchanged screens and dynamic screens (`[id]`, layouts) are not visited, and exploration does not follow links off a changed screen. Screens are picked the same way as for the comment and the screenshots. On other events the whole app is explored. If the diff touches no screen, the report is empty (0 screens, no findings). If the diff cannot be read (for example a shallow checkout without the base commit), it prints a message and explores the whole app. Without `--changed-from`, `shipvo explore` works as before.
 
 Run the same two commands locally with `npx shipvo ci check` while `npx shipvo sim --port 4545` is running.
 

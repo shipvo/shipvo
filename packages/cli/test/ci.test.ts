@@ -111,6 +111,11 @@ describe("shipvo ci check exit code", () => {
 });
 
 describe("check --changed-from", () => {
+  it("exits 2 when the value is missing or another flag", async () => {
+    quiet();
+    expect(await ci(["check", "--changed-from"])).toBe(2);
+    expect(await ci(["check", "--changed-from", "--foo"])).toBe(2);
+  });
   it("passes extra flags to explore only", async () => {
     const { check } = await import("../src/ci");
     const seen: string[][] = [];

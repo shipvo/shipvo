@@ -57,7 +57,7 @@ export async function ci(argv: string[], cwd = process.cwd()): Promise<number> {
   const [sub, ...rest] = argv;
   if (sub === "check") {
     const i = rest.indexOf("--changed-from");
-    if (i >= 0 && !rest[i + 1]) { console.error("shipvo ci check: --changed-from needs a commit sha"); return 2; }
+    if (i >= 0 && !rest[i + 1] || rest[i + 1]!.startsWith("--")) { console.error("shipvo ci check: --changed-from needs a commit sha"); return 2; }
     return check(testCmd, explore, i >= 0 ? ["--changed-from", rest[i + 1]!] : []);
   }
   if (sub === "shots") return shotsCmd(rest);

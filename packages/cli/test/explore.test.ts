@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { walk, elements, changedRoutes, renderMarkdown, explore, type Driver, type Reply } from "../src/explore.js";
+import { walk, elements, changedRoutes, changedRoutesOrAll, renderMarkdown, explore, type Driver, type Reply } from "../src/explore.js";
 
 // A fixture app: Home has a button that crashes, an unnamed button, a link to Settings and a link to a dead end.
 const SCREENS: Record<string, string> = {
@@ -200,6 +200,27 @@ describe("--changed-from", () => {
     expect(r.stoppedEarly).toBeNull();
     expect(r.findings.some((f) => f.screen.includes('heading "Home"'))).toBe(false);
     expect(taps).not.toContain("Crash");
+  });
+  it("falls back to the whole app (undefined) with a message when the diff cannot be read", () => {
+    const warned: string[] = [];
+    const r = changedRoutesOrAll("abc", () => { throw new Error("fatal: bad revision 'abc'"); }, (m) => warned.push(m));
+    expect(r).toBeUndefined();
+    expect(warned).toHaveLength(1);
+    expect(warned[0]).toContain("Exploring the whole app instead");
+  });
+  it("a diff that touches no screens gives a clean empty report", async () => {
+    const { driver, taps } = fixture();
+    const routes = changedRoutes("abc", () => ["README.md", "app/_layout.tsx", "app/item/[id].tsx"]);
+    expect(routes).toEqual([]);
+    const r = await walk(driver, { routes, onlyRoutes: true, maxDepth: 1 });
+    expect(r.screens).toBe(0);
+    expect(r.findings).toEqual([]);
+    expect(r.stoppedEarly).toBeNull();
+    expect(taps).toEqual([]);
+    const md = renderMarkdown(r);
+    expect(md).toContain("Screens seen: 0");
+    expect(md).toContain("Stopped early: no");
+    expect(md).toContain("No findings in 0 steps");
   });
   it("without the flag, home and every route are still walked", async () => {
     const { driver } = fixture();
