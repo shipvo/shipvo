@@ -9,6 +9,15 @@ const yaml = createRequire(import.meta.url)("js-yaml") as { load: (s: string) =>
 const TEMPLATE = join(__dirname, "..", "..", "..", "templates", "capacitor", "github-actions", "build.yml");
 const quiet = () => { vi.spyOn(console, "log").mockImplementation(() => {}); vi.spyOn(console, "error").mockImplementation(() => {}); };
 
+describe("shipvo ci check --changed-from", () => {
+  it.each([[["check", "--changed-from"]], [["check", "--changed-from", "--foo"]]])("rejects a missing value %j with exit 2", async (argv) => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await ci(argv)).toBe(2);
+    expect(err.mock.calls[0]![0]).toMatch(/needs a commit sha/);
+    err.mockRestore();
+  });
+});
+
 describe("shipvo ci init", () => {
   it("writes the workflow file", async () => {
     quiet();
@@ -91,6 +100,14 @@ describe("shipvo ci init --check", () => {
 });
 
 describe("shipvo ci check exit code", () => {
+  it("passes --changed-from to explore", async () => {
+    const seen: string[][] = [];
+    await check(async () => 0, async (a) => { seen.push(a); return 0; }, "abc123");
+    expect(seen[0]).toEqual(["--sim", "http://localhost:4545", "--changed-from", "abc123"]);
+    await check(async () => 0, async (a) => { seen.push(a); return 0; });
+    expect(seen[1]).toEqual(["--sim", "http://localhost:4545"]);
+  });
+
   const run = (t: number, e: number | Error) => check(async () => t, async () => { if (e instanceof Error) throw e; return e; });
 
   it("passes when tests pass and exploration has only notes", async () => {
