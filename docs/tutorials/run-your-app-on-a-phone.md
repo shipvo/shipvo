@@ -2,7 +2,7 @@
 
 You will type one command and get a phone, Android or iPhone style, in a browser tab, running your app. You will tap through your shop, look at the pretend Android system sheet, switch to the iPhone style and stop it again. You need no real phone, no Android Studio and no Xcode.
 
-**Level:** beginner. **Time:** about 10 minutes to read and follow. On our test machine the first start took under a minute (see "What we measured" at the end).
+**Level:** beginner. **Time:** about 10 minutes to read and follow. On our test machine the first start took within a minute (see "What we measured" at the end).
 
 New words are explained once, and collected in the [glossary](../glossary.md).
 
