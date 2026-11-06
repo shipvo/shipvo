@@ -1,2 +1,0 @@
-- `@shipvo/cli`: new `shipvo audit <app> [--format json|csv] [--limit n]` exports the audit log to stdout (slice of #295). CSV quotes every field and prefixes values starting with `=`, `+`, `-` or `@` with `'`. See [docs/cli.md](docs/cli.md).
-- Migration: none; this is a new command.

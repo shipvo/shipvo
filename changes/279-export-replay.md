@@ -1,2 +1,0 @@
-- `@shipvo/mcp`: a test replays a script from `export_test` against the sample app with Vitest and `@shipvo/test`; `docs/agents.md` shows the real output.
-- Migration: none.

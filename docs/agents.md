@@ -40,6 +40,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb |
 | `screenshot(session)` | PNG of the phone |
 | `set_device(...)` · `device_reset(...)` | What the simulated phone has: platform, permissions, location, barcode in view, biometrics, payment outcome, network |
+| `lock` · `unlock` · `restart` | Press the power button (lock screen), swipe up to unlock, or restart the phone (boot screen, the app starts fresh, storage is kept). While locked, tap, type, scroll and back fail with `phone_locked` |
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
@@ -118,15 +119,18 @@ The `waitFor(/\S/)` lines only wait for the screen to have some text. Replace ea
 ```bash
 shipvo explore --max-steps 100 --max-depth 3
 shipvo explore --sim http://localhost:4545   # use a simulator that is already running
+shipvo explore --skin ios                   # small-target minimum 44 instead of 48
 shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
 ```
 
-It writes `explore-report.md` and `explore-report.json`. The report has four kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `back`):
+It writes `explore-report.md` and `explore-report.json`. The report has six kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `back`):
 
 - an uncaught error or a red screen;
 - a tap that was `not_delivered`;
 - a dead end: a screen with no actionable element;
-- an actionable element with no accessible name.
+- an actionable element with no accessible name (`unnamed`);
+- `small_target`: an actionable element rendered under the minimum tap size, 44 x 44 for iOS (Apple HIG) and 48 x 48 for Android. The simulator is an Android phone, so the default is 48; pass `--skin ios` for 44;
+- `duplicate_name`: two or more actionable elements on one screen with the same role and name, which a screen reader cannot tell apart.
 
 The header lists what the simulator cannot show. A clean run says "No findings in N steps", never that a screen is fine. Exit code 1 also means the walk itself failed (for example the simulator could not start or a step failed). If it fails mid-walk, the report is still written with the findings so far and `stoppedEarly` says why; the error is also printed to stderr. If it fails before the walk starts, no report is written.
 

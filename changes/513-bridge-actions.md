@@ -1,2 +1,0 @@
-- `@shipvo/cli`: the `shipvo run` frame-page bridge answers `tap`, `type`, `scroll` and `back` by ref. A ref that is unknown, gone, or whose role or name changed returns `stale_ref`, with the same message as the simulator. The simulator's ref-stability cases now run against the bridge too.
-- Migration: none.

@@ -1,0 +1,45 @@
+{
+  "name": "shipvo",
+  "description": "The Shipvo CLI under its short name: npx shipvo init, run, sim, publish, rollback. Same as @shipvo/cli.",
+  "bin": {
+    "shipvo": "bin/shipvo.js"
+  },
+  "keywords": [
+    "shipvo",
+    "react-native",
+    "expo",
+    "ota",
+    "simulator",
+    "mcp",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipvo/shipvo.git",
+    "directory": "packages/shipvo"
+  },
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "type": "module",
+  "homepage": "https://shipvo.dev",
+  "bugs": {
+    "url": "https://github.com/shipvo/shipvo/issues"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@shipvo/cli": "workspace:^"
+  },
+  "scripts": {
+    "test": "node --test test/bin.test.mjs"
+  }
+}

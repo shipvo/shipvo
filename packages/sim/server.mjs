@@ -16,6 +16,7 @@ import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { PhoneBrowser } from "./phone-browser.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
+import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -75,7 +76,7 @@ async function newSession(id, opts = {}) {
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString() });
+  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -138,9 +139,29 @@ async function act(id, body) {
     });
     if (covered) throw fail("covered", String(body.ref));
   };
+  // A locked phone takes no input: say so with a typed error before anything reaches the app.
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification"].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   switch (body.action) {
+    // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
+    case "lock": case "unlock": {
+      try { (body.action === "lock" ? lock : unlock)(s.life); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
+      return { locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
+    }
+    case "restart": {
+      restart(s.life);
+      await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
+      return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
+    }
     case "screen": break;
     case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
+    // Where an element is: centre and size as 0..1 of the viewport. Used by the recorder to draw taps. Does not act.
+    case "locate": {
+      let box = null; const vp = page.viewportSize();
+      try { box = await (await resolve(body.ref)).boundingBox({ timeout: 1000 }); } catch {}
+      if (!box || !vp) throw new SimError("not_found", `no element ${body.ref} on this screen.`);
+      const c = (v) => Math.min(1, Math.max(0, v));
+      return { locate: { x: c((box.x + box.width / 2) / vp.width), y: c((box.y + box.height / 2) / vp.height), w: c(box.width / vp.width), h: c(box.height / vp.height) } };
+    }
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.
       let t = await resolve(body.ref);
@@ -209,7 +230,7 @@ async function act(id, body) {
         }
       } catch (e) { throw e.code ? new SimError(e.code, e.message) : e; }
     }
-    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    case "device_log": return { log: [X, ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
@@ -222,6 +243,16 @@ async function act(id, body) {
     case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
+    // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.
+    case "sizes": {
+      const text = await screen(page); const sizes = {};
+      for (const m of text.matchAll(/\[ref=(\w+)\]/g)) {
+        const raw = m[1].replace(/^p\d+(?=e\d+$)/, "");
+        const box = await page.locator(`aria-ref=${raw}`).first().boundingBox().catch(() => null);
+        if (box) sizes[m[1]] = [Math.round(box.width * 10) / 10, Math.round(box.height * 10) / 10];
+      }
+      return { sizes, screen: text };
+    }
     case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) { await ready(b.first()); await b.first().click(); } else throw new Error("no Back button on this screen"); break; }
     case "screenshot": {
       // format "jpeg" has no alpha channel, which the stores require. inline: true also returns the bytes as base64 for clients on another machine.
@@ -229,7 +260,7 @@ async function act(id, body) {
       const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

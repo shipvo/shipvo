@@ -1,2 +1,0 @@
-- `@shipvo/site`: Learn has instant search, Type/Goal/Level/Time filters kept in the URL, and a desktop sidebar with its own filter box.
-- Migration: none; site only.

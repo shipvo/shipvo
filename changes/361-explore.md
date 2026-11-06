@@ -1,3 +1,0 @@
-- `@shipvo/cli`: new `shipvo explore` walks the app in the simulator (no LLM, no device) and writes `explore-report.md` and `explore-report.json`: uncaught errors and red screens, taps that were not delivered, dead-end screens and controls with no accessible name, each with replayable steps. Flags: `--max-depth` (3), `--max-steps` (100), `--fail-on-findings`, `--out`, `--sim <url>`. `shipvo.json` may list `routes` (deep links) to visit.
-- `@shipvo/sim`: new `errors` action returns uncaught page errors since the last read.
-- Migration: none; both additions are new.
