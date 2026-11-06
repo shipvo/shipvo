@@ -4,13 +4,23 @@
 // With PATCH_FROM=<file>[,<file>...] (for example the app's embedded main.jsbundle, and release 1's bundle when
 // building release 2) it also lists a bsdiff patch from each file, built with the Python bsdiff4 module, like
 // `shipvo publish` does.
+// With MISMATCH_HERMES=1 the bundle's Hermes bytecode version is changed to a different one before signing, so the
+// release is one the app must refuse (the file given is not modified).
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { hermesVersionOf, otherHermesVersion, withHermesVersion } from "./hermes.mjs";
 import { signBytes, sha256Hex } from "../../packages/cli/dist/index.js";
 
 const [root, app, seed, releaseS, file, min = "1.0.0"] = process.argv.slice(2);
-const release = Number(releaseS), bytes = new Uint8Array(readFileSync(file));
+const release = Number(releaseS);
+let bytes = new Uint8Array(readFileSync(file));
+if (process.env.MISMATCH_HERMES === "1") {
+  const shell = hermesVersionOf(bytes);
+  if (shell == null) throw new Error("MISMATCH_HERMES=1 needs a Hermes bytecode bundle");
+  bytes = withHermesVersion(bytes, otherHermesVersion(shell));
+  console.log(`bytecode version ${shell} -> ${hermesVersionOf(bytes)}`);
+}
 mkdirSync(join(root, "b", app), { recursive: true });
 writeFileSync(join(root, "b", app, `ios-r${release}.hbc`), bytes);
 const patches = [], seen = new Set();

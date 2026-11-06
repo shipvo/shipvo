@@ -3,14 +3,15 @@
 // so the video lasts as long as the recording even when screenshots are slow or the machine is busy.
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type Format = "9:16" | "16:9" | "1:1";
 export const SIZES: Record<Format, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 }, "16:9": { width: 1920, height: 1080 }, "1:1": { width: 1080, height: 1080 },
 };
 export type Chapter = { t: number; caption: string };
-export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[] };
+export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[]; credits?: string };
 export class RecorderError extends Error { constructor(public code: string, message: string) { super(message); } }
 
 type Page = { screenshot(o: { type: "jpeg"; quality: number }): Promise<Buffer>; goto(u: string, o?: object): Promise<unknown>; evaluate?(f: string): Promise<unknown> };
@@ -113,7 +114,7 @@ export class Recorder {
     this.chapters.push(c); return c;
   }
 
-  async stop(): Promise<Recording> {
+  async stop(o: { music?: boolean } = {}): Promise<Recording> {
     if (!this.running) throw new RecorderError("no_recording", "no recording is running: call record_start first");
     this.running = false; this.stopping = true;
     try {
@@ -138,8 +139,9 @@ export class Recorder {
         } else if (existsSync(raw)) renameSync(raw, file);
         rmSync(raw, { force: true });
       }
-      const out = { file, duration_s, ...size, chapters };
+      const out: Recording = { file, duration_s, ...size, chapters };
       if (code !== 0) throw new RecorderError("encode_failed", `ffmpeg failed${code === -1 ? " to start (is it installed?)" : ""}: ${err.trim().slice(0, 300)}`);
+      if (o.music) out.credits = addMusic(file);
       return out;
     } finally { rmSync(this.framesDir, { recursive: true, force: true }); this.stopping = false; }
   }
@@ -163,4 +165,21 @@ export class Recorder {
     try { await this.browser?.close(); } catch {}
     this.browser = this.page = this.loop = undefined;
   }
+}
+
+/** Mix a ducked music bed under the finished MP4 with scripts/video/bgmusic.py and write <name>.credits.json next to it. Returns the credits path.
+ *  SHIPVO_BGMUSIC points at the script; SHIPVO_MUSIC_FILE uses a local track instead of picking and downloading one. */
+function addMusic(file: string): string {
+  const script = process.env.SHIPVO_BGMUSIC ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "scripts", "video", "bgmusic.py");
+  if (!existsSync(script)) throw new RecorderError("music_unavailable", `music needs bgmusic.py, not found at ${script}: set SHIPVO_BGMUSIC`);
+  const credits = file.replace(/\.mp4$/, ".credits.json"), work = file.replace(/\.mp4$/, ".music"), tmp = join(work, "mixed.mp4");
+  mkdirSync(work, { recursive: true });
+  try {
+    const track = process.env.SHIPVO_MUSIC_FILE;
+    const args = track ? ["mix", "--music", track] : ["auto", "--want", "cinematic,documentary,corporate", "--outdir", join(work, "tracks")];
+    const r = spawnSync("python3", [script, ...args, "--video", file, "--out", tmp, "--work", work, "--credits", credits], { encoding: "utf8" });
+    if (r.error || r.status !== 0 || !existsSync(tmp)) throw new RecorderError("music_failed", `could not mix music${r.error ? " (is python3 installed?)" : ""}: ${String(r.error?.message ?? r.stderr).trim().split("\n").slice(-2).join(" ").slice(0, 300)}. The silent video is at ${file}`);
+    renameSync(tmp, file);
+    return credits;
+  } finally { rmSync(work, { recursive: true, force: true }); }
 }

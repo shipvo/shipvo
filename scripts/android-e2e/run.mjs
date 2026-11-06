@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { startServer } from "./server.mjs";
 import { publishRelease } from "./release.mjs";
-import { FULL_BUNDLE_SCENARIO, ROLLBACK_SCENARIO, rollbackVerdict, rolledBackEvent, tapTarget, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, releaseReached, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
+import { FULL_BUNDLE_SCENARIO, ROLLBACK_SCENARIO, resumeFacts, rollbackVerdict, rolledBackEvent, tapTarget, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, releaseReached, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const APK = resolve(arg("apk", "shell.apk")), BUNDLES = resolve(arg("bundles", "bundles")), KEY = JSON.parse(readFileSync(arg("key", "key.json"), "utf8"));
@@ -64,7 +64,8 @@ const scenario = async (name, fn) => {
   results.push({ name, ...r, wallS: Math.round((Date.now() - t0) / 1000) }); console.log(`${r.pass ? "PASS" : "FAIL"} ${name}`, JSON.stringify(r).slice(0, 400));
 };
 
-const server = await startServer(TREE, PORT, LOG);
+const cut = { path: null, fraction: 0.5, done: false }; // armed by the resumed-download scenario only
+const server = await startServer(TREE, PORT, LOG, { cutFirst: cut });
 const env = {
   date: new Date().toISOString(), host: { cpus: os.cpus().length, cpu: os.cpus()[0]?.model, node: process.version },
   device: { model: sh("getprop ro.product.model").trim(), android: sh("getprop ro.build.version.release").trim(), api: Number(sh("getprop ro.build.version.sdk")), abi: sh("getprop ro.product.cpu.abi").trim(), emulator: sh("getprop ro.kernel.qemu").trim() === "1" || /sdk|emulator/i.test(sh("getprop ro.product.model")), fingerprint: sh("getprop ro.build.fingerprint").trim() },
@@ -205,6 +206,22 @@ await scenario("staged rollout: a device outside the cohort does not get the rel
   const ev = await waitFor(() => healthy(p.release, q.at), 120_000);
   if (ev) history.push({ rel: p.release, bytes: bundle("v1") }); // the device now runs this release, so the crash-loop scenarios must expect it as the previous one
   return { pass: outsideOk && !!ev, deviceBand: BAND, cohort: prefs().cohort, publishedToBands: others, devicePollsWhileOutside: ownPolls.length, devicePollStatuses: [...new Set(ownPolls.map((x) => x.status))], downloadsOfNewRelease: fetched, currentWhileOutside: after.current_release, joinedAfterWideningMs: ev ? ev.at - q.at : null };
+});
+
+// The server cuts the first full-bundle response in half. The runtime must keep the partial file, ask again with
+// `Range: bytes=<n>-`, get a 206, and still apply the release. Runs before the crash-loop scenarios (needs a polling app).
+await scenario("resumed download: an interrupted bundle download resumes with Range", async () => {
+  if (!pid()) launch();
+  const rel = nextRel, path = `/b/${APP}/r${rel}.hbc`, bytes = bundle("v2");
+  cut.path = path; cut.done = false;
+  const p = await publish(bytes, { bases: [] });
+  const ev = await waitFor(() => healthy(p.release, p.at), 180_000);
+  cut.path = null;
+  if (ev) history.push({ rel: p.release, bytes });
+  const f = resumeFacts({ entries: entries(), path, since: p.at, healthyAt: ev?.at ?? null });
+  const why = !f.firstCut ? "the server never cut the first response" : f.requests < 2 ? "the app did not retry the download" : !f.usedRange ? "the second request did not use Range" : f.secondStatus !== 206 ? `the second request got HTTP ${f.secondStatus}, not 206` : !ev ? "the release did not report healthy" : null;
+  return { pass: !why, ...(why ? { failure: why } : {}), release: p.release, bundleBytes: bytes.length, bytesSentTotal: f.bytesSent, firstResponseBytes: f.firstBytes, requests: f.requests,
+    secondRequestUsedRange: f.usedRange, secondRequestRange: f.secondRange, secondRequestStatus: f.secondStatus, firstRequestToHealthyMs: f.firstToHealthyMs };
 });
 
 for (const [kind, file, title, maxBadRuns] of [

@@ -33,6 +33,21 @@ export const parseLog = (text) => text.split("\n").filter(Boolean).map((l) => { 
 /** Telemetry events (POST /t) from a parsed log, with the server receive time in ms. */
 export const telemetry = (entries) => entries.filter((e) => e.method === "POST" && e.path === "/t").map((e) => { try { return { at: e.t, ...JSON.parse(e.body) }; } catch { return null; } }).filter(Boolean);
 
+/**
+ * What happened to one bundle path in the "resumed download" scenario, from the parsed server log. Requests are GETs of
+ * `path` at or after `since`. `usedRange` is true when the second request carried a Range header; `resumed` also needs a
+ * 206 answer. `bytesSent` adds up the bytes the server wrote, including the cut first response. `healthyAt` (ms) is
+ * when the app reported healthy; `firstToHealthyMs` is null without it.
+ */
+export function resumeFacts({ entries, path, since = 0, healthyAt = null }) {
+  const reqs = entries.filter((e) => e.method === "GET" && e.path === path && e.t >= since);
+  const [first, second] = reqs;
+  const usedRange = !!second?.range;
+  return { requests: reqs.length, firstCut: !!first?.cut, bytesSent: reqs.reduce((s, e) => s + (e.bytes || 0), 0), firstBytes: first?.bytes ?? null,
+    secondRange: second?.range ?? null, secondStatus: second?.status ?? null, usedRange, resumed: usedRange && second.status === 206,
+    firstToHealthyMs: healthyAt != null && first ? healthyAt - (first.t) : null };
+}
+
 /** Percent change from base to now; positive means slower or larger. */
 export const pctChange = (base, now) => (base ? Math.round(((now - base) / base) * 1000) / 10 : null);
 

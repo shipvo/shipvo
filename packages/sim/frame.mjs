@@ -99,7 +99,7 @@ if(e.detail===0&&e.shiftKey){shown("power-menu")?closeMenu():openMenu();return}
 if(shown("power-menu")){closeMenu();return}
 if(shown("lock-screen")){return}
 lockNow()});
-function bump(d){vol=Math.max(0,Math.min(100,vol+d));q("volume-level").textContent=vol;show(q("volume-overlay"),true);clearTimeout(volT);volT=setTimeout(function(){show(q("volume-overlay"),false)},1500)}
+function bump(d){vol=Math.max(0,Math.min(100,vol+d));q("volume-level").textContent=vol;q("volume-bar").firstChild.style.width=vol+"%";show(q("volume-overlay"),true);clearTimeout(volT);volT=setTimeout(function(){show(q("volume-overlay"),false)},1500)}
 q("volume-up-button").addEventListener("click",function(){bump(10)});q("volume-down-button").addEventListener("click",function(){bump(-10)});
 q("off-screen").addEventListener("click",powerOn);q("off-screen").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();powerOn()}});
 r.addEventListener("keydown",function(e){if(e.key==="Escape")closeMenu()});
@@ -155,7 +155,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}<span class="sf-icons">${icons(st)}</span></div>`
     + `<div class="sf-content">${screen}</div>`
     + lockScreenHtml(st.time) + bootScreenHtml() + offScreenHtml()
-    + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button><button role="menuitem" data-act="cancel">Cancel</button></div>`
+    + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button><button role="menuitem" data-act="cancel">Cancel</button></div>`
     + `<div class="sf-bar" data-part="${k.bottom}"><i></i></div></div>`
     + `<button class="sf-btn sf-power" data-part="power-button" aria-label="Power"></button><button class="sf-btn sf-volup" data-part="volume-up-button" aria-label="Volume up"></button><button class="sf-btn sf-voldown" data-part="volume-down-button" aria-label="Volume down"></button>`
     + `<span class="sf-label" data-part="simulated-label">Simulated</span></div>`;
@@ -176,7 +176,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-lock,.sf-boot,.sf-off,.sf-menu,.sf-vol{position:absolute;z-index:5}.sf-lock[hidden],.sf-boot[hidden],.sf-off[hidden],.sf-menu[hidden],.sf-vol[hidden]{display:none}.sf-off{inset:0;z-index:7;background:#000;cursor:pointer}`,
     `.sf-lock{inset:0;background:#10151c;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif}.sf-lock-time{font-size:64px;font-weight:300}.sf-lock-hint{font-size:14px;opacity:.7}.sf-lock button{margin-top:8px;padding:10px 28px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer}`,
     `.sf-boot{inset:0;z-index:6;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font:700 34px system-ui,sans-serif;letter-spacing:.04em}`,
-    `.sf-vol{top:80px;right:12px;padding:8px 14px;border-radius:14px;background:#222d;color:#fff;font:600 14px system-ui,sans-serif}`,
+    `.sf-vbar{display:block;width:90px;height:4px;margin-top:6px;border-radius:2px;background:#fff4}.sf-vbar b{display:block;height:100%;border-radius:2px;background:#fff}.sf-vol{top:80px;right:12px;padding:8px 14px;border-radius:14px;background:#222d;color:#fff;font:600 14px system-ui,sans-serif}`,
     `.sf-menu{left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:16px;background:#222;box-shadow:0 8px 30px #0008}.sf-menu button{padding:10px 24px;border:0;border-radius:10px;background:#3a3d42;color:#fff;font:600 15px system-ui,sans-serif}`,
     `.sf-label{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:600 9px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa0a6}`,
   ].join("\n");
