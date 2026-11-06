@@ -37,6 +37,12 @@ describe("run agent channel", () => {
     await s.close();
     expect(existsSync(join(dir, ".shipvo", "run.json"))).toBe(false);
   });
+  it("writes the app id, not the display name, to run.json", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "shipvo-agent-"));
+    const s = await startRunServer({ dir, platform: "android", name: "Tidepool Shop", appId: "tidepool", projectDir: dir, render: renderFrame });
+    expect(JSON.parse(readFileSync(join(dir, ".shipvo", "run.json"), "utf8")).app).toBe("tidepool");
+    await s.close();
+  });
   it("relays driver messages to the screen and replies back", async () => {
     const { s, url } = await setup();
     const screen = await open(url("screen")); const driver = await open(url("driver"));

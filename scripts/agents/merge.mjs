@@ -22,6 +22,13 @@ const DRY = process.env.DRY_RUN === "true";
 import { LOCKED, GUARDED } from "./contract.mjs";
 const GREEN = new Set(["success", "skipped", "neutral"]);
 
+
+// Squash message we set ourselves: without it GitHub appends a Co-authored-by line for every author on the branch.
+// Keeps only the issue-closing lines from the PR body.
+const squashMessage = (pr) => {
+  const refs = [...new Set(((pr.body || "").match(/\b(?:fixes|closes|resolves)\s+#\d+/gi) || []).map((x) => x.replace(/^\w+/, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase())))];
+  return refs.join("\n") || " ";
+};
 const gh = (...args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 256 * 1024 * 1024 });
 const api = (path, ...rest) => JSON.parse(gh("api", path, ...rest) || "null");
 const apiAll = (path) => JSON.parse(gh("api", "--paginate", "--slurp", path)).flat();
@@ -201,7 +208,7 @@ for (const pr of prs) {
   let merged = false;
   for (let attempt = 1; attempt <= 3 && !merged; attempt++) {
     act(`merge #${n} ${pr.title} (attempt ${attempt})`, () => gh("api", "-X", "PUT", `repos/${REPO}/pulls/${n}/merge`,
-      "-f", "merge_method=squash", "-f", `commit_title=${pr.title} (#${n})`, "-f", `sha=${full.head.sha}`));
+      "-f", "merge_method=squash", "-f", `commit_title=${pr.title} (#${n})`, "-f", `commit_message=${squashMessage(full)}`, "-f", `sha=${full.head.sha}`));
     if (DRY) break;
     try { merged = api(`repos/${REPO}/pulls/${n}`).merged === true; } catch { merged = false; }
     if (!merged && attempt < 3) execFileSync("sleep", [String(attempt * 10)]);

@@ -4,6 +4,7 @@ import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@s
 import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
+import { forbidden, type Action } from "./roles";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
@@ -219,6 +220,11 @@ const medianSql = (col: string) =>
 app.get("/t/:app/summary", async (c) => {
   const appId = c.req.param("app");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  // The summary stays public. A caller who presents this app's publish token is checked against its role.
+  if ((c.req.header("authorization") ?? "").includes("sv_publish_")) {
+    const pub = await publisher(c, appId);
+    const no = pub ? forbidden(pub.role, "read_summary") : null; if (no) return c.json(no, 403);
+  }
   const counts = await c.env.DB.prepare(`SELECT release, event, COUNT(*) AS n, MAX(id) AS last_id FROM telemetry WHERE app_id = ? AND release IN (${TOP_RELEASES}) GROUP BY release, event`).bind(appId, appId).all<{ release: number; event: string; n: number; last_id: number }>();
   const apply = await c.env.DB.prepare(medianSql("apply_ms")).bind(appId, appId).all<{ release: number; m: number }>();
   const cold = await c.env.DB.prepare(medianSql("cold_start_ms")).bind(appId, appId).all<{ release: number; m: number }>();
@@ -314,11 +320,19 @@ app.post("/app/:id/api/command", async (c) => {
  * PUT {threshold, min_reports?} turns it on; DELETE turns it off.
  */
 async function haltConfigAuth(c: any, appId: string) { return (await owner(c, appId)) || (await publisher(c, appId)); }
+/** Owner and role-less publish tokens act as admin; a publish token with a role must be allowed the action. Returns a 403 Response or null. */
+async function roleDenied(c: any, appId: string, action: Action): Promise<Response | null> {
+  if (await owner(c, appId)) return null;
+  const pub = await publisher(c, appId);
+  const no = forbidden(pub?.role, action);
+  return no ? c.json(no, 403) : null;
+}
 const bad = (c: any, message: string) => c.json({ error: "bad_halt_config", message }, 400);
 app.get("/app/:id/api/halt-config", async (c) => {
   const appId = c.req.param("id");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
   if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  { const no = await roleDenied(c, appId, "read_summary"); if (no) return no; }
   const raw = await c.env.POINTERS.get(`halt-config/${appId}`);
   if (raw) {
     try {
@@ -332,6 +346,7 @@ app.put("/app/:id/api/halt-config", async (c) => {
   const appId = c.req.param("id");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
   if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  { const no = await roleDenied(c, appId, "halt"); if (no) return no; }
   let body: any; try { body = await c.req.json(); } catch { return bad(c, "body must be JSON like {\"threshold\": 0.2}"); }
   const t = body?.threshold, m = body?.min_reports === undefined ? 20 : body.min_reports;
   if (typeof t !== "number" || !Number.isFinite(t) || t <= 0 || t > 1) return bad(c, "threshold must be a number above 0 and at most 1");
@@ -343,6 +358,7 @@ app.delete("/app/:id/api/halt-config", async (c) => {
   const appId = c.req.param("id");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
   if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  { const no = await roleDenied(c, appId, "halt"); if (no) return no; }
   await c.env.POINTERS.delete(`halt-config/${appId}`);
   return c.json({ enabled: false });
 });
@@ -352,6 +368,7 @@ app.get("/audit/:app", async (c) => {
   const appId = c.req.param("app");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
   if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  { const no = await roleDenied(c, appId, "read_audit"); if (no) return no; }
   const lq = c.req.query("limit"), bq = c.req.query("before");
   const limit = lq === undefined ? 50 : Number(lq);
   if (!Number.isInteger(limit) || limit < 1) return c.json({ error: "bad_request", message: "limit must be a positive integer" }, 400);

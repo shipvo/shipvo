@@ -138,7 +138,6 @@ Finish a task by checking the final screen says what you expected (for example "
 
 // ctx.app: the app(s) this key opens, comma-separated (the beta app plus any the key owner has registered).
 const keyApps = ctx.app ? ctx.app.split(",").map((s) => s.trim()).filter(Boolean) : null;
-const allowed = async (id: string) => (keyApps ? keyApps.includes(id) : !!(await localApps())[id]);
 server.tool("list_apps", "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').", { query: z.string().optional() }, RO, async ({ query }) => {
   const APPS = await localApps(); const ids = keyApps ?? Object.keys(APPS); const q = (query ?? "").toLowerCase();
   let dir: Record<string, { name: string; description: string; category: string }> = {};
@@ -158,11 +157,13 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
 }, WR, async ({ app, session, seed_cart, dark, attach }) => {
   const id = app.split("@")[0];
-  if (!(await allowed(id))) return result("", { ok: false, code: "unknown_app", error: keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
+  const live = attach === "never" ? undefined : findLiveRun(id);
+  // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
+  if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
+  if (!keyApps && !live && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const mode = attach ?? "auto";
-  const live = mode === "never" ? undefined : findLiveRun(id);
   if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
   let attachNote = "";
   if (live) {

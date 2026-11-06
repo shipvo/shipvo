@@ -25,9 +25,12 @@
 
 <section class="cmp-sec">
   <div class="wrap">
-    <h2>2. Without the skill tool: one curl line</h2>
-    <p class="lede">Run it in your project folder. It needs Node 22 or newer and npm. It tells you what it will run, then runs <code>npx -y @shipvo/cli agents setup</code> in the current folder. It installs nothing outside the project and does not use <code>sudo</code>. If Node is missing, it says how to install it. You can <a href="/install.sh">read the script</a> first.</p>
+    <h2>2. Without the skill tool: one line for your system</h2>
+    <p class="lede">Run it in your project folder. It needs Node 22 or newer. It tells you what it will run, then runs <code>npx -y @shipvo/cli agents setup</code> in the current folder. It installs nothing outside the project and needs no admin rights. If Node is missing, it tells you how to install it. Read the script first: <a href="/install.sh">install.sh</a> (macOS, Linux, WSL) or <a href="/install.ps1">install.ps1</a> (Windows).</p>
+    <h3 class="os">macOS and Linux</h3>
     <pre class="term"><code>curl -fsSL https://shipvo.dev/install.sh | bash</code></pre>
+    <h3 class="os">Windows (PowerShell)</h3>
+    <pre class="term"><code>irm https://shipvo.dev/install.ps1 | iex</code></pre>
   </div>
 </section>
 
@@ -35,7 +38,6 @@
   <div class="wrap">
     <h2>3. Paste this to your agent</h2>
     <pre class="term"><code>Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints.</code></pre>
-    <p class="note"><b>Windows:</b> there is no PowerShell installer yet. Use the <code>skills</code> line (1) or the paste line (3), from a terminal where Node 22 is installed.</p>
   </div>
 </section>
 </main>

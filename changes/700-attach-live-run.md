@@ -1,0 +1,2 @@
+- `shipvo run` writes the app id (`appId` from `shipvo.json`) to `.shipvo/run.json`, not the display name. Migration: none; the file is rewritten on every run.
+- `@shipvo/mcp`: `open_app` accepts the app of a live `shipvo run` even when no simulator knows it, and attaching works: the run page now answers the `screen` request.
