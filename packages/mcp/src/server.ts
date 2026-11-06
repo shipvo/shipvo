@@ -64,6 +64,10 @@ const attached = new Map<string, Driver>();
 const ATTACH_TYPES = new Set(["screen", "tap", "type", "scroll", "back"]);
 // One action on a session: through the driver connection when attached, else the simulator.
 async function act(body: Record<string, unknown>): Promise<Act> {
+  const end = recorder.actionSpan();
+  try { return await act1(body); } finally { end(); }
+}
+async function act1(body: Record<string, unknown>): Promise<Act> {
   const d = attached.get(String(body.session));
   if (!d) return sim("/act", body);
   const { session: _s, action, ...args } = body;
@@ -202,12 +206,12 @@ const timeoutMs = z.number().int().min(0).max(30000).optional().describe("How lo
 const settle = z.boolean().optional().describe("Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text.");
 type Wait = { wait_for?: WaitFor; timeout_ms?: number; settle?: boolean };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-// Poll the screen after an action. Returns the latest result and what happened. On timeout the action result is kept as is.
+// Poll the screen after an action. The polling reads are not action spans, so the wait counts as idle time in a recording. Returns the latest result and what happened. On timeout the action result is kept as is.
 async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; waited?: Waited }> {
   if (!r.ok || r.screen == null || (!w.wait_for && !w.settle)) return { r };
   const t0 = Date.now(), limit = w.timeout_ms ?? 2000, left = () => limit - (Date.now() - t0);
   let cur = r, matched = true;
-  const read = async () => { const n = await act({ session, action: "screen" }); if (n.ok && n.screen != null) cur = { ...cur, screen: n.screen }; return n.ok && n.screen != null; };
+  const read = async () => { const n = await act1({ session, action: "screen" }); if (n.ok && n.screen != null) cur = { ...cur, screen: n.screen }; return n.ok && n.screen != null; };
   if (w.wait_for) {
     matched = satisfied(cur.screen!, w.wait_for);
     while (!matched && left() > 0) { await sleep(Math.min(100, left())); if (await read()) matched = satisfied(cur.screen!, w.wait_for); }
@@ -344,8 +348,9 @@ server.tool("record_start", "Start recording the phone frame to an MP4 under .sh
   fps: z.union([z.literal(30), z.literal(60)]).optional().describe("Frames per second (default 30)"),
   title: z.string().optional().describe("Used in the file name"),
   show_taps: z.boolean().optional().describe("Draw a finger dot and ripple on taps and a trail on scrolls (default true)"),
-}, WR, async ({ format, fps, title, show_taps }) => {
-  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
+  background: z.string().min(1).optional().describe('Behind the phone: "brand", "plain" (white) or a CSS colour such as "#102030"'),
+}, WR, async ({ format, fps, title, show_taps, background }) => {
+  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }

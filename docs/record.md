@@ -18,6 +18,8 @@ Ask your assistant: "Record a 30 second demo of the checkout. Add a chapter at e
 
 The file is written to `.shipvo/recordings/<title>-<yyyymmddhhmmss>.mp4` in the folder where the MCP server runs (H.264, so it plays everywhere).
 
+Waits longer than 0.6 s between actions are cut, including `wait_for` and `settle` waits. So `duration_s` is shorter than wall-clock time. Time inside one action is kept.
+
 ## Options
 
 | Tool | Argument | Values |
@@ -25,7 +27,8 @@ The file is written to `.shipvo/recordings/<title>-<yyyymmddhhmmss>.mp4` in the 
 | `record_start` | `format` | `9:16` (1080x1920, default), `16:9` (1920x1080), `1:1` (1080x1080) |
 | | `fps` | `30` (default) or `60` |
 | | `title` | Used in the file name |
-| `record_marker` | `caption` | Required, a chapter title at the current time |
+| | `background` | `brand`, `plain` or a CSS colour behind the phone |
+| `record_marker` | `caption` | Required, a chapter title at the current time. It also shows on screen as a lower third until the next marker |
 | `record_stop` | none | |
 
 Only one recording runs at a time per server.
