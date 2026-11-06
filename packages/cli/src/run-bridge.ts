@@ -334,14 +334,30 @@ function bridgeMain(win: any, token: string) {
       stream = await win.navigator.mediaDevices.getDisplayMedia({ video: true, audio: false, preferCurrentTab: true });
       video = doc.createElement("video"); video.muted = true; video.srcObject = stream;
       await video.play();
-      for (const t of stream.getTracks()) t.addEventListener("ended", () => { capture = "refused"; stream = undefined; });
+      for (const t of stream.getTracks()) t.addEventListener("ended", () => { capture = "ask"; asked = false; stream = undefined; step("Tab sharing stopped. Screenshots are drawn from the page; the next agent action asks again."); });
       capture = "granted"; step("The agent can see this tab.");
     } catch { capture = "refused"; step("Tab capture was refused. Screenshots are drawn from the page."); }
   };
-  const png = (c: any): Promise<string> => new Promise((ok, fail) => c.toBlob((b: any) => {
-    if (!b) return fail(new Error("could not make a PNG"));
-    const r = new win.FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.onerror = () => fail(new Error("could not read the PNG")); r.readAsDataURL(b);
-  }, "image/png"));
+  // The socket drops any message over 1 MiB, so a screenshot is kept under SHOT_MAX base64 characters.
+  const SHOT_MAX = 700_000;
+  const blob64 = (c: any, type: string, q?: number): Promise<string> => new Promise((ok, fail) => c.toBlob((b: any) => {
+    if (!b) return fail(new Error("could not make an image"));
+    const r = new win.FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.onerror = () => fail(new Error("could not read the image")); r.readAsDataURL(b);
+  }, type, q));
+  /** PNG if it fits. Otherwise a smaller PNG, then JPEG at lower scale and quality. Throws if nothing fits. */
+  async function png(c: any): Promise<{ image: string; mime: string; width: number; height: number }> {
+    const steps: [string, number, number][] = [["image/png", 1, 1], ["image/png", 0.5, 1], ["image/jpeg", 1, 0.8], ["image/jpeg", 0.5, 0.6], ["image/jpeg", 0.3, 0.5]];
+    for (const [mime, scale, q] of steps) {
+      let src = c;
+      if (scale < 1) {
+        src = doc.createElement("canvas"); src.width = Math.max(1, Math.round(c.width * scale)); src.height = Math.max(1, Math.round(c.height * scale));
+        const g = src.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, src.width, src.height); g.drawImage(c, 0, 0, src.width, src.height);
+      }
+      const image = await blob64(src, mime, q);
+      if (image.length <= SHOT_MAX) return { image, mime, width: src.width, height: src.height };
+    }
+    throw new Error("the screenshot is too large to send, even scaled down");
+  }
   /** A frame of the live tab, cropped to the phone. */
   async function tabShot() {
     for (let i = 0; i < 20 && !video.videoWidth; i++) await sleep(50);
@@ -349,7 +365,7 @@ function bridgeMain(win: any, token: string) {
     const k = video.videoWidth / win.innerWidth, r = doc.getElementById("phone").getBoundingClientRect();
     const c = doc.createElement("canvas"); c.width = Math.max(1, Math.round(r.width * k)); c.height = Math.max(1, Math.round(r.height * k));
     c.getContext("2d").drawImage(video, r.left * k, r.top * k, r.width * k, r.height * k, 0, 0, c.width, c.height);
-    return { image: await png(c), width: c.width, height: c.height };
+    return await png(c);
   }
   /** The app iframe's DOM drawn to a canvas through an SVG foreignObject. Says what it could not draw. */
   async function renderedShot() {
@@ -384,7 +400,7 @@ function bridgeMain(win: any, token: string) {
     await new Promise((ok, fail) => { img.onload = ok; img.onerror = () => fail(new Error("the page could not be drawn")); img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
     const c = doc.createElement("canvas"); c.width = W; c.height = H;
     const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.drawImage(img, 0, 0);
-    return { image: await png(c), width: W, height: H, unsupported: Array.from(skipped) };
+    return { ...(await png(c)), unsupported: Array.from(skipped) };
   }
   async function shot() {
     if (capture === "granted" && stream) {
@@ -401,8 +417,9 @@ function bridgeMain(win: any, token: string) {
     if (m.type !== "tree") seenAgent = true;
     if (m.type !== "tree" && m.type !== "screen") askCapture();
     if (m.type === "screenshot") {
-      shot().then((r) => ws.send(JSON.stringify({ id: m.id, type: "screenshot", ok: true, ...r, screen: screenOrUndefined() })),
-        (err: any) => ws.send(JSON.stringify({ id: m.id, type: "screenshot", ok: false, error: String(err && err.message || err), screen: screenOrUndefined() })));
+      const out = (o: any) => ws.send(JSON.stringify(o));
+      shot().then((r) => { const body = JSON.stringify({ id: m.id, type: "screenshot", ok: true, ...r, screen: screenOrUndefined() }); if (body.length > 1000000) throw new Error("the screenshot reply is too large to send"); ws.send(body); }).catch(
+        (err: any) => out({ id: m.id, type: "screenshot", ok: false, error: String(err && err.message || err), screen: screenOrUndefined() }));
       return;
     }
     if (taken && m.type !== "tree") { ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, code: "taken_over", error: "the person took over" })); return; }

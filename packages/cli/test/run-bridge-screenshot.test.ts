@@ -14,8 +14,8 @@ const PAGE = `<!doctype html><html><head><title>t</title><style>body{margin:0;ba
 <h1>Hello shots</h1><button>Buy</button><img alt="far" src="https://example.invalid/x.png"><video width="50" height="30"></video></body></html>`;
 
 let browser: any; const closers: (() => Promise<void>)[] = [];
-async function connect(init?: string) {
-  const dist = mkdtempSync(join(tmpdir(), "shipvo-shot-")); writeFileSync(join(dist, "index.html"), PAGE);
+async function connect(init?: string, html = PAGE) {
+  const dist = mkdtempSync(join(tmpdir(), "shipvo-shot-")); writeFileSync(join(dist, "index.html"), html);
   const server = await startRunServer({ dir: dist, platform: "ios", name: "Test" });
   const page = await browser.newPage({ viewport: { width: 500, height: 950 } });
   if (init) await page.addInitScript(init);
@@ -32,6 +32,9 @@ async function connect(init?: string) {
   return { page, ask };
 }
 const isPng = (b64: string) => Buffer.from(b64, "base64").subarray(1, 4).toString() === "PNG";
+// A canvas of random pixels: a PNG of it is several MiB, far over the 1 MiB socket limit.
+const NOISY = `<!doctype html><html><body style="margin:0"><h1>Noisy shots</h1><canvas id="n" width="900" height="1800"></canvas><script>
+const c=document.getElementById("n"),g=c.getContext("2d"),d=g.createImageData(900,1800);for(let i=0;i<d.data.length;i++)d.data[i]=i%4==3?255:Math.random()*256;g.putImageData(d,0,0);</script></body></html>`;
 
 beforeAll(async () => {
   const pw = require("playwright");
@@ -87,5 +90,31 @@ describe("run bridge screenshot", () => {
     await page.waitForFunction(() => document.querySelector("#shipvo-log")?.textContent?.includes("refused"));
     const r = await ask({ type: "screenshot" });
     expect(r.ok, r.error).toBe(true); expect(r.source).toBe("rendered");
+  }, 30_000);
+
+  it("keeps big screenshots under the socket limit and the connection open", async () => {
+    const { page, ask } = await connect(undefined, NOISY);
+    const a = await ask({ type: "screenshot" });
+    expect(a.ok, a.error).toBe(true); expect(a.source).toBe("rendered");
+    expect(a.image.length).toBeLessThan(900_000);
+    await page.click("#shipvo-capture button:text('Allow')");
+    await page.waitForFunction(() => document.querySelector("#shipvo-log")?.textContent?.includes("can see this tab"));
+    const b = await ask({ type: "screenshot" });
+    expect(b.ok, b.error).toBe(true); expect(b.source).toBe("tab-capture");
+    expect(b.image.length).toBeLessThan(900_000);
+    const s = await ask({ type: "screen" }); // the socket is still open
+    expect(s.ok).toBe(true);
+  }, 60_000);
+
+  it("asks again after the person stops sharing the tab", async () => {
+    const { page, ask } = await connect(`const g = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices); navigator.mediaDevices.getDisplayMedia = async (o) => (window.__s = await g(o));`);
+    await ask({ type: "screenshot" });
+    await page.click("#shipvo-capture button:text('Allow')");
+    await page.waitForFunction(() => document.querySelector("#shipvo-log")?.textContent?.includes("can see this tab"));
+    await page.evaluate(() => { for (const t of (window as any).__s.getTracks()) { t.stop(); t.dispatchEvent(new Event("ended")); } });
+    await page.waitForFunction(() => document.querySelector("#shipvo-log")?.textContent?.includes("sharing stopped"));
+    const r = await ask({ type: "screenshot" });
+    expect(r.ok, r.error).toBe(true); expect(r.source).toBe("rendered");
+    await expect(page.locator("#shipvo-capture").isVisible()).resolves.toBe(true);
   }, 30_000);
 });
