@@ -31,8 +31,8 @@ const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "
 export const webCrypto: TelemetryCrypto = {
   randomBytes: (n) => globalThis.crypto.getRandomValues(new Uint8Array(n)),
   hmacSha256: async (key, data) => {
-    const k = await globalThis.crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    return new Uint8Array(await globalThis.crypto.subtle.sign("HMAC", k, data));
+    const k = await globalThis.crypto.subtle.importKey("raw", key as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    return new Uint8Array(await globalThis.crypto.subtle.sign("HMAC", k, data as BufferSource));
   },
 };
 
