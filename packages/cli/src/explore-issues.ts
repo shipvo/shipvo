@@ -28,7 +28,12 @@ export function findingToIssue(f: Finding, skin: Skin): { title: string; body: s
 export function redactTestSecrets(text: string, env: NodeJS.ProcessEnv = process.env): string {
   const values = Object.entries(env).filter(([k, v]) => k.startsWith("SHIPVO_TEST_") && v && v.length >= 4).map(([, v]) => v!).sort((a, b) => b.length - a.length);
   let out = text;
-  for (const v of values) out = out.split(v).join("***");
+  for (const v of values) {
+    out = out.split(v).join("***");
+    // JSON output escapes quotes, backslashes and control characters, so mask that form too.
+    const esc = JSON.stringify(v).slice(1, -1);
+    if (esc !== v) out = out.split(esc).join("***");
+  }
   return out;
 }
 

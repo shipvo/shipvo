@@ -235,3 +235,26 @@ describe("shipvo test --upload", () => {
     err.mockRestore(); vi.unstubAllEnvs();
   });
 });
+
+describe("shipvo test secrets", () => {
+  it("keeps a password out of logged lines and both report files", async () => {
+    const pw = "pw-Zx81-secret";
+    const base = kit();
+    const secretKit: TestKit = {
+      ...base,
+      redact: (t) => t.split(pw).join("***"),
+      runSteps: async () => { throw new Error(`login rejected ${pw}\nScreen now:\n- text "${pw}"`); },
+    };
+    const f = project(); const dir = mkdtempSync(join(tmpdir(), "shipvo-report-"));
+    const json = join(dir, "r.json"), md = join(dir, "r.md"); const out: string[] = [];
+    const code = await testCmd([f, "--report", json, "--report-md", md], secretKit, (s) => out.push(s));
+    expect(code).toBe(1);
+    expect(out.join("\n")).toContain("login rejected ***");
+    expect(out.join("\n")).not.toContain(pw);
+    for (const file of [json, md]) {
+      const text = readFileSync(file, "utf8");
+      expect(text).toContain("***");
+      expect(text).not.toContain(pw);
+    }
+  });
+});

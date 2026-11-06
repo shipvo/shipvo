@@ -57,7 +57,8 @@ export async function runSteps(phone: Phone, steps: Step[]): Promise<void> {
           await phone.type({ ref: user.ref }, a.user);
           await phone.type({ ref: pw.ref }, a.password);
           const btn = phone.nodes().find((n) => n.role === "button" && /^(log ?in|sign ?in)$/i.test(n.name.trim()));
-          if (btn) await phone.tap({ ref: btn.ref });
+          if (!btn) throw new PhoneError(`cannot log in as "${s.account}": no Log in or Sign in button on the screen`, "login_button_missing");
+          await phone.tap({ ref: btn.ref });
           break;
         }
         case "scroll": await phone.scroll(s.direction); break;

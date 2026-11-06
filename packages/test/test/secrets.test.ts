@@ -140,6 +140,17 @@ describe('log in as "name"', () => {
     phone.type = async (_t: unknown, x: string) => { throw new Error(`rejected ${x}`); };
     const err = await runSteps(phone, parseSteps('log in as "buyer"')).catch((e) => e as Error) as Error;
     expect(err.message).not.toContain("buyer@example.test");
-    expect(redact("echo pw-Zx81-secret")).toBe("echo ***");
+    expect(err.message).not.toContain("pw-Zx81-secret");
+    expect(err.message).toContain("***");
+  });
+  it("fails with login_button_missing when the screen has no Log in or Sign in button", async () => {
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_USER = "buyer@example.test";
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD = "pw-Zx81-secret";
+    const { phone, calls } = make();
+    (phone as unknown as { nodes: () => unknown }).nodes = () => parseScreen('- textbox "Email" [ref=e1]\n- textbox "Password" [ref=e2]\n- button "Cancel" [ref=e3]');
+    const err = await runSteps(phone, parseSteps('log in as "buyer"')).catch((e) => e as PhoneError) as PhoneError;
+    expect(err.code).toBe("login_button_missing");
+    expect(err.message).toContain('cannot log in as "buyer": no Log in or Sign in button on the screen');
+    expect(calls.some((c) => c.startsWith("tap"))).toBe(false);
   });
 });
