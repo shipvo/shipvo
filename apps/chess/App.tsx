@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from "react-native";
 import { ChessGame } from "./src/actions";
 import { name, squareLabel, type Square } from "./src/engine";
-import { statusText, tapSquare } from "./src/ui";
+import { PALETTES, startNewGame, statusText, tapSquare } from "./src/ui";
 
 const GLYPH: Record<string, string> = {
   "white king": "♔", "white queen": "♕", "white rook": "♖", "white bishop": "♗", "white knight": "♘", "white pawn": "♙",
@@ -15,6 +15,7 @@ export default function App() {
   const [from, setFrom] = useState<Square | null>(null);
   const [note, setNote] = useState("White to move.");
   const [secs, setSecs] = useState(0);
+  const c = PALETTES[useColorScheme() === "dark" ? "dark" : "light"];
   const board = game.get_board();
   const over = ["checkmate", "stalemate", "draw"].includes(board.status.status);
 
@@ -29,13 +30,18 @@ export default function App() {
     if (r.moved) bump((n) => n + 1);
   };
 
+  const newGame = () => {
+    const r = startNewGame(game);
+    setFrom(r.from); setNote(r.note); setSecs(0); bump((n) => n + 1);
+  };
+
   const status = statusText(game);
 
   return (
-    <View style={s.root} accessible={false}>
-      <Text style={s.title} accessibilityRole="header">Chess</Text>
-      <Text style={s.status} accessibilityLiveRegion="polite">{status}</Text>
-      {!over && <Text style={s.timer} accessibilityLabel="Move timer">Timer {secs} s</Text>}
+    <View style={[s.root, { backgroundColor: c.bg }]} accessible={false}>
+      <Text style={[s.title, { color: c.text }]} accessibilityRole="header">Chess</Text>
+      <Text style={[s.status, { color: c.text }]} accessibilityLiveRegion="polite">{status}</Text>
+      {!over && <Text style={[s.timer, { color: c.muted }]} accessibilityLabel="Move timer">Timer {secs} s</Text>}
       <View style={s.board} accessibilityLabel="Chess board">
         {[8, 7, 6, 5, 4, 3, 2, 1].map((r) => (
           <View key={r} style={s.row}>
@@ -45,19 +51,26 @@ export default function App() {
               return (
                 <Pressable key={at} onPress={() => tap(at)} accessibilityRole="button"
                   accessibilityLabel={squareLabel(game.state, at) + (from === at ? ", selected" : targets.includes(at) ? ", legal move" : "")}
-                  style={[s.sq, { backgroundColor: from === at ? "#E0B33C" : targets.includes(at) ? "#7FB06A" : dark ? "#8A6B4B" : "#E8D5B5" }]}>
-                  <Text style={s.piece}>{p ? GLYPH[name(p)] : ""}</Text>
+                  style={[s.sq, { backgroundColor: from === at ? c.selected : targets.includes(at) ? c.target : dark ? c.darkSq : c.lightSq }]}>
+                  {p && (
+                    <View style={[s.disc, p.color === "white" ? { backgroundColor: c.whiteFill, borderColor: c.blackFill } : { backgroundColor: c.blackFill, borderColor: c.whiteFill }]}>
+                      <Text style={[s.piece, { color: p.color === "white" ? c.whiteInk : c.blackInk }]}>{GLYPH[name(p)]}</Text>
+                    </View>
+                  )}
                 </Pressable>
               );
             })}
           </View>
         ))}
       </View>
-      <Text style={s.note} accessibilityLiveRegion="polite">{note}</Text>
-      <Text style={s.h2} accessibilityRole="header">Moves</Text>
+      <Pressable onPress={newGame} accessibilityRole="button" accessibilityLabel="New game" style={[s.btn, { backgroundColor: c.button }]}>
+        <Text style={[s.btnText, { color: c.buttonText }]}>New game</Text>
+      </Pressable>
+      <Text style={[s.note, { color: c.text }]} accessibilityLiveRegion="polite">{note}</Text>
+      <Text style={[s.h2, { color: c.text }]} accessibilityRole="header">Moves</Text>
       <ScrollView style={s.list}>
-        {board.moves.length === 0 ? <Text style={s.item}>No moves yet.</Text> : board.moves.map((m, i) => (
-          <Text key={i} style={s.item}>{m.color === "white" ? `${m.n}. ` : `${m.n}... `}{m.san} ({m.text})</Text>
+        {board.moves.length === 0 ? <Text style={[s.item, { color: c.text }]}>No moves yet.</Text> : board.moves.map((m, i) => (
+          <Text key={i} style={[s.item, { color: c.text }]}>{m.color === "white" ? `${m.n}. ` : `${m.n}... `}{m.san} ({m.text})</Text>
         ))}
       </ScrollView>
     </View>
@@ -65,14 +78,17 @@ export default function App() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, paddingTop: 48, paddingHorizontal: 8, backgroundColor: "#F6F2EA" },
+  root: { flex: 1, paddingTop: 48, paddingHorizontal: 8 },
   title: { fontSize: 22, fontWeight: "700", color: "#222" },
   status: { fontSize: 15, color: "#222", marginVertical: 6 },
   timer: { fontSize: 13, color: "#555" },
   board: { aspectRatio: 1, width: "100%" },
   row: { flex: 1, flexDirection: "row" },
   sq: { flex: 1, alignItems: "center", justifyContent: "center" },
-  piece: { fontSize: 28, color: "#111" },
+  disc: { width: "84%", aspectRatio: 1, borderRadius: 999, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  piece: { fontSize: 24 },
+  btn: { minHeight: 44, borderRadius: 8, alignItems: "center", justifyContent: "center", marginTop: 8 },
+  btnText: { fontSize: 16, fontWeight: "700" },
   note: { fontSize: 14, color: "#333", marginVertical: 6 },
   h2: { fontSize: 16, fontWeight: "700", color: "#222" },
   list: { flex: 1 },

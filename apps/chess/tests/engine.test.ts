@@ -66,6 +66,15 @@ describe("typed actions", () => {
     expect(b.rows[4]![4]).toBe("e4: empty");
     expect(b.pieces.g1).toBe("white knight");
   });
+  test("legal_moves for an opponent's piece is empty", () => {
+    expect(new ChessGame().legal_moves("g8")).toEqual([]);
+  });
+  test("a stray promotion on a normal move is ignored", () => {
+    const g = new ChessGame();
+    const r = g.move("e2", "e4", "queen");
+    expect(r.ok).toBe(true);
+    expect(g.state.board["e4"]).toEqual({ color: "white", kind: "pawn" });
+  });
   test("legal_moves lists a knight's moves", () => {
     expect(new ChessGame().legal_moves("g1")).toEqual([{ from: "g1", to: "f3" }, { from: "g1", to: "h3" }]);
   });

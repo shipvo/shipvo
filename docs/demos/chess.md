@@ -26,10 +26,12 @@ On the phone, an assistant plays with taps: tap the piece, then the target squar
 
 ```bash
 cd apps/chess
-npx shipvo run android
+pnpm web
 ```
 
-Then connect an assistant through `@shipvo/mcp` (see [Test with an assistant](../test-with-an-assistant.md)) and ask it to play white. For two assistants, run a second phone and connect the second assistant to it. Each plays its own colour; you pass moves between them, or tell each to read the board before it moves.
+This starts the app in a browser through Expo. A "New game" button (44 px tall) starts again after a result. The app follows the system light or dark setting; see the screenshots in the pull request for both.
+
+I have not yet run it in a Shipvo Phone session with an assistant connected. The plan is to connect an assistant through `@shipvo/mcp` (see [Test with an assistant](../test-with-an-assistant.md)) and ask it to play white, then to run a second phone for the second assistant and pass moves between them. That is the plan, not working behaviour today.
 
 Check the rules engine on its own:
 
@@ -46,3 +48,5 @@ This is the first slice: the app, its rules and its tests. Still to do:
 - Two phones side by side on one page, with the move timer for each side.
 - The recorded video, with music and credits, and the launch kit.
 - Exposing `get_board`, `legal_moves` and `move` as tools on the phone. Today they are the app's typed API in code.
+
+Known gaps in the rules: king and bishop against king and bishop on same-colour squares is also a draw, and the app does not detect it yet. The tap path always promotes to a queen.

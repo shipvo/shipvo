@@ -200,7 +200,8 @@ export class IllegalMove extends Error {
 /** Play a move. Throws `IllegalMove` with a typed code. Pawns reaching the last rank need `promotion`; it defaults to queen only when you pass it. */
 export function move(s: State, from: string, to: string, promotion?: Promotion): State {
   if (!isSquare(from) || !isSquare(to)) throw new IllegalMove("bad_square", `Squares are a1 to h8, got "${from}" and "${to}".`);
-  if (result(s).status === "checkmate" || result(s).status === "stalemate" || result(s).status === "draw") throw new IllegalMove("game_over", "The game is over.");
+  const before = result(s).status;
+  if (before === "checkmate" || before === "stalemate" || before === "draw") throw new IllegalMove("game_over", "The game is over.");
   const piece = s.board[from];
   if (!piece) throw new IllegalMove("no_piece", `There is no piece on ${from}.`);
   if (piece.color !== s.turn) throw new IllegalMove("not_your_piece", `It is ${s.turn}'s turn; ${from} holds a ${name(piece)}.`);
