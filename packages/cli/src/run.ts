@@ -59,7 +59,7 @@ export const FRAMES = {
   ios: { width: 393, height: 852, radius: 55, label: "iOS", sheet: { title: "Would Like to Access", allow: "Allow While Using App", deny: "Don't Allow" } },
 } as const;
 
-export type RenderFrame = ((o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string }) & {
+export type RenderFrame = ((o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string; lumi?: boolean }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string }) & {
   /** Script that keeps the status bar live from the app's `pn:status` events. Absent in older @shipvo/sim. */
   statusScript?: (iframeId?: string, skin?: string) => string;
 };
@@ -250,7 +250,7 @@ export async function buildWeb(root: string, command?: string): Promise<void> {
   catch (e) { throw new Error(describeWebBuildFailure((e as { output?: string }).output ?? (e as Error).message)); }
 }
 
-function openBrowser(url: string) {
+export function openBrowser(url: string) {
   const [cmd, args] = process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
   const p = spawn(cmd, args, { stdio: "ignore", detached: true });
   p.on("error", () => console.error(`Could not open a browser. Open ${url} yourself.`));

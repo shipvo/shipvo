@@ -365,3 +365,9 @@ For CodePush apps, `--apply` edits only these things, each file copied to `.ship
 - In `package.json`, `react-native-code-push` is replaced by `@shipvo/runtime` and `@shipvo/device`, with `@shipvo/cli` as a dev dependency. It does not run your package manager.
 
 Native bootstrap code is never edited: `MainApplication.java`/`.kt`, `AppDelegate.m`/`.mm`/`.swift`, `*.gradle` and `Podfile` often still call CodePush, and the native build breaks until you change them by hand. Any of those files that mention `CodePush` or `code-push` are listed as manual steps. `appcenter codepush` scripts and CI lines are never edited. Neither are CodePush calls it cannot rewrite (for example a call that spans several lines). It prints each with file and line as a manual step, and lists them under `data.manual` in `--json`. A dirty git tree is refused with code `dirty_tree` unless you pass `--force`. A second run changes nothing and exits 0.
+
+## `shipvo lumi`
+
+`shipvo lumi [android|ios] [--ui-port 4547] [--no-open]` builds the app, opens it in your browser on Shipvo Phone and shows the Lumi sidebar: a live feed of each action, findings as they appear, coverage (screens and controls tried) and a command box. It runs on your machine and answers only requests from its own page.
+
+Commands (plain text, no AI): `test my app`, `test <flow>`, `try <flow> with bad input`, `stop`, `replay bug <n>`, `help`. A flow is a name from `routes` in `shipvo.json` or a control on the start screen, such as `cart`. Unknown text gets the list of commands.
