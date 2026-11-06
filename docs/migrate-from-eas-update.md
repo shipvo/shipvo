@@ -1,6 +1,6 @@
 # Migrate from EAS Update to Shipvo
 
-This guide moves an Expo app that uses `expo-updates` (EAS Update) to Shipvo over-the-air updates. `shipvo migrate --plan` (`packages/cli/src/migrate.ts`) prints the plan for your app. It only reads; it changes no files. Editing your files for you is not part of the command yet, so you do the steps by hand.
+This guide moves an Expo app that uses `expo-updates` (EAS Update) to Shipvo over-the-air updates. `shipvo migrate --plan` (`packages/cli/src/migrate.ts`) prints the plan for your app. It only reads; it changes no files. `shipvo migrate --apply` makes the safe edits for you (see below). You do the other steps by hand.
 
 Facts about `expo-updates` are from the [Expo EAS Update docs](https://docs.expo.dev/eas-update/introduction/).
 
@@ -24,6 +24,20 @@ It lists each entry it found:
 With `app.config.js` or `app.config.ts` it cannot read the config. It tells you to check those entries by hand.
 
 In an app with neither `expo-updates` nor CodePush it exits 0 and says there is nothing to migrate.
+
+## Apply the safe edits
+
+```bash
+npx shipvo migrate --apply
+npx shipvo migrate --apply --json
+```
+
+`--apply` removes exactly the entries `--plan` lists, and nothing else: the `expo-updates` dependency, the `expo-updates` plugin entry, and the `updates` and `runtimeVersion` keys in `app.json`. Before it writes, it copies each changed file to `.shipvo/migrate-backup/`.
+
+- It refuses a dirty git tree. Commit or stash first, or pass `--force`.
+- It does not edit `app.config.js` or `app.config.ts`, your code, or the lockfile. Run your package manager's install afterwards.
+- It does not run `shipvo init`. It prints that as the next step.
+- A second run exits 0 and says there is nothing left to do.
 
 ## Order of steps
 
