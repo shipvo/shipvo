@@ -104,6 +104,35 @@ describe("Lumi", () => {
     expect(l.state().feed.at(-1)!.text).toMatch(/Stopped: stopped by you/);
     expect(l.state().running).toBe(false);
   });
+  it("reports one small control once with its screen count, and the Done line uses the Coverage count", async () => {
+    const pages: Record<string, string> = {
+      home: `- button "A" [ref=e1]\n- button "B" [ref=e2]\n- button "C" [ref=e3]`,
+      a: `- heading "A" [ref=e1]\n- button "Cart" [ref=e2]\n- button "Back" [ref=e3]`,
+      b: `- heading "B" [ref=e1]\n- button "Cart" [ref=e2]\n- button "Back" [ref=e3]`,
+      c: `- heading "C" [ref=e1]\n- button "Cart" [ref=e2]\n- button "Back" [ref=e3]`,
+    };
+    let at = "home";
+    const view = (): Reply => ({ ok: true, screen: pages[at] });
+    const d: Driver = {
+      async open() { at = "home"; return view(); },
+      async openUrl() { return view(); },
+      async tap(ref) { if (at === "home") at = ({ e1: "a", e2: "b", e3: "c" } as Record<string, string>)[ref]!; return { ...view(), delivery: "delivered" }; },
+      async back() { at = "home"; return view(); },
+      async snapshot() { return view(); },
+      async errors() { return []; },
+      async sizes() { return at === "home" ? {} : { e2: [20, 20] as [number, number] }; },
+    };
+    const l = new Lumi(d, { settleMs: 1, maxSteps: 40, maxDepth: 2 });
+    await l.command("test my app"); await l.idle();
+    const st = l.state();
+    const small = st.findings.filter((f) => /^Small target: .*Cart/.test(f.message));
+    expect(small).toHaveLength(1);
+    expect(small[0]!.message).toMatch(/ on 3 screens$/);
+    expect(small[0]!.screens).toBe(3);
+    expect(small[0]!.paths).toHaveLength(3);
+    expect(st.feed.at(-1)!.text).toContain(`over ${st.coverage.screens} screens (`);
+    expect(st.feed.at(-1)!.text).toMatch(/, \d+ new bugs?, \d+ in total\./);
+  });
   it("replay bug <n> does the steps again and says if the bug is still there", async () => {
     const l = new Lumi(shop().driver, opts);
     expect(await l.command("replay bug 1")).toMatch(/no bugs to replay/);
