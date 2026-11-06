@@ -411,13 +411,13 @@ function agentRules(): Record<string, string> {
     return h;
   } catch { return {}; }
 }
-server.tool("owner_command", "Run an owner command against the live app (changes are audited). Commands that cannot be undone or reach users (publish, prices, offers, deletes, API keys) do nothing and return { code: \"needs_confirm\", plan } first: show the plan to the owner, then call again with the same args and confirm: true.", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional(), confirm: z.boolean().optional().describe("true to run a command that returned needs_confirm; pass the same args") }, DEST,
-  async ({ app, command, args, confirm }) => {
+server.tool("owner_command", "Run an owner command against the live app (changes are audited). Commands that cannot be undone or reach users (publish, prices, offers, deletes, API keys) do nothing and return { code: \"needs_confirm\", plan } first: show the plan to the owner, then ask the owner to approve the returned challenge in the admin (approval_url). You cannot approve it yourself, and confirm: true alone does nothing. Once approved, call again with the same args and approval: <challenge id>. An approval works once, for 10 minutes, for exactly those args.", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional(), approval: z.string().optional().describe("Challenge id the owner approved; pass the same args") }, DEST,
+  async ({ app, command, args, approval }) => {
     if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": owner commands need an owner key`);
     if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
     const token = ctx.ownerToken || OWNER_TOKEN;
     if (!token) throw new Error("owner commands are not enabled on this server.");
-    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...agentRules() }, body: JSON.stringify({ name: command, args: { ...Object.fromEntries(Object.entries(args ?? {}).filter(([k]) => k !== "confirm")), ...(confirm === true ? { confirm: true } : {}) } }) });
+    const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...agentRules() }, body: JSON.stringify({ name: command, args: { ...Object.fromEntries(Object.entries(args ?? {}).filter(([k]) => k !== "confirm" && k !== "approval")), ...(approval ? { approval } : {}) } }) });
     return text(await r.text());
   });
 
@@ -431,12 +431,18 @@ async function approvalsCall(app: string, path: string, method: "GET" | "POST") 
   const body: any = await r.json().catch(() => ({}));
   return { r, body };
 }
-server.tool("approvals_list", "List promotes held above the app's policy band, waiting for a second owner, and auto-halts held by the anomaly guard (kind \"halt\": approve confirms the halt, reject dismisses it): hold id, release, band asked for, proposer and age. Needs an owner token.", { app: z.string() }, RO, async ({ app }) => {
+server.tool("approvals_list", "List what waits for an owner. approvals: promotes held above the app's policy band (hold id, release, band, proposer, age) and auto-halts held by the anomaly guard (kind \"halt\": approve confirms the halt, reject dismisses it). challenges: owner commands waiting for the owner to approve in the admin (id, command, plan, expiry, approval_url). Agents cannot approve either. Needs an owner token.", { app: z.string() }, RO, async ({ app }) => {
   const { r, body } = await approvalsCall(app, "", "GET");
   if (!r.ok) return { ...text(JSON.stringify({ ok: false, status: r.status, ...body })), isError: true };
   const t = Date.now();
+  // Owner-command challenges waiting for the owner to approve in the admin. Listing is allowed; approving is not.
+  let challenges: any[] = [];
+  try {
+    const cr = await fetch(`${CONTROL}/app/${encodeURIComponent(app)}/api/approvals`, { headers: { authorization: `Bearer ${ctx.ownerToken || OWNER_TOKEN}` } });
+    if (cr.ok) challenges = ((await cr.json()) as any).approvals ?? [];
+  } catch { /* the holds list still works */ }
   const approvals = (body.approvals ?? []).map((h: any) => ({ id: h.id, release: h.release, band: h.band, proposer: h.proposer, proposed_at: h.proposed_at, ...(h.kind ? { kind: h.kind, reason: h.reason } : {}), age_seconds: Number.isFinite(Date.parse(h.proposed_at)) ? Math.max(0, Math.round((t - Date.parse(h.proposed_at)) / 1000)) : null }));
-  return { ...text(JSON.stringify({ ok: true, app, approvals }, null, 2)), structuredContent: { ok: true, app, approvals } };
+  return { ...text(JSON.stringify({ ok: true, app, approvals, challenges }, null, 2)), structuredContent: { ok: true, app, approvals, challenges } };
 });
 server.tool("approval_approve", "Approve a held promote so it goes live. The proposer cannot approve it, and an agent cannot approve an agent's proposal: that is refused with rule self_approval. Ask the owner to approve in that case. Both outcomes are audited.", { app: z.string(), id: z.string().describe("Hold id from approvals_list") }, DEST, async ({ app, id }) => {
   const { r, body } = await approvalsCall(app, `/${encodeURIComponent(id)}/approve`, "POST");

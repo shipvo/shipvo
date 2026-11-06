@@ -22,3 +22,21 @@ Fields:
 - `errors`: one `{ url, status }` per failed call (`status` 0 means no response; a `message` explains). The matching field is `null`.
 
 Test: `node --test scripts/metrics/adoption.test.mjs`
+
+# North-star query
+
+`north-star.mjs` counts, for the last 7 days, the distinct app IDs other than `tide-and-tackle` with at least one healthy row (`applied` or `content_applied`, as in `HEALTHY_EVENTS` in the control plane) in the `telemetry` table, and the number of such rows. It only reads. Node 22, no dependencies.
+
+```bash
+export CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=...
+node scripts/metrics/north-star.mjs
+node scripts/metrics/north-star.mjs --json
+node scripts/metrics/north-star.mjs --fixture rows.json   # offline, no credentials
+```
+
+- It runs `wrangler d1 execute purenative --remote --json` in `services/control-plane` with a single `SELECT`. It never writes.
+- A fixture is a JSON array of rows with `app_id`, `event` and `received_at` (ISO time).
+- `--json` prints `metric`, `windowDays`, `since`, `until`, `excludedApp`, `apps`, `healthyRows`.
+- Without credentials and without `--fixture` it prints one line and exits 1. Tokens are never printed.
+
+Test: `node --test scripts/metrics/north-star.test.mjs`

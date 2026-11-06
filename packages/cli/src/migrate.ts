@@ -1,9 +1,11 @@
 // `shipvo migrate --plan`: read-only plan for switching an Expo app from EAS Update (expo-updates) to Shipvo.
 // It reads package.json and the app config and prints steps. It writes nothing.
-import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+// `--apply` makes the safe edits (backups first). See applyEdits.
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { dirname, join, resolve } from "node:path";
 import { detectProject } from "./adopt.js";
-import { runJson, UsageError, type Done } from "./json-out.js";
+import { CliFailure, runJson, UsageError, type Done } from "./json-out.js";
 
 export type Found = { kind: "dependency" | "plugin" | "config-key" | "package"; where: string; entry: string };
 export type MigratePlan = { system: "expo-updates" | "codepush" | null; found: Found[]; steps: string[] };
@@ -48,16 +50,100 @@ export function buildPlan(dir: string): MigratePlan {
   return { system, found, steps };
 }
 
+const BACKUP = join(".shipvo", "migrate-backup");
+const isPlugin = (pl: any) => (Array.isArray(pl) ? pl[0] : pl) === "expo-updates";
+const indentOf = (raw: string) => (/^[ \t]+(?=")/m.exec(raw)?.[0] ?? "  ");
+
+/** Edits one JSON file in memory. Returns the new text and what was removed, or null when nothing applies. */
+function editJson(raw: string, edit: (o: any) => string[]): { text: string; removed: string[] } | null {
+  const o = JSON.parse(raw);
+  const removed = edit(o);
+  return removed.length ? { text: JSON.stringify(o, null, indentOf(raw)) + (raw.endsWith("\n") ? "\n" : ""), removed } : null;
+}
+
+/** The safe edits: expo-updates dependency and plugin, and updates/runtimeVersion keys in app.json. */
+export function applyEdits(dir: string): { file: string; removed: string[] }[] {
+  const jobs: { file: string; edit: (o: any) => string[] }[] = [
+    { file: "package.json", edit: (o) => {
+      const r: string[] = [];
+      for (const sec of ["dependencies", "devDependencies"]) if (o?.[sec]?.["expo-updates"]) { r.push(`package.json ${sec}: expo-updates`); delete o[sec]["expo-updates"]; }
+      return r;
+    } },
+    { file: "app.json", edit: (o) => {
+      const expo = o?.expo ?? o; const r: string[] = [];
+      if (!expo || typeof expo !== "object") return r;
+      if (Array.isArray(expo.plugins) && expo.plugins.some(isPlugin)) { expo.plugins = expo.plugins.filter((x: any) => !isPlugin(x)); r.push("app.json plugins: expo-updates"); }
+      for (const k of ["updates", "runtimeVersion"]) if (k in expo) { delete expo[k]; r.push(`app.json: ${k}`); }
+      for (const os of ["ios", "android"]) if (expo[os] && typeof expo[os] === "object" && "runtimeVersion" in expo[os]) { delete expo[os].runtimeVersion; r.push(`app.json: ${os}.runtimeVersion`); }
+      return r;
+    } },
+  ];
+  const pending: { file: string; text: string; removed: string[] }[] = [];
+  for (const j of jobs) {
+    const path = join(dir, j.file);
+    if (!existsSync(path)) continue;
+    let e; try { e = editJson(readFileSync(path, "utf8"), j.edit); } catch { continue; }
+    if (e) pending.push({ file: j.file, ...e });
+  }
+  for (const f of pending) {
+    const b = join(dir, BACKUP, f.file);
+    mkdirSync(dirname(b), { recursive: true });
+    copyFileSync(join(dir, f.file), b);
+  }
+  for (const f of pending) writeFileSync(join(dir, f.file), f.text);
+  return pending.map((f) => ({ file: f.file, removed: f.removed }));
+}
+
+function dirtyFiles(dir: string): string[] {
+  const r = spawnSync("git", ["status", "--porcelain"], { cwd: dir, encoding: "utf8" });
+  if (r.error || r.status !== 0) return [];
+  return String(r.stdout).split("\n").filter(Boolean);
+}
+
+function applyEdits0(dir: string, force: boolean) {
+  // Nothing to edit means nothing to refuse: a second run must exit 0 even though the backups are untracked.
+  const probe = buildPlan(dir).found.some((f) => f.kind !== "dependency" || f.entry.startsWith("expo-updates@"));
+  if (!probe) return [];
+  if (!force) {
+    const d = dirtyFiles(dir);
+    if (d.length) throw new CliFailure(`Git tree is not clean (${d.length} changed path(s)). Commit or stash first, or pass --force.`, "dirty_tree", 1, [{ command: "git status", why: "See what changed." }, { command: "shipvo migrate --apply --force", why: "Apply anyway. Backups go in " + BACKUP + "." }]);
+  }
+  return applyEdits(dir);
+}
+
 const buildPlanPm = (dir: string) => detectProject(dir).packageManager;
 
 export async function migrate(argv: string[], dir = process.cwd()): Promise<number> {
   dir = resolve(dir);
   const json = argv.includes("--json");
   const run = async (): Promise<Done> => {
-    if (!argv.includes("--plan")) throw new UsageError("shipvo migrate needs --plan. Slice 1 only reads your app and prints the steps; it changes no files.");
+    const apply = argv.includes("--apply");
+    if (!apply && !argv.includes("--plan")) throw new UsageError("shipvo migrate needs --plan (print the steps) or --apply (make the safe edits).");
+    if (apply && argv.includes("--plan")) throw new UsageError("Use --plan or --apply, not both.");
     const plan = buildPlan(dir);
+    if (apply && plan.system === "expo-updates") {
+      const edits = applyEdits0(dir, argv.includes("--force"));
+      const pm = buildPlanPm(dir);
+      if (!edits.length) {
+        if (!json) console.log("Nothing left to do: no expo-updates entries remain in package.json or app.json.");
+        return { code: "nothing_left", summary: "Nothing left to do: no expo-updates entries remain that --apply can edit.", data: { changed: [], backupDir: BACKUP }, next: [{ command: "shipvo init --dry-run", why: "Preview what init adds." }] };
+      }
+      const rest = plan.steps.filter((s) => !/^Remove (expo-updates from package|the expo-updates entry)/.test(s) && !/^Commit your work/.test(s));
+      if (!json) {
+        console.log("Changed:");
+        for (const e of edits) for (const r of e.removed) console.log(`  - ${r}`);
+        console.log(`\nBackups are in ${BACKUP}/.`);
+        console.log("Old binaries keep using EAS Update until a new store build ships.");
+        console.log("\nNext steps:");
+        console.log(`  - Run ${pm} install to refresh the lockfile.`);
+        rest.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
+        console.log("\nI did not run shipvo init. Run it yourself when ready.");
+      }
+      return { code: "applied", summary: `Removed ${edits.reduce((n, e) => n + e.removed.length, 0)} entries from ${edits.length} file(s). Backups in ${BACKUP}.`, data: { changed: edits, backupDir: BACKUP, steps: rest }, next: [{ command: `${pm} install`, why: "Refresh the lockfile after removing expo-updates." }, { command: "shipvo init", why: "Add Shipvo. It is not run for you." }] };
+    }
+    if (apply && plan.system === "codepush") throw new UsageError("--apply only supports EAS Update. For CodePush see docs/migrate-from-codepush.md.");
     if (!plan.system) {
-      if (!json) console.log("Nothing to migrate: this app has no expo-updates or CodePush.");
+      if (!json) console.log(apply ? "Nothing left to do: this app has no expo-updates or CodePush." : "Nothing to migrate: this app has no expo-updates or CodePush.");
       return { code: "nothing_to_migrate", summary: "Nothing to migrate: no expo-updates or CodePush found.", data: plan, next: [{ command: "shipvo init", why: "Add Shipvo to this app." }] };
     }
     if (!json) {
@@ -75,5 +161,5 @@ export async function migrate(argv: string[], dir = process.cwd()): Promise<numb
     };
   };
   if (json) { await runJson(run, [{ command: "shipvo help", why: "See the commands and flags." }]); return Number(process.exitCode ?? 0); }
-  try { await run(); return 0; } catch (e) { console.error(e instanceof Error ? e.message : String(e)); return e instanceof UsageError ? 2 : 1; }
+  try { await run(); return 0; } catch (e) { console.error(e instanceof Error ? e.message : String(e)); return e instanceof CliFailure ? e.exit : 1; }
 }

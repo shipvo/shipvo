@@ -32,7 +32,7 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `stale_ref` | The ref is not on the current screen, or the screen changed since it was read. | Call `screen` and use a ref from the new tree. |
 | `unknown_app` | The app id is not one this server or key can open. | Call `list_apps` and use an id from it. |
 | `sim_timeout` | The simulator did not answer in time. The action may have run. | Call `screen` to see where the app is. Do not repeat the action blindly. |
-| `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan. | Show the plan to the owner, then call again with `confirm: true`. |
+| `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan and a one-time `challenge`. | Show the plan to the owner and ask them to approve it at `challenge.approval_url` in the admin. Then call again with the same args and `approval: <challenge id>`. `confirm: true` does nothing. |
 | `bad_url` | `open_url` got a URL the app cannot take. | Fix the URL and call again. |
 | `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
@@ -50,7 +50,7 @@ Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `scre
 
 `record_start`, `record_marker` and `record_stop` write an MP4 of the phone to `.shipvo/recordings/`. `record_stop` takes `music: true` (a ducked music bed and a `.credits.json`) and `narration` (a path to a wav). It needs ffmpeg and `playwright`. Music works only from a repo checkout, or when `SHIPVO_BGMUSIC` points at `scripts/video/bgmusic.py`; otherwise `record_stop` returns `music_unavailable` (and `music_failed` if the mix fails). A runnable example is in [`docs/record-a-demo-video.md`](../../docs/record-a-demo-video.md).
 
-**Owner commands that cannot be undone need `confirm: true`.** `owner_command` takes an optional `confirm`. `publish`, price changes, offers, deletes and API keys first return `{ code: "needs_confirm", plan }` and do nothing; call again with the same `args` and `confirm: true` to run. `agentPolicy` (`ask` default, `deny`, `allow`) and `agentDeny` in `shipvo.json` (read from `PN_APP_DIR` or the current folder) can only tighten the control plane's rules. Details: `docs/agents.md`.
+**Owner commands that cannot be undone need the owner's approval.** `publish`, price changes, offers, deletes and API keys first return `{ code: "needs_confirm", plan, challenge }` and change nothing. The owner approves the challenge in the admin (an agent cannot), then `owner_command` is called again with the same args and `approval: "<challenge id>"`. An approval works once, for 10 minutes, for exactly those arguments. `approvals_list` shows pending challenges. With `agentPolicy: "allow"` agents act without asking.
 
 Native features work with no phone: the simulated device (see `@shipvo/device`) shows permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners and the share sheet as real dialogs in the tree; `set_device` decides what the phone has (location, a barcode in view, whether the fingerprint matches, whether a payment is approved, network off).
 
