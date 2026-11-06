@@ -151,7 +151,7 @@ export function ensureShipvoIgnored(dir: string): void {
  * The agent channel is a WebSocket at `/__shipvo/agent?role=screen|driver&token=...`, loopback only. It relays JSON
  * messages between the `screen` and the `driver`. With `projectDir`, `.shipvo/run.json` describes the session while it runs.
  */
-export async function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string } }): Promise<{ server: Server; port: number; token: string; lanToken?: string; close: () => Promise<void> }> {
+export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string } }): Promise<{ server: Server; port: number; token: string; lanToken?: string; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const token = randomBytes(24).toString("hex");
   // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
@@ -224,7 +224,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
       const port = (server.address() as { port: number }).port;
       boundPort = port;
       if (infoPath) {
-        const info: RunInfo = { port, platform: opts.platform, app: opts.name, token, pid: process.pid };
+        const info: RunInfo = { port, platform: opts.platform, app: opts.appId ?? opts.name, token, pid: process.pid };
         mkdirSync(join(infoPath, ".."), { recursive: true });
         writeFileSync(infoPath, JSON.stringify(info, null, 2) + "\n", { mode: 0o600 });
       }
@@ -268,8 +268,8 @@ export async function run(argv: string[]): Promise<number> {
     const call = spawnBin(cmd, args);
     return spawnSync(call.command, call.args, { stdio: "inherit", shell: call.shell }).status ?? 1;
   }
-  let name: string;
-  try { name = loadConfig().name; } catch (e) { console.error((e as Error).message); return 1; }
+  let name: string, appId: string;
+  try { const c = loadConfig(); name = c.name; appId = c.appId; } catch (e) { console.error((e as Error).message); return 1; }
   if (o.port !== undefined && o.port !== 0 && !(await portFree(o.port))) { console.error(`Port ${o.port} is in use. Pass another --port <n>.`); return 1; }
   const out = join(process.cwd(), "sim-dist");
   if (isFirstBuild(process.cwd())) console.error("First build, this can take a minute.");
@@ -282,7 +282,7 @@ export async function run(argv: string[]): Promise<number> {
     if (!host) { console.error("--lan needs a network address and this computer has none. Connect to Wi-Fi and try again."); return 1; }
     lan = { host };
   }
-  const s = await startRunServer({ dir: out, platform: o.platform, name, port: o.port, projectDir: process.cwd(), lan });
+  const s = await startRunServer({ dir: out, platform: o.platform, name, appId, port: o.port, projectDir: process.cwd(), lan });
   const url = `http://127.0.0.1:${s.port}/${s.lanToken ? `?t=${s.lanToken}` : ""}`;
   if (lan && s.lanToken) {
     const lanUrl = `http://${lan.host}:${s.port}/?t=${s.lanToken}`;

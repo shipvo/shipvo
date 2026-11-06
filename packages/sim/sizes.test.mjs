@@ -14,7 +14,8 @@ const ONE = `<!doctype html><html><body><button style="width:20px;height:20px;pa
 const TWO = `<!doctype html><html><body><button style="width:30px;height:40px;padding:0">Small</button></body></html>`;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(4900, 300);
+// Own port range: another test file used 4900-5199 and a clash made this test talk to the wrong server.
+const PORT = pickPort(6500, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-sizes-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc;
