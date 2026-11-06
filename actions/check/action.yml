@@ -1,0 +1,39 @@
+name: Shipvo check
+description: Build the app for web, run it headless on Shipvo Phone, run your @shipvo/test flows, explore the changed screens and post one pull request comment.
+inputs:
+  compare-base:
+    description: Run the same flows on the base commit and report regressions.
+    default: "false"
+  github-token:
+    description: Token used to post the comment.
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - name: Install
+      shell: bash
+      run: |
+        if [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile
+        elif [ -f yarn.lock ]; then yarn install --frozen-lockfile
+        else npm ci; fi
+    - name: Shipvo check
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        SHIPVO_PR_NUMBER: ${{ github.event.pull_request.number }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        COMPARE: ${{ inputs.compare-base }}
+      run: |
+        EXTRA=""
+        if [ "$COMPARE" = "true" ]; then EXTRA="--compare-base"; fi
+        npx shipvo check --changed-from "$BASE_SHA" --post $EXTRA
+    - name: Upload screenshots and recording
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: shipvo-check
+        path: shipvo-check/
+        if-no-files-found: ignore

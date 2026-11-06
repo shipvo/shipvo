@@ -1,0 +1,2 @@
+- `@shipvo/cli`: new `shipvo check --changed-from <sha> [--compare-base] [--post]` runs your tests, explores changed screens and writes one PR comment that is edited in place. `shipvo ci init --check` writes the workflow.
+- Migration: none; new command.
