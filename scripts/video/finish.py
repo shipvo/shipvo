@@ -4,7 +4,7 @@
 The picture (characters, sets, shots) is always made fresh for each film. This only does the
 shared finishing work, the same way every time:
 
-  1. sound effects: a whoosh on every cut it detects in the picture, plus hits you choose
+  1. sound effects: a whoosh on every cut (exact, from the renderer's --shots, or detected), plus hits you choose
      (--hits "6:boom,55:chime,68.5:boom"), synthesised, nothing to credit
   2. music: your track from --music-offset, faded in and out, ducked hard under the voices
   3. voices: vo.wav from dialogue.py, cleaned and placed above the music
@@ -13,7 +13,7 @@ shared finishing work, the same way every time:
   6. checks: voice clarity over the music on every line, pacing (pacing.py, if it sits next to
      this file), a 10-frame contact sheet, and <out>.report.md with every result
 
-  python3 finish.py --video silent.mp4 --vo vo.wav --lines lines.json \
+  python3 finish.py --video silent.mp4 --shots silent.shots.json --vo vo.wav --lines lines.json \
       --music track.mp3 --music-offset 59 --credit "Music: ..." --hits "6:boom,55:chime" --out final.mp4
 
 Needs ffmpeg and numpy. Exits 1 if a check fails.
