@@ -9,7 +9,7 @@ This is our own app. We never point assistants at a third-party chess site: bots
 The app is in `apps/chess`. It is a Shipvo app and a template.
 
 - Every square has a label: `e4, white pawn` or `e5, empty`. A selected square and a legal target say so in the label too.
-- The app checks every rule: check, castling, en passant, promotion, checkmate, stalemate, and draws by repetition, the 50-move rule and too few pieces.
+- The app checks every rule: check, castling, en passant, promotion, checkmate, stalemate, and draws by repetition, the automatic 50-move draw and too few pieces.
 - A move list and a status line (whose turn, check, result) are on screen, and a timer shows how long the side to move has been thinking.
 
 Typed actions live in `apps/chess/src/actions.ts`:
@@ -31,7 +31,7 @@ pnpm web
 
 This starts the app in a browser through Expo. A "New game" button (44 px tall) starts again after a result. The app follows the system light or dark setting; see the screenshots in the pull request for both.
 
-I have not yet run it in a Shipvo Phone session with an assistant connected. The plan is to connect an assistant through `@shipvo/mcp` (see [Test with an assistant](../test-with-an-assistant.md)) and ask it to play white, then to run a second phone for the second assistant and pass moves between them. That is the plan, not working behaviour today.
+We have not yet run it in a Shipvo Phone session with an assistant connected. The plan is to connect an assistant through `@shipvo/mcp` (see [Test with an assistant](../test-with-an-assistant.md)) and ask it to play white, then to run a second phone for the second assistant and pass moves between them. That is the plan, not working behaviour today.
 
 Check the rules engine on its own:
 
