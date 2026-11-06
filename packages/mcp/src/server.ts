@@ -281,6 +281,14 @@ server.tool("dismiss_notification", "Swipe a notification away in the open shade
   async ({ session, id, all }) => { need(session); return result(session, await act({ session, action: "dismiss_notification", id, all })); });
 server.tool("close_panels", "Close the notification shade, Notification Center or Control Center (swipe up).", { session: sid }, WR,
   async ({ session }) => { need(session); return result(session, await act({ session, action: "close_panels" })); });
+server.tool("press_home", "Press Home: the app goes to the background (it receives AppState \"background\") and the phone shows the home screen with the app icon. While there, tap, type, scroll and back fail with app_not_foreground. Call resume_app to bring the app back (AppState \"active\"). Logged as simulated.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "press_home" })); });
+server.tool("open_recents", "Open the app switcher: the app goes to the background and its card is shown. resume_app opens the card again; kill_app swipes it away.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "open_recents" })); });
+server.tool("resume_app", "Tap the app icon on the home screen, or its card in the app switcher: the app comes back (AppState \"active\") with its screen kept. Fails with app_in_foreground if it is already in front.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "resume_app" })); });
+server.tool("kill_app", "Swipe the app's card away in the app switcher (call open_recents first). The app is killed: the next resume_app is a cold start, with storage kept. Fails with recents_not_open otherwise.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "kill_app" })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 

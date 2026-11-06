@@ -6,6 +6,8 @@
 // `shipvo publish` does.
 // With MISMATCH_HERMES=1 the bundle's Hermes bytecode version is changed to a different one before signing, so the
 // release is one the app must refuse (the file given is not modified).
+// Like `shipvo publish`, the pointer carries `hermes_bytecode_version` (read from the bundle header) when the bundle is
+// Hermes bytecode. The iOS runtime refuses a mismatch from this field, so without it a mismatched release is applied.
 // With CRASH_ON_START=1 the file given is written first: Hermes bytecode of a script that throws when it starts,
 // compiled by the Hermes compiler at HERMESC (the one that matches the app's React Native). It is the bad release
 // for the crash-loop scenario.
@@ -32,6 +34,7 @@ if (process.env.MISMATCH_HERMES === "1") {
 }
 mkdirSync(join(root, "b", app), { recursive: true });
 writeFileSync(join(root, "b", app, `ios-r${release}.hbc`), bytes);
+const hermesVersion = hermesVersionOf(bytes);
 const patches = [], seen = new Set();
 for (const from of (process.env.PATCH_FROM || "").split(",").filter(Boolean)) {
   const fromSha = sha256Hex(new Uint8Array(readFileSync(from)));
@@ -45,7 +48,7 @@ for (const from of (process.env.PATCH_FROM || "").split(",").filter(Boolean)) {
 }
 for (const band of ["b0", "b1", "b2"]) {
   const body = JSON.stringify({ schema_version: "1.0", app_id: app, shell_major: 1, band, platform: "ios", release, issued_at: new Date().toISOString(),
-    core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${app}/ios-r${release}.hbc`, patches }, addons: [], screens: [], min_shell_version: min });
+    core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${app}/ios-r${release}.hbc`, patches }, addons: [], screens: [], min_shell_version: min, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}) });
   mkdirSync(join(root, "p", app, "1", "ios"), { recursive: true });
   writeFileSync(join(root, "p", app, "1", "ios", `${band}.json`), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), seed) }));
 }

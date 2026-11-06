@@ -33,6 +33,8 @@ beforeAll(async () => {
     if (req.url === "/act" && body.action === "toggle_tile" && body.tile === "wifi") return res.end(JSON.stringify({ ok: false, code: "tile_not_visible", error: "open_notifications first" }));
     if (req.url === "/act" && body.action === "open_control_center") return res.end(JSON.stringify({ ok: false, code: "no_control_center", error: "an Android phone has no Control Center" }));
     if (req.url === "/act" && ["open_notifications", "toggle_tile", "dismiss_notification", "close_panels"].includes(body.action)) return res.end(JSON.stringify({ ok: true, panel: "shade", screen: `Notification shade (${body.action}:${body.tile ?? body.id ?? ""})` }));
+    if (req.url === "/act" && body.action === "kill_app") return res.end(JSON.stringify({ ok: false, code: "recents_not_open", error: "open the app switcher first (open_recents), then kill_app" }));
+    if (req.url === "/act" && ["press_home", "open_recents", "resume_app"].includes(body.action)) return res.end(JSON.stringify({ ok: true, appState: body.action === "resume_app" ? "active" : "background", screen: "Home screen" }));
     if (req.url === "/act" && body.action === "type") return res.end(JSON.stringify({ ok: true, delivery: "delivered", value: body.text, screen: "- textbox \"Name\" [ref=e1]: ignored" }));
     if (req.url === "/act" && body.action === "push_notification") return res.end(JSON.stringify({ ok: true, delivered: body.title !== "blocked", screen: "heading Menu" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Menu" }));
@@ -91,6 +93,18 @@ describe("notification shade tools", () => {
     expect((await call("close_panels")).isError).toBeFalsy();
     const a = await call("toggle_tile", { tile: "wifi" }); expect(a.isError).toBe(true); expect(a.structuredContent.code).toBe("tile_not_visible");
     const b = await call("open_control_center"); expect(b.isError).toBe(true); expect(b.structuredContent.code).toBe("no_control_center");
+    await c.close();
+  });
+});
+
+describe("home, recents and kill", () => {
+  it("send the navigation actions and pass typed errors through", async () => {
+    const c = await connect();
+    const call = (name: string) => c.callTool({ name, arguments: { session: "live" } }) as Promise<any>;
+    expect((await call("press_home")).isError).toBeFalsy();
+    expect((await call("open_recents")).isError).toBeFalsy();
+    expect((await call("resume_app")).isError).toBeFalsy();
+    const k = await call("kill_app"); expect(k.isError).toBe(true); expect(k.structuredContent.code).toBe("recents_not_open");
     await c.close();
   });
 });
