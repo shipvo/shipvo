@@ -14,7 +14,7 @@
 .rm-card{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px;justify-content:space-between;min-width:0}
 .rm-card p{margin:0;line-height:1.5;color:var(--paper);overflow-wrap:anywhere}
 .rm-meta{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
-.rm-issue,.rm-pr,.rm-doc{display:inline-flex;align-items:center;min-height:44px;padding:0 4px;color:var(--sky-text,var(--sky));font-family:var(--mono);font-size:14px}
+.rm-issue,.rm-pr,.rm-doc{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:0 4px;color:var(--sky-text,var(--sky));font-family:var(--mono);font-size:14px}
 .rm-doc{font-family:inherit;font-weight:600}
 .rm-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .rm-prog{flex:1 1 120px;height:8px;border-radius:99px;background:var(--ink-3);border:1px solid var(--line);overflow:hidden}

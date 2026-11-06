@@ -424,7 +424,9 @@ main p a:not(.btn):not(.card){text-decoration:underline;text-underline-offset:2p
   html body .nav .logo{min-height:44px}
   html body .cmd button,html body .code-bar .copy,html body .btn.small,html body .share button,html body .share a,html body .blog-top .tabs button{min-height:44px;min-width:44px}
   html body .code-bar .copy{padding:4px 14px}
-  html body .legal-nav a{min-height:44px;display:inline-flex;align-items:center}
+  html body pre.term .term-copy{min-height:44px;min-width:64px}
+  html body .edit{min-height:44px;display:inline-flex;align-items:center}
+  html body .legal-nav a,html body .legal-links a{min-height:44px;min-width:44px;display:inline-flex;align-items:center}
   html body .foot-grid a,html body .foot-bottom a,html body .foot .logo,html body .prose a[href="/learn/videos/"]{min-height:44px;display:inline-flex;align-items:center}
 }
 @media(max-width:520px){
