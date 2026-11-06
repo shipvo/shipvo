@@ -87,4 +87,4 @@ Over MCP, with a session open: `record_start` → do the steps, calling `record_
 
 ## Planned
 
-`shipvo agents setup`, `shipvo smoke` and `--json` on every command are planned (see issue 533). Today only some commands take `--json`.
+`shipvo agents setup` and `--json` on every command are planned (see issue 533). Today only some commands take `--json`.
