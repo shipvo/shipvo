@@ -29,6 +29,8 @@ npx -y @shipvo/cli sim                  # serve the app in the simulator for age
 | `pubkey` | Print the public key for the current seed |
 | `hash <file>`, `sign-file <file>`, `sign-json <file>`, `verify-json <file> <key>`, `verify <pointer> [key]` (release pointers) | Low-level signing helpers |
 
+`init`, `login`, `audit` and `keys` take `--json`: one `{ ok, code, summary, data, next }` document on stdout, progress on stderr. Exit codes: 0 ok, 1 failed, 2 usage error. The codes and `data` shapes are in [docs/cli.md](../../docs/cli.md#--json-for-init-login-audit-and-keys). `keys export --json` needs `--out`, and no envelope holds a seed or token.
+
 Changing computers? See [Moving to a new machine](new-machine.md).
 
 Also usable as a library: `signDoc`, `verifyDoc`, `signBytes`, `sha256Hex`, `keyFromSeed`.
