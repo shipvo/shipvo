@@ -1,0 +1,74 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "stripe-tracker", "name": "Stripe Tracker", "icon": "chart-line", "description": "Daily Stripe revenue, customers and failed payments." },
+  "theme": {
+    "mode": "dark",
+    "palette": { "primary": "#7CF3C8", "accent": "#FF7A59", "background": "#0B0F14", "surface": "#141A22", "text": "#F3F6F9", "muted": "#8A97A8", "danger": "#FF5D6C", "success": "#3DDC97" },
+    "font": { "family": "Inter", "display": "Space Grotesk", "scale": 1.0 },
+    "radius": "lg",
+    "density": "comfortable",
+    "elevation": "soft",
+    "motion": "lively"
+  },
+  "permissions": { "network": ["api.stripe.com"], "device": ["notifications"], "write": [] },
+  "secrets": [
+    { "name": "STRIPE_KEY", "service": "stripe", "access": "read", "help": "Create a restricted key with read access to Charges and Balance." }
+  ],
+  "data": {
+    "charges": {
+      "source": "http",
+      "get": "https://api.stripe.com/v1/charges",
+      "query": { "limit": 100, "created[gte]": "{{ unix(startOf('day', now)) }}" },
+      "auth": { "secret": "STRIPE_KEY", "type": "bearer" },
+      "select": "data",
+      "cache": "5m",
+      "paginate": { "type": "cursor", "param": "starting_after", "next": "last(data).id", "until": "!has_more" }
+    },
+    "goals": {
+      "source": "collection",
+      "fields": { "title": "text", "target": "number", "due": "date", "done": "bool" },
+      "seed": []
+    },
+    "revenueToday": {
+      "source": "computed",
+      "value": "{{ sum(charges.filter(c, c.status == 'succeeded').map(c, c.amount)) / 100 }}"
+    },
+    "revenueYesterday": { "source": "computed", "value": "{{ 1 }}" }
+  },
+  "state": { "period": { "type": "enum", "options": ["day", "week", "month"], "default": "day" } },
+  "navigation": { "type": "tabs", "items": [ { "screen": "today", "icon": "sun" }, { "screen": "failed", "icon": "alert" } ] },
+  "screens": [
+    {
+      "id": "today",
+      "title": "Today",
+      "body": [
+        { "type": "stack", "gap": "lg", "children": [
+          { "type": "stat", "label": "Revenue today", "value": "{{ money(revenueToday, 'EUR') }}", "delta": "{{ percent(revenueToday / revenueYesterday - 1) }}", "variant": "hero" },
+          { "type": "segmented", "label": "Period", "bind": "state.period", "options": ["day", "week", "month"] },
+          { "type": "chart", "kind": "area", "from": "charges", "x": "{{ formatDate(item.created, 'day') }}", "y": "{{ item.amount / 100 }}", "aggregate": "sum", "label": "Revenue by day" },
+          { "type": "list", "label": "Failed payments", "from": "{{ charges.filter(c, c.status == 'failed') }}",
+            "item": { "title": "{{ orElse(item.billing_details.name, 'Unknown') }}", "subtitle": "{{ item.failure_message }}", "trailing": "{{ money(item.amount / 100, item.currency) }}" },
+            "onPress": { "navigate": "charge", "params": { "id": "{{ item.id }}" } },
+            "empty": { "message": "No failed payments today" } }
+        ] }
+      ]
+    },
+    { "id": "failed", "title": "Failed", "body": [ { "type": "text", "variant": "title", "value": "Failed payments" } ] },
+    { "id": "charge", "title": "{{ route.params.id }}", "params": { "id": "text" }, "presentation": "sheet", "body": [ { "type": "text", "value": "{{ route.params.id }}" } ] }
+  ],
+  "actions": {
+    "stripe_summary": {
+      "description": "Revenue, new customers and failed payments for a period.",
+      "input": { "period": { "type": "enum", "options": ["day", "week", "month"], "default": "day" } },
+      "returns": { "revenue": "money", "customers": "number", "failed": "number" },
+      "do": [ { "refresh": "charges" }, { "return": { "revenue": "{{ revenueToday }}", "customers": "{{ count(unique(charges, 'customer')) }}", "failed": "{{ count(charges.filter(c, c.status == 'failed')) }}" } } ]
+    },
+    "add_goal": {
+      "description": "Add a revenue goal.",
+      "input": { "title": { "type": "text" }, "target": { "type": "money" }, "due": { "type": "date" } },
+      "do": [ { "insert": "goals", "value": "{{ input }}" }, { "toast": "Goal added" } ]
+    }
+  },
+  "schedules": [ { "id": "morning", "cron": "0 8 * * *", "tz": "person", "do": [ { "call": "stripe_summary", "with": { "period": "day" } }, { "notify": { "title": "Stripe today", "body": "{{ money(result.revenue, 'EUR') }}, {{ result.failed }} failed" } } ] } ],
+  "strings": { "fr": { "Revenue today": "Revenus du jour" } }
+}
