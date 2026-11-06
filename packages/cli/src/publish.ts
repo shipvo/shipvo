@@ -3,7 +3,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import path, { dirname, join, relative, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
 import { checkBundle, parseDeclared } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
@@ -48,6 +48,12 @@ function switchFlag(a: Record<string, string | undefined>, name: string): boolea
   throw new Error(`--${name} is an on/off flag: use --${name}, --${name} true or --${name} false (got "${v}")`);
 }
 
+/** True when `file` is strictly inside `root`. Uses the platform's separator, so it works with Windows paths too. */
+export function isInside(root: string, file: string, p: typeof path.posix = path): boolean {
+  const rel = p.relative(root, file);
+  return rel !== "" && !rel.startsWith("..") && !p.isAbsolute(rel);
+}
+
 /** A store that only writes files under `dir` (key `p/app/1/b0` becomes `dir/p/app/1/b0`). It reads back only what this run wrote (kept in memory), never old files, so the iOS pass can find the web artifact and a dry run never needs a control plane. */
 function localKv(dir: string) {
   const root = resolve(dir);
@@ -59,7 +65,7 @@ function localKv(dir: string) {
     async keys(prefix: string): Promise<string[]> { return [...mem.keys()].filter((k) => k.startsWith(prefix)); },
     async put(k: string, body: BodyInit, _type: string) {
       const f = resolve(root, k);
-      if (!f.startsWith(root + "/")) throw new Error(`refusing to write outside ${dir}: ${k}`);
+      if (!isInside(root, f)) throw new Error(`refusing to write outside ${dir}: ${k}`);
       const bytes = typeof body === "string" ? enc.encode(body) : new Uint8Array(body as Uint8Array);
       mkdirSync(dirname(f), { recursive: true });
       writeFileSync(f, bytes);
@@ -215,7 +221,7 @@ export function dryRunSummary(release: number, bytes: number, outDir: string, in
 }
 
 async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number, outDir?: string) {
-  execSync("PN_SIM=1 npx expo export --platform web --output-dir dist-web --clear", { stdio: "inherit" });
+  execSync("npx expo export --platform web --output-dir dist-web --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
   const base = `w/${APP}/r${release}`; const files: string[] = []; let indexSha = "";
   for (const f of walk("dist-web")) {
     const rel = f.slice("dist-web/".length); if (rel === "metadata.json") continue;
