@@ -221,7 +221,7 @@ export function dryRunSummary(release: number, bytes: number, outDir: string, in
 }
 
 async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number, outDir?: string) {
-  execSync("PN_SIM=1 npx expo export --platform web --output-dir dist-web --clear", { stdio: "inherit" });
+  execSync("npx expo export --platform web --output-dir dist-web --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
   const base = `w/${APP}/r${release}`; const files: string[] = []; let indexSha = "";
   for (const f of walk("dist-web")) {
     const rel = f.slice("dist-web/".length); if (rel === "metadata.json") continue;

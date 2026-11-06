@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ensurePlaywright } from "../src/ensure-playwright";
+import { ensurePlaywright, installerStdio } from "../src/ensure-playwright";
 
 const setup = (files: string[], env: NodeJS.ProcessEnv = {}, resolves = false) => {
   const run = vi.fn();
@@ -40,5 +40,20 @@ describe("ensurePlaywright", () => {
     const { run, deps } = setup(["pnpm-lock.yaml"]);
     run.mockImplementation(() => { throw new Error("ERR_PNPM_OFFLINE no network"); });
     expect(() => ensurePlaywright(deps)).toThrow(/pnpm add -D playwright.*ERR_PNPM_OFFLINE no network/);
+  });
+
+  it("quiet mode sends the notice to stderr, not stdout, and the installer's output to stderr", () => {
+    const out = vi.spyOn(console, "log").mockImplementation(() => {});
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { run, deps } = setup([]);
+      const { log: _log, ...rest } = deps;
+      ensurePlaywright({ ...rest, quiet: true });
+      expect(run).toHaveBeenCalled();
+      expect(out).not.toHaveBeenCalled();
+      expect(err.mock.calls.join("\n")).toContain("playwright is not installed");
+      expect(installerStdio(true)).toEqual(["ignore", 2, 2]);
+      expect(installerStdio(false)).toBe("inherit");
+    } finally { out.mockRestore(); err.mockRestore(); }
   });
 });

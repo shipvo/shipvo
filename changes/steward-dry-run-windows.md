@@ -1,2 +1,3 @@
 - `@shipvo/cli`: `shipvo publish --dry-run` works on Windows. It refused every file with "refusing to write outside .shipvo/dry-run" because the path check assumed `/`.
 - Migration: none.
+- `@shipvo/cli`: `shipvo publish`, `shipvo sim` and `shipvo explore` set `PN_SIM=1` for the web export through the environment, so the export also runs under cmd.exe on Windows.
