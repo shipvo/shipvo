@@ -1,3 +1,4 @@
+import http from "node:http";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,12 +9,13 @@ vi.mock("node:child_process", async (orig) => {
   return { ...m, spawnSync: vi.fn((...a: Parameters<typeof m.spawnSync>) => (process.env.RUN_TEST_FAKE_NATIVE ? ({ status: 0 } as never) : m.spawnSync(...a))) };
 });
 import { renderFrame } from "../../sim/frame.mjs";
-import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, describeWebBuildFailure, buildWeb, run, isFirstBuild } from "../src/run";
+import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, describeWebBuildFailure, buildWeb, run, lanAddress, isFirstBuild } from "../src/run";
 
 describe("parseRunArgs", () => {
   it("parses platform and flags", () => {
-    expect(parseRunArgs(["android"])).toEqual({ platform: "android", open: true, port: undefined, native: false });
-    expect(parseRunArgs(["ios", "--no-open", "--port", "5000", "--native"])).toEqual({ platform: "ios", open: false, port: 5000, native: true });
+    expect(parseRunArgs(["android"])).toEqual({ platform: "android", open: true, port: undefined, native: false, lan: false });
+    expect(parseRunArgs(["ios", "--no-open", "--port", "5000", "--native"])).toEqual({ platform: "ios", open: false, port: 5000, native: true, lan: false });
+    expect(parseRunArgs(["ios", "--lan"]).lan).toBe(true);
     expect(parseRunArgs(["--no-open", "ios"]).platform).toBe("ios");
   });
   it("rejects bad input", () => {
@@ -142,6 +144,53 @@ describe("server", () => {
     const r = await fetch(`http://127.0.0.1:${s.port}/app`, { redirect: "manual" });
     expect(r.status).toBe(302);
     expect(r.headers.get("location")).toBe("/app/");
+  });
+});
+
+describe("--lan", () => {
+  let close: (() => Promise<void>) | undefined;
+  afterEach(async () => { await close?.(); close = undefined; });
+  const app = () => { const dir = mkdtempSync(join(tmpdir(), "run-")); writeFileSync(join(dir, "index.html"), "<p>the app</p>"); return dir; };
+  const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
+  it("binds to localhost only without --lan", async () => {
+    const s = await startRunServer({ dir: app(), platform: "ios", name: "Tide", render: renderFrame });
+    close = s.close;
+    expect((s.server.address() as { address: string }).address).toBe("127.0.0.1");
+    expect(s.lanToken).toBeUndefined();
+  });
+  it("binds to all interfaces and answers 403 without the token, 200 with it", async () => {
+    const s = await startRunServer({ dir: app(), platform: "ios", name: "Tide", render: renderFrame, lan: { host: "192.168.1.20" } });
+    close = s.close;
+    expect((s.server.address() as { address: string }).address).toBe("0.0.0.0");
+    const base = `http://127.0.0.1:${s.port}`;
+    expect((await fetch(base + "/")).status).toBe(403);
+    expect((await fetch(base + "/app/")).status).toBe(403);
+    expect((await fetch(base + "/?t=wrong")).status).toBe(403);
+    const ok = await fetch(`${base}/?t=${s.lanToken}`);
+    expect(ok.status).toBe(200);
+    expect(await ok.text()).toContain("dynamic-island");
+    // the page's own requests carry the cookie the first request set
+    const cookie = ok.headers.get("set-cookie")!.split(";")[0];
+    expect((await fetch(base + "/app/", { headers: { cookie } })).status).toBe(200);
+    // the LAN address as Host is accepted; any other Host is not
+    const r = await new Promise<number>((res) => { const q = http.request({ port: s.port, host: "127.0.0.1", path: `/?t=${s.lanToken}`, headers: { host: `192.168.1.20:${s.port}` } }, (m) => { m.resume(); res(m.statusCode ?? 0); }); q.end(); });
+    expect(r).toBe(200);
+    const bad = await new Promise<number>((res) => { const q = http.request({ port: s.port, host: "127.0.0.1", path: `/?t=${s.lanToken}`, headers: { host: "evil.example" } }, (m) => { m.resume(); res(m.statusCode ?? 0); }); q.end(); });
+    expect(bad).toBe(403);
+  });
+  it("skips the phone frame for a mobile user agent and keeps it on desktop", async () => {
+    const s = await startRunServer({ dir: app(), platform: "ios", name: "Tide", render: renderFrame, lan: { host: "192.168.1.20" } });
+    close = s.close;
+    const url = `http://127.0.0.1:${s.port}/?t=${s.lanToken}`;
+    const phone = await (await fetch(url, { headers: { "user-agent": IPHONE } })).text();
+    expect(phone).toContain('data-part="bare-app"');
+    expect(phone).not.toContain("dynamic-island");
+    expect(await (await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) Chrome/120" } })).text()).toContain("dynamic-island");
+  });
+  it("picks a private LAN address", () => {
+    const nic = (address: string, internal = false) => [{ address, family: "IPv4", internal }] as never;
+    expect(lanAddress({ lo: nic("127.0.0.1", true), a: nic("203.0.113.5"), b: nic("192.168.1.20") })).toBe("192.168.1.20");
+    expect(lanAddress({ lo: nic("127.0.0.1", true) })).toBeUndefined();
   });
 });
 
