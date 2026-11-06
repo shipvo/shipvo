@@ -384,8 +384,8 @@ use(server, tools.end_session, async ({ session }) => {
 
 // Record the phone frame page to an MP4 (one recording per server). Page: SHIPVO_FRAME_URL, default the simulator's root.
 const recFail = (e: unknown) => { if (e instanceof RecorderError) return result("", { ok: false, code: e.code, error: e.message }); throw e; };
-use(server, tools.record_start, async ({ format, fps, title, show_taps, background }) => {
-  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
+use(server, tools.record_start, async ({ format, fps, title, show_taps, background, lumi, lumi_voice }) => {
+  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background, lumi, lumiVoice: lumi_voice }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 use(server, tools.record_marker, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }

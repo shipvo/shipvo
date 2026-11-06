@@ -96,6 +96,21 @@ Sealed records carry a `shipvo-vault/v1` tag in their authenticated data. Rotati
 
 Not covered in this slice: injection at call time (a later slice), listing, rotating and revoking keys, rate limits on the vault page, and a restricted Stripe key that has write permissions (the check reads the key prefix, not its permissions). A person who opens the link on a compromised browser can be phished by the page's lookalike; the ticket URL is the only credential, so treat it like a password until it is used.
 
+## Person phone and sign-in (slice 2 of #843)
+
+A person signs in with an email magic link and gets one phone: an installed-apps list and a per-app key-value data area. Code: `services/control-plane/src/people.ts`, `phone.ts`, migration `0022_people_phone.sql`. Tests: `services/control-plane/test/phone.test.ts`. Developer auth is unchanged.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| Reading or changing another person's phone or data | Every query is keyed by the person id from the session, never from the request. No route takes a person id. Another person's data reads as 404 (empty phone, no such key). | "another person gets 404 on every route and cannot change anything" |
+| Calls without sign-in | Every phone route needs a live session token. | "needs sign-in on every route"; "an expired session is refused" |
+| Login link reused or raced | The link token is claimed in one conditional `UPDATE`. It works once and lasts 15 minutes. | "login token works once" |
+| Database read | Login and session tokens are stored only as SHA-256 hashes. | "stores only hashes of tokens" |
+| Finding which emails have accounts | The login route gives the same answer for every valid address. | "rejects a bad email and answers the same for any valid one" |
+| Mail-bombing an address, or filling the database, through the login route | Sign-in link requests are limited per IP and per hashed email, per hour. Over the limit the route answers 429 with `retry-after`. No raw email is stored in KV. A failed mail send deletes the stored link token. | "limits sign-in requests per IP and per email" |
+| One app filling storage | Each app's data has a size cap set in configuration. | "caps per-app data by configuration" |
+| Data left behind or inherited | Taking an app off the phone deletes its data. Installing it again starts empty. | "removing an app removes its data" |
+
 ## Secret vault, MCP tools (slice 2)
 
 Two tools let an assistant start and follow the flow without seeing a key. Code: `request_secret` and `secret_status` in `packages/mcp-tools/src/index.ts` (one registry for the stdio and remote servers), handlers in `packages/mcp/src/server.ts`, and `GET /vault/status/:app/:name` in `services/control-plane/src/vault.ts`.
