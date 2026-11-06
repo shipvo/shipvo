@@ -44,6 +44,12 @@ window.addEventListener("DOMContentLoaded", () => { document.body.append("loads:
 </script><button onclick="localStorage.setItem('keep','yes');this.textContent='Saved'">Save</button></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
+// The page adds its text on DOMContentLoaded, so on a slow runner the first read can come before it. Read again until the text shows.
+async function screenWith(session, re) {
+  let r;
+  for (let i = 0; i < 25; i++) { r = await act(session, { action: "screen" }); if (re.test(r.screen)) return r; await new Promise((x) => setTimeout(x, 200)); }
+  return r;
+}
 
 before(async () => {
   const require = createRequire(import.meta.url);
@@ -77,7 +83,7 @@ test("lock then unlock returns to the same screen; input while locked is a typed
 
 test("restart cold-starts the app (reload counter up) and storage survives", async () => {
   assert.ok((await call("/session", { session: "r" })).ok);
-  const first = await act("r", { action: "screen" }); assert.match(first.screen, /loads:1 saved:none/);
+  const first = await screenWith("r", /loads:1/); assert.match(first.screen, /loads:1 saved:none/);
   assert.ok((await act("r", { action: "tap", ref: "e3" })).ok);
   const r = await act("r", { action: "restart" });
   assert.ok(r.ok); assert.equal(r.reloads, 2);

@@ -139,3 +139,32 @@ test("device.set merges nested state and reset clears clipboard, files and log",
   assert.equal(await device.clipboard.get(), "");
   assert.equal(dev.state.biometrics.nextResult, "success");
 });
+
+test("openUrl: a web page goes to the Browser app, an app link goes to the app", async () => {
+  const opened = [], got = [];
+  globalThis.__pnOpenBrowser = (u) => { opened.push(u); return true; };
+  const off = mod.onUrl((u) => got.push(u));
+  try {
+    assert.equal(dev.openUrl("https://shop.test/pay"), true);
+    assert.deepEqual(opened, ["https://shop.test/pay"]); assert.deepEqual(got, []);
+    assert.equal(dev.openUrl("tide://item/3"), true);
+    assert.deepEqual(got, ["tide://item/3"]); assert.equal(opened.length, 1);
+    delete globalThis.__pnOpenBrowser;      // no Browser app (hosted embed): the app gets the link as before
+    dev.openUrl("https://shop.test/x"); assert.equal(got.at(-1), "https://shop.test/x");
+  } finally { off(); delete globalThis.__pnOpenBrowser; }
+});
+
+test("openUrl: a page the Browser app refuses is logged as refused and openUrl answers false", async () => {
+  const before = dev.log().length;
+  try {
+    globalThis.__pnOpenBrowser = async () => ({ ok: false, code: "host_not_allowed" });
+    assert.equal(await dev.openUrl("http://10.0.0.1/"), false);
+    globalThis.__pnOpenBrowser = () => Promise.reject(Object.assign(new Error("no"), { code: "bad_url" }));
+    assert.equal(await dev.openUrl("http://x.test/"), false);
+    globalThis.__pnOpenBrowser = async () => ({ ok: true });
+    assert.equal(await dev.openUrl("https://ok.test/"), true);
+  } finally { delete globalThis.__pnOpenBrowser; }
+  const entries = JSON.stringify(dev.log().slice(before));
+  assert.match(entries, /browser_open_refused[^}]*host_not_allowed/); assert.match(entries, /bad_url/);
+  assert.equal((entries.match(/browser_opened/g) ?? []).length, 1);   // only the accepted page
+});
