@@ -1,0 +1,2 @@
+- `scripts/ios-e2e`: `make-release.mjs` has a `CRASH_ON_START=1` mode, and `analyze.mjs` reports "Crash-loop reverted" (pass only if the bad release ran at most 3 times and the app ends on the previous release).
+- Migration: none; test tooling only.
