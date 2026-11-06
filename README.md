@@ -61,7 +61,7 @@ Guides: [Build your first app](docs/getting-started.md) · [Tutorials](docs/tuto
 Install the Shipvo skill. It teaches your agent to set up Shipvo, run the app on Shipvo Phone, test it, publish and roll back signed updates, start the store path and record a demo.
 
 - With npm: `npx skills add shipvo/shipvo --skill shipvo -g`
-- Without: `curl -fsSL https://shipvo.dev/install.sh | bash` (planned, see [#533](https://github.com/shipvo/shipvo/issues/533))
+- Without: `curl -fsSL https://shipvo.dev/install.sh | bash` (more on [shipvo.dev/setup](https://shipvo.dev/setup/))
 - Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints." (`agents setup` is planned.)
 
 The skill is in [`skills/shipvo`](skills/shipvo/SKILL.md). A test checks that every command it names exists in `shipvo help`.
