@@ -349,3 +349,7 @@ Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `n
 ## shipvo migrate --plan
 
 Read-only. Run it in an Expo app that uses `expo-updates`. It lists the `expo-updates` entries it finds (dependency, plugin entry, `updates` and `runtimeVersion` keys in `app.json`), the steps to switch, and the order that keeps installed apps safe. It changes no files. With `--json` it prints the standard envelope with `next` steps. In an app without `expo-updates` or CodePush it exits 0 and says there is nothing to migrate. See [Migrate from EAS Update](migrate-from-eas-update.md).
+
+## shipvo migrate --apply
+
+Makes the safe edits for the switch from EAS Update: removes the `expo-updates` dependency and plugin entry, and the `updates` and `runtimeVersion` keys from `app.json`. Each changed file is copied to `.shipvo/migrate-backup/` first. It refuses a dirty git tree unless you pass `--force`. It does not run `shipvo init`; it prints it as a next step, with the rest of the plan. A second run exits 0 and says there is nothing left to do. `--json` prints the standard envelope with `next` steps. See [Migrate from EAS Update](migrate-from-eas-update.md).
