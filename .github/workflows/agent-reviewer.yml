@@ -1,20 +1,34 @@
 # Code reviewer: Claude reviews every agent PR (Claude's and Copilot's) when it is opened or updated,
 # then labels it agent:approved or agent:changes-requested.
+# workflow_dispatch (input pr) reviews a PR whose last push got no review: GitHub sometimes sends no
+# pull_request event, e.g. PR #531 after its 23:55 fix push on 2026-11-05. health.mjs dispatches it.
 name: agent-reviewer
+run-name: "${{ github.event.pull_request.title || format('review #{0}', inputs.pr) }}"
 on:
   pull_request: { types: [opened, synchronize, ready_for_review, reopened] }
+  workflow_dispatch:
+    inputs:
+      pr: { description: "PR number", required: true }
 permissions: { contents: read, issues: write, pull-requests: write, actions: read, id-token: write }
-concurrency: { group: "agent-review-${{ github.event.pull_request.number }}", cancel-in-progress: true }
+concurrency: { group: "agent-review-${{ github.event.pull_request.number || inputs.pr }}", cancel-in-progress: true }
 jobs:
   gate:
     if: >-
-      vars.AGENTS_PAUSED != 'true' && !github.event.pull_request.draft &&
+      vars.AGENTS_PAUSED != 'true' && (github.event_name == 'workflow_dispatch' || (!github.event.pull_request.draft &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      (startsWith(github.event.pull_request.head.ref, 'agent/') || startsWith(github.event.pull_request.head.ref, 'copilot/'))
+      (startsWith(github.event.pull_request.head.ref, 'agent/') || startsWith(github.event.pull_request.head.ref, 'copilot/'))))
     runs-on: ubuntu-latest
-    env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", N: "${{ github.event.pull_request.number }}", R: "${{ github.repository }}", HEAD: "${{ github.event.pull_request.head.ref }}" }
+    outputs:
+      pr: ${{ steps.pr.outputs.pr }}
+      author: ${{ steps.pr.outputs.author }}
+    env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", N: "${{ github.event.pull_request.number || inputs.pr }}", R: "${{ github.repository }}" }
     steps:
-      - run: |
+      - id: pr
+        run: |
+          read -r STATE DRAFT REPO HEAD AUTHOR < <(gh api "repos/$R/pulls/$N" --jq '[.state, .draft, .head.repo.full_name, .head.ref, .user.login] | @tsv')
+          case "$HEAD" in agent/*|copilot/*) ;; *) echo "::error::PR #$N is not an agent PR ($HEAD)"; exit 1;; esac
+          [ "$STATE" = open ] && [ "$DRAFT" = false ] && [ "$REPO" = "$R" ] || { echo "::error::PR #$N is not open, is a draft, or is from a fork"; exit 1; }
+          echo "pr=$N" >> "$GITHUB_OUTPUT"; echo "author=$AUTHOR" >> "$GITHUB_OUTPUT"
           gh pr edit $N -R $R --add-label agent-pr --remove-label agent:approved --remove-label agent:changes-requested --remove-label agent:conflict --remove-label contract:ok --remove-label contract:drift --remove-label agent:contract-check || true
           case "$HEAD" in copilot/*) gh pr edit $N -R $R --add-label agent:copilot || true;; esac
   review:
@@ -24,17 +38,17 @@ jobs:
     with:
       role: reviewer
       mode: read
-      pr: ${{ github.event.pull_request.number }}
+      pr: ${{ needs.gate.outputs.pr }}
       model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
       max_turns: 60
       timeout: 40
       allowed_bots: copilot-swe-agent,Copilot
-      vars: '{"PR": "${{ github.event.pull_request.number }}", "AUTHOR": "${{ github.event.pull_request.user.login }}"}'
+      vars: '{"PR": "${{ needs.gate.outputs.pr }}", "AUTHOR": "${{ needs.gate.outputs.author }}"}'
   verdict:
-    needs: review
+    needs: [gate, review]
     if: always() && needs.review.result == 'success'
     runs-on: ubuntu-latest
-    env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", N: "${{ github.event.pull_request.number }}", R: "${{ github.repository }}", V: "${{ needs.review.outputs.verdict }}" }
+    env: { GH_TOKEN: "${{ secrets.AGENT_TOKEN }}", N: "${{ needs.gate.outputs.pr }}", R: "${{ github.repository }}", V: "${{ needs.review.outputs.verdict }}" }
     steps:
       - run: |
           case "$V" in
