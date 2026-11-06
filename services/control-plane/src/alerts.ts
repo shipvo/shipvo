@@ -6,6 +6,9 @@ export const REVERT_EVENTS = new Set(["rolled_back", "crash_loop_revert"]);
 export const ALERT_WINDOW_MS = 3600_000;
 /** Most alerts one app can send per window, whatever the release numbers. `POST /t` is unauthenticated. */
 export const MAX_ALERTS_PER_APP = 10;
+/** Most alerts per app and window that come from unverified reports. They have their own slots, so a flood of
+ *  forged reports cannot use up the slots for verified ones. */
+export const MAX_UNVERIFIED_ALERTS_PER_APP = 3;
 
 /** Accepts only https URLs without credentials. Throws OwnerError("bad_webhook_url"). */
 export function parseWebhookUrl(raw: string): string {
@@ -18,8 +21,8 @@ export function parseWebhookUrl(raw: string): string {
 }
 
 /** Send the alert if the app has a webhook and none was sent for this release in the last hour,
- *  and the app is under its hourly cap. A slot is claimed before the POST, so a failed POST is not retried. Never throws. */
-export async function sendRevertAlert(db: D1Database, appId: string, release: number, event: string): Promise<void> {
+ *  and the app is under its hourly cap. Verified and unverified reports use separate slots and separate caps. A slot is claimed before the POST, so a failed POST is not retried. Never throws. */
+export async function sendRevertAlert(db: D1Database, appId: string, release: number, event: string, verified: boolean): Promise<void> {
   try {
     const row = await db.prepare("SELECT webhook FROM app_alerts WHERE app_id = ?").bind(appId).first<{ webhook: string }>();
     if (!row?.webhook) return;
@@ -27,11 +30,13 @@ export async function sendRevertAlert(db: D1Database, appId: string, release: nu
     const cutoff = new Date(nowMs - ALERT_WINDOW_MS).toISOString();
     // Drop rows older than the window, then enforce the per-app cap. The delete, count and claim are separate
     // statements, so concurrent reverts can slightly exceed the cap. That is fine for a flood guard.
-    await db.prepare("DELETE FROM alert_sent WHERE app_id = ? AND sent_at <= ?").bind(appId, cutoff).run();
-    const n = await db.prepare("SELECT COUNT(*) AS n FROM alert_sent WHERE app_id = ?").bind(appId).first<{ n: number }>();
-    if ((n?.n ?? 0) >= MAX_ALERTS_PER_APP) return;
+    const table = verified ? "alert_sent" : "alert_sent_unverified";
+    const cap = verified ? MAX_ALERTS_PER_APP : MAX_UNVERIFIED_ALERTS_PER_APP;
+    await db.prepare(`DELETE FROM ${table} WHERE app_id = ? AND sent_at <= ?`).bind(appId, cutoff).run();
+    const n = await db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE app_id = ?`).bind(appId).first<{ n: number }>();
+    if ((n?.n ?? 0) >= cap) return;
     // Claim the slot in one statement: insert, or take over a row older than one hour.
-    const claim = await db.prepare("INSERT INTO alert_sent (app_id, release, sent_at) VALUES (?,?,?) ON CONFLICT(app_id, release) DO UPDATE SET sent_at = excluded.sent_at WHERE alert_sent.sent_at <= ?")
+    const claim = await db.prepare(`INSERT INTO ${table} (app_id, release, sent_at) VALUES (?,?,?) ON CONFLICT(app_id, release) DO UPDATE SET sent_at = excluded.sent_at WHERE ${table}.sent_at <= ?`)
       .bind(appId, release, time, cutoff).run();
     if (!claim.meta?.changes) return;
     await fetch(row.webhook, { method: "POST", headers: { "content-type": "application/json" }, redirect: "manual",

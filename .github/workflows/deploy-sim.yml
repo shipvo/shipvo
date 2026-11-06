@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["services/sim/**", "packages/mcp/**", "packages/sim/*.mjs", ".github/workflows/deploy-sim.yml"]
+    paths: ["services/sim/**", "packages/mcp/**", "packages/mcp-tools/**", "packages/sim/*.mjs", ".github/workflows/deploy-sim.yml"]
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,7 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @shipvo/mcp build
+      # "@shipvo/mcp..." also builds its workspace deps (the private @shipvo/mcp-tools it bundles, escalation #858).
+      - run: pnpm --filter "@shipvo/mcp..." build
       - name: Apply control-plane migrations (api_keys, sim_sessions)
         working-directory: services/control-plane
         env:

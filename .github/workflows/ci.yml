@@ -40,8 +40,8 @@ jobs:
       - run: pnpm -r test
         env: { SHIPVO_REQUIRE_FFMPEG: "1" }
       # scripts/ is not a workspace package, so `pnpm -r test` skips these (escalation #634). They need the built packages.
-      - name: Script tests (iOS e2e helpers, first-run)
-        run: node --test scripts/ios-e2e/*.test.mjs scripts/first-run/*.test.mjs
+      - name: Script tests (iOS e2e helpers, first-run, agent-efficiency)
+        run: node --test scripts/ios-e2e/*.test.mjs scripts/first-run/*.test.mjs $(ls scripts/video/story/*.test.mjs 2>/dev/null) scripts/agent-efficiency/*.test.mjs
       - name: npm package size budget (each @shipvo package under 10 MB unpacked)
         run: |
           pnpm -r --filter "./packages/**" build > /dev/null

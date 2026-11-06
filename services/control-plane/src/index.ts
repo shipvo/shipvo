@@ -209,7 +209,7 @@ app.post("/t", async (c) => {
   // Halting is a best-effort side effect: never fail the response.
   if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release); } catch (e) { console.error("halt check failed", e); } }
   if (stored && REVERT_EVENTS.has(d.event)) {
-    const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
+    const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event, verified === 1);
     try { c.executionCtx.waitUntil(job); } catch { /* no execution context (tests, local): the job runs on its own */ }
   }
   return c.json(stored ? { ok: true } : { ok: true, stored: false }, 202);
