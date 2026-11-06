@@ -37,6 +37,8 @@ jobs:
       RUN_ID: ${{ github.event.workflow_run.id }}
       RUN_URL: ${{ github.event.workflow_run.html_url }}
       RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+      RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+      RUN_EVENT: ${{ github.event.workflow_run.event }}
       MAX_ROUNDS: ${{ vars.AGENT_MAX_FIX_ROUNDS || 3 }}
     steps:
       - id: r
@@ -67,10 +69,19 @@ jobs:
                  "--label", "agent:ready", "--label", "agent:claude", "--label", "priority:urgent", "--label", "type:bug", "--label", "ci-main",
                  "--body", f"**Problem**\nThe `ci` workflow failed on `main`: {E['RUN_URL']}\n\n**What to do**\nRead the failing log (`gh run view {E['RUN_ID']} --log-failed`), find the cause and fix it.\n\n**Acceptance criteria**\n- [ ] `ci` is green on the fix PR\n- [ ] The cause is explained in the PR body\n- [ ] No test is skipped or deleted to get green")
               print("opened main CI issue"); raise SystemExit
-          prs = json.loads(gh("pr", "list", "-R", R, "--head", B, "--state", "open", "--json", "number,labels,body,headRefName") or "[]")
+          prs = json.loads(gh("pr", "list", "-R", R, "--head", B, "--state", "open", "--json", "number,labels,body,headRefName,headRefOid") or "[]")
           if not prs: raise SystemExit
           pr = prs[0]; n = pr["number"]; names = [l["name"] for l in pr["labels"]]
           if "agent-pr" not in names or "needs-human" in names: raise SystemExit
+          if E["EVENT"] == "workflow_run":
+              # A failure on a commit the PR no longer points at is stale: the new head gets its own CI.
+              if E.get("RUN_SHA") and pr.get("headRefOid") and E["RUN_SHA"] != pr["headRefOid"]:
+                  print("CI failure is for an old commit; ignoring"); raise SystemExit
+              # ci runs on both push and pull_request for agent branches. The pull_request run is the one
+              # that counts; the push run only matters while the PR conflicts (GitHub then runs no PR CI).
+              # Counting both spent two fix rounds per failure, and a flaky push run closed approved PR #823.
+              if E.get("RUN_EVENT") == "push" and "agent:conflict" not in names:
+                  print("push CI failure while pull_request CI covers this PR; ignoring"); raise SystemExit
           rounds = max([int(x.split(":")[1]) for x in names if re.fullmatch(r"fix:\d+", x)] or [0])
           # A conflict caused by other PRs landing on main is not the engineer's failure: resolving it
           # never uses up a fix round, so an approved PR is never closed just because main moved.
@@ -81,6 +92,10 @@ jobs:
               gh("pr", "edit", str(n), "-R", R, "--add-label", "needs-human", "--remove-label", "agent:changes-requested")
               gh("pr", "comment", str(n), "-R", R, "--body", f"Still drifting from the merge contract after {rounds} fix rounds. Waiting for the owner.")
               raise SystemExit
+          # An approved PR whose CI fails at the cap is most likely a flaky test: re-run it once before closing.
+          if rounds_cap and E["EVENT"] == "workflow_run" and "agent:approved" in names and int(E.get("RUN_ATTEMPT") or 1) < 2:
+              gh("api", "-X", "POST", f"repos/{R}/actions/runs/{E['RUN_ID']}/rerun-failed-jobs")
+              print("approved PR at the fix cap: re-ran the failed CI jobs once"); raise SystemExit
           if rounds_cap:
               gh("pr", "comment", str(n), "-R", R, "--body", f"Closing after {rounds} fix rounds without success. The issue goes back to the backlog for the other engineer.")
               gh("pr", "close", str(n), "-R", R, "--delete-branch")

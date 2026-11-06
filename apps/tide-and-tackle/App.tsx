@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { Runtime, onRuntimeEvents, type RuntimeState } from "@shipvo/runtime";
+import { Runtime, onRuntimeEvents, ensureInstallIdentity, signReport, type RuntimeState } from "@shipvo/runtime";
+import { createReportSigner } from "./src/telemetry";
 import { RELEASE } from "./src/release";
 import { useContent } from "./src/content/useContent";
 import { ShopApp } from "./src/ui/Shop";
@@ -11,9 +12,14 @@ import type { Order } from "./src/domain/shop";
 const POLL_MS = 10_000;
 type Line = { at: string; text: string };
 
+const signReportBody = createReportSigner({ ensureInstallIdentity, signReport });
+
 async function post(state: RuntimeState | null, path: string, body: Record<string, unknown>) {
   if (!state?.baseUrl) return;
-  try { await fetch(`${state.baseUrl}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); } catch {}
+  try {
+    const payload = path === "/t" ? await signReportBody(state.baseUrl, body) : JSON.stringify(body);
+    await fetch(`${state.baseUrl}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: payload });
+  } catch {}
 }
 const report = (state: RuntimeState, event: string, extra: Record<string, unknown> = {}) =>
   post(state, "/t", { schema_version: "1.0", app_id: state.appId, release: state.runningRelease, event, device_class: "low",
