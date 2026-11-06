@@ -59,7 +59,7 @@ async function servePointer(c: any, platform: "android" | "ios") {
     body = ReleasePointerBody.parse(JSON.parse(env.body));
   } catch { return c.json({ error: "corrupt_pointer" }, 500); }
   // The halt key is read only when the earlier rules pass, as before.
-  const query = { hbc: c.req.query("hbc"), nm: c.req.query("nm") };
+  const query = { hbc: c.req.query("hbc"), hbe: c.req.query("hbe"), nm: c.req.query("nm") };
   const decide = (haltedRelease?: string | null): OfferResult | null => {
     try { return decideOffer({ body, ...query, haltedRelease }); } catch { return null; }
   };

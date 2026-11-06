@@ -1,0 +1,80 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`phone app tools > lists the four tools with their schemas 1`] = `
+[
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "App id from list_store_apps",
+          "type": "string",
+        },
+        "session": {
+          "description": "Session from open_app",
+          "type": "string",
+        },
+      },
+      "required": [
+        "session",
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "install_app",
+  },
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {},
+      "type": "object",
+    },
+    "name": "list_store_apps",
+  },
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Installed app id",
+          "type": "string",
+        },
+        "session": {
+          "description": "Session from open_app",
+          "type": "string",
+        },
+      },
+      "required": [
+        "session",
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "switch_app",
+  },
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Installed app id",
+          "type": "string",
+        },
+        "session": {
+          "description": "Session from open_app",
+          "type": "string",
+        },
+      },
+      "required": [
+        "session",
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "uninstall_app",
+  },
+]
+`;

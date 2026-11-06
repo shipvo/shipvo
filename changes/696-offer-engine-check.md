@@ -1,0 +1,1 @@
+- control-plane: the pointer route reads an optional `?hbe=` Hermes engine id and refuses a release whose `hermes_engine` differs, with the existing `hermes_bytecode_mismatch` reason. Absent or malformed `hbe` is offered as before. Migration: none.

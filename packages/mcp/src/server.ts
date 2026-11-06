@@ -3,7 +3,7 @@
 //   PN_SIM=http://localhost:4545  PN_CONTROL=https://api.shipvo.dev  PN_OWNER_TOKEN=...  shipvo-mcp
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
-// Tools: list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
+// Tools: list_store_apps, install_app, uninstall_app, switch_app (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
 //        owner_describe, owner_command, audit_log (the app's live content, prices, orders: owner token required).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -57,6 +57,22 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
     const what = path === "/act" && typeof body.action === "string" ? `action "${body.action}"` : `request ${path}`;
     return { ok: false, code: "sim_timeout", error: `the simulator did not answer ${what} within ${ms} ms. The action may still have run and the session may still be alive: call screen to see where it is.` };
   }
+}
+// The marketplace list for the phone's Store: the control plane's public apps. PN_STORE_FIXTURE=1 uses a local list (tests, offline demos).
+type StoreApp = { id: string; name: string; url: string; version: string };
+const STORE_FIXTURE: StoreApp[] = [
+  { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0" },
+  { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1" },
+  { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0" },
+];
+async function storeApps(): Promise<{ ok: true; apps: StoreApp[]; fixture: boolean } | { ok: false; code: "store_unreachable"; error: string }> {
+  if (process.env.PN_STORE_FIXTURE === "1") return { ok: true, apps: STORE_FIXTURE, fixture: true };
+  try {
+    const r = await fetch(`${CONTROL}/apps/public`, { signal: AbortSignal.timeout(simTimeoutMs()) });
+    if (!r.ok) throw new Error(`status ${r.status}`);
+    const list = ((await r.json()) as { apps?: { app_id: string; name?: string; latest_release?: number }[] }).apps ?? [];
+    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, url: a.latest_release != null ? `app://${a.app_id}@r${a.latest_release}` : `app://${a.app_id}@latest`, version: a.latest_release != null ? `r${a.latest_release}` : "latest" })) };
+  } catch (e) { return { ok: false, code: "store_unreachable", error: `the marketplace at ${CONTROL} did not answer (${(e as Error).message}). Try again when the network is back.` }; }
 }
 const recorder = new Recorder();
 // Sessions attached to a live `shipvo run` phone. Module level: HTTP mode builds a server per request.
@@ -294,6 +310,17 @@ server.tool("resume_app", "Tap the app icon on the home screen, or its card in t
   async ({ session }) => { need(session); return result(session, await act({ session, action: "resume_app" })); });
 server.tool("kill_app", "Swipe the app's card away in the app switcher (call open_recents first). The app is killed: the next resume_app is a cold start, with storage kept. Fails with recents_not_open otherwise.", { session: sid }, WR,
   async ({ session }) => { need(session); return result(session, await act({ session, action: "kill_app" })); });
+server.tool("list_store_apps", "List the apps in the phone's Store: the marketplace apps from the control plane, each with id, name, bundle url and version. Fails with store_unreachable when the marketplace cannot be reached (nothing is guessed). Install one with install_app.", {}, RO, async () => {
+  const r = await storeApps();
+  if (!r.ok) return result("", r);
+  return { ...text(JSON.stringify(r.apps, null, 2)), structuredContent: { apps: r.apps } };
+});
+server.tool("install_app", "Install a Store app on the phone, as tapping Install in the Store screen does. The app icon appears on the home screen. Fails with unknown_app (not in the Store) or already_installed. If the marketplace is unreachable the phone's own Store list is used. Logged in device_log as simulated: nothing real is installed.", { session: sid, id: z.string().describe("App id from list_store_apps") }, WR,
+  async ({ session, id }) => { need(session); const st = await storeApps(); return result(session, await act({ session, action: "install_app", id, ...(st.ok ? { catalog: st.apps } : {}) })); });
+server.tool("uninstall_app", "Remove an installed app from the phone. If it was open, the phone returns to the home screen. Fails with not_installed. Logged in device_log as simulated.", { session: sid, id: z.string().describe("Installed app id") }, DEST,
+  async ({ session, id }) => { need(session); return result(session, await act({ session, action: "uninstall_app", id })); });
+server.tool("switch_app", "Open an installed app (tap its icon on the home screen): it becomes current_app and comes to the front. Fails with not_installed. Logged in device_log as simulated.", { session: sid, id: z.string().describe("Installed app id") }, WR,
+  async ({ session, id }) => { need(session); return result(session, await act({ session, action: "switch_app", id })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
