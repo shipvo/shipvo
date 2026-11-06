@@ -2,6 +2,37 @@
 
 Short videos for people who are new to Shipvo. Each one has captions and a written transcript.
 
+## Run your app
+
+### See your app on a phone in your browser with shipvo run
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="See your app on a phone in your browser with shipvo run" data-length="1 min 33 s" poster="/videos/run-your-app-on-a-phone.jpg" src="/media/videos/run-your-app-on-a-phone-807378b0.mp4"><track kind="captions" src="/videos/run-your-app-on-a-phone.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+1 minute 33 seconds. One command, `npx shipvo run android`, opens a simulated phone in your browser with no account and no Android Studio or Xcode. It covers the iPhone look, the dark frame, how your AI assistant drives the same phone with `open_app`, and the `--port` and `--native` options. It follows [Run your app on a phone in your browser](run.md).
+
+[Captions (.vtt)](/videos/run-your-app-on-a-phone.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Princess of my heart" by Zero-project (<a href="https://www.jamendo.com">Jamendo</a>, <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>). Source: <a href="https://www.jamendo.com/track/633200">https://www.jamendo.com/track/633200</a></details>
+
+<details>
+<summary>Transcript</summary>
+
+Want to see your app on a phone? You do not need a phone. You do not need Android Studio, or Xcode. One command opens a phone in your browser.
+
+Open a terminal in your app folder. Type npx shipvo run android, and press Enter. Shipvo builds a web copy of your app. It needs no account.
+
+Your browser opens on a page with a phone in the middle. A label says Simulated, because this is a copy of a phone, not a real one. Click it like you would tap.
+
+Want an iPhone instead? Type ios. You get the iPhone look, with its Dynamic Island. The page scales the phone to your window. Add ?dark=1 to the address for the dark frame.
+
+Now the best part. Your AI assistant can drive the same phone while you watch. While shipvo run is up, the assistant calls open_app, and finds your live phone. It taps, types and scrolls. You see every move.
+
+Need another port? Add --port. Want a real emulator later? Add --native. When you are done, press Ctrl+C in the terminal.
+
+That is it. A phone in your browser, in seconds. Try npx shipvo run android in your app folder. The guide is at shipvo.dev/learn.
+
+</details>
+
 ## Get your app on Google Play
 
 ### Get your 12 Google Play testers with Shipvo Testers
