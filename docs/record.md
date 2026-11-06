@@ -25,6 +25,7 @@ The file is written to `.shipvo/recordings/<title>-<yyyymmddhhmmss>.mp4` in the 
 | `record_start` | `format` | `9:16` (1080x1920, default), `16:9` (1920x1080), `1:1` (1080x1080) |
 | | `fps` | `30` (default) or `60` |
 | | `title` | Used in the file name |
+| | `background` | `brand`, `plain` or a CSS colour behind the phone |
 | `record_marker` | `caption` | Required, a chapter title at the current time |
 | `record_stop` | none | |
 

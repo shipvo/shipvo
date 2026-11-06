@@ -1,0 +1,1 @@
+- mcp: demo videos cut waits longer than 0.6 s between agent actions, and `chapters` and `duration_s` follow the trimmed timeline. `record_marker` captions show as a lower third from the marker until the next one. `record_start` takes `background` (`"brand"`, `"plain"` or a CSS colour). Videos recorded before a long wait are now shorter than wall-clock time (#522).

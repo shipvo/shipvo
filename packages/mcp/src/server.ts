@@ -64,6 +64,10 @@ const attached = new Map<string, Driver>();
 const ATTACH_TYPES = new Set(["screen", "tap", "type", "scroll", "back"]);
 // One action on a session: through the driver connection when attached, else the simulator.
 async function act(body: Record<string, unknown>): Promise<Act> {
+  recorder.action();
+  try { return await act1(body); } finally { recorder.action(); }
+}
+async function act1(body: Record<string, unknown>): Promise<Act> {
   const d = attached.get(String(body.session));
   if (!d) return sim("/act", body);
   const { session: _s, action, ...args } = body;
@@ -299,8 +303,9 @@ server.tool("record_start", "Start recording the phone frame to an MP4 under .sh
   fps: z.union([z.literal(30), z.literal(60)]).optional().describe("Frames per second (default 30)"),
   title: z.string().optional().describe("Used in the file name"),
   show_taps: z.boolean().optional().describe("Draw a finger dot and ripple on taps and a trail on scrolls (default true)"),
-}, WR, async ({ format, fps, title, show_taps }) => {
-  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
+  background: z.string().min(1).optional().describe('Behind the phone: "brand", "plain" (white) or a CSS colour such as "#102030"'),
+}, WR, async ({ format, fps, title, show_taps, background }) => {
+  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
