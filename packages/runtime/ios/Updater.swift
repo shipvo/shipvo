@@ -32,6 +32,7 @@ enum Updater {
 
   static func check(_ s: Store) async throws -> [String: Any] {
     try require(!s.baseUrl.isEmpty && !s.publicKey.isEmpty && !s.appId.isEmpty, "runtime not configured")
+    Rotation.sync(s)   // statements that came due since the last launch apply before any pointer check
     let known = max(s.currentRelease, s.pendingRelease, s.blockedRelease)
     let (data, resp) = try await URLSession.shared.data(for: request(pointerURL(s), etag: known > 0 ? "\"\(known)\"" : nil))
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -47,8 +48,10 @@ enum Updater {
     guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
           let bodyStr = envelope["body"] as? String, let sig = envelope["signature"] as? String else { throw UpdateError("pointer is not an envelope") }
 
+    // Rotation statements first, so a release signed by a new key can arrive in the same fetch.
+    Rotation.process(s, rotations: envelope["rotations"])
     let t0 = Store.now()
-    try require(Verify.ed25519(Data(bodyStr.utf8), signatureB64: sig, publicKeyB64: s.publicKey), "pointer signature invalid")
+    try require(Verify.ed25519(Data(bodyStr.utf8), signatureB64: sig, publicKeyB64: Rotation.currentKey(s)), "pointer signature invalid")
     guard let body = try JSONSerialization.jsonObject(with: Data(bodyStr.utf8)) as? [String: Any] else { throw UpdateError("pointer body unreadable") }
     try require(body["platform"] as? String == "ios", "pointer is not for iOS")
     try require(body["app_id"] as? String == s.appId && body["shell_major"] as? Int == s.shellMajor, "pointer for another app/shell")
