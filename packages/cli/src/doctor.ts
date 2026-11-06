@@ -6,6 +6,7 @@ import { portFree } from "./sim.js";
 import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
 import { parseDeclared } from "./hermes.js";
+import { emit, envelope, type Next } from "./json-out.js";
 
 type CheckResult = { name: string; ok: boolean; fix: string; note?: string };
 type ShipvoConfig = { publicKey?: unknown; controlPlane?: unknown; hermesBytecodeVersion?: unknown };
@@ -202,14 +203,38 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   return results;
 }
 
+/** The command that fixes a failed check, with the fix text as the reason. */
+function nextFor(r: CheckResult): Next {
+  const why = `${r.name}: ${r.fix}`;
+  if (r.name === "shipvo.json parses") return { command: r.fix.startsWith("run this") ? "shipvo init ." : "shipvo doctor", why };
+  if (r.name.startsWith("signing key matches")) return { command: "shipvo keys import", why };
+  if (r.name === "signing key file is private") return { command: r.fix.match(/`(chmod [^`]+)`/)?.[1] ?? "shipvo doctor", why };
+  if (r.name.startsWith("sim port")) return { command: "shipvo doctor --port <n>", why };
+  return { command: "shipvo doctor", why };
+}
+
 export async function doctor(argv: string[]) {
+  const json = argv.includes("--json");
   const a = parseArgs(argv);
   const port = a.port === undefined ? 4545 : Number(a.port);
   const offline = argv.includes("--offline");
   const skipSim = argv.includes("--skip-sim");
   const stray = argv.some((x, i) => !x.startsWith("--") && argv[i - 1] !== "--port");
-  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) { console.error("Usage: shipvo doctor [--port <n>] [--offline] [--skip-sim]"); process.exit(2); }
+  if (stray || !Number.isInteger(port) || port < 1 || port > 65535) {
+    const usage = "Usage: shipvo doctor [--port <n>] [--offline] [--skip-sim] [--json]";
+    if (json) emit(envelope("usage", usage, { checks: [] }, [{ command: "shipvo help", why: "See the options for doctor." }], 2));
+    else console.error(usage);
+    process.exit(2);
+  }
   const results = await runDoctorChecks({ port, offline, skipSim });
-  for (const r of results) console.log(`${r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
-  if (results.some((r) => !r.ok)) process.exit(1);
+  const failed = results.filter((r) => !r.ok);
+  if (json) {
+    const checks = results.map((r) => ({ name: r.name, ok: r.ok, fix: r.ok ? null : r.fix, note: r.note ?? null }));
+    emit(failed.length
+      ? envelope("checks_failed", `${failed.length} of ${results.length} checks failed.`, { checks }, failed.map(nextFor), 1)
+      : envelope("ok", `All ${results.length} checks passed.`, { checks }, [{ command: "shipvo status --json", why: "See what to do next." }], 0));
+  } else {
+    for (const r of results) console.log(`${r.ok ? `PASS ${r.name}${r.note ? ` (${r.note})` : ""}` : `FAIL ${r.name} — fix: ${r.fix}`}`);
+  }
+  if (failed.length) process.exit(1);
 }

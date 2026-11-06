@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 import { PARITY_LIMITS } from "./explore.js";
 import { renderReportMarkdown } from "./report-md.js";
 import { pathToFileURL } from "node:url";
+import { emit, envelope } from "./json-out.js";
 
 type Node = { role: string; name: string; text: string; ref: string };
 type StepLike = { kind: string; target?: string; text?: string; enter?: boolean; line: number };
@@ -82,24 +83,33 @@ function flagValue(argv: string[], name: string): string | undefined {
 }
 
 /** Runs the suite. Returns the exit code: 0 when every step passed (or every failure was repaired and written), 1 otherwise. */
-export async function testCmd(argv: string[], kit?: TestKit, rawLog: (s: string) => void = console.log): Promise<number> {
+export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string) => void): Promise<number> {
+  const json = argv.includes("--json");
+  // With --json, stdout holds only the document: progress goes to stderr.
+  const out = rawLog ?? (json ? (s: string) => console.error(s) : console.log);
+  const flows: FlowReport[] = [];
+  const fail = (msg: string, next: { command: string; why: string }[]) => {
+    if (json) emit(envelope("usage", msg, { flows }, next, 2)); else console.error(msg);
+    return 2;
+  };
   const repair = argv.includes("--repair");
   const write = argv.includes("--write");
-  if (write && !repair) { console.error("--write only works with --repair"); return 2; }
+  if (write && !repair) { return fail("--write only works with --repair", [{ command: "shipvo test --repair --write", why: "--write needs --repair." }]); }
   const reportPath = flagValue(argv, "--report");
   const release = flagValue(argv, "--release");
   const reportMdPath = flagValue(argv, "--report-md");
-  if (argv.includes("--report") && !reportPath) { console.error("--report needs a file name"); return 2; }
-  if (argv.includes("--report-md") && !reportMdPath) { console.error("--report-md needs a file name"); return 2; }
+  if (argv.includes("--report") && !reportPath) { return fail("--report needs a file name", [{ command: "shipvo test --report report.json", why: "Pass a file name." }]); }
+  if (argv.includes("--report-md") && !reportMdPath) { return fail("--report-md needs a file name", [{ command: "shipvo test --report-md report.md", why: "Pass a file name." }]); }
   const valueIdx = new Set(["--report", "--report-md", "--release"].map((f) => argv.indexOf(f) + 1).filter((i) => i > 0));
   const given = argv.filter((a, i) => !a.startsWith("--") && !valueIdx.has(i));
-  const flows: FlowReport[] = [];
   const files = given.length ? given : findStepFiles("tests");
-  if (!files.length) { console.error("No tests found. Put plain-language steps in tests/*.steps, or pass file names."); return 2; }
-  const k = kit ?? (await loadKit());
+  if (!files.length) { return fail("No tests found. Put plain-language steps in tests/*.steps, or pass file names.", [{ command: "shipvo test tests/example.steps", why: "Pass a steps file, or add tests/*.steps." }]); }
+  let k: TestKit;
+  try { k = kit ?? (await loadKit()); }
+  catch (e) { return fail((e as Error).message, [{ command: "npm i -D @shipvo/test", why: "shipvo test needs @shipvo/test in the app." }]); }
   const scrub = (t: string) => k.redact?.(t) ?? t;
   // Every line goes through scrub: screen text and errors can echo a secret.
-  const log = (s: string) => rawLog(scrub(s));
+  const log = (s: string) => out(scrub(s));
   let failed = 0, repaired = 0, unresolved = 0;
   for (const file of files) {
     const text = readFileSync(file, "utf8");
@@ -144,5 +154,14 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog: (s: string)
     if (reportPath) { writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n"); log(`wrote report ${reportPath}`); }
     if (reportMdPath) { writeFileSync(reportMdPath, renderReportMarkdown(report)); log(`wrote Markdown report ${reportMdPath}`); }
   }
-  return failed === 0 || (write && repaired === failed) ? 0 : 1;
+  const exit = failed === 0 || (write && repaired === failed) ? 0 : 1;
+  if (json) {
+    const bad = flows.filter((f) => f.status === "failed");
+    const data = { flows: flows.map((f) => ({ name: f.name, status: f.status, steps: f.steps.length, failedStep: f.failedStep, message: f.message })), failed, repaired, unresolved };
+    emit(exit === 0
+      ? envelope("ok", failed ? `${failed} failed step(s) repaired and written.` : `All ${flows.length} flow(s) passed.`, data, [{ command: "shipvo explore --json", why: "Walk the app for crashes and accessibility problems." }], 0)
+      : envelope("tests_failed", `${bad.length} of ${flows.length} flow(s) failed.`, data,
+        [repair ? { command: "shipvo test --repair --write", why: "Write the proposed repairs to the steps files." } : { command: `shipvo test ${bad[0]?.name ?? ""} --repair`.replace("  ", " "), why: "Show a diff that fixes broken steps." }], 1));
+  }
+  return exit;
 }
