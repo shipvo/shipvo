@@ -13,3 +13,15 @@ test("pickPort never returns a port fetch refuses", () => {
   const port = pickPort(4900, 300, () => draws.shift());
   assert.equal(port, 4900 + 150);
 });
+
+test("fetch really refuses port 6566, which sizes.test.mjs could draw", async () => {
+  await assert.rejects(fetch("http://localhost:6566/"), (e) => /bad port/.test(e.cause?.message ?? e.message));
+  assert.ok(isFetchBlockedPort(6566));
+});
+
+test("every blocked port in the 6500-6799 test range is refused by fetch", async () => {
+  for (let p = 6500; p < 6800; p++) {
+    if (!isFetchBlockedPort(p)) continue;
+    await assert.rejects(fetch(`http://localhost:${p}/`), (e) => /bad port/.test(e.cause?.message ?? e.message), String(p));
+  }
+});
