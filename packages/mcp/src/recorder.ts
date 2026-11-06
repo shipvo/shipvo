@@ -81,7 +81,7 @@ export class Recorder {
       this.running = true; this.starting = false;
       this.loop = (async () => { while (this.running) await this.grab(); })();
       return { file: this.file, ...this.size };
-    } catch (e) { await this.cleanup(); throw e; }
+    } catch (e) { await this.cleanup(); if (this.framesDir) rmSync(this.framesDir, { recursive: true, force: true }); throw e; }
   }
 
   private async grab() {
@@ -148,6 +148,7 @@ export class Recorder {
   private encode(end: number): Promise<number | null> {
     const n = this.frames.length;
     if (!n) { this.ffErr = "no frames were captured"; return Promise.resolve(-1); }
+    // Names are slugged to [a-z0-9-] in start(), so the quoted paths in this list never hold a single quote.
     const lines = this.frames.map((t, i) => `file '${i}.jpg'\nduration ${(Math.max((this.frames[i + 1] ?? end) - t, 1) / 1000).toFixed(3)}`);
     lines.push(`file '${n - 1}.jpg'`);
     const list = join(this.framesDir, "list.txt"); writeFileSync(list, lines.join("\n") + "\n");
