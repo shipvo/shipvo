@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { createPublicKey, verify } from "node:crypto";
 import { b64, keyFromSeed } from "../../packages/cli/dist/index.js";
-import { buildPointer, median, parseLog, telemetry, pctChange, sha256, FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion, releaseReached } from "./lib.mjs";
+import { buildPointer, median, parseLog, telemetry, pctChange, sha256, FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion, releaseReached, rollbackVerdict, rolledBackEvent, tapTarget } from "./lib.mjs";
 
 const seed = b64(randomBytes(32)), pub = b64(keyFromSeed(seed).publicKey);
 const bytes = new Uint8Array(randomBytes(500));
@@ -79,4 +79,45 @@ test("releaseReached stops waiting when the stage was too short to see", () => {
   assert.equal(releaseReached({ pending_release: 0, current_release: 5 }, 5), "current");
   assert.equal(releaseReached({ current_release: 4 }, 5), null);
   assert.equal(releaseReached({}, 5), null);
+});
+
+const GOOD = { good: 5, bad: 6, prefs: { current_release: 5, blocked_release: 6 }, runningAfterRelaunch: 5, badRefetched: false, telemetryEvent: { event: "rolled_back" }, goodActiveMs: 900 };
+test("tapTarget finds the centre of a node by content-desc", () => {
+  const xml = '<hierarchy><node text="" content-desc="Check for update now" bounds="[0,100][200,200]"/><node text="" content-desc="Roll back to previous release" bounds="[10,300][110,360]"/></hierarchy>';
+  assert.deepEqual(tapTarget(xml, "Roll back to previous release"), { x: 60, y: 330 });
+  assert.equal(tapTarget(xml, "missing"), null);
+});
+test("rolledBackEvent is keyed on the restored release, not the rolled-back one", () => {
+  const t = [{ event: "rolled_back", release: 5, at: 100 }]; // A = 5 runs again, B = 6 was rolled back
+  assert.ok(rolledBackEvent(t, 5, 50)); assert.equal(rolledBackEvent(t, 5, 101), null); assert.equal(rolledBackEvent(t, 6, 50), null);
+});
+test("rollbackVerdict passes only when A runs, B stays blocked and the event is reported", () => {
+  assert.deepEqual(rollbackVerdict(GOOD), { pass: true, failures: [] });
+  assert.equal(rollbackVerdict({ ...GOOD, telemetryEvent: null }).pass, false);
+  assert.equal(rollbackVerdict({ ...GOOD, goodActiveMs: null }).pass, false);
+  assert.equal(rollbackVerdict({ ...GOOD, badRefetched: true }).pass, false);
+});
+test("rollbackVerdict checks both the running release and the prefs", () => {
+  const a = rollbackVerdict({ ...GOOD, prefs: { current_release: 6, blocked_release: 6 } });
+  assert.equal(a.pass, false); assert.match(a.failures[0], /release 6 came back/);
+  const b = rollbackVerdict({ ...GOOD, runningAfterRelaunch: 6 });
+  assert.equal(b.pass, false); assert.match(b.failures[0], /release 6 came back/);
+  const c = rollbackVerdict({ ...GOOD, runningAfterRelaunch: null });
+  assert.equal(c.pass, false); assert.match(c.failures[0], /ran release none, expected 5/);
+});
+test("rollbackVerdict says so when B comes back after the relaunch", () => {
+  const v = rollbackVerdict({ ...GOOD, runningAfterRelaunch: 6, prefs: { current_release: 6, blocked_release: 0 } });
+  assert.equal(v.pass, false); assert.match(v.failures[0], /release 6 came back after the relaunch/);
+});
+import { resumeFacts } from "./lib.mjs";
+test("resumeFacts reads a cut first request and a Range second request", () => {
+  const entries = [{ t: 50, method: "GET", path: "/b/tide/r9.hbc", status: 200, bytes: 99 }, // before publish: ignored
+    { t: 1000, method: "GET", path: "/b/tide/r9.hbc", status: 200, bytes: 500, cut: true }, { t: 6000, method: "GET", path: "/b/tide/r9.hbc", status: 206, bytes: 500, range: "bytes=500-" }];
+  const f = resumeFacts({ entries, path: "/b/tide/r9.hbc", since: 100, healthyAt: 7500 });
+  assert.deepEqual(f, { requests: 2, firstCut: true, bytesSent: 1000, firstBytes: 500, secondRange: "bytes=500-", secondStatus: 206, usedRange: true, resumed: true, firstToHealthyMs: 6500 });
+});
+test("resumeFacts flags a second request without Range", () => {
+  const entries = [{ t: 1000, method: "GET", path: "/b", status: 200, bytes: 5, cut: true }, { t: 2000, method: "GET", path: "/b", status: 200, bytes: 10 }];
+  const f = resumeFacts({ entries, path: "/b" });
+  assert.equal(f.usedRange, false); assert.equal(f.resumed, false); assert.equal(f.secondRange, null); assert.equal(f.firstToHealthyMs, null);
 });

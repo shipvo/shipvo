@@ -45,7 +45,10 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `screenshot(session)` | PNG of the phone |
 | `set_device(...)` · `device_reset(...)` | What the simulated phone has: platform, permissions, location, barcode in view, biometrics, payment outcome, network |
 | `lock` · `unlock` · `restart` | Press the power button (lock screen), swipe up to unlock, or restart the phone (boot screen, the app starts fresh, storage is kept). While locked, tap, type, scroll and back fail with `phone_locked` |
+| `open_notifications` · `open_control_center` · `toggle_tile` · `dismiss_notification` · `close_panels` | Pull down the notification shade (Android: first call shows a few tiles and notifications, second call all tiles) or Notification Center (iPhone), open Control Center (iPhone only), flip a tile (`wifi`, `mobile_data`, `airplane`, `location`, `dark_mode`, `dnd`, `auto_rotate`, `flashlight`; iPhone: `airplane`, `wifi`, `mobile_data`, `focus`, `orientation_lock`, `brightness`, `dark_mode`), swipe away a notification or clear all. A tile changes the simulated device like `set_device`: Wi-Fi and mobile data both off take the network offline, `dark_mode` sets the app's `prefers-color-scheme`, `dnd` stops heads-up banners. Typed errors: `tile_not_visible`, `unknown_tile`, `no_control_center`, `no_such_notification`, `panel_closed`. While a panel is open, `tap`, `type` and `scroll` fail with `panel_open` (call `close_panels` first), as the panel covers the app. Panel actions need the app in the foreground. `dismiss_notification` without an `id` removes the newest notification. |
+| `press_home` · `open_recents` · `resume_app` · `kill_app` | Home (app gets `AppState` background, home screen shows the app icon), app switcher card, bring the app back (`active`), swipe the card away (next open is a cold start). While away, tap, type, scroll, back, `open_url` and `open_notification` fail with `app_not_foreground`; `screenshot` shows the home screen or switcher |
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
+| `get_settings` · `set_setting` · `browser_open` · `browser_snapshot` · `browser_click` · `browser_type` · `browser_scroll` · `browser_back` · `browser_wait_for` · `browser_tabs` · `browser_close_tab` · `browser_screenshot` | Read and change the phone's system settings, and drive its separate web Browser. See [the phone's Browser and Settings](phone-apps.md) |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
@@ -125,7 +128,10 @@ shipvo explore --max-steps 100 --max-depth 3
 shipvo explore --sim http://localhost:4545   # use a simulator that is already running
 shipvo explore --skin ios                   # small-target minimum 44 instead of 48
 shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
+shipvo explore --issues-dir issues           # one ready-to-file issue per finding
 ```
+
+With `--issues-dir <dir>`, it also writes one Markdown file per distinct finding, `<n>-<kind>.md`. The first line is the title (`explore: <kind> on <screen>`), then the message, the numbered steps, the platform skin and the simulator limits. It does not call GitHub. It prints one `gh issue create --title ... --body-file ...` line per file for you or your agent to run. With no findings it writes nothing and says so.
 
 It writes `explore-report.md` and `explore-report.json`. The report has six kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `back`):
 
@@ -141,6 +147,16 @@ The header lists what the simulator cannot show. A clean run says "No findings i
 ## Owner API: agents that run the shop
 
 With an owner token, the same MCP server exposes the app's typed owner commands: change content, prices and offers, read orders, publish to every phone. Every change is audited with who made it. `owner_describe("tide")` lists the commands with their arguments; the admin at `/app/<id>/admin` is the same API with a form on top.
+
+**Read the audit log.** `audit_log` is a read-only tool. It returns the app's audit rows newest first, so an agent can check "was this release already rolled back?" before it acts. Inputs: `app`, `limit` (default 50, clamped to 1..200) and `action` (only rows with that action). It needs the owner token, and it never calls `owner_command`. Errors carry a `code`: `unauthorized` or `not_found`.
+
+```json
+{ "name": "audit_log", "arguments": { "app": "tide", "action": "rollback", "limit": 5 } }
+```
+
+```json
+{ "app": "tide", "rows": [{ "actor": "agent", "action": "rollback", "subject": "r42", "at": "2026-11-05T10:12:00Z" }] }
+```
 
 **Confirm before anything that cannot be undone.** These owner commands reach customers or cannot be undone: `publish`, `update_product` with a new price, `remove_product`, `upsert_promo`, `set_promo_active`, `remove_home_block`, `discard_draft` (when the draft has changes), `create_api_key` and `revoke_api_key`. When an agent calls one without `confirm: true`, nothing changes and the result is `{ ok: false, code: "needs_confirm", plan: [...] }`. The plan says what would change and who it reaches; for `publish` it includes how many update reports the server has received (telemetry has no device id, so the number of phones is not known). The control plane cannot check that the plan was shown to the owner, so the agent must show it. Show it to the owner, then call again with the same arguments and `confirm: true`. Every call that ran after `confirm: true` is written to the audit log (`audit_log`) with who, what and when, and `"confirmed": true`. A refused call is logged with `"denied": true`. A call that ran under `agentPolicy: "allow"` is logged without `confirmed`. Changes to the policy (`set_agent_policy`) are logged with the admin as actor. No owner command sends notifications today.
 

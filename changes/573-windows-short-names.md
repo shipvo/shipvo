@@ -1,0 +1,2 @@
+- `shipvo`, `create-shipvo`: `npx shipvo` and `npm create shipvo` work on Windows. They built the path to `@shipvo/cli` as `C:/C:/...` and failed with `ERR_MODULE_NOT_FOUND`.
+- Migration: none.

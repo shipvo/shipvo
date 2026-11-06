@@ -77,3 +77,67 @@ jobs:
         if: always()
         working-directory: services/control-plane
         run: docker compose down -v
+
+  # First applied OTA of a scaffolded app on the Android emulator (escalations #628, #634; script from PR #629).
+  # Skips cleanly until scripts/first-run/applied-ota.mjs is on main.
+  applied-ota:
+    name: applied OTA (Android emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - id: has
+        run: if [ -f scripts/first-run/applied-ota.mjs ]; then echo "script=1" >> "$GITHUB_OUTPUT"; else echo "applied-ota.mjs not on this ref yet, skipping"; fi
+      - if: steps.has.outputs.script == '1'
+        name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - if: steps.has.outputs.script == '1'
+        uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - if: steps.has.outputs.script == '1'
+        uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - if: steps.has.outputs.script == '1'
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - if: steps.has.outputs.script == '1'
+        uses: gradle/actions/setup-gradle@v4
+      - if: steps.has.outputs.script == '1'
+        run: pnpm install --frozen-lockfile && pnpm -r --filter "./packages/**" build
+      - if: steps.has.outputs.script == '1'
+        name: Script tests
+        run: node --test scripts/first-run/*.test.mjs
+      - if: steps.has.outputs.script == '1'
+        name: Start the local control plane
+        working-directory: services/control-plane
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 120); do curl -sf localhost:8787/health > /dev/null && break; sleep 2; done
+          curl -sf localhost:8787/health
+      - if: steps.has.outputs.script == '1'
+        name: Time the first applied OTA on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          # One line: the runner starts a new sh per line, and a pipe into tee would hide the script's exit code.
+          script: node scripts/first-run/applied-ota.mjs --control-url http://localhost:8787 --out "$RUNNER_TEMP/applied-ota.json" > "$RUNNER_TEMP/applied-ota.md"; rc=$?; cat "$RUNNER_TEMP/applied-ota.md"; exit $rc
+      - if: always() && steps.has.outputs.script == '1'
+        name: Summary
+        run: |
+          { echo "### First applied OTA on the Android emulator (API 30, x86_64, pixel_5)"; echo; cat "$RUNNER_TEMP/applied-ota.md" 2>/dev/null || echo "No output."; echo; \
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.has.outputs.script == '1'
+        with:
+          name: applied-ota
+          path: |
+            ${{ runner.temp }}/applied-ota.json
+            ${{ runner.temp }}/applied-ota.md
+          if-no-files-found: ignore
