@@ -41,7 +41,8 @@ export function workspacePackages(root) {
       const f = join(base, d, "package.json");
       if (!existsSync(f)) continue;
       const j = JSON.parse(readFileSync(f, "utf8"));
-      if (j.name) map.set(j.name, { dir: join(base, d), deps: Object.keys({ ...j.dependencies, ...j.optionalDependencies, ...j.peerDependencies }).filter((n) => n.startsWith("@shipvo/")) });
+      // A private package (services/sim is also named @shipvo/sim) is never published, so it never stands in for one.
+      if (j.name && !j.private) map.set(j.name, { dir: join(base, d), deps: Object.keys({ ...j.dependencies, ...j.optionalDependencies, ...j.peerDependencies }).filter((n) => n.startsWith("@shipvo/")) });
     }
   }
   return map;

@@ -77,6 +77,21 @@ test("dependency walk packs the CLI's @shipvo deps transitively", () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("a private service with the same name never replaces the published package", () => {
+  const root = mkdtempSync(join(tmpdir(), "ws "));
+  try {
+    const add = (group, dir, json) => {
+      mkdirSync(join(root, group, dir), { recursive: true });
+      writeFileSync(join(root, group, dir, "package.json"), JSON.stringify(json));
+    };
+    add("packages", "cli", { name: "@shipvo/cli", dependencies: { "@shipvo/sim": "workspace:^" } });
+    add("packages", "sim", { name: "@shipvo/sim", version: "0.1.6" });
+    add("services", "sim", { name: "@shipvo/sim", version: "0.0.1", private: true });
+    const ws = workspacePackages(root);
+    assert.equal(ws.get("@shipvo/sim").dir, join(root, "packages", "sim"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("unpublished versions: every tarball is a --package and an override", () => {
   const f = [...files, "shipvo-sim-9.9.9.tgz", "shipvo-store-9.9.9.tgz", "shipvo-schema-9.9.9.tgz"];
   const t = findTarballs("d", f);
