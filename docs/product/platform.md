@@ -58,6 +58,10 @@ This section is set by the owner. The Head of Product plans from it and does not
 
 **Risks to watch:** Apple and Google rules on updates (stay on interpreted code and declared capabilities, and document compliance publicly); trust in AI-written code (the merge contract and test evidence are the answer, never hidden); and adoption (only real users prove anything).
 
+### Infrastructure (owner, 6 Nov 2026)
+
+The Shipvo Runner is one shared runner that executes app specs and never runs user-written code; user code runs only in a separate isolated tier. Hosting plans, vendor tiers, limits, quotas and costs are internal and are never written in this repository or any public text (see "Internal details stay private" in `CLAUDE.md`).
+
 ### Shipvo for coding agents (owner, 6 Nov 2026)
 
 Any coding agent sets up and uses Shipvo by itself from one line: `npx skills add shipvo/shipvo --skill shipvo -g`, or `curl -fsSL https://shipvo.dev/install.sh | bash`, or "run `npx -y @shipvo/cli agents setup`". Every command answers in JSON with exit codes and the next command to run; packages ship their own skills. Expo has `@expo/agent-cli` and Expo Simulators in preview; Shipvo must be at least as easy for agents and give them more (a whole phone, testing, demos, the store path, signed updates). Epic #533.

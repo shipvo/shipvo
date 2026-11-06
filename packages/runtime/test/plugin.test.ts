@@ -37,6 +37,14 @@ describe("config plugin", () => {
     expect(plist.ShipvoNativeModules).toBe("react-native-mmkv@3.1.0,@scope/x@1.0.0");
   });
 
+  it("writes hermesEngine on Android and iOS, and rejects a bad one", () => {
+    load()({}, { ...base, hermesEngine: "250829098.0.10" });
+    expect(meta["dev.shipvo.HERMES_ENGINE"]).toBe("250829098.0.10");
+    expect(plist.ShipvoHermesEngine).toBe("250829098.0.10");
+    expect(() => load()({}, { ...base, hermesEngine: "latest" })).toThrow(/hermesEngine/);
+    expect(() => load()({}, { ...base, hermesEngine: 5 })).toThrow(/hermesEngine/);
+  });
+
   it("writes nothing without the props", () => {
     load()({}, base);
     expect(meta["dev.shipvo.BASE_URL"]).toBe("https://cp.example");

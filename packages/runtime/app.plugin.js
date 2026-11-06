@@ -15,6 +15,15 @@ function formatBytecodeVersions(value) {
   return value.join(",");
 }
 
+// Returns the engine build id (like "250829098.0.10"), or undefined when the prop is omitted.
+function formatHermesEngine(value) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !/^\d+\.\d+\.\d+$/.test(value.trim())) {
+    throw new Error(`@shipvo/runtime: hermesEngine must look like 250829098.0.10, got ${JSON.stringify(value)}`);
+  }
+  return value.trim();
+}
+
 // Returns "name@version,..." for the native modules, or undefined when the prop is omitted.
 function formatNativeModules(value) {
   if (value === undefined) return undefined;
@@ -39,6 +48,7 @@ module.exports = function withShipvo(config, props) {
   const { baseUrl, publicKey, appId, shellMajor = 1 } = props || {};
   if (!baseUrl || !publicKey || !appId) throw new Error("@shipvo/runtime: baseUrl, publicKey and appId are required");
   const hbc = formatBytecodeVersions(props.hermesBytecodeVersions);
+  const hbe = formatHermesEngine(props.hermesEngine);
   const nm = formatNativeModules(props.nativeModules);
   config.extra = { ...(config.extra ?? {}), shipvo: { baseUrl, appId, shellMajor, ...(props.reportEvents === false ? { reportEvents: false } : {}) } };
   config = withInfoPlist(config, (cfg) => {
@@ -47,6 +57,7 @@ module.exports = function withShipvo(config, props) {
     cfg.modResults.ShipvoAppId = appId;
     cfg.modResults.ShipvoShellMajor = String(shellMajor);
     if (hbc !== undefined) cfg.modResults.ShipvoHermesBytecodeVersions = hbc;
+    if (hbe !== undefined) cfg.modResults.ShipvoHermesEngine = hbe;
     if (nm !== undefined) cfg.modResults.ShipvoNativeModules = nm;
     return cfg;
   });
@@ -58,6 +69,7 @@ module.exports = function withShipvo(config, props) {
     set("dev.shipvo.APP_ID", appId);
     set("dev.shipvo.SHELL_MAJOR", shellMajor);
     if (hbc !== undefined) set("dev.shipvo.HERMES_BYTECODE_VERSIONS", hbc);
+    if (hbe !== undefined) set("dev.shipvo.HERMES_ENGINE", hbe);
     if (nm !== undefined) set("dev.shipvo.NATIVE_MODULES", nm);
     return cfg;
   });

@@ -37,6 +37,10 @@ Node 22, pnpm 10. CI (`.github/workflows/ci.yml`, job `test`) must pass before a
 
 If you are stuck because of something you may not change (a workflow, a prompt, CI, a secret, a repository setting, missing tools on the runner), do not work around it in product code. Write `/tmp/agent/escalate.md` (Aider: `.agent/escalate.md`): first line a short title, then what blocked you, the evidence (log lines, run links), and the fix you propose. It becomes an `agent:escalate` issue, and the steward acts on it within the hour. Then finish what you can, or write `blocked.md` as usual.
 
+## Internal details stay private
+
+This repository, its issues and PRs, the site, docs, blog, tutorials, videos, llms.txt and release notes are public. Never write in them: our hosting plans or vendor tiers, provider limits we run under, internal quotas and their numbers, infrastructure costs or margins, or which limits we are close to. Describe behaviour instead ("usage quotas apply; when one is reached you see how to get more"). Quota numbers live in configuration and private notes, not in public text. If a task needs such a detail, ask in an escalation rather than writing it down.
+
 ## Device testing standard
 
 Android emulators and the iOS Simulator in CI are our device test standard. Prove features there and ship on that evidence. Never block work, mark an issue `needs-human`, or file an issue because something has not been tried on a physical phone, and do not add "not tested on a real device" notes to docs, the site, the README or release notes. Report what CI measured, on what, as it is.

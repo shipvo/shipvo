@@ -16,13 +16,14 @@ enum Updater {
 
   private static func resolve(_ s: Store, _ url: String) -> String { url.hasPrefix("http") ? url : "\(s.baseUrl)/\(url.drop(while: { $0 == "/" }))" }
 
-  /// Pointer URL. `?hbc=` and `?nm=` are added only when the shell declares them. Scoped names are percent-encoded.
+  /// Pointer URL. `?hbc=`, `?hbe=` and `?nm=` are added only when the shell declares them. Scoped names are percent-encoded.
   static func pointerURL(_ s: Store) -> String {
     var url = "\(s.baseUrl)/p/\(s.appId)/\(s.shellMajor)/ios/\(s.band).json"
     func enc(_ x: String) -> String { x.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")) ?? x }
     var q: [String] = []
     let hbc = s.hermesBytecodeVersions
     if !hbc.isEmpty { q.append("hbc=" + hbc.map(String.init).joined(separator: ",")) }
+    if let hbe = s.hermesEngine { q.append("hbe=" + enc(hbe)) }
     let nm = s.nativeModules
     if !nm.isEmpty { q.append("nm=" + nm.keys.sorted().map { enc($0) + "%40" + enc(nm[$0]!) }.joined(separator: ",")) }
     if !q.isEmpty { url += "?" + q.joined(separator: "&") }
