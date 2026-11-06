@@ -250,6 +250,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
       const safe = left.filter((x) => !x.risky);
       const info = (x: Act): ActionInfo => ({ kind: x.kind, role: x.el.role, name: x.el.name, nth: x.el.nth, invalid: !!x.enter, risky: x.risky, depth: node.depth, left: left.length, total: node.acts.length, visits: node.n, index: node.acts.indexOf(x) });
       let a = safe[0] ?? left[0]!;
+      // Ties go to the first action in the list, which keeps the pick deterministic.
       if (o.ranker && safe.length > 1) { let top = -Infinity; for (const x of safe) { const sc = o.ranker.score(info(x)); if (sc > top) { top = sc; a = x; } } }
       a.done = true;
       const target = find(screen, a.el, a.kind === "type" ? FIELDS : ACTIONABLE);

@@ -18,6 +18,8 @@ Run by `packages/cli/test/explore-ranker.test.ts` (apps in `packages/cli/test/be
 - Training: 30 apps, 3 heuristic walks each, 40 steps, 3,592 samples.
 - Evaluation: 40 other apps, 3 seeds each (120 runs per row). The model never saw these apps. Same step budget, same seeds, same depth limit (5) for both walkers.
 
+Table: results on the 70 generated benchmark apps, 40 of them held out from training.
+
 | Steps | Heuristic screens | Ranker screens | Heuristic findings | Ranker findings |
 | ---: | ---: | ---: | ---: | ---: |
 | 15 | 8.98 | 10.59 | 0.63 | 0.85 |
