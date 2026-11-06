@@ -185,6 +185,8 @@ const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string;
       else {
         sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() }); steps.set(sid, [{ action: "open" }]);
         if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
+        // Lumi shows the step in the phone frame. tap, type, scroll and back are captioned by the page itself, from the element it acts on.
+        void d.request("lumi", { caption: `Opened ${id}`, state: "working", hold: 1800 }, 1000).catch(() => {});
         return text(`session: ${sid}\napp: ${id} release: local\nmode: attached to the live shipvo run phone\n\n${r.screen ?? ""}`);
       }
     } catch (e) {
