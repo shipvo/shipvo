@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createRequire } from "node:module";
-import { AGENT_ACTOR, runOwnerCommand } from "../src/owner";
+import { AGENT_ACTOR, resolveChallenge, runOwnerCommand } from "../src/owner";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 
@@ -50,9 +50,10 @@ describe("set_alert_webhook audit and confirm", () => {
     expect(JSON.stringify(r.plan)).not.toContain("s3cr3t");
     expect(sql.prepare("SELECT COUNT(*) AS n FROM app_alerts").get().n).toBe(0);
     expect(sql.prepare("SELECT COUNT(*) AS n FROM audit").get().n).toBe(0);
-    const ok = await runOwnerCommand(env(true), "set_alert_webhook", { url: SECRET, confirm: true });
+    expect((await resolveChallenge(env(false), r.challenge.id, "approve", "owner (admin)")).ok).toBe(true);
+    const ok = await runOwnerCommand(env(true), "set_alert_webhook", { url: SECRET, approval: r.challenge.id });
     expect(ok.ok).toBe(true);
     expect(sql.prepare("SELECT COUNT(*) AS n FROM app_alerts").get().n).toBe(1);
-    expect(sql.prepare("SELECT args_json FROM audit").get().args_json).not.toContain("s3cr3t");
+    expect(JSON.stringify(sql.prepare("SELECT args_json FROM audit").all())).not.toContain("s3cr3t");
   });
 });

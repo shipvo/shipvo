@@ -261,7 +261,10 @@ describe("approvals tools", () => {
     const r: any = await c.callTool({ name: "approvals_list", arguments: { app: "menu" } });
     expect(r.structuredContent.approvals[0]).toMatchObject({ id: "h1", release: 7, band: "b2", proposer: "ann" });
     expect(r.structuredContent.approvals[0].age_seconds).toBeGreaterThanOrEqual(120);
-    expect(seen.at(-1)).toMatchObject({ method: "GET", url: "/apps/menu/approvals" });
+    expect(seen.map((x) => x.url)).toContain("/apps/menu/approvals");
+    // The same call also lists owner-command challenges (the mock answers with the same body shape), read only.
+    expect(seen.at(-1)).toMatchObject({ method: "GET", url: "/app/menu/api/approvals" });
+    expect(r.structuredContent.challenges[0].id).toBe("h1");
     await c.close();
   });
   it("approves as an agent and surfaces a refusal with the rule named", async () => {
@@ -282,7 +285,7 @@ describe("approvals tools", () => {
   });
 });
 
-describe("owner_command confirm", () => {
+describe("owner_command approval", () => {
   let control: http.Server; const seen: { headers: http.IncomingHttpHeaders; body: any }[] = [];
   beforeAll(async () => {
     control = http.createServer(async (req, res) => {
@@ -294,24 +297,24 @@ describe("owner_command confirm", () => {
   });
   afterAll(() => control?.close());
   const url = () => `http://127.0.0.1:${(control.address() as { port: number }).port}`;
-  it("passes confirm and the shipvo.json agent rules to the control plane", async () => {
+  it("passes approval and the shipvo.json agent rules to the control plane", async () => {
     const dir = mkdtempSync(join(root, "dist-test-app-"));
     writeFileSync(join(dir, "shipvo.json"), JSON.stringify({ agentPolicy: "deny", agentDeny: ["set_theme", "publish"] }));
     try {
       const c = await connect({ PN_CONTROL: url(), PN_OWNER_TOKEN: "t", PN_APP_DIR: dir });
-      await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x" }, confirm: true } });
+      await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x" }, approval: "ch-1" } });
       await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x" } } });
-      expect(seen[0]!.body).toEqual({ name: "publish", args: { note: "x", confirm: true } });
+      expect(seen[0]!.body).toEqual({ name: "publish", args: { note: "x", approval: "ch-1" } });
       expect(seen[0]!.headers["x-shipvo-agent-policy"]).toBe("deny");
       expect(seen[0]!.headers["x-shipvo-agent-deny"]).toBe("set_theme,publish");
       expect(seen[1]!.body.args).toEqual({ note: "x" });
       await c.close();
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
-  it("ignores confirm inside args unless the top-level confirm is true", async () => {
+  it("ignores confirm and approval inside args; only the top-level approval is sent", async () => {
     const c = await connect({ PN_CONTROL: url(), PN_OWNER_TOKEN: "t" });
     const n = seen.length;
-    await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x", confirm: true } } });
+    await c.callTool({ name: "owner_command", arguments: { app: "menu", command: "publish", args: { note: "x", confirm: true, approval: "forged" } } });
     expect(seen[n]!.body.args).toEqual({ note: "x" });
     await c.close();
   });
