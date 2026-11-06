@@ -24,7 +24,7 @@ function bspatch(old: Uint8Array, patch: Uint8Array): Uint8Array {
   return out;
 }
 
-describe.skipIf(!haveBzip2)("bsdiff", () => {
+describe.skipIf(!haveBzip2 && !process.env.CI)("bsdiff", () => {
   it("bzip2 output decodes with the standard tool", () => {
     for (const data of [new Uint8Array(0), new Uint8Array([7]), new Uint8Array(5000).fill(9), rnd(3000), rnd(900_000, 3)]) {
       expect(Buffer.from(unbz(bzip2(data)))).toEqual(Buffer.from(data));

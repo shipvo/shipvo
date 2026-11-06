@@ -6,7 +6,11 @@ import { createHash } from "node:crypto";
 
 const exec = vi.hoisted(() => ({ fn: (_cmd: string, _opts?: { env?: NodeJS.ProcessEnv }) => {} }));
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string, o?: { env?: NodeJS.ProcessEnv }) => exec.fn(c, o) }));
-vi.mock("../src/bsdiff.js", () => ({ bsdiff: () => new Uint8Array(10).fill(1) })); // the real one is tested in bsdiff.test.ts
+const realDiff = vi.hoisted(() => ({ on: false }));
+vi.mock("../src/bsdiff.js", async (orig) => {
+  const actual = await orig<typeof import("../src/bsdiff.js")>();
+  return { ...actual, bsdiff: (a: Uint8Array, b: Uint8Array) => (realDiff.on ? actual.bsdiff(a, b) : new Uint8Array(10).fill(1)) };
+});
 
 const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown, engine: undefined as string | undefined }));
 const puts: string[] = [];
@@ -409,6 +413,27 @@ describe("publish and the Hermes bytecode check", () => {
     expect(android.patches.map((p: any) => p.from_sha256)).toEqual([sha(1)]);
     expect(android.patches[0].url).toBe(`b/demo/d-${sha(1).slice(0, 16)}-r2.bsdiff`);
     expect(puts).toContain(ios.patches[0].url);
+  });
+
+  it("a stored patch is a real BSDIFF40 patch that rebuilds the new bundle", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const big = () => { const b = new Uint8Array(20_000); b.set(fakeHbc(96)); for (let i = 64; i < b.length; i++) b[i] = ((i * 7919) ^ (i >> 3)) & 0xff; return b; };
+    const old = big(), next = big();
+    next[5000] ^= 1; next[300] ^= 1;
+    blobs.set("b/demo/r1.hbc", old);
+    values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: createHash("sha256").update(old).digest("hex") }));
+    writeFileSync(join(cwd, "dist-ota/_expo/static/js/android/index.hbc"), next);
+    realDiff.on = true;
+    try { await publish([...flags, "--release", "2"]); } finally { realDiff.on = false; }
+    const key = puts.find((k) => k.endsWith(".bsdiff"))!;
+    expect(key).toBeTruthy();
+    const patch = blobs.get(key)!;
+    expect(new TextDecoder().decode(patch.subarray(0, 8))).toBe("BSDIFF40");
+    const rd = (o: number) => { let y = 0; for (let i = 6; i >= 0; i--) y = y * 256 + patch[o + i]; return y; };
+    const cl = rd(8), dl = rd(16);
+    const dec = (b: Uint8Array) => { const r = spawnSync("bzip2", ["-dc"], { input: Buffer.from(b) }); if (r.error && !process.env.CI) return null; expect(r.status).toBe(0); return r.stdout; };
+    for (const part of [patch.subarray(32, 32 + cl), patch.subarray(32 + cl, 32 + cl + dl), patch.subarray(32 + cl + dl)]) dec(part);
+    expect(rd(24)).toBe(next.length);
   });
 
   it("iOS also patches from a shell's embedded bundle; Android ignores iOS bases", async () => {

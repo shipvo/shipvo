@@ -36,14 +36,10 @@ The full rules are in step 9 of the [adapter contract](https://github.com/shipvo
 When you publish, the CLI builds patches from recent releases and from each app shell's embedded bundle:
 
 ```bash
-pip install bsdiff4
 shipvo publish --max-bases 6
 ```
 
-`--max-bases` sets how many older releases to patch from (the default is 6). The CLI prints the result, for example `patches: <hash>=64.0KB`. Two details are worth knowing:
-
-- Patching needs the Python package `bsdiff4`. Without it, the CLI says so and publishes full bundles. Updates still work, they are just bigger.
-- A patch is kept only if it is under 60% of the full bundle. Otherwise the phone gets the full file.
+`--max-bases` sets how many older releases to patch from (the default is 6). The CLI prints the result, for example `patches: <hash>=64.0KB`. `shipvo publish` builds the patches itself, with nothing else to install. A patch is kept only if it is under 60% of the full bundle. Otherwise the phone gets the full file.
 
 A first release has nothing to patch from, so `shipvo publish --dry-run` reports full bundles only. See the [getting started guide](/docs/getting-started/) for the dry-run layout.
 

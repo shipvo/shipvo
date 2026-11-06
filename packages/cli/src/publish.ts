@@ -168,8 +168,8 @@ async function publishRun(argv: string[], json: boolean): Promise<Done> {
       for (const h of hist) bases.set(h.sha256, `b/${APP}/${bundleName(h.release, pf)}`);
       for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); if ((b.platform ?? "android") === pf) bases.set(b.sha256, b.key); } catch {} }
       // Patches are built in-process (no Python or other tool); a first release has no older bundle to patch from.
-      const bsdiffOn = bases.size > 0;
-      if (bsdiffOn) {
+      const hasBases = bases.size > 0;
+      if (hasBases) {
         for (const [fromSha, key] of bases) {
           if (fromSha === newSha) continue;
           const base = await kv.getBytes(key); if (!base) continue;
@@ -180,7 +180,7 @@ async function publishRun(argv: string[], json: boolean): Promise<Done> {
           patches.push({ from_sha256: fromSha, url: pkey, size: patch.length, sha256: sha256Hex(patch) });
         }
       }
-      patchInfo.bases = bases.size; patchInfo.bsdiff = bsdiffOn; patchInfo.patches = patches.length;
+      patchInfo.bases = bases.size; patchInfo.bsdiff = hasBases; patchInfo.patches = patches.length;
       console.error(`patches: ${patches.map((p) => `${p.from_sha256.slice(0, 8)}=${(p.size / 1024).toFixed(1)}KB`).join(", ") || "none"}`);
     }
 
