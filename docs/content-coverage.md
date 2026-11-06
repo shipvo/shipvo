@@ -56,7 +56,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | The `shipvo` skill for coding agents | [agents](agents.md) | | | |
 | Policy enforced by the control plane (weekday, staged rollout, max band) | [cli](cli.md) | | | |
 | Hosted MCP `server/discover` support | [mcp](../packages/mcp/README.md) | | | |
-| Phone Settings screen (`get_settings`, `set_setting`) | [phone-apps](phone-apps.md) | | | |
+| Phone Settings screen (`get_settings`, `set_setting`) | [phone-apps](phone-apps.md) | | | [test-dark-mode-large-text-and-rtl-in-react-native](../blog/test-dark-mode-large-text-and-rtl-in-react-native.md) |
 | Phone Browser app (`browser_*` tools) | [phone-apps](phone-apps.md) | | | |
 | Phone home, recents, shade and power controls | [agents](agents.md), [phone-apps](phone-apps.md) | | | |
 | Lumi on Shipvo Phone (captions, reactions, first-run guide) | [lumi](lumi.md) | | | |
