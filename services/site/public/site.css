@@ -446,3 +446,13 @@ pre.term .term-copy.done{color:#0B0F0E;background:#FF9A2E;border-color:#FF9A2E}
 @media (pointer:coarse){pre.term .term-copy{min-height:44px}}
 @media(max-width:600px){pre.term.has-copy{padding-right:20px;padding-bottom:62px}pre.term .term-copy{top:auto;bottom:10px;transform:none}}
 
+
+/* series episodes: recap buttons over the player (shell.js) */
+.ep-box{position:relative}
+.ep-bar{position:absolute;top:0;left:0;padding:12px;box-sizing:border-box;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;pointer-events:none;z-index:2}
+.ep-bar[hidden]{display:none}
+.ep-btn{pointer-events:auto;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.35);background:rgba(11,16,32,.82);color:#fff;font-family:inherit;font-weight:600;font-size:14px;line-height:1;display:inline-flex;align-items:center;gap:6px;cursor:pointer;text-decoration:none;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:background .15s,border-color .15s}
+.ep-btn:hover{background:#0B1020;border-color:#fff;color:#fff}
+.ep-btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.ep-skip{border-color:var(--accent,#7CFFB2)}
+@media (max-width:480px){.ep-bar{padding:8px}.ep-btn{font-size:13px;padding:0 12px}}

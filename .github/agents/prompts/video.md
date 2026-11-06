@@ -79,14 +79,15 @@ Our videos run like a show with many episodes, so each one sells the next and vi
 - **Series bible:** `scripts/video/series.json` lists seasons and episodes in order: number, title, slug, one-line logline, the cliffhanger it ends on, and status (planned, rendering, published). Season 1 follows the recurring cast from "no app" to "the shop runs on agents"; tutorials form their own season ("Shipvo in 60 seconds"). The planner keeps at least the next 3 episodes planned; add them as `type:video` issues.
 - **Stay one episode ahead.** When an episode ships, the next episode's hook and its two best shots are already rendered, so the trailer is real footage, never a promise of something we have not made.
 - **Each episode's shape:**
-  - Cold open: the hook (Retention rule 1).
-  - "Previously" (episodes 2 and later): 3 to 5 s of quick cuts from the last episode, only when the story continues.
+  - **Recap first (episodes 2 and later), 4 to 8 s:** "Previously on Shipvo", fast cuts from the last episode that set up this one. The viewer can skip it: the site shows "◀ Watch <previous episode>" and "Skip recap ›" over the player while the recap plays (`services/site/public/shell.js`). Mark it on the episode's `<video>` in `docs/videos.md` with `data-recap-end="<seconds the recap ends>"`, `data-prev="<link to the previous episode>"` and `data-prev-title="E<n> · <title>"` (`scripts/check-episodes.mjs` checks these). The recap must end on a clean cut so the skip lands on the cold open.
+  - Cold open right after the recap (episode 1 starts here): the hook (Retention rule 1). The hook rule counts from the end of the recap.
   - Title card with the episode number, 1 to 2 s ("S1 · E3 · The rush hour").
   - The episode.
   - End on a cliffhanger or open question that the next episode answers.
   - **Next-episode trailer, 8 to 12 s:** "Next on Shipvo", 3 or 4 fast cuts from the next episode, one line of narration or caption, the episode title, then the end card. A season finale ends with a season 2 teaser.
 - **When the next episode ships, re-cut the trailer** at the end of the previous episode with final footage if it changed, re-upload it under a new R2 key and update the links.
 - **Name and link them as a series:** titles start "S1 · E<n> ·"; `docs/videos.md` groups episodes by season in order; each episode's page and description link to the previous and next episode, and to a playlist where the video is posted elsewhere.
+- **Where the video is posted elsewhere**, put the recap end time as the first chapter in the description (`0:00 Previously`, `0:06 Episode`) so players there offer the same skip.
 - **Continuity:** cast, palettes, sound logo and the music theme stay the same across a season (keep one recurring motif in `music-used.json` notes; a story ad may reuse the season theme). The 9:16 cut ends on a 3 s "next episode" tease too.
 - The retention map lists the "previously" section, the cliffhanger and the trailer.
 
