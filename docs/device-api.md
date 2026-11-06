@@ -165,6 +165,29 @@ Simulator: `set_device(online: false)` takes the phone offline; the app's offlin
 | `notifications(session)` / `open_notification(session, id?)` | The shade; tap one |
 | `device_log(session)` | Every device event in the session (permission prompts and answers, location reads, scans, auth, payments, notifications, shares), each `simulated: true`, plus `capabilities()` |
 
+## Real camera, microphone and location in the browser
+
+In a browser with a person present (for example `shipvo run` or a shared preview), `device.camera.scan`, `device.location.current` and `device.microphone.open` use the real webcam, microphone and location when the person allows it. Headless runs, hidden tabs, a refusal or missing hardware fall back to the simulated device.
+
+```ts
+const mic = await device.microphone.open();   // web and simulator only; optional on Device
+```
+
+- The simulated permission always comes first. If `permissions.location` is `"denied"`, location is denied even when a person is present.
+- Every `device_log` entry has `source: "real"` or `"simulated"`. `set_device({ source: "simulated" })` forces simulated mode. `set_device({ microphone: { level } })` sets the simulated microphone.
+- `"microphone"` is a `PermissionName` and a `Capability`. On native it reports `"unavailable"`. On the web `capabilities()` reports `"real"` when real hardware may be used. Code that switches over `PermissionName` or `Capability` exhaustively needs a `"microphone"` case.
+
+## Troubleshooting
+
+- **`Location permission denied`**: the permission is `denied` in the simulator (`set_device`) or the person refused the browser prompt. Reset with `device_reset`.
+- **`scan()` throws on a phone**: `expo-camera` is not installed, so `camera` is `unavailable`. Check `device.capabilities()`.
+- **A log entry says `source: "simulated"` when you expected real hardware**: the tab was hidden or headless, or the browser refused access.
+
+## Next steps
+
+- [Run on a phone in your browser](run.md)
+- [Test with an assistant](test-with-an-assistant.md)
+
 ## Using raw Expo modules
 
 Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication`, `expo-notifications`, `expo-clipboard`, `expo-contacts`, `expo-calendar` or `expo-document-picker` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.
