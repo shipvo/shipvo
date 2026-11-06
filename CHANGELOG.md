@@ -2,6 +2,163 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## 2026-11-06 (release)
+
+- **@shipvo/cli 0.1.5**: cli: shipvo and create-shipvo short names on npm; init lists npm install first; cli: shipvo agents setup and status --json with next steps (slice 2 of #533); phone: live status bar from simulated device state (slice 1b of #467); cli: frame-page bridge runs tap, type, scroll and back (slice 3c of #448); skills: the shipvo skill, installable with npx skills add (slice 1 of #533)
+- **@shipvo/device 0.1.3**: phone: live status bar from simulated device state (slice 1b of #467); device: real camera, mic and location in the browser with simulated fallback
+- **@shipvo/mcp 0.0.9**: phone: power and volume buttons, lock, restart (slice 1c of #467); mcp: recorder duration_s matches the video under load; mcp: record_start, record_marker, record_stop write an MP4 of the phone frame; mcp: open_app attaches to a live shipvo run phone (slice 2 of #448); device: real camera, mic and location in the browser with simulated fallback
+- **@shipvo/schema 0.0.5**: control-plane: enforce weekday and staged-rollout policy rules on publish; capacitor: @shipvo/capacitor core, release decisions and verification for web bundles; schema: maxCohortForAgents and requireStageBeforeFull in the policy block (slice 1 of #356)
+- **@shipvo/sim 0.1.5**: phone: power and volume buttons, lock, restart (slice 1c of #467); phone: live status bar from simulated device state (slice 1b of #467); cli: frame-page bridge runs tap, type, scroll and back (slice 3c of #448); cli: frame-page bridge answers tree with refs, equivalent to the simulator (slice 3b of #448); phone: frame renderer with Android and iPhone skins (slice 1a of #467)
+- **@shipvo/store 0.0.2**: store: Shipvo Testers group, shipvo store testers, shipvo.dev/testers; store: shipvo store screenshots, fast mode (slice 3b of #249); store: screenshot size table and checker (slice 3a of #249); store: shipvo store setup routing and store status timeline (slice 2 of #249)
+- **@shipvo/test 0.1.3**: test: secret(name) and {secret:NAME} keep test logins out of tests and reports; device: real camera, mic and location in the browser with simulated fallback; test: shipvo test --repair proposes fixes for broken refs (slice 3 of #317); test: plain-language steps compile to typed steps (slice 1 of #317)
+
+### Changes
+
+- `@shipvo/mcp`: a test replays a script from `export_test` against the sample app with Vitest and `@shipvo/test`; `docs/agents.md` shows the real output.
+- Migration: none.
+- `@shipvo/cli`: the `shipvo preview` page has a Device panel (location, camera, fingerprint or Face ID, payment, network, push notification) that drives the simulated device. It sits under the phone at phone width. Camera, biometrics and payment controls set the result of every later check or payment until you change it.
+- Migration: none; re-run `shipvo preview` to get the panel.
+- `@shipvo/cli`: the `shipvo preview` page has a Record button and a "Download test" button. Taps, typed text and panel changes become a `@shipvo/test` script (same output as the MCP export). Password fields use an environment variable, never the typed value.
+- `@shipvo/cli`: the preview page says it is the app's web build on the simulated device, measured against Android and iOS in `docs/parity-results.md`, and that native-only UI can differ.
+- Migration: none.
+- `control-plane`: publishing a release pointer (including `shipvo promote`) now also enforces `blockedWeekdays`/`blockedAfterHour` and `requireStageBeforeFull`, not only `maxBand` and `agentMaxBand`. A refusal is 403 `{ code: "policy_refused", rule, reason }` with one audit row. Weekday rules use the policy's `timeZone`, or UTC if it has none. `requireStageBeforeFull` refuses a `b2` pointer unless the same release has a signed pointer on `b0`/`b1` (reaching at least `percent`; `b0` is 1%, `b1` is 10%) accepted by the control plane at least `minHours` ago (the server records its own clock when it stores a `b0`/`b1` pointer; the signed `issued_at` is not used).
+- `control-plane`: A stored policy with one invalid field keeps its other valid rules. `set_release_policy` takes `blockedWeekdays`, `blockedAfterHour`, `timeZone`, `stagePercent` and `stageMinHours`. Policies stored before keep working.
+- `schema`: new optional `policy.timeZone` (IANA name) and exported `checkPolicy`, `BAND_PERCENT`, `PolicyResult`. The CLI now uses the shared `checkPolicy`; `shipvo.json` files without `timeZone` behave as before (machine local time). Migration: none.
+- Migration: no database change.
+- `control-plane`: a release pointer that names an older bundle (what `shipvo rollback` writes) is audited as `rollback` with `rolled_back_to`; publish and rollback rows now also carry the previous release in `before`. Migration: none.
+- `control-plane`: every accepted release publish now writes one `audit_log` row (actor, `publish`, release, band, platform). A failed audit write does not fail the publish. Publish tokens carry no agent marker yet, so `actor_kind` is `person`.
+- Migration: none.
+- `services/control-plane`: the automatic halt rule now writes one `audit_log` row (`actor` `halt-rule`, `actor_kind` `system`, `action` `halt`) when it halts a release (slice 3 of #305, halt half). A failed audit write does not change the response or the halt.
+- Migration: none.
+- `@shipvo/test`: new `parseSteps(text)` and `runSteps(phone, steps)` (and type `Step`) turn plain-English lines such as `tap "Add to cart"` into typed steps and run them. An unknown line throws a `PhoneError` with code `step_unparsed` and the line number.
+- Migration: none; this only adds exports.
+- `@shipvo/cli`: `shipvo publish --dry-run-policy` (slice 3 of #356) checks the `policy` section for the given `--bands`, prints the rule and reason on a refusal and exits 1. It builds and publishes nothing. See [docs/cli.md](docs/cli.md).
+- Migration: none; this is a new flag.
+- `@shipvo/cli`: new `shipvo audit <app> [--format json|csv] [--limit n]` exports the audit log to stdout (slice of #295). CSV quotes every field and prefixes values starting with `=`, `+`, `-` or `@` with `'`. See [docs/cli.md](docs/cli.md).
+- Migration: none; this is a new command.
+- **New `shipvo store setup` and `shipvo store status`.** `setup` asks whether you have a company (or takes `--company yes|no --android-now --play-account-before-2023-11-13`), writes `store-plan.json` and prints which Google Play and App Store account to open, the steps and the waits. The Play tester rule (12 testers, 14 days in a row) is named only for personal accounts made after 13 Nov 2023. `status` prints a `todo`, `waiting` or `done` timeline per store and the next action; `status --mark <step> [--as waiting|done]` updates it. Bad flag values exit 2. No store calls, no credentials. `@shipvo/store` exports `routeStore`. Migration: none; additive.
+- `@shipvo/cli`: new `shipvo explore` walks the app in the simulator (no LLM, no device) and writes `explore-report.md` and `explore-report.json`: uncaught errors and red screens, taps that were not delivered, dead-end screens and controls with no accessible name, each with replayable steps. Flags: `--max-depth` (3), `--max-steps` (100), `--fail-on-findings`, `--out`, `--sim <url>`. `shipvo.json` may list `routes` (deep links) to visit.
+- `@shipvo/sim`: new `errors` action returns uncaught page errors since the last read.
+- Migration: none; both additions are new.
+- `@shipvo/test`: new `proposeRepair(step, tree)` returns `repaired` (one match by role and closest name, with a reason naming old and new label) or `unresolved` (with candidates). `tap` and `type` steps get an optional `role`.
+- `@shipvo/cli`: new `shipvo test [files] [--repair [--write]]` runs `tests/*.steps`; `--repair` prints a unified diff and writes only with `--write`.
+- Migration: none; this only adds.
+- `shipvo preview`: the preview page has a Comment button. Testers tap a point and type a note; each note keeps the screen and the steps taken. Notes show in a side list, stay in the browser (localStorage) and export as `comments.json`. Nothing is uploaded.
+- Migration: none.
+- `@shipvo/schema`: the `policy` section of `shipvo.json` takes two more rules, `maxCohortForAgents` (a band name or a percent) and `requireStageBeforeFull` (`{ percent, minHours }`). Unknown keys are still an error. New type export `Policy` (same as `ShipvoPolicy`). Schema only: nothing enforces the new rules yet.
+- Migration: none; policies without these keys parse as before.
+- `@shipvo/cli`: `shipvo init` now prints the next steps with your real app id: `doctor`, `app create <id>`, `publish` and `sim`.
+- Migration: none.
+- `@shipvo/store`: new `checkScreenshot` and `checkSet` check store screenshot size, alpha channel, format and count before upload.
+- Migration: none; new exports.
+- `@shipvo/cli`: `shipvo store screenshots` (fast mode) renders the start screen and each route in `shipvo.json` at store sizes, writes `store-assets/raw/<set>/`, and prints the checker result per file. It is a simulator render, not the native UI.
+- `@shipvo/store`: `checkScreenshot` also returns the detected `format`. `@shipvo/sim`: `/session` takes optional `width`, `height`, `scale`; the `screenshot` action takes `format: "jpeg"` and `inline: true`.
+- Migration: none; all additions.
+- `@shipvo/cli`: `shipvo init` now pins `playwright` to `>=1.63.0 <1.65.0` in the scaffolded app. `pnpm install` failed (also under `CI=true`) with `ERR_PNPM_NO_MATCHING_VERSION` because `playwright@1.65.0` needed `playwright-core@1.65.0`, which the registry did not have.
+- Migration: none. Raise the range in your app once a working 1.65 is published.
+- `scripts/first-run/measure.mjs`: new `--control-log <file>` option. If the real publish fails, the last 20 lines of that control plane log are printed.
+- Tests: a 2 MB random bundle publishes end to end through the real CLI against the control plane (`services/control-plane/test/publish-large.test.ts`). No bug was found, so the CLI and control plane are unchanged.
+- Migration: none.
+- `@shipvo/cli`: `shipvo publish` against a control plane now shows the real network error (for example `ECONNRESET`) and the key it was writing, and retries network failures twice with a short backoff. HTTP errors such as 401 are not retried.
+- Migration: none.
+- site: long inline code on docs pages wraps on phones instead of scrolling the whole page sideways; the Copy button is a 44 px tap target on touch screens.
+- docs: new pages "Run on a phone in your browser" (`shipvo run`, assistant attach) and "Record a demo video" (`record_start`, `record_marker`, `record_stop`). The Device API page covers real camera, microphone and location, and has troubleshooting. The glossary has four new terms.
+- `@shipvo/mcp`: the HTTP endpoint answers `server/discover` and rejects 2026-07-28 requests whose `Mcp-Method`/`Mcp-Name` headers disagree with the body (HTTP 400, JSON-RPC error -32001). 2025-era clients are unchanged.
+- Migration: none.
+- `@shipvo/sim`, `@shipvo/cli`: when Chromium cannot launch because the browser is missing ("Executable doesn't exist"), `shipvo sim` and `shipvo doctor` now say to run `npx playwright install chromium` in the app folder, name the playwright version that was resolved, and add the Linux system-package hint.
+- Migration: none.
+- Docs: README brought up to date (package table, iOS measurements, store path, frameworks, guide links). No API change.
+- `control-plane`: new owner commands `set_release_policy` (owner sign-in only) and `get_release_policy` store `maxBand` and `agentMaxBand` per app in KV. A release pointer publish to a wider band is refused with 403 `{ code: "policy_refused", rule, reason }`, nothing is written, and an audit row (`action: publish`, `after.refused: true`) is recorded. Calls with the `x-shipvo-actor: agent` header count as agents. No stored policy means no change.
+- `cli`: `shipvo publish` sends that header when `SHIPVO_ACTOR=agent` and prints the server's rule and reason on a refusal.
+- Migration: none.
+- `@shipvo/cli`: `shipvo test --report <file> [--release <id>]` writes JSON results keyed by app, commit and release, with the failing step per flow.
+- Migration: none; new flag.
+- `site`: tutorials and docs can embed a live phone with one line (`<div data-shipvo-phone ...>`). Both tutorials now have two "Try it" phones that load the sample shop, with the screenshot as fallback.
+- Migration: none; site only.
+- `capacitor-sample` (private app, not published): new minimal Capacitor 8 sample app in `apps/capacitor-sample` for adapter work (#297).
+- Migration: none; no package API changes.
+- `@shipvo/capacitor` (new, 0.0.1): release decisions, Ed25519 pointer and sha-256/size verification, staging, trial boots, crash-loop rollback and events for signed web bundles. Native apply is not in this release.
+- `@shipvo/schema`: `ReleasePointer` has a new optional field `kind` (`"web"`). Absent means a React Native bundle, as before.
+- Migration: none; the field is additive.
+- `@shipvo/cli`: new `shipvo eas setup` and `shipvo eas build` make a Capacitor repo ready for `eas build` and `eas submit` with your own Expo account. See `docs/capacitor.md`.
+- Migration: none; new commands.
+- **New `shipvo ci init --framework capacitor`.** Copies a GitHub Actions template to `.github/workflows/shipvo-build.yml`. It builds the web app, runs `npx cap sync`, builds a signed Android `bundleRelease` (JDK 21) and a signed iOS `.ipa` on `macos-latest`, and uploads both. Signing comes from your repository secrets. `--dry-run` prints the file and writes nothing; `--force` overwrites an existing file. The template lives in `templates/capacitor/github-actions/build.yml` and is copied into `dist/templates` on build. Migration: none; additive.
+- `site`: Learn is a top-level section at `/learn/` with a hub that lists every tutorial and video, generated at build time. Tutorials are at `/learn/<slug>/`, videos at `/learn/videos/`, the glossary at `/learn/glossary/`.
+- Migration: the old `/docs/learn/`, `/docs/first-app/`, `/docs/your-own-shop/`, `/docs/videos/` and `/docs/glossary/` URLs (and their `.md` versions) redirect with a 301.
+- Android e2e: new scenario publishes a release whose `hermes_bytecode_version` differs from the shell's. It fails if the app applies, downloads or crashes on it, and the run summary shows the refusal reason read from telemetry (`hermes_bytecode_mismatch`).
+- Migration: none; this is test tooling only.
+- `scripts`: the android-e2e report has a `firstRun` block (median of the "update: full bundle (no patches offered)" scenario, labelled as such, not as the first-run app), the summary prints a publish-to-healthy line from it, and `measure.mjs --apply-report` adds it to first-run.json. A missing value shows as "not measured", never 0 s.
+- Migration: none.
+- `@shipvo/cli`: new `shipvo run android|ios` builds the web export with the simulated device and opens an Android or iOS phone frame in your default browser. No Playwright. `--no-open`, `--port`, `--native` (runs `npx expo run:android|ios`).
+- Migration: none.
+- sim: the simulator finds system Chrome or Edge, then the Playwright Chromium cache, then runs `npx playwright install chromium` once. Set `SHIPVO_NO_AUTO_INSTALL=1` to skip the install. `--chromium` still wins. Missing Linux libraries now point to `npx playwright install-deps chromium`.
+- `@shipvo/cli`: new `ensurePlaywright` helper installs `playwright` as a dev dependency with the app's package manager (pnpm, yarn, bun or npm). `SHIPVO_NO_AUTO_INSTALL=1` turns it into an error that names the command. Not wired into `shipvo sim` or `explore` yet.
+- Migration: none; not exported from the package.
+- cli: `shipvo sim`, `explore`, `test` and `store screenshots` now install playwright when it is missing and let the simulator pick Chrome, Edge or a one-time Chromium download. The old "Install @shipvo/sim (and playwright)" errors are gone. `shipvo doctor` renames the check to "Browser for the simulator" and passes when Chrome or Edge is found, or notes the one-time download. Set `SHIPVO_NO_AUTO_INSTALL=1` to turn the installs off.
+- Docs: the CLI guide, store, Capacitor, adapters, telemetry export and CodePush migration pages now appear on shipvo.dev, in `sitemap.xml` and in `llms.txt`. Troubleshooting added to the CLI guide and store page; glossary has five new terms; `docs/content-coverage.md` added.
+- Migration: none.
+- `@shipvo/site` (site only): every page passes a phone layout check at 360 and 390 px; the phone menu traps focus and closes on Escape. Migration: none.
+- `@shipvo/site`: Learn has instant search, Type/Goal/Level/Time filters kept in the URL, and a desktop sidebar with its own filter box.
+- Migration: none; site only.
+- cli: `shipvo init --template shop` now sends the payment to the shop name from `--name`. The name is stored as `name` in `src/data/shop.json`. Existing shops: add `"name"` to `src/data/shop.json` and use it in `Cart.tsx`.
+- cli: the `shop` template now posts each paid order to the backend (`/o/<appId>`), so the simulator records it and `end_session` lists it. A declined payment posts nothing.
+- `@shipvo/mcp`: the `tap` description and the `settle` and `wait_for` fields now tell assistants to wait after any action that starts work, so they do not report "Paying..." as the result.
+- Migration: none.
+- `@shipvo/sim`: new `@shipvo/sim/frame.mjs` with `renderFrame({ skin, dark, status })`, a pure renderer for the phone body (Android 412x915 with a punch-hole camera, iPhone 393x852 with an island cutout, status bar, "Simulated" label).
+- `@shipvo/cli`: `shipvo run android|ios` draws its frame with `renderFrame`. It loads `@shipvo/sim` from the app, so the app needs `@shipvo/sim` installed (apps from `shipvo init` have it). `/?dark=1` shows the dark frame.
+- Migration: none for apps from `shipvo init`. Older apps without `@shipvo/sim` get a message with the install command.
+- `@shipvo/sim`: the phone frame status bar can follow the simulated device. New `statusFromDevice`, `isDarkBackground`, `statusParts` and `statusClientScript` exports in `frame.mjs`.
+- `@shipvo/device`: simulated device state gains `airplane` and `battery`. Changes to network, airplane or battery are logged as simulated and sent as a `pn:status` event; `__pnDevice.status()` returns them.
+- Migration: none; new fields have defaults.
+- `@shipvo/cli`: `shipvo run` inlines the status script into the frame page, so the status bar follows `__pnDevice` network, airplane and battery changes. The status strip, not the screen behind the app, takes the app's top colour.
+- device: in the browser, `device.camera.scan`, `device.location.current` and the new `device.microphone.open` use the real webcam, microphone and location when a person is present and allows it. Headless, hidden, refused or missing hardware falls back to the simulated device. The microphone API is optional on `Device` (web and simulator only), so existing code is unaffected.
+- device: every `device_log` entry has `source: "real"` or `"simulated"`. `set_device` takes `source: "simulated"` to force simulated mode, and `microphone: { level }` for the simulated microphone.
+- device: the simulated permission always comes first. `camera.scan`, `location.current` and `microphone.open` check `permissions` before they touch real hardware, so `permissions.location = "denied"` is honoured even with a person present. `"microphone"` is now a `PermissionName` and a `Capability` (native reports `"unavailable"`; migration: code that switches over `PermissionName` or `Capability` exhaustively needs a `"microphone"` case). On the web, `capabilities()` reports `"real"` when real hardware may be used.
+- `@shipvo/cli`: `shipvo promote` reads a test report (`--report <file>`, default `shipvo-test-report.json` if present) and refuses to widen a release whose report has failing flows. A report for another release only prints a warning. `--force` overrides.
+- Migration: none; without a report file nothing changes.
+- `@shipvo/test`: new `secret(name)` reads `SHIPVO_TEST_<NAME>` and names the variable if it is missing. Plain-language steps accept `{secret:NAME}` in typed text, resolved at run time. Errors and `shipvo test --report` files show `***` for secret values. Export is additive.
+- Migration: none.
+- `@shipvo/cli`: `shipvo test --report-md <file>` writes the test report as Markdown for issues and PR comments.
+- Migration: none; new flag.
+- docs: `docs/testing.md` has a "Gate a rollout on tests" CI recipe (sim, test --report --release, publish to the first cohort, promote --report), and a test checks its commands and flags against the CLI help.
+- cli: the top-level help now lists `publish --release` and `promote --report`.
+- Migration: none.
+- `@shipvo/cli`: `shipvo run` now hosts a loopback-only agent WebSocket at `/__shipvo/agent` (session token required) and writes `.shipvo/run.json` (`port`, `platform`, `app`, `token`, `pid`) while it runs. It adds `.shipvo/` to `.gitignore` if missing. Nothing visible changes yet.
+- Migration: none. `startRunServer` takes an optional `projectDir` and also returns `token`.
+- `@shipvo/mcp`: `open_app` attaches to a live `shipvo run` phone when `.shipvo/run.json` points to a running session for the same app. New optional `attach` argument: `auto` (default), `never`, `always`. The result text says `attached to the live shipvo run phone` or `headless session`. In attached mode, screen, tap, type, scroll and back go through the run's agent channel.
+- Migration: none. Headless results now include a `mode: headless session` line.
+- `@shipvo/mcp`: attach needs a global `WebSocket` (Node 22+). On older Node, `open_app` in `auto` mode falls back to headless and the result says `(live run found but attach failed: ...)`. `attach: "always"` returns `attach_failed` with "attach needs Node 22+".
+- `@shipvo/mcp`: new tools `record_start`, `record_marker` and `record_stop`. They record the phone frame page to an H.264 MP4 under `.shipvo/recordings/` (9:16, 16:9 or 1:1, at 30 or 60 fps) and return the file, duration, size and chapters. Needs ffmpeg and the optional `playwright` peer. The page is `SHIPVO_FRAME_URL`, default the simulator root.
+- Migration: none. New tools only.
+- `@shipvo/sim`: the phone frame has power, volume up and volume down buttons. Power press locks (lock screen with the time, swipe up unlocks), long-press opens a menu with Restart and Power off, volume shows an overlay. Restart shows a boot screen and cold-starts the app; storage is kept.
+- `@shipvo/sim`, `@shipvo/mcp`: new actions and tools `lock`, `unlock` and `restart`. While locked, tap, type, scroll and back fail with `phone_locked`; `lock` and `unlock` out of order fail with `already_locked` and `not_locked`. Each is logged in `device_log` with source `simulated`.
+- Migration: none.
+- `@shipvo/sim`: the frame buttons work from the keyboard (Enter locks, Shift+Enter opens the power menu, Escape or Cancel closes it), the lock screen has an Unlock button and a dialog role, and a powered-off phone turns on again from the power button or a click. New MCP error codes are listed in the `@shipvo/mcp` README.
+- `@shipvo/sim`: the on-screen rules (off-screen list items, content behind a modal, hidden subtrees, labelled controls) now live in `screen-rules.mjs`, shipped in the package. No behaviour change.
+- Migration: none.
+- `@shipvo/cli`: the `shipvo run` frame page now answers `tree` requests on the agent channel with an accessibility tree, in the simulator's line shape and with stable `eN` refs. The shared screen rules are applied first. Differences from the simulator tree are in `docs/run-bridge.md`.
+- `@shipvo/cli` now depends on `@shipvo/sim`; `@shipvo/sim` exports `./screen-rules.mjs`.
+- Migration: none.
+- `@shipvo/cli`: the `shipvo run` server now rejects HTTP requests and WebSocket upgrades whose `Host` is not `127.0.0.1:<port>` or `localhost:<port>`, and upgrades whose `Origin` is set to anything else. The page gets its own random in-memory credential that opens only the `screen` role; the agent token stays in `.shipvo/run.json` and is never served. The bridge script removes its `data-token` attribute after reading it.
+- `@shipvo/cli`: the `shipvo run` frame-page bridge answers `tap`, `type`, `scroll` and `back` by ref. A ref that is unknown, gone, or whose role or name changed returns `stale_ref`, with the same message as the simulator. The simulator's ref-stability cases now run against the bridge too.
+- Migration: none.
+- `store`: new exports `SHIPVO_TESTERS_GROUP`, `SHIPVO_TESTERS_JOIN_URL`, `SHIPVO_TESTERS_SHORT_URL`. The `play-closed-test` step text for personal accounts under the tester rule now names the Shipvo Testers group. Migration: none.
+- `cli`: new `shipvo store testers [--package id] [--track alpha] [--play-key file] [--json]` prints the steps to get 12 testers and, with your own Play service account key, adds the Shipvo Testers group to the closed track (keeps existing groups; the key is never stored).
+- `site`: `shipvo.dev/testers` redirects to the Shipvo Testers join page.
+- `@shipvo/site`: public roadmap at shipvo.dev/roadmap/, built from `docs/ROADMAP.md`, linked from the footer and the changelog, listed in the sitemap and `llms.txt`.
+- Migration: none.
+- Create your first app video: re-rendered with a CC BY-SA music track (was CC BY-NC-ND).
+- The first-app video page and credits now state that the video, including its soundtrack, is shared under CC BY-SA 3.0.
+- `shipvo` and `create-shipvo` on npm: `npx shipvo <command>`, `npm i -g shipvo` and `npm create shipvo myshop` now work; both forward to `@shipvo/cli`.
+- `@shipvo/cli`: `shipvo init` lists `npm install` as step 2 and `shipvo sim` right after it, so the next steps work in order.
+- Migration: none.
+- skills: new `skills/shipvo` agent skill, installable with `npx skills add shipvo/shipvo --skill shipvo`. A CLI test keeps its commands in step with `shipvo help`.
+- `@shipvo/cli`: new `shipvo agents setup [--dry-run] [--json]` writes a marked `AGENTS.md` section and adds `@shipvo/mcp` to `.mcp.json` (and `.cursor/mcp.json`).
+- `@shipvo/cli`: `shipvo status --json` now prints `{ ok, code, summary, data, next }` and exits 0, 1 (action needed) or 2 (error). Migration: the old JSON was the raw control-plane summary; read `data.pending_release` and run `shipvo status` for the table.
+- recorder: `duration_s` and chapter times now start at the first frame, so they match the video length when the first screenshot is slow. Reported durations get shorter by the first-screenshot delay (#541).
+- site: llms.txt now opens with the positioning line and has "For AI coding agents", "How Shipvo works", "Straight answers" and a generated Packages list. Install lines appear only when they exist.
+- docs: add a captioned video for the "Create your first app" tutorial, and list it on the Videos page.
+
 ## 2026-11-05 (release)
 
 - **@shipvo/cli 0.1.4**: cli: preview frame with Android and iPhone skins, size switch and back control (slice 1 of #285); store: new @shipvo/store package, shipvo store details --dry-run (slice 1 of #249); cli: shop template gets a Pay button and paid/declined tests; cli: plain message for a failed sim --watch rebuild; schema, cli: shipvo.policy section and a policy check in publish --dry-run (slice 2 of #295)

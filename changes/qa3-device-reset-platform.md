@@ -1,0 +1,2 @@
+- `@shipvo/device`: in the simulator, `reset({ platform, api })` now sets the notification permission default from the new platform and API level, not the old ones.
+- Migration: none.

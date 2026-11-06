@@ -1,3 +1,0 @@
-- `scripts/first-run/measure.mjs`: new `--control-log <file>` option. If the real publish fails, the last 20 lines of that control plane log are printed.
-- Tests: a 2 MB random bundle publishes end to end through the real CLI against the control plane (`services/control-plane/test/publish-large.test.ts`). No bug was found, so the CLI and control plane are unchanged.
-- Migration: none.

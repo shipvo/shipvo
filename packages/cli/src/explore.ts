@@ -22,8 +22,13 @@ export type Driver = {
   back(): Promise<Reply>;
   /** Uncaught page errors since the last call. */
   errors(): Promise<string[]>;
+  /** Rendered size in px of each ref on the current screen. Optional: without it the size check is skipped. */
+  sizes?(): Promise<Record<string, [number, number]>>;
 };
-export type Kind = "error" | "not_delivered" | "action_failed" | "dead_end" | "unnamed";
+export type Skin = "android" | "ios";
+/** Smallest tap target: 44 x 44 pt on iOS (Apple HIG), 48 x 48 dp on Android (Material and Android accessibility guide). */
+export const MIN_TARGET: Record<Skin, number> = { ios: 44, android: 48 };
+export type Kind = "error" | "not_delivered" | "action_failed" | "dead_end" | "unnamed" | "small_target" | "duplicate_name";
 export type Finding = { kind: Kind; message: string; screen: string; steps: Step[] };
 export type Report = {
   app: string; generatedAt: string; steps: number; screens: number; maxSteps: number; maxDepth: number;
@@ -66,7 +71,8 @@ const label = (e: { role: string; name: string }) => `${e.role} "${e.name}"`;
 /** Steps in plain lines, for the report. */
 export const describeStep = (s: Step) => s.action === "open" ? "open the app" : s.action === "open_url" ? `open_url ${s.url}` : s.action === "tap" ? `tap ${label(s)}${s.nth ? ` (number ${s.nth + 1} with that name)` : ""}` : "back";
 
-export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: number; maxSteps?: number; app?: string } = {}): Promise<Report> {
+export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: number; maxSteps?: number; app?: string; skin?: Skin } = {}): Promise<Report> {
+  const skin = o.skin ?? "android", min = MIN_TARGET[skin];
   const maxDepth = o.maxDepth ?? 3, maxSteps = o.maxSteps ?? 100;
   const findings: Finding[] = []; const seenFinding = new Set<string>();
   const seenScreens = new Set<string>(); let steps = 0; let stopped: string | null = null; let cut = 0;
@@ -101,6 +107,18 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
     const els = elements(screen);
     if (!els.length) add({ kind: "dead_end", message: "Dead end: the screen has no actionable element", screen, steps: path });
     for (const e of els) if (!e.name) add({ kind: "unnamed", message: `Unnamed ${e.role}: it has no accessible name`, screen, steps: path });
+    for (const e of els) if (e.name && e.nth === 1) {
+      const n = els.filter((x) => x.role === e.role && x.name === e.name).length;
+      add({ kind: "duplicate_name", message: `Duplicate name: ${n} ${e.role}s are named "${e.name}", so a screen reader cannot tell them apart`, screen, steps: path });
+    }
+    if (driver.sizes) {
+      // A simulator without the `sizes` action must not break the walk: skip the size check for this screen.
+      const sizes = await driver.sizes!().catch(() => ({} as Record<string, [number, number]>));
+      for (const e of els) {
+        const z = sizes[e.ref]; if (!z || (z[0] >= min && z[1] >= min)) continue;
+        add({ kind: "small_target", message: `Small target: ${e.name ? label(e) : e.role}${e.nth ? ` (number ${e.nth + 1})` : ""} is ${z[0]} x ${z[1]}, under the ${min} x ${min} minimum for ${skin}`, screen, steps: path });
+      }
+    }
     let current = screen;
     for (const e of els) {
       if (!e.name || /^(back|go back)$/i.test(e.name)) continue;
@@ -176,6 +194,7 @@ export function simDriver(base: string, app: string, session = `explore-${Date.n
     tap: (ref) => act({ action: "tap", ref }),
     back: () => act({ action: "back" }),
     errors: async () => (await act({ action: "errors" })).errors ?? [],
+    sizes: async () => ((await act({ action: "sizes" })) as { sizes?: Record<string, [number, number]> }).sizes ?? {},
   };
 }
 
@@ -209,7 +228,8 @@ export async function explore(argv: string[]): Promise<number> {
   const maxDepth = num("max-depth", 3), maxSteps = num("max-steps", 100);
   const sim = await startSim(a, cfg); const base = sim.base;
   try {
-    const report = await walk(simDriver(base, cfg.appId), { routes: cfg.routes, maxDepth, maxSteps, app: cfg.appId });
+    if (a.skin !== undefined && a.skin !== "ios" && a.skin !== "android") throw new Error("--skin must be android or ios");
+    const report = await walk(simDriver(base, cfg.appId), { routes: cfg.routes, maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
     writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
     console.log(`${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`);

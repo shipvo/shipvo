@@ -18,7 +18,14 @@ jobs:
         with: { node-version: 22, cache: pnpm, registry-url: "https://registry.npmjs.org" }
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @shipvo/schema build && pnpm -r --filter "./packages/**" build
-      - run: pnpm -r test
+      # Only the packages being published are tested here: main CI already ran everything (site, apps)
+      # on this commit before the release train tagged it, and a site browser check must not block npm.
+      - name: Install Chromium for package tests
+        run: bash scripts/agents/install-chromium.sh
+      - name: Install ffmpeg for package tests
+        run: bash scripts/agents/install-ffmpeg.sh
+      - run: pnpm -r --filter "./packages/**" test
+        env: { SHIPVO_REQUIRE_FFMPEG: "1" }
       - name: Publish @shipvo packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}

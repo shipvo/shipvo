@@ -42,7 +42,7 @@ async function localApps(): Promise<AppInfo> {
   return TIDE;
 }
 
-type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
+type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; locate?: { x: number; y: number; w: number; h: number }; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
@@ -70,6 +70,20 @@ async function act(body: Record<string, unknown>): Promise<Act> {
   if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone yet. Use screen, tap, type, scroll or back, or open a headless session with attach: "never".` };
   const m = await d.request(String(action), args);
   return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code };
+}
+// While recording with show_taps, ask the simulator where an element is (0..1 of the viewport). Unknown element or attached phone: undefined, so no dot.
+async function locating(session: string, ref: string, whole = false) {
+  if (!recorder.drawing || attached.has(session)) return undefined;
+  const r = await sim("/act", { session, action: "locate", ref }).catch(() => undefined);
+  const l = r?.ok ? r.locate : undefined;
+  return l ? (whole ? l : { x: l.x, y: l.y }) : undefined;
+}
+// Where the finger goes for a scroll: along the element when given, else down the middle of the page. The finger moves against the content.
+function scrollTrail(dir: string, el?: { x: number; y: number; w?: number; h?: number }): [{ x: number; y: number }, { x: number; y: number }] {
+  const c = { x: el?.x ?? 0.5, y: el?.y ?? 0.5 }; const w = (el?.w ?? 0.6) * 0.35, h = (el?.h ?? 0.5) * 0.35;
+  const k = (v: number) => Math.min(1, Math.max(0, v));
+  const [dx, dy] = dir === "down" ? [0, -h] : dir === "up" ? [0, h] : dir === "right" ? [-w, 0] : [w, 0];
+  return [{ x: k(c.x - dx), y: k(c.y - dy) }, { x: k(c.x + dx), y: k(c.y + dy) }];
 }
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
@@ -206,11 +220,11 @@ async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; wait
 }
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
 server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await act({ session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "tap", ref }), { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const at = await locating(session, ref); const first = await act({ session, action: "tap", ref }); if (first.ok && at) void recorder.tap(at); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
 server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
   async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await act({ session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
 server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
-  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "scroll", direction, ref }), { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
+  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const box = ref ? await locating(session, ref, true) : undefined; const first = await act({ session, action: "scroll", direction, ref }); if (first.ok && recorder.drawing) void recorder.trail(...scrollTrail(direction, box)); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
 server.tool("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await act({ session, action: "screenshot" });
@@ -284,8 +298,9 @@ server.tool("record_start", "Start recording the phone frame to an MP4 under .sh
   format: z.enum(["9:16", "16:9", "1:1"]).optional().describe("Video shape (default 9:16: 1080x1920; 16:9 is 1920x1080; 1:1 is 1080x1080)"),
   fps: z.union([z.literal(30), z.literal(60)]).optional().describe("Frames per second (default 30)"),
   title: z.string().optional().describe("Used in the file name"),
-}, WR, async ({ format, fps, title }) => {
-  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
+  show_taps: z.boolean().optional().describe("Draw a finger dot and ripple on taps and a trail on scrolls (default true)"),
+}, WR, async ({ format, fps, title, show_taps }) => {
+  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }

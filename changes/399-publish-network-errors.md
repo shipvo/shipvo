@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo publish` against a control plane now shows the real network error (for example `ECONNRESET`) and the key it was writing, and retries network failures twice with a short backoff. HTTP errors such as 401 are not retried.
-- Migration: none.

@@ -1,3 +1,0 @@
-- docs: `docs/testing.md` has a "Gate a rollout on tests" CI recipe (sim, test --report --release, publish to the first cohort, promote --report), and a test checks its commands and flags against the CLI help.
-- cli: the top-level help now lists `publish --release` and `promote --report`.
-- Migration: none.

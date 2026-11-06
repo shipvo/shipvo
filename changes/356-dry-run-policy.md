@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo publish --dry-run-policy` (slice 3 of #356) checks the `policy` section for the given `--bands`, prints the rule and reason on a refusal and exits 1. It builds and publishes nothing. See [docs/cli.md](docs/cli.md).
-- Migration: none; this is a new flag.
