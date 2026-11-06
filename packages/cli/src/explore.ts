@@ -9,6 +9,7 @@ import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
+import { runFlows, renderFlows, FLOW_NAMES, type FlowName } from "./flows.js";
 
 export type Step =
   | { action: "open" }
@@ -379,6 +380,15 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     if (a.seed !== undefined) { seed = Number(a.seed); if (!Number.isInteger(seed) || seed < 0) throw new Error("--seed must be a whole number of 0 or more"); }
     const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, seed, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
+    if (a.flows !== undefined) {
+      const names = a.flows === "true" ? FLOW_NAMES : a.flows.split(",").map((x) => x.trim().replace(/-/g, "_"));
+      const bad = names.find((n) => !FLOW_NAMES.includes(n as FlowName));
+      if (bad) throw new Error(`--flows: unknown flow "${bad}". Use ${FLOW_NAMES.join(", ")}`);
+      const fr = await runFlows(simDriver(base, cfg.appId), { flows: names as FlowName[], app: cfg.appId });
+      writeFileSync(`${out}-flows.md`, renderFlows(fr)); writeFileSync(`${out}-flows.json`, JSON.stringify(fr, null, 2) + "\n");
+      const msg = `Flows: ${fr.flows.map((f) => `${f.flow} ${f.status}`).join(", ")}. Wrote ${out}-flows.md and ${out}-flows.json`;
+      if (json) console.error(msg); else console.log(msg);
+    }
     const nothingChanged = onlyRoutes && !routes?.length;
     if (nothingChanged) console.error("No screens changed, nothing explored.");
     writeFileSync(`${out}.md`, (nothingChanged ? "No screens changed, nothing explored.\n\n" : "") + renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
