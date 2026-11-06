@@ -145,4 +145,10 @@ describe("accessibility findings", () => {
     const r = await walk(drv(`- button "Add" [ref=e1]\n- button "Add" [ref=e2]\n- button "Add" [ref=e3]`, {}));
     expect(r.findings.filter((x) => x.kind === "duplicate_name")).toHaveLength(1);
   });
+  it("skips the size check when sizes() throws", async () => {
+    const d = { ...drv(`- button "Tiny" [ref=e1]`, {}), sizes: async () => { throw new Error("unknown action 'sizes'"); } };
+    const r = await walk(d);
+    expect(r.findings.filter((x) => x.kind === "small_target")).toHaveLength(0);
+    expect(r.stoppedEarly).toBeNull();
+  });
 });

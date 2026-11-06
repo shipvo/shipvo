@@ -112,7 +112,8 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
       add({ kind: "duplicate_name", message: `Duplicate name: ${n} ${e.role}s are named "${e.name}", so a screen reader cannot tell them apart`, screen, steps: path });
     }
     if (driver.sizes) {
-      const sizes = await driver.sizes();
+      // A simulator without the `sizes` action must not break the walk: skip the size check for this screen.
+      const sizes = await driver.sizes!().catch(() => ({} as Record<string, [number, number]>));
       for (const e of els) {
         const z = sizes[e.ref]; if (!z || (z[0] >= min && z[1] >= min)) continue;
         add({ kind: "small_target", message: `Small target: ${e.name ? label(e) : e.role}${e.nth ? ` (number ${e.nth + 1})` : ""} is ${z[0]} x ${z[1]}, under the ${min} x ${min} minimum for ${skin}`, screen, steps: path });
