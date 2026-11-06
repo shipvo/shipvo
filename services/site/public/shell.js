@@ -59,4 +59,30 @@
     pre.classList.add('has-copy');pre.appendChild(b);
   });
   document.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){navigator.clipboard&&navigator.clipboard.writeText(b.getAttribute('data-copy')).then(function(){var t=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=t},1400)})})});
+  // series episodes: while the recap at the start plays, offer "previous episode" and "skip recap".
+  // Markup: <video data-recap-end="6" data-prev="/learn/videos/#s1-e1" data-prev-title="E1 · No app">.
+  // Runs after the other deferred scripts so it sees the final wrapper (docs.js adds .vid).
+  function episodes(){
+    document.querySelectorAll('video[data-recap-end]').forEach(function(v){
+      if(v.getAttribute('data-ep-ready'))return;v.setAttribute('data-ep-ready','1');
+      var start=parseFloat(v.getAttribute('data-recap-start')||'0'),end=parseFloat(v.getAttribute('data-recap-end'));
+      if(!(end>start))return;
+      var box=v.parentNode;
+      if(!box.classList.contains('vid')){box=document.createElement('div');box.className='ep-box';v.parentNode.insertBefore(box,v);box.appendChild(v)}
+      var bar=document.createElement('div');bar.className='ep-bar';bar.setAttribute('role','group');bar.setAttribute('aria-label','Recap');
+      var prev=v.getAttribute('data-prev');
+      if(prev){var a=document.createElement('a');a.className='ep-btn ep-prev';a.href=prev;
+        a.textContent='\u25C0 Watch '+(v.getAttribute('data-prev-title')||'previous episode');
+        a.addEventListener('click',function(){v.pause()});bar.appendChild(a)}
+      var skip=document.createElement('button');skip.type='button';skip.className='ep-btn ep-skip';skip.textContent='Skip recap \u203A';
+      skip.addEventListener('click',function(){v.currentTime=end;var p=v.play();if(p&&p.catch)p.catch(function(){});v.focus()});
+      bar.appendChild(skip);box.appendChild(bar);
+      // pin the bar to the video's own box, whatever width the page gives the video
+      function place(){bar.style.left=v.offsetLeft+'px';bar.style.top=v.offsetTop+'px';bar.style.width=v.offsetWidth+'px'}
+      if(window.ResizeObserver)new ResizeObserver(place).observe(v);window.addEventListener('resize',place);place();
+      function sync(){var t=v.currentTime||0;bar.hidden=!(t>=start&&t<end-0.25)}
+      ['timeupdate','seeked','loadedmetadata','play'].forEach(function(e){v.addEventListener(e,sync)});sync();
+    });
+  }
+  if(document.readyState==='complete')episodes();else{document.addEventListener('DOMContentLoaded',episodes);window.addEventListener('load',episodes)}
 })();
