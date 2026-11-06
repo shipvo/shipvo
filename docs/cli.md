@@ -352,6 +352,30 @@ Without `--json`, `publish` and `rollback` print a single plain sentence.
 
 `next` suggests the follow-up. After `publish` it is `shipvo status --json` (and `shipvo promote --to ...` when some bands are left). After a dry run it is the real command. After a failure it is the likely fix, for example `shipvo doctor --json`.
 
+## `--json` for `init`, `login`, `audit` and `keys`
+
+These commands take `--json` and print the same `{ ok, code, summary, data, next }` envelope as the other `--json` commands. Stdout holds one JSON line. Progress and text go to stderr. Exit codes: 0 ok, 1 failed, 2 usage error. No envelope holds a key seed, a token or an API key.
+
+| Command | `code` on success | `data` |
+|---|---|---|
+| `init <dir>` | `created` | `{ mode: "create", dry_run, dir, app_id, control_plane, public_key, seed_file }` (`seed_file` is the path of the git-ignored seed file, or `null` when you passed `--public-key`) |
+| `init` in an existing app | `adopted`, `dry_run` | the same with `mode: "adopt"`. Needs `--yes` or `--dry-run`. |
+| `login` | `signed_in` | `{ login, key_prefix, saved_to, quota_minutes, expires_at, apps, mcp_url, device: { verification_uri, user_code } }` |
+| `audit <app>` | `ok` | `{ app, count, rows }` (`--format csv` is not combined with `--json`) |
+| `keys` | `ok` | `{ login, prefix, scope, app, expires_at, used_minutes, quota_minutes, last_used_at, mcp_url }` |
+| `keys export --out <file>` | `exported` | `{ app_id, public_key, out }`. `--out` is required, so the seed is never printed. |
+| `keys import` | `imported`, `unchanged` | `{ app_id, public_key, seed_file, gitignore_warning }` |
+| `keys rotate sign` | `rotation_signed` | `{ app_id, envelope: { body, signature } }` |
+| `keys rotate upload` | `rotation_uploaded` | `{ app_id, response }` |
+
+`login --json` writes the device URL and code to stderr as soon as it has them, so a person can open the page. It then waits for GitHub as it does without `--json`, and the final envelope repeats both in `data.device`.
+
+Failure codes: `usage`, `failed`, `dir_exists`, `init_failed`, `login_unavailable`, `login_failed`, `login_expired`, `login_timeout`, `no_credentials`, `auth_failed`, `remote_failed`, `no_project`, `not_signed_in`, `key_expired`, `key_invalid`, `no_seed`, `seed_mismatch`, `invalid_seed`, `rotate_failed`, `refused`. On failure `data` is `{}` and `summary` is the error message.
+
+After `init`, `next` is `npm install`, `npx shipvo run android` and `npx shipvo publish --json`.
+
+Migration: `keys rotate sign --json` used to print the bare signed envelope. It now prints the standard envelope with the signed envelope in `data.envelope`.
+
 ## shipvo migrate --plan
 
 Read-only. Run it in an app that uses `expo-updates` or `react-native-code-push`. It changes no files. With `--json` it prints the standard envelope with `next` steps. In an app with neither it exits 0 and says there is nothing to migrate.

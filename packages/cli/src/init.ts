@@ -1,11 +1,12 @@
 // `shipvo init <dir>`: a new Expo app wired to Shipvo: signed OTA runtime + plugin, the device API, the simulator,
 // a publish workflow and a shipvo.json. Everything an agent needs to open it is in place on the first commit.
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { args as parse } from "./config.js";
 import { adopt, detectProject, isAdoptArgs, isBareApp, positional } from "./adopt.js";
+import { CliFailure, UsageError, runJson, trapExit } from "./json-out.js";
 
 const HOSTED = "https://api.shipvo.dev";
 const SDK = { expo: "~58.0.21", camera: "~58.0.14", clipboard: "~58.0.4", localAuth: "~58.0.2", location: "~58.0.20", notifications: "~58.1.7", statusBar: "~58.0.4", constants: "~58.0.0", metroRuntime: "~58.0.15", react: "19.3.0", rn: "0.88.1", rnw: "^0.21.4" };
@@ -46,11 +47,42 @@ Creates <dir> with a ready app. Every option is optional.
                            blank    the starter with device API buttons.
                            content  a list screen and a detail screen reading titles and text from src/data/articles.json.
                            shop     a product list, a product page and a cart, reading products and prices from src/data/products.json.
+  --json                 Print one JSON envelope on stdout; progress goes to stderr.
   --help                 Show this text.`;
 
 const title = (s: string) => s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+/** `shipvo init --json`: the same work, reported as one envelope. The seed is never in it; only the path of the seed file. */
+async function initJson(argv: string[]) {
+  const [dirArg] = positional(argv.filter((x) => x !== "--json"));
+  const adoptMode = isAdoptArgs(argv) && (dirArg === "." || detectProject(process.cwd()).isExpo || isBareApp(process.cwd()));
+  const dry = argv.includes("--dry-run");
+  return runJson(async () => {
+    if (adoptMode && !argv.includes("--yes") && !dry) throw new UsageError("init --json in an existing app needs --yes to apply the plan, or --dry-run to only print it.");
+    await trapExit(() => init(argv.filter((x) => x !== "--json")), (m, st) => {
+      const code = st === 2 ? "usage" : /already exists/.test(m) ? "dir_exists" : "init_failed";
+      return new CliFailure(m, code, st, code === "usage" ? [{ command: "shipvo init --help", why: "See the options." }] : code === "dir_exists" ? [{ command: "shipvo init <new-dir> --json", why: "Pick a folder that does not exist." }] : [{ command: "shipvo doctor --json", why: "Check your setup." }]);
+    });
+    const dir = adoptMode ? process.cwd() : resolve(dirArg);
+    let cfg: any = {};
+    try { cfg = JSON.parse(readFileSync(join(dir, "shipvo.json"), "utf8")); } catch {}
+    const seedFile = join(dir, ".shipvo", "seed.txt");
+    const cd = adoptMode ? [] : [`cd ${dirArg} && `];
+    return {
+      code: dry ? "dry_run" : adoptMode ? "adopted" : "created",
+      summary: dry ? "Printed the plan. Nothing was changed." : adoptMode ? `Added Shipvo to this app${cfg.appId ? ` ("${cfg.appId}")` : ""}.` : `Created "${cfg.appId}" in ${dirArg}.`,
+      data: { mode: adoptMode ? "adopt" : "create", dry_run: dry, dir, app_id: cfg.appId ?? null, control_plane: cfg.controlPlane ?? null, public_key: cfg.publicKey ?? null, seed_file: !dry && existsSync(seedFile) ? seedFile : null },
+      next: dry ? [{ command: "shipvo init . --yes --json", why: "Apply the plan." }] : [
+        { command: `${cd[0] ?? ""}npm install`, why: "Install dependencies before any shipvo command." },
+        { command: `${cd[0] ?? ""}npx shipvo run android`, why: "See the app on a simulated phone (npx shipvo run ios for iOS)." },
+        { command: `${cd[0] ?? ""}npx shipvo publish --json`, why: "Send your first update." },
+      ],
+    };
+  }, [{ command: "shipvo init --help", why: "See the options." }]);
+}
+
 export async function init(argv: string[]) {
+  if (argv.includes("--json") && !argv.includes("--help") && !argv.includes("-h")) return initJson(argv);
   const [dirArg] = positional(argv);
   const a = parse(argv);
   if (argv.includes("--help") || argv.includes("-h")) { console.log(INIT_HELP); return; }
