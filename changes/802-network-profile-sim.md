@@ -1,0 +1,2 @@
+- `@shipvo/sim`: new `set_network_profile` action runs the session's fetches under a named network profile (`online` by default, `offline`, `2g`, `3g`, `slow-4g`, `spotty`, `low-end-4g`). A bad name answers `unknown_profile`. Each change is added to `device_log`, marked `simulated`. `mockNetwork` rules still win over the profile.
+- Migration: none; `online` behaves as before.
