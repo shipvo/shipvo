@@ -47,20 +47,20 @@ const backgroundScript = (b: Background) => `(() => { const v = ${JSON.stringify
 const captionScript = (text: string) => `(() => { let e = document.getElementById("shipvo-caption"); if (!e) { e = document.createElement("div"); e.id = "shipvo-caption";
   e.style.cssText = "position:fixed;z-index:2147483647;pointer-events:none;left:50%;bottom:6%;transform:translateX(-50%);max-width:80%;padding:14px 28px;border-radius:14px;background:rgba(0,0,0,.72);color:#fff;font:600 44px/1.2 system-ui,sans-serif;text-align:center"; document.body.appendChild(e); }
   e.textContent = ${JSON.stringify(text)}; })()`;
-// Lumi in the recorded frame. Hidden with a style rule when off. When on, a small observer in the page logs each caption Lumi shows, with the time, so the steps can be spoken.
+// Lumi in the recorded frame. The observer logs only caption changes, so the same text shown twice in a row is logged once. Hidden with a style rule when off. When on, a small observer in the page logs each caption Lumi shows, with the time, so the steps can be spoken.
 const lumiScript = (on: boolean) => `(() => { if (!${on}) { const s = document.createElement("style"); s.id = "shipvo-lumi-off"; s.textContent = '[data-part="lumi"],[data-part="lumi-caption"],.sf-lumi,.sf-lumi-cap{display:none !important}'; document.head.appendChild(s); return false; }
   const has = !!document.querySelector('[data-part="lumi"]'); const log = window.__shipvoSteps = window.__shipvoSteps || [];
   const c = document.querySelector('[data-part="lumi-caption"]');
   if (c) new MutationObserver(() => { const t = (c.textContent || "").trim(); if (t && !c.hidden && t !== (log.at(-1) || {}).text) log.push({ at: Date.now(), text: t }); }).observe(c, { childList: true, characterData: true, subtree: true, attributes: true });
   return has; })()`;
 export type Step = { at: number; text: string };
-/** Lines Lumi speaks: one per step caption, dropped when the previous line would still be playing (about 0.07 s a character plus a short gap). Times are seconds on the final video. */
+/** Lines Lumi speaks: one per step caption, dropped when the previous line would still be playing (about 0.09 s a character plus a 0.6 s gap). Times are seconds on the final video. */
 export function voiceCues(steps: Step[], t0: number, shift: (ms: number) => number, total: number): [number, string, string][] {
   const out: [number, string, string][] = []; let free = 0;
   for (const s of steps) {
     const t = shift(s.at - t0) / 1000, text = s.text.replace(/\s+/g, " ").trim().slice(0, 80);
     if (!text || t < 0 || t > total - 0.5 || t < free) continue;
-    out.push([Math.round(t * 1000) / 1000, "lumi", text]); free = t + 0.5 + text.length * 0.07;
+    out.push([Math.round(t * 1000) / 1000, "lumi", text]); free = t + 0.6 + text.length * 0.09;
   }
   return out;
 }
@@ -164,7 +164,11 @@ export class Recorder {
       let vo: string | undefined; let narration = o.narration; let voice: string | undefined;
       if (this.lumiVoice && !narration) {
         const cues = voiceCues(steps, t0, (ms) => ms - drop(ms), duration_s);
-        if (cues.length) { voice = narration = lumiVoice(file, cues, duration_s); out.lumi_lines = cues.length; }
+        if (cues.length) {
+          // A failed voice must not throw away the finished recording: keep the silent video (music still applies) and say why.
+          try { voice = narration = lumiVoice(file, cues, duration_s); out.lumi_lines = cues.length; }
+          catch (e) { if (!(e instanceof RecorderError) || e.code !== "voice_failed") throw e; (out.notes ??= []).push(e.message); }
+        }
         else (out.notes ??= []).push("lumi_voice was on but Lumi showed no step lines to speak");
       } else if (this.lumiVoice) (out.notes ??= []).push("lumi_voice was ignored because narration was given");
       try {
@@ -217,7 +221,7 @@ function addMusic(file: string, narration?: string): string {
 }
 
 /** Speak the cues with Lumi's voice: scripts/video/dialogue.py with the `energetic` preset. SHIPVO_DIALOGUE points at the script. Returns the wav path (next to the video). */
-function lumiVoice(file: string, cues: [number, string, string][], total: number): string {
+export function lumiVoice(file: string, cues: [number, string, string][], total: number): string {
   const script = process.env.SHIPVO_DIALOGUE ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "scripts", "video", "dialogue.py");
   const bad = (why: string) => new RecorderError("voice_failed", `${why}. The silent video is at ${file}`);
   if (!existsSync(script)) throw bad(`lumi_voice needs dialogue.py, not found at ${script}: set SHIPVO_DIALOGUE`);

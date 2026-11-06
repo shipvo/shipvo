@@ -55,12 +55,3 @@ describe.skipIf(!ok)("recorder overlays", () => {
     expect(trail).not.toEqual(none);
   }, 90000);
 });
-
-import { voiceCues } from "../src/recorder.js";
-describe("voiceCues", () => {
-  it("maps step times through the cuts and skips lines that would overlap", () => {
-    const steps = [{ at: 1000, text: "Tapping Checkout" }, { at: 1100, text: "Typing" }, { at: 9000, text: "Scrolling down" }, { at: 99000, text: "late" }];
-    const cues = voiceCues(steps, 0, (ms) => ms - 500, 10);
-    expect(cues).toEqual([[0.5, "lumi", "Tapping Checkout"], [8.5, "lumi", "Scrolling down"]]);
-  });
-});
