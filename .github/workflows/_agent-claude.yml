@@ -66,7 +66,8 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.chk.outputs.ok == 'true'
         with:
-          ref: ${{ inputs.mode == 'pr-branch' && inputs.branch || '' }}
+          # A dispatched review (agent-reviewer.yml, input pr) has no pull_request ref of its own: check out the PR head.
+          ref: ${{ inputs.mode == 'pr-branch' && inputs.branch || (inputs.role == 'reviewer' && github.event_name == 'workflow_dispatch' && format('refs/pull/{0}/head', inputs.pr)) || '' }}
           fetch-depth: 0
           persist-credentials: false
 
