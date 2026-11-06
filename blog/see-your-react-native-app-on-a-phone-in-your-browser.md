@@ -3,7 +3,7 @@ title: See your React Native app on a phone in your browser, with one command
 date: 2026-11-06
 order: 1
 author: Shipvo team
-tags: Guides, Shipvo Phone
+tags: Guides
 seo_title: Run a React Native app in the browser as a phone
 summary: See your app on a simulated phone in a browser tab with one command and no Android Studio. What it replaces, what it does not, and how an AI agent drives it.
 ---
