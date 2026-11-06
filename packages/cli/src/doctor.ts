@@ -5,11 +5,11 @@ import { execSync } from "node:child_process";
 import { portFree } from "./sim.js";
 import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
-import { parseDeclared } from "./hermes.js";
+import { installedHermesEngine, parseDeclared, parseEngine } from "./hermes.js";
 import { emit, envelope, type Next } from "./json-out.js";
 
 type CheckResult = { name: string; ok: boolean; fix: string; note?: string };
-type ShipvoConfig = { publicKey?: unknown; controlPlane?: unknown; hermesBytecodeVersion?: unknown };
+type ShipvoConfig = { publicKey?: unknown; controlPlane?: unknown; hermesBytecodeVersion?: unknown; hermesEngine?: unknown };
 type DoctorDeps = {
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -187,6 +187,20 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
     }
   }
   results.push({ name: "hermesBytecodeVersion (if present) is set", ok: hermesOk, fix: "set hermesBytecodeVersion to a positive integer or list (for example 96 or [96, 98])" });
+
+  // Engine build: only shown when the project declares one or has a hermes-compiler, so older setups see no new row.
+  const installedEngine = installedHermesEngine(deps.cwd);
+  let declaredEngine: string | undefined, engineBad = false;
+  try { declaredEngine = cfg ? parseEngine(cfg.hermesEngine) : undefined; } catch { engineBad = true; }
+  if (engineBad) results.push({ name: "Hermes engine build", ok: false, fix: "set hermesEngine in shipvo.json to an id like 250829098.0.10" });
+  else if (declaredEngine || installedEngine) {
+    const mismatch = !!declaredEngine && declaredEngine !== installedEngine;
+    results.push({
+      name: "Hermes engine build", ok: !mismatch,
+      fix: installedEngine ? `shipvo.json declares ${declaredEngine} but hermes-compiler is ${installedEngine}; install the declared build or update hermesEngine if the shell changed` : `shipvo.json declares ${declaredEngine} but hermes-compiler was not found; install it or remove hermesEngine`,
+      note: mismatch ? undefined : declaredEngine ? `${installedEngine}, matches hermesEngine` : `${installedEngine}, hermesEngine not declared in shipvo.json`,
+    });
+  }
 
   // Simulator checks only apply to projects that have a `sim` script.
   if (!deps.skipSim && hasSimScript(deps)) {

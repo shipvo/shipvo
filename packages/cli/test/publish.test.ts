@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 const exec = vi.hoisted(() => ({ fn: (_cmd: string, _opts?: { env?: NodeJS.ProcessEnv }) => {} }));
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string, o?: { env?: NodeJS.ProcessEnv }) => exec.fn(c, o) }));
 
-const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown }));
+const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown, engine: undefined as string | undefined }));
 const puts: string[] = [];
 const values = new Map<string, string>();
 const blobs = new Map<string, Uint8Array>();
@@ -19,7 +19,7 @@ const stub = {
 };
 vi.mock("../src/config.js", async (orig) => ({
   ...(await orig<typeof import("../src/config.js")>()),
-  loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k", ...(cfgPolicy.value ? { policy: cfgPolicy.value } : {}) }),
+  loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k", ...(cfgPolicy.value ? { policy: cfgPolicy.value } : {}), ...(cfgPolicy.engine ? { hermesEngine: cfgPolicy.engine } : {}) }),
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
 }));
@@ -35,7 +35,7 @@ const fakeHbc = (version: number) => {
 
 let cwd: string, prev: string;
 beforeEach(() => {
-  cfgPolicy.value = undefined; process.exitCode = undefined; puts.length = 0; values.clear(); blobs.clear(); exec.fn = () => {};
+  cfgPolicy.value = undefined; cfgPolicy.engine = undefined; process.exitCode = undefined; puts.length = 0; values.clear(); blobs.clear(); exec.fn = () => {};
   prev = process.cwd(); cwd = mkdtempSync(join(tmpdir(), "shipvo-pub-"));
   writeFileSync(join(cwd, "app.json"), JSON.stringify({ expo: { version: "1.0.0" } }));
   mkdirSync(join(cwd, "dist-ota/_expo/static/js/android"), { recursive: true });
@@ -79,6 +79,34 @@ describe("publish and native modules", () => {
     withBundle(96);
     await publish([...flags]);
     expect(JSON.parse(JSON.parse(values.get("p/demo/1/b0")!).body).required_native_modules).toBeUndefined();
+  });
+});
+
+const withCompiler = (v: string) => {
+  mkdirSync(join(cwd, "node_modules/hermes-compiler"), { recursive: true });
+  writeFileSync(join(cwd, "node_modules/hermes-compiler/package.json"), JSON.stringify({ name: "hermes-compiler", version: v }));
+};
+
+describe("publish and the Hermes engine check", () => {
+  it("refuses a different engine build with the same bytecode version, before any upload", async () => {
+    withBundle(98); withCompiler("250829098.0.16"); cfgPolicy.engine = "250829098.0.10";
+    await expect(publish([...flags, "--hermes-bytecode-version", "98"])).rejects.toThrow(/250829098\.0\.10.*250829098\.0\.16/);
+    expect(puts).toEqual([]);
+  });
+  it("records hermes_engine when declared and installed match", async () => {
+    withBundle(98); withCompiler("250829098.0.10"); cfgPolicy.engine = "250829098.0.10";
+    await publish([...flags]);
+    expect(JSON.parse(values.get("h/demo/r1")!).hermes_engine).toBe("250829098.0.10");
+  });
+  it("records the installed engine when nothing is declared", async () => {
+    withBundle(98); withCompiler("250829098.0.16");
+    await publish([...flags]);
+    expect(JSON.parse(values.get("h/demo/r1")!).hermes_engine).toBe("250829098.0.16");
+  });
+  it("behaves as before when there is no declaration and no compiler", async () => {
+    withBundle(98);
+    await publish([...flags]);
+    expect(JSON.parse(values.get("h/demo/r1")!).hermes_engine).toBeUndefined();
   });
 });
 

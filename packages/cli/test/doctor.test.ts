@@ -91,6 +91,27 @@ describe("shipvo doctor checks", () => {
     expect(nameOf(fail, "hermesBytecodeVersion (if present) is set").ok).toBe(false);
   });
 
+  describe("Hermes engine build", () => {
+    const setup = (engine?: string, installed?: string) => {
+      const seed = makeSeed();
+      const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed), ...(engine ? { hermesEngine: engine } : {}) }), seed);
+      if (installed) {
+        mkdirSync(join(cwd, "node_modules/hermes-compiler"), { recursive: true });
+        writeFileSync(join(cwd, "node_modules/hermes-compiler/package.json"), JSON.stringify({ version: installed }));
+      }
+      return runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch }).then((r) => r.find((c) => c.name === "Hermes engine build"));
+    };
+    it("passes on a match", async () => expect(await setup("250829098.0.10", "250829098.0.10")).toMatchObject({ ok: true, note: "250829098.0.10, matches hermesEngine" }));
+    it("fails on a mismatch and names both", async () => {
+      const c = await setup("250829098.0.10", "250829098.0.16");
+      expect(c?.ok).toBe(false);
+      expect(c?.fix).toContain("250829098.0.10");
+      expect(c?.fix).toContain("250829098.0.16");
+    });
+    it("reports the installed build when undeclared", async () => expect(await setup(undefined, "250829098.0.16")).toMatchObject({ ok: true, note: expect.stringContaining("not declared") }));
+    it("adds no row when nothing is declared or installed", async () => expect(await setup()).toBeUndefined());
+  });
+
   it("never prints seed or token values", async () => {
     const seed = makeSeed();
     const token = "shipvo-publish-token-value";
