@@ -51,7 +51,7 @@ export function renderComment(i: CommentInput): string {
     L.push("### Explore", "");
     if (!findings.length) L.push(`No findings in ${i.explore.steps} steps.`, "");
     else {
-      L.push(`- New crashes or runtime errors: ${crashes.length}`, `- Dead ends: ${deadEnds.length}`, `- Accessibility and other problems: ${other.length}`, "");
+      L.push(`- Crashes or runtime errors: ${crashes.length}`, `- Dead ends: ${deadEnds.length}`, `- Accessibility and other problems: ${other.length}`, "");
       for (const f of findings.slice(0, 10)) L.push(`- ${f.kind}: ${cell(f.message)} (screen ${cell(f.screen || "unknown")})`);
       if (findings.length > 10) L.push(`- and ${findings.length - 10} more in \`explore-report.md\``);
       L.push("");
@@ -106,8 +106,9 @@ export async function commentCmd(argv: string[]): Promise<number> {
   const body = renderComment({ test: readJson("shipvo-report.json"), explore: readJson("explore-report.json"), changed, screenshots: shots,
     runUrl: env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : undefined });
   const pr = Number(val("--pr") ?? /refs\/pull\/(\d+)\//.exec(env.GITHUB_REF ?? "")?.[1]);
-  if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY || !pr) { console.log(body); console.error("Not posted: needs GITHUB_TOKEN, GITHUB_REPOSITORY and a pull request number."); return 0; }
-  try { console.log(`Comment ${await upsertComment({ repo: env.GITHUB_REPOSITORY, pr, token: env.GITHUB_TOKEN, body })}.`); }
+  const missing = [!env.GITHUB_TOKEN && "GITHUB_TOKEN", !env.GITHUB_REPOSITORY && "GITHUB_REPOSITORY", !pr && "a pull request number"].filter(Boolean);
+  if (missing.length) { console.log(body); console.error(`Not posted: missing ${missing.join(", ")}.`); return 0; }
+  try { console.log(`Comment ${await upsertComment({ repo: env.GITHUB_REPOSITORY!, pr, token: env.GITHUB_TOKEN!, body })}.`); }
   catch (e) { console.error(`Not posted: ${e instanceof Error ? e.message : e}`); }
   return 0;
 }

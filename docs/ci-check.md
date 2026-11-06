@@ -39,7 +39,7 @@ On each pull request the check posts one comment and updates it on every push. I
 The comment shows:
 
 - pass or fail for each flow;
-- new crashes or runtime errors, dead ends and other problems from `shipvo explore`;
+- crashes or runtime errors, dead ends and other problems from `shipvo explore`;
 - the screens your diff changed (up to four), picked from files under `app/` or `screens/` since the base commit (`--changed-from <sha>`).
 
 Screenshots, when there are any, are uploaded in the `shipvo-check` artifact of your own workflow run. Open the run, scroll to Artifacts and download the zip. Nothing in Shipvo takes per-screen screenshots in CI yet, so the screen list shows even when there are none. The comment is built and posted by your workflow with its `GITHUB_TOKEN`. Nothing is sent to Shipvo. The workflow needs `pull-requests: write` for the comment; without it the check still runs and the comment is skipped.

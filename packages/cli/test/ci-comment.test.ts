@@ -26,7 +26,7 @@ describe("renderComment", () => {
       changed: ["cart"], screenshots: ["a.png", "b.png", "c.png", "d.png", "e.png"], runUrl: "https://github.com/o/r/actions/runs/1",
     });
     expect(c).toContain("Shipvo check: failed");
-    expect(c).toContain("New crashes or runtime errors: 1");
+    expect(c).toContain("Crashes or runtime errors: 1");
     expect(c).toContain("Dead ends: 1");
     expect(c).toContain("4 screenshots saved");
     expect(c).not.toContain("e.png");
@@ -54,6 +54,18 @@ describe("commentCmd", () => {
     const log = console.log, err = console.error;
     console.log = (m: string) => { out.push(String(m)); }; console.error = () => {};
     try { expect(await commentCmd(["--pr", "3"])).toBe(0); } finally { console.log = log; console.error = err; process.env = saved; }
+    expect(out.join("\n")).toContain(MARKER);
+  });
+
+  it("names the missing values and still renders when the diff cannot be read", async () => {
+    const saved = { ...process.env };
+    delete process.env.GITHUB_TOKEN; delete process.env.GITHUB_REPOSITORY;
+    const out: string[] = [], errs: string[] = [];
+    const log = console.log, err = console.error;
+    console.log = (m: string) => { out.push(String(m)); }; console.error = (m: string) => { errs.push(String(m)); };
+    try { expect(await commentCmd(["--changed-from", "0000000000000000000000000000000000000000"])).toBe(0); } finally { console.log = log; console.error = err; process.env = saved; }
+    expect(errs.join("\n")).toContain("could not read the diff");
+    expect(errs.join("\n")).toContain("missing GITHUB_TOKEN, GITHUB_REPOSITORY");
     expect(out.join("\n")).toContain(MARKER);
   });
 });
