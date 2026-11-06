@@ -22,6 +22,8 @@ All of these must hold:
 
 `min_reports` and `min_installs` are set per app. `PUT /app/<id>/api/halt-config` accepts `min_reports` and `min_installs` (integers, 1 to 10000). Each install is one vote, so a halt needs at least as many installs as the larger of `min_reports` and `min_installs`. If a PUT leaves out `min_installs`, the stored value is kept. `GET` and the status summary return `min_installs`. Deployments with no salt secret store no `net_hash`, so the 3-network rule cannot pass and they will not auto-halt.
 
+The Tide and Tackle sample app signs its reports. If it cannot register, it sends them unsigned, and they count as unverified.
+
 ## What does not count
 
 - Unsigned reports, and reports with a bad signature or from an unknown install.

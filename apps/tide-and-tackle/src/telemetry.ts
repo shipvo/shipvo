@@ -1,4 +1,4 @@
-import type { TelemetryCrypto, TelemetryStorage } from "@shipvo/runtime";
+import type { InstallIdentity, TelemetryCrypto, TelemetryStorage } from "@shipvo/runtime";
 
 /**
  * Adapters for signed telemetry on React Native.
@@ -90,3 +90,39 @@ export function createTelemetryStorage(backend?: StorageBackend): TelemetryStora
 export const rnStorage: TelemetryStorage = createTelemetryStorage();
 
 export const telemetryDeps = { storage: rnStorage, crypto: rnCrypto };
+
+/** The two `@shipvo/runtime` functions used here. App.tsx passes them in; tests run without React Native. */
+export type RuntimeIdentity = {
+  ensureInstallIdentity(storage: TelemetryStorage, crypto: TelemetryCrypto, registerUrl: string): Promise<InstallIdentity | null>;
+  signReport(identity: InstallIdentity, body: string, crypto?: TelemetryCrypto): Promise<{ install_id: string; sig: string }>;
+};
+
+const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+
+/**
+ * Turn a report into the string to send. With an identity, add `install_id` and a `sig` the control plane accepts.
+ * The control plane signs with SHA-256 of the install key (hex), so the secret is derived the same way here.
+ * Without an identity, or if signing fails, return the plain body: the report counts as unverified.
+ */
+export async function signBody(runtime: RuntimeIdentity, identity: InstallIdentity | null, body: Record<string, unknown>, crypto: TelemetryCrypto = rnCrypto): Promise<string> {
+  if (!identity) return JSON.stringify(body);
+  try {
+    const signed = JSON.stringify({ ...body, install_id: identity.install_id });
+    const secret = { install_id: identity.install_id, key: hex(sha256(new TextEncoder().encode(identity.key))) };
+    const { sig } = await runtime.signReport(secret, signed, crypto);
+    return `${signed.slice(0, -1)},"sig":"${sig}"}`;
+  } catch {
+    return JSON.stringify(body);
+  }
+}
+
+/**
+ * Make the function the app uses for every `/t` report. The first call registers the install at `${baseUrl}/t/register`
+ * once; later calls reuse the identity. If registering fails the report goes out unsigned and the next report tries again.
+ */
+export function createReportSigner(runtime: RuntimeIdentity, deps: { storage: TelemetryStorage; crypto: TelemetryCrypto } = telemetryDeps) {
+  let pending: Promise<InstallIdentity | null> | null = null;
+  const identity = (baseUrl: string) => (pending ??= runtime.ensureInstallIdentity(deps.storage, deps.crypto, `${baseUrl}/t/register`).then(
+    (id) => { if (!id) pending = null; return id; }, () => { pending = null; return null; }));
+  return async (baseUrl: string, body: Record<string, unknown>) => signBody(runtime, await identity(baseUrl), body, deps.crypto);
+}
