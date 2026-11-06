@@ -46,6 +46,15 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
 
+## Driving the live phone
+
+When `shipvo run` is up for your app, `open_app` attaches to that phone and the person watching sees what the agent does:
+
+- a dot at each tap point, an outline around the target, and an "Agent is driving" banner;
+- a step log in plain words, such as `Tapped button "Add to cart"`. Events from the simulated device are marked "(simulated)".
+
+The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on.
+
 ## What the tree shows (and hides), on purpose
 
 - **Rails show only what is on screen.** A horizontal list exposes its visible items; the agent swipes (`scroll right` with the rail's ref) to see more, as on a phone.

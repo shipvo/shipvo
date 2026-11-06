@@ -44,7 +44,11 @@ export function connectDriver(info: RunInfo, ms = 3000): Promise<Driver> {
         if (d.closed) return res({ ok: false, code: "attach_closed", error: "the shipvo run phone is gone: call open_app again" });
         const id = next++;
         const t = setTimeout(() => { pending.delete(id); res({ ok: false, code: "sim_timeout", error: `the live phone did not answer "${type}" within ${limit} ms. The action may still have run: call screen to see where it is.` }); }, limit);
-        pending.set(id, (m) => { clearTimeout(t); res(m); });
+        pending.set(id, (m) => {
+          clearTimeout(t);
+          // The person using the phone paused the agent. Say what to do instead of retrying.
+          res(m.code === "taken_over" ? { ...m, ok: false, error: "the person took over: they are using the live phone now. Stop acting and ask them to press Hand back, then call screen to see where the app is." } : m);
+        });
         ws.send(JSON.stringify({ ...args, id, type } satisfies DriverMessage));
       }),
     };

@@ -181,6 +181,7 @@ function bridgeMain(win: any, token: string) {
 
   function tap(el: any, ref: unknown) {
     const { x, y, target } = ready(el, ref);
+    mark(x, y, el);
     const w = el.ownerDocument.defaultView;
     const init = { bubbles: true, cancelable: true, composed: true, view: w, clientX: x, clientY: y, button: 0, pointerId: 1, pointerType: "mouse", isPrimary: true };
     const fire = (Ctor: any, type: string, buttons: number) => target.dispatchEvent(new Ctor(type, { ...init, buttons }));
@@ -228,6 +229,66 @@ function bridgeMain(win: any, token: string) {
     throw new Error("no Back button on this screen");
   }
 
+  // The person can see and stop the agent (slice 4 of #448). Overlay elements live in the frame page, outside the app iframe.
+  let seenAgent = false, taken = false, hideTimer: any;
+  const css = doc.createElement("style");
+  css.textContent = "#shipvo-agent{position:fixed;left:50%;top:40px;transform:translateX(-50%);z-index:2147483000;display:none;align-items:center;gap:8px;padding:4px 12px;border-radius:14px;background:#4f46e5;color:#fff;font:12px system-ui,sans-serif}" +
+    "#shipvo-agent.paused{background:#b45309}#shipvo-agent button{border:0;border-radius:10px;padding:2px 10px;font:inherit;cursor:pointer;display:none}#shipvo-agent.paused button{display:inline-block}" +
+    "#shipvo-dot{position:fixed;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#4f46e5aa;border:2px solid #fff;box-shadow:0 0 0 2px #4f46e5;pointer-events:none;z-index:2147483000;display:none}" +
+    "#shipvo-outline{position:fixed;border:2px solid #4f46e5;border-radius:4px;pointer-events:none;z-index:2147483000;display:none}" +
+    "#shipvo-log{position:fixed;right:12px;bottom:12px;width:240px;max-height:40%;overflow:auto;margin:0;padding:8px 8px 8px 26px;border-radius:8px;background:#111d;color:#fff;font:12px system-ui,sans-serif;z-index:2147483000;display:none}#shipvo-log li{margin:2px 0}";
+  doc.head.appendChild(css);
+  const make = (tag: string, id: string) => { const e = doc.createElement(tag); e.id = id; doc.body.appendChild(e); return e; };
+  const banner = make("div", "shipvo-agent");
+  banner.setAttribute("role", "status");
+  const bannerText = doc.createElement("span"); banner.appendChild(bannerText);
+  const handBack = doc.createElement("button"); handBack.type = "button"; handBack.textContent = "Hand back"; banner.appendChild(handBack);
+  const dot = make("div", "shipvo-dot"), outline = make("div", "shipvo-outline"), log = make("ol", "shipvo-log");
+  log.setAttribute("aria-label", "Agent steps");
+  const showBanner = () => {
+    banner.style.display = "flex"; banner.classList.toggle("paused", taken);
+    bannerText.textContent = taken ? "You took over. The agent is paused." : "Agent is driving";
+  };
+  const step = (text: string, simulated = false) => {
+    const li = doc.createElement("li"); li.textContent = text + (simulated ? " (simulated)" : "");
+    if (simulated) li.setAttribute("data-simulated", "true");
+    log.appendChild(li); log.style.display = "block"; log.scrollTop = log.scrollHeight;
+    while (log.children.length > 50) log.removeChild(log.firstChild!);
+  };
+  /** Where the scaled app iframe is on the frame page. */
+  const toPage = () => { const f = doc.getElementById("app"); const r = f.getBoundingClientRect(); const k = f.offsetWidth ? r.width / f.offsetWidth : 1; return { left: r.left, top: r.top, k }; };
+  function mark(x: number, y: number, el: any) {
+    const o = toPage(), b = el.getBoundingClientRect();
+    dot.style.left = o.left + x * o.k + "px"; dot.style.top = o.top + y * o.k + "px"; dot.style.display = "block";
+    Object.assign(outline.style, { left: o.left + b.left * o.k + "px", top: o.top + b.top * o.k + "px", width: b.width * o.k + "px", height: b.height * o.k + "px", display: "block" });
+    win.clearTimeout(hideTimer);
+    hideTimer = win.setTimeout(() => { dot.style.display = "none"; outline.style.display = "none"; }, 1500);
+  }
+  /** Plain words for a step that worked. Taken before the action runs, so the name is the one the agent saw. */
+  const describe = (m: any): string => {
+    const target = () => { try { const e = byRef.get(String(m.ref))?.el; if (!e) return "an element"; const r = roleOf(e); const n = r ? nameOf(e, r).name : norm(e.textContent); return (r || "element") + (n ? " " + quote(n) : ""); } catch { return "an element"; } };
+    if (m.type === "tap") return "Tapped " + target();
+    if (m.type === "type") return "Typed " + quote(String(m.text ?? "")) + " into " + target() + (m.enter ? " and pressed Enter" : "");
+    if (m.type === "scroll") return "Scrolled " + m.direction + (m.ref ? " in " + target() : "");
+    return "Pressed Back";
+  };
+  function takeOver(e: any) {
+    if (!e.isTrusted || taken || !seenAgent) return;
+    if (e.target && e.target.closest && e.target.closest("#shipvo-agent")) return;
+    taken = true; showBanner(); step("You took over. The agent is paused.");
+  }
+  handBack.onclick = () => { taken = false; showBanner(); step("You handed back. The agent can continue."); };
+  const watch = (d: any) => { if (!d) return; for (const t of ["pointerdown", "touchstart", "keydown"]) d.addEventListener(t, takeOver, true); };
+  watch(doc);
+  const frameEl = doc.getElementById("app");
+  const watchApp = () => { try { watch(frameEl.contentDocument); } catch {} };
+  frameEl.addEventListener("load", watchApp); watchApp();
+  // Device events from the simulated phone are not the app's own: the log marks them.
+  win.addEventListener("message", (e: any) => {
+    const d = e.data;
+    if (d && d.type === "shipvo:system-sheet" && seenAgent) step(d.open !== false ? "System permission sheet opened" : "System permission sheet closed", true);
+  });
+
   const sleep = (ms: number) => new Promise((r) => win.setTimeout(r, ms));
   /** Give the app a moment to react, and wait for a page load a tap started. */
   async function settle() {
@@ -253,10 +314,14 @@ function bridgeMain(win: any, token: string) {
   ws.onmessage = (e: any) => {
     let m: any; try { m = JSON.parse(String(e.data)); } catch { return; }
     if (!m || typeof m.id !== "number") return;
+    // Reading the screen changes nothing, so it neither counts as the agent arriving nor is blocked by a take-over.
+    if (m.type !== "tree") seenAgent = true;
+    if (taken && m.type !== "tree") { ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, code: "taken_over", error: "the person took over" })); return; }
+    const words = /^(tap|type|scroll|back)$/.test(m.type) ? (showBanner(), describe(m)) : "";
     try {
       if (m.type === "tree") ws.send(JSON.stringify({ id: m.id, type: "tree", ok: true, tree: tree() }));
       else if (/^(tap|type|scroll|back)$/.test(m.type)) {
-        act(m).then((r) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r })),
+        act(m).then((r) => { step(words); return r; }).then((r) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r })),
           (err: any) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, ...(err && err.code ? { code: err.code } : {}), error: String(err && err.message || err), screen: screenOrUndefined() })));
       }
       else ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: "unknown request: " + m.type }));
