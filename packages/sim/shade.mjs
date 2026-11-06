@@ -90,7 +90,7 @@ export function describePanel(platform, panel, device, list, now = Date.now()) {
 /** Markup for the panels. Hidden until the page opens one. */
 export function shadeHtml(platform = "android") {
   const ios = platform === "ios";
-  const panel = (part, label, inner) => `<div class="sf-panel" data-part="${part}" role="dialog" aria-label="${label}" hidden>${inner}</div>`;
+  const panel = (part, label, inner) => `<div class="sf-panel" data-part="${part}" role="dialog" aria-label="${label}" tabindex="-1" hidden>${inner}<button type="button" class="sf-close" data-part="close">Close</button></div>`;
   const list = `<div class="sf-notes" data-part="notification-list"></div><button type="button" class="sf-clear" data-part="clear-all">Clear all</button>`;
   return `<div class="sf-grab" data-part="top-edge" aria-hidden="true"></div>`
     + (ios ? panel("notification-center", "Notification Center", list) + panel("control-center", "Control Center", `<div class="sf-tiles" data-part="tiles"></div>`)
@@ -98,12 +98,12 @@ export function shadeHtml(platform = "android") {
 }
 
 export const shadeCss = [
-  `.sf-grab{position:absolute;left:0;right:0;top:0;height:18px;z-index:4}`,
+  `.sf-grab{position:absolute;left:0;right:0;top:0;height:18px;z-index:7}`,
   `.sf-panel{position:absolute;inset:0;z-index:6;overflow:auto;padding:48px 14px 14px;background:#1b1e23f2;color:#fff;font:14px system-ui,sans-serif}.sf-panel[hidden]{display:none}`,
   `.sf-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}`,
   `.sf-tile{padding:10px 4px;border:0;border-radius:14px;background:#3a3d42;color:#fff;font:600 11px system-ui,sans-serif}.sf-tile[aria-pressed="true"]{background:#4da3ff;color:#001}`,
   `.sf-note{display:block;width:100%;margin:6px 0;padding:10px 12px;border:0;border-radius:14px;background:#2c3036;color:#fff;text-align:left;font:13px system-ui,sans-serif}.sf-note b{display:block}.sf-note small{opacity:.7}.sf-group{margin:10px 0 0;font-weight:700;opacity:.8}`,
-  `.sf-clear{margin-top:8px;padding:8px 16px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff}`,
+  `.sf-clear,.sf-close{margin-top:8px;padding:8px 16px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff}`,
 ].join("\n");
 
 /** Browser script for the frame page: pulls down from the top open a panel; tiles and notifications act on the app's `__pnDevice`. Expects the markup from shadeHtml. */
@@ -119,19 +119,20 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;
 function draw(){var d=dev(),el=open==="none"?null:q(partOf(open));if(!el||!d)return;
 var t=q("tiles");if(t&&el.contains(t)){t.innerHTML=tileStates(P,d.settings(),open!=="shade").map(function(x){return '<button type="button" class="sf-tile" data-tile="'+x.id+'" aria-pressed="'+x.on+'">'+esc(x.label)+(x.slider?' '+x.value+'%':'')+'</button>'}).join("")}
 var l=q("notification-list");if(l&&el.contains(l)){var ns=d.notifications(),h="";(P==="ios"?groupByApp(ns):[{app:null,items:ns.slice().reverse()}]).forEach(function(g){if(g.app)h+='<p class="sf-group">'+esc(g.app)+'</p>';g.items.forEach(function(n){h+='<button type="button" class="sf-note" data-note="'+esc(n.id)+'"><b>'+esc(n.title)+'</b>'+esc(n.body)+' <small>'+ago(n.at)+'</small></button>'})});l.innerHTML=h||'<p>No notifications</p>'}}
-function show(o){open=o;["notification-shade","notification-center","control-center"].forEach(function(p){var e=q(p);if(e)e.hidden=true});if(o!=="none"){var e=q(partOf(o));if(e){e.hidden=false;draw();e.focus&&e.focus()}}}
+var back=null;
+function show(o){var was=open;if(was==="none"&&o!=="none")back=document.activeElement;open=o;["notification-shade","notification-center","control-center"].forEach(function(p){var e=q(p);if(e)e.hidden=true});if(o!=="none"){var e=q(partOf(o));if(e){e.hidden=false;draw();e.focus&&e.focus({preventScroll:true})}}else if(was!=="none"&&back){var b=back;back=null;b.focus&&b.focus({preventScroll:true})}}
 function pull(x){var e=r.getBoundingClientRect();show(panelFor(P,x,e.width,open))}
-var sy=null,sx=0;edge.addEventListener("pointerdown",function(e){sy=e.clientY;sx=e.clientX-r.getBoundingClientRect().left});
+var sy=null,sx=0;edge.addEventListener("mousedown",function(e){e.preventDefault()});edge.addEventListener("pointerdown",function(e){try{edge.setPointerCapture(e.pointerId)}catch(x){}sy=e.clientY;sx=e.clientX-r.getBoundingClientRect().left});
 document.addEventListener("pointerup",function(e){if(sy!=null&&e.clientY-sy>40)pull(sx);sy=null});
-r.addEventListener("keydown",function(e){if(e.key==="Escape"&&open!=="none")show("none")});
-var closeY=null;r.addEventListener("pointerdown",function(e){if(open!=="none"&&!e.target.closest(".sf-tile,.sf-note,.sf-clear"))closeY=e.clientY});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&open!=="none")show("none")});
+var closeY=null;r.addEventListener("pointerdown",function(e){if(open!=="none"&&!e.target.closest(".sf-tile,.sf-note,.sf-clear,.sf-close"))closeY=e.clientY});
 document.addEventListener("pointerup",function(e){if(closeY!=null&&closeY-e.clientY>60)show("none");closeY=null});
-r.addEventListener("click",function(e){var d=dev();if(!d)return;var tl=e.target.closest(".sf-tile");
+r.addEventListener("click",function(e){if(swiped){swiped=false;return}if(e.target.closest(".sf-close")){show("none");return}var d=dev();if(!d)return;var tl=e.target.closest(".sf-tile");
 if(tl){var id=tl.getAttribute("data-tile");try{d.set(tilePatch(P,id,d.settings(),undefined))}catch(x){}draw();return}
 if(e.target.closest(".sf-clear")){d.clearAll();draw();return}
 var nb=e.target.closest(".sf-note");if(nb){var nid=nb.getAttribute("data-note");show("none");d.openNotification(nid)}});
-var sw=null;r.addEventListener("pointerdown",function(e){var n=e.target.closest&&e.target.closest(".sf-note");sw=n?{n:n,x:e.clientX}:null});
-document.addEventListener("pointerup",function(e){if(sw&&Math.abs(e.clientX-sw.x)>80){var d=dev();if(d){d.dismiss(sw.n.getAttribute("data-note"));draw()}}sw=null});
+var sw=null,swiped=false;r.addEventListener("pointerdown",function(e){var n=e.target.closest&&e.target.closest(".sf-note");sw=n?{n:n,x:e.clientX}:null});
+document.addEventListener("pointerup",function(e){if(sw&&Math.abs(e.clientX-sw.x)>80){var d=dev();if(d){d.dismiss(sw.n.getAttribute("data-note"));draw();swiped=true;setTimeout(function(){swiped=false},100)}}sw=null});
 var f=document.getElementById(${JSON.stringify(iframeId)});function wire(){var w=f&&f.contentWindow;if(w&&!w.__shipvoShadeHooked){w.__shipvoShadeHooked=true;w.addEventListener("pn:settings",draw);w.addEventListener("pn:status",draw)}}
 if(f){f.addEventListener("load",wire);wire()}
 setInterval(function(){if(open!=="none"&&!document.hidden)draw()},1000);

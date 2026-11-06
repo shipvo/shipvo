@@ -52,6 +52,7 @@ test("toggle_tile changes the device and the colour scheme; hidden tiles fail", 
   const r = await shadeAction(page, shade, { action: "open_notifications" }); assert.equal(r.panel, "shade"); assert.equal(r.tiles.length, 4);
   await assert.rejects(shadeAction(page, shade, { action: "toggle_tile", tile: "dark_mode" }), { code: "tile_not_visible" });
   assert.equal((await shadeAction(page, shade, { action: "open_notifications" })).panel, "shade-expanded");
+  assert.equal((await shadeAction(page, shade, { action: "open_notifications" })).panel, "shade-expanded", "a repeat call stays expanded");
   await shadeAction(page, shade, { action: "toggle_tile", tile: "dark_mode" });
   assert.equal(page.st.darkMode, true); assert.deepEqual(page.media.at(-1), { colorScheme: "dark" });
   await shadeAction(page, shade, { action: "toggle_tile", tile: "wifi" }); assert.equal(page.st.wifi, false);
@@ -68,4 +69,7 @@ test("iPhone Control Center tiles and Notification Center dismiss", async () => 
   await shadeAction(page, shade, { action: "toggle_tile", tile: "airplane" }); assert.equal(page.st.airplane, true);
   await assert.rejects(shadeAction(page, shade, { action: "dismiss_notification" }), { code: "panel_closed" });
   assert.ok(new ShadeError("x", "y") instanceof Error);
+});
+test("the frame markup gives each panel tabindex and a Close button", () => {
+  for (const skin of ["android", "ios"]) { const h = shadeHtml(skin); const n = (h.match(/class="sf-panel"/g) || []).length; assert.equal((h.match(/tabindex="-1"/g) || []).length, n); assert.equal((h.match(/data-part="close"/g) || []).length, n); }
 });

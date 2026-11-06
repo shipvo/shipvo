@@ -190,11 +190,12 @@ async function act(id, body) {
   switch (body.action) {
     // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
     case "lock": case "unlock": {
+      if (body.action === "lock") s.shade.open = "none";
       try { (body.action === "lock" ? lock : unlock)(s.life); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
       return { locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
     }
     case "restart": {
-      restart(s.life);
+      restart(s.life); s.shade.open = "none";
       await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
       return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
     }
@@ -292,7 +293,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
+    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await applyScheme(page, !!body.device?.darkMode); s.shade.open = "none"; break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.

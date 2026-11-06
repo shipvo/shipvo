@@ -19,7 +19,7 @@ export async function shadeAction(page, shade, body) {
   switch (body.action) {
     case "open_notifications": {
       // Android: the first pull shows quick-settings tiles and notifications, the second expands all tiles. iPhone: Notification Center.
-      shade.open = info.platform === "ios" ? "notifications" : (shade.open === "shade" || body.expand) ? "shade-expanded" : "shade";
+      shade.open = info.platform === "ios" ? "notifications" : (shade.open === "shade" || shade.open === "shade-expanded" || body.expand) ? "shade-expanded" : "shade";
       return view(info, shade);
     }
     case "open_control_center": {
