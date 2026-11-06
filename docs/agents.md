@@ -130,11 +130,12 @@ The `waitFor(/\S/)` lines only wait for the screen to have some text. Replace ea
 
 ## Walk an app with `shipvo explore`
 
-`shipvo explore` is a walker with no LLM inside. It starts the simulator on your app, opens the start screen and each deep link in `routes` in `shipvo.json`, and taps every actionable element once, going back after each. It stops at `--max-steps` (default 100) and `--max-depth` (default 3) and says so in the report.
+`shipvo explore` is a walker with no LLM inside. It starts the simulator on your app, opens the start screen and each deep link in `routes` in `shipvo.json`, and walks the app. It picks the next screen to explore by how little it has been seen (an upper confidence bound), so new screens come first. It taps buttons whose labels end a session or destroy data, such as "Log out" or "Delete", last. It types sample text into text fields and submits them. It stops at `--max-steps` (default 100) and `--max-depth` (default 3) and says so in the report.
 
 ```bash
 shipvo explore --max-steps 100 --max-depth 3
 shipvo explore --sim http://localhost:4545   # use a simulator that is already running
+shipvo explore --seed 1                     # the same seed repeats the same run
 shipvo explore --skin ios                   # small-target minimum 44 instead of 48
 shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
 shipvo explore --issues-dir issues           # one ready-to-file issue per finding
@@ -142,14 +143,17 @@ shipvo explore --issues-dir issues           # one ready-to-file issue per findi
 
 With `--issues-dir <dir>`, it also writes one Markdown file per distinct finding, `<n>-<kind>.md`. The first line is the title (`explore: <kind> on <screen>`), then the message, the numbered steps, the platform skin and the simulator limits. It does not call GitHub. It prints one `gh issue create --title ... --body-file ...` line per file for you or your agent to run. With no findings it writes nothing and says so.
 
-It writes `explore-report.md` and `explore-report.json`. The report has six kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `back`):
+It writes `explore-report.md` and `explore-report.json`. The report has nine kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `type`, `back`):
 
 - an uncaught error or a red screen;
 - a tap that was `not_delivered`;
 - a dead end: a screen with no actionable element;
 - an actionable element with no accessible name (`unnamed`);
 - `small_target`: an actionable element rendered under the minimum tap size, 44 x 44 for iOS (Apple HIG) and 48 x 48 for Android. The simulator is an Android phone, so the default is 48; pass `--skin ios` for 44;
-- `duplicate_name`: two or more actionable elements on one screen with the same role and name, which a screen reader cannot tell apart.
+- `duplicate_name`: two or more actionable elements on one screen with the same role and name, which a screen reader cannot tell apart;
+- `network_failed`: the app threw a network error, or the screen shows text such as "Network request failed";
+- `stuck_loading`: the screen still shows a loading indicator (progress bar or spinner) after the walker looks again twice;
+- `blank_screen`: nothing is drawn on the screen, no names and no text.
 
 The header lists what the simulator cannot show. A clean run says "No findings in N steps", never that a screen is fine. Exit code 1 also means the walk itself failed (for example the simulator could not start or a step failed). If it fails mid-walk, the report is still written with the findings so far and `stoppedEarly` says why; the error is also printed to stderr. If it fails before the walk starts, no report is written.
 
