@@ -1,7 +1,7 @@
 import type { ShipvoCapacitor } from "./engine.js";
 import type { BundleFiles, KeyValueStore } from "./types.js";
 
-/** The methods the Android plugin (`android/`, plugin name `Shipvo`) exposes through the Capacitor bridge. Binary data travels as base64. */
+/** The methods the native plugin (`android/` and `ios/`, plugin name `Shipvo`) exposes through the Capacitor bridge. Binary data travels as base64. */
 export interface ShipvoNativePlugin {
   kvGet(o: { key: string }): Promise<{ value?: string }>;
   kvSet(o: { key: string; value: string }): Promise<void>;
@@ -19,14 +19,14 @@ export interface ShipvoNativePlugin {
 const toB64 = (u: Uint8Array) => { let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
 const fromB64 = (b: string) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
 
-/** `KeyValueStore` backed by the native plugin (SharedPreferences on Android). */
+/** `KeyValueStore` backed by the native plugin (SharedPreferences on Android, UserDefaults on iOS). */
 export class NativeStore implements KeyValueStore {
   constructor(private n: ShipvoNativePlugin) {}
   async get(key: string) { return (await this.n.kvGet({ key })).value; }
   async set(key: string, value: string) { await this.n.kvSet({ key, value }); }
 }
 
-/** `BundleFiles` backed by the native plugin (the app-private files directory on Android). */
+/** `BundleFiles` backed by the native plugin (the app-private files directory on Android, Application Support on iOS). */
 export class NativeFiles implements BundleFiles {
   constructor(private n: ShipvoNativePlugin) {}
   async write(name: string, bytes: Uint8Array) { await this.n.fileWrite({ name, data: toB64(bytes) }); }

@@ -7,7 +7,7 @@ The core is TypeScript and makes every decision: it verifies the signature and t
 | Platform | Native layer |
 |---|---|
 | Android | `android/`: stores the verified bundle zip in app-private files and the state in SharedPreferences; switches the web view with `Bridge.setServerBasePath` to the unpacked bundle |
-| iOS | Next slice, tracked in its own issue. It will use the same JavaScript core and the same `boot` and `bootAndServe` calls as Android. |
+| iOS | `ios/` and `Package.swift`: stores the verified bundle zip in Application Support and the state in UserDefaults; switches the web view with `setServerBasePath` to the unpacked bundle. Same JavaScript core, same `boot` and `bootAndServe` calls as Android. |
 
 ## Android
 
@@ -36,6 +36,17 @@ await shipvo.markHealthy();
 Each launch starts on the embedded bundle, then `bootAndServe` switches to the pending or current release. The page of a served bundle runs the same code; it resumes the release `boot()` already chose and does not count another trial boot.
 
 Tests: `pnpm --filter @shipvo/capacitor test` runs the stage, apply, crash and rollback sequence through the native bridge. The plugin's JVM tests run with `./gradlew :shipvo-capacitor:testDebugUnitTest` in `apps/capacitor-sample/android` (after `pnpm --filter capacitor-sample sync`).
+
+## iOS
+
+`ios/` is a Capacitor plugin named `Shipvo`, shipped as a Swift package (`Package.swift`, product `ShipvoCapacitor`). It backs `KeyValueStore` with UserDefaults and `BundleFiles` with the app's Application Support directory, and points the web view at the staged bundle. The zip reader, the DEFLATE decoder and the SHA-256 fallback are plain Swift, so the plugin adds no dependency besides Capacitor.
+
+1. Install the package. `npx cap sync ios` adds the Swift package to your app.
+2. Call `bootAndServe` when the page loads, exactly as on Android. Use `platform: "ios"` in the `ShipvoCapacitor` options (the sample app passes `Capacitor.getPlatform()`).
+
+Native re-checks the sha-256 the core verified before it unpacks, refuses zip entries that leave the directory, and caps the unpacked size. The Android and iOS stores accept and refuse the same file names and hashes: both follow `test/vectors/bundle-store.json`, and `pnpm --filter @shipvo/capacitor test` checks both sources against it.
+
+Tests: the core's apply, refuse and crash-loop rollback sequences run for `platform: "ios"` in `pnpm --filter @shipvo/capacitor test`. The Swift store tests run with `swift test` in `packages/capacitor`.
 
 ## Install
 

@@ -1,0 +1,2 @@
+- `@shipvo/capacitor`: iOS native layer (Swift package `ShipvoCapacitor`) stores a signed web bundle, checks its sha-256 again before it unpacks, applies it on next launch and rolls back after a crash loop, the same as Android. The sample app now runs updates on Android and iOS.
+- Migration: none; Android code is unchanged. iOS apps run `npx cap sync ios` after updating.

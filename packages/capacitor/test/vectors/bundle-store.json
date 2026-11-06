@@ -1,0 +1,10 @@
+{
+  "note": "Shared by the Android and iOS bundle stores (BundleStore.java, BundleStore.swift). Both must accept and refuse exactly these.",
+  "namePattern": "[A-Za-z0-9._-]{1,128}",
+  "goodNames": ["release-2.bundle", "a", "A_b-c.1"],
+  "badNames": ["../x", "a/b", "", "..", "a..b", "a b", "a\\b"],
+  "sha256": [
+    { "text": "", "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
+    { "text": "abc", "hex": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" }
+  ]
+}

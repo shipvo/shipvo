@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { ShipvoCapacitor, NativeFiles, NativeStore, bootAndServe, sha256Hex, MAX_BOOTS } from "../src/index.js";
 import type { ShipvoNativePlugin } from "../src/index.js";
@@ -33,18 +34,19 @@ beforeAll(async () => {
   pub = b64(new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey)));
 });
 
-async function server(release: number) {
+async function server(release: number, platform: "android" | "ios" = "android", badSig = false) {
   const bytes = enc.encode(`zip of release ${release}`);
   const body = JSON.stringify({
-    schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b2", kind: "web", release, issued_at: "2026-11-05T00:00:00Z",
+    schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b2", kind: "web", ...(platform === "ios" ? { platform } : {}), release, issued_at: "2026-11-05T00:00:00Z",
     core: { version: "1.0.0", sha256: await sha256Hex(bytes), size: bytes.byteLength, url: `/b/${release}` }, min_shell_version: "1.0.0",
   });
   const sig = b64(new Uint8Array(await crypto.subtle.sign("Ed25519", pair.privateKey, enc.encode(body))));
-  return (async (url: string) => String(url).includes("/p/") ? Response.json({ body, signature: sig }) : new Response(bytes)) as unknown as typeof fetch;
+  const signature = badSig ? b64(new Uint8Array(64)) : sig;
+  return (async (url: string) => String(url).includes("/p/") ? Response.json({ body, signature }) : new Response(bytes)) as unknown as typeof fetch;
 }
 
-const core = (n: FakeNative, f: typeof fetch, now: () => number) => new ShipvoCapacitor({
-  appId: "tide", shellMajor: 1, shellVersion: "1.0.0", platform: "android", publicKey: pub, baseUrl: "https://cp.test",
+const core = (n: FakeNative, f: typeof fetch, now: () => number, platform: "android" | "ios" = "android") => new ShipvoCapacitor({
+  appId: "tide", shellMajor: 1, shellVersion: "1.0.0", platform, publicKey: pub, baseUrl: "https://cp.test",
   store: new NativeStore(n), files: new NativeFiles(n), fetch: f, random: () => 0.5, now,
 });
 
@@ -78,6 +80,36 @@ describe("native bridge", () => {
     const st = await sc.getState();
     expect(st).toMatchObject({ currentRelease: 1, pendingRelease: 0, blockedRelease: 2 });
     expect((await sc.consumeEvents()).events).toContain("crash_loop_revert");
+  });
+
+  it("iOS: applies a signed bundle, then rolls back after a crash loop", async () => {
+    const n = new FakeNative(); let t = 2_000_000; const now = () => t;
+    let sc = core(n, await server(1, "ios"), now, "ios");
+    await bootAndServe(sc, n);
+    expect((await sc.checkForUpdate({ apply: true })).status).toBe("staged");
+    n.restart(); sc = core(n, await server(1, "ios"), now, "ios");
+    expect(await bootAndServe(sc, n)).toEqual({ release: 1, served: true });
+    sc = core(n, await server(1, "ios"), now, "ios");
+    await bootAndServe(sc, n); await sc.markHealthy();
+    sc = core(n, await server(2, "ios"), now, "ios");
+    expect((await sc.checkForUpdate({ apply: true })).release).toBe(2);
+    for (let i = 0; i < MAX_BOOTS; i++) {
+      n.restart(); t += 1000; sc = core(n, await server(2, "ios"), now, "ios");
+      expect(await bootAndServe(sc, n)).toEqual({ release: 2, served: true });
+    }
+    n.restart(); sc = core(n, await server(2, "ios"), now, "ios");
+    expect(await bootAndServe(sc, n)).toEqual({ release: 1, served: true });
+    expect(await sc.getState()).toMatchObject({ currentRelease: 1, blockedRelease: 2 });
+  });
+
+  it("iOS: refuses a bad signature and a pointer for the other platform", async () => {
+    const n = new FakeNative();
+    const bad = core(n, await server(1, "ios", true), () => 3, "ios");
+    expect((await bad.checkForUpdate({ apply: true })).status).not.toBe("staged");
+    expect(n.files.size).toBe(0);
+    const wrong = core(n, await server(1, "android"), () => 3, "ios");
+    expect((await wrong.checkForUpdate({ apply: true })).status).not.toBe("staged");
+    expect(n.files.size).toBe(0);
   });
 
   it("boots again when a new bridge starts in the same process", async () => {
@@ -114,5 +146,29 @@ describe("native bridge", () => {
     await f.write("release-3.bundle", new Uint8Array([0, 255, 7]));
     expect(await f.list()).toEqual(["release-3.bundle"]);
     expect([...(await f.read("release-3.bundle"))]).toEqual([0, 255, 7]);
+  });
+});
+
+describe("native stores share one set of vectors", () => {
+  const v = JSON.parse(readFileSync(new URL("./vectors/bundle-store.json", import.meta.url), "utf8"));
+  const java = readFileSync(new URL("../android/src/main/java/dev/shipvo/capacitor/BundleStore.java", import.meta.url), "utf8");
+  const swift = readFileSync(new URL("../ios/Sources/ShipvoBundle/BundleStore.swift", import.meta.url), "utf8");
+
+  it("the Android store uses the vector name pattern and refuses '..'", () => {
+    expect(java).toContain(`name.matches("${v.namePattern}")`);
+    expect(java).toContain('name.contains("..")');
+    const re = new RegExp(`^${v.namePattern}$`);
+    for (const n of v.goodNames) expect(re.test(n) && !n.includes("..")).toBe(true);
+    for (const n of v.badNames) expect(re.test(n) && !n.includes("..")).toBe(false);
+  });
+
+  it("the iOS store checks the same limits and refuses '..'", () => {
+    expect(swift).toContain("name.count <= 128");
+    expect(swift).toContain('!name.contains("..")');
+    expect(swift).toContain('"._-"');
+  });
+
+  it("the vector hashes are real sha-256 values", async () => {
+    for (const h of v.sha256) expect(await sha256Hex(enc.encode(h.text))).toBe(h.hex);
   });
 });

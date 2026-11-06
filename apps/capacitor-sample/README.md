@@ -12,7 +12,7 @@ The app has a list screen, a detail screen, and a button that shows the current 
 
 ## Updates
 
-`pnpm build` bundles the app with `@shipvo/capacitor`. Set `SHIPVO_PUBLIC_KEY` and `SHIPVO_BASE_URL` before building to turn on updates. The Android project includes the plugin from `packages/capacitor/android`. The **Check for update** button runs `checkForUpdate({ apply: true })`.
+`pnpm build` bundles the app with `@shipvo/capacitor`. Set `SHIPVO_PUBLIC_KEY` and `SHIPVO_BASE_URL` before building to turn on updates. The Android project includes the plugin from `packages/capacitor/android`; `cap sync ios` adds the plugin from `packages/capacitor` (Swift package `ShipvoCapacitor`) to the iOS project. The **Check for update** button runs `checkForUpdate({ apply: true })`.
 
 ## Test
 

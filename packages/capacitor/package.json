@@ -38,6 +38,9 @@
     "dist",
     "android/build.gradle",
     "android/src/main",
+    "Package.swift",
+    "ios/Sources",
+    "ios/Tests",
     "README.md"
   ],
   "publishConfig": {
@@ -46,5 +49,10 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
   }
 }
