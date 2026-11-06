@@ -17,11 +17,11 @@ let proc, backend, backendUrl;
 const PAGE = `<!doctype html><html><head><title>fx</title></head><body><h1 id="h">Idle</h1>
 <script>
 window.go = async (path) => {
-  try { const r = await fetch(window.BACKEND + path); const x = await r.text(); document.getElementById("h").textContent = "Got " + r.status + " " + x; }
+  try { const r = await fetch(window.BACKEND + path); const x = await r.text(); document.getElementById("h").textContent = "Got " + r.status + " " + x.slice(0, 20); }
   catch (e) { document.getElementById("h").textContent = "Failed " + e; }
 };
 </script>
-<button onclick="go('/items')">Load items</button><button onclick="go('/other')">Load other</button></body></html>`;
+<button onclick="go('/items')">Load items</button><button onclick="go('/other')">Load other</button><button onclick="go('/big')">Load big</button></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
 function ensureChromium() {
@@ -33,7 +33,7 @@ function ensureChromium() {
 }
 before(async () => {
   ensureChromium();
-  backend = http.createServer((req, res) => { res.writeHead(200, { "content-type": "text/plain", "access-control-allow-origin": "*" }); res.end("real"); });
+  backend = http.createServer((req, res) => { res.writeHead(200, { "content-type": "text/plain", "access-control-allow-origin": "*" }); res.end(req.url === "/big" ? "x".repeat(10000) : "real"); });
   await new Promise((r) => backend.listen(0, "127.0.0.1", r));
   backendUrl = `http://127.0.0.1:${backend.address().port}`;
   mkdirSync(dist, { recursive: true }); writeFileSync(join(dist, "index.html"), PAGE.replace("</head>", `<script>window.BACKEND=${JSON.stringify(backendUrl)}</script></head>`));
@@ -49,15 +49,15 @@ after(async () => {
 });
 
 const ref = (screen, name) => { const m = new RegExp(`${name}[^\\n]*\\[ref=(\\w+)\\]`).exec(screen); assert.ok(m, screen); return m[1]; };
-async function press(session, name) {
+async function press(session, name, tries = 40) {
   const s = (await act(session, { action: "screen" })).screen;
   await act(session, { action: "tap", ref: ref(s, name) });
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < tries; i++) {
     const r = await act(session, { action: "screen" });
     if (/Got |Failed /.test(r.screen)) return /(?:Got|Failed)[^\n"]*/.exec(r.screen)[0];
     await new Promise((r) => setTimeout(r, 100));
   }
-  assert.fail("no result on the page");
+  assert.fail("no result on the page: " + (await act(session, { action: "screen" })).screen);
 }
 const netLog = async (session) => (await act(session, { action: "device_log" })).log.filter((e) => e.name === "network_profile");
 
@@ -94,4 +94,17 @@ test("a bad profile name answers unknown_profile and changes nothing", async () 
   assert.equal(r.ok, false);
   assert.equal(r.code, "unknown_profile");
   assert.equal((await netLog("d")).length, 0);
+});
+
+test("2g applies the bandwidth limit to the response and still returns the real body", async () => {
+  assert.ok((await call("/session", { session: "e" })).ok);
+  await act("e", { action: "set_network_profile", profile: "2g" });
+  // 10,000 bytes at 50 kbps is 1,600 ms of transfer on top of 800 ms latency. Latency alone is 800 ms.
+  const t0 = Date.now();
+  assert.match(await press("e", "Load big", 100), /Got 200 x{20}/);
+  assert.ok(Date.now() - t0 >= 2000, `took ${Date.now() - t0} ms`);
+  await act("e", { action: "set_network_profile", profile: "online" });
+  assert.match(await press("e", "Load items"), /Got 200 real/);
+  await act("e", { action: "set_network_profile", profile: "2g" });
+  assert.match(await press("e", "Load items"), /Got 200 real/);
 });

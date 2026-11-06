@@ -186,7 +186,7 @@ async function ensureNetworkRoute(s, page) {
     }
     if (!s.profiled) return route.fallback();
     try {
-      const res = await s.profiled(req.url(), { method: req.method(), body: req.postDataBuffer() ?? undefined, route });
+      const { res } = await s.profiled(req.url(), { method: req.method(), body: req.postDataBuffer() ?? undefined, route });
       await route.fulfill({ response: res }).catch(() => {});
     } catch { await route.abort("internetdisconnected").catch(() => {}); }
   });
@@ -197,7 +197,11 @@ async function setNetworkProfile(s, page, name) {
   let profile; try { profile = getProfile(name); } catch (e) { throw new SimError(e.code, e.message); }
   const from = s.netProfile ?? "online";
   s.netProfile = name;
-  s.profiled = name === "online" ? null : applyProfile(async (_url, init) => init.route.fetch(), profile, { clock: { sleep: (ms) => new Promise((r) => setTimeout(r, ms)) } });
+  s.profiled = name === "online" ? null : applyProfile(async (_url, init) => {
+    // Playwright's APIResponse has headers() as a method. A chunked reply has no content-length, so use the body size.
+    const res = await init.route.fetch(); const headers = res.headers(); const size = String((await res.body()).length);
+    return { res, headers: { get: (n) => { const k = String(n).toLowerCase(); return headers[k] ?? (k === "content-length" ? size : null); } } };
+  }, profile, { clock: { sleep: (ms) => new Promise((r) => setTimeout(r, ms)) } });
   if (s.profiled) await ensureNetworkRoute(s, page);
   (s.netLog ??= []).push({ at: Date.now(), name: "network_profile", profile: name, from, source: "simulated" });
 }
