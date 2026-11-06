@@ -151,6 +151,10 @@ function library(o: Required<Pick<EvalOptions, "locale" | "timeZone">> & { now: 
     f("lower", 1, (s) => String(s).toLowerCase()), f("upper", 1, (s) => String(s).toUpperCase()), f("trim", 1, (s) => String(s).trim()),
     f("split", 2, (s, sep) => String(s).split(String(sep))),
     f("join", 2, (l, sep) => list(l, "join").join(String(sep))),
+    f("__mod", 2, (a, b) => {
+      if (b === 0) throw new Error("modulo by zero");
+      return (a as number) % (b as number);
+    }),
     f("orElse", 2, (v, fb) => (v === null || v === undefined ? fb : v))
   ];
 }
@@ -175,6 +179,7 @@ function walk(e: AnyExpr | undefined, mult: number, st: { cost: number }): void 
     case "structExpr": k.value.entries.forEach((x: any) => { walk(x.keyKind?.value, mult, st); walk(x.value, mult, st); }); break;
     case "callExpr": {
       const c = k.value;
+      if (c.function === "_%_") c.function = "__mod";
       if (c.function === "size") {
         c.function = "count";
         if (c.target) { c.args = [c.target]; c.target = undefined; }
@@ -218,10 +223,10 @@ function toBinding(v: unknown, depth = 0): CelInput {
   throw new ExpressionError(`A ${typeof v} value cannot be used in an expression.`);
 }
 
-/** A regex test with a guard: long patterns, backreferences and nested repeats are refused. */
+/** A regex test with a guard: long patterns, backreferences and nested repeats and alternation under a repeat are refused. */
 const re2 = {
   compile(p: string) {
-    if (p.length > 200 || /\\[1-9]/.test(p) || /[*+}]\)?[*+{]/.test(p) || /\([^)]*[*+][^)]*\)[*+{]/.test(p)) throw new Error("this pattern is not allowed");
+    if (p.length > 200 || /\\[1-9]/.test(p) || /[*+}]\)?[*+{]/.test(p) || /\([^)]*[*+][^)]*\)[*+{]/.test(p) || /\([^)]*\|[^)]*\)[*+{]/.test(p)) throw new Error("this pattern is not allowed");
     const re = new RegExp(p, "u");
     return { test: (t: string) => re.test(t) };
   }
@@ -260,11 +265,18 @@ export function evaluate(expression: string, scope: Record<string, unknown> = {}
     const env = celEnv({ funcs: library(opts), re2, variables: Object.fromEntries(Object.keys(bindings).map((k) => [k, D])) });
     const r = plan(env, parsed)(bindings);
     if (isCelError(r)) throw new ExpressionError(r.message);
-    return toJs(r as CelValue);
+    const v = toJs(r as CelValue);
+    assertFinite(v);
+    return v;
   } catch (e) {
     if (e instanceof ExpressionError) throw e;
     throw new ExpressionError(e instanceof Error ? e.message : "The expression failed.");
   }
+}
+function assertFinite(v: unknown): void {
+  if (typeof v === "number" && !Number.isFinite(v)) throw new ExpressionError("The result is not a finite number (division by zero?).");
+  if (Array.isArray(v)) v.forEach(assertFinite);
+  else if (v && typeof v === "object") Object.values(v).forEach(assertFinite);
 }
 const fmtCheck = (locale: string) => new Intl.NumberFormat(locale);
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
+import { checkNames } from "../src/check";
 import { evaluate, evaluateTemplate, ExpressionError, validate } from "../src/index";
 
 const NOW = "2026-11-06T10:30:00Z";
@@ -106,6 +107,21 @@ describe("evaluate: limits", () => {
   it("refuses a regex that can hang", () => {
     expect(() => evaluate("s.matches('(a+)+$')", { s: "a".repeat(40) + "b" })).toThrow();
   });
+  it("refuses alternation under a repeat", () => {
+    expect(() => evaluate("s.matches('^(a|aa)+$')", { s: "a".repeat(34) + "!" })).toThrow(/not allowed/);
+    expect(() => evaluate("s.matches('(a|aa)+$')", { s: "a" })).toThrow(/not allowed/);
+  });
+  it("supports modulo", () => {
+    expect(ev("10 % 3")).toBe(1);
+    expect(evaluate("x % 2 == 0", { x: 8 })).toBe(true);
+    expect(evaluate("x % 2 == 0", { x: 7 })).toBe(false);
+    expect(() => ev("5 % 0")).toThrow(ExpressionError);
+  });
+  it("division by zero throws instead of returning null", () => {
+    expect(() => ev("1 / 0")).toThrow(ExpressionError);
+    expect(() => ev("-1 / 0")).toThrow(ExpressionError);
+    expect(() => ev("0 / 0")).toThrow(ExpressionError);
+  });
   it("unknown names fail instead of guessing", () => expect(() => ev("nope")).toThrow(ExpressionError));
 });
 
@@ -160,6 +176,14 @@ describe("validate: names", () => {
     const deep = "[1].filter(a, [1].filter(b, [1].filter(c, [1].filter(d, d > 0)).size() > 0).size() > 0)";
     const r = validate(spec(`{{ ${deep} }}`));
     expect(r.errors[0]!.message).toContain("costs");
+  });
+});
+
+describe("checkNames nested fields", () => {
+  it("does not flag item.x or other nested fields", () => {
+    const scope = { names: { items: undefined } };
+    expect(checkNames("items.map(item, item.x + item.y.z)", scope)).toEqual([]);
+    expect(checkNames("items.filter(i, i.a.b > 0)", scope)).toEqual([]);
   });
 });
 
