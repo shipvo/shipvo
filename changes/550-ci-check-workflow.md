@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo ci init --check` writes `.github/workflows/shipvo-check.yml`, which runs the new `actions/check` composite action (build for web, `shipvo test`, `shipvo explore`) on every pull request. `shipvo ci check` fails on test regressions and crashes, not on exploration notes. Docs: `docs/ci-check.md`.
+- Migration: none.
