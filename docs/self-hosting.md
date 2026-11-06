@@ -43,6 +43,19 @@ Not covered:
 - `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login does not work offline, so only the routes the smoke script uses are exercised.
 - This is not a production setup.
 
+## D1 Free plan limits
+
+On the Workers Free plan, D1 allows 5 million rows read and 100,000 rows written per day. Past a limit, D1 returns errors until 00:00 UTC ([D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/)). Each telemetry event writes a row plus index entries.
+
+When D1 refuses a telemetry write, Shipvo:
+
+- answers the phone `202` with `{"ok":true,"stored":false}`, never a 5xx;
+- adds one to the KV counter `telemetry_dropped/<app>/<yyyy-mm-dd>`;
+- for failure events, keeps a KV count per release (kept for one hour) and auto-halt uses the larger of that and the D1 count;
+- reports the day's total as `telemetry_dropped_today` in `GET /health` and in `shipvo doctor`.
+
+Release pointers come from KV, so updates keep flowing. Dropped events are not stored, so dashboards undercount until the limit resets or you move to a paid plan.
+
 ## Back up and upgrade
 
 This is for the Docker control plane above. All state (the local D1 database and KV data) is in one place: the Docker volume `control-plane-data`, mounted at `/data`. Compose prefixes the project name, so from `services/control-plane` the volume is called `control-plane_control-plane-data` (check with `docker volume ls`). The image holds no state, and `docker compose down -v` deletes the volume.
