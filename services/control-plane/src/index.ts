@@ -146,6 +146,8 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const counts = tallyVotes(votes);
   const verdict = shouldHalt(counts, { threshold, minReports, minInstalls });
   if (!verdict.halt) return;
+  // The owner chose "Keep rolling out" for this release: do not halt or hold it again until the dismissal expires.
+  if (await isDismissed(env, appId, release)) return;
   const key = `halt/${appId}`;
   const cur = await env.POINTERS.get(key);
   if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
@@ -153,6 +155,10 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const reason = anomalyReason(votes, await failureRate(env, appId), Date.now());
   if (reason) { await holdRelease(env, appId, release, reason, verdict.reports, counts.failed, threshold); return; }
   await applyHalt(env, appId, release, verdict.reports, counts.failed, threshold);
+}
+
+async function isDismissed(env: Env, appId: string, release: number): Promise<boolean> {
+  return !!(await env.POINTERS.get(`anomaly-dismissed/${appId}/${release}`));
 }
 
 /** Failure reports for the app in the spike window and in the baseline period before it. Null if it cannot be read. */
@@ -211,6 +217,10 @@ async function settleHold(env: Env, appId: string, ch: { id: string; command: st
     if (!other) await applyHalt(env, appId, h.release, h.reports, h.failed, h.threshold, ch.approved_by ?? "owner", "person");
   }
   await env.POINTERS.delete(key);
+  if (verb === "deny") {
+    // Remember the dismissal so the next failure report does not ask again. It expires with the hold TTL.
+    await env.POINTERS.put(`anomaly-dismissed/${appId}/${rel}`, JSON.stringify({ dismissed_at: new Date().toISOString(), by: ch.approved_by ?? "owner" }), { expirationTtl: Math.round(ANOMALY_HOLD_TTL_MS / 1000) });
+  }
 }
 
 /** Device telemetry for the spike: applied / reverted / timings. */

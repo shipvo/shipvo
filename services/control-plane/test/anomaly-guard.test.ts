@@ -112,6 +112,17 @@ describe("anomaly guard", () => {
     expect(m["anomaly-hold/tide/5"]).toBeUndefined();
     expect((await list(e)).approvals).toHaveLength(0);
   });
+  it("after a dismiss, more failures neither hold nor halt that release", async () => {
+    const { m, e } = setup(fresh);
+    await fail(e);
+    const id = (await list(e)).approvals[0].id;
+    await decide(e, id, "deny");
+    await fail(e);
+    await fail(e);
+    expect((await list(e)).approvals).toHaveLength(0);
+    expect(m["halt/tide"]).toBeUndefined();
+    expect(m["anomaly-dismissed/tide/5"]).toBeDefined();
+  });
   it("the owner token cannot confirm a hold", async () => {
     const { m, e } = setup(fresh);
     await fail(e);
