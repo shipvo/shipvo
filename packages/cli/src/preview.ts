@@ -3,7 +3,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep, extname } from "node:path";
-import { spawnBin } from "./spawn-bin.js";
+import { spawnBin, toSpawn } from "./spawn-bin.js";
 import { args as parse, loadConfig } from "./config.js";
 import { RECORDER_JS } from "./preview-recorder.js";
 
@@ -296,11 +296,16 @@ export async function publishToHereNow(files: PreviewFile[], o: PreviewOpts = {}
   return { url: done.siteUrl ?? created.siteUrl, claimUrl: created.claimUrl ?? null, expiresAt: created.expiresAt ?? null, files: files.length, warnings };
 }
 
+/** The spawn call for the web export. Exported so a test can check the Windows wiring. */
+export function webExportCall(out: string, platform: NodeJS.Platform = process.platform) {
+  return toSpawn(spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out], platform));
+}
+
 function build(root: string, out: string): Promise<void> {
   rmSync(out, { recursive: true, force: true }); mkdirSync(join(root, ".shipvo"), { recursive: true });
   return new Promise((resolve, reject) => {
-    const sb = spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out]);
-    const p = spawn(sb.command, sb.args, { shell: sb.shell, cwd: root, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });
+    const t = webExportCall(out);
+    const p = spawn(t.file, t.args, { shell: t.shell, cwd: root, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });
     p.on("error", reject);
     p.on("exit", (c) => (c === 0 ? resolve() : reject(new Error(`The web build failed (exit ${c}). Run \`npx expo export --platform web\` to see why.`))));
   });

@@ -83,4 +83,17 @@ setTimeout(() => process.exit(0), 3000);`);
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(1));
     expect(logs.some((l) => l.startsWith("Simulator on"))).toBe(false);
   });
+
+  it("exits 1 with one message when the web build fails", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sim-"));
+    process.chdir(dir);
+    const port = await freePort();
+    const logs: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((m) => { logs.push(String(m)); });
+    vi.spyOn(process, "exit").mockImplementation(((c: number) => { throw new Error(`exit ${c}`); }) as never);
+    exec.mockReturnValueOnce({ status: 1 });
+    await expect(sim(["--port", port])).rejects.toThrow("exit 1");
+    expect(exec).toHaveBeenCalledWith("npx", ["expo", "export", "--platform", "web", "--output-dir", "sim-dist", "--clear"], expect.objectContaining({ env: expect.objectContaining({ PN_SIM: "1" }) }));
+    expect(logs).toContain("The web build failed. Run `npx expo export --platform web` to see why.");
+  });
 });

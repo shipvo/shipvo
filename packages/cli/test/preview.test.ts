@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vites
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { blockedPath, collectFiles, framePage, publishToHereNow, refuseSecrets, wrapBuild, type PreviewFile } from "../src/preview";
+import { blockedPath, collectFiles, framePage, webExportCall, publishToHereNow, refuseSecrets, wrapBuild, type PreviewFile } from "../src/preview";
 
 const file = (path: string, text = "x"): PreviewFile => ({ path, bytes: new TextEncoder().encode(text), contentType: "text/plain" });
 const json = (b: unknown, status = 200, h: Record<string, string> = {}) => new Response(JSON.stringify(b), { status, headers: h });
@@ -399,5 +399,14 @@ describe("device panel against the real simulated device", () => {
     pn.set({ permissions: { notifications: "granted" } }); r.click("push-send");
     expect(pn.notifications()).toEqual([expect.objectContaining({ title: "Hi", body: "Order shipped" })]);
     expect(r.status.textContent).toMatch(/push sent/i);
+  });
+});
+
+describe("web export call", () => {
+  it("uses npx.cmd as one command line on win32", () => {
+    expect(webExportCall("out dir", "win32")).toEqual({ file: 'npx.cmd expo export --platform web --clear --output-dir "out dir"', args: [], shell: true });
+  });
+  it("is plain npx on linux", () => {
+    expect(webExportCall("out", "linux")).toEqual({ file: "npx", args: ["expo", "export", "--platform", "web", "--clear", "--output-dir", "out"], shell: false });
   });
 });

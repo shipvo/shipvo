@@ -282,6 +282,12 @@ describe("publish and the Hermes bytecode check", () => {
     expect(existsSync(join(cwd, ".shipvo/dry-run/w/demo/r1/index.html"))).toBe(true);
   });
 
+  it("a failing web export stops publish with a clear message", async () => {
+    withBundle(96);
+    exec.fn = (c) => { if (c.includes("--platform web")) throw new Error("boom"); };
+    await expect(publish(["--skip-export", "true", "--skip-web", "false", "--bands", "b0", "--dry-run"])).rejects.toThrow(/The web build failed/);
+  });
+
   it("--dry-run false is a real publish; a bad value is an error", async () => {
     withBundle(96);
     await publish([...flags, "--dry-run", "false"]);

@@ -175,7 +175,7 @@ describe("run()", () => {
     Object.defineProperty(process, "platform", { value: "win32" });
     process.env.RUN_TEST_FAKE_NATIVE = "1";
     try { await run(["android", "--native"]); } finally { Object.defineProperty(process, "platform", orig); spy.mockRestore(); delete process.env.RUN_TEST_FAKE_NATIVE; }
-    expect(vi.mocked(spawnSync)).toHaveBeenLastCalledWith("npx.cmd", ["expo", "run:android"], expect.objectContaining({ shell: true }));
+    expect(vi.mocked(spawnSync)).toHaveBeenLastCalledWith("npx.cmd expo run:android", [], expect.objectContaining({ shell: true }));
   });
 });
 

@@ -22,8 +22,16 @@ describe("spawnBin", () => {
   it("leaves other programs alone on win32", () => {
     expect(spawnBin("node", ["a b"], "win32")).toEqual({ command: "node", args: ["a b"], shell: false });
   });
-  it("escapes quotes with a backslash on win32", () => {
-    expect(quoteWin('say "hi"')).toBe('"say \\"hi\\""');
+  it("refuses a double quote, so an arg cannot break out of the quotes", () => {
+    expect(() => quoteWin('a" & calc & "b')).toThrow(/double quote/);
+    expect(() => spawnBin("npx", ['x" & calc'], "win32")).toThrow();
+  });
+  it("keeps & inside quotes", () => {
+    expect(quoteWin("a & calc")).toBe('"a & calc"');
+    expect(quoteWin("a&calc")).toBe('"a&calc"');
+  });
+  it("doubles trailing backslashes in a quoted arg", () => {
+    expect(quoteWin("C:\\My Apps\\")).toBe('"C:\\My Apps\\\\"');
   });
   it("refuses % on win32 because cmd expands it inside quotes", () => {
     expect(() => spawnBin("npx", ["%PATH%"], "win32")).toThrow(/%/);
@@ -33,7 +41,11 @@ describe("spawnBin", () => {
 describe("runBin", () => {
   it("starts npx.cmd through a shell on win32 and returns the status", () => {
     expect(runBin("npx", ["expo", "export"], { env: { PN_SIM: "1" } }, "win32")).toBe(3);
-    expect(spawned).toHaveBeenLastCalledWith("npx.cmd", ["expo", "export"], { stdio: "inherit", shell: true, env: { PN_SIM: "1" } });
+    expect(spawned).toHaveBeenLastCalledWith("npx.cmd expo export", [], { stdio: "inherit", shell: true, env: { PN_SIM: "1" } });
+  });
+  it("returns 1 when the program did not start", () => {
+    spawned.mockReturnValueOnce({ status: null } as never);
+    expect(runBin("npx", ["expo"], {}, "linux")).toBe(1);
   });
   it("starts npx directly on linux", () => {
     runBin("npx", ["expo"], {}, "linux");
