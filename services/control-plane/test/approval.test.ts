@@ -14,7 +14,7 @@ async function pointer(band: string) {
 }
 
 // One keypair per test so the registered key matches the signed pointer.
-async function run(policy: object | undefined, band: string, headers: Record<string, string> = {}) {
+async function run(policy: object | undefined, band: string, headers: Record<string, string> = {}, ownerLogin = "ann", bobAccount = 2) {
   const state = { bytes: 0 };
   const p = await pointer(band);
   const store: Record<string, string> = {}, audits: any[][] = [];
@@ -24,19 +24,20 @@ async function run(policy: object | undefined, band: string, headers: Record<str
       if (sql.includes("FROM publish_tokens")) return args[0] === (await sha(PUB)) ? { id: 1, expires_at: null } : null;
       if (sql.includes("JOIN accounts a ON a.id = k.account_id")) {
         if (args[0] === (await sha(ANN))) return { account_id: 1, expires_at: null, github_login: "ann" };
-        if (args[0] === (await sha(BOB))) return { account_id: 2, expires_at: null, github_login: "bob" };
+        if (args[0] === (await sha(BOB))) return { account_id: bobAccount, expires_at: null, github_login: "bob" };
         return null;
       }
-      if (sql.includes("JOIN accounts")) return { login: "ann" };
+      if (sql.includes("JOIN accounts")) return { login: ownerLogin };
       if (sql.includes("FROM apps")) return { public_key: p.pk, bytes_used: state.bytes, account_id: 1 };
       return null;
     },
   }) }) } as any;
-  const POINTERS = { put: async (k: string, v: unknown) => { store[k] = typeof v === "string" ? v : new TextDecoder().decode(v as ArrayBuffer); }, get: async (k: string) => (k === "c/tide/release_policy" && policy && !store[k] ? JSON.stringify(policy) : store[k] ?? null) } as any;
+  const POINTERS = { put: async (k: string, v: unknown) => { store[k] = typeof v === "string" ? v : new TextDecoder().decode(v as ArrayBuffer); }, list: async ({ prefix }: { prefix: string }) => ({ keys: Object.keys(store).filter((k) => k.startsWith(prefix)).map((name) => ({ name })) }), get: async (k: string) => (k === "c/tide/release_policy" && policy && !store[k] ? JSON.stringify(policy) : store[k] ?? null) } as any;
   const env = { DB, POINTERS, OWNER_TOKEN: "owner-secret" } as any;
   const r = await app.request(`/apps/tide/kv/p/tide/1/${band}`, { method: "PUT", headers: { authorization: `Bearer ${PUB}`, ...headers }, body: p.buf }, env);
   const act = (aid: string, verb: string, token: string) => app.request(`/apps/tide/approvals/${aid}/${verb}`, { method: "POST", headers: { authorization: `Bearer ${token}` } }, env);
-  return { r, store, audits, act, state };
+  const list = (token: string) => app.request("/apps/tide/approvals", { headers: { authorization: `Bearer ${token}` } }, env);
+  return { r, store, audits, act, state, list };
 }
 const PTR = "p/tide/1/b2";
 
@@ -107,6 +108,15 @@ describe("requireApprovalAbove", () => {
     expect((await act(approval_id, "approve", ANN)).status).toBe(403);
     expect(store[PTR]).toBeUndefined();
   });
+  it("a different signed-in owner approves a person's hold; the audit row names them", async () => {
+    const { r, store, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2", {}, "ann", 1);
+    const { approval_id } = (await r.json()) as any;
+    const a = await act(approval_id, "approve", BOB);
+    expect(a.status).toBe(200); expect(store[PTR]).toBeTruthy();
+    const row = audits[audits.length - 1]!;
+    expect(row).toContain("bob"); expect(row).toContain("person");
+    expect(JSON.parse(row[8] as string)).toMatchObject({ approval: "approved", approval_id });
+  });
   it("a person who does not own the app is refused; no auth is refused", async () => {
     const { r, act } = await run({ requireApprovalAbove: "b1" }, "b2");
     const { approval_id } = (await r.json()) as any;
@@ -125,5 +135,43 @@ describe("requireApprovalAbove", () => {
     const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2", { "x-shipvo-actor": "agent" });
     const { approval_id } = (await r.json()) as any;
     expect((await act(approval_id, "approve", ANN)).status).toBe(200); expect(store[PTR]).toBeTruthy();
+  });
+  it("a person whose login starts with agent is not treated as an agent proposer", async () => {
+    const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2", {}, "agent-smith");
+    const { approval_id } = (await r.json()) as any;
+    expect((await act(approval_id, "approve", "owner-secret")).status).toBe(200); expect(store[PTR]).toBeTruthy();
+  });
+  it("a hold without proposer_kind falls back to the name check", async () => {
+    const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2", { "x-shipvo-actor": "agent" });
+    const { approval_id } = (await r.json()) as any;
+    const k = `c/tide/approval/${approval_id}`; const a = JSON.parse(store[k]!); delete a.proposer_kind; store[k] = JSON.stringify(a);
+    expect((await act(approval_id, "approve", "owner-secret")).status).toBe(403);
+  });
+  it("the proposer's refused approve writes a refused audit row naming the rule", async () => {
+    const { r, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2");
+    const { approval_id } = (await r.json()) as any;
+    const a = await act(approval_id, "approve", ANN);
+    expect(a.status).toBe(403); expect(((await a.json()) as any).rule).toBe("self_approval");
+    expect(audits).toHaveLength(2);
+    expect(JSON.parse(audits[1]![8] as string)).toMatchObject({ approval: "refused", rule: "self_approval" });
+    expect(audits[1]![2]).toBe("ann"); expect(audits[1]![3]).toBe("person");
+  });
+  it("an agent cannot approve an agent's proposal", async () => {
+    const { r, store, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2", { "x-shipvo-actor": "agent" });
+    const { approval_id } = (await r.json()) as any;
+    expect((await act(approval_id, "approve", "owner-secret")).status).toBe(403);
+    expect(store[PTR]).toBeUndefined();
+    expect(JSON.parse(audits[1]![8] as string).approval).toBe("refused"); expect(audits[1]![3]).toBe("agent");
+  });
+  it("list shows pending approvals to an owner and to the publish token, not to others", async () => {
+    const { r, list, act } = await run({ requireApprovalAbove: "b1" }, "b2");
+    const { approval_id } = (await r.json()) as any;
+    for (const t of [ANN, PUB, "owner-secret"]) {
+      const l = await list(t); expect(l.status).toBe(200);
+      expect(((await l.json()) as any).approvals).toEqual([expect.objectContaining({ id: approval_id, release: 7, band: "b2", proposer: "ann" })]);
+    }
+    expect((await list("nope")).status).toBe(401);
+    await act(approval_id, "approve", "owner-secret");
+    expect(((await (await list(ANN)).json()) as any).approvals).toEqual([]);
   });
 });
