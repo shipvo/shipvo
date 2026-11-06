@@ -4,7 +4,7 @@ This guide moves a React Native app that used `react-native-code-push` to Shipvo
 
 Run `shipvo migrate --plan` in your app first. It is read-only. It lists what it finds with file and line (the `react-native-code-push` dependency, `codePush()` and `CodePush.sync` calls, `CodePushDeploymentKey` and `CodePushPublicKey` in `Info.plist` and `strings.xml`, and `appcenter codepush` commands in `package.json` and CI files) and prints the steps in order. `--json` returns the same data.
 
-Apply is manual for CodePush: `shipvo migrate --apply` only supports EAS Update. You do the steps by hand, and you ship one new store build.
+`shipvo migrate --apply` makes the code edits for you (see [shipvo migrate --apply](cli.md#shipvo-migrate---apply)): it swaps the `codePush()` wrapper and `CodePush.sync` calls for `@shipvo/runtime` calls, removes the native keys, and swaps the dependency in `package.json`. It does not run the package manager, does not edit `appcenter codepush` scripts or CI files (it prints them as manual steps), and refuses a dirty git tree unless you pass `--force`. Review the diff with `git diff`. It does not edit native bootstrap code. Files such as `MainApplication.java`, `MainApplication.kt`, `AppDelegate.m`, `AppDelegate.mm`, `AppDelegate.swift`, `settings.gradle`, `app/build.gradle` and the `Podfile` often still call CodePush (for example `CodePush.getJSBundleFile()` or `[CodePush bundleURL]`). Change those by hand, or the native build fails once the dependency is gone. `--apply` lists every such file with its line under the manual steps. You still create the Shipvo config (Step 1) and ship one new store build.
 
 `--rollout <n>` has no direct equivalent. Shipvo uses cohort bands (`--bands`, then `shipvo promote`).
 
@@ -54,7 +54,7 @@ npm install --save-dev @shipvo/cli
 
 In the same release, remove `react-native-code-push` and call the Shipvo runtime so no build has two update mechanisms. The sample code in the file `App.tsx` that `init` writes shows the calls: `Runtime.markHealthy()` once the first screen renders, and `Runtime.checkForUpdate(true)` to look for a release. Copy that pattern.
 
-Remove the CodePush deployment key and public key from `Info.plist` and `strings.xml`.
+Remove the CodePush deployment key and public key from `Info.plist` and `strings.xml`. `shipvo migrate --apply` does steps like these for single-line calls.
 
 ## Step 3. Check the setup
 
