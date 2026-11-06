@@ -103,11 +103,11 @@ for (const p of prs.filter((p) => mins(p.updated_at) > 180 && !p.labels.some((l)
 }
 
 // 5b. Agent PRs whose last push got no review: no verdict label, quiet for 30 minutes, and no reviewer run
-// on the head commit. GitHub sometimes sends no pull_request event (PR #531, 2026-11-05). Start a review,
+// on the head commit that did not fail. GitHub sometimes sends no pull_request event (PR #531, 2026-11-05). Start a review,
 // at most once an hour per PR.
 for (const p of prs.filter((p) => !p.draft && /^(agent|copilot)\//.test(p.head.ref) && mins(p.updated_at) > 30 &&
   !["agent:approved", "agent:changes-requested", "agent:conflict", "needs-human"].some((l) => has(p, l)))) {
-  const reviewed = runs.some((r) => r.name === "agent-reviewer" && (r.head_sha === p.head.sha ||
+  const reviewed = runs.some((r) => r.name === "agent-reviewer" && ((r.head_sha === p.head.sha && r.conclusion !== "failure") ||
     ((r.display_title || "") === `review #${p.number}` && (r.status !== "completed" || mins(r.created_at) < 60))));
   if (reviewed) continue;
   act(`start a review of PR #${p.number}`, () => gh("api", "-X", "POST", `repos/${REPO}/actions/workflows/agent-reviewer.yml/dispatches`, "-f", "ref=main", "-f", `inputs[pr]=${p.number}`));
