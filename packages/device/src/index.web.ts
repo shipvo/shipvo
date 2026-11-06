@@ -26,6 +26,8 @@ export type DeviceState = {
   biometrics: { enrolled: boolean; nextResult: "success" | "fail" | "cancel" };
   payment: { nextResult: "approve" | "decline" | "timeout" | "insufficient_funds"; pin?: string };
   online: boolean;
+  /** The active network profile (set by the simulator). Anything but "online" is cellular; "offline" is not connected. */
+  networkProfile: "online" | "offline" | "2g" | "3g" | "slow-4g" | "spotty" | "low-end-4g";
   /** Airplane mode: the network is off and the status bar shows the airplane icon. */
   airplane: boolean;
   /** Quick-settings switches (notification shade and Control Center). Wi-Fi and mobile data both off means no network. */
@@ -53,7 +55,7 @@ const state: DeviceState = {
   camera: { barcode: null, delayMs: 800 },
   biometrics: { enrolled: true, nextResult: "success" },
   payment: { nextResult: "approve", pin: "1234" },
-  online: true, airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70,
+  online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70,
   fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false,
   battery: { level: 100, charging: false }, clipboard: "", log: [],
   ...(cfg.device ?? {}),
@@ -62,7 +64,15 @@ const state: DeviceState = {
 // Readings from real hardware are marked source "real".
 const log = (kind: string, detail?: unknown, source: Source = "simulated") => state.log.push({ at: Date.now(), kind, detail, source, simulated: source === "simulated" } as any);
 // Network, airplane and battery feed the phone frame's status bar. Every change is logged (simulated) and announced as a "pn:status" event.
-const isOnline = () => state.online && !state.airplane && (state.wifi || state.mobileData);
+const isOnline = () => state.online && !state.airplane && (state.wifi || state.mobileData) && state.networkProfile !== "offline";
+// Cellular generation a profile reports. "spotty" is a weak, slow link, so it reports 3g.
+const GENERATION = { "2g": "2g", "3g": "3g", "spotty": "3g", "slow-4g": "4g", "low-end-4g": "4g" } as const;
+const connection = (): { isConnected: boolean; type: "wifi" | "cellular" | "none"; generation?: "2g" | "3g" | "4g" } => {
+  if (!isOnline()) return { isConnected: false, type: "none" };
+  const gen = (GENERATION as Record<string, "2g" | "3g" | "4g">)[state.networkProfile];
+  if (gen) return { isConnected: true, type: "cellular", generation: gen };
+  return state.wifi ? { isConnected: true, type: "wifi" } : { isConnected: true, type: "cellular", generation: "4g" };
+};
 const SETTINGS = ["wifi", "mobileData", "locationServices", "darkMode", "dnd", "autoRotate", "flashlight", "orientationLock", "brightness", "airplane"] as const;
 const settings = () => Object.fromEntries(SETTINGS.map((k) => [k, state[k]]));
 const SYSTEM = ["darkMode", "fontSize", "boldText", "reduceMotion", "language", "rtl"] as const;
@@ -76,7 +86,7 @@ function announceSystem(before: string, record = true) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pn:system", { detail: now }));
 }
 const settingsKey = () => JSON.stringify(settings());
-const statusKey = () => JSON.stringify([state.online, state.airplane, isOnline(), state.battery.level, state.battery.charging]);
+const statusKey = () => JSON.stringify([state.online, state.airplane, isOnline(), state.networkProfile, state.battery.level, state.battery.charging]);
 function announceStatus(before: string, record = true, beforeSettings = "") {
   if (beforeSettings && settingsKey() !== beforeSettings && typeof window !== "undefined") { if (record) log("settings", settings()); window.dispatchEvent(new CustomEvent("pn:settings", { detail: settings() })); }
   if (statusKey() === before) return;
@@ -259,7 +269,7 @@ export const device: Device = {
     },
   },
   clipboard: { async set(t) { state.clipboard = t; }, async get() { return state.clipboard; } },
-  net: { online: isOnline, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
+  net: { online: isOnline, connection, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
 };
 
 // A notification banner at the top, like a heads-up notification: tapping it opens the app's handler.

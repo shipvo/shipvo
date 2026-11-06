@@ -53,5 +53,9 @@ export interface Device {
   /** Opens the system file picker for one file. Resolves with the file, or null if the person cancels. */
   files: { pick(options?: PickFileOptions): Promise<PickedFile | null> };
   clipboard: { set(text: string): Promise<void>; get(): Promise<string> };
-  net: { online(): boolean; onChange(cb: (online: boolean) => void): () => void };
+  net: {
+    online(): boolean; onChange(cb: (online: boolean) => void): () => void;
+    /** Connection state and type. Only the simulated device provides it; it follows the active network profile. */
+    connection?(): { isConnected: boolean; type: "wifi" | "cellular" | "none"; generation?: "2g" | "3g" | "4g" };
+  };
 }

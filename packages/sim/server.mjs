@@ -203,6 +203,7 @@ async function setNetworkProfile(s, page, name) {
     return { res, headers: { get: (n) => { const k = String(n).toLowerCase(); return headers[k] ?? (k === "content-length" ? size : null); } } };
   }, profile, { clock: { sleep: (ms) => new Promise((r) => setTimeout(r, ms)) } });
   if (s.profiled) await ensureNetworkRoute(s, page);
+  await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), name).catch(() => {}); // the app's connectivity follows the profile
   (s.netLog ??= []).push({ at: Date.now(), name: "network_profile", profile: name, from, source: "simulated" });
 }
 
