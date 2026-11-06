@@ -7,13 +7,14 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { pickPort } from "./test-port.mjs";
 import { refOf } from "./ref-stability.cases.mjs";
 
 const ONE = `<!doctype html><html><body><button style="width:20px;height:20px;padding:0">Tiny</button><button style="width:60px;height:60px;padding:0">Big</button><a href="two.html">Go two</a><button onclick="location.reload()">Reload</button></body></html>`;
 const TWO = `<!doctype html><html><body><button style="width:30px;height:40px;padding:0">Small</button></body></html>`;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = 4900 + Math.floor(Math.random() * 300);
+const PORT = pickPort(4900, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-sizes-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc;
