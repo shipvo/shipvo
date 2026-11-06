@@ -46,7 +46,7 @@ Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `scre
 
 ## Record a demo video
 
-`record_start`, `record_marker` and `record_stop` write an MP4 of the phone to `.shipvo/recordings/`. `record_stop` takes `music: true` (a ducked music bed and a `.credits.json`) and `narration` (a path to a wav). It needs ffmpeg and `playwright`. A runnable example is in [`docs/record-a-demo-video.md`](../../docs/record-a-demo-video.md).
+`record_start`, `record_marker` and `record_stop` write an MP4 of the phone to `.shipvo/recordings/`. `record_stop` takes `music: true` (a ducked music bed and a `.credits.json`) and `narration` (a path to a wav). It needs ffmpeg and `playwright`. Music works only from a repo checkout, or when `SHIPVO_BGMUSIC` points at `scripts/video/bgmusic.py`; otherwise `record_stop` returns `music_unavailable` (and `music_failed` if the mix fails). A runnable example is in [`docs/record-a-demo-video.md`](../../docs/record-a-demo-video.md).
 
 **Owner commands that cannot be undone need `confirm: true`.** `owner_command` takes an optional `confirm`. `publish`, price changes, offers, deletes and API keys first return `{ code: "needs_confirm", plan }` and do nothing; call again with the same `args` and `confirm: true` to run. `agentPolicy` (`ask` default, `deny`, `allow`) and `agentDeny` in `shipvo.json` (read from `PN_APP_DIR` or the current folder) can only tighten the control plane's rules. Details: `docs/agents.md`.
 
