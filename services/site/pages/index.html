@@ -19,7 +19,7 @@
         <a class="btn" href="/apps">Browse apps agents can use</a>
       </div>
       <div class="cmd reveal"><span class="p">$</span><span>npx -y @shipvo/cli init myshop</span><button type="button" data-copy="npx -y @shipvo/cli init myshop">Copy</button></div>
-      <div class="facts reveal"><span><b>Android</b> OTA today</span><span><b>iOS</b> <a href="/docs/parity-results/">simulator parity 100%</a></span><span><b>Apache-2.0</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
+      <div class="facts reveal"><span><b>Android</b> OTA today</span><span><b>iOS</b> <a href="/docs/parity-results/">simulator parity 100% (actionable elements)</a></span><span><b>Apache-2.0</b> licensed</span><span><b>Self-host</b> in 10 min</span></div>
     </div>
     <div class="phone-stage reveal" id="stage">
       <div class="bubble"><small>YOU ASK YOUR ASSISTANT</small><b>Buy a Surface Popper with mobile money. Tell me if anything breaks.</b></div>
@@ -165,7 +165,7 @@
 <span class="g">›</span> <span class="c">open_app("myshop@latest")</span>  <span class="d">the exact release phones run</span></pre></div>
         </div>
         <div role="tabpanel" id="p-ver" aria-labelledby="t-ver" hidden>
-          <div class="panel-grid"><div><h3>Simulator vs real device, scored every night.</h3><p>The same scripted flows run in the simulator, on an Android emulator and on an iPhone simulator. We compare every actionable element and every text on every screen and publish the gaps as well as the score. This is how the simulator earned the right to replace your emulator for most of the loop.</p><a class="link" href="/docs/parity-results/">Read the parity results →</a></div>
+          <div class="panel-grid"><div><h3>Simulator vs real device, scored every night.</h3><p>The same scripted flows run in the simulator, on an Android emulator and on an iPhone simulator. We compare every actionable element (role and label) and every text on every screen. We do not yet compare enabled state, order, bounds or values. We publish the gaps as well as the score. This is how the simulator earned the right to replace your emulator for most of the loop.</p><a class="link" href="/docs/parity-results/">Read the parity results →</a></div>
 <pre class="term"><span class="d">| Screen              | Elements  | Actionable | Text  |</span>
 <span class="d">| ------------------- | --------- | ---------- | ----- |</span>
 | Camera permission   | 3 / 4     | <span class="g">100%</span>       | 100%  |
@@ -227,7 +227,7 @@
       <article class="cell wide"><div class="n">PUBLISH</div><h3>Signed over-the-air updates</h3><p>Ed25519 pointers, SHA-256 bundles, bsdiff patches, cohort bands, <code>min_shell_version</code> gating and one-command rollback. The shell pins your public key; nothing delivered over the air can change it.</p><div class="k">Typical update <b>tens of KB</b> · applied on a 2 GB Redmi 9A <b>without a restart</b></div></article>
       <article class="cell"><div class="n">SIMULATE</div><h3>A phone agents can operate</h3><p>Accessibility-tree screens with refs over MCP. Local with <code>npm run sim</code>, hosted with a key from <code>shipvo login</code>.</p><div class="k">ChatGPT placed a full order in <b>18 steps, 76 s</b></div></article>
       <article class="cell"><div class="n">DEVICE</div><h3>One device API, two truths</h3><p>Camera, location, biometrics, payments, notifications. Real on phones, simulated for agents, labelled <code>simulated</code> every time.</p><div class="k">Receipts say <b>SIMULATED-</b>; logs say <b>simulated: true</b></div></article>
-      <article class="cell"><div class="n">VERIFY</div><h3>Parity, not promises</h3><p>Nightly runs on an Android emulator and an iPhone simulator; every gap published.</p><div class="k">Actionable parity <b>100 %</b> · text <b>98.6 % / 96.2 %</b></div></article>
+      <article class="cell"><div class="n">VERIFY</div><h3>Parity, not promises</h3><p>Runs on an Android emulator and an iOS Simulator in CI; every gap published. <a href="/docs/parity-results/">Parity results</a>.</p><div class="k">Actionable elements (role, label) <b>100 %</b> on 13 purchase screens · text <b>98.6 % / 96.2 %</b></div></article>
       <article class="cell"><div class="n">MARKETPLACE</div><h3>Listed for every agent</h3><p>Flip <code>listing.public</code> and your app appears on <a href="/apps">shipvo.dev/apps</a> and in every signed-in agent's <code>list_apps</code>.</p><div class="k">Review before listing · <b>3 apps</b> per account in the beta</div></article>
       <article class="cell wide"><div class="n">OWN IT</div><h3>Self-host in ten minutes, or use ours</h3><p>The control plane is a Cloudflare Worker with KV and D1. Run it in your account with your keys, or register on the hosted one with <code>shipvo app create</code>; publish tokens are scoped to one app and every pointer is checked against your public key.</p><div class="k"><b>api.shipvo.dev</b> hosted · <b>Apache-2.0</b> everywhere</div></article>
     </div>
@@ -236,9 +236,9 @@
 
 <section id="proof" class="band">
   <div class="wrap">
-    <div class="sec-head"><h2>Numbers, not adjectives.</h2><p class="lede">Taken on a 2 GB Redmi 9A, an Android emulator and an iPhone simulator in CI. Method and gaps in <a class="link" href="/docs/parity-results/">parity results</a>.</p></div>
+    <div class="sec-head"><h2>Numbers, not adjectives.</h2><p class="lede">Parity: an Android emulator and an iOS Simulator in CI. Update timings: a 2 GB Redmi 9A. Method and gaps in <a class="link" href="/docs/parity-results/">parity results</a>.</p></div>
     <div class="proof">
-      <div class="stat"><div class="v">100<small>%</small></div><div class="l">Actionable parity, simulator vs device, Android and iOS, 3 flows, 21 screens</div><div class="s">parity-results</div></div>
+      <div class="stat"><div class="v">100<small>%</small></div><div class="l">Actionable parity (same role and label, not enabled state, order or bounds), simulator vs Android emulator and iOS Simulator. 100% on the 13 purchase screens; 18 of 21 on the native-feature flow on Android. iOS text gap on order confirmation (89%).</div><div class="s">parity-results</div></div>
       <div class="stat"><div class="v">18 <small>steps</small></div><div class="l">For ChatGPT to scan, locate, pay by mobile money with a fingerprint and reopen the notification. 76 s. Order confirmed by the backend.</div><div class="s">agents</div></div>
       <div class="stat"><div class="v">&lt;1 <small>s</small></div><div class="l">Cold start of the native shell on a 2 GB Android after an over-the-air update applied without a restart</div><div class="s">spike-results</div></div>
       <div class="stat"><div class="v">3</div><div class="l">Known gaps listed, not hidden: two unlabeled Android dialog buttons and a payment-sheet cancel the Android tree does not expose</div><div class="s">parity-results</div></div>

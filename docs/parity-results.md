@@ -7,6 +7,8 @@ Can an agent trust the Shipvo UI simulator? We ran two complete purchases on the
 
 **Result: 100% actionable parity on both Android and iOS across all 13 screens; text coverage 98.6% (Android) and 96.2% (iOS). Both purchases completed on every side.** Bar: ≥ 99% actionable, ≥ 95% text.
 
+**What this measures:** the same actionable elements (role and label) on each screen. It does not yet cover enabled state, element order, bounds or field values. Environments: Android emulator and iOS Simulator in CI (not a physical phone). Known gaps: 18 of 21 screens on the native-feature flow on Android, and the iOS text gap on the order-confirmation screen (89%).
+
 | Flow | Screen | Android: actionable | Android: text | iOS: actionable | iOS: text |
 | --- | --- | --- | --- | --- | --- |
 | A | Home | 100% | 96% | 100% | 96% |
@@ -66,7 +68,7 @@ On iOS, the mobile-money number field opens a number pad with no Done key, and t
 
 ## Definitions (what the numbers do and do not measure)
 
-- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** It is not a full accessibility-tree diff: enabled/disabled state, element order, bounds and field values are not part of the score yet.
+- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** It is not a full accessibility-tree diff: enabled/disabled state, element order, bounds and field values are not part of the score yet.
 - **Text coverage:** the share of text the simulator shows that also appears on the device, exactly or contained in a longer label.
 - **Same order:** on every "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical on both sides; receipts differ by provider (`SIMULATED-` vs `SANDBOX-`) and are normalised.
 - **Visibility rules applied on both sides:** only on-screen items of a horizontal rail; nothing behind a modal sheet (the rule TalkBack and iOS apply; Android's uiautomator tree does not, so the Android driver applies it); the on-screen keyboard is never part of the app.
