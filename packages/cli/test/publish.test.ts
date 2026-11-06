@@ -388,13 +388,14 @@ describe("publish and the Hermes bytecode check", () => {
   });
 
   it("summary: bases exist but no patch was built says full bundles still work", () => {
-    const text = dryRunSummary(2, 5000, "out", { bases: 2, bsdiff: false, patches: 0 });
-    expect(text).toContain("Patches were skipped");
+    const text = dryRunSummary(2, 5000, "out", { bases: 2, patches: 0 });
+    expect(text).toContain("No small patch was built");
+    expect(text).not.toContain("Patches built: 0");
     expect(text).not.toContain("pip");
   });
 
   it("summary: bases exist and patches were built shows the count", () => {
-    const text = dryRunSummary(2, 5000, "out", { bases: 2, bsdiff: true, patches: 2 });
+    const text = dryRunSummary(2, 5000, "out", { bases: 2, patches: 2 });
     expect(text).not.toContain("first release");
     expect(text).not.toContain("pip");
     expect(text).toContain("Patches built: 2");

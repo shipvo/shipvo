@@ -1,6 +1,7 @@
 ---
 title: How big is a React Native OTA update? Bundle diffing, measured
 date: 2026-11-05
+modified: 2026-11-06
 order: 25
 author: Shipvo team
 tags: Guides, OTA
