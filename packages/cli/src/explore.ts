@@ -376,18 +376,29 @@ export async function routesFromChange(sha: string, log: (s: string) => void = c
   return { routes: screens.map(([, r]) => `${scheme}://${r === "/" ? "" : r.slice(1)}`), onlyRoutes: true };
 }
 
+/** `--train`: train a ranker from samples recorded with --record-features. No simulator is started. */
+export function trainCommand(a: Record<string, string | undefined>): void {
+  if (a.train === "true") throw new Error("--train needs a samples file");
+  if (a["ranker-out"] === "true") throw new Error("--ranker-out needs a file");
+  const outFile = a["ranker-out"] ?? "ranker.json";
+  let text: string;
+  try { text = readFileSync(a.train!, "utf8"); } catch { throw new Error(`--train: cannot read ${a.train}`); }
+  const samples = parseSamples(text);
+  if (!samples.length) throw new Error("--train: the samples file is empty");
+  writeFileSync(outFile, JSON.stringify(train(samples)) + "\n");
+  console.log(`Trained a ranker on ${samples.length} samples. Wrote ${outFile}`);
+}
+
+/** `--ranker`: load a trained model with clear errors. */
+export function readRanker(file: string): Ranker {
+  let raw: string;
+  try { raw = readFileSync(file, "utf8"); } catch { throw new Error(`--ranker: cannot read ${file}`); }
+  try { return Ranker.from(JSON.parse(raw)); } catch { throw new Error(`--ranker: ${file} is not a ranker model`); }
+}
+
 async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const a = parse(argv);
-  if (a.train !== undefined) {
-    // Train a ranker from samples recorded with --record-features. No simulator is started.
-    const outFile = a["ranker-out"] ?? "ranker.json";
-    if (a.train === "true") throw new Error("--train needs a samples file");
-    const samples = parseSamples(readFileSync(a.train, "utf8"));
-    if (!samples.length) throw new Error("--train: the samples file is empty");
-    writeFileSync(outFile, JSON.stringify(train(samples)) + "\n");
-    console.log(`Trained a ranker on ${samples.length} samples. Wrote ${outFile}`);
-    return 0;
-  }
+  if (a.train !== undefined) { trainCommand(a); return 0; }
   const cfg = loadConfig();
   const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
   const maxDepth = num("max-depth", 3), maxSteps = num("max-steps", 100);
@@ -403,7 +414,7 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     let seed: number | undefined;
     if (a.seed !== undefined) { seed = Number(a.seed); if (!Number.isInteger(seed) || seed < 0) throw new Error("--seed must be a whole number of 0 or more"); }
     for (const k of ["ranker", "record-features"]) if (a[k] === "true") throw new Error(`--${k} needs a file`);
-    const ranker = a.ranker ? Ranker.from(JSON.parse(readFileSync(a.ranker, "utf8"))) : undefined;
+    const ranker = a.ranker ? readRanker(a.ranker) : undefined;
     // Opt-in only: one JSON line per action, with numbers and flags. No labels, text or values.
     const onSample = a["record-features"] ? (smp: Sample) => appendFileSync(a["record-features"]!, JSON.stringify(smp) + "\n") : undefined;
     const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, seed, ranker, onSample, app: cfg.appId, skin: a.skin as Skin | undefined });

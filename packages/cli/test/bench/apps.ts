@@ -1,6 +1,8 @@
 // Benchmark apps for the action ranker: generated fake apps behind the walker's Driver interface.
 // Each app has a hidden screen graph. A button's label hints at what it does, but only most of the time,
 // and each app shifts the odds, so a ranker has to learn a tendency and cannot memorise an app.
+// Apps are seeded: benchApp(seed) is fully determined by its seed. The benchmark trains on one seed range and
+// evaluates on another (see benchmark() below). Re-run the table with SHOW_BENCH=1 pnpm --filter @shipvo/cli test -- explore-ranker.
 import { walk, type Driver, type Reply } from "../../src/explore.js";
 import { train, type Ranker, type Sample } from "../../src/explore-ranker.js";
 

@@ -155,7 +155,7 @@ It writes `explore-report.md` and `explore-report.json`. The report has nine kin
 - `stuck_loading`: the screen still shows a loading indicator (progress bar or spinner) after the walker looks again twice;
 - `blank_screen`: nothing is drawn on the screen, no names and no text.
 
-Opt-in learned ranker (research, off by default): `--record-features <file>` records anonymous action features (no labels, text or values), `--train <file> --ranker-out <file>` trains a small model, and `--ranker <file>` uses it. The measurement and its limits are in `docs/research/lumi-action-ranker.md`.
+`--record-features <file>` records anonymous action features (no labels, text or values), `--train <file> --ranker-out <file>` trains a small model, `--ranker <file>` uses it. Measurement: `docs/research/lumi-action-ranker.md`.
 
 The header lists what the simulator cannot show. A clean run says "No findings in N steps", never that a screen is fine. Exit code 1 also means the walk itself failed (for example the simulator could not start or a step failed). If it fails mid-walk, the report is still written with the findings so far and `stoppedEarly` says why; the error is also printed to stderr. If it fails before the walk starts, no report is written.
 

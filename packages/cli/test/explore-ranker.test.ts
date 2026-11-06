@@ -1,6 +1,9 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { features, FEATURES, parseSamples, Ranker, train, type ActionInfo } from "../src/explore-ranker.js";
-import { walk } from "../src/explore.js";
+import { walk, trainCommand, readRanker } from "../src/explore.js";
 import { benchApp, benchmark, run } from "./bench/apps.js";
 
 const act = (o: Partial<ActionInfo> = {}): ActionInfo => ({ kind: "tap", role: "button", name: "Next", nth: 0, invalid: false, risky: false, depth: 1, left: 3, total: 4, visits: 0, index: 1, ...o });
@@ -46,6 +49,21 @@ describe("ranker in the walker", () => {
     expect(() => parseSamples(JSON.stringify({ x: [1], y: 1 }))).toThrow(/line 1: x must be a list/);
     expect(() => parseSamples(JSON.stringify({ x: FEATURES.map(() => "a"), y: 1 }))).toThrow(/finite/);
     expect(() => parseSamples(JSON.stringify({ x: FEATURES.map(() => 0), y: 2 }))).toThrow(/y must be 0 or 1/);
+  });
+  it("fails clearly on bad files and flags", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rk-")); const f = (n: string, t: string) => { const p = join(dir, n); writeFileSync(p, t); return p; };
+    expect(() => trainCommand({ train: "true" })).toThrow(/--train needs a samples file/);
+    expect(() => trainCommand({ train: f("s.jsonl", ""), "ranker-out": "true" })).toThrow(/--ranker-out needs a file/);
+    expect(() => trainCommand({ train: join(dir, "none") })).toThrow(/--train: cannot read/);
+    expect(() => trainCommand({ train: f("e.jsonl", ""), "ranker-out": join(dir, "o.json") })).toThrow(/empty/);
+    expect(() => readRanker(join(dir, "none"))).toThrow(/--ranker: cannot read/);
+    expect(() => readRanker(f("bad.json", "{oops"))).toThrow(/is not a ranker model/);
+    expect(() => readRanker(f("wrong.json", "{}"))).toThrow(/is not a ranker model/);
+  });
+  it("handles a screen with total 0", () => {
+    const v = features(act({ total: 0, index: 0 }));
+    expect(v).toHaveLength(FEATURES.length);
+    expect(v.every(Number.isFinite)).toBe(true);
   });
   it("reaches more screens and findings than the heuristic in the same steps on held-out benchmark apps", async () => {
     const b = await benchmark([15, 30, 60]);
