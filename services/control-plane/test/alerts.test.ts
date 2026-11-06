@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import app from "../src/index";
+import { newInstall } from "./signed";
 import { runOwnerCommand } from "../src/owner";
-import { MAX_ALERTS_PER_APP } from "../src/alerts";
+import { ALERT_MIN_INSTALLS, MAX_ALERTS_PER_APP } from "../src/alerts";
 
 // A tiny D1 stand-in for the three statements the alert code uses.
 function fakeDb(webhook: string | null) {
@@ -21,12 +21,20 @@ function fakeDb(webhook: string | null) {
       if (sql.startsWith("DELETE FROM app_alerts")) hook = null;
       return { meta: { changes: 1 } };
     },
-    first: async () => sql.includes("COUNT(*)") ? { n: [...sent.keys()].filter((k) => k.startsWith(`${a[0]}/`)).length } : (sql.includes("FROM app_alerts") && hook ? { webhook: hook } : null),
+    first: async () => sql.includes("COUNT(DISTINCT install_id) AS n") ? { n: ALERT_MIN_INSTALLS } : sql.includes("COUNT(*)") ? { n: [...sent.keys()].filter((k) => k.startsWith(`${a[0]}/`)).length } : (sql.includes("FROM app_alerts") && hook ? { webhook: hook } : null),
   }) }) } as any;
   return { d, get hook() { return hook; } };
 }
 const ev = (event: string, release = 3) => ({ schema_version: "1.0", app_id: "tide", release, event });
-const send = (db: any, body: unknown, ctx?: any) => app.request("/t", { method: "POST", body: JSON.stringify(body) }, { DB: db } as any, ctx);
+let ipn = 0;
+// Every call is a different registered install, so these tests exercise the alert slots, not the signing.
+const send = async (db: any, body: any, ctx?: any) => {
+  const m: Record<string, string> = {};
+  const env = { DB: db, OWNER_TOKEN: "secret", POINTERS: { get: async (k: string) => m[k] ?? null, put: async (k: string, v: string) => { m[k] = v; } } } as any;
+  const i = ++ipn;
+  const inst = await newInstall(env, "tide", `10.${i >> 8}.${i & 255}.1`);
+  return inst.sendWith(body, ctx);
+};
 const ctx = () => { const p: Promise<unknown>[] = []; return { c: { waitUntil: (x: Promise<unknown>) => p.push(x), passThroughOnException() {} } as any, done: () => Promise.all(p) }; };
 
 afterEach(() => vi.unstubAllGlobals());

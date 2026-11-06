@@ -6,6 +6,8 @@ export const REVERT_EVENTS = new Set(["rolled_back", "crash_loop_revert"]);
 export const ALERT_WINDOW_MS = 3600_000;
 /** Most alerts one app can send per window, whatever the release numbers. `POST /t` is unauthenticated. */
 export const MAX_ALERTS_PER_APP = 10;
+/** A revert alert needs this many distinct verified installs that reverted the release (#733). */
+export const ALERT_MIN_INSTALLS = 3;
 
 /** Accepts only https URLs without credentials. Throws OwnerError("bad_webhook_url"). */
 export function parseWebhookUrl(raw: string): string {
@@ -19,7 +21,7 @@ export function parseWebhookUrl(raw: string): string {
 
 /** Send the alert if the app has a webhook and none was sent for this release in the last hour,
  *  and the app is under its hourly cap. A slot is claimed before the POST, so a failed POST is not retried. Never throws. */
-export async function sendRevertAlert(db: D1Database, appId: string, release: number, event: string): Promise<void> {
+export async function sendRevertAlert(db: D1Database, appId: string, release: number, event: string, slot: number = release): Promise<void> {
   try {
     const row = await db.prepare("SELECT webhook FROM app_alerts WHERE app_id = ?").bind(appId).first<{ webhook: string }>();
     if (!row?.webhook) return;
@@ -32,7 +34,7 @@ export async function sendRevertAlert(db: D1Database, appId: string, release: nu
     if ((n?.n ?? 0) >= MAX_ALERTS_PER_APP) return;
     // Claim the slot in one statement: insert, or take over a row older than one hour.
     const claim = await db.prepare("INSERT INTO alert_sent (app_id, release, sent_at) VALUES (?,?,?) ON CONFLICT(app_id, release) DO UPDATE SET sent_at = excluded.sent_at WHERE alert_sent.sent_at <= ?")
-      .bind(appId, release, time, cutoff).run();
+      .bind(appId, slot, time, cutoff).run();
     if (!claim.meta?.changes) return;
     await fetch(row.webhook, { method: "POST", headers: { "content-type": "application/json" }, redirect: "manual",
       body: JSON.stringify({ app: appId, release, event, time }), signal: AbortSignal.timeout(5000) });

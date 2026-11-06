@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import app from "../src/index";
+import { newInstall } from "./signed";
 
 function kvStore(init: Record<string, string> = {}) {
   const m: Record<string, string> = { ...init };
@@ -23,26 +24,36 @@ describe("telemetry when D1 refuses writes", () => {
     const h = await (await app.request("/health", {}, { DB: failingDb, POINTERS: kv } as any)).json() as any;
     expect(h.telemetry_dropped_today).toBe(1);
   });
-  it("still halts from the KV count", async () => {
-    const { m, kv } = kvStore({ "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 5 }) });
+  it("holds for the owner (no automatic halt) from the verified KV count when D1 is down", async () => {
+    const { m, kv } = kvStore({ "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 5, min_installs: 5 }) });
+    const env = { DB: failingDb, POINTERS: kv, OWNER_TOKEN: "secret" };
     for (let i = 0; i < 5; i++) {
-      const r = await post({ schema_version: "1.0", app_id: "tide", release: 7, event: "rolled_back" }, { DB: failingDb, POINTERS: kv });
-      expect(r.status).toBe(202);
-      if (i < 4) expect(m["halt/tide"]).toBeUndefined();
-    }
-    expect(JSON.parse(m["halt/tide"]).release).toBe(7);
-    expect(m[`telemetry_dropped/tide/${day}`]).toBe("5");
-  });
-  it("does not halt a healthy release when D1 is down and healthy events dominate", async () => {
-    const { m, kv } = kvStore({ "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 5 }) });
-    for (let i = 0; i < 95; i++) await post({ schema_version: "1.0", app_id: "tide", release: 9, event: "applied" }, { DB: failingDb, POINTERS: kv });
-    for (let i = 0; i < 6; i++) {
-      const r = await post({ schema_version: "1.0", app_id: "tide", release: 9, event: "rolled_back" }, { DB: failingDb, POINTERS: kv });
+      const r = await (await newInstall(env, "tide", `10.0.${i}.1`)).send({ schema_version: "1.0", app_id: "tide", release: 7, event: "rolled_back" });
       expect(r.status).toBe(202);
     }
     expect(m["halt/tide"]).toBeUndefined();
+    expect(JSON.parse(m["c/tide/approval/halt-7"])).toMatchObject({ kind: "halt", status: "pending", release: 7 });
+    expect(m[`telemetry_dropped/tide/${day}`]).toBe("5");
+  });
+  it("does not count unverified reports when D1 is down", async () => {
+    const { m, kv } = kvStore({ "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 5, min_installs: 5 }) });
+    for (let i = 0; i < 30; i++) await post({ schema_version: "1.0", app_id: "tide", release: 7, event: "rolled_back" }, { DB: failingDb, POINTERS: kv, OWNER_TOKEN: "secret" });
+    expect(m["halt/tide"]).toBeUndefined();
+    expect(m["c/tide/approval/halt-7"]).toBeUndefined();
+    expect(m["telemetry_failed/tide/7"]).toBeUndefined();
+  });
+  it("does not hold a healthy release when D1 is down and healthy events dominate", async () => {
+    const { m, kv } = kvStore({ "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 5, min_installs: 5 }) });
+    const env = { DB: failingDb, POINTERS: kv, OWNER_TOKEN: "secret" };
+    for (let i = 0; i < 40; i++) await (await newInstall(env, "tide", `10.1.${i}.1`)).send({ schema_version: "1.0", app_id: "tide", release: 9, event: "applied" });
+    for (let i = 0; i < 6; i++) {
+      const r = await (await newInstall(env, "tide", `10.2.${i}.1`)).send({ schema_version: "1.0", app_id: "tide", release: 9, event: "rolled_back" });
+      expect(r.status).toBe(202);
+    }
+    expect(m["halt/tide"]).toBeUndefined();
+    expect(m["c/tide/approval/halt-9"]).toBeUndefined();
     expect(m["telemetry_failed/tide/9"]).toBe("6");
-    expect(m["telemetry_healthy/tide/9"]).toBe("95");
+    expect(m["telemetry_healthy/tide/9"]).toBe("40");
   });
   it("a dropped non-failure event writes no telemetry_failed key", async () => {
     const { m, kv } = kvStore();

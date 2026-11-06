@@ -69,3 +69,6 @@ export const Runtime: Native = native
       reload: () => native.reload(),
     }
   : fallback;
+
+export { ensureInstallIdentity, signReport, webCrypto } from "./telemetry";
+export type { InstallIdentity, InstallStorage, TelemetryCrypto } from "./telemetry";

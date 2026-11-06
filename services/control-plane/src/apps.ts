@@ -265,7 +265,7 @@ async function recordStaged(kv: KVNamespace, id: string, buf: ArrayBuffer) {
 
 const BAND_RANK = ["b0", "b1", "b2"];
 const approvalKey = (id: string, approvalId: string) => `c/${id}/approval/${approvalId}`;
-type Approval = { id: string; key: string; pointer: string; band: string; release: number; proposer: string; proposer_kind?: "agent" | "person"; status: "pending" | "approved" | "rejected"; proposed_at: string };
+type Approval = { kind?: "halt"; reason?: string; id: string; key: string; pointer: string; band: string; release: number; proposer: string; proposer_kind?: "agent" | "person"; status: "pending" | "approved" | "rejected"; proposed_at: string };
 
 /** With policy.requireApprovalAbove set, a pointer above that band is stored as a pending approval instead of going live. Returns the 202 body, or null. */
 async function proposeIfApprovalNeeded(c: any, id: string, buf: ArrayBuffer, key: string) {
@@ -290,12 +290,28 @@ async function approver(c: any, id: string): Promise<{ actor: string; kind: "per
   return row && row.account_id === dev.account_id ? { actor: dev.login, kind: "person" } : null;
 }
 
+/** A halt held by the anomaly guard: approve confirms the halt, reject dismisses it. Both are audited. A halt is the safe direction, so any owner or agent may confirm. */
+async function resolveHaltHold(c: any, id: string, a: Approval, who: { actor: string; kind: "person" | "agent" }, verb: "approve" | "reject") {
+  const approved = verb === "approve";
+  if (approved) {
+    const halted = { ...JSON.parse(a.pointer), halted_at: now(), confirmed_by: who.actor };
+    const cur = await c.env.POINTERS.get(a.key);
+    let same = false; try { same = !!cur && JSON.parse(cur).release === a.release; } catch { /* overwrite bad value */ }
+    if (!same) await c.env.POINTERS.put(a.key, JSON.stringify(halted));
+  }
+  await c.env.POINTERS.put(approvalKey(id, a.id), JSON.stringify({ ...a, status: approved ? "approved" : "rejected", resolved_by: who.actor, resolved_at: now() }));
+  await recordAudit(c.env.DB, { app_id: id, actor: who.actor, actor_kind: who.kind, action: "halt", release: a.release,
+    after: JSON.stringify({ halt: approved ? "confirmed" : "dismissed", approval_id: a.id, release: a.release, reason: a.reason }) });
+  return c.json({ ok: true, approval_id: a.id, status: approved ? "approved" : "rejected" });
+}
+
 async function resolveApproval(c: any, verb: "approve" | "reject") {
   const id = c.req.param("app"); const who = await approver(c, id); if (!who) return c.json({ error: "unauthorized" }, 401);
   const aid = c.req.param("id"); const raw = await c.env.POINTERS.get(approvalKey(id, aid));
   if (!raw) return c.json({ error: "not_found" }, 404);
   const a: Approval = JSON.parse(raw);
   if (a.status !== "pending") return c.json({ error: "not_pending", message: `This approval is already ${a.status}.` }, 409);
+  if (a.kind === "halt") return resolveHaltHold(c, id, a, who, verb);
   // Holds written before proposer_kind existed fall back to the old name check.
   const proposerKind = a.proposer_kind ?? (a.proposer.startsWith("agent") ? "agent" : "person");
   // An agent cannot approve an agent's proposal either: the owner token and the publish token are both agents.
@@ -347,7 +363,7 @@ apps.get("/:app/approvals", async (c) => {
     const listed: any = await c.env.POINTERS.list({ prefix, cursor, limit: 1000 });
     for (const k of listed.keys) {
       const raw = await c.env.POINTERS.get(k.name); if (!raw) continue;
-      try { const a: Approval = JSON.parse(raw); if (a.status === "pending") out.push({ id: a.id, release: a.release, band: a.band, proposer: a.proposer, proposed_at: a.proposed_at, status: a.status }); } catch { /* skip unreadable */ }
+      try { const a: Approval = JSON.parse(raw); if (a.status === "pending") out.push({ id: a.id, release: a.release, band: a.band, proposer: a.proposer, proposed_at: a.proposed_at, status: a.status, ...(a.kind ? { kind: a.kind, reason: a.reason } : {}) }); } catch { /* skip unreadable */ }
     }
     cursor = listed.list_complete === false ? listed.cursor : undefined;
   } while (cursor);

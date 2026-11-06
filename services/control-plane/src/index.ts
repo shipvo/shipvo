@@ -5,14 +5,16 @@ import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { forbidden, type Action } from "./roles";
-import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
+import { ALERT_MIN_INSTALLS, REVERT_EVENTS, sendRevertAlert } from "./alerts";
+import { DEFAULT_MIN_INSTALLS, DEFAULT_MIN_NETWORKS, DEFAULT_MIN_REPORTS, clientIp, netHash, rateLimit, registerInstall, verifyReport } from "./trust";
 import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket };
+const ANOMALY_WINDOW_MS = 600_000;
+type Env = { TELEMETRY_SECRET?: string; POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket };
 const app = new Hono<{ Bindings: Env }>();
 
 /* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
@@ -121,59 +123,112 @@ app.get("/b/:app/:file", async (c) => {
 
 /**
  * Write KV `halt/<app>` when a release fails on too many devices. Settings live in KV `halt-config/<app>`:
- * {"threshold": number, "min_reports": number}. No config key means halting is off.
+ * {"threshold", "min_reports", "min_installs", "min_networks"}. No config key means halting is off.
+ * Only verified reports count (signed by a registered install), one vote per install per release (#733).
+ * A halt needs `min_installs` distinct failing installs from `min_networks` distinct /24 networks (when networks are known).
+ * If the burst looks abnormal, the release is held and the owner is asked instead.
  */
 async function maybeHalt(env: Env, appId: string, release: number, kv?: { failed: number; healthy: number }): Promise<void> {
   if (!env.POINTERS) return;
   const raw = await env.POINTERS.get(`halt-config/${appId}`);
   if (!raw) return;
-  let cfg: { threshold?: unknown; min_reports?: unknown };
+  let cfg: { threshold?: unknown; min_reports?: unknown; min_installs?: unknown; min_networks?: unknown };
   try { cfg = JSON.parse(raw); } catch { return; }
   if (!cfg || typeof cfg !== "object") return;
   const threshold = typeof cfg.threshold === "number" ? cfg.threshold : undefined;
-  const minReports = typeof cfg.min_reports === "number" ? cfg.min_reports : 20;
-  let results: { event: string; n: number }[] = [];
+  const minReports = typeof cfg.min_reports === "number" ? cfg.min_reports : DEFAULT_MIN_REPORTS;
+  const minInstalls = typeof cfg.min_installs === "number" ? cfg.min_installs : DEFAULT_MIN_INSTALLS;
+  const minNetworks = typeof cfg.min_networks === "number" ? cfg.min_networks : DEFAULT_MIN_NETWORKS;
+  const counts = { healthy: 0, failed: 0 };
+  const reasons: string[] = [];
+  const inList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
+  let nets = 0;
   try {
-    results = (await env.DB.prepare("SELECT event, COUNT(*) AS n FROM telemetry WHERE app_id = ? AND release = ? GROUP BY event").bind(appId, release).all<{ event: string; n: number }>()).results ?? [];
+    const rows = (await env.DB.prepare("SELECT event, COUNT(DISTINCT install_id) AS n FROM telemetry WHERE app_id = ? AND release = ? AND verified = 1 GROUP BY event").bind(appId, release).all<{ event: string; n: number }>()).results ?? [];
+    for (const r of rows) if (HEALTHY_EVENTS.includes(r.event)) counts.healthy += r.n;
+    const since = new Date(Date.now() - ANOMALY_WINDOW_MS).toISOString();
+    const f = await env.DB.prepare(`SELECT COUNT(DISTINCT install_id) AS installs, COUNT(DISTINCT net_hash) AS nets, COUNT(DISTINCT CASE WHEN fresh = 1 THEN install_id END) AS fresh_installs, COUNT(DISTINCT CASE WHEN received_at >= ? THEN install_id END) AS recent FROM telemetry WHERE app_id = ? AND release = ? AND verified = 1 AND event IN (${inList})`)
+      .bind(since, appId, release).first<{ installs: number; nets: number; fresh_installs: number; recent: number }>();
+    counts.failed = f?.installs ?? 0; nets = f?.nets ?? 0;
+    if (counts.failed < 1) return;
+    if (f && f.fresh_installs * 2 > f.installs) reasons.push("most failing installs registered in the last hour");
+    const from = new Date(Date.now() - 86400_000).toISOString();
+    const base = await env.DB.prepare(`SELECT COUNT(*) AS n FROM telemetry WHERE app_id = ? AND verified = 1 AND release != ? AND event IN (${inList}) AND received_at >= ? AND received_at < ?`).bind(appId, release, from, since).first<{ n: number }>();
+    const normal = (base?.n ?? 0) / (86400_000 / ANOMALY_WINDOW_MS - 1);
+    if (normal > 0 && (f?.recent ?? 0) >= minInstalls && (f?.recent ?? 0) > 10 * normal) reasons.push("failure reports jumped far above this app's normal rate");
   } catch (e) {
-    // D1 over its limit: fall back to the KV count so auto-halt still works.
+    // D1 over its limit: use the KV count of verified installs. Networks cannot be checked then, so the owner decides.
     if (!kv) throw e;
     console.error("halt count read failed, using KV fallback", e);
+    counts.failed = kv.failed; counts.healthy = kv.healthy;
+    reasons.push("report store unavailable, networks could not be checked");
   }
-  const counts = { healthy: 0, failed: 0 };
-  for (const r of results) {
-    if (HEALTHY_EVENTS.includes(r.event)) counts.healthy += r.n;
-    else if (FAILED_EVENTS.includes(r.event)) counts.failed += r.n;
-  }
-  if (kv) { counts.failed = Math.max(counts.failed, kv.failed); counts.healthy = Math.max(counts.healthy, kv.healthy); }
   const verdict = shouldHalt(counts, { threshold, minReports });
-  if (!verdict.halt) return;
+  if (!verdict.halt || counts.failed < minInstalls) return;
+  // Not enough distinct networks: not corroborated, so neither halt nor ask. (nets is 0 when no IPs are known, for example self-hosted without Cloudflare.)
+  if (nets > 0 && nets < minNetworks) return;
+  const halted = { release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold };
+  if (reasons.length) { await holdHalt(env, appId, release, halted, reasons.join("; ")); return; }
+  await applyHalt(env, appId, release, halted, "halt-rule", "system");
+}
+
+/** Write the halt flag and audit it. The same release is never re-halted (keeps halted_at). */
+export async function applyHalt(env: Env, appId: string, release: number, halted: Record<string, unknown>, actor: string, kind: "system" | "person" | "agent"): Promise<void> {
   const key = `halt/${appId}`;
   // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
   const cur = await env.POINTERS.get(key);
   if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
-  const halted = { release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold };
   await env.POINTERS.put(key, JSON.stringify(halted));
   // recordAudit never throws, so a failed audit write cannot undo or block the halt.
-  await recordAudit(env.DB, { app_id: appId, actor: "halt-rule", actor_kind: "system", action: "halt", release, before: null, after: JSON.stringify({ release, reports: verdict.reports, failed: counts.failed, threshold }) });
+  await recordAudit(env.DB, { app_id: appId, actor, actor_kind: kind, action: "halt", release, before: null, after: JSON.stringify(halted) });
 }
 
-/** Device telemetry for the spike: applied / reverted / timings. */
+/** Do not halt. Keep the release at its current band and ask the owner: an approval entry, an audit row and the alert webhook. Once per release. */
+async function holdHalt(env: Env, appId: string, release: number, halted: Record<string, unknown>, reason: string): Promise<void> {
+  const key = `c/${appId}/approval/halt-${release}`;
+  if (await env.POINTERS.get(key)) return; // already asked (pending) or already answered (a dismissal stays dismissed)
+  const hold = { id: `halt-${release}`, kind: "halt", key: `halt/${appId}`, pointer: JSON.stringify(halted), band: "halt", release, reason, proposer: "halt-rule", proposer_kind: "person", status: "pending", proposed_at: new Date().toISOString() };
+  await env.POINTERS.put(key, JSON.stringify(hold));
+  await recordAudit(env.DB, { app_id: appId, actor: "halt-rule", actor_kind: "system", action: "halt", release, before: null, after: JSON.stringify({ halt: "held_for_owner", reason, ...halted }) });
+  // Own alert slot (negative release) so a held halt is not starved by revert alerts.
+  await sendRevertAlert(env.DB, appId, release, "halt_held", -release);
+}
+
+/** Register an install (once, on first launch). Rate limited per IP and per app. */
+app.post("/t/register", async (c) => {
+  const ip = clientIp(c) ?? "unknown";
+  if (!(await rateLimit(c.env.POINTERS, `reg-ip/${ip}`, 10))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
+  if (typeof body?.app_id === "string" && !(await rateLimit(c.env.POINTERS, `reg-app/${body.app_id}`, 300))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  if (typeof body?.app_id !== "string" || !ID.test(body.app_id)) return c.json({ error: "bad_register" }, 400);
+  const r = await registerInstall(c.env, body);
+  return c.json(r.json, r.status as any);
+});
+
+/** Device telemetry: applied / reverted / timings. Reports from registered installs are verified; all others are stored as unverified. */
 app.post("/t", async (c) => {
+  const ip = clientIp(c);
+  if (!(await rateLimit(c.env.POINTERS, `t-ip/${ip ?? "unknown"}`, 300))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
   let body: any;
   try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
   const t = Telemetry.safeParse(body);
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
+  if (!(await rateLimit(c.env.POINTERS, `t-app/${d.app_id}`, 3000)) || (d.install_id && !(await rateLimit(c.env.POINTERS, `t-install/${d.app_id}/${d.install_id}`, 30)))) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  const trust = await verifyReport(c.env, d, extra);
+  if (trust.duplicate) return c.json({ ok: true, duplicate: true }, 202);
+  const net = await netHash(c.env, d.app_id, ip);
   let stored = true;
   try {
   await c.env.DB.prepare(
-    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via, install_id, verified, net_hash, fresh) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(d.app_id, d.release, d.event, d.cold_start_ms ?? null, d.bytes_downloaded ?? null, d.apply_ms ?? null, d.device_class ?? null,
     typeof extra.published_at === "string" ? extra.published_at.slice(0, 40) : null,
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
-    extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
+    extra.via === "patch" || extra.via === "full" ? extra.via : null,
+    trust.installId, trust.verified ? 1 : 0, net, trust.fresh ? 1 : 0).run();
   } catch (e) {
     // D1 can refuse writes (for example the Free plan daily limit). Never send a 5xx to the phone.
     stored = false;
@@ -187,24 +242,30 @@ app.post("/t", async (c) => {
       await bump(`telemetry_dropped/${d.app_id}/${utcDay()}`, 7 * 86400);
       await bump(`telemetry_dropped_total/${utcDay()}`, 7 * 86400);
       const isFailed = FAILED_EVENTS.includes(d.event), isHealthy = HEALTHY_EVENTS.includes(d.event);
-      if (isFailed || isHealthy) {
-        // Count both sides per release (1h TTL) so the fallback ratio is not failures against zero.
+      if (trust.verified && trust.installId && (isFailed || isHealthy)) {
+        // Count both sides per release (1h TTL), verified installs only, one vote per install and side.
+        const side = isFailed ? "failed" : "healthy";
+        const vote = `telemetry_vote/${d.app_id}/${d.release}/${side}/${trust.installId}`;
         const fk = `telemetry_failed/${d.app_id}/${d.release}`, hk = `telemetry_healthy/${d.app_id}/${d.release}`;
-        const f = isFailed ? await bump(fk, 3600) : Number(await c.env.POINTERS.get(fk)) || 0;
-        const h = isHealthy ? await bump(hk, 3600) : Number(await c.env.POINTERS.get(hk)) || 0;
-        kv = { failed: f, healthy: h };
+        if (!(await c.env.POINTERS.get(vote))) { await c.env.POINTERS.put(vote, "1", { expirationTtl: 3600 }); await bump(isFailed ? fk : hk, 3600); }
+        kv = { failed: Number(await c.env.POINTERS.get(fk)) || 0, healthy: Number(await c.env.POINTERS.get(hk)) || 0 };
       }
     } catch (e) { console.error("telemetry fallback counter failed", e); }
   }
-  // Halting is a best-effort side effect: never fail the response.
-  if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release, kv); } catch (e) { console.error("halt check failed", e); } }
-  if (stored && REVERT_EVENTS.has(d.event)) {
-    const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
+  // Halting is a best-effort side effect: never fail the response. Unverified reports never reach it.
+  if (trust.verified && FAILED_EVENTS.includes(d.event) && (stored || kv)) { try { await maybeHalt(c.env, d.app_id, d.release, kv); } catch (e) { console.error("halt check failed", e); } }
+  if (stored && trust.verified && REVERT_EVENTS.has(d.event)) {
+    // Alert only after several distinct verified installs reverted this release, so one source cannot spend the alert slots.
+    const job = (async () => {
+      try {
+        const n = await c.env.DB.prepare("SELECT COUNT(DISTINCT install_id) AS n FROM telemetry WHERE app_id = ? AND release = ? AND verified = 1 AND event IN ('rolled_back','crash_loop_revert')").bind(d.app_id, d.release).first<{ n: number }>();
+        if ((n?.n ?? 0) >= ALERT_MIN_INSTALLS) await sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
+      } catch { /* alerts never affect telemetry */ }
+    })();
     try { c.executionCtx.waitUntil(job); } catch { /* no execution context (tests, local): the job runs on its own */ }
   }
   return c.json(stored ? { ok: true } : { ok: true, stored: false }, 202);
 });
-
 /** Spike read-out: latest telemetry rows for an app. Public on purpose for the spike; behind Access later. */
 app.get("/t/:app", async (c) => {
   const appId = c.req.param("app");
@@ -245,8 +306,16 @@ app.get("/t/:app/summary", async (c) => {
   // The auto-halt setting, so `shipvo status` can show it. Not secret. Null means off.
   let auto_halt: { threshold: number; min_reports: number } | null = null;
   const cfgRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt-config/${appId}`) : null;
-  if (cfgRaw) { try { const v = JSON.parse(cfgRaw); if (v && typeof v.threshold === "number" && v.threshold > 0 && v.threshold <= 1) auto_halt = { threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : 20 }; } catch { /* corrupt: off */ } }
-  return c.json({ releases, halted, auto_halt });
+  if (cfgRaw) { try { const v = JSON.parse(cfgRaw); if (v && typeof v.threshold === "number" && v.threshold > 0 && v.threshold <= 1) auto_halt = { threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS }; } catch { /* corrupt: off */ } }
+  // Halts held for the owner (anomaly guard). The admin shows these as a banner; `approvals_list` shows them too.
+  const halt_holds: unknown[] = [];
+  if (c.env.POINTERS?.list) {
+    try {
+      const listed: any = await c.env.POINTERS.list({ prefix: `c/${appId}/approval/halt-`, limit: 50 });
+      for (const k of listed.keys) { const a = JSON.parse((await c.env.POINTERS.get(k.name)) ?? "null"); if (a?.status === "pending") halt_holds.push({ id: a.id, release: a.release, reason: a.reason, proposed_at: a.proposed_at }); }
+    } catch { /* no list: no banner */ }
+  }
+  return c.json({ releases, halted, auto_halt, halt_holds });
 });
 
 app.get("/band/:cohort", (c) => {
@@ -337,7 +406,7 @@ app.get("/app/:id/api/halt-config", async (c) => {
   if (raw) {
     try {
       const v = JSON.parse(raw);
-      if (v && typeof v.threshold === "number") return c.json({ enabled: true, threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : 20 });
+      if (v && typeof v.threshold === "number") return c.json({ enabled: true, threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS });
     } catch { /* corrupt: treated as off */ }
   }
   return c.json({ enabled: false });
@@ -348,11 +417,17 @@ app.put("/app/:id/api/halt-config", async (c) => {
   if (!(await haltConfigAuth(c, appId))) return c.json({ error: "unauthorized" }, 401);
   { const no = await roleDenied(c, appId, "halt"); if (no) return no; }
   let body: any; try { body = await c.req.json(); } catch { return bad(c, "body must be JSON like {\"threshold\": 0.2}"); }
-  const t = body?.threshold, m = body?.min_reports === undefined ? 20 : body.min_reports;
+  const t = body?.threshold, m = body?.min_reports === undefined ? DEFAULT_MIN_REPORTS : body.min_reports;
   if (typeof t !== "number" || !Number.isFinite(t) || t <= 0 || t > 1) return bad(c, "threshold must be a number above 0 and at most 1");
   if (typeof m !== "number" || !Number.isInteger(m) || m < 1 || m > 10000) return bad(c, "min_reports must be an integer from 1 to 10000");
-  await c.env.POINTERS.put(`halt-config/${appId}`, JSON.stringify({ threshold: t, min_reports: m }));
-  return c.json({ enabled: true, threshold: t, min_reports: m });
+  const extra: Record<string, number> = {};
+  for (const [k, max] of [["min_installs", 10000], ["min_networks", 1000]] as const) {
+    if (body?.[k] === undefined) continue;
+    if (typeof body[k] !== "number" || !Number.isInteger(body[k]) || body[k] < 1 || body[k] > max) return bad(c, `${k} must be an integer from 1 to ${max}`);
+    extra[k] = body[k];
+  }
+  await c.env.POINTERS.put(`halt-config/${appId}`, JSON.stringify({ threshold: t, min_reports: m, ...extra }));
+  return c.json({ enabled: true, threshold: t, min_reports: m, ...extra });
 });
 app.delete("/app/:id/api/halt-config", async (c) => {
   const appId = c.req.param("id");

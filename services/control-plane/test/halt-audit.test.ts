@@ -1,17 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
-import app from "../src/index";
+import { newInstall } from "./signed";
 
 function setup(failAudit: boolean) {
-  const store: Record<string, string> = { "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 20 }) };
+  const store: Record<string, string> = { "halt-config/tide": JSON.stringify({ threshold: 0.2, min_reports: 20, min_installs: 1 }) };
   const POINTERS = { get: async (k: string) => store[k] ?? null, put: async (k: string, v: string) => { store[k] = v; } } as any;
   const audits: unknown[][] = [];
   const DB = { prepare: (sql: string) => ({ bind: (...a: unknown[]) => ({
     run: async () => { if (sql.includes("INSERT INTO audit_log")) { if (failAudit) throw new Error("db down"); audits.push(a); } return {}; },
+    first: async () => sql.includes("AS installs") ? { installs: 6, nets: 5, fresh_installs: 0, recent: 0 } : sql.includes("COUNT(*) AS n FROM telemetry") ? { n: 0 } : null,
     all: async () => ({ results: sql.includes("GROUP BY event") ? [{ event: "applied", n: 14 }, { event: "rolled_back", n: 6 }] : [] }),
   }) }) } as any;
-  return { env: { POINTERS, DB } as any, store, audits };
+  return { env: { POINTERS, DB, OWNER_TOKEN: "secret" } as any, store, audits };
 }
-const fail = (env: any) => app.request("/t", { method: "POST", body: JSON.stringify({ schema_version: "1.0", app_id: "tide", release: 5, event: "rolled_back" }) }, env);
+const fail = async (env: any) => (await newInstall(env)).send({ schema_version: "1.0", app_id: "tide", release: 5, event: "rolled_back" });
 
 describe("automatic halt audit row", () => {
   it("writes one system row for the halt", async () => {

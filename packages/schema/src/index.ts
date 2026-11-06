@@ -164,8 +164,24 @@ export const Telemetry = z.object({
   bytes_downloaded: z.number().int().nonnegative().optional(),
   apply_ms: z.number().nonnegative().optional(),
   device_class: z.enum(["low", "mid", "high"]).optional(),
+  // Additive trust fields (#733). Old runtimes omit them; their reports are stored as unverified and never count toward auto-halt.
+  install_id: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/).optional(),
+  install_token: z.string().max(200).optional(),
+  /** Hex HMAC-SHA-256 of canonicalize(report without `sig`), keyed with the install key. */
+  sig: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 });
 export type Telemetry = z.infer<typeof Telemetry>;
+
+/** `POST /t/register` body: one call per install, on first launch. The server answers `{ install_token }`. */
+export const TelemetryRegister = z.object({
+  schema_version: z.literal("1.0"),
+  app_id: z.string(),
+  install_id: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/),
+  /** Random per-install secret, 32 to 128 hex characters. Used only to sign this install's reports. */
+  install_key: z.string().regex(/^[0-9a-f]{32,128}$/),
+  shell_version: z.string().min(1).max(40),
+});
+export type TelemetryRegister = z.infer<typeof TelemetryRegister>;
 
 /** Canonical JSON for signing: sorted keys, no whitespace, `signature` excluded. */
 export function canonicalize(value: unknown): string {

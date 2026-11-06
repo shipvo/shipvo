@@ -12,7 +12,7 @@ With no flags, print the current setting.
 
 Flags (write a value after a space, not =):
   --threshold 0.2     Halt when more than this share of reports failed (above 0, at most 1)
-  --min-reports 20    Wait for this many reports first (1 to 10000, default 20)
+  --min-reports 20    Wait for this many reports first (1 to 10000, default 50)
   --off               Turn auto-halt off
   --dry-run           Print what would change, write nothing
   --json              Print one JSON envelope on stdout; text goes to stderr

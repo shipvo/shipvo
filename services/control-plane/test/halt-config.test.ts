@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import app from "../src/index";
+import { newInstall } from "./signed";
 
 const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 type Tok = { app_id: string; revoked_at?: string | null; expires_at?: string | null };
@@ -11,6 +12,8 @@ function setup(healthy = 14, failed = 6, tokens: Record<string, Tok> = {}) {
     run: async () => ({}),
     first: async () => {
       if (sql.includes("FROM publish_tokens")) { const [h, app_] = _a as string[]; const t = tokens[h]; return t && t.app_id === app_ && !t.revoked_at ? { id: 1, expires_at: t.expires_at ?? null } : null; }
+      if (sql.includes("COUNT(DISTINCT install_id) AS installs")) return { installs: failed, nets: 5, fresh_installs: 0, recent: 0 };
+      if (sql.includes("COUNT(*) AS n FROM telemetry")) return { n: 0 };
       if (sql.includes("FROM apps")) return { public_key: "k", bytes_used: 0 };
       return null;
     },
@@ -39,10 +42,10 @@ describe("halt-config route", () => {
     const g = await app.request("/app/tide/api/halt-config", { headers: H }, s.env);
     expect(await g.json()).toEqual({ enabled: true, threshold: 0.2, min_reports: 20 });
   });
-  it("defaults min_reports to 20 and accepts the bounds", async () => {
+  it("defaults min_reports to 50 and accepts the bounds", async () => {
     const s = setup();
     expect((await put(s.env, { threshold: 1 })).status).toBe(200);
-    expect(JSON.parse(s.store["halt-config/tide"]).min_reports).toBe(20);
+    expect(JSON.parse(s.store["halt-config/tide"]).min_reports).toBe(50);
     expect((await put(s.env, { threshold: 0.01, min_reports: 10000 })).status).toBe(200);
     expect((await put(s.env, { threshold: 0.5, min_reports: 1 })).status).toBe(200);
   });
@@ -68,10 +71,11 @@ describe("halt-config route", () => {
   });
   it("halts a failing release after the config is set through the route", async () => {
     const s = setup(14, 6);
-    const fail = () => app.request("/t", { method: "POST", body: JSON.stringify({ schema_version: "1.0", app_id: "tide", release: 5, event: "rolled_back" }) }, s.env);
+    const inst = await newInstall(s.env);
+    const fail = () => inst.send({ schema_version: "1.0", app_id: "tide", release: 5, event: "rolled_back" });
     await fail();
     expect(s.store["halt/tide"]).toBeUndefined();
-    await put(s.env, { threshold: 0.2, min_reports: 20 });
+    await put(s.env, { threshold: 0.2, min_reports: 20, min_installs: 1 });
     await fail();
     expect(JSON.parse(s.store["halt/tide"])).toMatchObject({ release: 5, reports: 20, failed: 6, threshold: 0.2 });
   });

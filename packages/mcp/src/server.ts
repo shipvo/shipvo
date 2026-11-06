@@ -431,11 +431,11 @@ async function approvalsCall(app: string, path: string, method: "GET" | "POST") 
   const body: any = await r.json().catch(() => ({}));
   return { r, body };
 }
-server.tool("approvals_list", "List promotes held above the app's policy band, waiting for a second owner: hold id, release, band asked for, proposer and age. Needs an owner token.", { app: z.string() }, RO, async ({ app }) => {
+server.tool("approvals_list", "List promotes held above the app's policy band, waiting for a second owner, and auto-halts held by the anomaly guard (kind \"halt\": approve confirms the halt, reject dismisses it): hold id, release, band asked for, proposer and age. Needs an owner token.", { app: z.string() }, RO, async ({ app }) => {
   const { r, body } = await approvalsCall(app, "", "GET");
   if (!r.ok) return { ...text(JSON.stringify({ ok: false, status: r.status, ...body })), isError: true };
   const t = Date.now();
-  const approvals = (body.approvals ?? []).map((h: any) => ({ id: h.id, release: h.release, band: h.band, proposer: h.proposer, proposed_at: h.proposed_at, age_seconds: Number.isFinite(Date.parse(h.proposed_at)) ? Math.max(0, Math.round((t - Date.parse(h.proposed_at)) / 1000)) : null }));
+  const approvals = (body.approvals ?? []).map((h: any) => ({ id: h.id, release: h.release, band: h.band, proposer: h.proposer, proposed_at: h.proposed_at, ...(h.kind ? { kind: h.kind, reason: h.reason } : {}), age_seconds: Number.isFinite(Date.parse(h.proposed_at)) ? Math.max(0, Math.round((t - Date.parse(h.proposed_at)) / 1000)) : null }));
   return { ...text(JSON.stringify({ ok: true, app, approvals }, null, 2)), structuredContent: { ok: true, app, approvals } };
 });
 server.tool("approval_approve", "Approve a held promote so it goes live. The proposer cannot approve it, and an agent cannot approve an agent's proposal: that is refused with rule self_approval. Ask the owner to approve in that case. Both outcomes are audited.", { app: z.string(), id: z.string().describe("Hold id from approvals_list") }, DEST, async ({ app, id }) => {

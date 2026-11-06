@@ -63,6 +63,28 @@ Trust boundaries, from least to most trusted:
 | **A signed release that crashes the app** | Not an attack, but the same blast radius. The device counts trial boots, drops a release that never reports healthy, and reverts one that dies shortly after. | `BootRules.kt`, `Store.swift` | `StabilityTest.kt` `releaseThatDiesAfterMarkHealthyIsReverted`; `RuntimeTests.swift` `testUnhealthyReleaseIsDroppedAfterThreeLoads`, `testReleaseThatDiesAfterMarkHealthyIsReverted`. |
 | **Agent with a scoped token** | An agent that holds only the owner token or a publish token cannot sign. It cannot create a release phones accept. The control plane gates its destructive calls behind a confirm step, applies the owner's `agentMaxBand` limit, and the owner can set approval so that a second person must approve a wide release. | `services/control-plane/src/index.ts`, `apps.ts` | `agent-confirm.test.ts` "the deny list blocks any command, confirm or not", "agents cannot change the policy; the admin can"; `release-policy.test.ts` "refuses an agent beyond agentMaxBand; a human at the same band succeeds"; `approval.test.ts` "the proposer cannot approve". An agent given the seed has the same power as a stolen seed. |
 
+## Forged telemetry (auto-halt)
+
+`POST /t` is open, so anyone can send a report. A forged report must never halt a release or hide a real alert.
+
+| Attack | Result | Test |
+|---|---|---|
+| No token, bad token, bad HMAC, or a body edited after signing | Stored as `unverified`. Shown on dashboards. Never counted for halt, hold or alerts. | `telemetry-trust.test.ts` "reports with no token..." |
+| Replayed body | Second copy is dropped (24 h). | "a replayed body is stored once" |
+| One install voting many times | One vote per install id per release. Also 30 reports per minute per install. | "one install voting many times counts once" |
+| Many fresh installs from one network | Needs failing installs from at least 3 distinct /24 networks (IPv6: /48). Otherwise no halt and no owner request. | "many fresh installs from one network..." |
+| A burst of new installs, or a spike far above the app's normal rate | No automatic halt. The release is held and the owner is asked. | "anomaly guard" tests |
+| Forged rollbacks to use up alert webhooks | Only verified reports alert, and only after 3 distinct verified installs reverted the release. 10 alerts per app per hour still applies. | "forged rollbacks cannot use up alert slots..." |
+| Flooding `/t` or `/t/register` | Rate limits per IP, per install and per app (KV counters). | "limits POST /t per IP..." |
+
+Not protected:
+
+- **A determined attacker with many networks.** Registration is open and rate limited (10 per minute per IP), not authenticated. An attacker with hundreds of IPs and an hour of patience can still produce enough verified, aged installs to cause a halt. The guard raises the cost; it does not remove it. A halt is reversible (publish a new release).
+- **Old runtimes.** They send no key. Their reports count for dashboards only. Until the app ships a runtime that signs reports, auto-halt will not fire for that app.
+- **KV counters are not atomic.** Under heavy concurrency a rate limit can be exceeded by a small margin.
+- **No Cloudflare, no network check.** Without the `cf-connecting-ip` header (some self-hosted setups), network hashes are empty and the network rule is skipped.
+- **Signing secret.** Install tokens are signed with `TELEMETRY_SECRET` (falls back to `OWNER_TOKEN`, then `ADMIN_PASSWORD`). With none of these set, nothing is verified.
+
 ## What we do not defend against
 
 - **A stolen or leaked seed.** There is no second factor on signing and no key rotation for installed apps. Release policy and approval slow a release down. They do not make a signed release invalid.
@@ -71,7 +93,7 @@ Trust boundaries, from least to most trusted:
 - **Withholding.** A compromised control plane, CDN or network can serve nothing, or serve a stale pointer. Devices then keep running what they have. There is no signed freshness proof, so a device cannot tell "no update" from "update hidden".
 - **Native code changes.** An update is JavaScript on the shell's existing native modules. It cannot add permissions or native modules, but it can use any that the shell already has.
 - **A compromised phone or a rooted device.** The staged bundle sits in the app's own storage. We do not defend against code that can already write there.
-- **Telemetry integrity.** Update reports sent by devices are unsigned. The auto-halt feature acts on them, so a flood of false reports could halt a good release.
+- **Telemetry truth.** A report cannot be proven true. Auto-halt only counts reports that carry a registered install key, so a forger has to register many installs from many networks. See "Forged telemetry" below for what is and is not protected.
 - **Denial of service** against the control plane.
 - **Android device-side platform check.** See the platform row: not covered.
 - **Anything in the hosted simulator or the sample app.** This page is about signed updates only.
