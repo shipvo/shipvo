@@ -15,14 +15,15 @@ function fake() {
   const DB = { prepare: (sql: string) => ({ bind: (...a: any[]) => ({
     first: async () => {
       if (sql.includes("FROM content_versions")) return a[1] === 3 ? { json: JSON.stringify(content) } : null;
-      if (sql.startsWith("SELECT status")) return rows.find((r) => r.app_id === a[0] && r.order_id === a[1]) ?? null;
+      if (sql.startsWith("SELECT status")) return rows.find((r) => r.app_id === a[0] && r.idem === a[1]) ?? null;
       if (sql.includes("COUNT(*)")) { const col = sql.includes("ip_hash") ? "ip_hash" : "install"; return { n: rows.filter((r) => r.app_id === a[0] && r[col] === a[1]).length }; }
       return null;
     },
+    all: async () => ({ results: rows.filter((r) => r.app_id === a[0] && r.order_id === a[1] && (a.length < 3 || r[sql.includes("idem = ?") ? "idem" : "install"] === a[2])).map((r) => ({ id: r.id, status: r.status, total: r.total })) }),
     run: async () => {
-      if (sql.startsWith("INSERT INTO orders")) { if (!rows.some((r) => r.app_id === a[0] && r.order_id === a[1])) rows.push({ app_id: a[0], order_id: a[1], total: a[2], json: a[3], status: a[4], simulated: a[5], ip_hash: a[6], install: a[7] }); }
-      if (sql.startsWith("UPDATE orders")) { const r = rows.find((x) => x.app_id === a[2] && x.order_id === a[3] && x.status === "unverified"); if (r) { r.status = "settled"; r.settled_at = a[0]; } }
-      return {};
+      if (sql.startsWith("INSERT INTO orders")) { if (rows.some((r) => r.app_id === a[0] && r.idem === a[8])) return { meta: { changes: 0 } }; rows.push({ id: rows.length + 1, app_id: a[0], order_id: a[1], total: a[2], json: a[3], status: a[4], simulated: a[5], ip_hash: a[6], install: a[7], idem: a[8] }); }
+      if (sql.startsWith("UPDATE orders")) { const r = rows.find((x) => x.id === a[2] && x.status === "unverified"); if (r) { r.status = "settled"; r.settled_at = a[0]; } }
+      return { meta: { changes: 1 } };
     },
   }) }) } as any;
   return { DB, rows, env: { DB, POINTERS: { get: async () => null }, OWNER_TOKEN: "tok" } as any };
@@ -50,6 +51,34 @@ describe("POST /o/:app trust rules", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].total).toBe(2000);
   });
+  it("stores the same order id from two installs, both", async () => {
+    const { env, rows } = fake();
+    expect((await place(env, good("TT-1001"), { install_id: "a" })).status).toBe(202);
+    const r = await place(env, good("TT-1001"), { install_id: "b" });
+    expect(((await r.json()) as any).duplicate).toBe(false);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((x) => x.status === "unverified")).toBe(true);
+  });
+  it("lets a client idempotency_key tell orders apart, and repeats of it are duplicates", async () => {
+    const { env, rows } = fake();
+    await place(env, good("TT-1001"), { idempotency_key: "u1" });
+    await place(env, good("TT-1001"), { idempotency_key: "u2" });
+    expect(((await (await place(env, good("TT-1001"), { idempotency_key: "u1" })).json()) as any).duplicate).toBe(true);
+    expect(rows).toHaveLength(2);
+  });
+  it("a simulated or price_mismatch squatter does not block a real order from another install", async () => {
+    const { env, rows } = fake();
+    await place(env, good("TT-1001"), { install_id: "evil", simulated: true });
+    await place(env, { ...good("TT-1001"), total: 1 }, { install_id: "evil2" });
+    const r = await place(env, good("TT-1001"), { install_id: "real" });
+    expect(r.status).toBe(202);
+    expect(((await r.json()) as any).status).toBe("unverified");
+    expect(rows.map((x) => x.status)).toEqual(["simulated", "price_mismatch", "unverified"]);
+    expect((await settle(env, "TT-1001", "Bearer tok")).status).toBe(409); // ambiguous without a selector
+    const ok = await app.request("/app/tide/api/orders/TT-1001/settle", { method: "POST", headers: { authorization: "Bearer tok" }, body: JSON.stringify({ install_id: "real" }) }, env);
+    expect(ok.status).toBe(200);
+    expect(rows[2].status).toBe("settled");
+  });
   it("marks a tampered total as price_mismatch and answers 422", async () => {
     const { env, rows } = fake();
     const r = await place(env, { ...good(), total: 1 });
@@ -72,6 +101,7 @@ describe("POST /o/:app trust rules", () => {
     expect(rows[0].status).toBe("simulated");
     expect(rows[0].simulated).toBe(1);
     expect((await settle(env, "TT-1", "Bearer tok")).status).toBe(409);
+    expect(rows[0].settled_at).toBeUndefined();
   });
   it("rate limits per install and per IP", async () => {
     const a = fake();
@@ -105,6 +135,13 @@ describe("POST /app/:id/api/orders/:order/settle", () => {
     expect(rows[0].status).toBe("settled");
     expect(((await (await settle(env, "TT-1", "Bearer tok")).json()) as any).already).toBe(true);
     expect((await settle(env, "nope", "Bearer tok")).status).toBe(404);
+  });
+  it("refuses to settle when the stated amount differs from the stored total", async () => {
+    const { env, rows } = fake();
+    await place(env, good());
+    const r = await app.request("/app/tide/api/orders/TT-1/settle", { method: "POST", headers: { authorization: "Bearer tok" }, body: JSON.stringify({ amount: 5 }) }, env);
+    expect(r.status).toBe(409);
+    expect(rows[0].status).toBe("unverified");
   });
   it("will not settle a price_mismatch order", async () => {
     const { env } = fake();

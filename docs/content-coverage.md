@@ -36,6 +36,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Self-hosting on Cloudflare | [self-hosting](self-hosting.md) | | | |
 | Share a preview link (`shipvo preview`) | [getting-started](getting-started.md) | | | |
 | Telemetry export to R2 | [telemetry-export](telemetry-export.md) | | | |
+| Taking real orders: verify and settle | [taking-real-orders](taking-real-orders.md) | | | |
 | Move from CodePush | [migrate-from-codepush](migrate-from-codepush.md) | | | [a-codepush-alternative-after-app-center](../blog/a-codepush-alternative-after-app-center.md) |
 | New machine and key backup | [new-machine](new-machine.md) | | | |
 | Release health dashboard and alerts | [self-hosting](self-hosting.md#revert-alerts-webhook), [telemetry-export](telemetry-export.md) | | | |

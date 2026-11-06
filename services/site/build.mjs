@@ -35,6 +35,7 @@ const NAV = [
     { slug: "capacitor", src: "docs/capacitor.md", title: "Capacitor apps in your own CI", desc: "Build signed Android and iOS binaries for a Capacitor app in your own GitHub Actions, with no EAS account needed." },
     { slug: "adapters", src: "docs/adapters.md", title: "Adapters for other runtimes", desc: "What a runtime port must do, which release-decision rules exist and where each lives, for maintainers adding a framework adapter." },
     { slug: "telemetry-export", src: "docs/telemetry-export.md", title: "Telemetry export with SQL", desc: "Copy release telemetry to your own R2 bucket as Parquet files and query it with DuckDB, Spark or an agent. No Shipvo API in the way." },
+    { slug: "taking-real-orders", src: "docs/taking-real-orders.md", title: "Taking real orders", desc: "Orders from an app are unverified until your backend settles them. How statuses, price checks, idempotency and rate limits work." },
   ]},
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },

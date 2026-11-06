@@ -279,12 +279,16 @@ app.post("/o/:app", async (c) => {
   if (json.length > 20_000) return c.json({ error: "too_large" }, 413);
   const reply = (status: string, duplicate = false) => status === "price_mismatch"
     ? c.json({ ok: false, error: "price_mismatch", status, duplicate }, 422) : c.json({ ok: true, status, duplicate }, 202);
-  // Idempotency: one order id per app. A repeat returns the first result and changes nothing.
-  const first = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND order_id = ?").bind(appId, o.id).first<{ status: string }>();
-  if (first) return reply(first.status, true);
-  // Rate limits per IP and per install, over the last minute.
   const ip = await sha(c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "unknown");
   const install = typeof body.install_id === "string" && body.install_id ? body.install_id.slice(0, 64) : null;
+  // Idempotency key. Order ids are not unique across customers (the Tide app starts every customer at TT-1001),
+  // so the key is the client's idempotency_key, else install_id + order id, else IP hash + order id.
+  // Another install or key can never collide with it, so nobody can squat an id to block a real order.
+  const idem = typeof body.idempotency_key === "string" && body.idempotency_key ? "k:" + body.idempotency_key.slice(0, 64) : `${install ? "i:" + install : "p:" + ip}:${o.id}`;
+  const first = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND idem = ?").bind(appId, idem).first<{ status: string }>();
+  if (first) return reply(first.status, true);
+  // Rate limits per IP and per install, over the last minute. The count and the insert are not atomic,
+  // so a burst can overshoot the limit slightly. That is fine at this scale.
   const since = new Date(Date.now() - 60_000).toISOString();
   const n = async (col: string, v: string) => (await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM orders WHERE app_id = ? AND ${col} = ? AND received_at > ?`).bind(appId, v, since).first<{ n: number }>())?.n ?? 0;
   if ((await n("ip_hash", ip)) >= RATE_PER_IP || (install && (await n("install", install)) >= RATE_PER_INSTALL)) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
@@ -297,8 +301,13 @@ app.post("/o/:app", async (c) => {
     if (why.length) status = "price_mismatch";
   }
   const stored = why.length ? JSON.stringify({ order: o, content_version: body.content_version ?? null, release: body.release ?? null, price_errors: why.slice(0, 5) }) : json;
-  await c.env.DB.prepare("INSERT INTO orders (app_id, order_id, total, json, status, simulated, ip_hash, install) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(app_id, order_id) DO NOTHING")
-    .bind(appId, o.id, Math.round(o.total), stored, status, simulated ? 1 : 0, ip, install).run();
+  const ins = await c.env.DB.prepare("INSERT INTO orders (app_id, order_id, total, json, status, simulated, ip_hash, install, idem) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(app_id, idem) DO NOTHING")
+    .bind(appId, o.id, Math.round(o.total), stored, status, simulated ? 1 : 0, ip, install, idem).run();
+  if ((ins as any)?.meta?.changes === 0) {
+    // A concurrent request with the same key won the race: report what it stored.
+    const won = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND idem = ?").bind(appId, idem).first<{ status: string }>();
+    if (won) return reply(won.status, true);
+  }
   return reply(status);
 });
 
@@ -308,12 +317,17 @@ app.post("/app/:id/api/orders/:order/settle", async (c) => {
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
   if ((await owner(c, appId)) !== AGENT_ACTOR) return c.json({ error: "unauthorized", message: "Send the owner token as a bearer token" }, 401);
   const body: any = await c.req.json().catch(() => ({}));
-  const row = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND order_id = ?").bind(appId, c.req.param("order")).first<{ status: string }>();
-  if (!row) return c.json({ error: "not_found" }, 404);
+  // Order ids are not unique, so a backend may name the row with the same install_id or idempotency_key it was placed with.
+  const sel = typeof body?.idempotency_key === "string" ? ["idem", "k:" + body.idempotency_key.slice(0, 64)] : typeof body?.install_id === "string" ? ["install", body.install_id.slice(0, 64)] : null;
+  const rows = (await c.env.DB.prepare(`SELECT id, status, total FROM orders WHERE app_id = ? AND order_id = ?${sel ? ` AND ${sel[0]} = ?` : ""}`).bind(...(sel ? [appId, c.req.param("order"), sel[1]] : [appId, c.req.param("order")])).all<{ id: number; status: string; total: number }>()).results ?? [];
+  if (!rows.length) return c.json({ error: "not_found" }, 404);
+  if (rows.length > 1) return c.json({ error: "ambiguous", message: "Several orders share this id. Send idempotency_key or install_id in the body." }, 409);
+  const row = rows[0];
+  if (body?.amount !== undefined && body.amount !== row.total) return c.json({ error: "amount_mismatch", expected: row.total }, 409);
   if (row.status === "settled") return c.json({ ok: true, status: "settled", already: true });
   if (row.status !== "unverified") return c.json({ error: "cannot_settle", status: row.status }, 409);
-  await c.env.DB.prepare("UPDATE orders SET status = 'settled', settled_at = ?, settlement_ref = ? WHERE app_id = ? AND order_id = ? AND status = 'unverified'")
-    .bind(new Date().toISOString(), typeof body?.reference === "string" ? body.reference.slice(0, 80) : null, appId, c.req.param("order")).run();
+  await c.env.DB.prepare("UPDATE orders SET status = 'settled', settled_at = ?, settlement_ref = ? WHERE id = ? AND status = 'unverified'")
+    .bind(new Date().toISOString(), typeof body?.reference === "string" ? body.reference.slice(0, 80) : null, row.id).run();
   return c.json({ ok: true, status: "settled" });
 });
 

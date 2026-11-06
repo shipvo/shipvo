@@ -8,7 +8,7 @@ const kv = (m: Record<string, string>) => ({
 
 function db() {
   const calls: { sql: string; args: unknown[] }[] = [];
-  const d = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({ run: async () => { calls.push({ sql, args }); return {}; }, all: async () => ({ results: [{ id: 1 }] }) }) }) } as any;
+  const d = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({ first: async () => null, run: async () => { calls.push({ sql, args }); return {}; }, all: async () => ({ results: [{ id: 1 }] }) }) }) } as any;
   return { d, calls };
 }
 const post = (path: string, body: unknown, env: any) => app.request(path, { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body) }, env);
@@ -64,6 +64,25 @@ describe("POST /t telemetry", () => {
   });
 });
 
+
+describe("POST /o/:app orders", () => {
+  const order = { id: "TT-1", lines: [], total: 12.6 };
+  it("stores a valid order with a rounded total", async () => {
+    const { d, calls } = db();
+    expect((await post("/o/tide", { order, simulated: true }, { DB: d } as any)).status).toBe(202);
+    const ins = calls.find((x) => x.sql.startsWith("INSERT INTO orders"))!;
+    expect(ins.args.slice(0, 3)).toEqual(["tide", "TT-1", 13]);
+  });
+  it("rejects malformed orders and oversized bodies", async () => {
+    const { d, calls } = db();
+    expect((await post("/o/tide", { order: { ...order, total: "5" } }, { DB: d } as any)).status).toBe(400);
+    expect((await post("/o/tide", { order: { ...order, lines: "x" } }, { DB: d } as any)).status).toBe(400);
+    expect((await post("/o/tide", "nope", { DB: d } as any)).status).toBe(400);
+    expect((await post("/o/Bad!", { order }, { DB: d } as any)).status).toBe(400);
+    expect((await post("/o/tide", { order: { ...order, note: "x".repeat(21_000) } }, { DB: d } as any)).status).toBe(413);
+    expect(calls).toHaveLength(0);
+  });
+});
 
 describe("GET /c/:app/content.json", () => {
   const env = { POINTERS: kv({ "c/tide/content.json": '{"version":4,"x":1}' }) } as any;
