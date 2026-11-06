@@ -1,2 +1,0 @@
-- `@shipvo/site`: public roadmap at shipvo.dev/roadmap/, built from `docs/ROADMAP.md`, linked from the footer and the changelog, listed in the sitemap and `llms.txt`.
-- Migration: none.

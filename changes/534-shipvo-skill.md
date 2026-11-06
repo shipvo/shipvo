@@ -1,1 +1,0 @@
-- skills: new `skills/shipvo` agent skill, installable with `npx skills add shipvo/shipvo --skill shipvo`. A CLI test keeps its commands in step with `shipvo help`.

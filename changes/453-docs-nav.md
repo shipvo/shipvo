@@ -1,2 +1,0 @@
-- Docs: the CLI guide, store, Capacitor, adapters, telemetry export and CodePush migration pages now appear on shipvo.dev, in `sitemap.xml` and in `llms.txt`. Troubleshooting added to the CLI guide and store page; glossary has five new terms; `docs/content-coverage.md` added.
-- Migration: none.

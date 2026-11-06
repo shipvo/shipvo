@@ -1,3 +1,0 @@
-- `shipvo` and `create-shipvo` on npm: `npx shipvo <command>`, `npm i -g shipvo` and `npm create shipvo myshop` now work; both forward to `@shipvo/cli`.
-- `@shipvo/cli`: `shipvo init` lists `npm install` as step 2 and `shipvo sim` right after it, so the next steps work in order.
-- Migration: none.

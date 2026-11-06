@@ -1,2 +1,0 @@
-- `@shipvo/sim`: the on-screen rules (off-screen list items, content behind a modal, hidden subtrees, labelled controls) now live in `screen-rules.mjs`, shipped in the package. No behaviour change.
-- Migration: none.

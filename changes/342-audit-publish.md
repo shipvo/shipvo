@@ -1,2 +1,0 @@
-- `control-plane`: every accepted release publish now writes one `audit_log` row (actor, `publish`, release, band, platform). A failed audit write does not fail the publish. Publish tokens carry no agent marker yet, so `actor_kind` is `person`.
-- Migration: none.
