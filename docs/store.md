@@ -93,6 +93,23 @@ Store mode (native capture on an emulator or simulator) is a later slice. Nothin
 
 The size numbers come from the table in `@shipvo/store` and issue #249. They were not re-checked against the Apple and Play pages when this command was added. Check them before you submit.
 
+## Screenshots with marketing frames
+
+`shipvo store screenshots --mode frames` turns each render into a store-ready image: a phone or tablet frame on a solid background with a short caption above it. Android sizes get an Android-style frame and iOS sizes get an iPhone or iPad-style frame, in the same layout, for Android and iOS together.
+
+```bash
+shipvo store screenshots --mode frames                 # writes store-assets/frames/<set>/NN-<screen>.png
+shipvo store screenshots --mode frames --out my-frames --json
+```
+
+Files are PNG with no alpha channel, at the exact sizes from the table above, and each one goes through the same checker. Captions come from `store.captions` in `shipvo.json`, keyed by route or screen name:
+
+```json
+{ "store": { "captions": { "start": "Plan your day on the water", "tide://cart": "Pay in one tap" } } }
+```
+
+With no entry, the caption is the screen title (the app name for the start screen). A long caption wraps at spaces; if it is still too long it is shortened at a word boundary and ends in "...". Words are never cut in the middle. `--json` prints one envelope: `{ ok, mode, out, files: [{ set, file, ok, problems }], notes }`.
+
 See the package: [`packages/store`](../packages/store/README.md).
 
 ## Troubleshooting

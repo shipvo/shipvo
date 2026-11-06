@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -201,4 +201,47 @@ it("addTesterGroup does not write when the group is already there", async () => 
   const r = await addTesterGroup({ pkg: "p", token: "t", group: "shipvo-testers@googlegroups.com", fetch: fake });
   expect(r.added).toBe(false);
   expect(methods).not.toContain("PUT");
+});
+
+describe("store screenshots --mode frames", () => {
+  const pngOf = async (w: number, h: number) => {
+    const { encodePng } = await import("@shipvo/store");
+    return encodePng({ width: w, height: h, rgb: new Uint8Array(w * h * 3).fill(180) });
+  };
+
+  it("writes a framed PNG per route in every set, passes the checker, and uses captions then titles", async () => {
+    const { renderScreenshots, captionFor } = await import("../src/store");
+    const log = vi.spyOn(console, "log"); log.mockClear();
+    const formats: (string | undefined)[] = [];
+    const caption = captionFor({ name: "Tide", store: { captions: { "tide://cart": "Pay in one tap" } } });
+    expect(caption("tide://cart", "cart")).toBe("Pay in one tap");
+    expect(caption("tide://tides", "tides")).toBe("Tides");
+    expect(caption(undefined, "start")).toBe("Tide");
+    const code = await renderScreenshots(["tide://cart"], async (s, _r, f) => { formats.push(f); return pngOf(s.width, s.height); }, "frames-out", { caption });
+    expect(code).toBe(0);
+    expect(new Set(formats)).toEqual(new Set(["png"]));
+    for (const set of ["iphone", "ipad-13", "play-phone", "play-tablet-7", "play-tablet-10"]) {
+      expect(existsSync(join(app, "frames-out", set, "01-start.png"))).toBe(true);
+      expect(existsSync(join(app, "frames-out", set, "02-cart.png"))).toBe(true);
+    }
+    expect(log.mock.calls.map((c) => c.join(" ")).join("\n")).toContain("frames mode");
+  }, 60000);
+
+  it("--json prints one envelope and nothing else", async () => {
+    const { renderScreenshots } = await import("../src/store");
+    const log = vi.spyOn(console, "log"); log.mockClear();
+    const code = await renderScreenshots(undefined, async (s) => pngOf(s.width, s.height), "frames-json", { caption: () => "Hello", json: true });
+    expect(code).toBe(0);
+    expect(log).toHaveBeenCalledTimes(1);
+    const env = JSON.parse(String(log.mock.calls[0][0]));
+    expect(env.ok).toBe(true);
+    expect(env.mode).toBe("frames");
+    expect(env.files).toHaveLength(5);
+  }, 60000);
+
+  it("reports a JPEG render as a failed file, not a crash", async () => {
+    const { renderScreenshots } = await import("../src/store");
+    const code = await renderScreenshots(undefined, async () => jpeg(100, 100), "frames-bad", { caption: () => "x", json: true });
+    expect(code).toBe(1);
+  });
 });

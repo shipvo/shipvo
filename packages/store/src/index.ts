@@ -6,3 +6,5 @@ export { checkScreenshot, checkSet, SCREENSHOT_SETS } from "./screenshots.js";
 export type { ScreenshotSetId, ScreenshotSetSpec, ScreenshotFile, CheckResult } from "./screenshots.js";
 export { routeStore, TESTER_RULE, SHIPVO_TESTERS_GROUP, SHIPVO_TESTERS_JOIN_URL, SHIPVO_TESTERS_SHORT_URL } from "./route.js";
 export type { RouteAnswers, RouteStep, StoreRoute, StoreRoutes, AccountType } from "./route.js";
+export { renderFrame, fitCaption, frameStyleFor, decodePng, encodePng } from "./frames.js";
+export type { FrameOptions, FrameStyle, RawImage } from "./frames.js";
