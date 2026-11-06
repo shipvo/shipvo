@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
-import { AGENT_ACTOR, describeOwner, runOwnerCommand } from "./owner";
+import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand } from "./owner";
 import { auth } from "./auth";
 import { forbidden, type Action } from "./roles";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
@@ -366,6 +366,25 @@ app.post("/app/:id/api/command", async (c) => {
   const list = (c.req.header("x-shipvo-agent-deny") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const local = agent ? { agentPolicy: c.req.header("x-shipvo-agent-policy") ?? undefined, agentDeny: list } : undefined;
   return c.json(await runOwnerCommand({ db: c.env.DB, kv: c.env.POINTERS, appId, actor, agent, local }, String(body?.name ?? ""), body?.args ?? {}));
+});
+
+// Approval challenges (agentPolicy "ask"). Anyone who is the owner may list them; only the signed-in admin session may decide.
+// The owner token and publish tokens are agent credentials, so they get 403 here.
+app.get("/app/:id/api/approvals", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await owner(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const list = await listChallenges({ kv: c.env.POINTERS, appId });
+  return c.json({ app: appId, approvals: list.map((x) => ({ id: x.id, command: x.command, args_hash: x.args_hash, requester: x.requester, plan: x.plan, created_at: x.created_at, expires_at: x.expires_at, approval_url: `/app/${appId}/admin?approve=${x.id}` })) });
+});
+for (const verb of ["approve", "deny"] as const) app.post(`/app/:id/api/approvals/:cid/${verb}`, async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const actor = await owner(c, appId);
+  if (!actor) return c.json({ error: "unauthorized" }, 401);
+  if (actor === AGENT_ACTOR) return c.json({ ok: false, error: { code: "agent_cannot_approve", message: "Only the owner signed in to the admin can decide an approval. A token cannot." } }, 403);
+  const r = await resolveChallenge({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, c.req.param("cid"), verb, actor, "admin session");
+  return c.json(r, r.ok ? 200 : r.error.code === "approval_not_found" ? 404 : 409);
 });
 
 /**

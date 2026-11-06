@@ -50,6 +50,46 @@ async function reach(env: OwnerEnv): Promise<string> {
   } catch { return "Reaches every installed phone (count unavailable)."; }
 }
 
+/* ---------- one-time owner approval challenges ----------
+ * An agent under agentPolicy "ask" does not get to approve itself with confirm: true. The server issues a challenge bound to the
+ * command and a hash of its arguments. Only the signed-in owner (admin session) can approve it. It works once, for 10 minutes. */
+export const CHALLENGE_TTL_MS = 10 * 60 * 1000;
+export type Challenge = { id: string; app_id: string; command: string; args_hash: string; requester: string; plan: string[]; status: "pending" | "approved" | "denied" | "used";
+  created_at: string; expires_at: string; approved_by?: string; approved_how?: string; resolved_at?: string };
+const challengeKey = (appId: string, id: string) => `c/${appId}/challenge/${id}`;
+const canon = (v: unknown): unknown => Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, canon((v as any)[k])])) : v;
+/** SHA-256 of the command name and its arguments in key-sorted JSON, so the same action always hashes the same. */
+export async function argsHash(command: string, args: Record<string, unknown>): Promise<string> {
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(canon({ command, args })))))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function loadChallenge(env: { kv: KVNamespace; appId: string }, id: string): Promise<Challenge | null> {
+  try { const raw = await env.kv.get(challengeKey(env.appId, id)); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+const saveChallenge = (env: { kv: KVNamespace }, c: Challenge) => env.kv.put(challengeKey(c.app_id, c.id), JSON.stringify(c), { expirationTtl: 86400 });
+const expired = (c: Challenge) => Date.parse(c.expires_at) <= Date.now();
+/** Pending, unexpired challenges, oldest first. */
+export async function listChallenges(env: { kv: KVNamespace; appId: string }): Promise<Challenge[]> {
+  const out: Challenge[] = []; let cursor: string | undefined;
+  do {
+    const l: any = await env.kv.list({ prefix: challengeKey(env.appId, ""), cursor });
+    for (const k of l.keys) { const c = await loadChallenge(env, k.name.slice(challengeKey(env.appId, "").length)); if (c && c.status === "pending" && !expired(c)) out.push(c); }
+    cursor = l.list_complete === false ? l.cursor : undefined;
+  } while (cursor);
+  return out.sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+/** Owner decision on a challenge. Callers must have checked that this is a signed-in owner, never a token. */
+export async function resolveChallenge(env: OwnerEnv, id: string, verb: "approve" | "deny", approver: string, how = "admin session"): Promise<{ ok: true; challenge: Challenge } | { ok: false; error: { code: string; message: string } }> {
+  const c = await loadChallenge(env, id);
+  if (!c) return { ok: false, error: { code: "approval_not_found", message: "No such approval." } };
+  if (c.status !== "pending") return { ok: false, error: { code: "approval_not_pending", message: `This approval is already ${c.status}.` } };
+  if (expired(c)) return { ok: false, error: { code: "approval_expired", message: "This approval expired. Ask the agent to try again." } };
+  const next: Challenge = { ...c, status: verb === "approve" ? "approved" : "denied", approved_by: approver, approved_how: how, resolved_at: new Date().toISOString() };
+  await saveChallenge(env, next);
+  await env.db.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
+    .bind(env.appId, next.resolved_at, approver, "approval", JSON.stringify({ command: c.command, approval: next.status, approval_id: c.id, approved_by: approver, approved_how: how, args_hash: c.args_hash }), 1).run();
+  return { ok: true, challenge: next };
+}
+
 export class OwnerError extends Error { code: string; constructor(code: string, message: string) { super(message); this.code = code; } }
 const fail = (code: string, message: string): never => { throw new OwnerError(code, message); };
 const product = (c: Content, id: string) => c.products.find((p) => p.id === id) ?? fail("not_found", `No product '${id}'`);
@@ -283,6 +323,7 @@ export function diffContent(a: Content | null, b: Content): string[] {
 }
 
 // The URL may hold a token, so logs and plans show only the host.
+const approvalUrl = (appId: string, id: string) => `/app/${appId}/admin?approve=${id}`;
 const hostOf = (raw: string): string => { try { return new URL(raw).host || "the given URL"; } catch { return "the given URL"; } };
 const auditArgs = (name: string, args: Record<string, unknown>) => name === "set_alert_webhook" ? { url: String(args.url ?? "").trim() ? hostOf(String(args.url)) : "" } : args;
 
@@ -295,9 +336,11 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   }
   const draft = await loadDraft(env);
   if (!draft) return { ok: false, error: { code: "no_content", message: "No content yet" } };
-  const { confirm, ...rest } = args; args = rest;
+  // confirm: true is ignored: under "ask" only an owner-approved challenge (approval: <id>) lets a gated command run.
+  const { confirm: _confirm, approval, ...rest } = args; args = rest;
+  let usedChallenge: Challenge | null = null;
   let res: any;
-  let confirmed = false, denied = false, gated = false;
+  let denied = false, gated = false;
   try {
     if (env.agent) {
       if (cmd.adminOnly) fail("admin_only", `'${name}' needs the owner signed in to the admin; agents cannot run it.`);
@@ -311,8 +354,25 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
       if (plan) {
         gated = true;
         if (policy === "deny") { denied = true; fail("denied", `agentPolicy is "deny": agents may not run '${name}'.`); }
-        if (policy === "ask" && confirm !== true) return { ok: false, error: { code: "needs_confirm", message: `Nothing was changed. Call '${name}' again with the same arguments and confirm: true to run it.` }, code: "needs_confirm", plan };
-        if (policy === "ask") confirmed = true; // only a call that ran after an explicit confirm: true
+        if (policy === "ask") {
+          const hash = await argsHash(name, args);
+          if (typeof approval !== "string" || !approval) {
+            const id = crypto.randomUUID(); const now = Date.now();
+            const ch: Challenge = { id, app_id: env.appId, command: name, args_hash: hash, requester: env.actor, plan, status: "pending", created_at: new Date(now).toISOString(), expires_at: new Date(now + CHALLENGE_TTL_MS).toISOString() };
+            await saveChallenge(env, ch);
+            return { ok: false, error: { code: "needs_confirm", message: `Nothing was changed. The owner must approve this in the admin (${approvalUrl(env.appId, id)}). Then call '${name}' again with the same arguments and approval: "${id}".` }, code: "needs_confirm", plan,
+              challenge: { id, command: name, args_hash: hash, app: env.appId, requester: env.actor, expires_at: ch.expires_at, approval_url: approvalUrl(env.appId, id) } };
+          }
+          const ch = await loadChallenge(env, approval);
+          if (!ch || ch.app_id !== env.appId) fail("approval_not_found", "No such approval. Call again without approval to get a new one.");
+          if (ch!.command !== name || ch!.args_hash !== hash) fail("approval_mismatch", "This approval was issued for a different command or different arguments. Nothing was run.");
+          if (ch!.status === "used") fail("approval_used", "This approval was already used. Each approval works once.");
+          if (ch!.status === "denied") fail("approval_denied", "The owner denied this approval.");
+          if (expired(ch!)) fail("approval_expired", "This approval expired after 10 minutes. Call again without approval to get a new one.");
+          if (ch!.status !== "approved") fail("approval_pending", `The owner has not approved this yet. They can do it at ${approvalUrl(env.appId, ch!.id)}.`);
+          await saveChallenge(env, { ...ch!, status: "used" }); // spent before the command runs, so a replay cannot run it twice
+          usedChallenge = ch!;
+        }
       }
     }
     const result = await cmd.run(draft, args, env);
@@ -327,7 +387,7 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   }
   if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy" || name === "set_release_policy" || name === "set_alert_webhook")
     await env.db.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
-      .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(denied ? { ...auditArgs(name, args), denied: true } : confirmed ? { ...auditArgs(name, args), confirmed: true } : auditArgs(name, args)).slice(0, 2000), res.ok && !denied ? 1 : 0).run();
+      .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(denied ? { ...auditArgs(name, args), denied: true } : usedChallenge ? { ...auditArgs(name, args), approved_by: usedChallenge.approved_by, approval_id: usedChallenge.id, approved_how: usedChallenge.approved_how } : auditArgs(name, args)).slice(0, 2000), res.ok && !denied ? 1 : 0).run();
   return res;
 }
 

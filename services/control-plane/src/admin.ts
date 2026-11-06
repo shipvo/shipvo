@@ -71,7 +71,7 @@ ${["home:Home screen", "products:Products", "promos:Offers", "theme:Brand", "ord
 <p class="muted" style="text-align:center">Preview of the draft. Publish to send it to phones.</p></div></main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
-const APP=${JSON.stringify(appId)};let draft=null,live=null,tab="home";
+const APP=${JSON.stringify(appId)};let draft=null,live=null,tab=new URLSearchParams(location.search).get("approve")?"agents":"home";
 const $=(s,r=document)=>r.querySelector(s),h=(s)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fcfa=n=>Number(n).toLocaleString("fr-FR").replace(/\\u202f|\\u00a0/g," ")+" FCFA";
 function toast(t,bad){const el=$("#toast");el.textContent=t;el.className="toast on"+(bad?" bad":"");clearTimeout(toast.t);toast.t=setTimeout(()=>el.className="toast",2600)}
@@ -159,9 +159,12 @@ async function renderHistory(P){P.innerHTML='<section><h2>History</h2><div class
  P.querySelectorAll("[data-v]").forEach(b=>b.onclick=async()=>{await cmd("restore_version",{version:Number(b.dataset.v)});toast("v"+b.dataset.v+" loaded into the draft. Publish to make it live.");refresh()});
  const a=await cmd("audit_log");if(a?.ok)$("#al").innerHTML=a.result.length?'<table><tbody>'+a.result.map(x=>'<tr><td class="muted">'+new Date(x.at).toLocaleString()+'</td><td>'+h(x.actor)+'</td><td><code>'+h(x.command)+'</code></td><td>'+(x.ok?"✓":"✗")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No changes yet.</div>'}
 async function renderAgents(P){const r=await fetch("/app/"+APP+"/api/describe");const d=await r.json();const base=location.origin+"/app/"+APP+"/api";
- P.innerHTML='<section><h2>Agent access</h2><div class="card"><p>Everything on this page is a typed command. An AI agent with the owner token can do what you do here: change prices, run offers, rearrange the home screen and publish.</p>'+
+ const ap=await (await fetch(base+"/approvals")).json();const want=new URLSearchParams(location.search).get("approve");
+ const pend='<div class="card"><h3>Waiting for your approval</h3>'+((ap.approvals||[]).length?(ap.approvals).map(x=>'<div style="border-top:1px solid var(--border);padding:10px 8px;border-radius:8px'+(x.id===want?';background:var(--sunken);border:2px solid var(--accent)':'')+'">'+(x.id===want?'<span class="tag">Opened from your link</span><br>':'')+'<b>'+h(x.requester)+'</b> wants to run <code>'+h(x.command)+'</code>:<ul>'+x.plan.map(l=>'<li>'+h(l)+'</li>').join("")+'</ul><span class="muted">Expires '+new Date(x.expires_at).toLocaleTimeString()+'. Works once.</span> <div class="row" style="margin-top:8px"><button class="btn primary" style="min-height:44px" data-ap="approve" data-id="'+h(x.id)+'">Approve</button> <button class="btn" style="min-height:44px" data-ap="deny" data-id="'+h(x.id)+'">Deny</button></div></div>').join(""):'<div class="empty">Nothing is waiting.</div>')+'<p class="muted">Agent policy "ask" (the default): agents cannot approve their own actions. Policy "allow" means agents act without asking.</p></div>';
+ P.innerHTML='<section><h2>Agent access</h2>'+pend+'<div class="card"><p>Everything on this page is a typed command. An AI agent with the owner token can do what you do here: change prices, run offers, rearrange the home screen and publish.</p>'+
  '<pre>curl -s '+base+'/describe -H "Authorization: Bearer $OWNER_TOKEN"\\ncurl -s '+base+'/command -H "Authorization: Bearer $OWNER_TOKEN" \\\\\\n  -H "content-type: application/json" \\\\\\n  -d \\'{"name":"update_product","args":{"product_id":"lure-popper-9","price":3900}}\\'</pre></div>'+
- '<div class="card"><h3>'+d.commands.length+' owner commands</h3><table><tbody>'+d.commands.map(c=>'<tr><td><code>'+h(c.name)+'</code></td><td>'+h(c.description)+'</td><td class="muted">'+Object.keys(c.params).join(", ")+'</td></tr>').join("")+'</tbody></table></div></section>'}
+ '<div class="card"><h3>'+d.commands.length+' owner commands</h3><table><tbody>'+d.commands.map(c=>'<tr><td><code>'+h(c.name)+'</code></td><td>'+h(c.description)+'</td><td class="muted">'+Object.keys(c.params).join(", ")+'</td></tr>').join("")+'</tbody></table></div></section>';
+ P.querySelectorAll("[data-ap]").forEach(b=>b.onclick=async()=>{let j;try{const x=await fetch(base+"/approvals/"+b.dataset.id+"/"+b.dataset.ap,{method:"POST"});if(x.status===401){toast("Your session ended. Sign in again.",true);return}j=await x.json()}catch(e){toast("Could not reach the server. Check your connection and try again.",true);return}toast(j.ok?(b.dataset.ap==="approve"?"Approved. The agent can run it once.":"Denied."):j.error.message,!j.ok);renderAgents(P)})}
 refresh();
 </script></body></html>`;
 }
