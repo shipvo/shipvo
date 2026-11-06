@@ -8,6 +8,8 @@
 // Steps recorded: "publish" (real), "pointer" and "bundle" (fetches the bundle the pointer names; checks signature, size and sha256). A non-2xx publish exits 1 and prints the server's message.
 // With --with-install --with-session, a "first agent session" step then starts `shipvo sim` for the scaffolded app (its web build
 // counts), opens the app with @shipvo/test, reads the screen and stops the simulator. Needs playwright's chromium.
+// --template <name>: blank (default), shop or content, passed to `shipvo init`.
+// --with-test (needs --with-install): runs the scaffold's own generated test (`npm test`) against `shipvo sim`, as step "app test". A failing test exits 1 and prints its output.
 // The CLI must be built first (pnpm --filter @shipvo/cli build). No login, no secrets.
 // Default run uses no network. With --with-install, also times an install in the scaffolded app,
 // which downloads packages (network). init prints `npm install (or pnpm / bun)`; we prefer pnpm
@@ -169,13 +171,10 @@ function runNode(args, cwd, env, timeout) {
   });
 }
 
-/**
- * Times a first agent session in the scaffolded app: start `shipvo sim` (its web build counts), open the app
- * with @shipvo/test and read the screen. Needs the app's dependencies installed. Stops the simulator after.
- */
-export async function firstAgentSession(cli, app, timeoutMs = 300000) {
+/** Starts `shipvo sim` for the app, waits for it, runs fn(url, remainingMs), then stops it. Returns a step result. */
+async function withSim(name, cli, app, timeoutMs, fn) {
   const t0 = performance.now();
-  const done = (exit, stderr) => ({ step: STEP_SESSION, ms: Math.round(performance.now() - t0), exit, stderr });
+  const done = (exit, stderr) => ({ step: name, ms: Math.round(performance.now() - t0), exit, stderr });
   let port;
   try { port = await freePort(); } catch (e) { return done(1, `no free port: ${e.message}`); }
   const url = `http://127.0.0.1:${port}`;
@@ -193,8 +192,7 @@ export async function firstAgentSession(cli, app, timeoutMs = 300000) {
       if (!up) await sleep(200);
     }
     if (!up) return done(1, `simulator did not start${exited ? " (it exited)" : " in time"}:\n${out.join("")}`);
-    const fallback = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/test/dist/index.js")).href;
-    const r = await runNode(["--input-type=module", "-e", sessionScript(fallback)], app, { FIRST_RUN_SIM: url }, timeoutMs - (performance.now() - t0));
+    const r = await fn(url, timeoutMs - (performance.now() - t0));
     return done(r.exit, r.exit === 0 ? "" : `${r.out}\n${out.join("")}`);
   } finally {
     if (!exited) {
@@ -203,6 +201,32 @@ export async function firstAgentSession(cli, app, timeoutMs = 300000) {
       await Promise.race([gone, sleep(5000)]);
     }
   }
+}
+
+/**
+ * Times a first agent session in the scaffolded app: start `shipvo sim` (its web build counts), open the app
+ * with @shipvo/test and read the screen. Needs the app's dependencies installed. Stops the simulator after.
+ */
+export function firstAgentSession(cli, app, timeoutMs = 300000) {
+  const fallback = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/test/dist/index.js")).href;
+  return withSim(STEP_SESSION, cli, app, timeoutMs, (url, left) => runNode(["--input-type=module", "-e", sessionScript(fallback)], app, { FIRST_RUN_SIM: url }, left));
+}
+
+export const STEP_TEST = "app test";
+
+/**
+ * Runs the scaffolded app's own generated test (`npm test`, which is vitest) against a running simulator.
+ * A failing test makes the step fail and its output is kept for the report.
+ */
+export function appTest(cli, app, timeoutMs = 300000) {
+  return withSim(STEP_TEST, cli, app, timeoutMs, (url, left) => new Promise((done) => {
+    const out = [];
+    const c = spawn(detectPackageManager(), ["run", "test"], { cwd: app, env: { ...cleanEnv(), PN_SIM: url, CI: "1" }, timeout: Math.max(Math.round(left), 1000) });
+    c.stdout.on("data", (d) => out.push(String(d)));
+    c.stderr.on("data", (d) => out.push(String(d)));
+    c.on("error", (e) => done({ exit: 127, out: String(e) }));
+    c.on("close", (code) => done({ exit: code ?? 1, out: out.join("") }));
+  }));
 }
 
 // No secrets in, nothing to log in to: the seed comes from the .shipvo/seed.txt that init writes.
@@ -237,7 +261,8 @@ export function table(results, totalMs = results.reduce((n, r) => n + r.ms, 0)) 
 }
 
 // withExport: run the real bundle export inside `shipvo publish` (needs install and network).
-export async function measure(cli, withInstall = false, controlUrl, withExport = false, withSession = false, controlLog) {
+export async function measure(cli, withInstall = false, controlUrl, withExport = false, withSession = false, controlLog, template = "blank", withTest = false) {
+  if (withTest && !withInstall) throw new Error("--with-test needs --with-install");
   if (withSession && !withInstall) throw new Error("--with-session needs --with-install");
   if (withExport && !(withInstall && controlUrl)) throw new Error("--with-export needs --with-install and --control-url");
   const start = performance.now();
@@ -245,7 +270,7 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
   const app = join(root, "app");
   const results = [];
   try {
-    results.push(runStep("init", cli, ["init", app], root));
+    results.push(runStep("init", cli, ["init", app, ...(template === "blank" ? [] : ["--template", template])], root));
     let ok = results[0].exit === 0;
     if (ok && withInstall) {
       const inst = runInstallStep(app);
@@ -275,6 +300,11 @@ export async function measure(cli, withInstall = false, controlUrl, withExport =
       results.push(sess);
       ok = sess.exit === 0;
     }
+    if (ok && withTest) {
+      const t = await appTest(cli, app);
+      results.push(t);
+      ok = t.exit === 0;
+    }
     if (ok && controlUrl) results.push(...(await realPublish(cli, app, controlUrl, withExport, controlLog)));
   } finally { rmSync(root, { recursive: true, force: true }); }
   results.totalMs = Math.round(performance.now() - start);
@@ -301,7 +331,7 @@ export async function main(argv) {
   const withInstall = argv.includes("--with-install");
   const controlUrl = opt("--control-url", undefined);
   let results;
-  try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export"), argv.includes("--with-session"), opt("--control-log", undefined)); }
+  try { results = await measure(cli, withInstall, controlUrl, argv.includes("--with-export"), argv.includes("--with-session"), opt("--control-log", undefined), opt("--template", "blank"), argv.includes("--with-test")); }
   catch (e) { console.error(e.message); return 1; }
   const applyPath = opt("--apply-report", undefined);
   let apply = null, applyErr = false;

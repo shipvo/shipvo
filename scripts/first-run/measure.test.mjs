@@ -424,3 +424,45 @@ test("--apply-report with a valid report but no firstRun timing says why on stde
   assert.match(r.stderr, /no firstRun timing/);
   assert.match(r.stdout, /not measured/);
 });
+
+// --template and the "app test" step
+const fakePmTest = () => {
+  const bindir = mkdtempSync(join(tmpdir(), "fake-pm-"));
+  const body = `#!/bin/sh\nif [ "$1" = run ]; then echo "$FAKE_TEST_OUT"; exit \${FAKE_TEST_EXIT:-0}; fi\necho 9.9.9\nexit 0\n`;
+  for (const n of ["pnpm", "npm"]) { writeFileSync(join(bindir, n), body); chmodSync(join(bindir, n), 0o755); }
+  return bindir + ":" + dirname(process.execPath);
+};
+const INIT_ARGS = `import {mkdirSync, appendFileSync} from "node:fs"; if (process.argv[2]==="init") { mkdirSync(process.argv[3],{recursive:true}); appendFileSync(process.env.ARGS_LOG, process.argv.slice(2).join(" ")+"\\n"); }`;
+
+test("--template is passed to init; blank passes none", () => {
+  for (const [args, want] of [[["--template", "shop"], /--template shop$/], [["--template", "content"], /--template content$/], [[], /^init \S+$/]]) {
+    const f = fake(INIT_ARGS);
+    const log = join(dirname(f.cli), "args.log");
+    const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, ...args], { encoding: "utf8", env: { ...process.env, ARGS_LOG: log } });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(readFileSync(log, "utf8").trim(), want);
+  }
+});
+
+test("--with-test needs --with-install", () => {
+  const f = fake(INIT);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-test"], { encoding: "utf8" });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /--with-test needs --with-install/);
+});
+
+test("--with-test records an app test step that passes", () => {
+  const f = fake(INIT + SIM);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install", "--with-test"], { encoding: "utf8", env: { ...process.env, PATH: fakePmTest() } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => [x.step, x.exit]), [["init", 0], ["install", 0], ["doctor", 0], ["publish --dry-run", 0], ["app test", 0], ["total", 0]]);
+});
+
+test("a failing generated test exits 1 and prints the test output", () => {
+  const f = fake(INIT + SIM);
+  const r = spawnSync(process.execPath, [script, "--cli", f.cli, "--out", f.out, "--with-install", "--with-test"], { encoding: "utf8", env: { ...process.env, PATH: fakePmTest(), FAKE_TEST_EXIT: "1", FAKE_TEST_OUT: "FAIL tests/app.test.ts the list shows every product" } });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /step "app test" failed/);
+  assert.match(r.stderr, /FAIL tests\/app\.test\.ts the list shows every product/);
+  assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => [x.step, x.exit]).slice(-2), [["app test", 1], ["total", 1]]);
+});
