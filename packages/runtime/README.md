@@ -44,6 +44,23 @@ To turn the automatic report off, pass `reportEvents: false` to the config plugi
 
 The runtime does not emit `download_failed` yet. The control plane accepts it.
 
+## Signed telemetry
+
+Call `enableSignedTelemetry` once at startup. The install registers once, keeps a secret key in your storage, and then signs each report. If registration fails, reports go out unsigned and the next launch tries again.
+
+```ts
+import { enableSignedTelemetry } from "@shipvo/runtime";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+await enableSignedTelemetry({
+  storage: AsyncStorage,
+  registerUrl: "https://cp.example.com/t/register",
+  // crypto: { randomBytes, hmacSha256 }  // React Native has no crypto.subtle, so pass your own
+});
+```
+
+The sent body is the unsigned JSON with its closing `}` replaced by `,"sig":"<hex>"}`. The HMAC-SHA256 covers the unsigned JSON, closing `}` included. A second call replaces the first identity.
+
 ## Crash after `markHealthy`
 
 `markHealthy` means the first screen rendered. It promotes a staged release, but it does not clear the unhealthy-boot count. The count is cleared when the app has stayed in the foreground for 30 seconds, or when it goes to background. If the process dies before that, the next launch counts as an unhealthy boot for that release. After 3 unhealthy boots inside 60 seconds the runtime blocks the release, goes back to the previous one and records `crash_loop_revert`.
