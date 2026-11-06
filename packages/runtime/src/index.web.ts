@@ -16,7 +16,6 @@ export const Runtime = {
   rollback(): void {},
   reload(): void { (globalThis as any).location?.reload(); },
 };
-export { FORWARDED_EVENTS } from "./runtimeEvents";
-export { forwardRuntimeEvents } from "./runtimeEvents";
+export { FORWARDED_EVENTS, forwardRuntimeEvents } from "./runtimeEvents";
 export function reportRuntimeEvents(): string[] { return []; }
 export function onRuntimeEvents(_fn: (events: string[]) => void): () => void { return () => {}; }

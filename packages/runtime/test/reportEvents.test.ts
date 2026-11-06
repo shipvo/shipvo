@@ -1,7 +1,9 @@
+import { Telemetry } from "../../schema/src/index";
+import { createRequire } from "node:module";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const queue: string[] = [];
-async function load(opts: { fail?: boolean } = {}) {
+async function load(opts: { fail?: boolean; extra?: any } = {}) {
   vi.resetModules();
   queue.length = 0;
   const fetchMock = vi.fn(async (_u: string, _i: any) => { if (opts.fail) throw new Error("offline"); return { ok: true }; });
@@ -53,5 +55,34 @@ describe("event reporting", () => {
     queue.push("rolled_back");
     reportRuntimeEvents();
     expect(seen).toEqual([["rolled_back"]]);
+  });
+  it("sends a payload that passes the Telemetry schema", async () => {
+    const { Runtime, fetchMock } = await load();
+    await Runtime.checkForUpdate(true);
+    Runtime.markHealthy();
+    const bodies = sent(fetchMock);
+    expect(bodies.length).toBe(3);
+    for (const b of bodies) expect(Telemetry.safeParse(b).success).toBe(true);
+  });
+  it("reports when native.checkForUpdate rejects", async () => {
+    const { Runtime, fetchMock } = await load();
+    (globalThis as any).__native.checkForUpdate = async () => { queue.push("verify_failed:7"); throw new Error("net"); };
+    vi.resetModules();
+    const { Runtime: R2 } = await import("../src/index");
+    await expect(R2.checkForUpdate(true)).rejects.toThrow("net");
+    expect(sent(fetchMock).map((b: any) => [b.event, b.release])).toEqual([["verify_failed", 7]]);
+  });
+  it("does not send automatically when reportEvents is false", async () => {
+    const { fetchMock } = await load();
+    const req = createRequire(import.meta.url); const id = req.resolve("expo-constants");
+    const saved = req.cache[id]; req.cache[id] = { id, exports: { default: { expoConfig: { extra: { shipvo: { reportEvents: false } } } } }, loaded: true } as any;
+    vi.resetModules();
+    const { Runtime: R2, reportRuntimeEvents } = await import("../src/index");
+    R2.markHealthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+    queue.push("rolled_back");
+    reportRuntimeEvents();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    if (saved) req.cache[id] = saved; else delete req.cache[id];
   });
 });
