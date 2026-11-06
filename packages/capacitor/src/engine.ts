@@ -106,6 +106,19 @@ export class ShipvoCapacitor implements ShipvoCapacitorPlugin {
     return { release: s.current, file: s.current ? bundleName(s.current) : undefined };
   }
 
+  /** sha-256 of a stored release's archive, as checked against the signed pointer when it was staged. The native layer re-checks it before it serves the file. */
+  async bundleHash(release: number): Promise<string | undefined> { return (await this.load()).hashes[String(release)]; }
+
+  /**
+   * The web view loaded a page of a release that `boot()` already chose in this process
+   * (the native layer switched bundles and the new page starts the core again). Sets the running
+   * release without counting another trial boot. Ignored unless it is the pending or current release.
+   */
+  async resume(release: number): Promise<void> {
+    const s = await this.load();
+    if (release && (release === s.pending || release === s.current)) this.running = release;
+  }
+
   /** The app stayed up long enough (the native layer decides how long). Clears the boot counter. */
   async markStable() { const s = await this.load(); s.bootTimes = []; await this.save(); }
 

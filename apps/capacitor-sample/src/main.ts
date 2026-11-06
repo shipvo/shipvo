@@ -1,6 +1,7 @@
 import { ITEMS, findItem, releaseLabel } from "./items.js";
+import { startShipvo } from "./shipvo.js";
 
-// Set by a Shipvo adapter once one exists. Until then the app shows the embedded build.
+// Set by startShipvo() when the app runs a staged release. Otherwise the app shows the embedded build.
 declare global {
   interface Window {
     __SHIPVO_RELEASE__?: number;
@@ -30,7 +31,18 @@ function showList(): void {
   rel.addEventListener("click", () => {
     out.textContent = releaseLabel(window.__SHIPVO_RELEASE__);
   });
-  app.append(h, ul, rel, out);
+  const check = document.createElement("button");
+  check.id = "check";
+  check.textContent = "Check for update";
+  const checkOut = document.createElement("p");
+  checkOut.id = "check-out";
+  check.addEventListener("click", async () => {
+    const shipvo = await shipvoReady;
+    if (!shipvo) { checkOut.textContent = "Updates are not configured in this build."; return; }
+    const r = await shipvo.checkForUpdate({ apply: true });
+    checkOut.textContent = r.status === "staged" ? `Applying release ${r.release}` : r.status === "error" ? `Error: ${r.error}` : "Up to date";
+  });
+  app.append(h, ul, rel, out, check, checkOut);
 }
 
 function showDetail(id: number): void {
@@ -46,4 +58,5 @@ function showDetail(id: number): void {
   app.append(h, p, back);
 }
 
+const shipvoReady = startShipvo().catch(() => undefined);
 showList();

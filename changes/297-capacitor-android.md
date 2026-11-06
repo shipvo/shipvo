@@ -1,0 +1,2 @@
+- `@shipvo/capacitor`: Android native layer. `android/` is a Capacitor plugin (SharedPreferences store, private-files bundle storage, web view switch). New exports `NativeStore`, `NativeFiles`, `bootAndServe`, `bootAndSwitch`, `ShipvoNativePlugin`, and `ShipvoCapacitor.bundleHash` / `resume`.
+- Migration: none; additions only. A web bundle is a zip with `index.html` at its root.
