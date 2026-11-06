@@ -4,12 +4,14 @@
 //   node scripts/first-run/apply-ios.mjs --help | --dry-run
 // The scaffold is the one scripts/first-run/measure.mjs makes. A workflow publishes it, serves it with
 // scripts/ios-e2e/server.mjs (which writes <server.log.jsonl>), launches the app on the Simulator, and writes
-// <marks.json> with epoch-ms marks: {"publish_start", "publish_done", "app_launched", "healthy"}.
-// The download time comes from the server log (scripts/ios-e2e/analyze.mjs parseLog), so it needs no app change.
+// <marks.json> with epoch-ms marks: {"publish_start", "publish_done" (or "pointer_published"), "app_launched", "healthy"}.
+// Nothing writes publish_start and publish_done yet: the workflow step that runs `shipvo publish` must, and it is under .github/ (see the escalation).
+// The download time comes from the server log through analyzeRun in scripts/ios-e2e/analyze.mjs, so it needs no app change.
+// A run with no /b/ request between app_launched and healthy throws: it is not a first applied OTA.
 //
 // Markers, in order: publish_start, publish_done, download_start, download_done, healthy.
 //   publishMs  = publish_done - publish_start     (`shipvo publish`)
-//   downloadMs = download_done - download_start   (first to last request of /b/ paths, after app_launched)
+//   downloadMs = download_done - download_start   (first request after app_launched to the last /b/ request)
 //   applyMs    = healthy - download_done          (last byte to the runtime reporting healthy)
 //   healthyMs  = healthy - publish_done           (published to healthy on the Simulator)
 //   totalMs    = healthy - publish_start
@@ -18,7 +20,7 @@
 // Not timed: store builds, installing the app on the Simulator before launch, reading docs, `npm install`.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { parseLog } from "../ios-e2e/analyze.mjs";
+import { parseLog, analyzeRun } from "../ios-e2e/analyze.mjs";
 
 export const ORDER = ["publish_start", "publish_done", "download_start", "download_done", "healthy"];
 
@@ -46,13 +48,23 @@ export function summarise(events) {
   };
 }
 
-/** Markers from the Simulator marks plus the server log's bundle requests between app_launched and healthy. */
+/**
+ * Markers from the Simulator marks plus the server log. Download time comes from analyzeRun (scripts/ios-e2e/analyze.mjs):
+ * from the first request after app_launched to the last /b/ request, so a single bundle request still has a transfer time.
+ * Throws when app_launched or healthy is missing, or when no bundle was downloaded: that is not a first applied OTA.
+ * publish_done may also be written as pointer_published, the name the ios-e2e marks use.
+ */
 export function eventsFrom(entries, marks) {
   const ev = [];
-  for (const k of ["publish_start", "publish_done", "healthy"]) if (typeof marks[k] === "number") ev.push({ name: k, t: marks[k] });
-  if (typeof marks.app_launched !== "number") throw new Error("missing mark app_launched");
-  const reqs = entries.filter((e) => e.t >= marks.app_launched && e.t <= (marks.healthy ?? Infinity) && e.path.startsWith("/b/")).sort((a, b) => a.t - b.t);
-  if (reqs.length) ev.push({ name: "download_start", t: reqs[0].t }, { name: "download_done", t: reqs[reqs.length - 1].t });
+  const publishDone = marks.publish_done ?? marks.pointer_published;
+  if (typeof marks.publish_start === "number") ev.push({ name: "publish_start", t: marks.publish_start });
+  if (typeof publishDone === "number") ev.push({ name: "publish_done", t: publishDone });
+  for (const k of ["app_launched", "healthy"]) if (typeof marks[k] !== "number") throw new Error(`missing mark ${k}`);
+  ev.push({ name: "healthy", t: marks.healthy });
+  // analyzeRun wants pointer_published but only uses it for a number we do not read here.
+  const r = analyzeRun(entries, { ...marks, pointer_published: typeof publishDone === "number" ? publishDone : marks.healthy });
+  const done = marks.healthy - r.applyMs;
+  ev.push({ name: "download_start", t: done - r.downloadMs }, { name: "download_done", t: done });
   return ev;
 }
 

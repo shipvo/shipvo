@@ -7,3 +7,5 @@ Timed: `shipvo publish`, the download, the apply, and the runtime reporting heal
 Not timed: store builds, installing the app on the Simulator, reading docs, and `npm install`.
 
 The script does not launch the Simulator. A workflow does that and writes the inputs. See the header of `apply-ios.mjs`.
+
+A run with no `/b/` request between `app_launched` and `healthy` is an error, not a zero. Download time starts at the first request after `app_launched`, as in `scripts/ios-e2e/analyze.mjs`. The `publish_start` and `publish_done` marks (`pointer_published` also works) are written by the workflow step that runs `shipvo publish`; no step writes them yet.
