@@ -281,3 +281,22 @@ These come from fixed issues in this repository.
 - [Store details and screenshots](store.md).
 - [Self-host the control plane](self-hosting.md).
 - [Glossary](glossary.md) for the words used here.
+
+## `--json` for `publish`, `promote`, `rollback` and `auto-halt`
+
+These four commands take `--json` and print the same `{ ok, code, summary, data, next }` envelope. Stdout holds only that one JSON line. Text, build output and the old summary go to stderr. Without `--json` nothing changes. Exit codes: 0 ok, 1 failed (including an unreachable or refusing control plane, a missing bundle, a policy refusal), 2 usage error (unknown flag, bad value, missing `--to`).
+
+| Command | `code` on success | `data` |
+|---|---|---|
+| `publish` | `published` | `{ app, release, bands, min_shell_version, bytes, patches, platforms, total_bytes, web? }` (with `--platform all`, `android` and `ios` hold `{ bytes, patches }` instead of `bytes` and `patches`) |
+| `publish --dry-run` | `dry_run` | the same, plus `dry_run: true, out` |
+| `publish --dry-run-policy` | `policy_ok` | `{ policy: "none" or "allowed", bands }` |
+| `promote` | `promoted`, `nothing_to_promote` | `{ dry_run, promoted: [{ platform, release, from, bands, skipped_newer: [{ band, release }] }] }` |
+| `promote --dry-run` | `dry_run` | the same with `dry_run: true` |
+| `rollback` | `rolled_back` | `{ app, rolled_back_to_code_of, new_release, min_shell_version, issued_at, platforms, bands, dry_run: false }` |
+| `rollback --dry-run` | `dry_run` | the same with `dry_run: true` |
+| `auto-halt` | `auto_halt_show`, `auto_halt_on`, `auto_halt_off`, `dry_run` | `{ enabled, threshold, min_reports, dry_run, changed }` (`threshold` and `min_reports` are `null` when off) |
+
+Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`. On failure `data` is `{}` and `summary` is the error message.
+
+`next` suggests the follow-up. After `publish` it is `shipvo status --json` (and `shipvo promote --to ...` when some bands are left). After a dry run it is the real command. After a failure it is the likely fix, for example `shipvo doctor --json`.
