@@ -15,6 +15,8 @@ import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { PhoneBrowser } from "./phone-browser.mjs";
+import { acceptWebSocket } from "./ws-lite.mjs";
+import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
@@ -62,14 +64,56 @@ const sessions = new Map();
 
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
 
+// The phone's Browser app. Chromium starts on the first open. Pages that link to the app's own scheme hand the link to the app.
+// The instance is shared through s.browserP, so two opens at once make one Chromium context.
+function phoneBrowser(s) {
+  s.browserP ??= (async () => {
+    s.peers = s.peers ?? new Set();
+    const b = new PhoneBrowser(await browserReady, { allowPrivate: false, allowHosts: [], device: phone, onDeepLink: (u) => {
+      s.page.evaluate((x) => globalThis.__pnDevice?.openUrl(x), u).catch(() => {});
+      for (const peer of s.peers) peer.send(JSON.stringify({ type: "app", url: u }));   // the phone goes back to the app
+    } });
+    b.onChange = () => pushState(s);
+    s.browser = b;
+    return b;
+  })();
+  s.browserP.catch(() => { s.browserP = undefined; });
+  return s.browserP;
+}
+// One screencast feeds every viewer of the Browser app.
+function ensureCast(s) {
+  const b = s.browser; if (!b?.page || b.screencast || !s.peers?.size) return;
+  b.startScreencast((f) => { const msg = JSON.stringify({ type: "frame", ...f }); for (const p of s.peers) p.send(msg); }).catch(() => {});
+  pushState(s);
+}
+async function pushState(s) {
+  const b = s.browser; if (!b || !s.peers?.size) return;
+  const tabs = await b.tabs().catch(() => []);
+  const msg = JSON.stringify({ type: "state", tabs, url: b.page?.url() ?? "" });
+  for (const peer of s.peers) peer.send(msg);
+}
+/** Opens a web page in the Browser app. Resolves { ok: true }, or { ok: false, code, message } when the page is refused. Viewers get an `error` message too. */
+async function openInBrowserApp(id, url) {
+  const s = sessions.get(id); if (!s) return { ok: false, code: "no_session", message: "no session" };
+  const b = await phoneBrowser(s);
+  for (const peer of s.peers ?? []) peer.send(JSON.stringify({ type: "browser", url }));   // the phone shows the Browser app
+  try { await b.open(url); ensureCast(s); return { ok: true }; } catch (e) {
+    const r = { ok: false, code: e.code ?? "error", message: String(e.message).split("\n")[0] };
+    for (const peer of s.peers ?? []) peer.send(JSON.stringify({ type: "error", code: r.code, message: r.message }));
+    return r;
+  }
+}
+
 async function newSession(id, opts = {}) {
-  if (sessions.has(id)) { await sessions.get(id).browser?.close(); await sessions.get(id).ctx.close(); }
+  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close(); }
   const target = await resolveApp(opts.app);
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
   const browser = await browserReady;
   // Optional width, height (output pixels) and scale (device pixel ratio) make a session render at a store screenshot size.
   const size = Number.isInteger(opts.width) && Number.isInteger(opts.height) && opts.width > 0 && opts.height > 0 ? { viewport: { width: Math.round(opts.width / (opts.scale || 1)), height: Math.round(opts.height / (opts.scale || 1)) }, deviceScaleFactor: opts.scale || 1 } : {};
   const ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
+  // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
+  await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
   const errors = [];
@@ -214,18 +258,21 @@ async function act(id, body) {
       break;
     }
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
-    case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": {
-      if (body.action === "browser_open" && body.url && !s.browser) s.browser = new PhoneBrowser(await browserReady, { allowPrivate: body.allow_private === true, allowHosts: Array.isArray(body.allow_hosts) ? body.allow_hosts.map(String) : [], device: phone });
-      else if (body.action === "browser_open" && s.browser) { if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
+    case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
+      if (body.action === "browser_open" && body.url) { await phoneBrowser(s); if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
       if (!s.browser) { if (body.action === "browser_open") throw new SimError("bad_url", "browser_open needs a url"); throw new SimError("no_page", "no page is open: call browser_open first"); }
       const b = s.browser;
       try {
         switch (body.action) {
-          case "browser_open": return { ...(await b.open(String(body.url ?? ""))) };
+          case "browser_open": { const r = await b.open(String(body.url ?? "")); ensureCast(s); return { ...r }; }
           case "browser_snapshot": return { ...(await b.snapshot()) };
           case "browser_click": return { ...(await b.click(body.ref)) };
           case "browser_type": return { ...(await b.type(body.ref, body.text, body.enter)) };
           case "browser_back": return { ...(await b.back()) };
+          case "browser_tabs": return { source: "web", untrusted: true, tabs: await b.tabs() };
+          case "browser_close_tab": return { source: "web", untrusted: true, tabs: await b.closeTab(Number(body.index)) };
+          case "browser_scroll": return { ...(await b.scroll(Number.isFinite(body.dy) ? body.dy : 400, Number.isFinite(body.dx) ? body.dx : 0)) };
+          case "browser_wait_for": return { ...(await b.waitFor({ text: body.text, gone: body.gone === true, timeoutMs: body.timeout_ms })) };
           default: { const p = join(DIR, `${id}-web-${Date.now()}.png`); writeFileSync(p, await b.screenshot()); return { path: p, source: "web", untrusted: true }; }
         }
       } catch (e) { throw e.code ? new SimError(e.code, e.message) : e; }
@@ -260,7 +307,7 @@ async function act(id, body) {
       const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -310,6 +357,8 @@ const server = http.createServer(async (req, res) => {
       }
       return send(202, { ok: true }); // telemetry etc.
     }
+    // the Browser app, in a phone frame
+    if (req.method === "GET" && url.pathname === "/browser") return send(200, browserAppPage(url.searchParams.get("skin") === "ios" ? "ios" : "android", url.searchParams.get("session") ?? ""), MIME[".html"]);
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
@@ -322,6 +371,33 @@ const server = http.createServer(async (req, res) => {
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }
+});
+// The Browser app's live view: frames out, taps, swipes and typing in. Same trust as the HTTP API (loopback), plus an Origin check
+// so another web page open on this machine cannot drive the phone.
+server.on("upgrade", (req, socket) => {
+  const url = new URL(req.url, "http://x");
+  const refuse = (line) => socket.end(`HTTP/1.1 ${line}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  if (url.pathname !== "/browser/ws") return refuse("404 Not Found");
+  let originHost = null; try { if (req.headers.origin) originHost = new URL(req.headers.origin).host; } catch { originHost = "invalid"; }
+  // A missing Origin is allowed (non-browser clients). The Host comparison does not stop DNS rebinding, since both
+  // values come from the requester; the HTTP API has the same trust level.
+  if (originHost && originHost !== req.headers.host) return refuse("403 Forbidden");
+  const s = sessions.get(url.searchParams.get("session") ?? ""); if (!s) return refuse("404 Not Found");
+  const peer = acceptWebSocket(req, socket, async (text) => {
+    let m; try { m = JSON.parse(text); } catch { return; }
+    const b = s.browser;
+    try {
+      if (m.type === "open") { await openInBrowserApp(url.searchParams.get("session"), String(m.url)); return; }   // a refusal reaches every viewer as an `error` message
+      if (!b) return;
+      if (m.type === "back") await b.back(); else if (m.type === "forward") await b.forward(); else if (m.type === "reload") await b.reload();
+      else if (m.type === "tab") await b.selectTab(Number(m.index)); else if (m.type === "newtab") await b.newTab(); else if (m.type === "closetab") await b.closeTab(Number(m.index));
+      else await b.input(m);
+    } catch (e) { peer.send(JSON.stringify({ type: "error", code: e.code ?? "error", message: String(e.message).split("\n")[0] })); }
+  }, () => { s.peers?.delete(peer); if (!s.peers?.size) s.browser?.stopScreencast(); });
+  if (!peer) return;
+  s.peers = s.peers ?? new Set(); s.peers.add(peer);
+  peer.send(JSON.stringify({ type: "hello", browser: !!s.browser }));
+  ensureCast(s);
 });
 // Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
