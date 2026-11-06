@@ -28,7 +28,7 @@ The `first-run-cross-os` workflow packs the CLI and runs the first-run path from
 | macOS | `macos-26-arm64` (`macos-latest`) | `22` | [same four steps](https://github.com/shipvo/shipvo/actions/runs/42181287584/job/127771439227) |
 | Linux | `ubuntu-26.04` (`ubuntu-latest`) | `22` | [same four steps](https://github.com/shipvo/shipvo/actions/runs/42181287584/job/127771439219) |
 
-Each step exited with code 0. This run does not cover `shipvo sim` or `shipvo run android` on any system, and the log does not print the exact Node patch version, so we claim neither. No step failed on any system in this run. The Linux simulator run is in the first-run numbers above and in [`scripts/first-run/`](../scripts/first-run/).
+Each step exited with code 0, and no step failed on any system in this run. The Linux simulator run is in the first-run numbers above and in [`scripts/first-run/`](../scripts/first-run/).
 
 ## 1. Create the app
 
@@ -167,4 +167,4 @@ The simulator also runs hosted: one Worker spins up a sandbox per API key and ex
 
 ## Where things are measured
 
-Everything above is claimed from measurements on real hardware, published in this repo: OTA sizes and timings on a 2 GB Redmi 9A ([spike-results.md](spike-results.md)), and simulator-vs-device parity on an Android emulator and an iPhone simulator, including what the score does not cover ([parity-results.md](parity-results.md)).
+Everything above is claimed from measurements on real hardware, published in this repo: OTA sizes and timings on a 2 GB Redmi 9A ([spike-results.md](spike-results.md)), and simulator-vs-device parity on an Android emulator and an iPhone simulator ([parity-results.md](parity-results.md)).

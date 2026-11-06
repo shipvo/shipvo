@@ -29,6 +29,8 @@ Hosting trades control for reach: nothing to install, and it works from any mach
 
 Run `npx -y @shipvo/cli login`, then `npx -y @shipvo/cli mcp`, and ask your assistant to open the sample app. The [guide](https://github.com/shipvo/shipvo/blob/main/docs/test-with-an-assistant.md) has prompts that find real bugs. For the background, read [what MCP is and why your app might speak it](https://shipvo.dev/blog/what-mcp-is-and-why-your-app-might-speak-it/).
 
+To watch the simulated phone your assistant drives, see [seeing your app on a phone in your browser](https://shipvo.dev/blog/see-your-react-native-app-on-a-phone-in-your-browser/).
+
 ## Sources
 
 - [ios-simulator-mcp](https://docsearch.algolia.com/mcp/docs/repo/joshuayoes/ios-simulator-mcp), project documentation

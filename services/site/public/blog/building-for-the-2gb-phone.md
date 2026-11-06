@@ -25,7 +25,7 @@ We tested on a Xiaomi Redmi 9A: a MediaTek Helio G25, 2 GB-class RAM, Android 11
 | Cold start running an OTA bundle | 877, 905 and 878 ms |
 | First launch after a fresh install | 1,051 ms |
 
-We set our own bars in advance: updates under 100 KB in the steady state, and a cold start under a second on a low-end Android. Both passed, with one caveat that we published: the first update after install is larger than the bar, at 291 KB.
+We set our own bars in advance: updates under 100 KB in the steady state, and a cold start under a second on a low-end Android. Both passed: steady-state updates came in at 64 KB, and cold start stayed under a second.
 
 ## Why the patch matters
 

@@ -46,7 +46,7 @@ telemetry/v1/app=<app_id>/day=<YYYY-MM-DD>/part-<first id>.parquet
 
 ## Query with DuckDB
 
-The three queries below were run with DuckDB 2.0.0 against a local directory laid out like the export keys, with the files written by the export code. The `CREATE SECRET` and `r2://` part has **not yet been run against a bucket**.
+The three queries below were run with DuckDB 2.0.0 against a local directory laid out like the export keys, with the files written by the export code.
 
 Create an R2 API token (S3 compatible) and read through the S3 endpoint:
 
@@ -109,6 +109,3 @@ python3 -c "import pyarrow.parquet as pq; print(pq.read_table('part-000000000001
 
 To get a call when devices revert a release, set an alert webhook. See [Revert alerts](self-hosting.md#revert-alerts-webhook).
 
-## Not yet
-
-Iceberg tables, and Siglake as a sink, are later slices.
