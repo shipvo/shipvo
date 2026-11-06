@@ -24,6 +24,7 @@ export function changedScreens(files: string[]): string[] {
 
 /** Files changed since `base` (a commit sha). */
 export function changedFiles(base: string): string[] {
+  // Three dots: diff against the merge-base, which is what a PR shows.
   return execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" }).split("\n").filter(Boolean);
 }
 
