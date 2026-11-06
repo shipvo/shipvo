@@ -65,16 +65,20 @@ const sessions = new Map();
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
 
 // The phone's Browser app. Chromium starts on the first open. Pages that link to the app's own scheme hand the link to the app.
-async function phoneBrowser(s, opts = {}) {
-  if (!s.browser) {
+// The instance is shared through s.browserP, so two opens at once make one Chromium context.
+function phoneBrowser(s) {
+  s.browserP ??= (async () => {
     s.peers = s.peers ?? new Set();
-    s.browser = new PhoneBrowser(await browserReady, { allowPrivate: opts.allowPrivate === true, allowHosts: opts.allowHosts ?? [], device: phone, onDeepLink: (u) => {
+    const b = new PhoneBrowser(await browserReady, { allowPrivate: false, allowHosts: [], device: phone, onDeepLink: (u) => {
       s.page.evaluate((x) => globalThis.__pnDevice?.openUrl(x), u).catch(() => {});
       for (const peer of s.peers) peer.send(JSON.stringify({ type: "app", url: u }));   // the phone goes back to the app
     } });
-    s.browser.onChange = () => pushState(s);
-  }
-  return s.browser;
+    b.onChange = () => pushState(s);
+    s.browser = b;
+    return b;
+  })();
+  s.browserP.catch(() => { s.browserP = undefined; });
+  return s.browserP;
 }
 // One screencast feeds every viewer of the Browser app.
 function ensureCast(s) {
@@ -84,20 +88,24 @@ function ensureCast(s) {
 }
 async function pushState(s) {
   const b = s.browser; if (!b || !s.peers?.size) return;
-  const tabs = await b.tabs().catch(() => []); const history = await b.page?.evaluate(() => history.length).catch(() => 1);
-  const msg = JSON.stringify({ type: "state", tabs, url: b.page?.url() ?? "", history });
+  const tabs = await b.tabs().catch(() => []);
+  const msg = JSON.stringify({ type: "state", tabs, url: b.page?.url() ?? "" });
   for (const peer of s.peers) peer.send(msg);
 }
-/** Opens a web page in the Browser app. Resolves null when it opened, else the error. */
+/** Opens a web page in the Browser app. Resolves { ok: true }, or { ok: false, code, message } when the page is refused. Viewers get an `error` message too. */
 async function openInBrowserApp(id, url) {
-  const s = sessions.get(id); if (!s) return new Error("no session");
+  const s = sessions.get(id); if (!s) return { ok: false, code: "no_session", message: "no session" };
   const b = await phoneBrowser(s);
   for (const peer of s.peers ?? []) peer.send(JSON.stringify({ type: "browser", url }));   // the phone shows the Browser app
-  try { await b.open(url); ensureCast(s); return null; } catch (e) { return e; }
+  try { await b.open(url); ensureCast(s); return { ok: true }; } catch (e) {
+    const r = { ok: false, code: e.code ?? "error", message: String(e.message).split("\n")[0] };
+    for (const peer of s.peers ?? []) peer.send(JSON.stringify({ type: "error", code: r.code, message: r.message }));
+    return r;
+  }
 }
 
 async function newSession(id, opts = {}) {
-  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await old.browser?.close(); await old.ctx.close(); }
+  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close(); }
   const target = await resolveApp(opts.app);
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
   const browser = await browserReady;
@@ -251,8 +259,7 @@ async function act(id, body) {
     }
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
     case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
-      if (body.action === "browser_open" && body.url && !s.browser) { await phoneBrowser(s, { allowPrivate: body.allow_private === true, allowHosts: Array.isArray(body.allow_hosts) ? body.allow_hosts.map(String) : [] }); }
-      else if (body.action === "browser_open" && s.browser) { if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
+      if (body.action === "browser_open" && body.url) { await phoneBrowser(s); if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
       if (!s.browser) { if (body.action === "browser_open") throw new SimError("bad_url", "browser_open needs a url"); throw new SimError("no_page", "no page is open: call browser_open first"); }
       const b = s.browser;
       try {
@@ -372,13 +379,15 @@ server.on("upgrade", (req, socket) => {
   const refuse = (line) => socket.end(`HTTP/1.1 ${line}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
   if (url.pathname !== "/browser/ws") return refuse("404 Not Found");
   let originHost = null; try { if (req.headers.origin) originHost = new URL(req.headers.origin).host; } catch { originHost = "invalid"; }
+  // A missing Origin is allowed (non-browser clients). The Host comparison does not stop DNS rebinding, since both
+  // values come from the requester; the HTTP API has the same trust level.
   if (originHost && originHost !== req.headers.host) return refuse("403 Forbidden");
   const s = sessions.get(url.searchParams.get("session") ?? ""); if (!s) return refuse("404 Not Found");
   const peer = acceptWebSocket(req, socket, async (text) => {
     let m; try { m = JSON.parse(text); } catch { return; }
     const b = s.browser;
     try {
-      if (m.type === "open") { const err = await openInBrowserApp(url.searchParams.get("session"), String(m.url)); if (err) peer.send(JSON.stringify({ type: "error", code: err.code ?? "error", message: String(err.message).split("\n")[0] })); return; }
+      if (m.type === "open") { await openInBrowserApp(url.searchParams.get("session"), String(m.url)); return; }   // a refusal reaches every viewer as an `error` message
       if (!b) return;
       if (m.type === "back") await b.back(); else if (m.type === "forward") await b.forward(); else if (m.type === "reload") await b.reload();
       else if (m.type === "tab") await b.selectTab(Number(m.index)); else if (m.type === "newtab") await b.newTab(); else if (m.type === "closetab") await b.closeTab(Number(m.index));

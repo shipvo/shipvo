@@ -88,6 +88,18 @@ test("Linking.openURL from the app opens the Browser app, and the private-host g
   assert.match(JSON.stringify((await act("o", { action: "device_log" })).log), /host_not_allowed/);   // the guard still applies
 });
 
+test("two opens at once share one browser, and a refused page reaches the viewer", async () => {
+  await call("/session", { session: "r" });
+  const c = connect("r"); await c.opened;
+  await Promise.all([act("r", { action: "open_url", url: "http://10.1.2.3/a" }), act("r", { action: "open_url", url: "http://10.1.2.4/b" })]);
+  // Both refusals are in one navigation log: a second, leaked PhoneBrowser would have kept its own.
+  const log = JSON.stringify((await act("r", { action: "device_log" })).log);
+  assert.match(log, /10\.1\.2\.3/); assert.match(log, /10\.1\.2\.4/);
+  const err = await until(() => c.msgs.find((m) => m.type === "error"));
+  assert.equal(err.code, "host_not_allowed");
+  c.ws.close();
+});
+
 test("a deep link on a web page opens the app", async () => {
   await call("/session", { session: "d" });
   const c = connect("d"); await c.opened;
