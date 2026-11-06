@@ -187,6 +187,21 @@ The agent's "what next" command. It prints one JSON line:
 | 1 | action needed: no project, no signing key, or a halted release |
 | 2 | error: shipvo.json is invalid or the control plane could not be reached |
 
+## `shipvo approvals`
+
+With `policy.requireApprovalAbove` set, a promote above that band waits for a second owner. These commands show and release the holds.
+
+```bash
+shipvo approvals list                 # hold id, release, band, proposer, age
+shipvo approvals approve <id>         # let the promote go through
+shipvo approvals list --json          # one JSON line: { ok, command, app, approvals }
+```
+
+- `approve` needs `SHIPVO_OWNER_TOKEN` or a login. `list` also works with the publish token.
+- The proposer cannot approve its own hold, and an agent cannot approve an agent's hold. The CLI prints the rule (`self_approval`), exits 1, and the control plane writes an audit row for the refusal.
+- Exit codes: 0 done, 1 refused by a rule, 2 error. With `--json` a failure is `{ ok: false, error, message, rule? }`.
+- MCP tools: `approvals_list(app)` and `approval_approve(app, id)`.
+
 ## `shipvo audit`
 
 Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.

@@ -294,7 +294,12 @@ async function resolveApproval(c: any, verb: "approve" | "reject") {
   if (!raw) return c.json({ error: "not_found" }, 404);
   const a: Approval = JSON.parse(raw);
   if (a.status !== "pending") return c.json({ error: "not_pending", message: `This approval is already ${a.status}.` }, 409);
-  if (verb === "approve" && who.actor === a.proposer) return c.json({ error: "self_approval", message: "The actor that proposed this release cannot approve it." }, 403);
+  // An agent cannot approve an agent's proposal either: the owner token and the publish token are both agents.
+  if (verb === "approve" && (who.actor === a.proposer || (who.kind === "agent" && a.proposer.startsWith("agent")))) {
+    await recordAudit(c.env.DB, { app_id: id, actor: who.actor, actor_kind: who.kind, action: "publish", release: a.release, release_id: a.key,
+      after: JSON.stringify({ approval: "refused", rule: "self_approval", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
+    return c.json({ error: "self_approval", code: "self_approval", rule: "self_approval", message: "The actor that proposed this release cannot approve it. A second owner must." }, 403);
+  }
   const approved = verb === "approve";
   if (approved) {
     // Never roll a band back: if a newer release went live while this waited, refuse and close the approval.
@@ -324,6 +329,20 @@ async function resolveApproval(c: any, verb: "approve" | "reject") {
     after: JSON.stringify({ approval: approved ? "approved" : "rejected", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
   return c.json({ ok: true, approval_id: a.id, status: approved ? "approved" : "rejected" });
 }
+/** Pending approvals of an app, oldest first. Readable by an owner or by the app's publish token (an agent may list, never approve its own). */
+apps.get("/:app/approvals", async (c) => {
+  const id = c.req.param("app");
+  if (!(await approver(c, id)) && !(await publisher(c, id))) return c.json({ error: "unauthorized" }, 401);
+  const prefix = approvalKey(id, "");
+  const listed = await c.env.POINTERS.list({ prefix });
+  const out: any[] = [];
+  for (const k of listed.keys) {
+    const raw = await c.env.POINTERS.get(k.name); if (!raw) continue;
+    try { const a: Approval = JSON.parse(raw); if (a.status === "pending") out.push({ id: a.id, release: a.release, band: a.band, proposer: a.proposer, proposed_at: a.proposed_at, status: a.status }); } catch { /* skip unreadable */ }
+  }
+  out.sort((x, y) => String(x.proposed_at).localeCompare(String(y.proposed_at)));
+  return c.json({ app: id, approvals: out });
+});
 apps.post("/:app/approvals/:id/approve", (c) => resolveApproval(c, "approve"));
 apps.post("/:app/approvals/:id/reject", (c) => resolveApproval(c, "reject"));
 

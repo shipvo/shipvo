@@ -32,11 +32,12 @@ async function run(policy: object | undefined, band: string, headers: Record<str
       return null;
     },
   }) }) } as any;
-  const POINTERS = { put: async (k: string, v: unknown) => { store[k] = typeof v === "string" ? v : new TextDecoder().decode(v as ArrayBuffer); }, get: async (k: string) => (k === "c/tide/release_policy" && policy && !store[k] ? JSON.stringify(policy) : store[k] ?? null) } as any;
+  const POINTERS = { put: async (k: string, v: unknown) => { store[k] = typeof v === "string" ? v : new TextDecoder().decode(v as ArrayBuffer); }, list: async ({ prefix }: { prefix: string }) => ({ keys: Object.keys(store).filter((k) => k.startsWith(prefix)).map((name) => ({ name })) }), get: async (k: string) => (k === "c/tide/release_policy" && policy && !store[k] ? JSON.stringify(policy) : store[k] ?? null) } as any;
   const env = { DB, POINTERS, OWNER_TOKEN: "owner-secret" } as any;
   const r = await app.request(`/apps/tide/kv/p/tide/1/${band}`, { method: "PUT", headers: { authorization: `Bearer ${PUB}`, ...headers }, body: p.buf }, env);
   const act = (aid: string, verb: string, token: string) => app.request(`/apps/tide/approvals/${aid}/${verb}`, { method: "POST", headers: { authorization: `Bearer ${token}` } }, env);
-  return { r, store, audits, act, state };
+  const list = (token: string) => app.request("/apps/tide/approvals", { headers: { authorization: `Bearer ${token}` } }, env);
+  return { r, store, audits, act, state, list };
 }
 const PTR = "p/tide/1/b2";
 
@@ -125,5 +126,32 @@ describe("requireApprovalAbove", () => {
     const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2", { "x-shipvo-actor": "agent" });
     const { approval_id } = (await r.json()) as any;
     expect((await act(approval_id, "approve", ANN)).status).toBe(200); expect(store[PTR]).toBeTruthy();
+  });
+  it("the proposer's refused approve writes a refused audit row naming the rule", async () => {
+    const { r, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2");
+    const { approval_id } = (await r.json()) as any;
+    const a = await act(approval_id, "approve", ANN);
+    expect(a.status).toBe(403); expect(((await a.json()) as any).rule).toBe("self_approval");
+    expect(audits).toHaveLength(2);
+    expect(JSON.parse(audits[1]![8] as string)).toMatchObject({ approval: "refused", rule: "self_approval" });
+    expect(audits[1]![2]).toBe("ann"); expect(audits[1]![3]).toBe("person");
+  });
+  it("an agent cannot approve an agent's proposal", async () => {
+    const { r, store, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2", { "x-shipvo-actor": "agent" });
+    const { approval_id } = (await r.json()) as any;
+    expect((await act(approval_id, "approve", "owner-secret")).status).toBe(403);
+    expect(store[PTR]).toBeUndefined();
+    expect(JSON.parse(audits[1]![8] as string).approval).toBe("refused"); expect(audits[1]![3]).toBe("agent");
+  });
+  it("list shows pending approvals to an owner and to the publish token, not to others", async () => {
+    const { r, list, act } = await run({ requireApprovalAbove: "b1" }, "b2");
+    const { approval_id } = (await r.json()) as any;
+    for (const t of [ANN, PUB, "owner-secret"]) {
+      const l = await list(t); expect(l.status).toBe(200);
+      expect(((await l.json()) as any).approvals).toEqual([expect.objectContaining({ id: approval_id, release: 7, band: "b2", proposer: "ann" })]);
+    }
+    expect((await list("nope")).status).toBe(401);
+    await act(approval_id, "approve", "owner-secret");
+    expect(((await (await list(ANN)).json()) as any).approvals).toEqual([]);
   });
 });

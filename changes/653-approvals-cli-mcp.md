@@ -1,0 +1,4 @@
+- `@shipvo/cli`: new `shipvo approvals list` and `shipvo approvals approve <id>` (with `--json`) for promotes held above `policy.requireApprovalAbove`.
+- `@shipvo/mcp`: new tools `approvals_list` and `approval_approve`. An agent cannot approve an agent's proposal.
+- control-plane: new `GET /apps/:app/approvals` (pending holds). A refused self-approval now writes an audit row (`approval: "refused"`, `rule: "self_approval"`), and an agent can no longer approve an agent's proposal.
+- Migration: none; additive.

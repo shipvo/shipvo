@@ -397,6 +397,29 @@ server.tool("owner_command", "Run an owner command against the live app (changes
     return text(await r.text());
   });
 
+// Held promotes: a promote above policy.requireApprovalAbove waits for a second owner (control plane, slice 3a of #295).
+async function approvalsCall(app: string, path: string, method: "GET" | "POST") {
+  const token = ctx.ownerToken || OWNER_TOKEN;
+  if (!token) throw new Error("approvals are not enabled on this server: it needs an owner token (PN_OWNER_TOKEN).");
+  if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": approvals need an owner key`);
+  if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
+  const r = await fetch(`${CONTROL}/apps/${encodeURIComponent(app)}/approvals${path}`, { method, headers: { authorization: `Bearer ${token}`, "x-shipvo-actor": "agent" } });
+  const body: any = await r.json().catch(() => ({}));
+  return { r, body };
+}
+server.tool("approvals_list", "List promotes held above the app's policy band, waiting for a second owner: hold id, release, band asked for, proposer and age. Needs an owner token.", { app: z.string() }, RO, async ({ app }) => {
+  const { r, body } = await approvalsCall(app, "", "GET");
+  if (!r.ok) return { ...text(JSON.stringify({ ok: false, status: r.status, ...body })), isError: true };
+  const t = Date.now();
+  const approvals = (body.approvals ?? []).map((h: any) => ({ id: h.id, release: h.release, band: h.band, proposer: h.proposer, proposed_at: h.proposed_at, age_seconds: Math.max(0, Math.round((t - Date.parse(h.proposed_at)) / 1000)) }));
+  return { ...text(JSON.stringify({ ok: true, app, approvals }, null, 2)), structuredContent: { ok: true, app, approvals } };
+});
+server.tool("approval_approve", "Approve a held promote so it goes live. The proposer cannot approve it, and an agent cannot approve an agent's proposal: that is refused with rule self_approval. Ask the owner to approve in that case. Both outcomes are audited.", { app: z.string(), id: z.string().describe("Hold id from approvals_list") }, DEST, async ({ app, id }) => {
+  const { r, body } = await approvalsCall(app, `/${encodeURIComponent(id)}/approve`, "POST");
+  if (!r.ok) return { ...text(JSON.stringify({ ok: false, status: r.status, ...body })), isError: true };
+  return text(JSON.stringify({ ok: true, app, approval_id: body.approval_id ?? id, status: body.status }));
+});
+
 return server;
 }
 

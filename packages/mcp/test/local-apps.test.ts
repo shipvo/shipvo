@@ -242,6 +242,46 @@ describe("change line", () => {
   });
 });
 
+describe("approvals tools", () => {
+  let control: http.Server; const seen: { method?: string; url?: string; headers: http.IncomingHttpHeaders }[] = [];
+  beforeAll(async () => {
+    control = http.createServer((req, res) => {
+      seen.push({ method: req.method, url: req.url, headers: req.headers });
+      res.writeHead(req.url?.includes("/bad/") ? 403 : 200, { "content-type": "application/json" });
+      if (req.url?.includes("/bad/")) return res.end(JSON.stringify({ error: "self_approval", rule: "self_approval", message: "cannot approve" }));
+      if (req.method === "GET") return res.end(JSON.stringify({ approvals: [{ id: "h1", release: 7, band: "b2", proposer: "ann", proposed_at: new Date(Date.now() - 120000).toISOString() }] }));
+      res.end(JSON.stringify({ ok: true, approval_id: "h1", status: "approved" }));
+    });
+    await new Promise<void>((r) => control.listen(0, r));
+  });
+  afterAll(() => control?.close());
+  const url = () => `http://127.0.0.1:${(control.address() as { port: number }).port}`;
+  it("lists holds with id, release, band, proposer and age", async () => {
+    const c = await connect({ PN_CONTROL: url(), PN_OWNER_TOKEN: "t" });
+    const r: any = await c.callTool({ name: "approvals_list", arguments: { app: "menu" } });
+    expect(r.structuredContent.approvals[0]).toMatchObject({ id: "h1", release: 7, band: "b2", proposer: "ann" });
+    expect(r.structuredContent.approvals[0].age_seconds).toBeGreaterThanOrEqual(120);
+    expect(seen.at(-1)).toMatchObject({ method: "GET", url: "/apps/menu/approvals" });
+    await c.close();
+  });
+  it("approves as an agent and surfaces a refusal with the rule named", async () => {
+    const c = await connect({ PN_CONTROL: url(), PN_OWNER_TOKEN: "t" });
+    const ok: any = await c.callTool({ name: "approval_approve", arguments: { app: "menu", id: "h1" } });
+    expect(JSON.parse(ok.content[0].text)).toMatchObject({ ok: true, status: "approved" });
+    expect(seen.at(-1)).toMatchObject({ method: "POST", url: "/apps/menu/approvals/h1/approve" });
+    expect(seen.at(-1)!.headers["x-shipvo-actor"]).toBe("agent");
+    const no: any = await c.callTool({ name: "approval_approve", arguments: { app: "menu", id: "bad" } });
+    expect(no.isError).toBe(true); expect(JSON.parse(no.content[0].text)).toMatchObject({ ok: false, rule: "self_approval" });
+    await c.close();
+  });
+  it("needs an owner token", async () => {
+    const c = await connect({ PN_CONTROL: url() });
+    const r: any = await c.callTool({ name: "approvals_list", arguments: { app: "menu" } });
+    expect(r.isError).toBe(true);
+    await c.close();
+  });
+});
+
 describe("owner_command confirm", () => {
   let control: http.Server; const seen: { headers: http.IncomingHttpHeaders; body: any }[] = [];
   beforeAll(async () => {
