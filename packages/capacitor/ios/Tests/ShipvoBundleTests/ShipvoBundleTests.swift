@@ -5,7 +5,7 @@ import XCTest
 /// Runs the shared vectors in packages/capacitor/test-vectors/bundle.json, the file the TypeScript tests use.
 final class ShipvoBundleTests: XCTestCase {
   struct Case: Decodable { let name: String, body: String, signature: String, archive: String, expect: String }
-  struct Vectors: Decodable { let publicKey: String, appId: String, shellMajor: Int, band: String; let cases: [Case] }
+  struct Vectors: Decodable { let publicKey: String, appId: String, shellMajor: Int, band: String, shellVersion: String; let cases: [Case] }
 
   var vectors: Vectors!
   var root: URL!
@@ -21,7 +21,7 @@ final class ShipvoBundleTests: XCTestCase {
   override func tearDownWithError() throws { try? FileManager.default.removeItem(at: root) }
 
   func store() throws -> BundleStore {
-    let id = Identity(appId: vectors.appId, shellMajor: vectors.shellMajor, band: vectors.band, publicKey: vectors.publicKey)
+    let id = Identity(appId: vectors.appId, shellMajor: vectors.shellMajor, band: vectors.band, shellVersion: vectors.shellVersion, publicKey: vectors.publicKey)
     return try BundleStore(root: root, identity: id, now: { self.clock })
   }
   func good() -> Case { vectors.cases.first { $0.expect == "ok" }! }
@@ -45,6 +45,28 @@ final class ShipvoBundleTests: XCTestCase {
       }
       try? FileManager.default.removeItem(at: root)
     }
+  }
+
+  func testBadHashBlocksThatReleaseButANewerOneStages() throws {
+    let s = try store()
+    let bad = vectors.cases.first { $0.name == "bad hash refused" }!
+    XCTAssertThrowsError(try s.stage(body: bad.body, signature: bad.signature, archive: Data(base64Encoded: bad.archive)!))
+    XCTAssertEqual(s.blocked, 2)
+    // The same release is not accepted again, even with the right bytes.
+    XCTAssertThrowsError(try stageGood(s)) { XCTAssertEqual(($0 as? BundleError)?.code, "bad_pointer") }
+    // A bad signature does not block anything.
+    let sig = vectors.cases.first { $0.expect == "bad_signature" }!
+    let t = try { root = root.appendingPathComponent("b"); return try store() }()
+    XCTAssertThrowsError(try t.stage(body: sig.body, signature: sig.signature, archive: Data(base64Encoded: sig.archive)!))
+    XCTAssertEqual(t.blocked, 0)
+  }
+
+  func testSemverCompare() {
+    XCTAssertTrue(semverLess("1.0.0", "1.1.0"))
+    XCTAssertTrue(semverLess("1.9.9", "2.0.0"))
+    XCTAssertFalse(semverLess("1.1.0", "1.1.0"))
+    XCTAssertFalse(semverLess("1.2.0-beta", "1.2.0"))
+    XCTAssertFalse(semverLess("2", "1.9.9"))
   }
 
   func testGoodBundleIsPromotedAndSurvivesRestart() throws {

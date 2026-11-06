@@ -38,7 +38,14 @@ public final class BundleStore {
   /// Verifies, then stores the archive and makes it the pending release. A refused bundle changes nothing.
   @discardableResult
   public func stage(body: String, signature: String, archive: Data) throws -> Int {
-    let release = try BundleVerify.check(body: body, signature: signature, archive: archive, identity: identity)
+    let release: Int
+    do { release = try BundleVerify.check(body: body, signature: signature, archive: archive, identity: identity) }
+    catch BundleError.badHash {
+      // Like the TypeScript core: a release whose size or sha-256 does not match is blocked, so it is not tried again.
+      // The signature was valid, so the release number is trusted.
+      if let r = signedRelease(body: body, signature: signature) { s.blocked = max(s.blocked, r); try save() }
+      throw BundleError.badHash
+    }
     if release <= max(s.current, s.pending, s.blocked) { throw BundleError.badPointer }
     let dir = directory(for: release)
     do {
@@ -51,6 +58,14 @@ public final class BundleStore {
     if old != 0 && old != release { drop(old) }
     try save()
     return release
+  }
+
+  /// The release number of a pointer whose signature is valid, else nil.
+  private func signedRelease(body: String, signature: String) -> Int? {
+    struct R: Decodable { let release: Int }
+    guard BundleVerify.signatureOK(body: body, signature: signature, publicKey: identity.publicKey),
+          let r = try? JSONDecoder().decode(R.self, from: Data(body.utf8)) else { return nil }
+    return r.release
   }
 
   /// The release to serve now, or 0 for the embedded bundle. The stored hash is re-checked before a file is chosen.

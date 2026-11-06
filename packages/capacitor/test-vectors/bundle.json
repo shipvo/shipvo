@@ -1,6 +1,6 @@
 {
- "description": "Shared bundle vectors for the Capacitor TypeScript core and the iOS Swift tests. Test key only. Each case is a signed pointer body, its signature and the archive (base64); `expect` is ok or the refusal code. The Ed25519 signature covers the exact UTF-8 bytes of body.",
- "publicKey": "d1xbbljyJWvtluAKrhPfgEtN3I4UnxhrtnwKwTPUyIY=",
+ "description": "Shared bundle vectors for the Capacitor TypeScript core and the iOS Swift tests. Test key only. Each case is a signed pointer body, its signature and the archive (base64); `expect` is ok or the refusal code. `shellVersion` is the installed app version; a pointer with a higher `min_shell_version` is refused. The Ed25519 signature covers the exact UTF-8 bytes of body.",
+ "publicKey": "XeUw7quch2S7TuBeVSe3pSo7ym+BK9xn09CUS5OpOhg=",
  "appId": "tide",
  "shellMajor": 1,
  "band": "b2",
@@ -14,44 +14,51 @@
   {
    "name": "good bundle accepted",
    "body": "{\"schema_version\":\"1.0\",\"kind\":\"web\",\"platform\":\"ios\",\"app_id\":\"tide\",\"shell_major\":1,\"band\":\"b2\",\"release\":2,\"issued_at\":\"2026-11-05T00:00:00Z\",\"min_shell_version\":\"1.0.0\",\"core\":{\"version\":\"1.0.0\",\"url\":\"r2.zip\",\"size\":38,\"sha256\":\"6ae1d00803e163e326b771b118d9b20ff402157d9e1350c1c77b0b4414e4f9c4\"}}",
-   "signature": "Nor5JbBnhFrp+EXw8sfxRufT9eXnSIok8YXZe66c/VP1FnZulhoRv3XBu6bRgF5JMqSmPmbnMBBvthALTaKXCg==",
+   "signature": "0NuzA8jG3HbzCJzVDsoPOpek1CIXLJoQd2IS7W1lATTPVVLs+5OkgZa2UExkfdPJS1plXTVOxvKKYSqNkgHNBg==",
    "archive": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMjwvaHRtbD4=",
    "expect": "ok"
   },
   {
    "name": "bad signature refused",
    "body": "{\"schema_version\":\"1.0\",\"kind\":\"web\",\"platform\":\"ios\",\"app_id\":\"tide\",\"shell_major\":1,\"band\":\"b2\",\"release\":2,\"issued_at\":\"2026-11-05T00:00:00Z\",\"min_shell_version\":\"1.0.0\",\"core\":{\"version\":\"1.0.0\",\"url\":\"r2.zip\",\"size\":38,\"sha256\":\"6ae1d00803e163e326b771b118d9b20ff402157d9e1350c1c77b0b4414e4f9c4\"}}",
-   "signature": "l6Fy1WN1iK0yb6rq7ZbNwnXDNCl6MfwvLPngs0vp+WwahVAfP0f5Dv3o8S36QiaVGuhwM2p5mZnd3kRdECEWDQ==",
+   "signature": "GC4DJ+Xo5OiXeu9nxDj0VzfdHXBpNCszmsLohSQvbg8+aUVCdrxkNhnbUuv+ypu1iISnbGp18RqF2HJWc+2hDg==",
    "archive": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMjwvaHRtbD4=",
    "expect": "bad_signature"
   },
   {
    "name": "bad hash refused",
    "body": "{\"schema_version\":\"1.0\",\"kind\":\"web\",\"platform\":\"ios\",\"app_id\":\"tide\",\"shell_major\":1,\"band\":\"b2\",\"release\":2,\"issued_at\":\"2026-11-05T00:00:00Z\",\"min_shell_version\":\"1.0.0\",\"core\":{\"version\":\"1.0.0\",\"url\":\"r2.zip\",\"size\":38,\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\"}}",
-   "signature": "aenkFlEDDeHvcS1vZ0/U2u+aP39S1zMeVhIZy/qPOta6CenDGpNhd1psKEbaKDSwP7oHcwoAevsZO8Dpu/kLAw==",
+   "signature": "TMhVBklIsepNr2rerDaloHoO0wSA5xDVQNqEQyiLCjYxyWZ2LsP/C2UJxH3lRZUHjlXPKUY6q9/8ADMohlvJDw==",
    "archive": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMjwvaHRtbD4=",
    "expect": "bad_hash"
   },
   {
    "name": "bad size refused",
    "body": "{\"schema_version\":\"1.0\",\"kind\":\"web\",\"platform\":\"ios\",\"app_id\":\"tide\",\"shell_major\":1,\"band\":\"b2\",\"release\":2,\"issued_at\":\"2026-11-05T00:00:00Z\",\"min_shell_version\":\"1.0.0\",\"core\":{\"version\":\"1.0.0\",\"url\":\"r2.zip\",\"size\":39,\"sha256\":\"6ae1d00803e163e326b771b118d9b20ff402157d9e1350c1c77b0b4414e4f9c4\"}}",
-   "signature": "CwwFRHMaGWRs7a8B1QuNATkVLj9xc05LjGESClc9JFdMNapufPTHzweR4sQn4jcA9hthBLdgJN3tYVGJMGoQCA==",
+   "signature": "qTUUrAEOj5kTl7ZbRsSp93Uplv10A9yS0Ulh4THQhB50e9Yn71pLrcjmLyN190ijFS9ZO7pGhV4xaa1BNeiHBA==",
    "archive": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMjwvaHRtbD4=",
    "expect": "bad_hash"
   },
   {
    "name": "android pointer refused on iOS",
    "body": "{\"schema_version\":\"1.0\",\"kind\":\"web\",\"platform\":\"android\",\"app_id\":\"tide\",\"shell_major\":1,\"band\":\"b2\",\"release\":2,\"issued_at\":\"2026-11-05T00:00:00Z\",\"min_shell_version\":\"1.0.0\",\"core\":{\"version\":\"1.0.0\",\"url\":\"r2.zip\",\"size\":38,\"sha256\":\"6ae1d00803e163e326b771b118d9b20ff402157d9e1350c1c77b0b4414e4f9c4\"}}",
-   "signature": "LjkgKnG5ZDE0g34iSfnZKmpCUaepXlwAJwfAXdrOstaaHGdKD2sxrMLilSaTW1QyIywu5rhSTxVjtdAfw/Q4CA==",
+   "signature": "UG5s4x6cpccof8IttLbyWtIu8XAC6nCg72MhIeNT2fMa0ciVnFeCBibeZUoniyaMt9ARb4syfs1gTzQaPfymAg==",
    "archive": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMjwvaHRtbD4=",
    "expect": "bad_pointer"
   },
   {
    "name": "not a web bundle refused",
    "body": "{\"schema_version\":\"1.0\",\"kind\":\"rn\",\"platform\":\"ios\",\"app_id\":\"tide\",\"shell_major\":1,\"band\":\"b2\",\"release\":2,\"issued_at\":\"2026-11-05T00:00:00Z\",\"min_shell_version\":\"1.0.0\",\"core\":{\"version\":\"1.0.0\",\"url\":\"r2.zip\",\"size\":38,\"sha256\":\"6ae1d00803e163e326b771b118d9b20ff402157d9e1350c1c77b0b4414e4f9c4\"}}",
-   "signature": "GtQ+nnXU5iBbM8kKDIavOu4mFZnUVe+nQqc3TVgs+8PbBn+UBLvlDZGROG5HvwbdamvXybZOr3rWpveJQbw9DQ==",
+   "signature": "BS6TbGZFryEj9K4qORQVd7KCGgBqXPcSjSO8cwu/82BPeNxjkN9NFrksW7D+0ZXaowG9EPsuUqwpBHgvOiuaAg==",
    "archive": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMjwvaHRtbD4=",
    "expect": "bad_pointer"
+  },
+  {
+   "name": "needs newer shell refused",
+   "body": "{\"schema_version\":\"1.0\",\"kind\":\"web\",\"platform\":\"ios\",\"app_id\":\"tide\",\"shell_major\":1,\"band\":\"b2\",\"release\":2,\"issued_at\":\"2026-11-05T00:00:00Z\",\"min_shell_version\":\"1.1.0\",\"core\":{\"version\":\"1.0.0\",\"url\":\"r2.zip\",\"size\":38,\"sha256\":\"6ae1d00803e163e326b771b118d9b20ff402157d9e1350c1c77b0b4414e4f9c4\"}}",
+   "signature": "vND8mpRkzQ7mv0DaEepvY+XxDy5eFAu4fGNkXqEjbhmx0Gm8m5gIavdFFyHqHRtsbLcwWu9mQvq/3RhUX3LYBg==",
+   "archive": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMjwvaHRtbD4=",
+   "expect": "shell_too_old"
   }
  ]
 }
