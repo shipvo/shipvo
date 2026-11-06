@@ -1,0 +1,3 @@
+- `@shipvo/cli`: `shipvo explore` reports `small_target` (under 48 x 48 on Android, 44 x 44 with `--skin ios`) and `duplicate_name` findings.
+- `@shipvo/sim`: new `sizes` action returns the rendered size of each ref on the screen.
+- Migration: none. `Driver.sizes` is optional.
