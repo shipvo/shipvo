@@ -258,11 +258,11 @@ async function act(id, body) {
     if (covered) throw fail("covered", String(body.ref));
   };
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification", "install_app", "uninstall_app", "switch_app", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "open_notification", "install_app", "uninstall_app", "switch_app", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   // Home screen or app switcher showing: the app is in the background and takes no input.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
   // An open panel covers the app on a phone, so input to the app is refused until it is closed.
-  if (["tap", "type", "scroll"].includes(body.action) && s.shade.open !== "none") throw new SimError("panel_open", `a panel (${s.shade.open}) is open and covers the app, so nothing was sent to it. Close it first (close_panels).`);
+  if (["tap", "tap_xy", "type_keys", "type", "scroll"].includes(body.action) && s.shade.open !== "none") throw new SimError("panel_open", `a panel (${s.shade.open}) is open and covers the app, so nothing was sent to it. Close it first (close_panels).`);
   switch (body.action) {
     // Home, recents, resume and kill. The app hears them as AppState changes (document.visibilityState). Kill is a cold start.
     case "press_home": case "open_recents": case "resume_app": case "kill_app": {
@@ -324,6 +324,10 @@ async function act(id, body) {
       return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
     }
     case "screen": break;
+    // Coordinate input, for the "screenshots and coordinates only" side of scripts/agent-efficiency. Not an MCP tool: agents using
+    // the labelled screen tap by ref. x and y are CSS pixels from the top left of the screenshot.
+    case "tap_xy": { const x = Number(body.x), y = Number(body.y); if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("tap_xy needs numbers x and y"); await page.mouse.click(x, y); break; }
+    case "type_keys": await page.keyboard.type(String(body.text ?? ""), { delay: 5 }); if (body.enter) await page.keyboard.press("Enter"); break;
     case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
     // Where an element is: centre and size as 0..1 of the viewport. Used by the recorder to draw taps. Does not act.
     case "locate": {
