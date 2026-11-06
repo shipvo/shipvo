@@ -53,3 +53,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **MP4.** A common video file. Shipvo can record the simulated phone to one.
 
 **Shipvo Testers.** A group of founders who test each other's apps on Google Play, to help each other reach the 12 testers Google asks for.
+
+**Phone Browser.** A web browser inside the simulated phone, separate from your app. Your app opens web links in it, and your assistant can read and click the pages. See [phone-apps](phone-apps.md).

@@ -40,6 +40,11 @@ jobs:
       - if: steps.has.outputs.script == '1'
         uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
+      # pnpm runs package scripts with cmd.exe on Windows, and the cli build uses chmod, mkdir -p and cp -R
+      # ("The syntax of the command is incorrect", run 42170196986). Run them with Git Bash, as on the other two.
+      - if: steps.has.outputs.script == '1' && runner.os == 'Windows'
+        name: Package scripts use Git Bash on Windows
+        run: pnpm config set script-shell "C:\\Program Files\\Git\\bin\\bash.exe" && pnpm config get script-shell
       - if: steps.has.outputs.script == '1'
         run: pnpm install --frozen-lockfile
       - if: steps.has.outputs.script == '1'

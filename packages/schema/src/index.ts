@@ -27,6 +27,8 @@ export const ShellManifest = z.object({
   addon_api: z.number().int().positive(),
   /** Hermes bytecode format version(s) this shell can run. Absent = unknown, so the control plane offers any release. */
   hermes_bytecode_versions: z.array(z.number().int().positive()).min(1).optional(),
+  /** Hermes engine build this shell runs, such as "250829098.0.10". Absent = unknown, so the control plane offers any release. */
+  hermes_engine: z.string().min(1).optional(),
   /** Native modules compiled into this shell: package name to version. Absent = unknown, so the control plane offers any release. */
   native_modules: z.record(z.string().min(1), semver).optional(),
   control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }),
@@ -82,6 +84,8 @@ export const ReleasePointer = z.object({
   min_shell_version: semver,
   /** Hermes bytecode format version of `core` (from the .hbc header). Absent on older releases and plain-JS bundles. */
   hermes_bytecode_version: z.number().int().positive().optional(),
+  /** Hermes engine build of the compiler that made `core`, such as "250829098.0.10". Absent on older releases or when unknown. */
+  hermes_engine: z.string().min(1).optional(),
   /** Native modules `core` needs: package name to semver range. Absent on older releases = unknown. */
   required_native_modules: z.record(z.string().min(1), z.string().min(1)).optional(),
   /** The agent-facing web build of this same release, served by the control plane at `base` (sim.shipvo.dev opens it). */
@@ -259,6 +263,8 @@ export function checkNativeModules(required: Record<string, string> | undefined,
 export const PolicyWeekday = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 /** The optional `policy` section of shipvo.json. Every rule is optional; an empty section means no rules. */
 export const ShipvoPolicy = z.object({
+  /** Widest band a publish may reach without a second owner's approval. A promote above it waits as a pending approval (control plane). Off by default. */
+  requireApprovalAbove: Band.optional(),
   /** Widest cohort band any publish may reach. */
   maxBand: Band.optional(),
   /** Widest cohort band a publish run by an agent may reach. */

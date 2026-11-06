@@ -24,3 +24,10 @@ test("a refusal row shows the reason read from telemetry", () => {
   assert.equal(r[0], "| m | pass | refused, reason from telemetry: hermes_bytecode_mismatch | - |");
   assert.equal(r[1], "| n | FAIL | not refused, reason from telemetry: none | - |");
 });
+
+test("rollback row shows the time on pass and the failure on FAIL", () => {
+  const r = rows({ scenarios: [{ name: "r", pass: true, rollbackToGoodActiveMs: 850 }, { name: "r2", pass: false, rollbackToGoodActiveMs: 700, failures: ["release 6 came back after the relaunch"] }, { name: "r3", pass: false, rollbackToGoodActiveMs: null, failures: ["x"] }] });
+  assert.equal(r[0], "| r | pass | rollback call to previous release active 850 ms; kept after restart; rolled_back reported | - |");
+  assert.equal(r[1], "| r2 | FAIL | rollback active 700 ms: release 6 came back after the relaunch | - |");
+  assert.match(r[2], /never took effect: x/);
+});

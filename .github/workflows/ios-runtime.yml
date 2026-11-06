@@ -223,6 +223,106 @@ jobs:
           echo "iOS first update from the embedded bundle: patch $P bytes, full bundle $F bytes, embedded bundle $E bytes. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" | tee -a "$GITHUB_STEP_SUMMARY"
           { echo; echo "### iOS patch from the embedded bundle"; echo; node ../../scripts/ios-e2e/analyze.mjs "$RUNNER_TEMP/server.log.jsonl" "$RUNNER_TEMP/marks.json" "$RUNNER_TEMP/patch-marks.json" | tail -3; } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # The three scenarios below run in order on the same simulator, after the patch step left the app on release 2.
+      # Each starts from an empty server.log, keeps a copy (<name>-server.log) and adds one table to the step summary.
+      # `running` reads the release of the newest "applied" report, the release the app runs now.
+      - name: "Hermes mismatch is refused (release 3, slice 1 of #637)"
+        # Escalation #641. The pointer says another bytecode version; the runtime must refuse it and stay on release 2.
+        # The refusal is recorded during one launch and reaches telemetry on the next, so the app is relaunched until it shows.
+        continue-on-error: true
+        run: |
+          running() { node -e 'const l=require("fs").readFileSync(process.argv[1],"utf8").split("\n").filter(x=>x.startsWith("POST /t ")).map(x=>{try{return JSON.parse(x.slice(8))}catch{return null}}).filter(e=>e&&e.event==="applied");console.log(l.length?l[l.length-1].release:-1)' "$RUNNER_TEMP/server.log"; }
+          HBC=$(ls apps/tide-and-tackle/dist-e2e2/_expo/static/js/ios/*.hbc | head -1)
+          SEED=$(node -p "require(process.env.RUNNER_TEMP + '/key.json').seed")
+          MISMATCH_HERMES=1 node scripts/ios-e2e/make-release.mjs "$RUNNER_TEMP/cp" e2e "$SEED" 3 "$HBC"
+          : > "$RUNNER_TEMP/server.log"
+          for k in 1 2 3; do
+            xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true; sleep 2; xcrun simctl launch "$UDID" "$BID" > /dev/null
+            for i in $(seq 1 20); do grep -q '^POST /t .*hermes_bytecode_mismatch' "$RUNNER_TEMP/server.log" && break 2; sleep 1; done
+          done
+          sleep 3; cut -c1-260 "$RUNNER_TEMP/server.log"
+          echo "{\"release\":3,\"previous_release\":2,\"running_release\":$(running)}" > "$RUNNER_TEMP/hermes-marks.json"; cat "$RUNNER_TEMP/hermes-marks.json"
+          cp "$RUNNER_TEMP/server.log" "$RUNNER_TEMP/hermes-server.log"
+          { echo; echo "### iOS Hermes mismatch"; echo; node scripts/ios-e2e/analyze.mjs "$RUNNER_TEMP/server.log.jsonl" "$RUNNER_TEMP/marks.json" "" "$RUNNER_TEMP/hermes-marks.json" "$RUNNER_TEMP/hermes-server.log" | tail -3; } | tee "$RUNNER_TEMP/hermes.md"
+          cat "$RUNNER_TEMP/hermes.md" >> "$GITHUB_STEP_SUMMARY"; ! grep -q '| fail |' "$RUNNER_TEMP/hermes.md"
+
+      - name: "Crash-looping release is reverted (release 4, slice 2 of #15)"
+        # Escalation #648. Release 4 throws on start. The runtime must give it up after at most 3 runs and go back to release 2.
+        continue-on-error: true
+        working-directory: apps/tide-and-tackle
+        run: |
+          running() { node -e 'const l=require("fs").readFileSync(process.argv[1],"utf8").split("\n").filter(x=>x.startsWith("POST /t ")).map(x=>{try{return JSON.parse(x.slice(8))}catch{return null}}).filter(e=>e&&e.event==="applied");console.log(l.length?l[l.length-1].release:-1)' "$RUNNER_TEMP/server.log"; }
+          # The Hermes compiler that ships with the app's React Native (hermes-compiler package, or the older sdks/ path).
+          RN=$(node -p "require('path').dirname(require.resolve('react-native/package.json'))")
+          HERMESC=$(ls "$RN"/sdks/hermesc/osx-bin/hermesc 2>/dev/null || node -p "require('path').dirname(require.resolve('hermes-compiler/package.json',{paths:['$RN']}))+'/hermesc/osx-bin/hermesc'")
+          test -x "$HERMESC" || { echo "FAIL: no hermesc at $HERMESC"; exit 1; }
+          SEED=$(node -p "require(process.env.RUNNER_TEMP + '/key.json').seed")
+          CRASH_ON_START=1 HERMESC="$HERMESC" node ../../scripts/ios-e2e/make-release.mjs "$RUNNER_TEMP/cp" e2e "$SEED" 4 "$RUNNER_TEMP/crash.hbc"
+          : > "$RUNNER_TEMP/server.log"
+          # Launch 1 runs release 2, downloads release 4 and reloads into it. Later launches start release 4 until the revert.
+          # Up to 6 launches, so a late revert is measured instead of cut off (analyze.mjs fails above 4).
+          L=0
+          for k in 1 2 3 4 5 6; do
+            xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true; sleep 2; xcrun simctl launch "$UDID" "$BID" > /dev/null || true; L=$k
+            if [ $k = 1 ]; then for i in $(seq 1 60); do grep -q '^GET /b/e2e/ios-r4.hbc 200' "$RUNNER_TEMP/server.log" && break; sleep 1; done; fi
+            for i in $(seq 1 12); do grep -q '^POST /t .*crash_loop_revert' "$RUNNER_TEMP/server.log" && break 2; sleep 1; done
+          done
+          sleep 3; cut -c1-260 "$RUNNER_TEMP/server.log"
+          echo "{\"release\":4,\"previous_release\":2,\"running_release\":$(running),\"launches\":$L}" > "$RUNNER_TEMP/crash-marks.json"; cat "$RUNNER_TEMP/crash-marks.json"
+          cp "$RUNNER_TEMP/server.log" "$RUNNER_TEMP/crash-server.log"
+          { echo; echo "### iOS crash-loop revert"; echo; node ../../scripts/ios-e2e/analyze.mjs "$RUNNER_TEMP/server.log.jsonl" "$RUNNER_TEMP/marks.json" "" "" "$RUNNER_TEMP/crash-server.log" "$RUNNER_TEMP/crash-marks.json" | tail -3; } | tee "$RUNNER_TEMP/crash.md"
+          cat "$RUNNER_TEMP/crash.md" >> "$GITHUB_STEP_SUMMARY"; ! grep -q '| fail |' "$RUNNER_TEMP/crash.md"
+
+      - name: "Interrupted download resumes with Range (release 5, slice 3 of #15)"
+        # Escalation #650. The server cuts the first download of release 5 halfway; the app must resume it with
+        # Range: bytes=<n>- (HTTP 206), not start again from byte 0, and then run release 5.
+        continue-on-error: true
+        run: |
+          HBC=$(ls apps/tide-and-tackle/dist-e2e/_expo/static/js/ios/*.hbc | head -1)
+          SEED=$(node -p "require(process.env.RUNNER_TEMP + '/key.json').seed")
+          node scripts/ios-e2e/make-release.mjs "$RUNNER_TEMP/cp" e2e "$SEED" 5 "$HBC"
+          N=$(( $(stat -f %z "$RUNNER_TEMP/cp/b/e2e/ios-r5.hbc") / 2 ))
+          pkill -f "scripts/ios-e2e/server.mjs" || true; sleep 1
+          CUT_ONCE="/b/e2e/ios-r5.hbc:$N" nohup node scripts/ios-e2e/server.mjs "$RUNNER_TEMP/cp" "$E2E_PORT" "$RUNNER_TEMP/server.log" > "$RUNNER_TEMP/server.out" 2>&1 &
+          sleep 2; : > "$RUNNER_TEMP/server.log"
+          for k in 1 2 3 4; do
+            xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true; sleep 2; xcrun simctl launch "$UDID" "$BID" > /dev/null
+            for i in $(seq 1 30); do grep -q '^POST /t .*"release":5.*"event":"applied"\|^POST /t .*"event":"applied".*"release":5' "$RUNNER_TEMP/server.log" && break 2; sleep 1; done
+          done
+          cut -c1-260 "$RUNNER_TEMP/server.log"
+          echo '{"release":5,"bundlePath":"/b/e2e/ios-r5.hbc"}' > "$RUNNER_TEMP/resume-marks.json"
+          cp "$RUNNER_TEMP/server.log" "$RUNNER_TEMP/resume-server.log"
+          { echo; echo "### iOS interrupted download"; echo; RESUME_MARKS="$RUNNER_TEMP/resume-marks.json" node scripts/ios-e2e/analyze.mjs "$RUNNER_TEMP/server.log.jsonl" "$RUNNER_TEMP/marks.json" "" "" "$RUNNER_TEMP/resume-server.log" | tail -3; } | tee "$RUNNER_TEMP/resume.md"
+          cat "$RUNNER_TEMP/resume.md" >> "$GITHUB_STEP_SUMMARY"; ! grep -q '| fail |' "$RUNNER_TEMP/resume.md"
+
+      - name: "First applied OTA, publish to healthy (release 6, #668)"
+        # Escalations #672 and #678. Times signing and writing the pointer (make-release.mjs, the same wire format as
+        # `shipvo publish --platform ios`), then a fresh install's download, apply and healthy, and runs
+        # scripts/first-run/apply-ios.mjs on the marks. Skipped until that script is on main (PR #673).
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          [ -f scripts/first-run/apply-ios.mjs ] || { echo "scripts/first-run/apply-ios.mjs is not on this ref yet; skipping"; exit 0; }
+          APP=$(ls -d apps/tide-and-tackle/ios/build/Build/Products/Release-iphonesimulator/*.app | head -1)
+          HBC=$(ls apps/tide-and-tackle/dist-e2e/_expo/static/js/ios/*.hbc | head -1)
+          SEED=$(node -p "require(process.env.RUNNER_TEMP + '/key.json').seed")
+          ms() { python3 -c 'import time; print(int(time.time()*1000))'; }
+          xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true
+          xcrun simctl uninstall "$UDID" "$BID"; xcrun simctl install "$UDID" "$APP"
+          : > "$RUNNER_TEMP/server.log"
+          PS=$(ms); node scripts/ios-e2e/make-release.mjs "$RUNNER_TEMP/cp" e2e "$SEED" 6 "$HBC"; PD=$(ms)
+          T0=$(ms); xcrun simctl launch "$UDID" "$BID" > /dev/null
+          H=""
+          for i in $(seq 1 480); do
+            if grep -q '^POST /t .*"release":6' "$RUNNER_TEMP/server.log"; then H=$(ms); break; fi
+            sleep 0.25
+          done
+          [ -n "$H" ] || { echo "app did not report release 6 within 120 s"; exit 1; }
+          echo "{\"publish_start\": $PS, \"publish_done\": $PD, \"app_launched\": $T0, \"healthy\": $H}" > "$RUNNER_TEMP/first-run-marks.json"
+          cat "$RUNNER_TEMP/first-run-marks.json"
+          node scripts/first-run/apply-ios.mjs --server-log "$RUNNER_TEMP/server.log.jsonl" --marks "$RUNNER_TEMP/first-run-marks.json" --out "$RUNNER_TEMP/apply-ios.json"
+          { echo; echo "### iOS first applied OTA (apply-ios.mjs)"; echo; echo '```'; cat "$RUNNER_TEMP/apply-ios.json"; echo '```'; echo "Publish is make-release.mjs (sign and write the pointer). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -232,6 +332,15 @@ jobs:
             ${{ runner.temp }}/server.log.jsonl
             ${{ runner.temp }}/marks.json
             ${{ runner.temp }}/patch-marks.json
+            ${{ runner.temp }}/hermes-marks.json
+            ${{ runner.temp }}/crash-marks.json
+            ${{ runner.temp }}/resume-marks.json
+            ${{ runner.temp }}/first-run-marks.json
+            ${{ runner.temp }}/apply-ios.json
+            ${{ runner.temp }}/*-server.log
+            ${{ runner.temp }}/hermes.md
+            ${{ runner.temp }}/crash.md
+            ${{ runner.temp }}/resume.md
             ${{ runner.temp }}/ios-timings.md
             ${{ runner.temp }}/*.png
             ${{ runner.temp }}/xcodebuild.log

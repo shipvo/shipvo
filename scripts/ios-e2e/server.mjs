@@ -2,6 +2,8 @@
 // A tiny stand-in control plane for the iOS simulator end-to-end: serves a static tree (signed pointers + bundles) and
 // logs every request, including telemetry POSTs, so the workflow can assert what the app did.
 //   node server.mjs <rootDir> <port> <logFile> [jsonLogFile]
+// CUT_ONCE=<path>:<n> closes the first response for <path> after n bytes, once (the headers promise the full length).
+// Later requests are served normally. Range requests are logged with their header: "GET <path> 206 from <n> range=<header>".
 // <logFile> keeps the text lines the workflow greps. <jsonLogFile> (default <logFile>.jsonl) gets one JSON line per
 // request: {"t": ms since epoch, "path": "/b/x", "bytes": body bytes sent}. t is taken when the response is finished.
 import { createServer } from "node:http";
@@ -10,6 +12,8 @@ import { join, normalize } from "node:path";
 
 const [root, port, logFile] = [process.argv[2], Number(process.argv[3] || 8100), process.argv[4] || "server.log"];
 const jsonLog = process.argv[5] || logFile + ".jsonl";
+const [cutPath, cutN] = (process.env.CUT_ONCE || "").split(/:(?=\d+$)/);
+let cutDone = !cutPath || !(Number(cutN) > 0);
 const log = (s) => appendFileSync(logFile, s + "\n");
 createServer((req, res) => {
   let bytes = 0;
@@ -29,11 +33,18 @@ createServer((req, res) => {
   const data = readFileSync(f), type = f.endsWith(".json") ? "application/json" : "application/octet-stream";
   // Range support (bytes=<n>-), like the real control plane, so resumed downloads can be tested.
   // Paths under /b/no-range/ ignore Range and answer 200, like a server without range support.
+  if (!cutDone && url.pathname === cutPath && !req.headers.range) {
+    cutDone = true;
+    const n = Math.min(Number(cutN), data.length - 1);
+    log(`GET ${url.pathname} 200 cut at ${n}`);
+    res.writeHead(200, { "content-type": type, "accept-ranges": "bytes", "content-length": data.length });
+    return res.write(data.subarray(0, n), () => req.socket.destroy());
+  }
   const m = url.pathname.startsWith("/b/no-range/") ? null : /^bytes=(\d+)-$/.exec(req.headers.range || "");
   if (m) {
     const start = Number(m[1]);
     if (start >= data.length) { log(`GET ${url.pathname} 416`); return res.writeHead(416, { "content-range": `bytes */${data.length}` }).end(); }
-    log(`GET ${url.pathname} 206 from ${start}`);
+    log(`GET ${url.pathname} 206 from ${start} range=${req.headers.range}`);
     return res.writeHead(206, { "content-type": type, "accept-ranges": "bytes", "content-length": data.length - start,
       "content-range": `bytes ${start}-${data.length - 1}/${data.length}` }).end(data.subarray(start));
   }

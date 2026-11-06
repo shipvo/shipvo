@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo explore --issues-dir <dir>` writes one ready-to-file issue per finding and prints the `gh issue create` line for each.
+- Migration: none; new flag.
