@@ -155,6 +155,32 @@ device.net.onChange((online) => …);
 
 Simulator: `set_device(online: false)` takes the phone offline; the app's offline banner and queued actions can be tested without touching a radio.
 
+`device.net.type()` returns `none`, `wifi`, `cellular`, or the cellular generation (`2g`, `3g`, `4g`). On web it follows the active network profile. `device.net.onChange` also runs when the profile changes.
+
+### Network profiles
+
+For people on slow or patchy connections, test your app under a named network. In the simulator, the `set_network_profile` action runs the session's `fetch` calls under a profile:
+
+| Profile | Wait per request | Download rate | Requests that fail |
+| --- | --- | --- | --- |
+| `online` (default) | none | unlimited | 0% |
+| `offline` | none | none | 100% |
+| `2g` | 800 ms | 50 kbps | 2% |
+| `3g` | 300 ms | 750 kbps | 1% |
+| `slow-4g` | 150 ms | 1600 kbps | 0% |
+| `spotty` | 400 ms | 500 kbps | 30% |
+| `low-end-4g` | 100 ms | 6300 kbps | 0.5% |
+
+These are simulation settings, not measurements of a real network (from `packages/sim/network-profiles.mjs`). Failures are seeded, so a test repeats the same way. The rate limit applies to response bodies. The simulator keeps applying the profile to network requests after `device_reset`, but `device.net.type()` in the page returns to `wifi` after it. `mockNetwork` rules win over the profile.
+
+From a typed test:
+
+```ts
+await phone.act("set_network_profile", { profile: "2g" });
+```
+
+A name that is not in the table answers `unknown_profile`. Each change is added to `device_log` with `source: "simulated"`.
+
 ## The simulated device from the agent's side
 
 | MCP tool | Effect |
@@ -186,6 +212,7 @@ const mic = await device.microphone.open();   // web and simulator only; optiona
 ## Next steps
 
 - [Run on a phone in your browser](run.md)
+- [Lumi on Shipvo Phone](lumi.md)
 - [Test with an assistant](test-with-an-assistant.md)
 
 ## Using raw Expo modules

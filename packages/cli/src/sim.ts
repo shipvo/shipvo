@@ -53,15 +53,15 @@ export function friendlyBuildError(message: string, verbose = false): string {
  * `build` rejects with the build error; it is printed and the caller keeps serving the last good build.
  * Returns a function that stops watching.
  */
-export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>; debounceMs?: number; log?: (line: string) => void; verbose?: boolean }): () => void {
-  const { dir, build, debounceMs = 300, log = (l) => console.error(l), verbose = false } = opts;
+export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>; debounceMs?: number; log?: (line: string) => void; verbose?: boolean; onResult?: (r: { ok: true; seconds: number } | { ok: false; message: string }) => void }): () => void {
+  const { dir, build, debounceMs = 300, log = (l) => console.error(l), verbose = false, onResult } = opts;
   let timer: NodeJS.Timeout | undefined; let running = false; let again = false; let closed = false;
   const run = async () => {
     if (running) { again = true; return; }
     running = true;
     const t0 = Date.now();
-    try { await build(); log(`rebuilt in ${((Date.now() - t0) / 1000).toFixed(1)} s`); }
-    catch (e) { log(friendlyBuildError((e as Error).message, verbose)); }
+    try { await build(); const seconds = (Date.now() - t0) / 1000; log(`rebuilt in ${seconds.toFixed(1)} s`); onResult?.({ ok: true, seconds }); }
+    catch (e) { const message = friendlyBuildError((e as Error).message, verbose); log(message); onResult?.({ ok: false, message }); }
     running = false;
     if (again && !closed) { again = false; void run(); }
   };

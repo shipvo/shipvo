@@ -1,2 +1,0 @@
-- `scripts`: `selfhost-upgrade-check.mjs` seeds and verifies a release across a restart or upgrade of the Docker control plane; `docs/self-hosting.md` has a "Back up and upgrade" section.
-- Migration: none; new script and docs.

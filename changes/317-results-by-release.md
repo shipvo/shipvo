@@ -1,3 +1,0 @@
-- `services/control-plane`: `POST /r/:app/:release/tests` stores the latest `shipvo test --report` per release and platform. `GET /r/:app/tests` lists passing and failing flows per release, newest first, with the first release where each failing flow broke.
-- `@shipvo/cli`: `shipvo test --report <file> --release <n> [--platform android|ios] --upload` sends the report. `shipvo status` shows a "tests:" line per release, and `status --json` has a new `data.tests` field.
-- Migration: none; new routes, flags and field.
