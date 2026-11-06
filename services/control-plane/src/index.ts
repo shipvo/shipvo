@@ -10,6 +10,7 @@ import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
+import { TELEMETRY_LIMITS, check as rateCheck } from "./ratelimit";
 import { installs, verifyReport } from "./installs";
 import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, type InstallVote } from "./halt";
 
@@ -159,12 +160,19 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
 /** Device telemetry for the spike: applied / reverted / timings. */
 app.route("/", installs);
 app.post("/t", async (c) => {
+  const tooMany = (wait: number) => c.json({ error: "rate_limited" }, 429, { "retry-after": String(wait) });
+  const ipWait = await rateCheck(c.env.POINTERS, "telemetry", TELEMETRY_LIMITS, { ip: c.req.header("cf-connecting-ip") ?? "unknown" });
+  if (ipWait) return tooMany(ipWait);
   let body: any;
   const raw = await c.req.text();
   try { body = JSON.parse(raw); } catch { return c.json({ error: "bad_json" }, 400); }
   const t = Telemetry.safeParse(body);
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
+  // Old runtimes send no install id: they are limited per IP and per app only.
+  const installId = typeof extra.install_id === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(extra.install_id) ? extra.install_id : undefined;
+  const wait = await rateCheck(c.env.POINTERS, "telemetry", TELEMETRY_LIMITS, { appId: d.app_id, installId });
+  if (wait) return tooMany(wait);
   let stored = true;
   // Signed reports are marked verified. Everything else is still stored for dashboards.
   // The signature is the `x-shipvo-sig` header or a `sig` field. A body signature covers the raw body with that field removed.

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { REGISTER_LIMITS, check } from "./ratelimit";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; TELEMETRY_SECRET?: string };
 export const installs = new Hono<{ Bindings: Env }>();
@@ -52,35 +53,22 @@ export async function verifyReport(db: D1Database, appId: string, installId: unk
   } catch { return false; }
 }
 
-export const REGISTER_LIMITS = { perIp: 20, perApp: 200, windowSeconds: 3600 };
-
-/** Fixed-window counter in KV. Not atomic: concurrent calls can undercount a little. Fine for abuse control. */
-async function overLimit(kv: KVNamespace, key: string, max: number): Promise<boolean> {
-  const n = (Number(await kv.get(key)) || 0) + 1;
-  await kv.put(key, String(n), { expirationTtl: REGISTER_LIMITS.windowSeconds + 60 });
-  return n > max;
-}
-
 const b64url = (s: string) => btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 installs.post("/t/register", async (c) => {
   const secret = c.env.TELEMETRY_SECRET;
   if (!secret) return c.json({ error: "register_unavailable" }, 503);
   const ip = c.req.header("cf-connecting-ip") ?? "unknown";
-  const bucket = Math.floor(Date.now() / (REGISTER_LIMITS.windowSeconds * 1000));
-  try {
-    const limited = (await overLimit(c.env.POINTERS, `register_rl/ip/${await sha256Hex(ip)}/${bucket}`, REGISTER_LIMITS.perIp));
-    if (limited) return c.json({ error: "rate_limited" }, 429, { "retry-after": String(REGISTER_LIMITS.windowSeconds) });
-  } catch (e) { console.error("register rate limit (ip) failed", e); }
+  const ipWait = await check(c.env.POINTERS, "register", REGISTER_LIMITS, { ip }).catch(() => 0);
+  if (ipWait) return c.json({ error: "rate_limited" }, 429, { "retry-after": String(ipWait) });
 
   let body: any;
   try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
   const appId = body?.app_id, installId = body?.install_id, shell = body?.shell_version;
   if (typeof appId !== "string" || !ID.test(appId) || typeof installId !== "string" || !INSTALL_ID.test(installId) || typeof shell !== "string" || shell.length === 0 || shell.length > 40) return c.json({ error: "bad_register" }, 400);
 
-  try {
-    if (await overLimit(c.env.POINTERS, `register_rl/app/${appId}/${bucket}`, REGISTER_LIMITS.perApp)) return c.json({ error: "rate_limited" }, 429, { "retry-after": String(REGISTER_LIMITS.windowSeconds) });
-  } catch (e) { console.error("register rate limit (app) failed", e); }
+  const wait = await check(c.env.POINTERS, "register", REGISTER_LIMITS, { appId, installId }).catch(() => 0);
+  if (wait) return c.json({ error: "rate_limited" }, 429, { "retry-after": String(wait) });
 
   const existing = await c.env.DB.prepare("SELECT key_hash FROM installs WHERE app_id = ? AND install_id = ?").bind(appId, installId).first<{ key_hash: string }>();
   if (existing) {

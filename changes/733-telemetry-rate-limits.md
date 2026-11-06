@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: `POST /t` and `POST /t/register` now limit reports per IP, per install id and per app. Over a limit you get `429` with `Retry-After`. IPs are stored only as hashes.
+- Migration: none. Old runtimes without an install id are limited per IP and per app only.
