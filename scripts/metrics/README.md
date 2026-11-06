@@ -25,7 +25,7 @@ Test: `node --test scripts/metrics/adoption.test.mjs`
 
 # North-star query
 
-`north-star.mjs` counts, for the last 7 days, the distinct app IDs other than `tide-and-tackle` with at least one `healthy` row in the control-plane `telemetry` table, and the number of such rows. It only reads. Node 22, no dependencies.
+`north-star.mjs` counts, for the last 7 days, the distinct app IDs other than `tide-and-tackle` with at least one healthy row (`applied` or `content_applied`, as in `HEALTHY_EVENTS` in the control plane) in the `telemetry` table, and the number of such rows. It only reads. Node 22, no dependencies.
 
 ```bash
 export CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=...
