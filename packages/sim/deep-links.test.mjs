@@ -69,7 +69,7 @@ for (const platform of ["android", "ios"]) {
     const id = `y-${platform}`;
     assert.ok((await call("/session", { session: id, phone, device: { platform } })).ok);
     await tapButton(id, "Open B");
-    const st = await act(id, { action: "switch_app", id: "b" });   // already current: no change
+    const st = await act(id, { action: "switch_app", id: "b" });   // make b the current app
     assert.equal(st.current_app, "b");
     assert.match((await act(id, { action: "screen" })).screen, /Got appb:\/\/item\/7/);
     await tapButton(id, "Open nowhere");

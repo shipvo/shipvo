@@ -63,7 +63,7 @@ Give each app in `phone.json` the URL schemes it handles:
 { "apps": [{ "id": "shop", "name": "Shop", "url": "app://shop", "schemes": ["myshop"] }] }
 ```
 
-`open_url(session, url)` and `Linking.openURL(url)` in an app do the same thing. The app that declares the scheme comes to the front and gets the URL through `Linking.getInitialURL` and the `url` event. It works the same in the Android and iPhone skins. The open is recorded in `device_log` with `simulated: true`.
+`open_url(session, url)` and `Linking.openURL(url)` in an app do the same thing. The app that declares the scheme comes to the front and gets the URL through `Linking.getInitialURL` and the `url` event. It works the same in the Android and iPhone skins. The open is recorded in `device_log` with source "simulated".
 
 Errors: `no_handler` (no installed app declares the scheme) and `invalid_url` (the text is not a URL with a scheme). When no installed app declares a scheme, the link goes to the running app as before.
 
