@@ -1,0 +1,165 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:01.487
+Your app works.
+
+2
+00:00:01.487 --> 00:00:04.316
+Now you need Google Play and the App Store.
+
+3
+00:00:04.316 --> 00:00:09.316
+By the end, you have a plan for both stores, draft answers, and screenshots.
+
+4
+00:00:09.316 --> 00:00:13.000
+And one rule on Google Play, that catches most founders.
+
+5
+00:00:14.600 --> 00:00:15.205
+Step one.
+
+6
+00:00:15.205 --> 00:00:16.214
+Make your plan.
+
+7
+00:00:16.214 --> 00:00:17.828
+Type shipvo store setup.
+
+8
+00:00:17.828 --> 00:00:20.586
+It asks if you have a registered company.
+
+9
+00:00:20.586 --> 00:00:26.034
+With a company, you get organization accounts, and no tester rule on Google Play.
+
+10
+00:00:26.034 --> 00:00:30.675
+Without one, you get a personal account, and the tester rule applies.
+
+11
+00:00:32.275 --> 00:00:32.883
+Step two.
+
+12
+00:00:32.883 --> 00:00:34.571
+Type shipvo store status.
+
+13
+00:00:34.571 --> 00:00:37.002
+You see one timeline for each store.
+
+14
+00:00:37.002 --> 00:00:39.568
+Every step is to do, waiting, or done.
+
+15
+00:00:39.568 --> 00:00:41.526
+It tells you what to do next.
+
+16
+00:00:41.526 --> 00:00:44.025
+When you finish a step, mark it done.
+
+17
+00:00:46.275 --> 00:00:47.009
+Step three.
+
+18
+00:00:47.009 --> 00:00:49.877
+The stores ask what data your app collects.
+
+19
+00:00:49.877 --> 00:00:52.878
+Type shipvo store details --dry-run.
+
+20
+00:00:52.878 --> 00:00:59.348
+Shipvo reads the features your app uses, and drafts the data safety answers and a privacy policy.
+
+21
+00:00:59.348 --> 00:01:04.750
+Some questions only you can answer, like third-party tools and a contact address.
+
+22
+00:01:06.350 --> 00:01:07.026
+Step four.
+
+23
+00:01:07.026 --> 00:01:07.837
+Screenshots.
+
+24
+00:01:07.837 --> 00:01:09.866
+Type shipvo store screenshots.
+
+25
+00:01:09.866 --> 00:01:15.815
+Shipvo shows your app in the simulator, and saves files in the sizes the stores ask for.
+
+26
+00:01:15.815 --> 00:01:17.100
+It checks each one.
+
+27
+00:01:20.350 --> 00:01:21.266
+Now, the rule.
+
+28
+00:01:21.266 --> 00:01:27.220
+On Google Play with a personal account, you need twelve testers for fourteen days in a row.
+
+29
+00:01:27.220 --> 00:01:29.837
+Type shipvo store testers for the steps.
+
+30
+00:01:29.837 --> 00:01:34.089
+Shipvo Testers is a group of founders who test each other's apps.
+
+31
+00:01:34.089 --> 00:01:35.725
+We have a video about it.
+
+32
+00:01:37.325 --> 00:01:39.040
+So here is what you have.
+
+33
+00:01:39.040 --> 00:01:41.236
+A plan for each store, in order.
+
+34
+00:01:41.236 --> 00:01:44.529
+Data safety answers, and a privacy policy draft.
+
+35
+00:01:44.529 --> 00:01:47.343
+Screenshots in every store size, checked.
+
+36
+00:01:47.343 --> 00:01:48.784
+And the tester steps.
+
+37
+00:01:48.784 --> 00:01:49.950
+You press submit.
+
+38
+00:01:51.550 --> 00:01:52.973
+Start with your plan.
+
+39
+00:01:52.973 --> 00:01:55.886
+Type shipvo store setup in your app folder.
+
+40
+00:01:55.886 --> 00:01:57.919
+Next, get your twelve testers.
+
+41
+00:01:57.919 --> 00:02:00.900
+The guide is at shipvo.dev/learn.
