@@ -7,9 +7,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
 1. Shipvo Testers and `shipvo store testers` (blog; video done)
-2. Shipvo Phone and `shipvo run` (tutorial, video, blog: none exist yet; launch kit written 2026-11-06)
-2a. Record demo videos (`record_*`) (tutorial, video, blog)
-2b. The `shipvo` skill for coding agents (tutorial, video, blog)
+2. Shipvo Phone and `shipvo run` (all columns, as slices land)
 3. Store path: `shipvo store` from working app to both stores (video, blog)
 4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
 5. Signed over-the-air updates, staged rollout and rollback (tutorial, video)
@@ -27,6 +25,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Test your app with Claude, ChatGPT or Cursor | [test-with-an-assistant](test-with-an-assistant.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [your-assistant-can-test-your-app](../blog/your-assistant-can-test-your-app.md) |
 | Typed tests (`@shipvo/test`) and `export_test` | [testing](testing.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | [the-bug-our-first-typed-test-found](../blog/the-bug-our-first-typed-test-found.md) |
 | `shipvo explore` (walk every button) | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | |
+| Check every pull request (`shipvo ci init --check`) | [ci-check](ci-check.md) | | | |
 | Measured simulator parity | [parity-results](parity-results.md) | | | |
 | Simulated device features (camera, location, payment, biometrics, notifications) | [device-api](device-api.md) | | | [the-permission-you-never-test](../blog/the-permission-you-never-test.md) |
 | Airplane-mode testing | [device-api](device-api.md) | | | [test-airplane-mode](../blog/test-airplane-mode.md) |

@@ -22,7 +22,7 @@ Tutorial and video: https://shipvo.dev/learn/get-your-12-testers/
 
 ## Show HN-style description
 
-Shipvo Testers is a Google Group of app makers who test each other's closed-test apps, built for the Google Play rule that new personal accounts need 12 testers opted in for 14 days in a row. `shipvo store testers` (Apache-2.0, part of the Shipvo CLI) prints the steps for your app and, given your own Play service account key, adds the group to your closed track without removing existing groups. Docs: https://shipvo.dev/docs/store/ . Video (1 min 42 s): https://shipvo.dev/learn/videos/
+Shipvo Testers is a Google Group of app makers who test each other's closed-test apps, built for the Google Play rule that new personal accounts need 12 testers opted in for 14 days in a row. `shipvo store testers` (Apache-2.0, part of the Shipvo CLI) prints the steps for your app and, given your own Play service account key, adds the group to your closed track without removing existing groups. Docs: https://shipvo.dev/docs/store/ . Video: https://shipvo.dev/learn/videos/
 
 ## 30-second demo script (for the Video Studio)
 
