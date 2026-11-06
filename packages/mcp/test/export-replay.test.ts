@@ -16,7 +16,10 @@ const app = join(repo, "apps/tide-and-tackle");
 const require_ = createRequire(join(root, "package.json"));
 let out = ""; let work = ""; let sim: ChildProcess | undefined; let simErr = "";
 const SIM_START_MS = 180_000;
-const port = 4900 + Math.floor(Math.random() * 300);
+// fetch refuses ports 5060 and 5061, so the readiness poll never succeeds on them (see packages/sim/test-port.mjs).
+const FETCH_BLOCKED = new Set([5060, 5061]);
+let port = 4900 + Math.floor(Math.random() * 300);
+while (FETCH_BLOCKED.has(port)) port = 4900 + Math.floor(Math.random() * 300);
 
 beforeAll(async () => {
   out = mkdtempSync(join(root, "dist-test-"));
