@@ -58,7 +58,10 @@ export async function uploadShot(o: { repo: string; token: string; sha: string; 
   const path = `pr-${o.pr}/${o.sha.slice(0, 12)}/${o.side}/${o.name}`;
   const api = `https://api.github.com/repos/${o.repo}/contents/${path}`;
   const headers = { authorization: `Bearer ${o.token}`, accept: "application/vnd.github+json", "content-type": "application/json" };
-  const r = await f(api, { method: "PUT", headers, body: JSON.stringify({ message: `shipvo check: ${o.side} ${o.name}`, content: readFileSync(o.file).toString("base64"), branch: MEDIA_BRANCH }) });
+  const put = () => f(api, { method: "PUT", headers, body: JSON.stringify({ message: `shipvo check: ${o.side} ${o.name}`, content: readFileSync(o.file).toString("base64"), branch: MEDIA_BRANCH }) });
+  // Two writers on one branch can collide. A 409 is retried a few times with a short wait.
+  let r = await put();
+  for (let n = 1; r.status === 409 && n <= 4; n++) { await new Promise((ok) => setTimeout(ok, 150 * n)); r = await put(); }
   if (!r.ok) {
     let msg = "";
     try { msg = String(((await r.json()) as { message?: string })?.message ?? ""); } catch { /* no body */ }

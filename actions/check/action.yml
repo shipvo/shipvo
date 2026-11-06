@@ -96,6 +96,7 @@ runs:
           shipvo-base.log
           shipvo-shots/
         if-no-files-found: ignore
+    # Relies on "Test and explore" always exiting 0 so the comment step runs; earlier failures already fail the job.
     - name: Result
       if: always()
       shell: bash

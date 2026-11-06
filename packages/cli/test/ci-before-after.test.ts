@@ -87,7 +87,28 @@ describe("media branch and upload", () => {
   });
 });
 
+describe("uploadShot retry", () => {
+  it("retries a 409 and then succeeds", async () => {
+    const { a } = fixture();
+    const file = join(a, "home.ios.png");
+    let n = 0;
+    const url = await uploadShot({ repo: "o/r", token: "t", sha: "0123456789abcdef", pr: 1, side: "after", name: "home.ios.png", file, fetch: async () => (++n === 1 ? res(409, { message: "conflict" }) : res(201)) });
+    expect(n).toBe(2);
+    expect(url).toContain("/after/home.ios.png");
+  });
+});
+
 describe("pairShots total", () => {
+  it("does not count identical shot screens in the more-changed count", () => {
+    const root = mkdtempSync(join(tmpdir(), "ba-"));
+    const b = join(root, "b"), a = join(root, "a");
+    mkdirSync(b); mkdirSync(a);
+    const names = "abcdefgh".split("");
+    for (const [i, n] of names.slice(0, 6).entries()) for (const skin of ["android", "ios"]) { writeFileSync(join(b, `${n}.${skin}.png`), "1"); writeFileSync(join(a, `${n}.${skin}.png`), i < 2 ? "1" : "2"); }
+    const r = pairShots(names, b, a, (f) => f);
+    expect(r.screens).toHaveLength(4);
+    expect(r.total).toBe(6);
+  });
   it("counts changed screens that were not shot", () => {
     const root = mkdtempSync(join(tmpdir(), "ba-"));
     const b = join(root, "b"), a = join(root, "a");
@@ -168,13 +189,17 @@ describe("shotsCmd screens.json", () => {
     const list = join(root, "list.json");
     writeFileSync(list, JSON.stringify(["a", "b"]));
     const cwd = process.cwd();
-    vi.stubGlobal("fetch", async () => res(200, { ok: true, data: Buffer.from("png").toString("base64") }));
+    const sessions: string[] = [];
+    vi.stubGlobal("fetch", async (u: string, init?: { body?: string }) => { if (String(u).endsWith("/session")) sessions.push(init!.body!); return res(200, { ok: true, data: Buffer.from("png").toString("base64") }); });
     process.chdir(root);
     try {
       const out = join(root, "out");
       expect(await shotsCmd(["--skins", "android,ios", "--screens-file", list, "--out", join(root, "base")])).toBe(0);
       expect(existsSync(join(root, "base", "screens.json"))).toBe(false);
       expect(existsSync(join(root, "base", "a.ios.png"))).toBe(true);
+      // Two screens, two skins: one session per skin.
+      expect(sessions).toHaveLength(2);
+      expect(sessions.map((x) => JSON.parse(x)).map((x) => [x.device.platform, x.width, x.height])).toEqual([["android", 390, 844], ["ios", 390, 844]]);
       // Without --screens-file the list comes from the diff and is written next to the images.
       const { execFileSync } = await import("node:child_process");
       execFileSync("git", ["init", "-q"], { cwd: root });

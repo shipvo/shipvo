@@ -11,7 +11,6 @@ import { beforeAfterSection, ensureMediaBranch, pairShots, uploadShot, type Befo
 /** Hidden marker used to find our comment again. */
 export const MARKER = "<!-- shipvo-check -->";
 const MAX_SHOTS = 4;
-const UPLOADS = 4;
 const SCREEN_DIRS = /^(?:.*\/)?(?:app|screens|src\/screens|src\/app)\//;
 const SCREEN_FILE = /\.(?:tsx|ts|jsx|js)$/;
 
@@ -148,15 +147,11 @@ export async function commentCmd(argv: string[]): Promise<number> {
       const urls = new Map<string, string>();
       try {
         await ensureMediaBranch({ repo, token });
-        let next = 0;
-        const worker = async () => {
-          while (next < files.length) {
-            const file = files[next++];
-            const side = file.startsWith(`${beforeDir}/`) ? "before" : "after";
-            urls.set(file, await uploadShot({ repo, token, sha, pr: prNum, side, name: file.split("/").pop()!, file }));
-          }
-        };
-        await Promise.all(Array.from({ length: Math.min(UPLOADS, files.length) }, worker));
+        // One at a time: each upload is a commit on the same branch.
+        for (const file of files) {
+          const side = file.startsWith(`${beforeDir}/`) ? "before" : "after";
+          urls.set(file, await uploadShot({ repo, token, sha, pr: prNum, side, name: file.split("/").pop()!, file }));
+        }
         const u = (x?: string) => (x ? urls.get(x) : undefined);
         beforeAfter = { total: pairs.total, screens: pairs.screens.map((s) => ({ screen: s.screen, pairs: s.pairs.map((p) => ({ skin: p.skin, before: u(p.before), after: u(p.after) })) })) };
       } catch (e) { console.error(`Before and after images not uploaded: ${e instanceof Error ? e.message : e}. The images are in the shipvo-check artifact.`); }

@@ -66,9 +66,17 @@ export async function shotsCmd(argv: string[]): Promise<number> {
     if (!screensFile) writeFileSync(join(out, "screens.json"), JSON.stringify(screens));
   }
   const session = `ci-shots-${Date.now().toString(36)}`;
+  const opened = new Map<string, Promise<void>>();
   const files = await captureScreens(screens, async (route, skin) => {
-    const open = await post("/session", { session: skin ? `${session}-${skin}` : session, app: appId, width: 390, height: 844, ...(skin ? { device: { platform: skin } } : {}) });
-    if (open.ok === false) throw new Error(`could not open the app: ${open.error ?? "unknown error"}`);
+    // One session per skin, reused for every screen.
+    const key = skin ?? "";
+    if (!opened.has(key)) {
+      const p = post("/session", { session: skin ? `${session}-${skin}` : session, app: appId, width: 390, height: 844, ...(skin ? { device: { platform: skin } } : {}) })
+        .then((open) => { if (open.ok === false) throw new Error(`could not open the app: ${open.error ?? "unknown error"}`); });
+      opened.set(key, p);
+      p.catch(() => opened.delete(key));
+    }
+    await opened.get(key);
     const nav = await post("/act", { session: skin ? `${session}-${skin}` : session, action: "open_url", url: route });
     if (!nav.ok) throw new Error(`could not open ${route}: ${nav.error ?? "unknown error"}`);
     const shot = await post("/act", { session: skin ? `${session}-${skin}` : session, action: "screenshot", format: "png", inline: true });

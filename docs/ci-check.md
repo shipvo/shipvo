@@ -54,9 +54,9 @@ For each screen the diff changed, the comment shows the screen on the base commi
 
 The images are stored on the `shipvo-check-media` branch of your own repository, with your `GITHUB_TOKEN`, so the workflow needs `contents: write` (the generated workflow has it). The branch is created on first use as a separate history with one README, so your source code is not copied to it. Nothing is sent to Shipvo. Each push uploads its own images, and the single comment is updated in place to point at them.
 
-Write access: `contents: write` is a permission of the whole job, and the job runs your pull request's own code (`npx shipvo`, your build and tests). The action gives `GITHUB_TOKEN` only to the step that posts the comment, not to the steps that build and test, but the job token itself can write. Pull requests from forks get a read-only token: the upload is skipped, the comment has no Before and after section, and the check result does not change. If you do not want write access, remove `contents: write` and the section is left out the same way.
+Write access: `contents: write` is a permission of the whole job, and the job runs your pull request's own code (`npx shipvo`, your build and tests). The action gives `GITHUB_TOKEN` only to the step that posts the comment, not to the steps that build and test, but the job token itself can write. Pull requests from forks get a read-only token, so the Before and after section appears on pull requests from branches of your own repository, and the check result is the same either way. The section needs `contents: write`.
 
-In a private repository, raw image links do not render in comments. The same images are in the `shipvo-check` artifact of the run: open the run, download the zip, and look in `shipvo-shots/before` and `shipvo-shots/after`. If the base build fails, there are no before images and the action prints a line saying so.
+Private repositories: open the images in the `shipvo-check` artifact of the run (`shipvo-shots/before`, `shipvo-shots/after`). If the base build fails, there are no before images and the action prints a line saying so.
 
 ### Compared with base
 
