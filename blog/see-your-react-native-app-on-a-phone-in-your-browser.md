@@ -38,7 +38,7 @@ Web Bundled 5226ms index.ts (204 modules)
 Simulated Android phone at http://127.0.0.1:4611/  (Ctrl+C to stop)
 ```
 
-The page answered with HTTP 200. That is one timing from one run on a GitHub Actions Linux runner with Node 22, with an empty cache. It is not a benchmark. A cleaner start-to-tappable measurement is tracked in issue #676.
+The page answered with HTTP 200. That is one timing from one run on a GitHub Actions Linux runner with Node 22, with an empty cache. It is not a benchmark.
 
 ## What you get on screen
 
@@ -67,17 +67,19 @@ To force the issue, ask for an error instead of a fallback by passing `attach: "
 
 ## Show it on your own phone, on the same Wi-Fi
 
+Be aware that anyone on the network who has the address can open the page, and it is plain HTTP, so the phone's camera and sensors are not available this way.
+
 ```bash
 npx shipvo run android --lan
 ```
 
-This also serves the phone on your local network. Shipvo prints a URL with a random token (`?t=...`) and a QR code. On a phone browser the app fills the screen with no frame. Every request needs the token, otherwise the answer is 403. Be aware that anyone on the network who has the address can open the page, and it is plain HTTP, so the phone's camera and sensors are not available this way.
+This also serves the phone on your local network. Shipvo prints a URL with a random token (`?t=...`) and a QR code. On a phone browser the app fills the screen with no frame. Every request needs the token, otherwise the answer is 403.
 
 ## What this does not replace
 
 Be clear about what you are looking at. `shipvo run` runs a web build. It does not run your native binary, and it does not prove that a native module behaves the same on a device.
 
-That is what the parity work is for. We compare the simulator against the Android emulator and the iOS Simulator on the same flows. In the [published parity results](/docs/parity-results/), 18 of 21 screens on Android are at 100% actionable parity, which means the same actionable elements with the same roles and labels. The three below 100% are listed there. That figure does not say the two behave identically: it does not yet cover enabled state, element order, bounds or field values.
+That is what the parity work is for. We compare the simulator against the Android emulator and the iOS Simulator on the same flows. In the [published parity results](/docs/parity-results/), all 13 screens of the two purchase flows are at 100% actionable parity on Android and iOS, which means the same actionable elements with the same roles and labels. The native-feature flow is not there yet: on Android, 18 of 21 screens are at 100%, and the gaps are listed in that file. That figure does not say the two behave identically: it does not yet cover enabled state, element order, bounds or field values.
 
 When you need the real thing, `--native` runs your app on an emulator or simulator through `npx expo run:android` or `run:ios`. That needs Android Studio or Xcode.
 
