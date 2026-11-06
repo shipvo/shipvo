@@ -49,9 +49,6 @@ class RotationTest {
   private val keys = vectors.getJSONObject("keys")
   private fun pub(name: String) = keys.getJSONObject(name).getString("publicKey")
 
-  private class Env(val state: Mem, val clock: Array<Long>) {
-    var rot: Rotation? = null
-  }
 
   private fun make(state: Mem, clock: Array<Long>, count: IntArray) = Rotation(
     state, vectors.getString("appId"), pub("K1"), vectors.getJSONObject("root").getString("publicKey"),

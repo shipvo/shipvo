@@ -8,6 +8,8 @@ let plist: Record<string, string>;
 let meta: Record<string, string>;
 
 // Replace expo/config-plugins in the require cache so the mods run on plain objects.
+const ROOT = Buffer.alloc(32, 7).toString("base64");
+
 function load() {
   const id = require.resolve("expo/config-plugins");
   require.cache[id] = {
@@ -45,9 +47,19 @@ describe("config plugin", () => {
     expect(() => load()({}, { ...base, hermesEngine: 5 })).toThrow(/hermesEngine/);
   });
 
+  it("rejects a bad rootKey or minSequence", () => {
+    for (const rootKey of ["ROOT", 5, "!!!!".repeat(11), Buffer.alloc(31).toString("base64"), Buffer.alloc(33).toString("base64")]) {
+      expect(() => load()({}, { ...base, rootKey })).toThrow(/rootKey/);
+    }
+    for (const minSequence of ["abc", "3", -1, 1.5, NaN, 2 ** 53]) {
+      expect(() => load()({}, { ...base, rootKey: ROOT, minSequence })).toThrow(/minSequence/);
+    }
+    expect(() => load()({}, { ...base, minSequence: 3 })).toThrow(/minSequence needs rootKey/);
+  });
+
   it("writes the rotation root key and minimum sequence into the Android manifest", () => {
-    load()({}, { ...base, rootKey: "ROOT", minSequence: 3 });
-    expect(meta["dev.shipvo.ROOT_KEY"]).toBe("ROOT");
+    load()({}, { ...base, rootKey: ROOT, minSequence: 3 });
+    expect(meta["dev.shipvo.ROOT_KEY"]).toBe(ROOT);
     expect(meta["dev.shipvo.MIN_SEQUENCE"]).toBe("3");
     meta = {};
     load()({}, base);
