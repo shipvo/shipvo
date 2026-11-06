@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,7 +15,13 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "shipvo-config-"));
   process.chdir(dir);
 });
-afterAll(() => { process.chdir(cwd); process.env = saved; });
+afterEach(() => { process.chdir(cwd); rmSync(dir, { recursive: true, force: true }); });
+afterAll(() => {
+  for (const k of ENV) {
+    if (saved[k] === undefined) delete process.env[k];
+    else process.env[k] = saved[k];
+  }
+});
 
 describe("loadConfig", () => {
   it("tells you what to do when shipvo.json is missing", () => {
