@@ -83,3 +83,7 @@ The HTTP endpoint is stateless. There is no protocol session: each POST is handl
 - This package uses `@modelcontextprotocol/sdk` 1.x (the TypeScript SDK v2 is not stable on npm yet; 1.32.2 is `latest`). Tested by `test/http-stateless.test.ts`: discover without `initialize`, header/body mismatch, scope per request, 2025-era `initialize` clients. Stdio is unchanged.
 
  Requests without a valid key are refused. The hosted version at `sim.shipvo.dev` will issue keys per account with scopes (test, owner, read).
+
+### Narration and music in demo videos
+
+`record_stop` accepts `narration` (path to a WAV file) and `music: true`. The audio track is as long as the video. With `music`, a ducked music bed from `scripts/video/bgmusic.py` is mixed in and `<video>.credits.json` is written next to the MP4. Music needs a Shipvo checkout (or `SHIPVO_VIDEO_SCRIPTS`), python3 and network access. If audio fails, the silent video is kept and the result has `audio_error`. See [Record a demo video](../../docs/record-a-demo-video.md).

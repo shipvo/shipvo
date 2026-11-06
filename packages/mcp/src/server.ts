@@ -339,8 +339,11 @@ server.tool("record_start", "Start recording the phone frame to an MP4 under .sh
 server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
 });
-server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters.", {}, WR, async () => {
-  try { const r = await recorder.stop(); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
+server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters. Optional narration (a WAV path) and music (a ducked music bed, credits JSON written next to the video) add an audio track; if audio fails the silent video is kept and audio_error says why.", {
+  narration: z.string().min(1).optional().describe("Path to a WAV narration file. Padded or cut to the video length"),
+  music: z.boolean().optional().describe("Mix a music bed under the narration (ducked) and write <video>.credits.json"),
+}, WR, async ({ narration, music }) => {
+  try { const r = await recorder.stop({ narration, music }); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 
 // Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.

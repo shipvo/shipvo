@@ -1,0 +1,1 @@
+- mcp: `record_stop` takes `narration` (a WAV path) and `music` (`true`). It adds an audio track whose length matches the video. With `music` it mixes a ducked music bed using `scripts/video/bgmusic.py` and writes `<video>.credits.json` next to the MP4. If audio fails the silent MP4 is kept and the result has `audio_error`. New page: `docs/record-a-demo-video.md` (#501).

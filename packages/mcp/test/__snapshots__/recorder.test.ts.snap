@@ -62,7 +62,18 @@ exports[`MCP tools > lists the three tools with their schemas 1`] = `
   {
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {},
+      "additionalProperties": false,
+      "properties": {
+        "music": {
+          "description": "Mix a music bed under the narration (ducked) and write <video>.credits.json",
+          "type": "boolean",
+        },
+        "narration": {
+          "description": "Path to a WAV narration file. Padded or cut to the video length",
+          "minLength": 1,
+          "type": "string",
+        },
+      },
       "type": "object",
     },
     "name": "record_stop",

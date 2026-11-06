@@ -1,15 +1,67 @@
 // Records the phone frame page to an MP4. Playwright takes screenshots while a session runs; ffmpeg encodes them.
 // Waits longer than 0.6 s between agent actions are cut at stop. Frames carry wall-clock timestamps, so the video lasts as long as the recording even when screenshots are slow.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type Format = "9:16" | "16:9" | "1:1";
 export const SIZES: Record<Format, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 }, "16:9": { width: 1920, height: 1080 }, "1:1": { width: 1080, height: 1080 },
 };
 export type Chapter = { t: number; caption: string };
-export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[] };
+export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[]; credits?: string };
+export type AudioOptions = { narration?: string; music?: boolean };
+
+// Finds scripts/video (bgmusic.py, music.json) in a Shipvo checkout, or the folder named by SHIPVO_VIDEO_SCRIPTS.
+const videoScripts = () => {
+  if (process.env.SHIPVO_VIDEO_SCRIPTS) return resolve(process.env.SHIPVO_VIDEO_SCRIPTS);
+  let d = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 6; i++, d = dirname(d)) if (existsSync(join(d, "scripts", "video", "bgmusic.py"))) return join(d, "scripts", "video");
+  return "";
+};
+const secs = (file: string) => Number(spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]).stdout.toString());
+const tail = (r: { stderr: Buffer | string | null }) => String(r.stderr ?? "").trim().slice(-300);
+
+/** Adds narration and/or a ducked music bed to the MP4 in place. Returns the credits file when music was used. */
+function addAudio(file: string, a: AudioOptions): string | undefined {
+  if (a.narration && !existsSync(a.narration)) throw new RecorderError("narration_not_found", `narration file not found: ${a.narration}`);
+  const work = mkdtempSync(join(tmpdir(), "shipvo-audio-"));
+  const out = join(work, basename(file));
+  try {
+    const vlen = secs(file);
+    let vo: string | undefined;
+    if (a.narration) {
+      // Pad short narration with silence and cut long narration, so the audio is as long as the video.
+      vo = join(work, "vo.wav");
+      const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", resolve(a.narration), "-af", "apad", "-t", String(vlen), "-ar", "48000", vo]);
+      if (r.status !== 0) throw new RecorderError("audio_failed", `could not read the narration (is it a WAV file?): ${tail(r)}`);
+    }
+    let credits: string | undefined;
+    if (a.music) {
+      const dir = videoScripts(); const py = dir && join(dir, "bgmusic.py");
+      if (!py || !existsSync(py)) throw new RecorderError("music_unavailable", "music needs scripts/video/bgmusic.py from a Shipvo checkout (set SHIPVO_VIDEO_SCRIPTS to its folder) and python3");
+      let track = process.env.SHIPVO_MUSIC_FILE ?? "";
+      if (!track) {
+        const id = (JSON.parse(readFileSync(join(dir, "music.json"), "utf8")).tracks as { id: number }[])[0]?.id;
+        const d = spawnSync("python3", [py, "analyze", "--ids", String(id), "--outdir", work]);
+        track = join(work, `${id}.mp3`);
+        if (d.status !== 0 || !existsSync(track)) throw new RecorderError("music_unavailable", `could not download the music track (needs network): ${tail(d)}`);
+      }
+      credits = file.replace(/\.mp4$/, ".credits.json");
+      const args = [py, "mix", "--video", file, "--music", resolve(track), "--out", out, "--credits", credits, "--work", work];
+      if (vo) args.push("--narration", vo);
+      const r = spawnSync("python3", args);
+      if (r.status !== 0) throw new RecorderError("audio_failed", `bgmusic.py failed: ${tail(r)}`);
+    } else {
+      const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", file, "-i", vo!, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", out]);
+      if (r.status !== 0) throw new RecorderError("audio_failed", `could not add the narration: ${tail(r)}`);
+    }
+    renameSync(out, file);
+    return credits;
+  } finally { rmSync(work, { recursive: true, force: true }); }
+}
 export class RecorderError extends Error { constructor(public code: string, message: string) { super(message); } }
 
 type Page = { screenshot(o: { type: "jpeg"; quality: number }): Promise<Buffer>; goto(u: string, o?: object): Promise<unknown>; evaluate?(f: string): Promise<unknown> };
@@ -117,7 +169,7 @@ export class Recorder {
     this.chapters.push(c); return c;
   }
 
-  async stop(): Promise<Recording> {
+  async stop(audio: AudioOptions = {}): Promise<Recording> {
     if (!this.running) throw new RecorderError("no_recording", "no recording is running: call record_start first");
     this.running = false; this.stopping = true;
     try {
@@ -142,8 +194,10 @@ export class Recorder {
         } else if (existsSync(raw)) renameSync(raw, file);
         rmSync(raw, { force: true });
       }
-      const out = { file, duration_s, ...size, chapters };
+      const out: Recording = { file, duration_s, ...size, chapters };
       if (code !== 0) throw new RecorderError("encode_failed", `ffmpeg failed${code === -1 ? " to start (is it installed?)" : ""}: ${err.trim().slice(0, 300)}`);
+      // Audio problems keep the silent video, so the recording is never lost.
+      if (audio.narration || audio.music) { try { out.credits = addAudio(file, audio); } catch (e) { if (e instanceof RecorderError) (out as Recording & { audio_error?: { code: string; message: string } }).audio_error = { code: e.code, message: e.message }; else throw e; } }
       return out;
     } finally { this.stopping = false; }
   }
