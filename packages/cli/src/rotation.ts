@@ -50,7 +50,7 @@ export async function rotationCmd(sub: string, rest: string[]): Promise<number> 
   if (sub === "root") {
     const s = b64(randomBytes(32));
     if (a.out && a.out !== "true") { writeFileSync(a.out, s + "\n", { mode: 0o600 }); console.error(`Root seed written to ${a.out}. Keep it offline. Never commit it or put it in CI.`); }
-    else console.log(`root seed (secret, keep offline): ${s}`);
+    else { console.error("Warning: the root seed is printed below. Use --out <file> to keep it out of shell history and CI logs."); console.log(`root seed (secret, keep offline): ${s}`); }
     console.log(`rootKey (public, add to shipvo.json before your next store build): ${pub(s)}`);
     return 0;
   }
@@ -58,20 +58,23 @@ export async function rotationCmd(sub: string, rest: string[]): Promise<number> 
   const file = a["root-seed-file"];
   if (!file || file === "true") { console.error("Usage: shipvo keys rotate --root-seed-file <file> [--revoke-after <days>|now]"); return 2; }
   const rootSeed = readFileSync(file, "utf8").trim();
-  const cfgRoot = (cfg as { rootKey?: string }).rootKey;
+  const cfgRoot = cfg.rootKey;
   if (!cfgRoot) { console.error('shipvo.json has no "rootKey". Run `shipvo keys root`, add the key, and ship a store build that pins it first.'); return 1; }
   if (pub(rootSeed) !== cfgRoot) { console.error("That root seed does not match rootKey in shipvo.json."); return 1; }
   const dir = join(process.cwd(), ".shipvo", "rotations");
   const done = existsSync(dir) ? readdirSync(dir).filter((f) => /^\d+\.json$/.test(f)).map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")) as RotationStatement).sort((x, y) => x.sequence - y.sequence) : [];
   const last = done[done.length - 1];
-  const newSeed = b64(randomBytes(32));
   const ra = a["revoke-after"] ?? "30";
-  const revokeOldAfter = ra === "now" ? null : new Date(Date.now() + Number(ra) * 86_400_000).toISOString();
-  if (revokeOldAfter !== null && Number.isNaN(Date.parse(revokeOldAfter))) { console.error("--revoke-after must be a number of days or `now`."); return 2; }
+  const days = Number(ra);
+  if (ra !== "now" && (ra.trim() === "" || !Number.isFinite(days) || days < 0 || !Number.isFinite(new Date(Date.now() + days * 86_400_000).getTime()))) { console.error("--revoke-after must be a number of days (0 or more) or `now`."); return 2; }
+  const seedPath = join(process.cwd(), ".shipvo", "seed.next.txt");
+  if (existsSync(seedPath)) { console.error(`${seedPath} already exists. It holds the seed for the key an earlier rotation names. Publish with it, then move or delete the file and run this again.`); return 1; }
+  const newSeed = b64(randomBytes(32));
+  const revokeOldAfter = ra === "now" ? null : new Date(Date.now() + days * 86_400_000).toISOString();
   const st = makeRotation({ appId: cfg.appId, sequence: (last?.sequence ?? 0) + 1, previousKey: last?.newKey ?? cfg.publicKey, newKey: pub(newSeed), validFrom: new Date().toISOString(), revokeOldAfter }, rootSeed);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${st.sequence}.json`), JSON.stringify(st, null, 2) + "\n");
-  writeFileSync(join(process.cwd(), ".shipvo", "seed.next.txt"), newSeed + "\n", { mode: 0o600 });
+  writeFileSync(seedPath, newSeed + "\n", { mode: 0o600 });
   console.log(`Rotation #${st.sequence} signed: .shipvo/rotations/${st.sequence}.json\nNew release seed: .shipvo/seed.next.txt (secret). Publish with it after phones have the statement.`);
   return 0;
 }

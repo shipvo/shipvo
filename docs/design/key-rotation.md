@@ -72,3 +72,10 @@ Optional hardening, not in this slice: M-of-N root signatures, and a delay (a st
 - `shipvo keys rotate --root-seed-file <file> [--revoke-after <days>|now]` makes a new release seed in `.shipvo/seed.next.txt` and a signed statement in `.shipvo/rotations/<sequence>.json`.
 
 Prior art read: expo-updates code signing (certificate chains with an expiry) and TUF (root, threshold keys, version numbers that only go up).
+
+## Notes for owners
+
+- `.shipvo/` holds `seed.next.txt`, a secret. Keep it out of git (add `.shipvo/` to `.gitignore`).
+- `keys rotate` refuses to run while `.shipvo/seed.next.txt` exists, so the seed for the key an earlier statement names is never lost. Publish with that seed, then move the file away and rotate again.
+- After a rotation, set `publicKey` in `shipvo.json` to the newest `newKey` once you publish with the new seed. The next `keys rotate` takes `previousKey` from the last statement in `.shipvo/rotations`, not from `publicKey`, so keep the two in step.
+- `keys root` without `--out` prints the root seed to stdout and warns. Prefer `--out <file>`.

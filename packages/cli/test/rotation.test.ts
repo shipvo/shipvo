@@ -1,7 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { b64, keyFromSeed } from "../src/index";
-import { makeRotation, checkRotation, acceptedKeys, type TrustState } from "../src/rotation";
+import { makeRotation, checkRotation, acceptedKeys, rotationCmd, type TrustState } from "../src/rotation";
 
 const seed = () => b64(randomBytes(32));
 const pub = (s: string) => b64(keyFromSeed(s).publicKey);
@@ -30,5 +33,68 @@ describe("key rotation statements", () => {
     const grace = makeRotation(body({ revokeOldAfter: new Date(now + 1000).toISOString() }), root);
     expect(acceptedKeys(grace, now)).toEqual([pub(next), pub(rel)]);
     expect(acceptedKeys(grace, now + 2000)).toEqual([pub(next)]);
+  });
+});
+
+describe("shipvo keys rotate", () => {
+  const rootSeed = seed();
+  const setup = (cfg: object = {}) => {
+    const dir = mkdtempSync(join(tmpdir(), "rot-"));
+    writeFileSync(join(dir, "shipvo.json"), JSON.stringify({ appId: "tide", controlPlane: "https://x.test", publicKey: pub(rel), rootKey: pub(rootSeed), ...cfg }));
+    writeFileSync(join(dir, "root.txt"), rootSeed + "\n");
+    return dir;
+  };
+  const run = async (dir: string, rest: string[]) => {
+    const cwd = process.cwd();
+    process.chdir(dir);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try { return await rotationCmd("rotate", rest); } finally { err.mockRestore(); log.mockRestore(); process.chdir(cwd); }
+  };
+  const read = (dir: string, n: number) => JSON.parse(readFileSync(join(dir, ".shipvo", "rotations", `${n}.json`), "utf8"));
+
+  it("fails without rootKey in shipvo.json", async () => {
+    const dir = setup({ rootKey: undefined });
+    expect(await run(dir, ["--root-seed-file", join(dir, "root.txt")])).toBe(1);
+    expect(existsSync(join(dir, ".shipvo"))).toBe(false);
+  });
+  it("fails when the root seed does not match rootKey", async () => {
+    const dir = setup({ rootKey: pub(seed()) });
+    expect(await run(dir, ["--root-seed-file", join(dir, "root.txt")])).toBe(1);
+    expect(existsSync(join(dir, ".shipvo"))).toBe(false);
+  });
+  it("writes a chain of statements that pass checkRotation", async () => {
+    const dir = setup();
+    const f = ["--root-seed-file", join(dir, "root.txt")];
+    expect(await run(dir, f)).toBe(0);
+    const one = read(dir, 1);
+    expect(one.sequence).toBe(1);
+    expect(one.previousKey).toBe(pub(rel));
+    expect(checkRotation(one, { appId: "tide", rootKey: pub(rootSeed), releaseKey: pub(rel), sequence: 0 })).toBeNull();
+    expect(one.revokeOldAfter).not.toBeNull();
+    // The seed for the key rotation #1 names must not be overwritten.
+    const seedPath = join(dir, ".shipvo", "seed.next.txt");
+    const firstSeed = readFileSync(seedPath, "utf8");
+    expect(pub(firstSeed.trim())).toBe(one.newKey);
+    expect(await run(dir, f)).toBe(1);
+    expect(readFileSync(seedPath, "utf8")).toBe(firstSeed);
+    expect(existsSync(join(dir, ".shipvo", "rotations", "2.json"))).toBe(false);
+    // After the owner moves the seed away, rotation #2 chains from #1.
+    renameSync(seedPath, join(dir, "seed.1.txt"));
+    expect(await run(dir, f)).toBe(0);
+    const two = read(dir, 2);
+    expect(two.sequence).toBe(2);
+    expect(two.previousKey).toBe(one.newKey);
+    expect(checkRotation(two, { appId: "tide", rootKey: pub(rootSeed), releaseKey: one.newKey, sequence: 1 })).toBeNull();
+  });
+  it("--revoke-after now gives revokeOldAfter null", async () => {
+    const dir = setup();
+    expect(await run(dir, ["--root-seed-file", join(dir, "root.txt"), "--revoke-after", "now"])).toBe(0);
+    expect(read(dir, 1).revokeOldAfter).toBeNull();
+  });
+  it.each(["abc", "-1", "Infinity", "1e12"])("rejects --revoke-after %s with exit 2", async (v) => {
+    const dir = setup();
+    expect(await run(dir, ["--root-seed-file", join(dir, "root.txt"), "--revoke-after", v])).toBe(2);
+    expect(existsSync(join(dir, ".shipvo"))).toBe(false);
   });
 });
