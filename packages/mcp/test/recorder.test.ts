@@ -35,6 +35,7 @@ const probe = (file: string) => {
 };
 // Stand-in for Playwright: the first screenshot is slow, later ones are fast.
 const fake = vi.hoisted(() => ({ on: false, firstDelay: 0, jpeg: Buffer.alloc(0) }));
+// Passes through to the real playwright unless `fake.on` is set.
 vi.mock("playwright", async (orig) => {
   const real: any = await orig();
   const chromium = { ...real.chromium, executablePath: real.chromium.executablePath, launch: async (...a: unknown[]) => {
@@ -74,6 +75,7 @@ describe.skipIf(!encodeOk)("Recorder", () => {
 describe.skipIf(!ffmpegOk)("Recorder clock with a slow first screenshot", () => {
   it("duration_s and chapter times match the video, not the first-screenshot delay", async () => {
     const jpg = join(out, "frame.jpg");
+    // The frame is 64x64 on purpose: the recorder scales it, and this test only checks the clock.
     spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=0x113366:s=64x64", "-frames:v", "1", jpg]);
     fake.jpeg = readFileSync(jpg); fake.firstDelay = 800; fake.on = true;
     try {
