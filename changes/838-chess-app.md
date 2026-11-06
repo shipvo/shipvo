@@ -1,0 +1,2 @@
+- `chess` (sample app, `apps/chess`): a chess app with labelled squares and pieces, full rules, a move list, a move timer and typed `get_board`, `legal_moves` and `move` actions. See `docs/demos/chess.md`.
+- Migration: none; new app.

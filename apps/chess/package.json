@@ -1,0 +1,28 @@
+{
+  "name": "chess",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "Chess for two assistants: every square and piece labelled, legal moves checked, typed actions get_board, legal_moves and move.",
+  "dependencies": {
+    "@expo/metro-runtime": "~58.0.15",
+    "expo": "~58.0.21",
+    "expo-status-bar": "~58.0.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-web": "^0.21.4",
+    "@shipvo/device": "workspace:*",
+    "@shipvo/sim": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "typescript": "~6.0.3",
+    "vitest": "^2.1.4"
+  },
+  "scripts": {
+    "web": "expo start --web",
+    "sim": "shipvo sim",
+    "test": "vitest run"
+  }
+}

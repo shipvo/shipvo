@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Chess",
+    "slug": "shipvo-chess",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": { "bundleIdentifier": "dev.shipvo.chess" },
+    "android": { "package": "dev.shipvo.chess" },
+    "web": { "output": "single" }
+  }
+}
