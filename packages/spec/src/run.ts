@@ -162,9 +162,12 @@ export async function runSource(spec: unknown, name: string, ctx: RunContext): P
   const auth = isObj(s.auth) ? s.auth : undefined;
   const ttl = typeof s.cache === "string" ? parseTtl(s.cache) : 0;
   // The key holds the secret's name, never its value.
+  // An authed source is cached only when the host sets cacheScope. Without it, two people
+  // who saved a secret under the same name would share one entry.
+  const useCache = ttl > 0 && !!ctx.cache && (!auth || !!ctx.cacheScope);
   const key = JSON.stringify([ctx.cacheScope ?? "", name, method, url.toString(), auth?.secret ?? null]);
-  if (ttl > 0 && ctx.cache) {
-    const hit = await ctx.cache.get(key);
+  if (useCache) {
+    const hit = await ctx.cache!.get(key);
     if (hit !== undefined) {
       ctx.log?.({ event: "source.cache_hit", source: name, host: url.hostname, cached: true });
       return hit;
@@ -206,7 +209,7 @@ export async function runSource(spec: unknown, name: string, ctx: RunContext): P
   try { body = JSON.parse(text); } catch { throw new RunError("upstream_error", `${url.hostname} did not answer with JSON.`); }
 
   const result = trimResponse(selectPath(body, typeof s.select === "string" ? s.select : undefined), usedFields(spec));
-  if (ttl > 0 && ctx.cache) await ctx.cache.set(key, result, ttl);
+  if (useCache) await ctx.cache!.set(key, result, ttl);
   return result;
 }
 

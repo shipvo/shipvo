@@ -39,15 +39,39 @@ describe("runSource", () => {
   });
 
   it("uses the cache: a hit avoids a second fetch", async () => {
-    const { ctx, fetch } = mkCtx({ cache: memoryCache() });
+    const { ctx, fetch } = mkCtx({ cache: memoryCache(), cacheScope: "user-a" });
     await runSource(spec, "charges", ctx);
     await runSource(spec, "charges", ctx);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("does not read or write the cache for an authed source without cacheScope", async () => {
+    const cache = memoryCache();
+    const get = vi.spyOn(cache, "get");
+    const set = vi.spyOn(cache, "set");
+    const { ctx, fetch } = mkCtx({ cache });
+    await runSource(spec, "charges", ctx);
+    await runSource(spec, "charges", ctx);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(get).not.toHaveBeenCalled();
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it("keeps two scopes with different secret values apart", async () => {
+    const cache = memoryCache();
+    const a = mkCtx({ cache, cacheScope: "a" });
+    const b = mkCtx({ cache, cacheScope: "b", secrets: () => "sk_other" });
+    await runSource(spec, "charges", a.ctx);
+    await runSource(spec, "charges", b.ctx);
+    await runSource(spec, "charges", a.ctx);
+    await runSource(spec, "charges", b.ctx);
+    expect(a.fetch).toHaveBeenCalledTimes(1);
+    expect(b.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("fetches again after the cache expires", async () => {
     let t = 0;
-    const { ctx, fetch } = mkCtx({ cache: memoryCache(() => t) });
+    const { ctx, fetch } = mkCtx({ cache: memoryCache(() => t), cacheScope: "user-a" });
     await runSource(spec, "charges", ctx);
     t = 5 * 60_000 + 1;
     await runSource(spec, "charges", ctx);
@@ -158,5 +182,25 @@ describe("runAction", () => {
     const e = await runAction(spec, "heavy", {}, ctx).catch((x) => x);
     expect(e).toBeInstanceOf(RunError);
     expect(e.code).toBe("cost_limit");
+  });
+
+  const branchSpec = {
+    actions: {
+      pick: { do: [{ if: "input.n > 1", then: [{ return: "big" }], else: [{ return: "small" }] }] },
+      web: { do: [{ http: { post: "https://api.example.com/x" } }] }
+    }
+  };
+
+  it("runs the then branch when the condition is true and the else branch when it is not", async () => {
+    const { ctx } = mkCtx();
+    expect(await runAction(branchSpec, "pick", { n: 2 }, ctx)).toBe("big");
+    expect(await runAction(branchSpec, "pick", { n: 1 }, ctx)).toBe("small");
+  });
+
+  it("refuses http steps with unsupported_step", async () => {
+    const { ctx } = mkCtx();
+    const e = await runAction(branchSpec, "web", {}, ctx).catch((x) => x);
+    expect(e).toBeInstanceOf(RunError);
+    expect(e.code).toBe("unsupported_step");
   });
 });
