@@ -2,6 +2,14 @@
 
 An AI agent uses a Shipvo app the way a person with a screen reader does: it gets the screen as an accessibility tree with refs, and it taps, types, scrolls and goes back. It never sees DOM, React internals or test ids. That is deliberate: what the agent can do in the simulator is what a person can do on the phone, and we measure the match ([parity-results.md](parity-results.md)).
 
+## Install the Shipvo skill
+
+```bash
+npx skills add shipvo/shipvo --skill shipvo -g
+```
+
+The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. `shipvo agents setup` and `https://shipvo.dev/install.sh` are planned ([#533](https://github.com/shipvo/shipvo/issues/533)).
+
 ## Three ways to connect
 
 **1. Local, over stdio** (Claude Desktop, Claude Code, Cursor, PiPilot): run `shipvo sim` in the app, then

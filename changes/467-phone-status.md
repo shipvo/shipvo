@@ -1,0 +1,4 @@
+- `@shipvo/sim`: the phone frame status bar can follow the simulated device. New `statusFromDevice`, `isDarkBackground`, `statusParts` and `statusClientScript` exports in `frame.mjs`.
+- `@shipvo/device`: simulated device state gains `airplane` and `battery`. Changes to network, airplane or battery are logged as simulated and sent as a `pn:status` event; `__pnDevice.status()` returns them.
+- Migration: none; new fields have defaults.
+- `@shipvo/cli`: `shipvo run` inlines the status script into the frame page, so the status bar follows `__pnDevice` network, airplane and battery changes. The status strip, not the screen behind the app, takes the app's top colour.
