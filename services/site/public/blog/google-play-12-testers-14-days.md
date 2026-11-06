@@ -28,7 +28,7 @@ Check before you recruit anyone. `shipvo store setup` asks one question, whether
 shipvo store setup --company no
 ```
 
-This is the output for a founder with no company (run in this repo, trimmed):
+This is the output for a founder with no company (run in this repo, trimmed: the `play-account` step is cut to one `wait:` note):
 
 ```text
 Google Play: personal account. Personal account (25 USD once). Google Play needs at least 12 testers opted in to a closed test for 14 days in a row before you can apply for production.
@@ -60,6 +60,8 @@ Get your 12 testers for com.example.shop (closed track "alpha"):
   6. Keep at least 12 testers opted in for 14 days in a row. ...
 ```
 
+The `...` at the end of some lines marks text we cut. Run the command to see the full lines.
+
 Add `--json` if you want the same steps as data for a script or an AI agent.
 
 The step people trip on is number 2. **The first upload of a new app must be done by hand in Play Console.** The Play API will not do it, and so neither will we. You need a signed Android build for that upload. Expo's EAS or your own CI can make one; Shipvo does not build the native binary.
@@ -73,6 +75,8 @@ This is the hard part, and no tool removes it. Realistic sources:
 - Other founders in the same position. They need 12 testers too, so a swap is fair.
 
 That last one is why we run **Shipvo Testers**, a Google Group of founders who test each other's apps. Anyone can join at [shipvo.dev/testers](https://shipvo.dev/testers/). Members cannot see each other's emails, and only managers post. Add `shipvo-testers@googlegroups.com` to your closed track as a group and members can opt in.
+
+If you cannot reach 12, you are not stuck. Start with the people you can reach and keep asking. The 14 days start only once 12 people are opted in, so a slow start delays you but does not lose your work. Post in founder communities you already belong to, and offer to test their apps in return.
 
 We cannot promise how many people will opt in to your app. It works only if members test each other's apps, so open the ones others share, opt in, and keep them installed for the full 14 days.
 
@@ -120,6 +124,6 @@ Honest limits:
 
 ## Next steps
 
-- Follow the step-by-step [Get your 12 testers tutorial](https://shipvo.dev/docs/tutorials/get-your-12-testers/), with a 1 minute 42 second video.
+- Follow the step-by-step [Get your 12 testers tutorial](https://shipvo.dev/learn/get-your-12-testers/), with a 1 minute 42 second video.
 - Read the [store guide](https://shipvo.dev/docs/store/) for `setup`, `status`, `screenshots` and `testers`.
 - Join [Shipvo Testers](https://shipvo.dev/testers/) and test someone else's app this week.
