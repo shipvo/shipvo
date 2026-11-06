@@ -10,7 +10,7 @@ dialogue.json:
 
 Writes to --out:
   vo.wav      every line placed on the timeline (48 kHz mono), ready to mix with the music ducked under it
-  mouth.js    `const MOUTH = {who: [level per frame]}`; load it before the film script and draw each mouth
+  mouth.js    `window.MOUTH = {who: [level per frame]}`; load it before the film script and draw each mouth
               from MOUTH[who][Math.round(t * fps)]: 0 closed, 1 small, 2 open, 3 wide (anime mouth flaps,
               each shape held at least 2 frames)
   lines.json  start, end and text of every line, for captions and checks
@@ -100,7 +100,7 @@ def main():
     if bad:
         sys.exit("lines overlap; move the later cue: " + "; ".join(bad))
     mouth = {who: mouth_levels(tr, a.fps) for who, tr in tracks.items()}
-    open(os.path.join(a.out, "mouth.js"), "w").write("const MOUTH = " + json.dumps(mouth) + ";\n")
+    open(os.path.join(a.out, "mouth.js"), "w").write("window.MOUTH = " + json.dumps(mouth) + ";\n")
     json.dump(lines, open(os.path.join(a.out, "lines.json"), "w"), indent=1)
     mix = sum(tracks.values())
     mix = mix / max(1.0, np.abs(mix).max() / .9)
