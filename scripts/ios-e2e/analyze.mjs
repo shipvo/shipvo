@@ -97,6 +97,28 @@ export function hermesRefusalTable(result) {
   return `| Check | Result | Detail |\n| --- | --- | --- |\n| Hermes mismatch refused | ${result.pass ? "pass" : "fail"} | ${result.detail} |\n`;
 }
 
+/**
+ * "Interrupted download resumed": from the text server log. For GETs of the release bundle `bundlePath`, the log must
+ * show a response cut short ("200 cut at <n>"), then a request with "range=bytes=<n>-" (n above 0) answered 206, and
+ * an `applied` event for `release`. A later 200 for the bundle (a restart from byte 0) fails. Returns {pass, detail}.
+ */
+export function analyzeResume(text, { release, bundlePath }) {
+  if (typeof release !== "number" || typeof bundlePath !== "string") throw new Error("resume marks: need release and bundlePath");
+  const gets = text.split("\n").map((l) => /^GET (\S+) (\d{3})(?: (.*))?$/.exec(l)).filter((m) => m && m[1] === bundlePath);
+  const cut = gets.findIndex((m) => /^cut at \d+/.test(m[3] || ""));
+  if (cut < 0) return { pass: false, detail: "the server never cut the first download" };
+  const after = gets.slice(cut + 1);
+  if (!after.length) return { pass: false, detail: "the app did not retry the download" };
+  const ranged = after.find((m) => m[2] === "206" && Number(/range=bytes=(\d+)-/.exec(m[3] || "")?.[1]) > 0);
+  if (!ranged) return { pass: false, detail: after.some((m) => m[2] === "200") ? "the app re-downloaded from byte 0 (no Range request)" : "no Range request with an offset above 0 got a 206" };
+  if (!parseTelemetry(text).some((e) => e.release === release && e.event === "applied")) return { pass: false, detail: `release ${release} never became healthy` };
+  return { pass: true, detail: `resumed with ${/range=(\S+)/.exec(ranged[3])[1]}, HTTP 206, release ${release} healthy` };
+}
+
+export function resumeTable(result) {
+  return `| Check | Result | Detail |\n| --- | --- | --- |\n| Interrupted download resumed | ${result.pass ? "pass" : "fail"} | ${result.detail} |\n`;
+}
+
 export function analyze(entries, marks) {
   if (!marks.length) throw new Error("no runs in marks file");
   const runs = marks.map((m, i) => analyzeRun(entries, m, i));
@@ -118,6 +140,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (!textLogFile) { console.error("hermes marks need the text server log as the fifth argument"); process.exit(2); }
     const result = analyzeHermesRefusal(parseTelemetry(readFileSync(textLogFile, "utf8")), JSON.parse(readFileSync(hermesMarksFile, "utf8")));
     process.stdout.write("\n" + hermesRefusalTable(result));
+    if (!result.pass) process.exitCode = 1;
+  }
+  // RESUME_MARKS=<json file with {release, bundlePath}> adds the resume check; it reads the text log (fifth argument).
+  if (process.env.RESUME_MARKS && textLogFile) {
+    const result = analyzeResume(readFileSync(textLogFile, "utf8"), JSON.parse(readFileSync(process.env.RESUME_MARKS, "utf8")));
+    process.stdout.write("\n" + resumeTable(result));
     if (!result.pass) process.exitCode = 1;
   }
 }

@@ -135,3 +135,44 @@ test("Hermes mismatch refused: failing logs", () => {
   assert.match(hermesRefusalTable({ pass: false, detail: "x" }), /\| fail \|/);
   assert.throws(() => analyzeHermesRefusal(ok, {}), /missing release/);
 });
+
+import { analyzeResume, resumeTable } from "./analyze.mjs";
+
+const rm = { release: 3, bundlePath: "/b/e2e/ios-r3.hbc" };
+const rl = (...lines) => lines.join("\n");
+const P = "/b/e2e/ios-r3.hbc";
+
+test("Interrupted download resumed: passing log", () => {
+  const r = analyzeResume(rl(`GET ${P} 200 cut at 500`, `GET ${P} 206 from 500 range=bytes=500-`, tl({ release: 3, event: "applied" })), rm);
+  assert.equal(r.pass, true);
+  assert.match(resumeTable(r), /Interrupted download resumed \| pass/);
+});
+
+test("Interrupted download resumed: failing logs", () => {
+  const cut = `GET ${P} 200 cut at 500`, ok = `GET ${P} 206 from 500 range=bytes=500-`, applied = tl({ release: 3, event: "applied" });
+  assert.match(analyzeResume(rl(`GET ${P} 200`, applied), rm).detail, /never cut/);
+  assert.match(analyzeResume(rl(cut, applied), rm).detail, /did not retry/);
+  assert.match(analyzeResume(rl(cut, `GET ${P} 200`, applied), rm).detail, /byte 0/);
+  assert.equal(analyzeResume(rl(cut, `GET ${P} 206 from 0 range=bytes=0-`, applied), rm).pass, false);
+  assert.match(analyzeResume(rl(cut, ok), rm).detail, /never became healthy/);
+  assert.match(analyzeResume(rl(cut, ok, tl({ release: 2, event: "applied" })), rm).detail, /never became healthy/);
+  assert.throws(() => analyzeResume("", {}), /need release/);
+});
+
+test("server CUT_ONCE closes the first response early, then serves Range with 206", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cut-")), port = 18000 + (process.pid % 1000);
+  execFileSync("mkdir", ["-p", join(dir, "b")]);
+  writeFileSync(join(dir, "b/x.hbc"), Buffer.alloc(1000, 7));
+  const logf = join(dir, "s.log");
+  const srv = spawn(process.execPath, [new URL("./server.mjs", import.meta.url).pathname, dir, String(port), logf], { env: { ...process.env, CUT_ONCE: "/b/x.hbc:400" }, stdio: "ignore" });
+  try {
+    await new Promise((r) => setTimeout(r, 500));
+    const base = `http://127.0.0.1:${port}`;
+    await assert.rejects(async () => { const r = await fetch(base + "/b/x.hbc"); await r.arrayBuffer(); });
+    const r2 = await fetch(base + "/b/x.hbc", { headers: { range: "bytes=400-" } });
+    assert.equal(r2.status, 206); assert.equal((await r2.arrayBuffer()).byteLength, 600);
+    assert.equal((await (await fetch(base + "/b/x.hbc")).arrayBuffer()).byteLength, 1000);
+    const text = readFileSync(logf, "utf8");
+    assert.match(text, /GET \/b\/x\.hbc 200 cut at 400\nGET \/b\/x\.hbc 206 from 400 range=bytes=400-\n/);
+  } finally { srv.kill(); }
+});
