@@ -15,6 +15,22 @@ npx shipvo migrate --plan
 npx shipvo migrate --plan --json
 ```
 
+Real output, from a copy of `apps/tide-and-tackle` with `expo-updates`, an `updates` key and a `runtimeVersion` key added (the sample app itself has none, so on the unchanged app it prints "Nothing to migrate"):
+
+```text
+Found expo-updates (EAS Update):
+  - package.json dependencies: expo-updates@~58.0.0
+  - app.json plugins: expo-updates
+  - app.json: updates: {"url":"https://u.expo.dev/x"}
+  - app.json: runtimeVersion: {"policy":"appVersion"}
+
+Steps, in this order:
+  1. Commit your work. ...
+  (8 steps, the same as "Order of steps" below)
+
+No files were changed.
+```
+
 It lists each entry it found:
 
 - `expo-updates` in `dependencies` or `devDependencies` of `package.json`
@@ -57,7 +73,19 @@ npx shipvo migrate --apply --json
 | `eas update` | `shipvo publish` |
 | Channels and branches | Cohorts (bands): `--bands b0,b1,b2` |
 | `eas update:rollback` | `shipvo rollback --to <release>` |
-| `runtimeVersion` | `shellMajor` in the `@shipvo/runtime` plugin props |
+| `runtimeVersion` | `shellMajor` in `shipvo.json`. The shell also declares its Hermes bytecode version and native modules; `shipvo publish` checks a release against them |
 | Code signing certificate | Ed25519 key made by `shipvo init` |
+
+## First publish and first applied OTA
+
+After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` printed all `doctor` checks as PASS and the next steps: rebuild the native app once (`npx expo prebuild`, then `npx expo run:android`), then `npx shipvo publish --dry-run`.
+
+Not yet run for this guide: `shipvo publish --dry-run` (it needs `npm install` and a native platform in the app) and the first applied OTA on the Android emulator. This runner has no emulator. The script that times it is `scripts/first-run/applied-ota.mjs`. Until a CI run is linked here, this guide does not claim an applied OTA.
+
+## What does not map yet
+
+- Percentage rollouts: Shipvo has cohort bands (`--bands`), not an arbitrary percentage.
+- A dashboard: there is no web dashboard for releases. Use the CLI.
+- Channels and branches as separate objects: bands are the only grouping.
 
 See also [Migrate from CodePush](migrate-from-codepush.md) and [cli.md](cli.md).
