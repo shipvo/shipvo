@@ -57,12 +57,20 @@ export async function rotationCmd(sub: string, rest: string[]): Promise<number> 
   const cfg = loadConfig();
   const file = a["root-seed-file"];
   if (!file || file === "true") { console.error("Usage: shipvo keys rotate --root-seed-file <file> [--revoke-after <days>|now]"); return 2; }
-  const rootSeed = readFileSync(file, "utf8").trim();
   const cfgRoot = cfg.rootKey;
   if (!cfgRoot) { console.error('shipvo.json has no "rootKey". Run `shipvo keys root`, add the key, and ship a store build that pins it first.'); return 1; }
-  if (pub(rootSeed) !== cfgRoot) { console.error("That root seed does not match rootKey in shipvo.json."); return 1; }
+  let rootSeed = "", rootPub = "";
+  try {
+    rootSeed = readFileSync(file, "utf8").trim();
+    if (Buffer.from(rootSeed, "base64").length !== 32) throw new Error("bad length");
+    rootPub = pub(rootSeed);
+  } catch { console.error(`Could not read a root seed from ${file}. It must hold the 32-byte base64 seed made by \`shipvo keys root\`.`); return 1; }
+  if (rootPub !== cfgRoot) { console.error("That root seed does not match rootKey in shipvo.json."); return 1; }
   const dir = join(process.cwd(), ".shipvo", "rotations");
-  const done = existsSync(dir) ? readdirSync(dir).filter((f) => /^\d+\.json$/.test(f)).map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")) as RotationStatement).sort((x, y) => x.sequence - y.sequence) : [];
+  let done: RotationStatement[] = [];
+  try {
+    done = existsSync(dir) ? readdirSync(dir).filter((f) => /^\d+\.json$/.test(f)).map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")) as RotationStatement).sort((x, y) => x.sequence - y.sequence) : [];
+  } catch { console.error(`Could not read the statements in ${dir}. Fix or remove the corrupt file and run this again.`); return 1; }
   const last = done[done.length - 1];
   const ra = a["revoke-after"] ?? "30";
   const days = Number(ra);

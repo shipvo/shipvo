@@ -24,3 +24,4 @@ public/security/
 *.mkv
 .gradle/
 dist-test-*
+.shipvo/

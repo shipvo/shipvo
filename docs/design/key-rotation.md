@@ -79,3 +79,5 @@ Prior art read: expo-updates code signing (certificate chains with an expiry) an
 - `keys rotate` refuses to run while `.shipvo/seed.next.txt` exists, so the seed for the key an earlier statement names is never lost. Publish with that seed, then move the file away and rotate again.
 - After a rotation, set `publicKey` in `shipvo.json` to the newest `newKey` once you publish with the new seed. The next `keys rotate` takes `previousKey` from the last statement in `.shipvo/rotations`, not from `publicKey`, so keep the two in step.
 - `keys root` without `--out` prints the root seed to stdout and warns. Prefer `--out <file>`.
+
+`validFrom` and `revokeOldAfter` are compared as UTC instants (`Date.parse` of an ISO 8601 string), so the time zone of the machine that signed the statement does not matter.

@@ -21,6 +21,16 @@ beforeAll(() => {
 afterAll(() => { if (out) rmSync(out, { recursive: true, force: true }); });
 
 describe("cli", () => {
+  it("dispatches `keys root` and sets the exit code from `keys rotate`", () => {
+    const dir = mkdtempSync(join(tmpdir(), "keys-"));
+    const f = join(dir, "root.txt");
+    const r = spawnSync(process.execPath, [join(out, "cli.js"), "keys", "root", "--out", f], { encoding: "utf8", cwd: dir });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("rootKey");
+    expect(readFileSync(f, "utf8").trim()).toHaveLength(44);
+    const bad = spawnSync(process.execPath, [join(out, "cli.js"), "keys", "rotate"], { encoding: "utf8", cwd: dir });
+    expect(bad.status).not.toBe(0);
+  });
   it("names an unknown command and suggests the closest one", () => {
     const r = run("publsh");
     expect(r.status).toBe(1);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -87,6 +87,22 @@ describe("shipvo keys rotate", () => {
     expect(two.previousKey).toBe(one.newKey);
     expect(checkRotation(two, { appId: "tide", rootKey: pub(rootSeed), releaseKey: one.newKey, sequence: 1 })).toBeNull();
   });
+  it("fails cleanly on a bad root seed file", async () => {
+    const dir = setup();
+    for (const [name, text] of [["empty.txt", ""], ["short.txt", "abcd\n"]]) {
+      writeFileSync(join(dir, name), text);
+      expect(await run(dir, ["--root-seed-file", join(dir, name)])).toBe(1);
+    }
+    expect(await run(dir, ["--root-seed-file", join(dir, "missing.txt")])).toBe(1);
+    expect(existsSync(join(dir, ".shipvo"))).toBe(false);
+  });
+  it("fails cleanly on a corrupt statement file", async () => {
+    const dir = setup();
+    mkdirSync(join(dir, ".shipvo", "rotations"), { recursive: true });
+    writeFileSync(join(dir, ".shipvo", "rotations", "1.json"), "{nope");
+    expect(await run(dir, ["--root-seed-file", join(dir, "root.txt")])).toBe(1);
+    expect(existsSync(join(dir, ".shipvo", "seed.next.txt"))).toBe(false);
+  });
   it("--revoke-after now gives revokeOldAfter null", async () => {
     const dir = setup();
     expect(await run(dir, ["--root-seed-file", join(dir, "root.txt"), "--revoke-after", "now"])).toBe(0);
@@ -96,5 +112,32 @@ describe("shipvo keys rotate", () => {
     const dir = setup();
     expect(await run(dir, ["--root-seed-file", join(dir, "root.txt"), "--revoke-after", v])).toBe(2);
     expect(existsSync(join(dir, ".shipvo"))).toBe(false);
+  });
+});
+
+describe("shipvo keys root", () => {
+  const capture = async (rest: string[]) => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try { const code = await rotationCmd("root", rest); return { code, err: err.mock.calls.flat().join("\n"), out: log.mock.calls.flat().join("\n") }; }
+    finally { err.mockRestore(); log.mockRestore(); }
+  };
+  it("writes a 32-byte seed with mode 0600 and prints the matching rootKey", async () => {
+    const f = join(mkdtempSync(join(tmpdir(), "root-")), "root.txt");
+    const r = await capture(["--out", f]);
+    expect(r.code).toBe(0);
+    const s = readFileSync(f, "utf8").trim();
+    expect(Buffer.from(s, "base64").length).toBe(32);
+    expect(statSync(f).mode & 0o777).toBe(0o600);
+    expect(r.out).toContain(pub(s));
+    expect(r.out).not.toContain(s);
+  });
+  it("without --out warns on stderr and still prints the key", async () => {
+    const r = await capture([]);
+    expect(r.code).toBe(0);
+    expect(r.err).toMatch(/Warning/);
+    const seedLine = r.out.split("\n").find((l) => l.startsWith("root seed"))!;
+    const s = seedLine.split(": ").pop()!.trim();
+    expect(r.out).toContain(pub(s));
   });
 });
