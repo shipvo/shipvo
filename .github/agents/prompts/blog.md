@@ -22,3 +22,6 @@ Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (on
 Every row in `docs/content-coverage.md` must end with a link in the Blog column. Alternate: one run takes the next empty Blog cell (a practical post about that feature: the problem it solves, how to use it, real commands and output, measured numbers with links), the next run writes for search demand as before. Shipped features only.
 
 Always read the "Priority now" list at the top of `docs/content-coverage.md` first and take the first item that still has an empty cell in your column.
+
+
+Follow "Internal details stay private" in `CLAUDE.md`: never write hosting plans, vendor tiers, limits, quota numbers or costs in anything public.
