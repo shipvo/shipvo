@@ -29,7 +29,7 @@ Run time: a full run takes about 18 minutes (the crash-loop scenarios alone take
 
 ## Rollback scenario
 
-`on-device Runtime.rollback(): previous release restored and kept after a restart` publishes release A, then B (both healthy), taps the sample app's "Roll back to previous release" button (found with `uiautomator dump`), and times the call until the server receives `applied` telemetry for A (`rollbackToGoodActiveMs`). It then waits for two or more check-ins while the pointer still names B, force-stops and relaunches, and checks that A runs, B is blocked and was not downloaded again, and `rolled_back` telemetry arrived for B. If B comes back after the relaunch, the scenario fails and the row says so. The `rolled_back` event is sent when the app next mounts.
+`on-device Runtime.rollback(): previous release restored and kept after a restart` publishes release A, then B (both healthy), taps the sample app's "Roll back to previous release" button (found with `uiautomator dump`), and times the call until the server receives `applied` telemetry for A (`rollbackToGoodActiveMs`). It then waits for two or more check-ins while the pointer still names B, force-stops and relaunches, and checks that A runs, B is blocked and was not downloaded again, and `rolled_back` telemetry arrived. The app reports that event under the release that is running when it is sent, so the scenario looks for it under A. If B comes back after the relaunch, the scenario fails and the row says so. The `rolled_back` event is sent when the app next mounts.
 
 ## Patch update timeline
 

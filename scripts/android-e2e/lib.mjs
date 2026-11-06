@@ -141,8 +141,8 @@ export function tapTarget(xml, label) {
   return null;
 }
 
-/** The `rolled_back` telemetry event the app sends (under the rolled-back release id) after `since`, or null. */
-export const rolledBackEvent = (tele, release, since) => tele.find((e) => e.event === "rolled_back" && e.release === release && e.at >= since) ?? null;
+/** The `rolled_back` telemetry event after `since`, or null. The app sends it under the release that is running at that time (the restored one), not the rolled-back one. */
+export const rolledBackEvent = (tele, runningRelease, since) => tele.find((e) => e.event === "rolled_back" && e.release === runningRelease && e.at >= since) ?? null;
 
 /**
  * Verdict of the rollback scenario. `bad` is the release that was rolled back, `good` the one that must run.

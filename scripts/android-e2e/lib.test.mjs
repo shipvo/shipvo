@@ -87,15 +87,23 @@ test("tapTarget finds the centre of a node by content-desc", () => {
   assert.deepEqual(tapTarget(xml, "Roll back to previous release"), { x: 60, y: 330 });
   assert.equal(tapTarget(xml, "missing"), null);
 });
-test("rolledBackEvent matches the rolled-back release after the call", () => {
-  const t = [{ event: "rolled_back", release: 6, at: 100 }];
-  assert.ok(rolledBackEvent(t, 6, 50)); assert.equal(rolledBackEvent(t, 6, 101), null); assert.equal(rolledBackEvent(t, 5, 50), null);
+test("rolledBackEvent is keyed on the restored release, not the rolled-back one", () => {
+  const t = [{ event: "rolled_back", release: 5, at: 100 }]; // A = 5 runs again, B = 6 was rolled back
+  assert.ok(rolledBackEvent(t, 5, 50)); assert.equal(rolledBackEvent(t, 5, 101), null); assert.equal(rolledBackEvent(t, 6, 50), null);
 });
 test("rollbackVerdict passes only when A runs, B stays blocked and the event is reported", () => {
   assert.deepEqual(rollbackVerdict(GOOD), { pass: true, failures: [] });
   assert.equal(rollbackVerdict({ ...GOOD, telemetryEvent: null }).pass, false);
   assert.equal(rollbackVerdict({ ...GOOD, goodActiveMs: null }).pass, false);
   assert.equal(rollbackVerdict({ ...GOOD, badRefetched: true }).pass, false);
+});
+test("rollbackVerdict checks both the running release and the prefs", () => {
+  const a = rollbackVerdict({ ...GOOD, prefs: { current_release: 6, blocked_release: 6 } });
+  assert.equal(a.pass, false); assert.match(a.failures[0], /release 6 came back/);
+  const b = rollbackVerdict({ ...GOOD, runningAfterRelaunch: 6 });
+  assert.equal(b.pass, false); assert.match(b.failures[0], /release 6 came back/);
+  const c = rollbackVerdict({ ...GOOD, runningAfterRelaunch: null });
+  assert.equal(c.pass, false); assert.match(c.failures[0], /ran release none, expected 5/);
 });
 test("rollbackVerdict says so when B comes back after the relaunch", () => {
   const v = rollbackVerdict({ ...GOOD, runningAfterRelaunch: 6, prefs: { current_release: 6, blocked_release: 0 } });
