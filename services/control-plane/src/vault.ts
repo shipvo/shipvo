@@ -85,6 +85,16 @@ export function vaultRoutes(who: Who, deps: { fetch?: typeof fetch } = {}) {
     return c.json({ ticket: id, url, expires_in: TICKET_TTL_MS / 1000 }, 201, { "cache-control": "no-store" });
   });
 
+  /** Whether a key is saved, never the key. Same owner check as tickets. */
+  v.get("/status/:app/:name", async (c) => {
+    const appId = c.req.param("app"), name = c.req.param("name");
+    if (!ID.test(appId) || !NAME.test(name)) return c.json({ error: "bad_request" }, 400);
+    if (!(await who(c, appId))) return c.json({ error: "unauthorized" }, 401);
+    const row: any = await c.env.DB.prepare("SELECT access, valid FROM vault_secrets WHERE app_id = ? AND name = ?").bind(appId, name).first();
+    const out = row ? { saved: true, valid: row.valid === null ? null : row.valid === 1, access: row.access } : { saved: false, valid: null, access: null };
+    return c.json(out, 200, { "cache-control": "no-store" });
+  });
+
   async function load(c: any) {
     const id = c.req.param("ticket");
     if (!TICKET.test(id)) return null;
@@ -108,7 +118,7 @@ export function vaultRoutes(who: Who, deps: { fetch?: typeof fetch } = {}) {
   /** The only way a value enters the vault. */
   v.post("/t/:ticket", async (c) => {
     const asJson = (c.req.header("content-type") ?? "").includes("application/json");
-    const fail = (status: 400 | 410 | 413 | 500 | 503, error: string) => asJson ? c.json({ error }, status, { "cache-control": "no-store" }) : c.html(page("Not saved", `<h1>Not saved</h1><p>${esc(FAILURES[error] ?? FAILURES.save_failed)}</p>`), status, PAGE_HEADERS);
+    const fail = (status: 400 | 410 | 413 | 500 | 503, error: string) => asJson ? c.json({ error, message: FAILURES[error] ?? FAILURES.save_failed }, status, { "cache-control": "no-store" }) : c.html(page("Not saved", `<h1>Not saved</h1><p>${esc(FAILURES[error] ?? FAILURES.save_failed)}</p>`), status, PAGE_HEADERS);
     let value = "", claimApp: unknown, claimName: unknown;
     try {
       if (asJson) { const b: any = await c.req.json(); value = b?.value; claimApp = b?.app; claimName = b?.name; }

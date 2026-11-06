@@ -299,6 +299,10 @@ importers:
         version: 1.63.0
 
   packages/spec:
+    dependencies:
+      '@bufbuild/cel':
+        specifier: ^0.6.2
+        version: 0.6.2(@bufbuild/protobuf@2.17.0)
     devDependencies:
       '@types/node':
         specifier: ^22.8.0
@@ -749,6 +753,22 @@ packages:
   '@babel/types@7.29.11':
     resolution: {integrity: sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ==}
     engines: {node: '>=6.9.0'}
+
+  '@bufbuild/cel-spec@0.6.2':
+    resolution: {integrity: sha512-Zgs67gtVTIzva36INEeTWbk/UgMRWKwNk4kISaV3BuEH+Qv+HDBmfgGXRwSH99XC1WKx4CGfrjXnPdH92nM4Ow==}
+    peerDependencies:
+      '@bufbuild/protobuf': ^2.6.2
+
+  '@bufbuild/cel@0.6.2':
+    resolution: {integrity: sha512-AcZd2OnTqtiViJw2U+UQdUxjKQn3MqK1i1QyJtG5+wUKRPS5LzdkXLV3bWbKysuuUlZGJECm6wl3uLp1Cy+eQA==}
+    peerDependencies:
+      '@bufbuild/protobuf': ^2.6.2
+
+  '@bufbuild/protobuf@2.17.0':
+    resolution: {integrity: sha512-hcPkSz6D7MiTU/5VBBhK+kxaYDoOdQ6yJRFJ3kS8Nydp+VZXfg1vrpABKPNod8bXMufsVCmiUJVIKFzCzta4uw==}
+
+  '@bufbuild/re2@0.6.2':
+    resolution: {integrity: sha512-/J0aKLB8jZSRe8P5h988GGA15pX/QTBcYvmUzvSdqSJlandchxDxbvykJf1RUpR4bgAEM3eobH8rarINw74bCQ==}
 
   '@capacitor/android@8.6.0':
     resolution: {integrity: sha512-6IJS0TCfV/F/8+324CCwYd3xL6r+TH0W7zzaxYzPz9IV3YWCNvsZDuCCPHUIBC5iASb9od827ddSJ6rz+9Pu1Q==}
@@ -4951,6 +4971,20 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.11
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@bufbuild/cel-spec@0.6.2(@bufbuild/protobuf@2.17.0)':
+    dependencies:
+      '@bufbuild/protobuf': 2.17.0
+
+  '@bufbuild/cel@0.6.2(@bufbuild/protobuf@2.17.0)':
+    dependencies:
+      '@bufbuild/cel-spec': 0.6.2(@bufbuild/protobuf@2.17.0)
+      '@bufbuild/protobuf': 2.17.0
+      '@bufbuild/re2': 0.6.2
+
+  '@bufbuild/protobuf@2.17.0': {}
+
+  '@bufbuild/re2@0.6.2': {}
 
   '@capacitor/android@8.6.0(@capacitor/core@8.6.0)':
     dependencies:
