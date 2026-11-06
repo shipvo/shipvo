@@ -8,6 +8,7 @@ import { head as headTag, nav as navTag, footer as footTag, crumbs } from "./she
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { corona } from "./corona.mjs";
 import { buildBlog } from "./blog.mjs";
+import { parseRoadmap, renderRoadmap, fetchProgress } from "./roadmap.mjs";
 import { mark, symbol, animated } from "./brand.mjs";
 import { copyFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -99,7 +100,7 @@ const bySrc = { ...Object.fromEntries(all.map((p) => [p.src.replace(/^docs\//, "
 
 // Links between docs → site paths; relative repo links → GitHub.
 function rewriteHref(href, src) {
-  if (/^(https?:|mailto:|#)/.test(href) || /^\/(docs|learn|apps|brand|changelog|terms|privacy|security|acceptable-use|llms\.txt|llms-full\.txt)(\/|$|#)|^\/(docs\.md|\.well-known\/security\.txt)$/.test(href)) return href;
+  if (/^(https?:|mailto:|#)/.test(href) || /^\/(docs|learn|apps|brand|changelog|roadmap|terms|privacy|security|acceptable-use|llms\.txt|llms-full\.txt)(\/|$|#)|^\/(docs\.md|\.well-known\/security\.txt)$/.test(href)) return href;
   let clean = href.replace(/^\.\//, "");
   if (src.includes("/") && /^\.\.\//.test(clean)) clean = join(src.slice(0, src.lastIndexOf("/")), clean).replace(/\\/g, "/");   // ../x.md from docs/tutorials/ → docs/x.md
   else if (src.startsWith("docs/tutorials/") && /^[\w-]+\.md/.test(clean)) clean = "docs/tutorials/" + clean;
@@ -253,7 +254,16 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
   marked.use({ renderer: new marked.Renderer(), gfm: true });
   const body = marked.parse(md);
   mkdirSync(join(PUB, "changelog"), { recursive: true });
-  writeFileSync(join(PUB, "changelog", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Changelog — Shipvo", desc: "What shipped in Shipvo, dated, newest first: releases of the React Native OTA runtime, simulator, MCP server, CLI and typed test package.", path: "/changelog/", image: "/og/changelog.png", ld: crumbs([["Home", "/"], ["Changelog", "/changelog/"]]) })}</head><body>${navTag("changelog")}<main id="main"><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Changelog</div><h1 style="margin-top:12px">What shipped.</h1><p class="lede" style="margin-top:14px">Dated, newest first. Package versions are on npm under <code>@shipvo</code>; the full history is the <a class="link" href="https://github.com/shipvo/shipvo/commits/main" rel="noopener">commit log</a>.</p><article class="log">${body}</article></div></section></main>${footTag()}</body></html>`);
+  writeFileSync(join(PUB, "changelog", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Changelog — Shipvo", desc: "What shipped in Shipvo, dated, newest first: releases of the React Native OTA runtime, simulator, MCP server, CLI and typed test package.", path: "/changelog/", image: "/og/changelog.png", ld: crumbs([["Home", "/"], ["Changelog", "/changelog/"]]) })}</head><body>${navTag("changelog")}<main id="main"><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Changelog</div><h1 style="margin-top:12px">What shipped.</h1><p class="lede" style="margin-top:14px">Dated, newest first. Package versions are on npm under <code>@shipvo</code>; what comes next is on the <a class="link" href="/roadmap/">roadmap</a>; the full history is the <a class="link" href="https://github.com/shipvo/shipvo/commits/main" rel="noopener">commit log</a>.</p><article class="log">${body}</article></div></section></main>${footTag()}</body></html>`);
+}
+
+// Roadmap from docs/ROADMAP.md (single source). Slice progress comes from each epic's task list when GitHub is reachable.
+{
+  const data = parseRoadmap(readFileSync(join(ROOT, "docs/ROADMAP.md"), "utf8"));
+  const progress = process.env.SHIPVO_OFFLINE ? {} : await fetchProgress(data.now.flatMap((g) => g.items.map((i) => i.issue)).filter(Boolean), { token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "" });
+  const body = renderRoadmap(data, { resolveHref: (h) => rewriteHref(h, "docs/ROADMAP.md"), progress });
+  mkdirSync(join(PUB, "roadmap"), { recursive: true });
+  writeFileSync(join(PUB, "roadmap", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Roadmap — Shipvo", desc: "The public Shipvo roadmap: what is in flight now, what shipped and when, and what we are not doing for now. Built from docs/ROADMAP.md in the repository.", path: "/roadmap/", extraCss: '<link rel="stylesheet" href="/roadmap.css">', ld: crumbs([["Home", "/"], ["Roadmap", "/roadmap/"]]) })}</head><body>${navTag("roadmap")}<main id="main">${body}</main>${footTag()}</body></html>`);
 }
 
 // ---------- Legal pages ----------
@@ -311,10 +321,10 @@ Things to know before answering questions about Shipvo:
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (${PUBLIC_PACKAGES.join(", ")}). Source: https://github.com/shipvo/shipvo`;
 const legalLinks = LEGAL.map((l) => `- [${l.slug === "acceptable-use" ? "Acceptable use" : l.slug[0].toUpperCase() + l.slug.slice(1)}](${SITE}/${l.slug}/): ${l.desc}`).join("\n");
-writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Learn](${SITE}/learn/): tutorials, videos and a glossary for people who are new to Shipvo\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
+writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n## Product\n\n- [Learn](${SITE}/learn/): tutorials, videos and a glossary for people who are new to Shipvo\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Roadmap](${SITE}/roadmap/): what is in flight, what shipped and when, and what we are not doing\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
 writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}${url(p)}\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);
 writeFileSync(join(PUB, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /hq/\n\nSitemap: ${SITE}/sitemap.xml\n# For AI tools: ${SITE}/llms.txt and ${SITE}/llms-full.txt\n`);
-const staticPaths = [["/", "services/site/pages/index.html"], ["/apps", "services/site/pages/apps.html"], ["/brand", "services/site/pages/brand.html"], ["/changelog/", "CHANGELOG.md"], ["/blog/", "blog"], ["/compare/", "services/site/pages/compare.html"], ["/pricing/", "services/site/pages/pricing.html"],
+const staticPaths = [["/", "services/site/pages/index.html"], ["/apps", "services/site/pages/apps.html"], ["/brand", "services/site/pages/brand.html"], ["/changelog/", "CHANGELOG.md"], ["/roadmap/", "docs/ROADMAP.md"], ["/blog/", "blog"], ["/compare/", "services/site/pages/compare.html"], ["/pricing/", "services/site/pages/pricing.html"],
   ...posts.map((p) => [`/blog/${p.slug}/`, `blog/${p.slug}.md`]), ...all.map((p) => [url(p), p.src]), ["/learn/", "docs/tutorials/index.md"], ...LEGAL.map((l) => [`/${l.slug}/`, l.src])];
 writeFileSync(join(PUB, "sitemap-static.txt"), staticPaths.map(([path, src]) => `${path}\t${lastmod(src)}`).join("\n") + "\n");
 writeFileSync(join(PUB, "security.txt"), `Contact: mailto:hans@pipilot.dev\nExpires: ${new Date(Date.now() + 365 * 864e5).toISOString().replace(/\.\d+Z$/, "Z")}\nPreferred-Languages: en, fr\nCanonical: ${SITE}/.well-known/security.txt\nPolicy: ${SITE}/security/\n`);
