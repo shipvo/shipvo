@@ -6,7 +6,7 @@ Short videos for people who are new to Shipvo. Each one has captions and a writt
 
 ### From working app to Google Play and the App Store
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 2 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-d49f90fb.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 2 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-5e5f9607.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
 2 minutes 2 seconds. The store path in order: `shipvo store setup` for your plan, `shipvo store status` for what is next, `shipvo store details --dry-run` for the data safety draft, `shipvo store screenshots` for store-sized pictures and `shipvo store testers` for the Google Play tester rule. It also says plainly what Shipvo does not do: it does not upload to a store yet. It follows [Store details](store.md).
 

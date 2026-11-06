@@ -413,9 +413,9 @@ ${storeTag("Google Play", 800, 200, 1.6)}${storeTag("App Store", 800, 300, 2.4)}
   stSetup: () => `
 ${chip("Step 1")}
 <h2 class="abs in" style="left:72px;top:100px;--d:.3s">Make your plan</h2>
-${tcmd([{ t: "shipvo store setup --company no", tt: 2, d: 1.2, out: "Wrote store-plan.json. Nothing was uploaded.", od: 3.6 }], 72, 210, 1130, .8, 30)}
-<div class="abs card in" style="left:72px;top:400px;width:540px;padding:20px 28px;--d:5.4s"><div class="mono sky" style="font-size:18px">A COMPANY</div><div style="font-size:26px;margin-top:6px;line-height:1.35">Organization accounts. No tester rule on Google Play.</div></div>
-<div class="abs card in" style="left:650px;top:400px;width:540px;padding:20px 28px;--d:8.4s"><div class="mono or" style="font-size:18px">NO COMPANY</div><div style="font-size:26px;margin-top:6px;line-height:1.35">Personal Google Play account. The 12 tester rule applies.</div></div>`,
+${tcmd([{ t: "shipvo store setup --company no", tt: 2, d: 1.2, out: "Wrote store-plan.json. Run `shipvo store status` to see what to do next. Nothing was uploaded.", od: 3.6 }], 72, 210, 1130, .8, 30)}
+<div class="abs card in" style="left:72px;top:450px;width:540px;padding:20px 28px;--d:5.4s"><div class="mono sky" style="font-size:18px">A COMPANY</div><div style="font-size:26px;margin-top:6px;line-height:1.35">Organization accounts. No tester rule on Google Play.</div></div>
+<div class="abs card in" style="left:650px;top:450px;width:540px;padding:20px 28px;--d:8.4s"><div class="mono or" style="font-size:18px">NO COMPANY</div><div style="font-size:26px;margin-top:6px;line-height:1.35">Personal Google Play account. The 12 tester rule applies.</div></div>`,
 
   stStatus: () => `
 ${chip("Step 2")}
@@ -428,7 +428,7 @@ ${step("Open an individual account", "wait", 2, 260, 690)}${step("Submit to revi
   stDetails: () => `
 ${chip("Step 3")}
 <h2 class="abs in" style="left:72px;top:100px;--d:.3s">Draft the store forms</h2>
-${tcmd([{ t: "shipvo store details --dry-run", tt: 1.8, d: 1, out: "Filled without you: 6 of 9 fields.", od: 3.2 }], 72, 200, 1130, .6, 30)}
+${tcmd([{ t: "shipvo store details --dry-run", tt: 1.8, d: 1, out: "Filled without you: 8 of 12 fields.", od: 3.2 }], 72, 200, 1130, .6, 30)}
 <div class="abs card in" style="left:72px;top:380px;width:540px;padding:20px 28px;--d:5s"><div class="mono sky" style="font-size:18px">FROM YOUR APP</div><div style="font-size:26px;margin-top:6px;line-height:1.4">data-safety.csv<br>privacy-policy.md</div></div>
 <div class="abs card in" style="left:650px;top:380px;width:540px;padding:20px 28px;--d:8s"><div class="mono or" style="font-size:18px">STILL YOURS TO ANSWER</div><div style="font-size:26px;margin-top:6px;line-height:1.4">Third-party SDKs, sign-in, data deletion, a contact address</div></div>`,
 

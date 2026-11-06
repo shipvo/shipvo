@@ -1,6 +1,6 @@
 # Store details
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 2 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-d49f90fb.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 2 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-5e5f9607.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
 [Watch with a written transcript on the Videos page](videos.md#from-working-app-to-google-play-and-the-app-store).
 
