@@ -2,7 +2,7 @@
 
 You will fix a wrong price in your shop and send the fix straight to your customers' phones, without a new app store release. You will send it to a small group first, check that it works, send it to everyone, and then practise the "undo" button.
 
-**Level:** beginner. **Time:** about 20 minutes to read and follow. The commands themselves take under a minute each (see "What we measured").
+**Level:** beginner. **Time:** about 25 minutes to read and follow, including setup. The commands themselves take under a minute each (see "What we measured").
 
 New words are explained once, and collected in the [glossary](../glossary.md).
 
@@ -16,7 +16,7 @@ The word **over the air** means an update that reaches phones through the intern
 
 ## 1. Find the mistake
 
-Your shop shows the Canvas tote at $18.00, but you meant to sell it for $15.00. Open your shop on a simulated phone. Make sure your terminal is inside your app's folder and type:
+In the `shop` template, the Canvas tote costs $18.00, but you meant to sell it for $15.00. If your shop has your own products, pick one of them and a new price instead. Open your shop on a simulated phone. Make sure your terminal is inside your app's folder and type:
 
 ```bash
 npx shipvo run android
@@ -26,7 +26,7 @@ When you see `Simulated Android phone at http://127.0.0.1:4600/` the phone is re
 
 ![A simulated Android phone showing the Tidepool Shop with five products. The first one, Canvas tote, costs $18.00.](/tutorials/ship-a-fix/01-before.png)
 
-<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: look at the prices in the list, then tap one product and add it to the cart" data-fallback="/tutorials/ship-a-fix/01-before.png"></div>
+<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: the sample Tide &amp; Tackle shop, not your shop. Its prices differ from yours" data-fallback="/tutorials/ship-a-fix/01-before.png"></div>
 
 The phone above is a live practice shop: tap a product, add it to the cart, and open the cart. You should see the name, the price and the total.
 
@@ -88,7 +88,7 @@ This is called a **staged rollout**. If the fix has a problem, only a few custom
 npx shipvo publish --bands b0 --skip-web true
 ```
 
-This is a real release now. Shipvo builds your app, signs it and uploads it. It takes about 12 seconds. The last line it prints is a list of facts about the release. Look for `"release":` and a number, and `"bands":["b0"]`. Write the number down. In our run it was `4`.
+This is a real release now. Shipvo builds your app, signs it and uploads it. It takes about 13 seconds. The last line it prints is a list of facts about the release. Look for `"release":` and a number, and `"bands":["b0"]`. Write the number down. In our run it was `4`.
 
 > **If something goes wrong.**
 > - `Nothing to publish with`: you have not signed in. Type `npx shipvo login`, then `npx shipvo app create`, and try again.

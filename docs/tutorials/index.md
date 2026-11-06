@@ -37,7 +37,7 @@ For ChatGPT and for apps that are already published, see [Test with an assistant
 
 | Tutorial | You will | Time | Level |
 | --- | --- | --- | --- |
-| [Ship a fix to your customers' phones, a few at first, and undo it](ship-a-fix.md) | Fix a price, send it to a small group, check it, send it to everyone and practise a rollback | about 20 minutes | Beginner |
+| [Ship a fix to your customers' phones, a few at first, and undo it](ship-a-fix.md) | Fix a price, send it to a small group, check it, send it to everyone and practise a rollback | about 25 minutes, including setup | Beginner |
 
 For the full publish guide, see [Build your first app](../getting-started.md), step 5.
 
