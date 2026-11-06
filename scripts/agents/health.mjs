@@ -67,7 +67,7 @@ for (const i of issues.filter((i) => has(i, "agent:waiting"))) {
 // slices that mention them, and not an epic. With no merged PR they go back in the queue; with merged PRs they get
 // `agent:parent-check` so the planner decides: close as done, or file what remains.
 const STATE = ["agent:ready", "agent:in-progress", "agent:pr-open", "agent:waiting", "agent:blocked", "agent:parent-check", "needs-human"];
-for (const i of issues.filter((i) => !i.labels.some((l) => STATE.includes(l.name) || ["epic", "launch", "agent:log", "agent:health", "agent:escalate", "ci-main", "device-lab"].includes(l.name)) && mins(i.created_at) > 60)) {
+for (const i of issues.filter((i) => !i.labels.some((l) => STATE.includes(l.name) || ["epic", "launch", "agent:log", "agent:health", "agent:escalate", "ci-main", "device-lab", "video-studio"].includes(l.name)) && mins(i.created_at) > 60)) {
   try {
     const kids = api(`search/issues?q=${encodeURIComponent(`repo:${REPO} is:issue is:open "#${i.number}" in:body -is:pr`)}&per_page=20`).items.filter((k) => k.number !== i.number);
     if (kids.length) continue;
