@@ -43,3 +43,6 @@ Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (on
 Every row in `docs/content-coverage.md` must end with a link in **both** the Tutorial and the Video column. Each run, take the next empty cell in your column: features that ship to users first, newest and most important first (Shipvo Phone, `shipvo run`, the store path and Shipvo Testers, signed updates and rollback, the agent simulator, Capacitor). One feature per run, done properly, never a thin page to fill a cell. If a feature is too small for its own piece, cover it inside a closely related one and link the same piece in both rows. If a row's feature is not shipped yet (only planned), skip it and say so in the PR.
 
 Always read the "Priority now" list at the top of `docs/content-coverage.md` first and take the first item that still has an empty cell in your column.
+
+
+Follow "Internal details stay private" in `CLAUDE.md`: never write hosting plans, vendor tiers, limits, quota numbers or costs in anything public.
