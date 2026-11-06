@@ -5,7 +5,7 @@ order: 1
 author: Shipvo team
 tags: Guides, Shipvo Phone
 seo_title: Run a React Native app in the browser as a phone
-summary: See your app on a simulated phone in a browser tab with one command, no Android Studio or Xcode. What it replaces, what it does not, and how an AI agent drives it.
+summary: See your app on a simulated phone in a browser tab with one command and no Android Studio. What it replaces, what it does not, and how an AI agent drives it.
 ---
 
 The slowest part of building a mobile app is often not the code. It is the wait to see it. You install Android Studio or Xcode, create an emulator, wait for it to boot, and only then find out whether your change looks right. If an AI agent writes the code, that wait is where the loop stalls.
