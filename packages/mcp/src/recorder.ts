@@ -106,7 +106,9 @@ export class Recorder {
 
   private async grab() {
     try {
-      const at = this.vt(); const b = await this.page!.screenshot({ type: "jpeg", quality: 90 });
+      const at = this.vt();
+      // One retry: a screenshot taken while the page repaints can come back empty.
+      let b = await this.page!.screenshot({ type: "jpeg", quality: 90 }); if (!b?.length) b = await this.page!.screenshot({ type: "jpeg", quality: 90 });
       // Constant frame rate: repeat the shot until the video clock is reached.
       const n = Math.round(Math.min(at, this.vt()) * this.fps) - this.written;
       for (let i = 0; i < n && this.ff?.stdin?.writable; i++) this.ff.stdin.write(b);
@@ -120,7 +122,8 @@ export class Recorder {
     if (!this.running) return undefined;
     const at = this.touch();
     // A point needs both x and y. With only a ref, the frame page must know the element; if not, no dot is drawn.
-    if (this.taps) await this.paint({ tap: t.x !== undefined && t.y !== undefined ? { x: t.x, y: t.y } : undefined, ref: t.ref }); return at;
+    if (this.taps) await this.paint({ tap: t.x !== undefined && t.y !== undefined ? { x: t.x, y: t.y } : undefined, ref: t.ref });
+    return at;
   }
   /** A swipe or scroll trail between two points (0..1). */
   async swipe(a: [number, number], b: [number, number]): Promise<number | undefined> {

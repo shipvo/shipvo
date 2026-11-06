@@ -42,7 +42,7 @@ async function localApps(): Promise<AppInfo> {
   return TIDE;
 }
 
-type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
+type Act = { ok: boolean; box?: { x: number; y: number; w: number; h: number } | null; screen?: string | null; error?: string; code?: string; path?: string; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
@@ -74,6 +74,17 @@ async function act(body: Record<string, unknown>): Promise<Act> {
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
 const trees = new Map<string, string>();
+// Where a ref is on screen (0..1), asked of the simulator only while recording. Unknown means no overlay is drawn.
+async function where(session: string, ref: string): Promise<{ x: number; y: number; w: number; h: number } | undefined> {
+  if (!recorder.active) return undefined;
+  try { const r = await sim("/act", { session, action: "locate", ref }); return r.ok && r.box ? r.box : undefined; } catch { return undefined; }
+}
+// A scroll trail inside an element: along its own span, in the direction the content moves.
+const trail = (d: string, b: { x: number; y: number; w: number; h: number }): [[number, number], [number, number]] => {
+  const c = (n: number) => Math.min(1, Math.max(0, n));
+  const h = d === "left" || d === "right"; const dir = d === "down" || d === "right" ? 1 : -1;
+  return h ? [[c(b.x + dir * b.w * 0.2), b.y], [c(b.x - dir * b.w * 0.2), b.y]] : [[b.x, c(b.y + dir * b.h * 0.2)], [b.x, c(b.y - dir * b.h * 0.2)]];
+};
 // Recorded steps per session, for export_test. Dropped when the session ends.
 const steps = new Map<string, Step[]>();
 // Tool annotations (MCP hints): clients use them to decide what to run without asking.
@@ -206,11 +217,11 @@ async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; wait
 }
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
 server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await act({ session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); await recorder.tap({ ref }); const w = await waiting(session, await act({ session, action: "tap", ref }), { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const at = await where(session, ref); await recorder.tap(at ?? {}); const w = await waiting(session, await act({ session, action: "tap", ref }), { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
 server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
   async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); recorder.action(); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await act({ session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
 server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
-  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const v = { down: [[0.5, 0.7], [0.5, 0.3]], up: [[0.5, 0.3], [0.5, 0.7]], right: [[0.7, 0.5], [0.3, 0.5]], left: [[0.3, 0.5], [0.7, 0.5]] }[direction] as [[number, number], [number, number]]; await recorder.swipe(v[0], v[1]); const w = await waiting(session, await act({ session, action: "scroll", direction, ref }), { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
+  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const v = { down: [[0.5, 0.7], [0.5, 0.3]], up: [[0.5, 0.3], [0.5, 0.7]], right: [[0.7, 0.5], [0.3, 0.5]], left: [[0.3, 0.5], [0.7, 0.5]] }[direction] as [[number, number], [number, number]]; const at = ref ? await where(session, ref) : undefined; const tr = ref ? (at ? trail(direction, at) : undefined) : v; if (tr) await recorder.swipe(tr[0], tr[1]); else recorder.action(); const w = await waiting(session, await act({ session, action: "scroll", direction, ref }), { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
 server.tool("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); recorder.action(); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
   need(session); const r = await act({ session, action: "screenshot" });

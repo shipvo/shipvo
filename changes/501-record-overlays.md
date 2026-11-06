@@ -1,2 +1,4 @@
-- `@shipvo/mcp`: recordings draw a finger dot and ripple on taps and a trail on scrolls, cut waits to at most 0.6 s, and show `record_marker` captions as a lower third. `record_start` takes `show_taps` and `background` ("brand", "plain" or a CSS colour). Chapter times and `duration_s` now follow the trimmed video.
+- `@shipvo/mcp`: recordings draw a finger dot and ripple on `tap` and a trail on `scroll`, cut waits to at most 0.6 s, and show `record_marker` captions as a lower third. `record_start` takes `show_taps` and `background` ("brand", "plain" or a CSS colour). Chapter times and `duration_s` now follow the trimmed video.
+- `@shipvo/sim`: new `locate` action returns an element's centre and size as 0..1 of the viewport. The MCP server uses it while recording, so overlays sit on the real element. If the element cannot be placed, nothing is drawn. A `scroll` without `ref` draws a vertical or horizontal trail through the page centre. Typing is not drawn yet.
+- Idle cutting also shortens real app loading after an action to 0.6 s.
 - Migration: none; new optional inputs. Recordings are shorter than the wall-clock time when the agent paused.

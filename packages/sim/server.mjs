@@ -139,6 +139,13 @@ async function act(id, body) {
   };
   switch (body.action) {
     case "screen": break;
+    // Where an element is, as 0..1 of the viewport. Used by recordings to draw taps and scroll trails. Does not act.
+    case "locate": {
+      const l = await resolve(body.ref); const box = await l.boundingBox().catch(() => null); const vp = page.viewportSize();
+      if (!box || !vp) return { box: null };
+      const f = (n) => Math.round(Math.min(1, Math.max(0, n)) * 1000) / 1000;
+      return { box: { x: f((box.x + box.width / 2) / vp.width), y: f((box.y + box.height / 2) / vp.height), w: f(box.width / vp.width), h: f(box.height / vp.height) } };
+    }
     case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
     case "type": {
       // A labelled text field may resolve to its wrapper; type into the real input inside it, as a phone focuses the field.

@@ -1,2 +1,0 @@
-- mcp: a recorded tap draws a dot only when its position is known (explicit point, or an element with `data-ref` in the frame page); it never draws at a guessed spot.
-- mcp: recordings cut idle gaps to 0.6 s, which also shortens real app loading after an action.
