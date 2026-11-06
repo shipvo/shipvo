@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { captureScreens, screenRoute } from "../src/ci-shots";
+import { captureScreens, pairShots, screenRoute } from "../src/ci-shots";
 
 describe("screenRoute", () => {
   it("maps names to routes and skips dynamic ones", () => {
@@ -29,5 +29,43 @@ describe("captureScreens", () => {
   });
   it("writes nothing when no screen has a route", async () => {
     expect(await captureScreens(["x/[id]"], async () => new Uint8Array(), join(tmpdir(), "never-made-xyz"))).toEqual([]);
+  });
+});
+
+describe("pairShots", () => {
+  const make = (screens: string[], diff: (s: string, skin: string) => boolean) => {
+    const root = mkdtempSync(join(tmpdir(), "pairs-"));
+    for (const side of ["before", "after"]) for (const skin of ["android", "ios"]) {
+      mkdirSync(join(root, side, skin), { recursive: true });
+      for (const s of screens) writeFileSync(join(root, side, skin, `${s}.png`), side === "after" && diff(s, skin) ? "new" : "old");
+    }
+    return root;
+  };
+  it("returns one changed pair per skin when only home differs", () => {
+    const root = make(["home", "cart", "feed", "profile", "settings"], (s) => s === "home");
+    const { pairs } = pairShots(join(root, "before"), join(root, "after"));
+    const changed = pairs.filter((p) => p.changed);
+    expect(changed.map((p) => `${p.skin}:${p.screen}`).sort()).toEqual(["android:home", "ios:home"]);
+    expect(changed[0]).toMatchObject({ before: expect.stringMatching(/^(android|ios)\/home\.png$/), after: expect.stringMatching(/^(android|ios)\/home\.png$/) });
+    expect(pairs.slice(0, 2).every((p) => p.changed)).toBe(true);
+  });
+  it("gives the same result for ./dir and dir", () => {
+    const root = make(["home", "cart"], (s) => s === "home");
+    const cwd = process.cwd();
+    process.chdir(root);
+    try { expect(pairShots("./before", "./after")).toEqual(pairShots("before", "after")); } finally { process.chdir(cwd); }
+  });
+  it("caps at six pairs and counts the rest", () => {
+    const root = make(["a", "b", "c", "d", "e", "f", "g", "h"], () => true);
+    rmSync(join(root, "before", "ios"), { recursive: true }); rmSync(join(root, "after", "ios"), { recursive: true });
+    const r = pairShots(join(root, "before"), join(root, "after"));
+    expect(r.pairs).toHaveLength(6);
+    expect(r.moreCount).toBe(2);
+  });
+  it("marks a missing side as changed and names the side", () => {
+    const root = make(["home"], () => false);
+    rmSync(join(root, "before", "ios", "home.png"));
+    const p = pairShots(join(root, "before"), join(root, "after")).pairs[0];
+    expect(p).toEqual({ screen: "home", skin: "ios", after: "ios/home.png", changed: true });
   });
 });
