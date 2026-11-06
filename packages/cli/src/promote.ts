@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { signBytes } from "./index.js";
 import { CliFailure, UsageError, runJson, type Done, type Next } from "./json-out.js";
-import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
+import { args as parse, hasStore, kv as kvFor, loadConfig, offlineKv, seed } from "./config.js";
 
 const BANDS = ["b0", "b1", "b2"];
 const REVERT_EVENTS = ["rolled_back", "crash_loop_revert"];
@@ -63,7 +63,10 @@ async function promoteRun(argv: string[], deps: { kv?: Store; fetchFn?: typeof f
   const reportFile = a.report ?? (existsSync("shipvo-test-report.json") ? "shipvo-test-report.json" : null);
 
   const APP = cfg.appId, MAJOR = cfg.shellMajor;
-  const store = deps.kv ?? kvFor(cfg);
+  // A dry run with no login and no Cloudflare keys reads the files `shipvo publish --dry-run` wrote.
+  const offline = !deps.kv && dry && !hasStore();
+  const store = deps.kv ?? (offline ? offlineKv() : kvFor(cfg));
+  if (offline) console.log("Offline rehearsal: reading pointers from .shipvo/dry-run (written by shipvo publish --dry-run). No login used, nothing is sent.");
 
   // Read every source pointer before touching the network or writing anything.
   const plans: { pf: Platform; release: number; from: string; body: Record<string, unknown>; targets: string[]; newer: [string, number][] }[] = [];
@@ -99,7 +102,7 @@ async function promoteRun(argv: string[], deps: { kv?: Store; fetchFn?: typeof f
     }
   }
 
-  if (!force) {
+  if (!force && !offline) {
     const base = cfg.controlPlane.replace(/\/$/, "");
     let data: Summary;
     try {
