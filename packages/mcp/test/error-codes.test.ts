@@ -30,6 +30,12 @@ beforeAll(async () => {
       if (body.action === "unlock") { if (!st.v) return res.end(JSON.stringify({ ok: false, code: "not_locked", error: "the phone is not locked" })); st.v = false; return res.end(JSON.stringify({ ok: true, locked: false, screen: "heading Menu" })); }
       if (st.v) return res.end(JSON.stringify({ ok: false, code: "phone_locked", error: "the phone is locked, so nothing was sent to the app. Call unlock first." }));
     }
+    if (req.url === "/act" && body.action === "set_setting" && body.key !== "dark_mode") return res.end(JSON.stringify({ ok: false, code: "unknown_setting", error: `unknown setting '${body.key}'` }));
+    if (req.url === "/act" && body.action === "set_setting" && typeof body.value !== "boolean") return res.end(JSON.stringify({ ok: false, code: "bad_value", error: "'dark_mode' takes true or false" }));
+    if (req.url === "/act" && ["get_settings", "set_setting"].includes(body.action)) return res.end(JSON.stringify({ ok: true, settings: { dark_mode: body.value ?? false }, screen: `Settings (${body.action}:${body.key ?? ""}=${body.value ?? ""})` }));
+    if (req.url === "/act" && body.action === "toggle_tile" && body.tile === "wifi") return res.end(JSON.stringify({ ok: false, code: "tile_not_visible", error: "open_notifications first" }));
+    if (req.url === "/act" && body.action === "open_control_center") return res.end(JSON.stringify({ ok: false, code: "no_control_center", error: "an Android phone has no Control Center" }));
+    if (req.url === "/act" && ["open_notifications", "toggle_tile", "dismiss_notification", "close_panels"].includes(body.action)) return res.end(JSON.stringify({ ok: true, panel: "shade", screen: `Notification shade (${body.action}:${body.tile ?? body.id ?? ""})` }));
     if (req.url === "/act" && body.action === "kill_app") return res.end(JSON.stringify({ ok: false, code: "recents_not_open", error: "open the app switcher first (open_recents), then kill_app" }));
     if (req.url === "/act" && ["press_home", "open_recents", "resume_app"].includes(body.action)) return res.end(JSON.stringify({ ok: true, appState: body.action === "resume_app" ? "active" : "background", screen: "Home screen" }));
     if (req.url === "/act" && body.action === "type") return res.end(JSON.stringify({ ok: true, delivery: "delivered", value: body.text, screen: "- textbox \"Name\" [ref=e1]: ignored" }));
@@ -76,6 +82,32 @@ describe("lock and unlock", () => {
     const b = await call("lock"); expect(b.isError).toBe(true); expect(b.structuredContent.code).toBe("already_locked");
     const t = await call("tap", { ref: "e1" }); expect(t.isError).toBe(true); expect(t.structuredContent.code).toBe("phone_locked");
     expect((await call("unlock")).isError).toBeFalsy();
+    await c.close();
+  });
+});
+
+describe("notification shade tools", () => {
+  it("send the right actions and return typed errors", async () => {
+    const c = await connect();
+    const call = (name: string, args: Record<string, unknown> = {}) => c.callTool({ name, arguments: { session: "live", ...args } }) as Promise<any>;
+    expect((await call("open_notifications")).isError).toBeFalsy();
+    expect((await call("toggle_tile", { tile: "dark_mode" })).content[0].text).toContain("toggle_tile:dark_mode");
+    expect((await call("dismiss_notification", { id: "n1" })).content[0].text).toContain("dismiss_notification:n1");
+    expect((await call("close_panels")).isError).toBeFalsy();
+    const a = await call("toggle_tile", { tile: "wifi" }); expect(a.isError).toBe(true); expect(a.structuredContent.code).toBe("tile_not_visible");
+    const b = await call("open_control_center"); expect(b.isError).toBe(true); expect(b.structuredContent.code).toBe("no_control_center");
+    await c.close();
+  });
+});
+
+describe("settings tools", () => {
+  it("send the right actions and return typed errors", async () => {
+    const c = await connect();
+    const call = (name: string, args: Record<string, unknown> = {}) => c.callTool({ name, arguments: { session: "live", ...args } }) as Promise<any>;
+    expect((await call("get_settings")).isError).toBeFalsy();
+    expect((await call("set_setting", { key: "dark_mode", value: true })).content[0].text).toContain("set_setting:dark_mode=true");
+    const a = await call("set_setting", { key: "volume", value: true }); expect(a.isError).toBe(true); expect(a.structuredContent.code).toBe("unknown_setting");
+    const b = await call("set_setting", { key: "dark_mode", value: "yes" }); expect(b.isError).toBe(true); expect(b.structuredContent.code).toBe("bad_value");
     await c.close();
   });
 });
