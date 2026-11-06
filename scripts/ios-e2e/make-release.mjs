@@ -6,6 +6,9 @@
 // `shipvo publish` does.
 // With MISMATCH_HERMES=1 the bundle's Hermes bytecode version is changed to a different one before signing, so the
 // release is one the app must refuse (the file given is not modified).
+// With CRASH_ON_START=1 the file given is written first: Hermes bytecode of a script that throws when it starts,
+// compiled by the Hermes compiler at HERMESC (the one that matches the app's React Native). It is the bad release
+// for the crash-loop scenario.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,6 +17,12 @@ import { signBytes, sha256Hex } from "../../packages/cli/dist/index.js";
 
 const [root, app, seed, releaseS, file, min = "1.0.0"] = process.argv.slice(2);
 const release = Number(releaseS);
+if (process.env.CRASH_ON_START === "1") {
+  if (!process.env.HERMESC) throw new Error("CRASH_ON_START=1 needs HERMESC, the path of the hermesc binary");
+  const src = `${file}.crash.js`;
+  writeFileSync(src, 'throw new Error("ios-e2e: crash on start");\n');
+  execFileSync(process.env.HERMESC, ["-emit-binary", "-out", file, src]);
+}
 let bytes = new Uint8Array(readFileSync(file));
 if (process.env.MISMATCH_HERMES === "1") {
   const shell = hermesVersionOf(bytes);

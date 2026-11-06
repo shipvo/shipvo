@@ -190,3 +190,48 @@ test("server CUT_ONCE closes the first response early, then serves Range with 20
     assert.match(text, /GET \/b\/x\.hbc 200 cut at 400\nGET \/b\/x\.hbc 206 from 400 range=bytes=400-\n/);
   } finally { srv.kill(); }
 });
+
+import { analyzeCrashLoop, crashLoopTable } from "./analyze.mjs";
+
+const cm = { release: 3, previous_release: 2, running_release: 2, launches: 4 };
+
+test("Crash-loop reverted: passing log", () => {
+  const ev = parseTelemetry([tl({ release: 2, event: "applied" }), tl({ release: 3, event: "crash_loop_revert" })].join("\n"));
+  const r = analyzeCrashLoop(ev, cm);
+  assert.equal(r.pass, true);
+  assert.match(crashLoopTable(r), /Crash-loop reverted \| pass \| 4 \|/);
+});
+
+test("Crash-loop reverted: failing logs", () => {
+  const ok = parseTelemetry(tl({ release: 3, event: "crash_loop_revert" }));
+  // reverted too late: the bad release ran 4 times
+  const late = analyzeCrashLoop(ok, { ...cm, launches: 5 });
+  assert.equal(late.pass, false);
+  assert.match(late.detail, /ran 4 times/);
+  // never reverted: no event, app still on the bad release
+  const none = parseTelemetry(tl({ release: 3, event: "applied" }));
+  const never = analyzeCrashLoop(none, { ...cm, running_release: 3, launches: 4 });
+  assert.equal(never.pass, false);
+  assert.match(never.detail, /no crash_loop_revert/);
+  // event for another release only
+  assert.equal(analyzeCrashLoop(parseTelemetry(tl({ release: 2, event: "crash_loop_revert" })), cm).pass, false);
+  // wrong final release
+  const wrong = analyzeCrashLoop(ok, { ...cm, running_release: 0 });
+  assert.equal(wrong.pass, false);
+  assert.match(wrong.detail, /ends on release 0, expected 2/);
+  assert.match(crashLoopTable(wrong), /\| fail \| 4 \|/);
+  assert.throws(() => analyzeCrashLoop(ok, {}), /missing release/);
+});
+
+test("make-release CRASH_ON_START compiles a throwing script with HERMESC", () => {
+  const dir = mkdtempSync(join(tmpdir(), "crash-")), root = join(dir, "cp"), out = join(dir, "crash.hbc");
+  const fake = join(dir, "hermesc.sh");
+  writeFileSync(fake, '#!/bin/sh\n# hermesc -emit-binary -out <out> <src>\ngrep -q "throw new Error" "$4" && cp "$4" "$3"\n', { mode: 0o755 });
+  const seed = JSON.parse(execFileSync(process.execPath, [new URL("./keygen.mjs", import.meta.url).pathname])).seed;
+  const script = new URL("./make-release.mjs", import.meta.url).pathname;
+  execFileSync(process.execPath, [script, root, "e2e", seed, "3", out], { env: { ...process.env, CRASH_ON_START: "1", HERMESC: fake } });
+  assert.match(readFileSync(out, "utf8"), /crash on start/);
+  assert.equal(readFileSync(join(root, "b/e2e/ios-r3.hbc"), "utf8"), readFileSync(out, "utf8"));
+  const r = spawnSync(process.execPath, [script, root, "e2e", seed, "4", out], { env: { ...process.env, CRASH_ON_START: "1", HERMESC: "" }, encoding: "utf8" });
+  assert.notEqual(r.status, 0);
+});

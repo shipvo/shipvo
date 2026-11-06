@@ -14,6 +14,8 @@
 //   full bytes         = full_bytes (size of the full release bundle, measured by the caller)
 //   patch apply time   = healthy - last /b/ request time (last byte to healthy)
 // Hermes marks (optional fourth file, with the text server log as fifth): {"release", "previous_release", "running_release"}.
+// Crash-loop marks (optional sixth file; needs the text server log as fifth, pass "" as the fourth to skip the Hermes check):
+// {"release", "previous_release", "running_release", "launches"}.
 // A run that downloaded no patch, or also downloaded a full bundle, is an error: it did not take the patch path.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -120,6 +122,29 @@ export function resumeTable(result) {
   return `| Check | Result | Detail |\n| --- | --- | --- |\n| Interrupted download resumed | ${result.pass ? "pass" : "fail"} | ${result.detail} |\n`;
 }
 
+/**
+ * "Crash-loop reverted": a release that crashes on start was relaunched until the runtime gave it up. Passes only if the
+ * app reported `crash_loop_revert` for that release (checked against the @shipvo/schema Telemetry type), the bad release
+ * ran at most 3 times, and the app ends on the previous release.
+ * marks: {release, previous_release, running_release, launches}. `launches` is every launch the harness used; the last
+ * one is the revert, so the bad release ran launches - 1 times. Returns {pass, detail, launches}.
+ */
+export function analyzeCrashLoop(events, marks) {
+  for (const k of ["release", "previous_release", "running_release", "launches"]) if (typeof marks[k] !== "number") throw new Error(`crash-loop marks: missing ${k}`);
+  const { launches } = marks, badRuns = launches - 1;
+  const fail = (detail) => ({ pass: false, detail, launches });
+  const revert = events.find((e) => e.event === "crash_loop_revert" && e.release === marks.release);
+  if (!revert) return fail(`no crash_loop_revert event for release ${marks.release} after ${launches} launches`);
+  if (!Telemetry.safeParse(revert).success) return fail("revert event does not match the schema Telemetry type");
+  if (badRuns > 3) return fail(`release ${marks.release} ran ${badRuns} times before the revert, at most 3 allowed`);
+  if (marks.running_release !== marks.previous_release) return fail(`app ends on release ${marks.running_release}, expected ${marks.previous_release}`);
+  return { pass: true, detail: `release ${marks.release} ran ${badRuns} times, reverted on launch ${launches}, app ends on release ${marks.previous_release}`, launches };
+}
+
+export function crashLoopTable(result) {
+  return `| Check | Result | Launches used | Detail |\n| --- | --- | --- | --- |\n| Crash-loop reverted | ${result.pass ? "pass" : "fail"} | ${result.launches} | ${result.detail} |\n`;
+}
+
 export function analyze(entries, marks) {
   if (!marks.length) throw new Error("no runs in marks file");
   const runs = marks.map((m, i) => analyzeRun(entries, m, i));
@@ -132,7 +157,7 @@ export function analyze(entries, marks) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [logFile, marksFile, patchMarksFile, hermesMarksFile, textLogFile] = process.argv.slice(2);
+  const [logFile, marksFile, patchMarksFile, hermesMarksFile, textLogFile, crashMarksFile] = process.argv.slice(2);
   if (!logFile || !marksFile) { console.error("usage: node analyze.mjs <server.log.jsonl> <marks.json> [patch-marks.json]"); process.exit(2); }
   const entries = parseLog(readFileSync(logFile, "utf8"));
   process.stdout.write(analyze(entries, JSON.parse(readFileSync(marksFile, "utf8"))));
@@ -148,6 +173,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (!textLogFile) { console.error("resume marks need the text server log as the fifth argument"); process.exit(2); }
     const result = analyzeResume(readFileSync(textLogFile, "utf8"), JSON.parse(readFileSync(process.env.RESUME_MARKS, "utf8")));
     process.stdout.write("\n" + resumeTable(result));
+    if (!result.pass) process.exitCode = 1;
+  }
+  if (crashMarksFile) {
+    if (!textLogFile) { console.error("crash-loop marks need the text server log as the fifth argument"); process.exit(2); }
+    const result = analyzeCrashLoop(parseTelemetry(readFileSync(textLogFile, "utf8")), JSON.parse(readFileSync(crashMarksFile, "utf8")));
+    process.stdout.write("\n" + crashLoopTable(result));
     if (!result.pass) process.exitCode = 1;
   }
 }
