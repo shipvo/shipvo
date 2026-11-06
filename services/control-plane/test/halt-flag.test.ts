@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import app from "../src/index";
 import { newInstall } from "./signed";
@@ -52,6 +53,16 @@ describe("halt flag on POST /t", () => {
     await fail(t.env);
     expect(JSON.parse(t.store["halt/tide"]).reports).toBe(50);
   });
+  it("min_reports counts installs: 30 failing installs do not halt at min_reports 50", async () => {
+    const s = setup({ threshold: 0.2, min_reports: 50 }, 10, 30);
+    await fail(s.env);
+    expect(s.store["halt/tide"]).toBeUndefined();
+  });
+  it("a hand-edited min_installs of 0 still needs one failing install", async () => {
+    const s = setup({ threshold: 0.2, min_reports: 1, min_installs: 0 }, 0, 0);
+    await fail(s.env);
+    expect(s.store["halt/tide"]).toBeUndefined();
+  });
   it("keeps halted_at on later failures of the same release", async () => {
     const old = JSON.stringify({ release: 5, halted_at: "2026-01-01T00:00:00.000Z", reports: 20, failed: 6, threshold: 0.2 });
     const s = setup({ threshold: 0.2, min_reports: 20 }, 14, 7, { "halt/tide": old });
@@ -81,5 +92,14 @@ describe("halt flag on POST /t", () => {
     const inst = await newInstall(s.env);
     s.env.POINTERS.get = async () => { throw new Error("kv down"); };
     expect((await inst.send({ schema_version: "1.0", app_id: "tide", release: 5, event: "rolled_back" })).status).toBe(202);
+  });
+});
+
+describe("migration 0019", () => {
+  it("is additive", () => {
+    const sql = readFileSync(new URL("../migrations/0019_telemetry_trust.sql", import.meta.url), "utf8");
+    expect(sql).toMatch(/ALTER TABLE telemetry ADD COLUMN verified/);
+    expect(sql).toMatch(/CREATE INDEX IF NOT EXISTS/);
+    expect(sql).not.toMatch(/\b(DROP|RENAME|DELETE|UPDATE)\b/i);
   });
 });

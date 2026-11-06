@@ -137,8 +137,8 @@ async function maybeHalt(env: Env, appId: string, release: number, kv?: { failed
   if (!cfg || typeof cfg !== "object") return;
   const threshold = typeof cfg.threshold === "number" ? cfg.threshold : undefined;
   const minReports = typeof cfg.min_reports === "number" ? cfg.min_reports : DEFAULT_MIN_REPORTS;
-  const minInstalls = typeof cfg.min_installs === "number" ? cfg.min_installs : DEFAULT_MIN_INSTALLS;
-  const minNetworks = typeof cfg.min_networks === "number" ? cfg.min_networks : DEFAULT_MIN_NETWORKS;
+  const minInstalls = typeof cfg.min_installs === "number" ? Math.max(1, cfg.min_installs) : DEFAULT_MIN_INSTALLS;
+  const minNetworks = typeof cfg.min_networks === "number" ? Math.max(1, cfg.min_networks) : DEFAULT_MIN_NETWORKS;
   const counts = { healthy: 0, failed: 0 };
   const reasons: string[] = [];
   const inList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
@@ -224,6 +224,7 @@ app.post("/t", async (c) => {
     : !(await rateLimit(c.env.POINTERS, `t-app-unverified/${d.app_id}`, 600));
   if (limited) return c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
   if (trust.duplicate) return c.json({ ok: true, duplicate: true }, 202);
+  // The replay check (verifyReport, then markSeen) is read-then-write: two concurrent identical bodies can both be stored. Votes are per install, so halt counts are unaffected.
   await markSeen(c.env, trust.seenKey);
   const net = await netHash(c.env, d.app_id, ip);
   let stored = true;
@@ -273,6 +274,7 @@ app.post("/t", async (c) => {
   }
   return c.json(stored ? { ok: true } : { ok: true, stored: false }, 202);
 });
+
 /** Spike read-out: latest telemetry rows for an app. Public on purpose for the spike; behind Access later. */
 app.get("/t/:app", async (c) => {
   const appId = c.req.param("app");
@@ -469,7 +471,7 @@ app.put("/app/:id/api/halt-config", async (c) => {
   let body: any; try { body = await c.req.json(); } catch { return bad(c, "body must be JSON like {\"threshold\": 0.2}"); }
   const t = body?.threshold, m = body?.min_reports === undefined ? DEFAULT_MIN_REPORTS : body.min_reports;
   if (typeof t !== "number" || !Number.isFinite(t) || t <= 0 || t > 1) return bad(c, "threshold must be a number above 0 and at most 1");
-  if (typeof m !== "number" || !Number.isInteger(m) || m < 1 || m > 10000) return bad(c, "min_reports must be an integer from 1 to 10000");
+  if (typeof m !== "number" || !Number.isInteger(m) || m < 1 || m > 10000) return bad(c, "min_reports (a minimum number of distinct installs) must be an integer from 1 to 10000");
   const extra: Record<string, number> = {};
   for (const [k, max] of [["min_installs", 10000], ["min_networks", 1000]] as const) {
     if (body?.[k] === undefined) continue;

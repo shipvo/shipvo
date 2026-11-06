@@ -16,7 +16,7 @@ Only **verified** reports count. A report is verified when it comes from an inst
 
 All of these must hold for a release:
 
-- `failed / reports` is above `threshold`, with `reports` (distinct verified installs) at least `min_reports` (default **50**).
+- `failed / reports` is above `threshold`, with `reports` at least `min_reports` (default **50**). `reports` counts distinct verified *installs* (one vote each), not raw events, so `min_reports` is a minimum number of installs. `min_installs` (below) is a separate floor on failing installs.
 - At least `min_installs` distinct verified installs failed (default **20**). One vote per install per release.
 - Those installs come from at least `min_networks` distinct /24 networks (default **3**, IPv6 /48). Networks are stored as a salted hash, never the IP. If the server sees no IP at all, this rule is skipped.
 
