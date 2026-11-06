@@ -7,7 +7,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
 1. ~~Shipvo Testers and `shipvo store testers`~~ (done)
-2. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
+2. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps: Settings tutorial done; Browser, Store and updates need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
 3. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
 4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
 5. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
@@ -56,7 +56,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | The `shipvo` skill for coding agents | [agents](agents.md) | | | |
 | Policy enforced by the control plane (weekday, staged rollout, max band) | [cli](cli.md) | | | |
 | Hosted MCP `server/discover` support | [mcp](../packages/mcp/README.md) | | | |
-| Phone Settings screen (`get_settings`, `set_setting`) | [phone-apps](phone-apps.md) | | | [test-dark-mode-large-text-and-rtl-in-react-native](../blog/test-dark-mode-large-text-and-rtl-in-react-native.md) |
+| Phone Settings screen (`get_settings`, `set_setting`) | [phone-apps](phone-apps.md) | [check-dark-mode-text-size-arabic](tutorials/check-dark-mode-text-size-arabic.md) | | [test-dark-mode-large-text-and-rtl-in-react-native](../blog/test-dark-mode-large-text-and-rtl-in-react-native.md) |
 | Phone Browser app (`browser_*` tools) | [phone-apps](phone-apps.md) | | | |
 | Phone home, recents, shade and power controls | [agents](agents.md), [phone-apps](phone-apps.md) | | | |
 | Lumi on Shipvo Phone (captions, reactions, first-run guide) | [lumi](lumi.md) | | | |

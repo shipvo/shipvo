@@ -67,3 +67,9 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Lumi.** The small glowing orb beside the Shipvo Phone camera. It shows each step as a caption, looks worried when something fails, and powers `shipvo lumi`, which tests your app while you watch. See [Lumi](lumi.md).
 
 **Network profile.** A named connection speed and reliability for the simulated phone, such as `2g` or `spotty`, so you can see how your app behaves on a poor connection. See [Device API](device-api.md#network-profiles).
+
+**Dark mode.** A phone setting that turns light screens dark. An app has to be written to follow it. The simulated phone can switch it on so you can check your app.
+
+**Right-to-left (RTL).** A layout for languages such as Arabic, where lines start on the right. The simulated phone turns it on when you set the language to Arabic.
+
+**Text size.** A phone setting that makes all text bigger or smaller. The simulated phone has four sizes: small, default, large and largest.
