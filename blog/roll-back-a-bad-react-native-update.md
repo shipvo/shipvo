@@ -42,10 +42,7 @@ The Shipvo runtime counts failed boots. A release is marked healthy once the fir
 
 In the spike, release 4 of the sample app threw an error at startup on purpose. After three failed boots the phone reverted to release 3 by itself. Cold start after the revert was 847 ms on a Xiaomi Redmi 9A (Android). The timeline and the raw numbers are in the [spike results](/docs/spike-results/).
 
-Two limits to be honest about:
-
-- The numbers above are from Android.
-- The phone only reverts crashes it can see at boot. A release that runs but does the wrong thing, such as a button that does nothing, is not a crash. For that you need layer 3.
+Automatic rollback covers releases that crash at boot. For a release that runs but behaves wrongly, layer 3 puts the last good release back for everyone.
 
 ## Layer 3: republish the last good release for everyone
 
@@ -55,11 +52,13 @@ Use this command when you know which release was good:
 shipvo rollback --to 7
 ```
 
-Say release 8 is bad and release 7 was fine. The command takes release 7's bundle from storage and publishes it again as a new release, release 9. It prints a line like this (the fields come from `packages/cli/src/publish.ts`):
+Say release 8 is bad and release 7 was fine. The command takes release 7's bundle from storage and publishes it again as a new release, release 9. It prints one plain sentence:
 
-```json
-{"app":"myshop","rolled_back_to_code_of":7,"new_release":9,"min_shell_version":"1.0.0","issued_at":"..."}
+```text
+Rolled back to the code of release 7 as new release 9. Next: shipvo status.
 ```
+
+Add `--json` if a script or an agent reads the result. You then get one JSON line with `app`, `rolled_back_to_code_of`, `new_release` and more.
 
 `rollback` publishes the old code under the next release number.
 

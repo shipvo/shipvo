@@ -16,6 +16,7 @@ vi.mock("../src/config.js", async (orig) => ({
   loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k" }),
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
+  hasStore: () => true,
 }));
 import { promote } from "../src/promote";
 

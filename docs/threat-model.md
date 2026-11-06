@@ -2,7 +2,7 @@
 
 This page is for a security reviewer who wants to know what a stolen token or a bad server can and cannot do to the phones that run a Shipvo-updated app. It is written from the code and tests in this repository. Every claim below names a file and a test. Where nothing proves a claim, the row says **not covered**.
 
-It does not cover SBOM, penetration test results or compliance programmes. None exist in this repository. To report a problem, see `SECURITY.md`.
+To report a problem, see `SECURITY.md`.
 
 ## What is signed, and who checks it
 

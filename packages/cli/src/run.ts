@@ -59,7 +59,7 @@ export const FRAMES = {
   ios: { width: 393, height: 852, radius: 55, label: "iOS", sheet: { title: "Would Like to Access", allow: "Allow While Using App", deny: "Don't Allow" } },
 } as const;
 
-export type RenderFrame = ((o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string; lumi?: boolean }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string }) & {
+export type RenderFrame = ((o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string; lumi?: boolean; guide?: boolean }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string }) & {
   /** Script that keeps the status bar live from the app's `pn:status` events. Absent in older @shipvo/sim. */
   statusScript?: (iframeId?: string, skin?: string) => string;
 };
@@ -82,7 +82,7 @@ export function runFramePage(platform: Platform, name: string, render: RenderFra
   const f = FRAMES[platform];
   const title = name.replace(/[<>&"']/g, "");
   const sheet = `<div class="sheet" id="sheet" role="dialog" aria-label="${f.label} system sheet" data-part="system-sheet"><div class="box"><p>${f.sheet.title}</p><button type="button" data-act="allow">${f.sheet.allow}</button><button type="button" data-act="deny">${f.sheet.deny}</button></div></div>`;
-  const frame = render({ skin: platform, dark, screen: `<iframe id="app" src="/app/" title="${title}"></iframe>${sheet}` });
+  const frame = render({ skin: platform, dark, guide: true, screen: `<iframe id="app" src="/app/" title="${title}"></iframe>${sheet}` });
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} on ${f.label} (simulated)</title>

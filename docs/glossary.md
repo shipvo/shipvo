@@ -59,3 +59,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Shipvo Phone.** The simulated phone Shipvo shows in your browser, in an Android style or an iPhone style. It runs your app on your computer, so you need no real phone.
 
 **Phone Browser.** A web browser inside the simulated phone, separate from your app. Your app opens web links in it, and your assistant can read and click the pages. See [phone-apps](phone-apps.md).
+
+**Staged rollout.** Sending a release to a small group of phones first, then to more once it looks healthy. Shipvo does this with cohort bands.
+
+**Promote.** Widening a staged release to more phones. `shipvo promote` sends the release you already checked to the next bands.
