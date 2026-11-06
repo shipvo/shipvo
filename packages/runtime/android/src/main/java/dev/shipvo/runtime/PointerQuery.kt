@@ -8,11 +8,12 @@ internal object PointerQuery {
 
   private fun enc(v: String) = URLEncoder.encode(v, "UTF-8")
 
-  /** `hbc` is "96,98"; `nm` is "name@1.2.3,@scope/pkg@2.0.0". A blank value is treated as not declared. */
-  fun url(base: String, app: String, shellMajor: Int, band: String, hbc: String?, nm: String?): String {
+  /** `hbc` is "96,98"; `hbe` is the engine build id "250829098.0.10"; `nm` is "name@1.2.3,@scope/pkg@2.0.0". A blank value is treated as not declared. */
+  fun url(base: String, app: String, shellMajor: Int, band: String, hbc: String?, nm: String?, hbe: String? = null): String {
     val q = ArrayList<String>()
     hbc?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
       ?.let { q += "hbc=" + it.joinToString(",") { v -> enc(v) } }
+    hbe?.trim()?.takeIf { it.isNotEmpty() }?.let { q += "hbe=" + enc(it) }
     nm?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
       ?.let { q += "nm=" + it.joinToString(",") { v -> enc(v) } }
     val path = "$base/p/$app/$shellMajor/$band.json"

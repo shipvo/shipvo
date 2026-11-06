@@ -1,0 +1,2 @@
+- `@shipvo/runtime`: a shell can declare its Hermes engine build id (`hermesEngine` plugin prop, Android meta-data `dev.shipvo.HERMES_ENGINE`, iOS Info.plist `ShipvoHermesEngine`). The runtime sends it as `hbe` on the pointer request, only when set.
+- Migration: none. Existing shells keep working and send the same request as before. Set `hermesEngine` (for example `"250829098.0.10"`) in the plugin props to opt in.

@@ -6,7 +6,7 @@ final class Store {
   /// Replaces what the app's Info.plist and file system would say. Tests use it; the app never does.
   struct Overrides {
     var suite: String, dir: URL, baseUrl: String, publicKey: String, appId: String, shellMajor: Int, shellVersion: String, binaryVersion: String
-    var hermesBytecodeVersions: [Int] = [], nativeModules: [String: String] = [:]
+    var hermesBytecodeVersions: [Int] = [], hermesEngine: String? = nil, nativeModules: [String: String] = [:]
   }
 
   private let d: UserDefaults
@@ -105,6 +105,12 @@ final class Store {
     let v = bundle.object(forInfoDictionaryKey: "ShipvoHermesBytecodeVersions")
     let list: [Any] = (v as? [Any]) ?? ((v as? String)?.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) } ?? [])
     return list.compactMap { ($0 as? NSNumber)?.intValue ?? Int("\($0)") }.filter { $0 > 0 }
+  }
+  /// Hermes engine build id this shell runs (Info.plist `ShipvoHermesEngine`), or nil when not declared.
+  var hermesEngine: String? {
+    let v = o != nil ? o?.hermesEngine : plist("ShipvoHermesEngine")
+    let t = v?.trimmingCharacters(in: .whitespaces) ?? ""
+    return t.isEmpty ? nil : t
   }
   /// Native modules in this shell (Info.plist `ShipvoNativeModules`: a name-to-version dictionary).
   var nativeModules: [String: String] {
