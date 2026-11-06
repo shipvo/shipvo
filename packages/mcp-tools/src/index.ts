@@ -153,3 +153,4 @@ export function describeTools(): ToolInfo[] {
     return { name: t.name, description: t.description, inputSchema, annotations: t.annotations, errorCodes: t.errorCodes, needsApproval: t.needsApproval, ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}) };
   });
 }
+export { containsKeyShapedText, inputHasKey, KEY_REFUSAL } from "./secret-guard.js";

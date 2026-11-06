@@ -1,0 +1,58 @@
+// Refuses key-shaped text in tool inputs, so a key pasted into the chat by mistake does not travel through the model.
+// The result never contains the matched value.
+
+// Well-known provider prefixes followed by a token body.
+const PREFIXED: RegExp[] = [
+  /\bsk-(?:ant-|proj-|live-|test-)?[A-Za-z0-9_-]{20,}/,
+  /\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,}/,
+  /\bwhsec_[A-Za-z0-9]{16,}/,
+  /\bgh[pousr]_[A-Za-z0-9]{30,}/,
+  /\bgithub_pat_[A-Za-z0-9_]{40,}/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /\bAIza[0-9A-Za-z_-]{35}\b/,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
+  /\bglpat-[A-Za-z0-9_-]{20,}/,
+  /\bnpm_[A-Za-z0-9]{36}\b/,
+  /\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/,
+  /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, // JWT
+];
+const PEM = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/;
+
+const entropy = (s: string) => {
+  const n = new Map<string, number>();
+  for (const c of s) n.set(c, (n.get(c) ?? 0) + 1);
+  let h = 0;
+  for (const v of n.values()) { const p = v / s.length; h -= p * Math.log2(p); }
+  return h;
+};
+
+// A long mixed token with high entropy. Pure hex (hashes, uuids without dashes) and pure digits are ids, not keys.
+function looksLikeToken(t: string): boolean {
+  if (t.length < 32 || /^[0-9a-f]+$/i.test(t) || /^[0-9]+$/.test(t)) return false;
+  if (!/[a-z]/.test(t) || !/[A-Z]/.test(t) || !/[0-9]/.test(t)) return false;
+  if (/^[A-Za-z]+$/.test(t)) return false;
+  return entropy(t) >= 4.2;
+}
+const TOKEN = /[A-Za-z0-9_\-+/=]{32,}/g;
+
+/** True when the text holds something shaped like a secret key. */
+export function containsKeyShapedText(text: string): boolean {
+  if (PEM.test(text) || PREFIXED.some((r) => r.test(text))) return true;
+  for (const m of text.matchAll(TOKEN)) {
+    // Skip paths and URLs made of several long-ish words: only judge tokens without separators like "/" in the middle of words.
+    if (looksLikeToken(m[0])) return true;
+  }
+  return false;
+}
+
+function* strings(v: unknown, depth = 0): Generator<string> {
+  if (typeof v === "string") yield v;
+  else if (depth < 8 && Array.isArray(v)) for (const x of v) yield* strings(x, depth + 1);
+  else if (depth < 8 && v && typeof v === "object") for (const x of Object.values(v)) yield* strings(x, depth + 1);
+}
+
+/** True when any string in a tool input looks like a key. */
+export const inputHasKey = (input: unknown): boolean => { for (const s of strings(input)) if (containsKeyShapedText(s)) return true; return false; };
+
+/** Fixed advice text for a refused call. It never includes the input. */
+export const KEY_REFUSAL = "Refused: the input looks like an API key or private key. It was not used or stored. Treat it as exposed: rotate it now with the service that issued it. To give an app a key safely, call request_secret and have the person open the link; the key goes straight into the vault and never passes through this chat.";

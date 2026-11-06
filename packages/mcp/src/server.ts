@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { z } from "zod";
-import { tools, type ToolDef } from "@shipvo/mcp-tools";
+import { tools, inputHasKey, KEY_REFUSAL, type ToolDef } from "@shipvo/mcp-tools";
 import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
@@ -141,7 +141,7 @@ const result = (sid: string, r: Act) => {
 const need = (_sid: string) => {};
 
 // Register a tool from the shared registry (@shipvo/mcp-tools): name, description, schema and hints come from there.
-const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => server.tool(t.name, t.description, t.input, t.annotations, cb);
+const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => server.tool(t.name, t.description, t.input, t.annotations, ((args: any, extra: any) => inputHasKey(args) ? { content: [{ type: "text" as const, text: KEY_REFUSAL }], isError: true as const, structuredContent: { ok: false, code: "key_in_input", error: KEY_REFUSAL } } : (cb as any)(args, extra)) as unknown as ToolCallback<S>);
 type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
 const SERVER_VERSION = "0.0.4";
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
