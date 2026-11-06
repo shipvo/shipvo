@@ -22,6 +22,8 @@ beforeAll(async () => {
     seen.push(`${req.method} ${req.url} ${raw}`);
     res.setHeader("content-type", "application/json");
     if (req.headers.authorization !== "Bearer good") { res.writeHead(401); return res.end("{}"); }
+    if (req.url === "/vault/tickets" && raw.includes('"service":"nope"')) { res.writeHead(400); return res.end(JSON.stringify({ error: "bad_service", message: "Use a known service name or the service's domain." })); }
+    if (req.url === "/vault/tickets" && raw.includes('"service":"noturl"')) { res.writeHead(201); return res.end(JSON.stringify({ ticket: "vt_x" })); }
     if (req.url === "/vault/tickets") { res.writeHead(201); return res.end(JSON.stringify({ ticket: "vt_x", url: "http://cp/vault/t/vt_x", expires_in: 600, value: SECRET })); }
     if (req.url === "/vault/status/tide/STRIPE_KEY") return res.end(JSON.stringify({ saved: true, valid: true, access: "read", value: SECRET, ciphertext: SECRET }));
     if (req.url === "/vault/status/tide/BAD") { res.writeHead(400); return res.end(JSON.stringify({ error: "bad_request", detail: SECRET })); }
@@ -67,7 +69,39 @@ describe("vault tools", () => {
       await bad.callTool({ name: "request_secret", arguments: { app: "tide", name: "STRIPE_KEY", purpose: "x" } }),
     ];
     for (const r of results) { expect((r as any).isError).toBe(true); expect(JSON.stringify(r)).not.toContain(SECRET); }
-    expect(JSON.stringify(results[1])).toContain("request_secret again");
+    expect(JSON.stringify(results[1])).not.toContain("request_secret again");
+    expect(JSON.stringify(await c.callTool({ name: "request_secret", arguments: { app: "tide", name: "OTHER", purpose: "x", service: "stripe" } }))).not.toContain(SECRET);
     await c.close(); await bad.close();
+  });
+  it("request_secret without service is refused by the schema", async () => {
+    const c = await connect("good");
+    const n = seen.length;
+    const r: any = await c.callTool({ name: "request_secret", arguments: { app: "tide", name: "STRIPE_KEY", purpose: "x" } }).catch((e) => ({ isError: true, thrown: String(e) }));
+    expect(r.isError).toBe(true);
+    expect(seen.length).toBe(n);
+    await c.close();
+  });
+  it("request_secret without access sends the POST with access omitted", async () => {
+    const c = await connect("good");
+    await c.callTool({ name: "request_secret", arguments: { app: "tide", name: "STRIPE_KEY", purpose: "p", service: "stripe" } });
+    const last = seen[seen.length - 1];
+    expect(last).toContain("POST /vault/tickets");
+    expect(last).not.toContain('"access"');
+    await c.close();
+  });
+  it("a 400 bad_service keeps its code and the route's message", async () => {
+    const c = await connect("good");
+    const r: any = await c.callTool({ name: "request_secret", arguments: { app: "tide", name: "K", purpose: "x", service: "nope" } });
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent.code).toBe("bad_service");
+    expect(r.structuredContent.error).toBe("Use a known service name or the service's domain.");
+    await c.close();
+  });
+  it("a ticket answer without a link is an error, not 'undefined'", async () => {
+    const c = await connect("good");
+    const r: any = await c.callTool({ name: "request_secret", arguments: { app: "tide", name: "K", purpose: "x", service: "noturl" } });
+    expect(r.isError).toBe(true);
+    expect(JSON.stringify(r)).not.toContain("undefined");
+    await c.close();
   });
 });

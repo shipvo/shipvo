@@ -102,7 +102,7 @@ Two tools let an assistant start and follow the flow without seeing a key. Code:
 
 | Threat | What stops it | Test |
 |---|---|---|
-| A tool result or error carries a key | `request_secret` returns only the link, its lifetime and a notice. `secret_status` returns only `saved`, `valid` and `access`, picked field by field. Errors are fixed text. | "no tool output or error contains the stored value" (`packages/mcp/test/vault-tools.test.ts`) |
+| A tool result or error carries a key | `request_secret` returns only the link, its lifetime and a notice. `secret_status` returns only `saved`, `valid` and `access`, picked field by field (`valid: null` means not checked). Errors are fixed text. | "no tool output or error contains the stored value" (`packages/mcp/test/vault-tools.test.ts`) |
 | The assistant reads a key through the status call | The status endpoint selects only `access` and `valid` from the row. | "status says saved, valid and access, never the value" |
 | A key without an owner token asks for a link or reads status | Both tools need an owner key for the app, and the control plane checks the same owner rule as for tickets. | "needs the app's owner"; "status ... needs the owner" |
 | Expired or reused link | The page and the JSON post both say the link was used or expired and to ask the assistant for a new one. `request_secret` tells the assistant to call it again. | "a reused ticket gets a plain error that says how to ask again" |
