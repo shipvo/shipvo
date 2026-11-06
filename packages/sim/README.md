@@ -7,6 +7,8 @@ shipvo sim                  # in an app created with `shipvo init`: builds the w
 npx shipvo-sim --dist ./sim-dist --app myshop
 ```
 
-HTTP API (used by `@shipvo/mcp`): `POST /session {session, app, seed_cart, dark, device}`, `POST /act {session, action, ...}` with actions `screen tap type scroll back screenshot set_device push_notification notifications open_notification device_log device_reset`, and a per-session mock control plane at `/s/<session>/...` that records the orders the app posts (`GET /s/<session>/orders`).
+HTTP API (used by `@shipvo/mcp`): `POST /session {session, app, seed_cart, dark, device}`, `POST /act {session, action, ...}` with actions `screen lock unlock restart tap type scroll back screenshot set_device push_notification notifications open_notification device_log device_reset`, and a per-session mock control plane at `/s/<session>/...` that records the orders the app posts (`GET /s/<session>/orders`).
 
 `app` can be `myshop` (the local build), `myshop@r13` (a published release) or `myshop@latest`.
+
+`lock`, `unlock` and `restart` simulate the power state. While locked, `screen` shows only the lock screen and `push_notification` and `notifications` still work; other actions fail with `locked`. `restart` is a cold start: the app reloads and storage is kept.

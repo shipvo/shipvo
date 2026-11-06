@@ -15,7 +15,7 @@ import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
-import { createLifecycle, lockOverlay, removeLockOverlay, bootOverlay, OVERLAY_STYLE } from "./lifecycle.mjs";
+import { createLifecycle, lockOverlay, removeLockOverlay, coldStart, OVERLAY_STYLE } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -196,13 +196,7 @@ async function act(id, body) {
     // Lock screen and cold start. Simulated: the page gets an overlay, or a full reload with storage kept.
     case "lock": try { life.lock(); } catch (e) { throw new SimError(e.code, e.message); } await page.evaluate(`(${lockOverlay})(${JSON.stringify(OVERLAY_STYLE)})`); break;
     case "unlock": try { life.unlock(); } catch (e) { throw new SimError(e.code, e.message); } await page.evaluate(`(${removeLockOverlay})()`); break;
-    case "restart": {
-      await page.evaluate(`(${bootOverlay})(${JSON.stringify(OVERLAY_STYLE)})`).catch(() => {});
-      await page.waitForTimeout(300);
-      try { await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300); }
-      catch (e) { await page.evaluate(() => document.querySelector("[data-pn-boot]")?.remove()).catch(() => {}); throw e; }
-      life.restart(); break;
-    }
+    case "restart": await coldStart(page, life, OVERLAY_STYLE); break;
     case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...life.log()].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {

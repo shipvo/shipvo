@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pickPort } from "./test-port.mjs";
-import { createLifecycle } from "./lifecycle.mjs";
+import { createLifecycle, coldStart } from "./lifecycle.mjs";
 
 test("state machine: lock, unlock, typed errors, guard, restart", () => {
   const l = createLifecycle();
@@ -15,12 +15,11 @@ test("state machine: lock, unlock, typed errors, guard, restart", () => {
   l.lock(); assert.equal(l.locked, true);
   assert.throws(() => l.lock(), { code: "already_locked" });
   assert.throws(() => l.guard("tap"), { code: "locked" });
-  l.guard("screen"); l.guard("restart");
+  l.guard("screen"); l.guard("restart"); l.guard("push_notification"); l.guard("notifications");
   l.restart(); assert.equal(l.locked, false); assert.equal(l.restarts, 1);
   l.guard("tap");
-  l.volumeStep("up"); l.volumeStep("down");
   assert.ok(l.log().every((e) => e.source === "simulated"));
-  assert.deepEqual(l.log().map((e) => e.kind), ["lock", "restart", "volume_up", "volume_down"]);
+  assert.deepEqual(l.log().map((e) => e.kind), ["lock", "restart"]);
 });
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -101,4 +100,20 @@ test("device_log lists lock, unlock and restart as simulated", async () => {
 
 test("actions on an unknown session: no_session", async () => {
   for (const action of ["lock", "unlock", "restart"]) assert.equal((await act("nobody", { action })).code, "no_session");
+});
+
+test("coldStart: a failed reload removes the boot overlay and rethrows", async () => {
+  const calls = [];
+  const page = { evaluate: async (f) => { calls.push(typeof f === "string" ? "boot" : "remove"); }, waitForTimeout: async () => {}, reload: async () => { throw new Error("net down"); } };
+  const l = createLifecycle();
+  await assert.rejects(coldStart(page, l, "", 0), /net down/);
+  assert.deepEqual(calls, ["boot", "remove"]); assert.equal(l.restarts, 0);
+});
+
+test("a push arrives while locked", async () => {
+  await call("/session", { session: "p1" });
+  await act("p1", { action: "lock" });
+  const r = await act("p1", { action: "notifications" });
+  assert.notEqual(r.code, "locked");
+  assert.notEqual((await act("p1", { action: "push_notification", title: "Hi", body: "x" })).code, "locked");
 });

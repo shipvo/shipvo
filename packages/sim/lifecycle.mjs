@@ -1,18 +1,17 @@
 // Power, lock and restart for the simulated phone. The state machine is pure (no browser, no timers).
-// `lockOverlay`, `bootOverlay`, `volumeOverlay` and `powerMenu` are functions that run inside the page.
+// `lockOverlay` and `bootOverlay` are functions that run inside the page.
 // Everything here is simulated: nothing touches real hardware.
 
 export class LifecycleError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
-// While locked, only these actions work. The rest fail with "locked" and nothing reaches the app.
-export const WHILE_LOCKED = new Set(["screen", "screenshot", "unlock", "lock", "restart", "errors", "device_log"]);
+// While locked, only these actions work. Pushes still arrive on a locked phone, so push_notification and notifications stay allowed. The rest fail with "locked" and nothing reaches the app.
+export const WHILE_LOCKED = new Set(["screen", "screenshot", "push_notification", "notifications", "unlock", "lock", "restart", "errors", "device_log"]);
 
 export function createLifecycle() {
-  const st = { locked: false, volume: 50, restarts: 0, log: [] };
+  const st = { locked: false, restarts: 0, log: [] };
   const note = (kind, detail) => st.log.push({ at: Date.now(), kind, source: "simulated", ...(detail ? { detail } : {}) });
   return {
     get locked() { return st.locked; },
-    get volume() { return st.volume; },
     /** Number of cold starts since the session opened. */
     get restarts() { return st.restarts; },
     log: () => st.log.map((e) => ({ ...e })),
@@ -26,7 +25,6 @@ export function createLifecycle() {
     },
     /** Call after the app was reloaded. A restart also leaves the lock screen, as a boot does. */
     restart() { st.locked = false; st.restarts++; note("restart", { restarts: st.restarts }); },
-    volumeStep(dir) { st.volume = Math.min(100, Math.max(0, st.volume + (dir === "down" ? -10 : 10))); note(`volume_${dir === "down" ? "down" : "up"}`, { volume: st.volume }); return st.volume; },
     /** Gate for every other action. Throws "locked" when the phone is locked. */
     guard(action) {
       if (st.locked && !WHILE_LOCKED.has(action)) throw new LifecycleError("locked", `the phone is locked, so '${action}' did not reach the app. Call unlock first.`);
@@ -71,15 +69,13 @@ export function bootOverlay(style) {
   document.body.appendChild(el);
 }
 
-/** Runs in the page. A short volume bar that removes itself. */
-export function volumeOverlay(style, level) {
-  document.querySelector("[data-pn-volume]")?.remove();
-  const el = document.createElement("div");
-  el.setAttribute("data-pn-volume", ""); el.setAttribute("role", "status"); el.setAttribute("aria-label", `Volume ${level}%`);
-  el.style.cssText = "position:fixed;top:16px;right:12px;z-index:2147483646;width:10px;height:120px;border-radius:5px;background:#0006;overflow:hidden;";
-  el.innerHTML = `<div style="position:absolute;bottom:0;width:100%;height:${level}%;background:#fff"></div>`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1500);
-}
-
 export const OVERLAY_STYLE = STYLE;
+
+/** Cold start: show the boot screen, reload, record it. If the reload fails the boot screen is removed and the error rethrown. */
+export async function coldStart(page, life, style, wait = 300) {
+  await page.evaluate(`(${bootOverlay})(${JSON.stringify(style)})`).catch(() => {});
+  await page.waitForTimeout(wait);
+  try { await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(wait); }
+  catch (e) { await page.evaluate(() => document.querySelector("[data-pn-boot]")?.remove()).catch(() => {}); throw e; }
+  life.restart();
+}

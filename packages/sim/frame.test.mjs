@@ -50,12 +50,11 @@ test("is pure markup: no script and no scaling code", () => {
 test("renderFrame rejects an unknown skin", () => {
   assert.throws(() => renderFrame({ skin: "x" }), /Unknown skin/);
 });
-test("power and volume buttons sit on the frame edge, with lock, volume, menu and boot layers", () => {
+test("power and volume buttons sit on the frame edge and are not interactive", () => {
   for (const skin of ["android", "ios"]) {
     const f = renderFrame({ skin, status: { time: "7:05" } });
-    for (const p of ["power", "volume-up", "volume-down", "lock-screen", "volume-overlay", "power-menu", "boot-screen"]) assert.ok(f.html.includes(`data-part="${p}"`), `${skin} ${p}`);
-    assert.match(f.html, /data-part="power-menu" hidden>.*Restart.*Power off/);
-    assert.match(f.html, /<div class="sf-clock">7:05</);
-    assert.match(f.html, /Swipe up to unlock/);
+    for (const p of ["power", "volume-up", "volume-down"]) assert.ok(f.html.includes(`data-part="${p}"`), `${skin} ${p}`);
+    assert.match(f.html, /data-part="power"[^>]*tabindex="-1" aria-hidden="true"/);
+    assert.doesNotMatch(f.html, /sf-ov|lock-screen/);
   }
 });
