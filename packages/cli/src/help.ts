@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "approvals", "test", "keys", "mcp",
+  "init", "sim", "smoke", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "approvals", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -11,6 +11,7 @@ Start
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
                               First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
                               Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.
+  smoke [--timeout 30] [--json]  Check the app loads in the simulator: no thrown errors, a first screen with elements (exit 0 ok, 1 failed, 2 setup error)
   run android|ios [--no-open] [--port n] [--lan]  Open the app in a phone frame in your browser (no Playwright)
                               --lan also serves it to a phone on your Wi-Fi: URL + QR code, token required
   run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
