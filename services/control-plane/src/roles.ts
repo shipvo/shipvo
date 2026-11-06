@@ -1,4 +1,4 @@
-// Permission table for release roles. Pure and not wired into auth yet.
+// Permission table for release roles, plus the helper routes use to enforce it.
 export type Role = "viewer" | "developer" | "release_manager" | "admin";
 
 export type Action =
@@ -28,4 +28,13 @@ const TABLE: Readonly<Record<Role, readonly Action[]>> = {
 export function can(role: Role | string, action: Action | string): boolean {
   if (!Object.prototype.hasOwnProperty.call(TABLE, role)) return false;
   return (TABLE[role as Role] as readonly string[]).includes(action);
+}
+
+/** A token with no role acts as admin, so tokens made before roles existed keep working. */
+export const roleOf = (role: string | null | undefined): string => role ?? "admin";
+
+/** The 403 body for a denied action, or null when the role may do it. */
+export function forbidden(role: string | null | undefined, action: Action): { error: "forbidden"; action: Action; role: string } | null {
+  const r = roleOf(role);
+  return can(r, action) ? null : { error: "forbidden", action, role: r };
 }
