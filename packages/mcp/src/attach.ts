@@ -12,14 +12,14 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 // Safety: run.json may come from a parent directory, but we only ever connect to 127.0.0.1 and send its token there.
 /** Finds `.shipvo/run.json` in `cwd` or a parent, stopping after the git root. Returns it only if the pid is alive and the app matches. */
-export function findLiveRun(app: string, cwd = process.cwd()): RunInfo | undefined {
+export function findLiveRun(app: string | undefined, cwd = process.cwd()): RunInfo | undefined {
   let dir = resolve(cwd);
   for (;;) {
     const file = join(dir, ".shipvo", "run.json");
     if (existsSync(file)) {
       try {
         const i = JSON.parse(readFileSync(file, "utf8")) as Partial<RunInfo>;
-        if (typeof i.port === "number" && typeof i.token === "string" && typeof i.pid === "number" && typeof i.app === "string" && i.app === app && alive(i.pid)) return i as RunInfo;
+        if (typeof i.port === "number" && typeof i.token === "string" && typeof i.pid === "number" && typeof i.app === "string" && (app === undefined || i.app === app) && alive(i.pid)) return i as RunInfo;
       } catch {}
       return undefined; // the nearest run.json decides
     }

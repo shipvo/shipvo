@@ -92,7 +92,7 @@ This is a real release now. Shipvo builds your app, signs it and uploads it. It 
 
 > **If something goes wrong.**
 > - `Nothing to publish with`: you have not signed in. Type `npx shipvo login`, then `npx shipvo app create`, and try again.
-> - `Small patches are off because the Python tool bsdiff4 is not installed`: this is a note, not an error. Your update is a full copy of the app, so it is bigger, but it still works.
+> - `Could not build a small patch from release …; publishing the full bundle`: this is a note, not an error. That update is a full copy of the app, so it is bigger, but it still works.
 > - A line that starts `Refused by policy rule`: your app has a release rule that stops this publish. The rule is named in the message. See [policy](../cli.md#policy-in-shipvojson).
 
 Phones check for new releases while the app is open. Customers in `b0` get the new price. Everyone else keeps the old one.
