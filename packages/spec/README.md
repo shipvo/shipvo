@@ -37,8 +37,10 @@ const { errors, warnings } = validate({
 
 ## What it checks
 
-Errors: schema violations; HTTP to domains not in `permissions.network` (or `permissions.write` for action steps); strings that look like keys or tokens; interactive blocks without `label`; palette text contrast under 4.5:1; invalid CEL syntax or an expression over 2,000 characters; more than 40 screens or 2,000 blocks.
+Errors: schema violations; HTTP to domains not in `permissions.network` (or `permissions.write` for action steps); strings that look like keys or tokens; interactive blocks without `label`; palette text contrast under 4.5:1; invalid CEL syntax; an expression over 2,000 characters or 400 steps (tokens, a static stand-in for the CEL cost limit); more than 40 screens or 2,000 blocks.
 
 Warnings: touch targets under 44 px, more than three type sizes on a screen, many different spacing values on a screen, lists without an empty state, charts without a label, actions without a description.
 
-CEL expressions are only syntax-checked. Name and type checks come later.
+Not checked yet: unknown names and types in CEL expressions (they are only syntax-checked). Do not assume a spec that passes is fully validated.
+
+HTTP URLs must be absolute `https://` with a fixed host; `{{ }}` is allowed only in the path and query.

@@ -55,6 +55,36 @@ describe("errors", () => {
     s.permissions.write = ["hooks.example.com"];
     expect(validate(s).errors).toEqual([]);
   });
+  it("data URLs whose host cannot be checked are errors", () => {
+    for (const get of ["https://{{evil}}/x", "//evil.com/x", "https://evil.com\\@api.example.com/", "http://evil.com/x"]) {
+      const r = validate(mini([], { permissions: { network: ["api.example.com"] }, data: { x: { source: "http", get } } }));
+      expect(paths(r.errors), get).toContain("$.data.x.get");
+    }
+  });
+  it("action step URLs whose host cannot be checked are errors", () => {
+    const step = (http: unknown) => mini([], { permissions: { write: ["api.example.com"] }, actions: { go: { description: "d", do: [{ http }] } } });
+    for (const url of ["//evil.com/x", "https://{{x}}/x", "http://evil.com/x", "https://evil.com\\@api.example.com/"]) {
+      expect(paths(validate(step({ url })).errors), url).toContain("$.actions.go.do[0].http.url");
+    }
+    expect(validate(step({ url: "https://api.example.com/{{ input.id }}" })).errors).toEqual([]);
+  });
+  it("a step error names the key that held the URL", () => {
+    const r = validate(mini([], { actions: { go: { description: "d", do: [{ http: { post: "https://evil.com/x" } }] } } }));
+    expect(paths(r.errors)).toContain("$.actions.go.do[0].http.post");
+  });
+  it("expression with too many steps", () => {
+    const r = validate(mini([{ type: "text", label: "t", when: Array(300).fill("1").join(" + ") }]));
+    expect(r.errors.some((e) => e.message.includes("steps"))).toBe(true);
+  });
+  it("only children count as blocks", () => {
+    const r = validate(mini([{ type: "table", columns: [{ type: "text" }] }]));
+    expect(r.errors).toEqual([]);
+  });
+  it("the schema resolves from dist", async () => {
+    const { createRequire } = await import("node:module");
+    const file = createRequire(import.meta.url).resolve("@shipvo/spec/schema.json");
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual(appSpecSchema);
+  });
   it("secret-looking strings", () => {
     for (const v of ["sk_live_" + "a1B2c3D4e5F6g7H8", "ghp_" + "a".repeat(30), "eyJhbGciOi.eyJzdWIiOiIx.abcdefghij", "Bearer abcdefghijklmnopqrstuvwx", "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6"]) {
       const s = base();

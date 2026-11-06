@@ -155,6 +155,18 @@ class Parser {
 }
 
 /** Returns an error message, or undefined when the expression parses. */
+/** Most tokens one expression may have. A static stand-in for the CEL cost limit. */
+export const MAX_EXPRESSION_STEPS = 400;
+
+/** Number of tokens in an expression, or undefined if it cannot be read. */
+export function expressionSteps(src: string): number | undefined {
+  try {
+    return tokenize(src).length;
+  } catch {
+    return undefined;
+  }
+}
+
 export function celSyntaxError(src: string): string | undefined {
   try {
     new Parser(tokenize(src)).parse();

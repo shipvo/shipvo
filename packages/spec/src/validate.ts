@@ -1,5 +1,5 @@
 import schema from "./app-spec.v0.schema.json" with { type: "json" };
-import { celSyntaxError, extractExpressions } from "./cel.js";
+import { celSyntaxError, expressionSteps, extractExpressions, MAX_EXPRESSION_STEPS } from "./cel.js";
 import { checkSchema } from "./jsonschema.js";
 import { childPath, isObject, type Issue, type ValidationResult } from "./types.js";
 
@@ -7,6 +7,7 @@ export const MAX_SCREENS = 40;
 export const MAX_BLOCKS = 2000;
 export const MAX_EXPRESSION_LENGTH = 2000;
 const MAX_WALK_DEPTH = 100;
+const BLOCK_CONTAINERS = ["children"];
 
 const INTERACTIVE = new Set([
   "button", "toggle", "segmented", "slider", "search", "date", "picker", "chips", "rating", "camera", "scanner", "file", "form", "custom"
@@ -60,11 +61,20 @@ export function contrastRatio(a: string, b: string): number | undefined {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-function hostOf(url: string): string | undefined {
-  const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(url.trim());
-  if (!m) return undefined;
-  const host = m[1]!.replace(/^.*@/, "").replace(/:\d+$/, "").toLowerCase();
-  return host.includes("{{") || host === "" ? undefined : host;
+/** Why a URL cannot be checked, or its lower-case host. Parsed like a browser would. */
+function parseHost(url: string): { host: string } | { problem: string } {
+  const u = url.trim();
+  if (u.includes("\\")) return { problem: "The URL must not contain backslashes." };
+  if (!/^https:\/\//i.test(u)) return { problem: "The URL must be absolute and start with https://." };
+  const authority = /^https:\/\/([^/?#]*)/i.exec(u)![1]!;
+  if (authority.includes("{{")) return { problem: "The host of the URL must be fixed, not a {{ }} expression." };
+  try {
+    const host = new URL(u).hostname.toLowerCase();
+    if (host === "") return { problem: "The URL has no host." };
+    return { host };
+  } catch {
+    return { problem: "The URL cannot be read." };
+  }
 }
 
 function allowed(host: string, list: unknown): boolean {
@@ -75,6 +85,8 @@ function allowed(host: string, list: unknown): boolean {
     return dom.startsWith("*.") ? host.endsWith(dom.slice(1)) : host === dom;
   });
 }
+
+const URL_FIX = "Write the full URL with a fixed host, for example https://api.example.com/v1/items/{{ id }}. Keep {{ }} to the path and query.";
 
 class Run {
   errors: Issue[] = [];
@@ -104,6 +116,12 @@ class Run {
   checkExpression(src: string, path: string) {
     if (src.length > MAX_EXPRESSION_LENGTH) {
       this.error(path, `Expression is ${src.length} characters; the limit is ${MAX_EXPRESSION_LENGTH}.`,
+        "Split it into computed values in \"data\" and refer to them by name.");
+      return;
+    }
+    const steps = expressionSteps(src);
+    if (steps !== undefined && steps > MAX_EXPRESSION_STEPS) {
+      this.error(path, `Expression has ${steps} steps; the limit is ${MAX_EXPRESSION_STEPS}.`,
         "Split it into computed values in \"data\" and refer to them by name.");
       return;
     }
@@ -138,14 +156,12 @@ class Run {
         for (const key of ["get", "post"] as const) {
           const url = src[key];
           if (typeof url !== "string") continue;
-          const host = hostOf(url);
+          const parsed = parseHost(url);
           const p = childPath(base, key);
-          if (host === undefined) {
-            if (!url.includes("{{")) this.error(p, "The URL must be absolute and start with https://.", "Write the full URL, for example https://api.example.com/v1/items.");
-          } else if (!url.toLowerCase().startsWith("https://")) {
-            this.error(p, "Only https:// URLs are allowed.", `Use https://${host}/...`);
-          } else if (!allowed(host, this.domains().network)) {
-            this.error(p, `"${host}" is not declared in permissions.network.`, `Add "${host}" to permissions.network.`);
+          if ("problem" in parsed) {
+            this.error(p, parsed.problem, URL_FIX);
+          } else if (!allowed(parsed.host, this.domains().network)) {
+            this.error(p, `"${parsed.host}" is not declared in permissions.network.`, `Add "${parsed.host}" to permissions.network.`);
           }
         }
       }
@@ -162,11 +178,14 @@ class Run {
       if (!isObject(step)) return;
       const p = childPath(path, i);
       if (isObject(step.http)) {
-        const target = step.http.url ?? step.http.get ?? step.http.post;
-        const host = typeof target === "string" ? hostOf(target) : undefined;
-        if (host !== undefined && !allowed(host, this.domains().write)) {
-          this.error(childPath(childPath(p, "http"), typeof step.http.url === "string" ? "url" : "get"),
-            `"${host}" is not declared in permissions.write.`, `Add "${host}" to permissions.write.`);
+        const http = step.http;
+        const key = (["url", "get", "post"] as const).find((k) => typeof http[k] === "string");
+        const hp = childPath(childPath(p, "http"), key ?? "url");
+        const parsed = key ? parseHost(http[key] as string) : { problem: "The step has no URL." };
+        if ("problem" in parsed) {
+          this.error(hp, parsed.problem, URL_FIX);
+        } else if (!allowed(parsed.host, this.domains().write)) {
+          this.error(hp, `"${parsed.host}" is not declared in permissions.write.`, `Add "${parsed.host}" to permissions.write.`);
         }
       }
       if (typeof step.if === "string") this.checkBare(step.if, childPath(p, "if"));
@@ -222,9 +241,9 @@ class Run {
     }
     if (!isObject(v)) return;
     if (typeof v.type === "string") this.block(v, path, screen);
-    for (const [k, x] of Object.entries(v)) {
-      if (k === "style" || k === "motion") continue;
-      if (typeof x === "object" && x !== null) this.walkBlocks(x, childPath(path, k), screen, depth + 1);
+    // Blocks nest only through "children"; other objects with a "type" (columns, fields) are not blocks.
+    for (const k of BLOCK_CONTAINERS) {
+      if (Array.isArray(v[k])) this.walkBlocks(v[k], childPath(path, k), screen, depth + 1);
     }
   }
 
@@ -270,7 +289,6 @@ class Run {
       if (!isObject(s)) return;
       const p = childPath("$.screens", i);
       const stats: ScreenStats = { sizes: new Set(), spacing: new Set() };
-      if (typeof s.title === "string" && s.title.includes("{{")) { /* checked by the string scan */ }
       this.walkBlocks(s.body, childPath(p, "body"), stats);
       if (stats.sizes.size > 3) {
         this.warn(p, `This screen uses ${stats.sizes.size} type sizes; more than 3 looks cluttered.`, "Reuse the same text variants or font sizes.");
