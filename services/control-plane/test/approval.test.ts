@@ -77,9 +77,9 @@ describe("requireApprovalAbove", () => {
   });
   it("set_release_policy keeps requireApprovalAbove", async () => {
     const m: Record<string, string> = { "c/tide/release_policy": JSON.stringify({ requireApprovalAbove: "b1" }) };
-    const env: any = { kv: { get: async (k: string) => m[k] ?? null, put: async (k: string, v: string) => { m[k] = v; } }, appId: "tide", actor: "owner", isAgent: false, db: { prepare: () => ({ bind: () => ({ first: async () => null, run: async () => ({}) }) }) } };
+    const env: any = { kv: { get: async (k: string) => m[k] ?? null, put: async (k: string, v: string) => { m[k] = v; } }, appId: "tide", actor: "owner", isAgent: false, db: { prepare: () => ({ bind: () => ({ first: async () => ({ json: JSON.stringify({ x: 1 }) }), run: async () => ({}) }) }) } };
     const out: any = await runOwnerCommand(env, "set_release_policy", { maxBand: "b2" });
-    expect(out.result).toEqual({ maxBand: "b2", requireApprovalAbove: "b1" });
+    expect(out).toMatchObject({ ok: true }); expect(out.result).toEqual({ maxBand: "b2", requireApprovalAbove: "b1" });
     expect(JSON.parse(m["c/tide/release_policy"]!)).toEqual({ maxBand: "b2", requireApprovalAbove: "b1" });
   });
   it("the proposer cannot approve", async () => {
