@@ -21,11 +21,11 @@ Type this to your assistant:
 Open the Shipvo app "sandbar". Take a screenshot. Then turn on dark mode and take another screenshot. Tell me if they differ.
 ```
 
-The assistant uses the **Settings** of the simulated phone. It reads the settings, then changes one (`set_setting`). Every change is marked as simulated in the phone's log, in a line like `set_setting darkMode=true (simulated)`.
+The assistant uses the **Settings** of the simulated phone. It reads the settings, then changes one (`set_setting`). Every change is recorded in the phone's log (`device_log`) as a `setting` entry with `simulated: true`, so you can tell it from a real phone change.
 
 You should hear that dark mode is now on, and that the two screenshots are the same. The starter shop has fixed light colours. It does not look at the phone's setting. That is the first thing to fix.
 
-![The Sandbar Shop list on a phone screen with a pale background: the title Sandbar Shop, a Cart link, and five products with prices, Canvas tote $18.00 to Steel bottle $29.00. The phone is in dark mode, but the shop looks exactly the same as before.](/tutorials/check-dark-mode-text-size-arabic/01-before.png)
+![The Sandbar Shop list with a pale background and five products, shown while the phone is in dark mode.](/tutorials/check-dark-mode-text-size-arabic/01-before.png)
 
 > **If something goes wrong.** The assistant says it has no Shipvo tools, or cannot reach the simulator: see the "If something goes wrong" box in step 2 of [the assistant tutorial](test-with-an-assistant.md). If it says the app is not found, ask it to run `list_apps` and use the name it prints.
 
@@ -39,7 +39,7 @@ Setting the language to Arabic also turns on **right-to-left** layout: lines sta
 
 ![The same shop list with the layout flipped. The title Sandbar Shop is on the right and the Cart link on the left. In each row the product name is on the right and the price on the left.](/tutorials/check-dark-mode-text-size-arabic/02-arabic.png)
 
-Your shop already handles this. The words are still in English, because they come from your own product file, not from a translation. Ask your assistant to switch back with `language` set to `en`.
+The product list already flips. The words are still in English, because they come from your own product file, not from a translation. Other screens, such as the cart, may not flip yet: step 3 fixes that. Ask your assistant to switch back with `language` set to `en`.
 
 > **If something goes wrong.** The assistant says `bad_value`: the phone knows three languages, `en`, `fr` and `ar`. It says `unknown_setting`: the setting does not exist. It lists the valid ones, which are dark mode, font size, bold text, reduce motion, language and right-to-left.
 
@@ -68,7 +68,7 @@ You should see a dark teal page with light text, a light blue **Pay** button and
 ## 4. Try the largest text, together with dark mode
 
 ```text
-Set the font size to largest, then open the cart again and take a screenshot. Is anything cut off or overlapping?
+Set the font size to largest and take a screenshot of the cart. Is anything cut off or overlapping?
 ```
 
 The largest text size makes text 1.3 times as big. You should see "Total: $24.00" clearly bigger, with all words still on screen and the Pay button still wide.
@@ -95,7 +95,7 @@ You switched a simulated phone to dark mode, the largest text size and Arabic wi
 
 ## What we measured
 
-On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a new shop app from this branch, driven over MCP: opening the app, three setting changes and four screenshots ran in about 10 seconds. Before the fix, the dark mode and largest text screenshots were byte-for-byte the same size as the light one, 77,025 bytes. After the fix, the dark cart is a different image and the cart total is drawn larger. The screenshots here come from that run. The pictures are 1081 by 2340 pixels.
+On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a new shop app from this branch, driven over MCP: opening the app, three setting changes and four screenshots ran in about 10 seconds ([run log](https://github.com/shipvo/shipvo/actions/runs/42299243779)). Before the fix, the dark mode and largest text screenshots were byte-for-byte the same size as the light one, 77,025 bytes. After the fix, the dark cart screenshot is a different size from the light one. The screenshots here come from that run. The pictures are 1081 by 2340 pixels.
 
 ## Next steps
 
