@@ -43,6 +43,7 @@ const NAV = [
   { group: "Agents", pages: [
     { slug: "agents", src: "docs/agents.md", title: "Agents and Shipvo apps", desc: "How an AI agent sees and operates a Shipvo app over MCP: the accessibility tree, every tool, hosted access and public listings." },
     { slug: "record", src: "docs/record.md", title: "Record a demo video", desc: "Have your assistant record an MP4 of the phone with chapter markers using record_start, record_marker and record_stop, for store pages and bug reports." },
+    { slug: "record-a-demo-video", src: "docs/record-a-demo-video.md", title: "Add narration and music to a demo video", desc: "Add a voice-over and a quiet music bed to a demo video from record_stop with the narration and music options, and show the track credits." },
     { slug: "mcp", src: "packages/mcp/README.md", title: "@shipvo/mcp", desc: "The @shipvo/mcp server for AI agents: run it locally over stdio, remotely over HTTP, or hosted with a key. Config for Claude, Cursor, ChatGPT." },
   ]},
   { group: "Reference", pages: [

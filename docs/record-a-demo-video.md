@@ -1,4 +1,4 @@
-# Record a demo video
+# Add narration and music to a demo video
 
 For a founder who wants a short demo video of their app, with chapter titles, a voice-over and quiet background music. Your assistant drives the phone through MCP tools and the result is one MP4.
 
@@ -51,7 +51,7 @@ await client.close();
 | `narration` | Path to a WAV file. It is padded with silence or cut so the audio is as long as the video. |
 | `music` | `true` mixes a music bed under the narration. The bed is lowered while the voice speaks. |
 
-With `music: true` the server writes `<video>.credits.json` next to the MP4 and returns its path as `credits`. The file names the track, artist and licence. Show the `credit_line` wherever you publish the video.
+With `music: true` the server writes `<video>.credits.json` next to the MP4 and returns its path as `credits`. The file names the track, artist and licence. The track is licensed CC BY-SA 3.0, so the licence name and link in that file must be shown with the video, not only the `credit_line`. Share-alike terms can also apply to the video, so read the licence before you publish.
 
 Set `NARRATION=/path/to/voice.wav` to add a voice-over, or leave it unset for music only.
 

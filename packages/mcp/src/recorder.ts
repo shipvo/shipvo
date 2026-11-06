@@ -11,7 +11,7 @@ export const SIZES: Record<Format, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 }, "16:9": { width: 1920, height: 1080 }, "1:1": { width: 1080, height: 1080 },
 };
 export type Chapter = { t: number; caption: string };
-export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[]; credits?: string };
+export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[]; credits?: string; audio_error?: { code: string; message: string } };
 export type AudioOptions = { narration?: string; music?: boolean };
 
 // Finds scripts/video (bgmusic.py, music.json) in a Shipvo checkout, or the folder named by SHIPVO_VIDEO_SCRIPTS.
@@ -50,6 +50,7 @@ function addAudio(file: string, a: AudioOptions): string | undefined {
         if (d.status !== 0 || !existsSync(track)) throw new RecorderError("music_unavailable", `could not download the music track (needs network): ${tail(d)}`);
       }
       credits = file.replace(/\.mp4$/, ".credits.json");
+      rmSync(credits, { force: true });
       const args = [py, "mix", "--video", file, "--music", resolve(track), "--out", out, "--credits", credits, "--work", work];
       if (vo) args.push("--narration", vo);
       const r = spawnSync("python3", args);
@@ -197,7 +198,7 @@ export class Recorder {
       const out: Recording = { file, duration_s, ...size, chapters };
       if (code !== 0) throw new RecorderError("encode_failed", `ffmpeg failed${code === -1 ? " to start (is it installed?)" : ""}: ${err.trim().slice(0, 300)}`);
       // Audio problems keep the silent video, so the recording is never lost.
-      if (audio.narration || audio.music) { try { out.credits = addAudio(file, audio); } catch (e) { if (e instanceof RecorderError) (out as Recording & { audio_error?: { code: string; message: string } }).audio_error = { code: e.code, message: e.message }; else throw e; } }
+      if (audio.narration || audio.music) { try { out.credits = addAudio(file, audio); } catch (e) { if (e instanceof RecorderError) out.audio_error = { code: e.code, message: e.message }; else throw e; } }
       return out;
     } finally { this.stopping = false; }
   }
