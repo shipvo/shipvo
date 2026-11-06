@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Server } from "node:http";
 import { Lumi, lumiPage, parseCommand, routeName, startLumiServer, type State } from "../src/lumi.js";
 import type { Driver, Reply } from "../src/explore.js";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, sep } from "node:path";
 
 const SCREENS: Record<string, string> = {
   home: `- heading "Home" [ref=e1]\n- button "Sign up" [ref=e2]\n- button "Cart" [ref=e3]`,
@@ -70,6 +70,20 @@ describe("Lumi save bug", () => {
     const reply = await l.command(`save bug ${n}`);
     const file = /as (\S+\.test\.ts)\./.exec(reply)?.[1]!;
     expect(isAbsolute(file)).toBe(true); expect(file.startsWith(dir)).toBe(true); expect(existsSync(file)).toBe(true);
+  });
+  it("saving several bugs writes distinct files, named by bug number", async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "lumi-save-")), "tests");
+    const d = shop().driver;
+    const two = `- heading "Home" [ref=e1]\n- button [ref=e2]\n- link [ref=e3]\n- button "Cart" [ref=e4]`;
+    const l = new Lumi({ ...d, open: async () => ({ ok: true, screen: two }), snapshot: async () => ({ ok: true, screen: two }) }, { ...opts, testsDir: dir, routes: [] });
+    await l.command("test my app"); await l.idle();
+    const files = new Set<string>();
+    for (const f of l.state().findings) {
+      const m = /as (\S+\.test\.ts)\./.exec(await l.command(`save bug ${f.n}`));
+      if (m) { expect(m[1]!).toContain(`${sep}${f.n}-`); files.add(m[1]!); }
+    }
+    expect(files.size).toBeGreaterThanOrEqual(2);
+    expect(readdirSync(dir)).toHaveLength(files.size);
   });
   it("gives the reason when a bug cannot be a test", async () => {
     const dir = join(mkdtempSync(join(tmpdir(), "lumi-save-")), "tests");

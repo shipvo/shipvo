@@ -54,6 +54,12 @@ describe("writeTests", () => {
     expect(isAbsolute(r.files[0]!)).toBe(true);
     expect(readFileSync(r.files[0]!, "utf8")).toContain("lumi finding 1");
   });
+  it("startAt sets the file number and the title", () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "tests-")), "out");
+    const r = writeTests([mk("blank_screen", "Blank")], dir, 5);
+    expect(readdirSync(dir)).toEqual(["5-blank_screen-cart.test.ts"]);
+    expect(readFileSync(r.files[0]!, "utf8")).toContain("lumi finding 5");
+  });
   it("writes nothing for no findings", () => expect(writeTests([], join(tmpdir(), "never-made-xyz")).files).toEqual([]));
 });
 
