@@ -12,7 +12,7 @@ export const SESSION_TTL_MS = 30 * 86400_000;
 export const LOGIN_LIMITS = { perIp: 10, perInstall: 3, perApp: 0, windowSeconds: 3600 };
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,63}$/;
 
-const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+export const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const token = (prefix: string) => `${prefix}_${[...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 
 /** Default mailer: POST the message as JSON to MAIL_WEBHOOK_URL. */

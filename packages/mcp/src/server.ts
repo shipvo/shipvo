@@ -523,6 +523,32 @@ use(server, tools.secret_status, async ({ app, name }) => {
   return { ...text(JSON.stringify(out)), structuredContent: out };
 });
 
+// The person's persistent phone. The assistant token can ask and read; only the person's own session approves.
+async function phoneCall(path: string, init: { method: string; body?: string }): Promise<{ fail: ReturnType<typeof text> } | { body: Record<string, any> }> {
+  const fail = (code: string, error: string) => ({ ...text(JSON.stringify({ ok: false, code, error })), structuredContent: { ok: false, code, error }, isError: true });
+  const token = process.env.PN_ASSISTANT_TOKEN ?? "";
+  if (!token) return { fail: fail("unauthorized", "no assistant token: the person creates one for their phone and sets PN_ASSISTANT_TOKEN.") };
+  let r: Response;
+  try { r = await fetch(`${CONTROL}/phone${path}`, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, signal: AbortSignal.timeout(simTimeoutMs()) }); }
+  catch { return { fail: fail("unreachable", "could not reach the control plane. Try again in a minute.") }; }
+  const body = (await r.json().catch(() => ({}))) as Record<string, any>;
+  if (r.status === 401) return { fail: fail("unauthorized", "the assistant token was not accepted (it may have expired).") };
+  if (!r.ok) return { fail: fail(typeof body.error === "string" ? body.error : "unreachable", typeof body.message === "string" ? body.message : `the control plane answered ${r.status}`) };
+  return { body };
+}
+use(server, tools.request_app_install, async ({ app }) => {
+  const b = await phoneCall("/install-cards", { method: "POST", body: JSON.stringify({ app }) });
+  if ("fail" in b) return b.fail;
+  const out = { ok: true, ...b.body, notice: "Show this card to the person. They open approve_url or decline_url themselves. Nothing is installed until they approve, and you cannot approve for them." };
+  return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
+});
+use(server, tools.list_installed_apps, async () => {
+  const b = await phoneCall("/assistant/apps", { method: "GET" });
+  if ("fail" in b) return b.fail;
+  const out = { apps: b.body.apps ?? [] };
+  return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
+});
+
 return server;
 }
 
