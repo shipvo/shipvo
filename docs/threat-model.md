@@ -111,8 +111,6 @@ A person signs in with an email magic link and gets one phone: an installed-apps
 | One app filling storage | Each app's data has a size cap set in configuration. | "caps per-app data by configuration" |
 | Data left behind or inherited | Taking an app off the phone deletes its data. Installing it again starts empty. | "removing an app removes its data" |
 
-Not covered in this slice: app permissions, consent on install, and OAuth account linking.
-
 ## Secret vault, MCP tools (slice 2)
 
 Two tools let an assistant start and follow the flow without seeing a key. Code: `request_secret` and `secret_status` in `packages/mcp-tools/src/index.ts` (one registry for the stdio and remote servers), handlers in `packages/mcp/src/server.ts`, and `GET /vault/status/:app/:name` in `services/control-plane/src/vault.ts`.
