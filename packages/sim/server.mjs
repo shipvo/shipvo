@@ -22,7 +22,7 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
-import { AppsError, loadProfile, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -372,6 +372,8 @@ async function act(id, body) {
     case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {
       if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
+      let r; try { r = resolveUrl(s.apps, body.url, Array.isArray(CFG.schemes) && typeof CFG.appId === "string" ? [{ id: CFG.appId, schemes: CFG.schemes }] : []); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      if (r.app) { await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url); await page.waitForTimeout(400); return { app: r.app, screen: await screen(page) }; }   // a listener, if the app has one, still gets the URL
       const handled = await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url);
       if (!handled) throw new SimError("no_url_listener", `the app has no URL listener, so it did not handle ${body.url}. Register one with onUrl from @shipvo/device.`);
       await page.waitForTimeout(400); break;

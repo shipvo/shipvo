@@ -14,7 +14,8 @@ export const STORE_FIXTURE = [
 ];
 
 const text = (v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n);
-const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20) });
+const scheme = (x) => String(x).toLowerCase().replace(/:$/, "");
+const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}) });
 
 /** Phone state for apps. `installed_apps` is a list of { id, name, url, version }; `current_app` is an id or null (the app the phone was started with). */
 export function createApps(profile = {}) {
@@ -45,6 +46,22 @@ export function loadProfile(json) {
     for (const [k, v] of Object.entries(p.settings)) { try { settingPatch(k, v); } catch (e) { throw new AppsError("bad_profile", `settings: ${e.message}`); } st.settings[k] = v; }
   }
   return st;
+}
+
+/**
+ * Find the app that owns a URL. `extra` lists more declarations, such as { id, schemes } from shipvo.json.
+ * Returns { app } for a match, or { passthrough: true } when no app declares any scheme (the URL goes to the existing path).
+ * Throws AppsError invalid_url (no `scheme:` prefix) or no_handler (schemes are declared but none matches).
+ */
+export function resolveUrl(st, url, extra = []) {
+  const m = /^([a-z][a-z0-9+.-]*):/i.exec(typeof url === "string" ? url.trim() : "");
+  if (!m) throw new AppsError("invalid_url", `'${String(url).slice(0, 80)}' is not a URL: it needs a scheme, such as myapp://item/3 or mailto:a@b.c`);
+  const want = scheme(m[1]);
+  const decl = [...st.installed_apps, ...extra].filter((a) => Array.isArray(a.schemes) && a.schemes.length);
+  if (!decl.length) return { passthrough: true };
+  const hit = decl.find((a) => a.schemes.some((x) => scheme(x) === want));
+  if (!hit) throw new AppsError("no_handler", `no installed app handles '${want}:'. Schemes: ${[...new Set(decl.flatMap((a) => a.schemes))].join(", ")}`);
+  return { app: hit.id };
 }
 
 /** The device patch that applies a profile's settings (the same for every run). */

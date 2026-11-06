@@ -21,6 +21,8 @@ beforeAll(async () => {
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, release: "local", screen: "heading Table Menu" }));
+    if (sent.action === "open_url" && sent.url === "plain") return res.end(JSON.stringify({ ok: false, code: "invalid_url", error: "not a URL", screen: "heading Home" }));
+    if (sent.action === "open_url" && sent.url === "zzz://x") return res.end(JSON.stringify({ ok: false, code: "no_handler", error: "no installed app handles 'zzz:'", screen: "heading Home" }));
     if (sent.action === "open_url") return res.end(JSON.stringify(sent.url === "myapp://item/3" ? { ok: true, screen: "heading Item 3" } : { ok: false, code: "no_url_listener", error: "the app has no URL listener", screen: "heading Home" }));
     res.end(JSON.stringify({ ok: true, screen: "ok" }));
   });
@@ -62,6 +64,16 @@ describe("stateless HTTP", () => {
     expect(ok.body.result.content[0].text).toContain("heading Item 3");
     const bad = await rpc("tools/call", { name: "open_url", arguments: { session, url: "myapp://other" } });
     expect(bad.body.result.content[0].text).toContain("Error [no_url_listener]");
+  });
+
+  it("shows invalid_url and no_handler from open_url as typed errors", async () => {
+    const reg = (await rpc("tools/list", {})).body.result.tools.find((t: any) => t.name === "open_url");
+    expect(reg.description).toContain("no_handler");
+    await rpc("tools/call", { name: "open_app", arguments: { app: "menu" } });
+    const a = await rpc("tools/call", { name: "open_url", arguments: { session: "s1", url: "plain" } });
+    expect(a.body.result.content[0].text).toContain("Error [invalid_url]");
+    const b = await rpc("tools/call", { name: "open_url", arguments: { session: "s1", url: "zzz://x" } });
+    expect(b.body.result.content[0].text).toContain("Error [no_handler]");
   });
 
   it("enforces the scope of each request on its own", async () => {
