@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
-import { loadProfile, installApp, uninstallApp, switchApp, describeApps, profilePatch, AppsError, STORE_FIXTURE } from "./apps.mjs";
+import { loadProfile, installApp, uninstallApp, switchApp, describeApps, profilePatch, AppsError, STORE_FIXTURE, resolveUrl } from "./apps.mjs";
 import { createNav } from "./nav.mjs";
 
 const code = (fn) => { try { fn(); } catch (e) { return e.code; } return null; };
@@ -73,19 +73,16 @@ test("the Store screen lists the fixture apps and a tap installs one, in both sk
   } finally { await b.close(); }
 });
 
-import { resolveUrl as resolveUrlFn } from "./apps.mjs";
-import { test as urlTest } from "node:test";
-import urlAssert from "node:assert/strict";
 {
   const st = loadProfile({ apps: [{ id: "shop", name: "Shop", schemes: ["myapp", "mailto:"] }, { id: "notes" }] });
-  const code = (url, s = st) => { try { resolveUrlFn(s, url); } catch (e) { return e.code; } };
-  urlTest("resolveUrl: text without a scheme is invalid_url", () => { for (const u of ["item/3", "", "://x", 5]) urlAssert.equal(code(u), "invalid_url"); });
-  urlTest("resolveUrl: an undeclared scheme is no_handler", () => urlAssert.equal(code("other://x"), "no_handler"));
-  urlTest("resolveUrl: a declared scheme returns the owning app", () => {
-    for (const u of ["myapp://item/42", "myapp:item/3", "MAILTO:a@b.c"]) urlAssert.equal(resolveUrlFn(st, u).app, "shop");
+  const code = (url, s = st) => { try { resolveUrl(s, url); } catch (e) { return e.code; } };
+  test("resolveUrl: text without a scheme is invalid_url", () => { for (const u of ["item/3", "", "://x", 5]) assert.equal(code(u), "invalid_url"); });
+  test("resolveUrl: an undeclared scheme is no_handler", () => assert.equal(code("other://x"), "no_handler"));
+  test("resolveUrl: a declared scheme returns the owning app", () => {
+    for (const u of ["myapp://item/42", "myapp:item/3", "MAILTO:a@b.c"]) assert.equal(resolveUrl(st, u).app, "shop");
   });
-  urlTest("resolveUrl: shipvo.json declarations count, and with no schemes the URL passes through", () => {
-    urlAssert.equal(resolveUrlFn(loadProfile({ apps: [{ id: "a" }] }), "tel:1", [{ id: "me", schemes: ["tel"] }]).app, "me");
-    urlAssert.deepEqual(resolveUrlFn(loadProfile({ apps: [{ id: "a" }] }), "https://x.dev"), { passthrough: true });
+  test("resolveUrl: shipvo.json declarations count, and with no schemes the URL passes through", () => {
+    assert.equal(resolveUrl(loadProfile({ apps: [{ id: "a" }] }), "tel:1", [{ id: "me", schemes: ["tel"] }]).app, "me");
+    assert.deepEqual(resolveUrl(loadProfile({ apps: [{ id: "a" }] }), "https://x.dev"), { passthrough: true });
   });
 }

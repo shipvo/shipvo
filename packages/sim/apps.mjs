@@ -14,7 +14,8 @@ export const STORE_FIXTURE = [
 ];
 
 const text = (v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n);
-const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map((x) => String(x).toLowerCase().replace(/:$/, "")) } : {}) });
+const scheme = (x) => String(x).toLowerCase().replace(/:$/, "");
+const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}) });
 
 /** Phone state for apps. `installed_apps` is a list of { id, name, url, version }; `current_app` is an id or null (the app the phone was started with). */
 export function createApps(profile = {}) {
@@ -55,11 +56,11 @@ export function loadProfile(json) {
 export function resolveUrl(st, url, extra = []) {
   const m = /^([a-z][a-z0-9+.-]*):/i.exec(typeof url === "string" ? url.trim() : "");
   if (!m) throw new AppsError("invalid_url", `'${String(url).slice(0, 80)}' is not a URL: it needs a scheme, such as myapp://item/3 or mailto:a@b.c`);
-  const scheme = m[1].toLowerCase();
+  const want = scheme(m[1]);
   const decl = [...st.installed_apps, ...extra].filter((a) => Array.isArray(a.schemes) && a.schemes.length);
   if (!decl.length) return { passthrough: true };
-  const hit = decl.find((a) => a.schemes.some((x) => String(x).toLowerCase().replace(/:$/, "") === scheme));
-  if (!hit) throw new AppsError("no_handler", `no installed app handles '${scheme}:'. Schemes: ${[...new Set(decl.flatMap((a) => a.schemes))].join(", ")}`);
+  const hit = decl.find((a) => a.schemes.some((x) => scheme(x) === want));
+  if (!hit) throw new AppsError("no_handler", `no installed app handles '${want}:'. Schemes: ${[...new Set(decl.flatMap((a) => a.schemes))].join(", ")}`);
   return { app: hit.id };
 }
 
