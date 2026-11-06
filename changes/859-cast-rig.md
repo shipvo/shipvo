@@ -1,0 +1,1 @@
+- video: new `scripts/video/cast/` (cast bible, SVG character rig) and `scripts/video/camera.mjs` (camera, light and atmosphere helpers) for story ads. Migration: none.
