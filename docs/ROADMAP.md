@@ -72,6 +72,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-06: `shipvo lumi` opens your app on Shipvo Phone with a sidebar that tests it while you watch ([Lumi](lumi.md), #880)
 - 2026-11-06: Lumi lives in the Shipvo Phone frame (idle, working, happy, worried), with an off switch ([Run on a phone](run.md), #885)
 - 2026-11-06: `shipvo explore` picks smarter next steps, fills forms, finds failed network calls, stuck loading and blank screens, and repeats runs with `--seed` ([Agents](agents.md), #886)
 - 2026-11-06: Screenshots of the live phone in `shipvo run` ([Run on a phone](run.md), #834)
