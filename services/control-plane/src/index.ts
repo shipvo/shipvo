@@ -342,6 +342,30 @@ app.post("/o/:app", async (c) => {
   return c.json({ ok: true, order_id: orderId, status }, 202);
 });
 
+/** Mark an order paid. Owner only (admin session or owner token). Repeating the call changes nothing. */
+app.post("/app/:id/api/orders/:order/settle", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const actor = await owner(c, appId);
+  if (!actor) return c.json({ error: "unauthorized" }, 401);
+  const orderId = c.req.param("order");
+  const { results } = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND order_id = ?").bind(appId, orderId).all();
+  const statuses: string[] = (results ?? []).map((r: any) => r.status);
+  if (!statuses.length) return c.json({ error: "not_found" }, 404);
+  if (!statuses.includes("unverified")) {
+    if (statuses.includes("settled")) return c.json({ ok: true, order_id: orderId, status: "settled", already_settled: true });
+    const status = statuses[0];
+    return c.json({ error: "not_settleable", status, message: `An order that is ${status} cannot be settled.` }, 409);
+  }
+  const now = new Date().toISOString();
+  const upd: any = await c.env.DB.prepare("UPDATE orders SET status = 'settled' WHERE app_id = ? AND order_id = ? AND status = 'unverified'").bind(appId, orderId).run();
+  // A concurrent call may have settled it between our check and the update: then do not audit twice.
+  if (!upd?.meta?.changes) return c.json({ ok: true, order_id: orderId, status: "settled", already_settled: true });
+  await c.env.DB.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
+    .bind(appId, now, actor, "settle_order", JSON.stringify({ order_id: orderId }), 1).run();
+  return c.json({ ok: true, order_id: orderId, status: "settled" });
+});
+
 /* ---------- admin ---------- */
 app.get("/app/:id/admin", async (c) => {
   const appId = c.req.param("id");

@@ -224,7 +224,7 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
       return { draft_from_version: Number(a.version) };
     } },
   list_orders: { description: "Recent orders from the app, newest first.", params: { limit: { type: "number", description: "How many (default 50)" } }, mutates: false,
-    run: async (_d, a, env) => (await env.db.prepare("SELECT order_id, total, received_at, json FROM orders WHERE app_id = ? ORDER BY id DESC LIMIT ?").bind(env.appId, Math.min(200, Number(a.limit ?? 50))).all()).results.map((r: any) => ({ ...JSON.parse(r.json), received_at: r.received_at })) },
+    run: async (_d, a, env) => (await env.db.prepare("SELECT order_id, total, received_at, status, json FROM orders WHERE app_id = ? ORDER BY id DESC LIMIT ?").bind(env.appId, Math.min(200, Number(a.limit ?? 50))).all()).results.map((r: any) => ({ ...JSON.parse(r.json), received_at: r.received_at, status: r.status ?? "unverified" /* rows from before the status column have no value; they were never payment-checked */ })) },
   // Agent API keys for the hosted simulator (sim.shipvo.dev). The key is shown once; only its hash is stored.
   create_api_key: {
     plan: (_d, a) => [`Create a '${a.scope}' API key${a.scope === "owner" ? " that can run owner commands, including publish" : ""}. Does not reach phones.`],

@@ -155,6 +155,8 @@ Phones check while open, verify signature, hash and size, stage atomically, appl
 
 To see whether the release reached phones, run `shipvo status [--app <id>] [--json]`. It reads the control plane's `/t/<app>/summary` and prints one row per recent release: counts for each telemetry event, and the median apply and cold start times in milliseconds. It prints "No telemetry yet" when phones have not reported. `--json` prints the endpoint's payload unchanged.
 
+See [taking-real-orders.md](taking-real-orders.md) for how orders are verified and settled.
+
 Coming from Expo EAS Update? See [migrate-from-eas-update.md](migrate-from-eas-update.md). Coming from CodePush? See [migrate-from-codepush.md](migrate-from-codepush.md).
 
 Agents open the exact release phones run with `open_app("myshop@r8")` or `open_app("myshop@latest")`.
