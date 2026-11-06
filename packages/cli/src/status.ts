@@ -24,6 +24,32 @@ export function formatStatus(releases: Row[]): string {
   return rows.map((r) => r.map((c, i) => (i === 0 ? c.padEnd(w[i]) : c.padStart(w[i]))).join("  ")).join("\n");
 }
 
+const BANDS = ["b0", "b1", "b2"];
+
+/** Release number each band serves, from the public pointer. null when a band has none or cannot be read. */
+export async function fetchBands(base: string, appId: string, major: number, fetchFn: typeof fetch): Promise<Record<string, number | null>> {
+  const out: Record<string, number | null> = {};
+  await Promise.all(BANDS.map(async (b) => {
+    out[b] = null;
+    try {
+      const r = await fetchFn(`${base}/p/${encodeURIComponent(appId)}/${major}/${b}`);
+      if (!r.ok) return;
+      const env = (await r.json()) as { body?: string };
+      const rel = JSON.parse(String(env.body)).release;
+      if (typeof rel === "number") out[b] = rel;
+    } catch { /* unreadable: show "-" */ }
+  }));
+  return out;
+}
+
+/** "bands: b0=4 b1=4 b2=4", plus a hint to promote when bands differ. */
+export function describeBands(bands: Record<string, number | null>): string[] {
+  const line = `bands: ${BANDS.map((b) => `${b}=${bands[b] ?? "-"}`).join(" ")}`;
+  const vals = BANDS.map((b) => bands[b] ?? null);
+  if (vals.every((v) => v === null) || vals.every((v) => v === vals[0])) return [line];
+  return [line, "Bands differ. Run shipvo promote to give every band the newest release."];
+}
+
 /** "auto-halt: off" or "auto-halt: on at 20% after 20 reports". */
 export function describeAutoHalt(c: AutoHalt | undefined): string {
   if (!c || typeof c.threshold !== "number") return "auto-halt: off";
@@ -139,5 +165,6 @@ export async function status(argv: string[], fetchFn: typeof fetch = fetch): Pro
     console.log(`Release ${h.release} is halted: ${h.failed} of ${h.reports} devices failed (limit ${pct}%). Publish a new release or run shipvo rollback to clear.`);
   }
   console.log(formatStatus(releases));
+  for (const l of describeBands(await fetchBands(base, appId, cfg.shellMajor, fetchFn))) console.log(l);
   return 0;
 }

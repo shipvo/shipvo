@@ -1,0 +1,1 @@
+- status: `shipvo status` prints a `bands: b0=4 b1=4 b2=4` line with the release each band serves, and a hint to run `shipvo promote` when bands differ. Migration: none.

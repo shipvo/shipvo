@@ -54,9 +54,7 @@ describe("shipvo status", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await status([], (async () => resp({ ...payload, halted: null })) as any);
     await status([], (async () => resp(payload)) as any);
-    expect(log).toHaveBeenCalledTimes(2);
-    expect(String(log.mock.calls[0][0])).not.toContain("halted");
-    expect(String(log.mock.calls[1][0])).not.toContain("halted");
+    expect(log.mock.calls.map((c) => String(c[0])).filter((l) => l.includes("halted"))).toEqual([]);
     log.mockClear();
     const halted = { release: 8, reports: 40, failed: 12, threshold: 0.2 };
     expect(await status(["--json"], (async () => resp({ ...payload, halted })) as any)).toBe(1);
@@ -93,5 +91,26 @@ describe("shipvo status auto-halt line", () => {
     log.mockClear();
     await status([], (async () => resp(payload)) as any);
     expect(String(log.mock.calls[0][0])).not.toContain("auto-halt");
+  });
+});
+
+import { describeBands, fetchBands } from "../src/status";
+describe("bands line", () => {
+  const ptr = (release: number) => resp({ body: JSON.stringify({ release }) });
+  it("reads each band pointer", async () => {
+    const f = vi.fn(async (u: string) => (u.endsWith("/b2") ? resp({ error: "no_release" }, 404) : ptr(u.endsWith("/b0") ? 4 : 3)));
+    const b = await fetchBands("https://cp.test", "shop", 1, f as any);
+    expect(b).toEqual({ b0: 4, b1: 3, b2: null });
+    expect(describeBands(b)).toEqual(["bands: b0=4 b1=3 b2=-", "Bands differ. Run shipvo promote to give every band the newest release."]);
+  });
+  it("no hint when bands match", () => {
+    expect(describeBands({ b0: 4, b1: 4, b2: 4 })).toEqual(["bands: b0=4 b1=4 b2=4"]);
+  });
+  it("status prints the bands line after the table", async () => {
+    inApp();
+    const f = vi.fn(async (u: string) => (u.includes("/p/") ? ptr(8) : resp(payload)));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    expect(await status([], f as any)).toBe(0);
+    expect(log.mock.calls.map((c) => String(c[0]))).toContain("bands: b0=8 b1=8 b2=8");
   });
 });
