@@ -5,11 +5,12 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { Recorder } from "../src/recorder.js";
+import { Recorder, RecorderError } from "../src/recorder.js";
 
 const have = (bin: string) => spawnSync(bin, ["-version"]).status === 0;
 const chromiumPath = () => { try { return process.env.SHIPVO_CHROMIUM ?? createRequire(import.meta.url)("playwright").chromium.executablePath(); } catch { return ""; } };
-const ok = have("ffmpeg") && !!chromiumPath() && existsSync(chromiumPath());
+const ok = have("ffmpeg") && have("ffprobe") && !!chromiumPath() && existsSync(chromiumPath());
+if (process.env.SHIPVO_REQUIRE_FFMPEG === "1" && !ok) throw new Error("SHIPVO_REQUIRE_FFMPEG=1 but ffmpeg, ffprobe or Chromium is missing");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 let page: http.Server; let url = ""; let out = "";
@@ -29,7 +30,7 @@ const probe = (file: string) => Number(spawnSync("ffprobe", ["-v", "error", "-sh
 describe.skipIf(!ok)("recorder trim and captions", () => {
   it("cuts a 5 s wait, moves chapters, and shows the caption only after its marker", async () => {
     const r = new Recorder();
-    await r.start({ url, format: "1:1", dir: out, title: "trim", background: "#ff0000" });
+    await r.start({ url, format: "1:1", dir: out, title: "trim" });
     r.action(); await sleep(1000);
     r.action(); await sleep(5000);
     r.marker("Checkout");
@@ -48,4 +49,38 @@ describe.skipIf(!ok)("recorder trim and captions", () => {
     const before = frame(res.file, 0.3); const beforeLater = frame(res.file, Math.max(0.4, c.t - 0.3));
     expect(diff(before, beforeLater)).toBeLessThan(20);
   }, 90000);
+
+  it("keeps the whole time of one slow action, and the tail after the last action", async () => {
+    const r = new Recorder();
+    await r.start({ url, format: "1:1", dir: out, title: "slow" });
+    const end = r.actionSpan(); await sleep(2500); end();
+    await sleep(2000);
+    const res = await r.stop();
+    expect(res.duration_s).toBeGreaterThan(4.2);   // 4.5 s of wall clock, nothing cut
+    expect(Math.abs(probe(res.file) - res.duration_s)).toBeLessThan(0.5);
+  }, 90000);
+
+  const edge = (file: string) => { const f = frame(file, 0.3); return [f[0], f[1], f[2]]; };
+  const recordWith = async (background: string | undefined, title: string) => {
+    const r = new Recorder();
+    await r.start({ url, format: "1:1", dir: out, title, background }); await sleep(600);
+    return (await r.stop()).file;
+  };
+  it("background paints behind the page: colour, brand and plain", async () => {
+    const red = edge(await recordWith("#ff0000", "red"));
+    expect(red[0]).toBeGreaterThan(200); expect(red[1]).toBeLessThan(60); expect(red[2]).toBeLessThan(60);
+    const white = edge(await recordWith("plain", "plain"));
+    expect(Math.min(...white)).toBeGreaterThan(220);
+    const brand = edge(await recordWith("brand", "brand"));
+    expect(brand[2]).toBeGreaterThan(brand[0] + 20);   // the gradient starts dark navy: blue clearly above red
+    expect(Math.max(...brand)).toBeLessThan(120);
+    const none = edge(await recordWith(undefined, "none"));  // the page's own #113366
+    expect(none[0]).toBeLessThan(60); expect(none[2]).toBeGreaterThan(70);
+  }, 120000);
+  it.each(["red;}body{display:none", "url(https://example.com/x.png)", "not-a-colour", "red} * {display:none"])("rejects the background %s", async (bad) => {
+    const r = new Recorder();
+    await expect(r.start({ url, dir: out, background: bad })).rejects.toMatchObject({ code: "invalid_background" });
+    await expect(r.start({ url, dir: out, background: bad })).rejects.toBeInstanceOf(RecorderError);
+    expect(r.active).toBe(false);
+  }, 60000);
 });

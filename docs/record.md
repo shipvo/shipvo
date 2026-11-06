@@ -26,7 +26,7 @@ The file is written to `.shipvo/recordings/<title>-<yyyymmddhhmmss>.mp4` in the 
 | | `fps` | `30` (default) or `60` |
 | | `title` | Used in the file name |
 | | `background` | `brand`, `plain` or a CSS colour behind the phone |
-| `record_marker` | `caption` | Required, a chapter title at the current time |
+| `record_marker` | `caption` | Required, a chapter title at the current time. It also shows on screen as a lower third until the next marker |
 | `record_stop` | none | |
 
 Only one recording runs at a time per server.

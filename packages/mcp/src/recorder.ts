@@ -35,10 +35,12 @@ const overlayScript = (kind: "tap" | "trail", a: Point, b?: Point) => `(() => {
   dot(a); dot(b);`}
 })()`;
 const BRAND_BG = "linear-gradient(160deg,#0b1f3a,#1d4ed8)";
-const bgCss = (b: Background) => b === "brand" ? BRAND_BG : b === "plain" ? "#ffffff" : b;
-// Page background behind the phone. The colour is passed as JSON text, and only used as a CSS value.
-const backgroundScript = (b: Background) => `(() => { let s = document.getElementById("shipvo-bg-css"); if (!s) { s = document.createElement("style"); s.id = "shipvo-bg-css"; document.head.appendChild(s); }
-  const v = ${JSON.stringify(bgCss(b).replace(/[;{}<>]/g, ""))}; s.textContent = "html,body{background:" + v + " !important}"; })()`;
+// Page background behind the phone. "brand" and "plain" are fixed; anything else must be a CSS colour, checked in the page with CSS.supports.
+// Returns false (and changes nothing) if the value is not a colour, so url(...) and injected rules never reach the style rule.
+const backgroundScript = (b: Background) => `(() => { const v = ${JSON.stringify(b === "brand" ? BRAND_BG : b === "plain" ? "#ffffff" : b)};
+  if (${b === "brand" || b === "plain" ? "false" : "true"} && !CSS.supports("color", v)) return false;
+  let s = document.getElementById("shipvo-bg-css"); if (!s) { s = document.createElement("style"); s.id = "shipvo-bg-css"; document.head.appendChild(s); }
+  s.textContent = "html,body{background:" + v + " !important}"; return true; })()`;
 // Lower third: replaces the previous caption, stays until the next marker.
 const captionScript = (text: string) => `(() => { let e = document.getElementById("shipvo-caption"); if (!e) { e = document.createElement("div"); e.id = "shipvo-caption";
   e.style.cssText = "position:fixed;z-index:2147483647;pointer-events:none;left:50%;bottom:6%;transform:translateX(-50%);max-width:80%;padding:14px 28px;border-radius:14px;background:rgba(0,0,0,.72);color:#fff;font:600 44px/1.2 system-ui,sans-serif;text-align:center"; document.body.appendChild(e); }
@@ -49,7 +51,7 @@ export class Recorder {
   private browser?: Browser; private page?: Page; private ff?: ChildProcess; private loop?: Promise<void>;
   private t0 = 0; private running = false; private starting = false; private stopping = false; private ffErr = ""; private done?: Promise<number | null>;
   private chapters: Chapter[] = []; private file = ""; private raw = ""; private size = SIZES["9:16"]; private fps = 30; private showTaps = true;
-  private acts: number[] = [];
+  private acts: [number, number][] = [];
   get active() { return this.running || this.starting || this.stopping; }
 
   async start(o: { url: string; format?: Format; fps?: 30 | 60; title?: string; dir?: string; showTaps?: boolean; background?: Background }): Promise<{ file: string; width: number; height: number }> {
@@ -67,12 +69,16 @@ export class Recorder {
       this.page = await this.browser!.newPage({ viewport: this.size });
       try { await this.page.goto(o.url, { waitUntil: "load" }); }
       catch (e) { throw new RecorderError("frame_unreachable", `could not open the phone frame page ${o.url}: ${(e as Error).message.split("\n")[0]}`); }
+      if (o.background && this.page.evaluate) {
+        let good: unknown;
+        try { good = await this.page.evaluate(backgroundScript(o.background)); } catch (e) { throw new RecorderError("background_failed", `could not set the background: ${(e as Error).message.split("\n")[0]}`); }
+        if (good !== true) throw new RecorderError("invalid_background", `background must be "brand", "plain" or a CSS colour such as "#102030"; got ${JSON.stringify(o.background).slice(0, 60)}`);
+      }
       this.ff = spawn("ffmpeg", ["-y", "-loglevel", "error", "-use_wallclock_as_timestamps", "1", "-f", "image2pipe", "-c:v", "mjpeg", "-i", "-",
         "-vf", `fps=${this.fps},scale=${this.size.width}:${this.size.height},format=yuv420p`, "-c:v", "libx264", "-preset", "veryfast", "-movflags", "+faststart", this.raw], { stdio: ["pipe", "ignore", "pipe"] });
       this.ff.stderr!.on("data", (d) => { this.ffErr += d; });
       this.ff.stdin!.on("error", () => {});
       this.done = new Promise((r) => { this.ff!.on("error", (e) => { this.ffErr += e.message; r(-1); }); this.ff!.on("close", r); });
-      if (o.background && this.page.evaluate) { try { await this.page.evaluate(backgroundScript(o.background)); } catch {} }
       await this.grab();
       // The video timeline starts when ffmpeg gets the first frame, not before the first (slow) screenshot.
       this.t0 = Date.now();
@@ -98,7 +104,9 @@ export class Recorder {
   }
 
   /** The agent did something now. Gaps between actions longer than MAX_IDLE_S are cut from the video. */
-  action() { if (this.running) this.acts.push(Date.now() - this.t0); }
+  action() { if (this.running) { const t = Date.now() - this.t0; this.acts.push([t, t]); } }
+  /** An action that takes time. Its whole span is kept; call the returned function when it ends. */
+  actionSpan(): () => void { if (!this.running) return () => {}; const a = Date.now() - this.t0; return () => { if (this.running) this.acts.push([a, Date.now() - this.t0]); }; }
 
   marker(caption: string): Chapter {
     if (!this.running) throw new RecorderError("no_recording", "no recording is running: call record_start first");
@@ -122,8 +130,9 @@ export class Recorder {
       await this.cleanup();
       if (code === 0) {
         // Cut every wait longer than MAX_IDLE_S: keep it after each action, drop the rest up to the next one.
-        const pts = [0, ...this.acts].sort((a, b) => a - b); const cuts: [number, number][] = [];
-        pts.forEach((a, i) => { const end = i + 1 < pts.length ? pts[i + 1] : total; if (end - a > MAX_IDLE_S * 1000 + 50) cuts.push([a + MAX_IDLE_S * 1000, end]); });
+        // Keep MAX_IDLE_S after each action ends and drop the rest up to the next one starts. Time inside an action and the tail after the last one are kept.
+        const spans = [[0, 0], ...this.acts].sort((x, y) => x[0] - y[0]); const cuts: [number, number][] = []; let busy = 0;
+        for (const [a, e] of spans) { if (a - busy > MAX_IDLE_S * 1000 + 50) cuts.push([busy + MAX_IDLE_S * 1000, a]); busy = Math.max(busy, e); }
         if (cuts.length) {
           const drop = (t: number) => cuts.reduce((n, [a, b]) => n + Math.max(0, Math.min(t, b) - a), 0);
           const expr = cuts.map(([a, b]) => `between(t,${a / 1000},${b / 1000})`).join("+");

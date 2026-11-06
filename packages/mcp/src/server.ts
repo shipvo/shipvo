@@ -64,8 +64,8 @@ const attached = new Map<string, Driver>();
 const ATTACH_TYPES = new Set(["screen", "tap", "type", "scroll", "back"]);
 // One action on a session: through the driver connection when attached, else the simulator.
 async function act(body: Record<string, unknown>): Promise<Act> {
-  recorder.action();
-  try { return await act1(body); } finally { recorder.action(); }
+  const end = recorder.actionSpan();
+  try { return await act1(body); } finally { end(); }
 }
 async function act1(body: Record<string, unknown>): Promise<Act> {
   const d = attached.get(String(body.session));
