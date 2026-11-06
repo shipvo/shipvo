@@ -185,7 +185,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px sy
 .lm-cmd label{display:block;margin-bottom:4px;font-weight:600}.lm-cmd div{display:flex;gap:6px}.lm-cmd input{flex:1;min-width:0;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
 .lm-cmd button{font:inherit;padding:8px 14px;border:0;border-radius:8px;background:var(--accent);color:var(--bg);font-weight:600;cursor:pointer}.lm-reply{margin-top:6px;color:var(--muted);min-height:1.2em}
 .lm button:focus-visible,.lm input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-@media (max-width:900px){.lm-page{flex-direction:column;overflow:auto}.lm{width:auto}.lm-stage{flex:none;height:70vh}}`;
+@media (max-width:900px){.lm-page{flex-direction:column;overflow:auto}.lm{width:auto}.lm-stage{flex:none;height:50vh}}`;
 
 const CLIENT = `(function(){var $=function(p){return document.querySelector('[data-part="'+p+'"]')};
 var phone=document.querySelector('[data-part="phone-body"]'),stage=document.querySelector(".lm-stage");
@@ -272,6 +272,7 @@ export async function lumi(argv: string[]): Promise<number> {
     const frame = (await loadFrameRenderer())({ skin, lumi: true, screen: `<img data-part="screen" alt="The app on the phone, live" draggable="false">` });
     const shot = async () => {
       const r = await fetch(`${sim.base}/act`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session: "lumi", action: "screenshot", format: "jpeg", inline: true }), signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return null;
       const j = (await r.json()) as { ok?: boolean; data?: string };
       return j.ok && j.data ? Buffer.from(j.data, "base64") : null;
     };

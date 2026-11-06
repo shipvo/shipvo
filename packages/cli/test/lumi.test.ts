@@ -167,7 +167,7 @@ describe("page and server", () => {
   });
   it("keeps the stage a fixed share of the height on narrow screens and refits when it resizes", () => {
     const html = lumiPage(frame, "Tide");
-    expect(html).toMatch(/@media \(max-width:900px\)[^`]*\.lm-stage\{flex:none;height:70vh\}/);
+    expect(html).toMatch(/@media \(max-width:900px\)[^`]*\.lm-stage\{flex:none;height:50vh\}/);
     expect(html).toContain("new ResizeObserver(fit).observe(stage)");
   });
   it("serves the page, a command, state and a screenshot", async () => {
