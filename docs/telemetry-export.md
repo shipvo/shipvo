@@ -100,6 +100,15 @@ Any Parquet reader opens a file you downloaded:
 python3 -c "import pyarrow.parquet as pq; print(pq.read_table('part-000000000001.parquet').to_pandas())"
 ```
 
+## Troubleshooting
+
+- **No files appear in the bucket**: the export runs hourly. Check the R2 binding named in [Turn it on](#turn-it-on) and wait for the next hour.
+- **DuckDB cannot read a file**: confirm the file with the pyarrow check above first.
+
+## Release alerts
+
+To get a call when devices revert a release, set an alert webhook. See [Revert alerts](self-hosting.md#revert-alerts-webhook).
+
 ## Not yet
 
 Iceberg tables, and Siglake as a sink, are later slices.

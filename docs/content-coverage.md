@@ -24,10 +24,20 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 | Telemetry export to R2 | [telemetry-export](telemetry-export.md) | | | |
 | Move from CodePush | [migrate-from-codepush](migrate-from-codepush.md) | | | [a-codepush-alternative-after-app-center](../blog/a-codepush-alternative-after-app-center.md) |
 | New machine and key backup | [new-machine](new-machine.md) | | | |
-| Release health dashboard and alerts | | | | |
+| Release health dashboard and alerts | [self-hosting](self-hosting.md#revert-alerts-webhook), [telemetry-export](telemetry-export.md) | | | |
 | Take mobile money payments | [device-api](device-api.md) | | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | `shipvo test --repair`, `--report`, plain steps | [testing](testing.md) | | | |
 | Release policy and `--dry-run-policy` | [CLI guide](cli.md) | | | |
 | Audit log and `shipvo audit` | [CLI guide](cli.md) | | | |
 | `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | | | |
 | MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
+| `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | | | |
+| Assistant attaches to the live `shipvo run` phone (`open_app`) | [run](run.md), [agents](agents.md) | | | |
+| Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md) | | | |
+| Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | | |
+| Real camera, microphone and location in the browser | [device-api](device-api.md) | | | |
+| Gate a rollout on test results (`shipvo promote --report`, `--report-md`) | [testing](testing.md), [cli](cli.md) | | | |
+| Test secrets (`secret(name)`, `{secret:NAME}`) | [testing](testing.md) | | | |
+| The `shipvo` skill for coding agents | [agents](agents.md) | | | |
+| Policy enforced by the control plane (weekday, staged rollout, max band) | [cli](cli.md) | | | |
+| Hosted MCP `server/discover` support | [mcp](../packages/mcp/README.md) | | | |

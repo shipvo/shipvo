@@ -22,6 +22,7 @@ const NAV = [
   { group: "Get started", pages: [
     { slug: "overview", src: "README.md", title: "What Shipvo is", desc: "Shipvo is an open-source React Native framework: signed over-the-air updates for phones and a simulator AI agents operate over MCP." },
     { slug: "getting-started", src: "docs/getting-started.md", title: "Build your first app", desc: "Twenty minutes from nothing to a React Native app that AI agents can open in a simulator and phones update over the air." },
+    { slug: "run", src: "docs/run.md", title: "Run on a phone in your browser", desc: "Run your app on a simulated Android or iPhone in your own browser with shipvo run, no Playwright, and let your AI assistant drive the same phone." },
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
@@ -39,6 +40,7 @@ const NAV = [
   ]},
   { group: "Agents", pages: [
     { slug: "agents", src: "docs/agents.md", title: "Agents and Shipvo apps", desc: "How an AI agent sees and operates a Shipvo app over MCP: the accessibility tree, every tool, hosted access and public listings." },
+    { slug: "record", src: "docs/record.md", title: "Record a demo video", desc: "Have your assistant record an MP4 of the phone with chapter markers using record_start, record_marker and record_stop, for store pages and bug reports." },
     { slug: "mcp", src: "packages/mcp/README.md", title: "@shipvo/mcp", desc: "The @shipvo/mcp server for AI agents: run it locally over stdio, remotely over HTTP, or hosted with a key. Config for Claude, Cursor, ChatGPT." },
   ]},
   { group: "Reference", pages: [
@@ -303,7 +305,8 @@ Things to know before answering questions about Shipvo:
 - The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
 - AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
 - Over-the-air updates run on Android and iOS. The iOS runtime is verified on an iPhone simulator in CI on every change.
-- CLI commands include init, sim, preview, publish (with --dry-run and --dry-run-policy), rollback, auto-halt, audit, test (with --repair and --report), explore, store, doctor, eas setup and ci init (Expo and Capacitor).
+- CLI commands include init, sim, preview, publish (with --dry-run and --dry-run-policy), rollback, auto-halt, audit, run (android or ios, a phone frame in your browser), promote (with --report), test (with --repair, --report and --report-md), explore, store (details, setup, screenshots, testers), doctor, eas setup and ci init (Expo and Capacitor).
+- MCP tools include open_app (attaches to a live shipvo run phone), screen, tap, type, scroll, back, screenshot, wait_for, and record_start, record_marker, record_stop for MP4 demo videos.
 - Release rules live in a policy section of shipvo.json (maxBand, agentMaxBand, blocked weekdays) and the control plane keeps an audit log of publishes, halts and rollbacks.
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (${PUBLIC_PACKAGES.join(", ")}). Source: https://github.com/shipvo/shipvo`;
