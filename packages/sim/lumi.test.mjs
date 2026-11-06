@@ -100,7 +100,10 @@ test("Lumi on or off: app screenshot, recorded frames and labelled screen tree a
         const frame = await (async () => { for (let i = 0; i < 100; i++) { const f = p.frames().find((x) => x !== p.mainFrame()); if (f && await f.locator("button").count()) return f; await p.waitForTimeout(50); } throw new Error("app frame did not load"); })();
         await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
         // The app's own area: the same pixels an agent's screenshot of the app shows.
-        const box = await p.locator("#app").boundingBox();
+        // The bottom 12px of the app area sit under the screen's rounded corners (radius 36 over a 24px bar). Chromium may
+        // antialias a rounded clip differently once an animated layer exists, so those rows are frame edge, not app pixels.
+        const full = await p.locator("#app").boundingBox();
+        const box = { ...full, height: full.height - 12 };
         const snap = () => p.screenshot({ clip: box });
         // Wait until the app area stops changing, so a slow first paint cannot look like a Lumi difference.
         let shot = await snap();
