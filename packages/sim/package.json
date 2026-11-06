@@ -29,6 +29,8 @@
     "browser-app.mjs",
     "ws-lite.mjs",
     "lifecycle.mjs",
+    "shade.mjs",
+    "shade-actions.mjs",
     "frame.d.mts",
     "mock-rules.mjs",
     "screen-rules.mjs",
