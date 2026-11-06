@@ -7,6 +7,7 @@ import { PARITY_LIMITS } from "./explore.js";
 import { renderReportMarkdown } from "./report-md.js";
 import { pathToFileURL } from "node:url";
 import { emit, envelope } from "./json-out.js";
+import { loadConfig, publishToken } from "./config.js";
 
 type Node = { role: string; name: string; text: string; ref: string };
 type StepLike = { kind: string; target?: string; text?: string; enter?: boolean; line: number };
@@ -83,7 +84,7 @@ function flagValue(argv: string[], name: string): string | undefined {
 }
 
 /** Runs the suite. Returns the exit code: 0 when every step passed (or every failure was repaired and written), 1 otherwise. */
-export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string) => void): Promise<number> {
+export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string) => void, fetchFn: typeof fetch = fetch): Promise<number> {
   const json = argv.includes("--json");
   // With --json, stdout holds only the document: progress goes to stderr.
   const out = rawLog ?? (json ? (s: string) => console.error(s) : console.log);
@@ -98,9 +99,14 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string
   const reportPath = flagValue(argv, "--report");
   const release = flagValue(argv, "--release");
   const reportMdPath = flagValue(argv, "--report-md");
+  const platform = flagValue(argv, "--platform") ?? "android";
+  const upload = argv.includes("--upload");
+  if (platform !== "android" && platform !== "ios") { return fail('--platform must be "android" or "ios"', [{ command: "shipvo test --platform ios", why: "Pass android or ios." }]); }
+  if (upload && !reportPath) { return fail("--upload needs --report <file>", [{ command: "shipvo test --report report.json --release 12 --upload", why: "Upload sends the report file." }]); }
+  if (upload && !release) { return fail("--upload needs --release <number>", [{ command: "shipvo test --report report.json --release 12 --upload", why: "Results are stored per release." }]); }
   if (argv.includes("--report") && !reportPath) { return fail("--report needs a file name", [{ command: "shipvo test --report report.json", why: "Pass a file name." }]); }
   if (argv.includes("--report-md") && !reportMdPath) { return fail("--report-md needs a file name", [{ command: "shipvo test --report-md report.md", why: "Pass a file name." }]); }
-  const valueIdx = new Set(["--report", "--report-md", "--release"].map((f) => argv.indexOf(f) + 1).filter((i) => i > 0));
+  const valueIdx = new Set(["--report", "--report-md", "--release", "--platform"].map((f) => argv.indexOf(f) + 1).filter((i) => i > 0));
   const given = argv.filter((a, i) => !a.startsWith("--") && !valueIdx.has(i));
   const files = given.length ? given : findStepFiles("tests");
   if (!files.length) { return fail("No tests found. Put plain-language steps in tests/*.steps, or pass file names.", [{ command: "shipvo test tests/example.steps", why: "Pass a steps file, or add tests/*.steps." }]); }
@@ -156,14 +162,27 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string
   if (repair) log(`${failed} failed step(s): ${repaired} repaired${write ? " and written" : " (not written; add --write)"}, ${unresolved} unresolved`);
   else log(failed ? `${failed} failed` : "all steps passed");
   if (reportPath || reportMdPath) {
-    const report = { app: appIdFromConfig(), commit: gitCommit(), release: release ?? null, time: new Date().toISOString(), parityLimits: PARITY_LIMITS, flows };
+    const report = { app: appIdFromConfig(), commit: gitCommit(), release: release ?? null, platform, time: new Date().toISOString(), parityLimits: PARITY_LIMITS, flows };
     if (reportPath) { writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n"); log(`wrote report ${reportPath}`); }
     if (reportMdPath) { writeFileSync(reportMdPath, renderReportMarkdown(report)); log(`wrote Markdown report ${reportMdPath}`); }
+  }
+  let uploadError: string | null = null;
+  if (upload && reportPath) {
+    const token = publishToken();
+    try {
+      if (!token) throw new Error("No publish token. Set SHIPVO_PUBLISH_TOKEN, or run shipvo app create.");
+      const base = loadConfig().controlPlane.replace(/\/$/, "");
+      const appId = appIdFromConfig();
+      if (!appId) throw new Error("No appId in shipvo.json.");
+      const r = await fetchFn(`${base}/r/${encodeURIComponent(appId)}/${encodeURIComponent(release!)}/tests`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: readFileSync(reportPath, "utf8") });
+      if (!r.ok) { const e = (await r.json().catch(() => null)) as { message?: string; error?: string } | null; throw new Error(e?.message ?? e?.error ?? `HTTP ${r.status}`); }
+      log(`uploaded report for release ${release} (${platform})`);
+    } catch (e) { uploadError = (e as Error).message; log(`Could not upload the report: ${uploadError}`); }
   }
   const exit = failed === 0 || (write && repaired === failed) ? 0 : 1;
   if (json) {
     const bad = flows.filter((f) => f.status === "failed");
-    const data = { flows: flows.map((f) => ({ name: f.name, status: f.status, steps: f.steps.length, failedStep: f.failedStep, message: f.message })), failed, repaired, unresolved };
+    const data = { uploaded: upload ? !uploadError : undefined, upload_error: uploadError ?? undefined, flows: flows.map((f) => ({ name: f.name, status: f.status, steps: f.steps.length, failedStep: f.failedStep, message: f.message })), failed, repaired, unresolved };
     emit(exit === 0
       ? envelope("ok", failed ? `${failed} failed step(s) repaired and written.` : `All ${flows.length} flow(s) passed.`, data, [{ command: "shipvo explore --json", why: "Walk the app for crashes and accessibility problems." }], 0)
       : envelope("tests_failed", `${bad.length} of ${flows.length} flow(s) failed.`, data,
