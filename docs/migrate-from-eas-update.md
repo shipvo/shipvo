@@ -15,6 +15,28 @@ npx shipvo migrate --plan
 npx shipvo migrate --plan --json
 ```
 
+Output as printed (not edited), from a copy of `apps/tide-and-tackle` with `expo-updates`, an `updates` key and a `runtimeVersion` key added (the sample app itself has none, so on the unchanged app it prints "Nothing to migrate"):
+
+```text
+Found expo-updates (EAS Update):
+  - package.json dependencies: expo-updates@~58.0.0
+  - app.json plugins: expo-updates
+  - app.json: updates: {"url":"https://u.expo.dev/x"}
+  - app.json: runtimeVersion: {"policy":"appVersion"}
+
+Steps, in this order:
+  1. Commit your work. Installed apps keep using EAS Update until a new store build ships, so do not stop publishing to EAS yet.
+  2. Remove expo-updates from package.json (npm remove expo-updates).
+  3. Remove the expo-updates entry from plugins, and the updates and runtimeVersion keys, from the app config.
+  4. Remove calls to the expo-updates API (for example Updates.checkForUpdateAsync) from your code.
+  5. Run shipvo init. It adds @shipvo/runtime, the config plugin, a signing key, shipvo.json, the sim/publish/rollback scripts and a publish workflow. It never overwrites a file.
+  6. Back up the signing seed (shipvo keys export). If you lose it, installed apps will not accept another update.
+  7. Build and submit a new store build. Only this build uses Shipvo; older binaries keep using EAS Update.
+  8. Run shipvo publish --dry-run, then shipvo publish for the first Shipvo release once the new build is on devices.
+
+No files were changed. Details: docs/migrate-from-eas-update.md
+```
+
 It lists each entry it found:
 
 - `expo-updates` in `dependencies` or `devDependencies` of `package.json`
@@ -57,7 +79,19 @@ npx shipvo migrate --apply --json
 | `eas update` | `shipvo publish` |
 | Channels and branches | Cohorts (bands): `--bands b0,b1,b2` |
 | `eas update:rollback` | `shipvo rollback --to <release>` |
-| `runtimeVersion` | `shellMajor` in the `@shipvo/runtime` plugin props |
+| `runtimeVersion` | `shellMajor` in `shipvo.json`. The shell also declares its Hermes bytecode version and native modules; `shipvo publish` checks a release against them |
 | Code signing certificate | Ed25519 key made by `shipvo init` |
+
+## First publish and first applied OTA
+
+After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` printed all `doctor` checks as PASS and the next steps: rebuild the native app once (`npx expo prebuild`, then `npx expo run:android`), then `npx shipvo publish --dry-run`.
+
+Not yet run for this guide: `shipvo publish --dry-run` (it needs `npm install` and a native platform in the app) and the first applied OTA on the Android emulator. This runner has no emulator. The script that times it is `scripts/first-run/applied-ota.mjs`. This guide does not claim an applied OTA. Tracked in #751; the CI run will be linked here.
+
+## What does not map yet
+
+- Percentage rollouts: Shipvo has cohort bands (`--bands`), not an arbitrary percentage.
+- A release dashboard: the control plane admin at `/app/<id>/admin` covers content, orders and the owner API. Release status comes from `shipvo status` (see [getting-started.md](getting-started.md)).
+- Channels and branches as separate objects: bands are the only grouping.
 
 See also [Migrate from CodePush](migrate-from-codepush.md) and [cli.md](cli.md).
