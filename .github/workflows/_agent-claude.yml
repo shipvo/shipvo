@@ -349,12 +349,14 @@ jobs:
           # An old branch merged with main can bring back stale copies (PR #895 reverted CLAUDE.md): keep them as on main.
           if [ "${{ inputs.role }}" != "steward" ]; then
             git fetch -q origin main || true
+            # Compare with where this branch meets main, so a branch that is merely behind main is left alone.
+            MB=$(git merge-base HEAD origin/main 2>/dev/null || echo origin/main)
             LOCKED=""
             for p in CLAUDE.md .github scripts/agents LICENSE SECURITY.md legal; do
-              git diff --quiet origin/main -- "$p" 2>/dev/null || LOCKED="$LOCKED $p"
+              git diff --quiet "$MB" -- "$p" 2>/dev/null || LOCKED="$LOCKED $p"
             done
             if [ -n "$LOCKED" ]; then
-              for p in $LOCKED; do git checkout origin/main -- "$p" 2>/dev/null || git rm -rq --cached "$p" 2>/dev/null || true; done
+              for p in $LOCKED; do git checkout "$MB" -- "$p" 2>/dev/null || git rm -rq --cached "$p" 2>/dev/null || true; done
               git commit -qm "chore: keep locked files as on main ($LOCKED )" || true
               echo "::notice::Restored locked paths to main:$LOCKED"
             fi
