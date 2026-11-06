@@ -1,0 +1,3 @@
+- `@shipvo/sim`: the phone has its own Chromium page (`PhoneBrowser`): isolated context per phone, mobile viewport and touch, user agent marked "ShipvoPhone". Private hosts (loopback, link-local, RFC1918, CGNAT, `.local`, `.internal`, `localhost`) are refused with `host_not_allowed` unless `allow_private` or `allow_hosts` is set. Every navigation appears in `device_log`.
+- `@shipvo/mcp`: new tools `browser_open`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_back`, `browser_screenshot`. Page content is marked `source: "web"` (untrusted).
+- Migration: none; new tools.

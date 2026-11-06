@@ -7,11 +7,13 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
 1. Shipvo Testers and `shipvo store testers` (blog; video done)
-2. Shipvo Phone and `shipvo run` (all columns, as slices land)
+2. Shipvo Phone and `shipvo run` (tutorial, video, blog; docs done)
 3. Store path: `shipvo store` from working app to both stores (video, blog)
 4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
 5. Signed over-the-air updates, staged rollout and rollback (tutorial, video)
-6. Capacitor support (all columns, as slices land)
+6. Record demo videos (`record_*`) (tutorial, video, blog; docs done)
+7. The `shipvo` skill for coding agents (tutorial, blog; docs done)
+8. Capacitor support (all columns, as slices land)
 
 | Feature | Docs | Tutorial | Video | Blog |
 | --- | --- | --- | --- | --- |
