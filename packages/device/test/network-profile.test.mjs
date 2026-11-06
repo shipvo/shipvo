@@ -41,3 +41,22 @@ test("reset puts the network profile back to online", () => {
   assert.equal(device.net.online(), true);
   assert.deepEqual(device.net.connection(), { isConnected: true, type: "wifi" });
 });
+
+test("reset notifies subscribers when it brings the device back online", () => {
+  const seen = []; const off = device.net.onChange((o) => seen.push(o));
+  dev.set({ networkProfile: "offline" });
+  dev.reset();
+  assert.deepEqual(seen, [false, true]);
+  off();
+});
+
+test("a change between cellular profiles notifies subscribers", () => {
+  dev.set({ networkProfile: "3g" });
+  const seen = []; const off = device.net.onChange((o) => seen.push(o));
+  dev.set({ networkProfile: "2g" });
+  assert.deepEqual(seen, [true]);
+  dev.set({ networkProfile: "2g" });
+  assert.deepEqual(seen, [true]);
+  off();
+  dev.reset();
+});

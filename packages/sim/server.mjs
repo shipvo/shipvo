@@ -413,7 +413,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); if (s.netProfile && s.netProfile !== "online") await setNetworkProfile(s, page, "online"); await syncMedia(page); s.shade.open = "none"; break;
+    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); /* The device's own reset already cleared its profile; this call is for the netLog and the fetch route. */ if (s.netProfile && s.netProfile !== "online") await setNetworkProfile(s, page, "online"); await syncMedia(page); s.shade.open = "none"; break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.

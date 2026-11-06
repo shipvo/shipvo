@@ -55,7 +55,7 @@ export interface Device {
   clipboard: { set(text: string): Promise<void>; get(): Promise<string> };
   net: {
     online(): boolean; onChange(cb: (online: boolean) => void): () => void;
-    /** Connection state and type. Only the simulated device provides it; it follows the active network profile. */
+    /** Connection state and type. Only the simulated device provides it; it follows the active network profile. Example: `const c = device.net.connection?.(); if (c && !c.isConnected) showBanner();` */
     connection?(): { isConnected: boolean; type: "wifi" | "cellular" | "none"; generation?: "2g" | "3g" | "4g" };
   };
 }

@@ -95,6 +95,8 @@ function announceStatus(before: string, record = true, beforeSettings = "") {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pn:status", { detail }));
 }
 const urlSubs = new Set<(url: string) => void>();
+// Subscribers hear about any change to the connection (online, offline, or a different cellular generation); they still receive the online boolean.
+const netKey = () => `${isOnline()}|${JSON.stringify(connection())}`;
 const netSubs = new Set<(o: boolean) => void>(); const openSubs = new Set<(n: Notification) => void>(); const recvSubs = new Set<(n: Notification) => void>();
 
 // ---- system sheets (plain DOM so they sit above the app and read as dialogs) ----
@@ -296,7 +298,7 @@ function showBanner(n: Notification, popup = true) {
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
 g.__pnDevice = {
   state,
-  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasOnline = isOnline(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (isOnline() !== wasOnline) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
+  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
   /** Push a notification to the app. Returns its id, or null when permission is not granted. */
   push(n: Omit<Notification, "id">) { return deliver(n); },
   log: () => state.log,
@@ -319,10 +321,11 @@ g.__pnDevice = {
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
-    const before = statusKey(), bs = settingsKey(), sk = systemKey();
+    const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey();
     Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: (profile?.platform ?? state.platform) === "android" && (profile?.api ?? state.api) < 33 ? "granted" : "undetermined" },
       source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
     recent.length = 0; seq = 0;
+    if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline()));
     announceSystem(sk, false); announceStatus(before, false, bs);
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
