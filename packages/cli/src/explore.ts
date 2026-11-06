@@ -24,6 +24,10 @@ export type Driver = {
   errors(): Promise<string[]>;
   /** Rendered size in px of each ref on the current screen. Optional: without it the size check is skipped. */
   sizes?(): Promise<Record<string, [number, number]>>;
+  /** Current screen tree. Used by `shipvo smoke`. */
+  screen?(): Promise<string>;
+  /** console.error output since the last call. Used by `shipvo smoke`. */
+  consoleErrors?(): Promise<string[]>;
 };
 export type Skin = "android" | "ios";
 /** Smallest tap target: 44 x 44 pt on iOS (Apple HIG), 48 x 48 dp on Android (Material and Android accessibility guide). */
@@ -194,6 +198,8 @@ export function simDriver(base: string, app: string, session = `explore-${Date.n
     tap: (ref) => act({ action: "tap", ref }),
     back: () => act({ action: "back" }),
     errors: async () => (await act({ action: "errors" })).errors ?? [],
+    screen: async () => (await act({ action: "screen" })).screen ?? "",
+    consoleErrors: async () => (await act({ action: "console_errors" })).errors ?? [],
     sizes: async () => ((await act({ action: "sizes" })) as { sizes?: Record<string, [number, number]> }).sizes ?? {},
   };
 }

@@ -1,0 +1,3 @@
+- `@shipvo/cli`: new `shipvo smoke [android|ios] [--json] [--timeout s]` checks that the app loads in the simulator. Exit 0 ok, 1 failed, 2 setup error.
+- `@shipvo/sim`: new `console_errors` action returns `console.error` output.
+- Migration: none; new command and action.

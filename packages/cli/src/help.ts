@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "audit", "test", "keys", "mcp",
+  "init", "sim", "run", "explore", "smoke", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "audit", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -14,6 +14,7 @@ Start
   run android|ios [--no-open] [--port n]  Open the app in a phone frame in your browser (no Playwright)
   run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
   explore [--max-depth 3] [--max-steps 100] [--fail-on-findings]  Walk the app in the simulator, write explore-report.md and .json
+  smoke [android|ios] [--timeout 30] [--json]  Does the app load? Exit 0 ok, 1 failed, 2 setup error
   preview [--json]            Publish a public 24-hour preview link (here.now, no account)
 
 Ship

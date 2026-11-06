@@ -187,6 +187,34 @@ The agent's "what next" command. It prints one JSON line:
 | 1 | action needed: no project, no signing key, or a halted release |
 | 2 | error: shipvo.json is invalid or the control plane could not be reached |
 
+## `shipvo smoke`
+
+One fast answer: does the app still load? It starts the simulator like `shipvo explore` does, opens the app headless and waits for the first screen to settle (the tree is the same twice in a row).
+
+```bash
+shipvo smoke              # android (default)
+shipvo smoke ios --json --timeout 60
+```
+
+It fails when the page throws, logs `console.error`, has an unhandled rejection, or the first screen has no elements. `--timeout <s>` defaults to 30. It does not take screenshots or tap anything; use `shipvo explore` for that.
+
+`--json` prints one line, the same envelope as `status --json`:
+
+```json
+{ "ok": false, "code": "load_failed", "summary": "...",
+  "data": { "platform": "android", "time_to_first_screen_ms": 820, "elements": 0, "errors": ["Uncaught error: boom"], "error_count": 1 },
+  "next": [{ "command": "shipvo sim", "why": "..." }] }
+```
+
+- `code` is `ok`, `load_failed` or `setup_error`. `data.errors` holds the first 5 errors; `error_count` is the total.
+- A missing browser or Playwright is a setup error. `next` then has the install command.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | the app loaded with no errors |
+| 1 | load failed: an error, or an empty first screen |
+| 2 | setup error: no `shipvo.json`, browser missing, build or simulator failed, bad arguments |
+
 ## `shipvo audit`
 
 Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.

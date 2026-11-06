@@ -37,7 +37,7 @@ Add the server to your MCP config (`shipvo mcp` prints it):
 { "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
 ```
 
-Then: `open_app("<app id>")` → `screen(session)` (tree with `[ref=eN]`) → `tap` / `type` / `scroll` / `back` → `screenshot`. Use `set_device` for location, permissions, biometrics, payment and network. The tree shows what a person with a screen reader would get. To walk the whole app and get a report, run `shipvo explore`. Tool list: `references/mcp.md`.
+Then: `open_app("<app id>")` → `screen(session)` (tree with `[ref=eN]`) → `tap` / `type` / `scroll` / `back` → `screenshot`. Use `set_device` for location, permissions, biometrics, payment and network. The tree shows what a person with a screen reader would get. To walk the whole app and get a report, run `shipvo explore`. To check only that the app loads, run `shipvo smoke [android|ios] --json`: it prints `{ ok, code, summary, data: { platform, time_to_first_screen_ms, elements, errors }, next }` and exits 0 ok, 1 failed, 2 setup error. Tool list: `references/mcp.md`.
 
 ## Write and run @shipvo/test tests
 
