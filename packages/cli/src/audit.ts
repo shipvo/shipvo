@@ -52,7 +52,7 @@ async function auditRows(argv: string[], deps: { fetchFn?: typeof fetch }) {
   if (bad.length) throw new UsageError(`Unknown flag ${bad.join(", ")}. Known flags: ${AUDIT_FLAGS.map((k) => "--" + k).join(" ")}`);
   const a = parse(argv);
   // Positional app id: the first argument that is not a flag or a flag's value.
-  const appId = argv.find((x, i) => !x.startsWith("--") && !(i > 0 && AUDIT_FLAGS.includes(argv[i - 1].slice(2)) && argv[i - 1].startsWith("--")));
+  const appId = argv.find((x, i) => !x.startsWith("--") && !(i > 0 && argv[i - 1].startsWith("--") && argv[i - 1] !== "--json" && AUDIT_FLAGS.includes(argv[i - 1].slice(2))));
   if (!appId) throw new UsageError("Usage: shipvo audit <app> [--format json|csv] [--limit n] [--json]");
   const format = a.format ?? "json";
   if (format !== "json" && format !== "csv") throw new UsageError(`--format must be json or csv (got "${a.format}").`);

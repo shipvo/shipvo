@@ -101,6 +101,13 @@ describe("audit --json", () => {
     expect(doc).toMatchObject({ code: "ok", data: { app: "shop", count: 2, rows } });
     noSecret("owner-secret-token");
   });
+  it("accepts --json before the app name", async () => {
+    app(); process.env.SHIPVO_OWNER_TOKEN = "owner-secret-token";
+    const f = vi.fn(async () => new Response(JSON.stringify({ rows })));
+    const { doc, code } = await run(() => audit(["--json", "shop"], { fetchFn: f as any }));
+    expect(code).toBe(0);
+    expect(doc).toMatchObject({ code: "ok", data: { app: "shop", count: 2 } });
+  });
   it("a rejected token is auth_failed", async () => {
     app(); process.env.SHIPVO_OWNER_TOKEN = "owner-secret-token";
     const { doc, code } = await run(() => audit(["shop", "--json"], { fetchFn: (async () => new Response("{}", { status: 401 })) as any }));

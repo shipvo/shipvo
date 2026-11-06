@@ -55,9 +55,9 @@ const title = (s: string) => s.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.
 /** `shipvo init --json`: the same work, reported as one envelope. The seed is never in it; only the path of the seed file. */
 async function initJson(argv: string[]) {
   const [dirArg] = positional(argv.filter((x) => x !== "--json"));
-  const adoptMode = isAdoptArgs(argv) && (dirArg === "." || detectProject(process.cwd()).isExpo || isBareApp(process.cwd()));
   const dry = argv.includes("--dry-run");
   return runJson(async () => {
+    const adoptMode = isAdoptArgs(argv) && (dirArg === "." || detectProject(process.cwd()).isExpo || isBareApp(process.cwd()));
     if (adoptMode && !argv.includes("--yes") && !dry) throw new UsageError("init --json in an existing app needs --yes to apply the plan, or --dry-run to only print it.");
     await trapExit(() => init(argv.filter((x) => x !== "--json")), (m, st) => {
       const code = st === 2 ? "usage" : /already exists/.test(m) ? "dir_exists" : "init_failed";

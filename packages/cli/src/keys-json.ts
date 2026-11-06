@@ -20,7 +20,7 @@ const failIn = (table: [RegExp, string, Next[]][], fallbackCode = "failed") => (
 
 export async function keysJson(argv: string[]) {
   const [sub, ...rest] = argv.filter((x) => x !== "--json");
-  const rawRest = argv.filter((x) => x !== "--json").slice(1);
+  const rawRest = rest;
   return runJson(async (): Promise<Done> => {
     if (sub === undefined) {
       const lines = await captureLog(() => trapExit(() => keys(), failIn([
