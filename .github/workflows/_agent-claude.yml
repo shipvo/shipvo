@@ -332,9 +332,17 @@ jobs:
           BODY_FIXED=no
           if [ "$MODE" = "pr-branch" ] && [ -s /tmp/agent/pr_body.md ]; then
             # Never lose the "Fixes #n" link: GitHub uses it to close the issue when the PR merges.
-            gh pr view "$PR" -R "$REPO" --json body --jq .body | grep -oiE "(fixes|closes|resolves) #[0-9]+" | sort -u | while read -r k; do
-              grep -qiF "$k" /tmp/agent/pr_body.md || printf '\n%s\n' "$k" >> /tmp/agent/pr_body.md
-            done
+            # But a fixer may remove a wrong one (the contract flags "Fixes" on parents with work left, PR #825):
+            # if the new body has closing keywords, trust it and only make sure the branch's own issue stays linked;
+            # if it has none at all, the fixer forgot them, so carry the old ones over.
+            if grep -qiE "(fixes|closes|resolves) #[0-9]+" /tmp/agent/pr_body.md; then
+              OWN=$(printf '%s' "$BRANCH" | grep -oE 'issue-[0-9]+' | head -n1 | cut -d- -f2)
+              if [ -n "$OWN" ] && ! grep -qiE "(fixes|closes|resolves) #$OWN\b" /tmp/agent/pr_body.md; then printf '\nFixes #%s\n' "$OWN" >> /tmp/agent/pr_body.md; fi
+            else
+              gh pr view "$PR" -R "$REPO" --json body --jq .body | grep -oiE "(fixes|closes|resolves) #[0-9]+" | sort -u | while read -r k; do
+                printf '\n%s\n' "$k" >> /tmp/agent/pr_body.md
+              done
+            fi
             gh pr edit "$PR" -R "$REPO" --body-file /tmp/agent/pr_body.md && BODY_FIXED=yes || true
           fi
           AHEAD=$(git rev-list --count "$(cat /tmp/agent/start_sha)..HEAD")
