@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo migrate --apply` removes `expo-updates` from `package.json` and `app.json` (plugin, `updates`, `runtimeVersion`), keeps backups in `.shipvo/migrate-backup/`, and refuses a dirty git tree unless `--force`.
-- Migration: none; new flag.

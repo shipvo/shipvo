@@ -1,1 +1,0 @@
-- cli: new `shipvo migrate --plan [--json]` prints a read-only plan to switch from Expo EAS Update to Shipvo. `shipvo init` now points to it when it finds `expo-updates`. Migration: none.

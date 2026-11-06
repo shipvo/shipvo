@@ -1,1 +1,0 @@
-- docs: new page `docs/record-a-demo-video.md` with a worked example of `record_start`, `record_marker` and `record_stop` with `music` and `narration`, and a short section in the `@shipvo/mcp` README (#523, #501).

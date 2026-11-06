@@ -1,3 +1,0 @@
-- `@shipvo/mcp-tools`, `@shipvo/mcp`: new tools `request_secret` (returns a one-time vault link and a notice for the person) and `secret_status` (returns `{ saved, valid, access }`, never the key). Both servers list them.
-- control-plane: `GET /vault/status/:app/:name`; JSON errors from the vault page post now include a plain `message`.
-- Migration: none; new tools and one new endpoint.

@@ -1,3 +1,0 @@
-- `@shipvo/sim`: the Shipvo Phone frame draws Lumi, a small glowing orb, beside the camera cutout on the Android and iPhone skins. Lumi has idle, working, happy and worried states (blink, glow, small float). It sits outside the app screen, so screenshots, recordings for agents and the labelled screen tree are the same with Lumi on or off.
-- Setting: `renderFrame({ lumi: false })` or `SHIPVO_LUMI=off` hides Lumi anywhere. Lumi is off by default in CI (`SHIPVO_LUMI=on` shows it).
-- Migration: none; `renderFrame` gains an optional `lumi` option.

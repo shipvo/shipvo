@@ -1,3 +1,0 @@
-- `@shipvo/cli`: new `shipvo keys rotate sign` (offline, signs a key rotation statement with the root seed and prints the envelope) and `shipvo keys rotate upload` (sends it to the control plane with an owner session; the route lands in a later slice). Existing `keys export` and `keys import` are unchanged.
-- `@shipvo/runtime`: adds `test-vectors/rotation.json`, shared rotation test vectors for the Android and iOS runtimes (not published in the package).
-- Migration: none; new commands.
