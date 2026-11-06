@@ -10,6 +10,10 @@ npx skills add shipvo/shipvo --skill shipvo -g
 
 The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. Without npm: `curl -fsSL https://shipvo.dev/install.sh | bash`. Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints." All three lines are on [shipvo.dev/setup](https://shipvo.dev/setup/).
 
+## Skills that ship with each package
+
+`@shipvo/mcp`, `@shipvo/test`, `@shipvo/runtime` and `@shipvo/cli` each ship a short skill in `skills/<name>/SKILL.md` (`shipvo-mcp`, `shipvo-test`, `shipvo-runtime`, `shipvo-cli`). `shipvo agents setup` copies the skill of every installed `@shipvo/*` package your `package.json` depends on into `.agents/skills/` and `.claude/skills/`. A package you do not depend on is not copied. A second run changes nothing, and `--dry-run` lists the files without writing. `shipvo skills sync` runs only this step. `shipvo status --json` reports each one in `data.skills` as `{ package, name, synced }`.
+
 ## Three ways to connect
 
 **1. Local, over stdio** (Claude Desktop, Claude Code, Cursor, PiPilot): run `shipvo sim` in the app, then

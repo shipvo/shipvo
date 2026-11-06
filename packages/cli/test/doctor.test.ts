@@ -91,6 +91,27 @@ describe("shipvo doctor checks", () => {
     expect(nameOf(fail, "hermesBytecodeVersion (if present) is set").ok).toBe(false);
   });
 
+  describe("Hermes engine build", () => {
+    const setup = (engine?: string, installed?: string) => {
+      const seed = makeSeed();
+      const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed), ...(engine ? { hermesEngine: engine } : {}) }), seed);
+      if (installed) {
+        mkdirSync(join(cwd, "node_modules/hermes-compiler"), { recursive: true });
+        writeFileSync(join(cwd, "node_modules/hermes-compiler/package.json"), JSON.stringify({ version: installed }));
+      }
+      return runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch }).then((r) => r.find((c) => c.name === "Hermes engine build"));
+    };
+    it("passes on a match", async () => expect(await setup("250829098.0.10", "250829098.0.10")).toMatchObject({ ok: true, note: "250829098.0.10, matches hermesEngine" }));
+    it("fails on a mismatch and names both", async () => {
+      const c = await setup("250829098.0.10", "250829098.0.16");
+      expect(c?.ok).toBe(false);
+      expect(c?.fix).toContain("250829098.0.10");
+      expect(c?.fix).toContain("250829098.0.16");
+    });
+    it("reports the installed build when undeclared", async () => expect(await setup(undefined, "250829098.0.16")).toMatchObject({ ok: true, note: expect.stringContaining("not declared") }));
+    it("adds no row when nothing is declared or installed", async () => expect(await setup()).toBeUndefined());
+  });
+
   it("never prints seed or token values", async () => {
     const seed = makeSeed();
     const token = "shipvo-publish-token-value";
@@ -128,6 +149,17 @@ describe("shipvo doctor checks", () => {
     const r = await runDoctorChecks({ cwd, fetchFn: fetchFn as unknown as typeof fetch });
     expect(fetchFn).toHaveBeenCalled();
     expect(nameOf(r, "control plane reachable").ok).toBe(false);
+  });
+
+  it("notes telemetry_dropped_today from /health, and stays quiet for null or missing", async () => {
+    const seed = makeSeed();
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
+    const run = (body: unknown) => runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response(JSON.stringify(body))) as unknown as typeof fetch });
+    const withDrops = nameOf(await run({ ok: true, telemetry_dropped_today: 3 }), "control plane /health returns JSON");
+    expect(withDrops.ok).toBe(true);
+    expect(withDrops.note).toContain("telemetry_dropped_today: 3");
+    expect(nameOf(await run({ ok: true, telemetry_dropped_today: null }), "control plane /health returns JSON").note).toBeUndefined();
+    expect(nameOf(await run({ ok: true }), "control plane /health returns JSON").note).toBeUndefined();
   });
 
   it("fails control plane check on HTTP 503 and says so", async () => {

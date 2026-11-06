@@ -57,6 +57,7 @@
     "directory": "packages/cli"
   },
   "files": [
+    "skills",
     "dist",
     "README.md"
   ],

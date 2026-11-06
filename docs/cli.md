@@ -187,6 +187,21 @@ The agent's "what next" command. It prints one JSON line:
 | 1 | action needed: no project, no signing key, or a halted release |
 | 2 | error: shipvo.json is invalid or the control plane could not be reached |
 
+## `shipvo approvals`
+
+With `policy.requireApprovalAbove` set, a promote above that band waits for a second owner. These commands show and release the holds.
+
+```bash
+shipvo approvals list                 # hold id, release, band, proposer, age
+shipvo approvals approve <id>         # let the promote go through
+shipvo approvals list --json          # one JSON line: { ok, code, summary, data, next }; the list is data.approvals
+```
+
+- `approve` needs a signed-in person (`shipvo login`) when an agent proposed the hold, which is the usual case: a promote made with the publish token. `SHIPVO_OWNER_TOKEN` counts as an agent, so it can approve only holds that a person proposed. With the env token on an agent's hold, the CLI prints `Refused by rule self_approval` with a hint to run `shipvo login`, and exits 1. `list` also works with the publish token.
+- The proposer cannot approve its own hold, and an agent cannot approve an agent's hold. The second rule changes the existing approve endpoint: before, `OWNER_TOKEN` could approve a hold made with the publish token. A setup with no signed-in person can no longer release an agent's hold. The CLI prints the rule (`self_approval`), exits 1, and the control plane writes an audit row for the refusal.
+- Exit codes: 0 done, 1 refused by a rule, 2 error. With `--json` the output is the same `{ ok, code, summary, data, next }` envelope as `status --json`. On a refusal `code` is the rule (`self_approval`) and `data.rule` repeats it; other failures use `usage`, `config`, `no_credentials`, `unreachable` or `http_<status>`.
+- MCP tools: `approvals_list(app)` and `approval_approve(app, id)`. Both use the server's owner token (the MCP server holds no publish token), so an MCP agent counts as an agent and can approve only holds that a person proposed.
+
 ## `--json` for `doctor`, `test` and `explore`
 
 `shipvo doctor --json`, `shipvo test --json` and `shipvo explore --json` print the same envelope as `status --json`: `{ ok, code, summary, data, next }`. Stdout holds only that one JSON line. Progress and logs go to stderr, including the Playwright install notice for `explore` and the progress lines of `test`. The text output is unchanged without `--json`.
@@ -281,3 +296,22 @@ These come from fixed issues in this repository.
 - [Store details and screenshots](store.md).
 - [Self-host the control plane](self-hosting.md).
 - [Glossary](glossary.md) for the words used here.
+
+## `--json` for `publish`, `promote`, `rollback` and `auto-halt`
+
+These four commands take `--json` and print the same `{ ok, code, summary, data, next }` envelope. Stdout holds only that one JSON line. Text, build output and the old summary go to stderr. Without `--json` nothing changes. Exit codes: 0 ok, 1 failed (including an unreachable or refusing control plane, a missing bundle, a policy refusal), 2 usage error (unknown flag, bad value, missing `--to`).
+
+| Command | `code` on success | `data` |
+|---|---|---|
+| `publish` | `published` | `{ app, release, bands, min_shell_version, bytes, patches, platforms, total_bytes, web? }` (with `--platform all`, `android` and `ios` hold `{ bytes, patches }` instead of `bytes` and `patches`) |
+| `publish --dry-run` | `dry_run` | the same, plus `dry_run: true, out` |
+| `publish --dry-run-policy` | `policy_ok` | `{ policy: "none" or "allowed", bands }` |
+| `promote` | `promoted`, `nothing_to_promote` | `{ dry_run, promoted: [{ platform, release, from, bands, skipped_newer: [{ band, release }] }] }` |
+| `promote --dry-run` | `dry_run` | the same with `dry_run: true` |
+| `rollback` | `rolled_back` | `{ app, rolled_back_to_code_of, new_release, min_shell_version, issued_at, platforms, bands, dry_run: false }` |
+| `rollback --dry-run` | `dry_run` | the same with `dry_run: true` |
+| `auto-halt` | `auto_halt_show`, `auto_halt_on`, `auto_halt_off`, `dry_run` | `{ enabled, threshold, min_reports, dry_run, changed }` (`threshold` and `min_reports` are `null` when off) |
+
+Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`. On failure `data` is `{}` and `summary` is the error message.
+
+`next` suggests the follow-up. After `publish` it is `shipvo status --json` (and `shipvo promote --to ...` when some bands are left). After a dry run it is the real command. After a failure it is the likely fix, for example `shipvo doctor --json`.
