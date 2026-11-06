@@ -123,7 +123,7 @@ describe("shipvo keys rotate", () => {
     const env = signStatement({ appId: "tide", sequence: 1, newKey: V.keys.K2.publicKey, validFrom: now().toISOString() }, b64(randomBytes(32)));
     const file = seedFile(JSON.stringify(env));
     const login = await import("../src/login");
-    vi.spyOn(login, "savedCreds").mockReturnValue({ key: "session-key", control: "", mcp_url: "" });
+    vi.spyOn(login, "savedCreds").mockReturnValue({ key: "session-key", control: "https://cp.test/", mcp_url: "" });
     const f = vi.fn(async () => new Response(JSON.stringify({ sequence: 1 }), { status: 200 }));
     vi.spyOn(console, "log").mockImplementation(() => {});
     await rotate(["upload", file, "--json"], cfg, { fetchFn: f as any });
@@ -132,6 +132,14 @@ describe("shipvo keys rotate", () => {
     expect(init.method).toBe("POST");
     expect(init.headers.authorization).toBe("Bearer session-key");
     expect(JSON.parse(init.body)).toEqual(env);
+  });
+  it("upload refuses to send the session key to a different host", async () => {
+    const file = seedFile(JSON.stringify({ body: "{}", signature: "x" }));
+    const login = await import("../src/login");
+    vi.spyOn(login, "savedCreds").mockReturnValue({ key: "k", control: "https://other.test", mcp_url: "" });
+    const f = vi.fn();
+    await expect(rotate(["upload", file], cfg, { fetchFn: f as any })).rejects.toThrow(/Not sending your session key/);
+    expect(f).not.toHaveBeenCalled();
   });
   it("upload reports a refusal and needs a sign-in", async () => {
     const env = { body: "{}", signature: "x" };
@@ -143,7 +151,7 @@ describe("shipvo keys rotate", () => {
     await expect(rotate(["upload", file], cfg, { fetchFn: f as any })).rejects.toThrow(/Not signed in/);
     expect(f).not.toHaveBeenCalled();
     delete process.env.SHIPVO_OWNER_TOKEN; delete process.env.SHIPVO_PUBLISH_TOKEN;
-    spy.mockReturnValue({ key: "k", control: "", mcp_url: "" });
+    spy.mockReturnValue({ key: "k", control: "https://cp.test/", mcp_url: "" });
     const g = vi.fn(async () => new Response(JSON.stringify({ message: "not an owner session" }), { status: 403 }));
     await expect(rotate(["upload", file], cfg, { fetchFn: g as any })).rejects.toThrow(/HTTP 403\): not an owner session/);
   });
@@ -173,5 +181,15 @@ describe("shipvo keys rotate sign (process)", () => {
     const big = spawnSync(process.execPath, [join(out, "cli.js"), "keys", "rotate", "sign", "--root-seed-file", join(d, "good.txt"), "--new-key", V.keys.K2.publicKey, "--sequence", "100000000000000000000", "--json"], { cwd: d, encoding: "utf8" });
     expect(big.status).toBe(1);
     expect(big.stderr).toMatch(/--sequence/);
+  });
+
+  it("upload reads the envelope from stdin when the file is -", () => {
+    const d = mkdtempSync(join(tmpdir(), "rot-stdin-"));
+    writeFileSync(join(d, "shipvo.json"), JSON.stringify({ appId: "tide", controlPlane: "https://cp.test", publicKey: V.keys.K1.publicKey }));
+    const go = (input: string) => spawnSync(process.execPath, [join(out, "cli.js"), "keys", "rotate", "upload", "-"], { cwd: d, input, encoding: "utf8", env: { ...process.env, HOME: d, USERPROFILE: d } });
+    expect(go("not json").stderr).toMatch(/not a readable JSON envelope/);
+    const ok = go(JSON.stringify({ body: "{}", signature: "x" }));
+    expect(ok.status).toBe(1);
+    expect(ok.stderr).toMatch(/Not signed in/);
   });
 });

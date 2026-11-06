@@ -86,7 +86,7 @@ export async function rotate(argv: string[], cfg: Cfg, deps: { fetchFn?: typeof 
     try { env = signStatement({ appId: cfg.appId, sequence: Number(seq), newKey, validFrom }, rootSeed); }
     catch (e) { throw new RotateError(e instanceof Error ? e.message : String(e)); }
     console.log(JSON.stringify(env, null, json ? 0 : 2));
-    if (!json) console.error(`Signed rotation statement ${seq} for "${cfg.appId}". Save it, then run: shipvo keys rotate upload <file>`);
+    if (!json) console.error(`Signed rotation statement ${seq} for "${cfg.appId}". Confirm ${seq} is above every statement you signed before; this offline tool cannot check. Then run: shipvo keys rotate upload <file>`);
     return;
   }
   if (sub === "upload") {
@@ -97,6 +97,8 @@ export async function rotate(argv: string[], cfg: Cfg, deps: { fetchFn?: typeof 
     if (typeof env?.body !== "string" || typeof env?.signature !== "string") throw new RotateError("The envelope needs a string \"body\" and a string \"signature\".");
     const creds = savedCreds();
     if (!creds?.key) throw new RotateError("Not signed in. Run `shipvo login` as the app owner. Tokens cannot upload rotation statements.");
+    const norm = (u: string) => u.replace(/\/$/, "");
+    if (norm(creds.control ?? "") !== norm(cfg.controlPlane)) throw new RotateError(`shipvo.json controlPlane is ${cfg.controlPlane}, but you signed in at ${creds.control || "another host"}. Not sending your session key there. Fix controlPlane or run \`shipvo login\` for that host.`);
     const url = `${cfg.controlPlane.replace(/\/$/, "")}/rotation/${encodeURIComponent(cfg.appId)}`;
     let r: Response;
     try { r = await (deps.fetchFn ?? fetch)(url, { method: "POST", headers: { authorization: `Bearer ${creds.key}`, "content-type": "application/json" }, body: JSON.stringify({ body: env.body, signature: env.signature }) }); }
