@@ -301,6 +301,16 @@ function bridgeMain(win: any, token: string) {
   const frameEl = doc.getElementById("app");
   const watchApp = () => { try { watch(frameEl.contentDocument); } catch {} };
   frameEl.addEventListener("load", watchApp); watchApp();
+  // Lumi (when the frame draws it) reacts to a page error in the app and to a failed action, with the real message as the reason.
+  const lumi = (ev: any) => { try { win.shipvoLumi?.react(ev); } catch {} };
+  const watchErrors = () => {
+    try {
+      const w = frameEl.contentWindow;
+      w.addEventListener("error", (e: any) => lumi({ kind: "page-error", error: e.message || (e.error && e.error.message) }));
+      w.addEventListener("unhandledrejection", (e: any) => lumi({ kind: "page-error", error: e.reason && e.reason.message ? e.reason.message : e.reason }));
+    } catch {}
+  };
+  frameEl.addEventListener("load", watchErrors); watchErrors();
   // Device events from the simulated phone are not the app's own: the log marks them.
   win.addEventListener("message", (e: any) => {
     const d = e.data;
@@ -450,7 +460,7 @@ function bridgeMain(win: any, token: string) {
       else if (m.type === "tree") ws.send(JSON.stringify({ id: m.id, type: "tree", ok: true, tree: tree() }));
       else if (/^(tap|type|scroll|back)$/.test(m.type)) {
         act(m).then((r) => { step(words); lumiSay(cap, "idle", 1800); return r; }).then((r) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r })),
-          (err: any) => { lumiSay("Failed: " + cap, "worried", 2500); ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, ...(err && err.code ? { code: err.code } : {}), error: String(err && err.message || err), screen: screenOrUndefined() })); });
+          (err: any) => { lumiSay("Failed: " + cap, "worried", 2500); lumi({ kind: "action-failed", name: m.type, error: err && err.message || err }); ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, ...(err && err.code ? { code: err.code } : {}), error: String(err && err.message || err), screen: screenOrUndefined() })); });
       }
       else ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: "unknown request: " + m.type }));
     } catch (err: any) { ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: String(err && err.message || err) })); }

@@ -21,6 +21,31 @@ const FACE = {
   worried: `<path d="M8.8 16.6q2.2-1.8 4.4 0" fill="none" stroke="#10151c" stroke-width="1.3" stroke-linecap="round"/><path d="M6.6 8.2l3 .8M15.4 8.2l-3 .8" stroke="#10151c" stroke-width="1" stroke-linecap="round"/>`,
 };
 
+/**
+ * What Lumi shows for a result. `event` is { kind, error?, name?, detail? }:
+ * check-passed and flow-done give happy; page-error, crash, action-failed and check-failed give worried.
+ * The reason is one line taken from the real error or result (first line, spaces collapsed, at most 90 characters).
+ * Anything else, or an unusable event, returns null and Lumi stays as it is. Pure and self-contained, so the page can run it.
+ */
+export function lumiReaction(event) {
+  if (!event || typeof event !== "object") return null;
+  const one = (v) => {
+    const t = String(v && v.message ? v.message : v == null ? "" : v).split(/\r?\n/).map((x) => x.replace(/\s+/g, " ").trim()).find(Boolean) || "";
+    return t.length > 90 ? t.slice(0, 89) + "…" : t;
+  };
+  const name = one(event.name), err = one(event.error), detail = one(event.detail);
+  const why = (fallback) => err || detail || fallback;
+  switch (event.kind) {
+    case "check-passed": return { state: "happy", reason: name ? "Check passed: " + name : "Check passed" };
+    case "flow-done": return { state: "happy", reason: name ? "Flow finished: " + name : "Flow finished" };
+    case "page-error": return { state: "worried", reason: "Page error: " + why("the page threw an error") };
+    case "crash": return { state: "worried", reason: "Crash: " + why("the app stopped") };
+    case "action-failed": return { state: "worried", reason: (name ? "Action failed (" + name + "): " : "Action failed: ") + why("no reason given") };
+    case "check-failed": return { state: "worried", reason: (name ? "Check failed (" + name + "): " : "Check failed: ") + why("no reason given") };
+    default: return null;
+  }
+}
+
 /** Markup for Lumi. `state` is one of idle, working, happy, worried. */
 export function lumiHtml(state = "idle") {
   const st = LUMI_STATES.includes(state) ? state : "idle";
@@ -52,17 +77,21 @@ export const lumiCss = (k) => [
 ].join("\n");
 
 /**
- * Browser script. `window.shipvoLumi.set(state)` and a `{ type: "pn:lumi", state }` message change Lumi's state.
+ * Browser script. `window.shipvoLumi.set(state, reason?)` changes Lumi's state; `react(event)` picks the state and reason from a result (see lumiReaction).
+ * A `{ type: "pn:lumi", state, reason? }` or `{ type: "pn:lumi", event }` message does the same. The reason sits in Lumi's `data-reason` and `title`
+ * and is cleared when the state has no reason.
  * `window.shipvoLumi.say(text, state, holdMs)` (or `{ type: "pn:lumi", state, caption, hold }`) also shows a short caption.
  * With `holdMs` > 0 the caption goes away and Lumi goes back to idle after that long. Touches only Lumi and its caption.
  */
 export function lumiClientScript() {
-  return `(function(){var S=${JSON.stringify(LUMI_STATES)},T=0;
-function set(state){if(S.indexOf(state)<0)return false;var l=document.querySelector('[data-part="lumi"]');if(!l)return false;l.setAttribute("data-state",state);
+  return `(function(){var S=${JSON.stringify(LUMI_STATES)},T=0;var lumiReaction=${lumiReaction.toString()};
+function set(state,reason){if(S.indexOf(state)<0)return false;var l=document.querySelector('[data-part="lumi"]');if(!l)return false;l.setAttribute("data-state",state);
+if(typeof reason==="string"&&reason){l.setAttribute("data-reason",reason);l.setAttribute("title",reason)}else{l.removeAttribute("data-reason");l.removeAttribute("title")}
 var g=l.querySelectorAll("[data-face]");for(var i=0;i<g.length;i++)g[i].hidden=g[i].getAttribute("data-face")!==state;return true}
+function react(ev){var r=lumiReaction(ev);if(!r)return null;return set(r.state,r.reason)?r:null}
 function say(text,state,hold){clearTimeout(T);var c=document.querySelector('[data-part="lumi-caption"]');var ok=set(state||"working");
 if(c){var t=String(text==null?"":text).replace(/\\s+/g," ").trim().slice(0,80);c.textContent=t;c.hidden=!t}
 if(hold>0)T=setTimeout(function(){if(c){c.hidden=true;c.textContent=""}set("idle")},hold);return ok}
-if(typeof window==="undefined")return;window.shipvoLumi={set:set,say:say,states:S};
-window.addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pn:lumi")return;if(typeof d.caption==="string")say(d.caption,d.state,Number(d.hold)||0);else set(d.state)})})();`;
+if(typeof window==="undefined")return;window.shipvoLumi={set:set,react:react,say:say,states:S};
+window.addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pn:lumi")return;if(d.event)react(d.event);else if(typeof d.caption==="string")say(d.caption,d.state,Number(d.hold)||0);else set(d.state,d.reason)})})();`;
 }

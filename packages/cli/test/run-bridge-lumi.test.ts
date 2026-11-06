@@ -1,5 +1,6 @@
 // #874: Lumi shows each agent step in the phone frame, from the real action and its element. A scripted driver session
 // does what @shipvo/mcp does: tree, tap, type, scroll, back, and the `lumi` message for opening the app.
+// #875: Lumi reacts to a failed action and to a page error in the app, with the real message as the reason.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -12,7 +13,7 @@ import { startRunServer } from "../src/run";
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(resolve(here, "../../sim"), "package.json"));
 const HTML = `<!doctype html><meta name=viewport content="width=device-width"><body style="margin:0"><h1>Shop</h1>
-<button id=co onclick="document.title='paid'">Checkout</button><input aria-label="Promo code"><div style="height:2000px"></div></body>`;
+<button id=co onclick="document.title='paid'">Checkout</button><button id="b">Boom</button><input aria-label="Promo code"><div style="height:2000px"></div><script>document.getElementById("b").onclick=function(){setTimeout(function(){throw new Error("cart total is NaN\\n  at x.js:1")},0)}</script></body>`;
 
 let browser: any, server: Awaited<ReturnType<typeof startRunServer>>, page: any, driver: WebSocket;
 let nextId = 1; const pending = new Map<number, (m: any) => void>();
@@ -89,5 +90,19 @@ describe("Lumi captions each agent step", () => {
     await ask({ type: "lumi", caption: "Opened tide", state: "working", hold: 1800 });
     expect(((await ask({ type: "screen" })).screen as string)).not.toContain("Opened tide");
     expect(await page.$eval('[data-part="lumi-caption"]', (e: HTMLElement) => e.getAttribute("aria-hidden") + e.hasAttribute("inert")) ).toBe("truetrue");
+  });
+
+  it("is worried with the real message as the reason after a failed action", async () => {
+    const m = await ask({ type: "tap", ref: "e999" });
+    expect(m.ok).toBe(false);
+    const r = await page.$eval('[data-part="lumi"]', (e: any) => e.dataset.reason ?? null);
+    expect(r).toMatch(/^Action failed \(tap\): stale ref e999: the screen changed/);
+  });
+
+  it("is worried with the page error's message when the app throws", async () => {
+    await page.evaluate(() => (window as any).shipvoLumi.set("idle"));
+    await page.frames().find((f: any) => f !== page.mainFrame()).click("#b");
+    await page.waitForFunction(() => document.querySelector('[data-part="lumi"]')!.getAttribute("data-state") === "worried");
+    expect((await page.$eval('[data-part="lumi"]', (e: any) => e.dataset.reason))).toBe("Page error: Uncaught Error: cart total is NaN");
   });
 });

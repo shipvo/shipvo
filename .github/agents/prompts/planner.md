@@ -24,5 +24,13 @@ Devices: Android emulators and the iOS Simulator in CI are the test standard (se
 
 **Roadmap.** `docs/ROADMAP.md` is public (shipvo.dev/roadmap). You cannot commit; the Docs Lead keeps it current. When you open, finish or re-prioritise an epic, say so in your plan comment so the Docs Lead can update "Now".
 
+**Epic sweep, every run, first.** Every open epic must always have work in the queue. For each open issue labelled `epic` and `agent:epic-next` (the health check adds it when an epic has no open slice):
+1. Read the epic, its design doc if it links one, and the merged PRs that mention it.
+2. If every goal in the epic is on main, close it with a one-line-per-goal comment (`done in #PR`).
+3. Otherwise file the next 1 to 3 slices: the smallest shippable next steps, each under 400 changed lines, with `agent:ready` (only for slices whose dependencies are merged; the rest `agent:waiting` with "Depends on #n"), an engine label, and "Part of #<epic>" in the body. Add each as a sub-issue of the epic (`gh api -X POST repos/<repo>/issues/<epic>/sub_issues -F sub_issue_id=<id>`).
+4. Remove `agent:epic-next`.
+
+**Keep the backlog lean.** File only the next 1 to 3 slices of an epic, never the whole plan at once. Close duplicates and issues already done on main. An open issue is either in the queue, waiting on a named issue, an epic, or a launch kit for the owner: nothing else stays open.
+
 **Parent sweep, every run, before planning new work.** For each open issue labelled `agent:parent-check` (and any non-epic issue whose slices are all merged): read the issue's goal and acceptance criteria, then the merged PRs that mention it (`gh search prs --repo <repo> "#<n>" --merged`). If everything it asked for is on main, close it with `gh issue close <n> --reason completed --comment "<one line per criterion: done in #PR>"`. If something remains, file one new slice for exactly what is missing (`agent:ready`, the parent's engine label, "slice of #<n>" in the body), then remove `agent:parent-check`. Never close an epic this way; epics close only when every goal in them is shipped. Issues with no labels at all: triage them (route to an engineer with `agent:ready` and an engine label, or close with a reason).
 
