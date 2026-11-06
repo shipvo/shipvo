@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { walk, elements, renderMarkdown, type Driver, type Reply } from "../src/explore.js";
+import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { walk, elements, renderMarkdown, explore, type Driver, type Reply } from "../src/explore.js";
 
 // A fixture app: Home has a button that crashes, an unnamed button, a link to Settings and a link to a dead end.
 const SCREENS: Record<string, string> = {
@@ -150,5 +153,34 @@ describe("accessibility findings", () => {
     const r = await walk(d);
     expect(r.findings.filter((x) => x.kind === "small_target")).toHaveLength(0);
     expect(r.stoppedEarly).toBeNull();
+  });
+});
+
+describe("explore --json", () => {
+  it("exits 2 with an error envelope when shipvo.json is missing", async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(process, "cwd").mockReturnValue(mkdtempSync(join(tmpdir(), "explore-json-")));
+    const code = await explore(["--json"]);
+    vi.restoreAllMocks();
+    expect(code).toBe(2);
+    expect(logs).toHaveLength(1);
+    expect(JSON.parse(logs[0]!)).toMatchObject({ ok: false, code: "error" });
+  });
+  it("prints one envelope with findings and exits 1 with --fail-on-findings", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "explore-json-"));
+    writeFileSync(join(dir, "shipvo.json"), JSON.stringify({ appId: "a", name: "A", controlPlane: "https://example.com", publicKey: "k" }));
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(process, "cwd").mockReturnValue(dir);
+    vi.spyOn(globalThis, "fetch").mockImplementation((async () => Response.json({ ok: true, screen: '- heading "Home" [ref=e1]', errors: [] })) as never);
+    const code = await explore(["--json", "--sim", "http://sim.test", "--out", join(dir, "r"), "--fail-on-findings"]);
+    vi.restoreAllMocks();
+    expect(code).toBe(1);
+    expect(logs).toHaveLength(1);
+    const doc = JSON.parse(logs[0]!);
+    expect(doc).toMatchObject({ ok: false, code: "findings" });
+    expect(doc.data.findings[0].kind).toBe("dead_end");
+    expect(doc.next.length).toBeGreaterThan(0);
   });
 });

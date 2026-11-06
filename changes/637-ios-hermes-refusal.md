@@ -1,0 +1,1 @@
+- ios-e2e: `scripts/ios-e2e` can build a release with a different Hermes bytecode version (`MISMATCH_HERMES=1 make-release.mjs`), and `analyze.mjs` reports a "Hermes mismatch refused" pass or fail from the telemetry log and the app's running release. No change to published packages (#637).

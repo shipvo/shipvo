@@ -43,6 +43,53 @@ Not covered:
 - `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login does not work offline, so only the routes the smoke script uses are exercised.
 - This is not a production setup.
 
+## Back up and upgrade
+
+This is for the Docker control plane above. All state (the local D1 database and KV data) is in one place: the Docker volume `control-plane-data`, mounted at `/data`. Compose prefixes the project name, so from `services/control-plane` the volume is called `control-plane_control-plane-data` (check with `docker volume ls`). The image holds no state, and `docker compose down -v` deletes the volume.
+
+`scripts/selfhost-upgrade-check.mjs` proves the data survived. `seed` registers an app, publishes a signed pointer and writes `{appId, pointer}` to `selfhost-upgrade-check.json` (change the path with `UPGRADE_CHECK_FILE`). `verify` reads that file and exits 1 unless the server still serves the same pointer. Both use `SHIPVO_LOCAL_DEV_KEY` like the smoke script.
+
+### Back up
+
+Stop the control plane first, so the files are not copied mid-write. Run these in `services/control-plane`:
+
+```bash
+docker compose stop
+mkdir -p backup
+docker run --rm -v control-plane_control-plane-data:/data:ro -v "$PWD/backup":/backup node:22-bookworm-slim \
+  tar czf /backup/control-plane-data.tgz -C /data .
+docker compose start
+```
+
+### Restore
+
+Into a new, empty volume (after `docker compose down -v`, or on another machine):
+
+```bash
+docker volume create control-plane_control-plane-data
+docker run --rm -v control-plane_control-plane-data:/data -v "$PWD/backup":/backup:ro node:22-bookworm-slim \
+  tar xzf /backup/control-plane-data.tgz -C /data
+docker compose up -d
+```
+
+### Upgrade
+
+The compose file builds the image from this repository (`build:`), so there is no image to pull. You upgrade by updating the checkout and rebuilding.
+
+1. Before you change anything, with the server running, record a pointer: `node ../../scripts/selfhost-upgrade-check.mjs seed http://localhost:8787`. Do this once per environment; skip it if you already have a `selfhost-upgrade-check.json` from the same server.
+2. Back up the volume (above).
+3. Note the version you run now: `git rev-parse HEAD`.
+4. Update the code: `git pull`.
+5. Rebuild and restart: `docker compose up --build -d`. On start the container applies any new files in `migrations/` to the existing database.
+6. Run `node ../../scripts/selfhost-upgrade-check.mjs verify http://localhost:8787`. It prints `PASS` and exits 0 when the earlier release is still served. If it exits 1, the message says what is missing; roll back.
+
+### Roll back
+
+1. `docker compose down` (no `-v`).
+2. Check out the version from step 3: `git checkout <commit>`.
+3. If the failed upgrade changed or lost data, restore the backup into an empty volume (see Restore). Run `docker compose down -v` first so the volume is empty.
+4. `docker compose up --build -d`, then run `verify` again.
+
 ## Point apps at it
 
 In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `controlPlane: "https://your-domain"`, and in `shipvo.json`: `kv: { namespaceId: "<POINTERS id>" }`. Publishing needs a Cloudflare API token with *Workers KV Storage: Edit* on the account (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), plus `SHIPVO_SIGNING_SEED`.
@@ -65,6 +112,19 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 ## Routes
 
 `GET /p/:app/:major/:band` pointer · `GET /b/:app/:file` bundle · `GET /w/:app/releases.json`, `GET /w/:app/:rel/*` web artifact · `GET /c/:app/content.json` live content · `POST /o/:app` orders · `POST /t` telemetry, `GET /t/:app` summary · `GET /app/:id/admin` admin · `GET /app/:id/api/describe`, `POST /app/:id/api/command` owner API (bearer `OWNER_TOKEN` or admin session).
+
+## Roles
+
+The control plane defines four roles. **Roles are not enforced yet.** Today the existing tokens and admin session decide access. A later change will tie roles to tokens and SSO.
+
+| Action | viewer | developer | release_manager | admin |
+|---|---|---|---|---|
+| `read_summary`, `read_audit` | yes | yes | yes | yes |
+| `publish` (lowest band) | no | yes | yes | yes |
+| `promote`, `approve_hold`, `rollback`, `halt` | no | no | yes | yes |
+| `manage_tokens`, `manage_app` | no | no | no | yes |
+
+Each role has everything the one before it has. Unknown roles and actions are denied. The table is in `services/control-plane/src/roles.ts`.
 
 ## Revert alerts (webhook)
 
@@ -95,5 +155,7 @@ To stop a mismatched bundle at publish time, set `hermesBytecodeVersion` in `shi
 Limits. The recorded range is the one in `package.json`, not the installed version. `react-native` and `expo` have native code too, so they are recorded: a shell that sends `?nm=` must list them in `native_modules`, or every release is refused. Ranges that are not plain numeric semver (tags, git, `workspace:`, pre-release such as `^1.0.0-beta.1`) are not recorded, and `shipvo publish` prints a note naming them. An empty `?nm=` means the shell has no native modules.
 
 ## Trust model, in one paragraph
+
+The full threat table, with the code and test behind each row and a list of gaps, is in [docs/threat-model.md](threat-model.md).
 
 The shell carries the Ed25519 public key and the control plane URL as native manifest meta-data. Pointers are signed with the matching seed, which lives only in your CI secrets; the control plane never has it, so a compromised control plane can serve stale or no releases but cannot forge one. Bundles are verified by SHA-256 and size before staging; patches are verified by the hash of the *result*. A release can never add a permission the shell did not declare, because it is JavaScript running on the shell's native modules.

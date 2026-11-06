@@ -3,14 +3,15 @@
 // so the video lasts as long as the recording even when screenshots are slow or the machine is busy.
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type Format = "9:16" | "16:9" | "1:1";
 export const SIZES: Record<Format, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 }, "16:9": { width: 1920, height: 1080 }, "1:1": { width: 1080, height: 1080 },
 };
 export type Chapter = { t: number; caption: string };
-export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[] };
+export type Recording = { file: string; duration_s: number; width: number; height: number; chapters: Chapter[]; credits?: string; notes?: string[] };
 export class RecorderError extends Error { constructor(public code: string, message: string) { super(message); } }
 
 type Page = { screenshot(o: { type: "jpeg"; quality: number }): Promise<Buffer>; goto(u: string, o?: object): Promise<unknown>; evaluate?(f: string): Promise<unknown> };
@@ -113,7 +114,7 @@ export class Recorder {
     this.chapters.push(c); return c;
   }
 
-  async stop(): Promise<Recording> {
+  async stop(o: { music?: boolean; narration?: string } = {}): Promise<Recording> {
     if (!this.running) throw new RecorderError("no_recording", "no recording is running: call record_start first");
     this.running = false; this.stopping = true;
     try {
@@ -138,8 +139,14 @@ export class Recorder {
         } else if (existsSync(raw)) renameSync(raw, file);
         rmSync(raw, { force: true });
       }
-      const out = { file, duration_s, ...size, chapters };
+      const out: Recording = { file, duration_s, ...size, chapters };
       if (code !== 0) throw new RecorderError("encode_failed", `ffmpeg failed${code === -1 ? " to start (is it installed?)" : ""}: ${err.trim().slice(0, 300)}`);
+      let vo: string | undefined;
+      if (o.narration) {
+        const r = addNarration(file, o.narration, !!o.music); vo = r.vo;
+        if (r.trimmed) out.notes = [`narration was ${r.alen.toFixed(1)} s and the video is ${r.vlen.toFixed(1)} s: the narration was trimmed to the video length`];
+      }
+      try { if (o.music) out.credits = addMusic(file, vo); } finally { if (vo) rmSync(vo, { force: true }); }
       return out;
     } finally { rmSync(this.framesDir, { recursive: true, force: true }); this.stopping = false; }
   }
@@ -163,4 +170,40 @@ export class Recorder {
     try { await this.browser?.close(); } catch {}
     this.browser = this.page = this.loop = undefined;
   }
+}
+
+/** Mix a ducked music bed under the finished MP4 with scripts/video/bgmusic.py and write <name>.credits.json next to it. Returns the credits path.
+ *  SHIPVO_BGMUSIC points at the script; SHIPVO_MUSIC_FILE uses a local track instead of picking and downloading one. */
+function addMusic(file: string, narration?: string): string {
+  const script = process.env.SHIPVO_BGMUSIC ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "scripts", "video", "bgmusic.py");
+  if (!existsSync(script)) throw new RecorderError("music_unavailable", `music needs bgmusic.py, not found at ${script}: set SHIPVO_BGMUSIC`);
+  const credits = file.replace(/\.mp4$/, ".credits.json"), work = file.replace(/\.mp4$/, ".music"), tmp = join(work, "mixed.mp4");
+  mkdirSync(work, { recursive: true });
+  try {
+    const track = process.env.SHIPVO_MUSIC_FILE;
+    const args = track ? ["mix", "--music", track] : ["auto", "--want", "cinematic,documentary,corporate", "--outdir", join(work, "tracks")];
+    const r = spawnSync("python3", [script, ...args, "--video", file, ...(narration ? ["--narration", narration] : []), "--out", tmp, "--work", work, "--credits", credits], { encoding: "utf8" });
+    if (r.error || r.status !== 0 || !existsSync(tmp)) throw new RecorderError("music_failed", `could not mix music${r.error ? " (is python3 installed?)" : ""}: ${String(r.error?.message ?? r.stderr).trim().split("\n").slice(-2).join(" ").slice(0, 300)}. The silent video is at ${file}`);
+    renameSync(tmp, file);
+    return credits;
+  } finally { rmSync(work, { recursive: true, force: true }); }
+}
+
+const probeDur = (f: string) => { const r = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f], { encoding: "utf8" }); const d = parseFloat(r.stdout); return r.status === 0 && d > 0 ? d : NaN; };
+
+/** Add a narration wav to the silent MP4. The wav is cut to the video length and padded with silence if shorter, so the audio matches the video.
+ *  With `forMusic` the trimmed wav is left next to the video for the music mixer (the caller deletes it) and the video is not changed. */
+function addNarration(file: string, wav: string, forMusic: boolean): { trimmed: boolean; alen: number; vlen: number; vo?: string } {
+  const bad = (why: string) => new RecorderError("narration_unreadable", `${why}. The silent video is at ${file}`);
+  if (!existsSync(wav)) throw bad(`narration file not found: ${wav}`);
+  const alen = probeDur(wav), vlen = probeDur(file);
+  if (!(alen > 0)) throw bad(`narration file is not readable audio: ${wav}`);
+  const trimmed = alen > vlen + 0.05;
+  const tmp = file.replace(/\.mp4$/, forMusic ? ".narration.wav" : ".narrated.mp4");
+  const args = forMusic ? ["-i", wav, "-t", vlen.toFixed(3), tmp]
+    : ["-i", file, "-i", wav, "-map", "0:v", "-map", "1:a", "-af", "apad", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-t", vlen.toFixed(3), "-movflags", "+faststart", tmp];
+  const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", ...args]);
+  if (r.status !== 0 || !existsSync(tmp)) { rmSync(tmp, { force: true }); throw bad(`could not add narration: ${String(r.stderr).trim().split("\n").slice(-1)[0].slice(0, 200)}`); }
+  if (forMusic) return { trimmed, alen, vlen, vo: tmp };
+  renameSync(tmp, file); return { trimmed, alen, vlen };
 }

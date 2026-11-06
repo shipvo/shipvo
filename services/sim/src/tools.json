@@ -349,44 +349,6 @@
      },
      "additionalProperties": false
     },
-    "biometrics": {
-     "type": "object",
-     "properties": {
-      "enrolled": {
-       "type": "boolean"
-      },
-      "nextResult": {
-       "type": "string",
-       "enum": [
-        "success",
-        "fail",
-        "cancel"
-       ]
-      }
-     },
-     "additionalProperties": false
-    },
-    "payment": {
-     "type": "object",
-     "properties": {
-      "nextResult": {
-       "type": "string",
-       "enum": [
-        "approve",
-        "decline",
-        "timeout",
-        "insufficient_funds"
-       ]
-      },
-      "pin": {
-       "type": "string"
-      }
-     },
-     "additionalProperties": false
-    },
-    "online": {
-     "type": "boolean"
-    },
     "contacts": {
      "type": "array",
      "items": {
@@ -482,6 +444,97 @@
       "additionalProperties": false
      },
      "description": "Replace the files the file picker offers"
+    },
+    "biometrics": {
+     "type": "object",
+     "properties": {
+      "enrolled": {
+       "type": "boolean"
+      },
+      "nextResult": {
+       "type": "string",
+       "enum": [
+        "success",
+        "fail",
+        "cancel"
+       ]
+      }
+     },
+     "additionalProperties": false
+    },
+    "payment": {
+     "type": "object",
+     "properties": {
+      "nextResult": {
+       "type": "string",
+       "enum": [
+        "approve",
+        "decline",
+        "timeout",
+        "insufficient_funds"
+       ]
+      },
+      "pin": {
+       "type": "string"
+      }
+     },
+     "additionalProperties": false
+    },
+    "online": {
+     "type": "boolean"
+    },
+    "wifi": {
+     "type": "boolean"
+    },
+    "mobileData": {
+     "type": "boolean"
+    },
+    "airplane": {
+     "type": "boolean"
+    },
+    "locationServices": {
+     "type": "boolean"
+    },
+    "darkMode": {
+     "type": "boolean",
+     "description": "The app's colour scheme (prefers-color-scheme)"
+    },
+    "dnd": {
+     "type": "boolean",
+     "description": "Do Not Disturb: notifications go to the shade without a banner"
+    },
+    "autoRotate": {
+     "type": "boolean"
+    },
+    "flashlight": {
+     "type": "boolean"
+    },
+    "orientationLock": {
+     "type": "boolean"
+    },
+    "brightness": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 100
+    },
+    "source": {
+     "type": "string",
+     "enum": [
+      "auto",
+      "simulated"
+     ],
+     "description": "\"simulated\" forces the simulated camera, microphone and location even when a person could grant the real ones, for reproducible runs"
+    },
+    "microphone": {
+     "type": "object",
+     "properties": {
+      "level": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      }
+     },
+     "additionalProperties": false
     }
    },
    "required": [
@@ -489,6 +542,10 @@
    ],
    "additionalProperties": false,
    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "annotations": {
+   "readOnlyHint": false,
+   "destructiveHint": false
   },
   "execution": {
    "taskSupport": "forbidden"
@@ -656,6 +713,219 @@
    ],
    "additionalProperties": false,
    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "open_notifications",
+  "description": "Pull down from the top. Android: the first call opens the notification shade (a few quick-settings tiles and the notifications); a second call expands all tiles. iPhone: opens Notification Center (grouped by app). Returns the tiles and notifications.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "expand": {
+     "type": "boolean",
+     "description": "Android: go straight to all tiles"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "annotations": {
+   "readOnlyHint": false,
+   "destructiveHint": false
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "open_control_center",
+  "description": "iPhone only: swipe down from the top right to open Control Center (airplane, Wi-Fi, mobile data, focus, orientation lock, brightness, dark mode). Android fails with no_control_center: use open_notifications.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "annotations": {
+   "readOnlyHint": false,
+   "destructiveHint": false
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "toggle_tile",
+  "description": "Flip a quick-settings tile in the open shade or Control Center. It changes the simulated device like set_device: Wi-Fi and mobile data both off take the network offline, dark_mode changes the app's colour scheme, dnd stops banners. Tiles: wifi, mobile_data, airplane, location, dark_mode, dnd, auto_rotate, flashlight (Android); airplane, wifi, mobile_data, focus, orientation_lock, brightness, dark_mode (iPhone). Fails with tile_not_visible if the panel is closed.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "tile": {
+     "type": "string"
+    },
+    "value": {
+     "type": [
+      "boolean",
+      "number"
+     ],
+     "description": "true or false; 0 to 100 for brightness. Omit to flip."
+    }
+   },
+   "required": [
+    "session",
+    "tile"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "annotations": {
+   "readOnlyHint": false,
+   "destructiveHint": false
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "get_settings",
+  "description": "Read the phone's system settings from the Settings screen: dark_mode, font_size (small, default, large, largest), bold_text, reduce_motion, language (en, fr, ar) and rtl. Returns each setting and the screen as rows.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "annotations": {
+   "readOnlyHint": true,
+   "destructiveHint": false
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "set_setting",
+  "description": "Change one system setting, as a person would in the phone's Settings screen. The app sees it through Appearance (dark_mode), PixelRatio.getFontScale (font_size), AccessibilityInfo (bold_text, reduce_motion), I18nManager (rtl) and Intl (language). Setting language to ar turns rtl on; en and fr turn it off. Fails with unknown_setting for a key that does not exist and bad_value for a value it does not take. Logged in device_log as simulated.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "key": {
+     "type": "string",
+     "description": "dark_mode, font_size, bold_text, reduce_motion, language or rtl"
+    },
+    "value": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "string"
+      }
+     ],
+     "description": "true or false for switches; small, default, large or largest for font_size; en, fr or ar for language"
+    }
+   },
+   "required": [
+    "session",
+    "key",
+    "value"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "annotations": {
+   "readOnlyHint": false,
+   "destructiveHint": false
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "dismiss_notification",
+  "description": "Swipe a notification away in the open shade (newest if no id), or Clear all with all: true.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    },
+    "id": {
+     "type": "string"
+    },
+    "all": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "annotations": {
+   "readOnlyHint": false,
+   "destructiveHint": false
+  },
+  "execution": {
+   "taskSupport": "forbidden"
+  }
+ },
+ {
+  "name": "close_panels",
+  "description": "Close the notification shade, Notification Center or Control Center (swipe up).",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string",
+     "description": "Session from open_app"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "annotations": {
+   "readOnlyHint": false,
+   "destructiveHint": false
   },
   "execution": {
    "taskSupport": "forbidden"
