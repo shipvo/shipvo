@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
-import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand } from "./owner";
+import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand, holdRelease, HOLD_COMMAND } from "./owner";
 import { auth } from "./auth";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
@@ -17,7 +17,7 @@ import { decideOffer, type OfferResult } from "./offer";
 import { TELEMETRY_LIMITS, check as rateCheck } from "./ratelimit";
 import { REPORT_TTL_SECONDS, maxReportBytes, reportKey, sanitizeReport, summarize, type StoredReport } from "./tests-report";
 import { installs, verifyReport } from "./installs";
-import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, type InstallVote } from "./halt";
+import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, looksLikeAttack, type InstallVote } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string; VAULT_MASTER_KEY?: string; MAIL_WEBHOOK_URL?: string; PEOPLE_LOGIN_URL?: string; PHONE_APP_DATA_MAX_BYTES?: string; MAX_TEST_REPORT_BYTES?: string };
 const app = new Hono<{ Bindings: Env }>();
@@ -155,6 +155,17 @@ app.get("/b/:app/:file", async (c) => {
   return new Response(buf, { headers });
 });
 
+/** Failure reports in the last 10 minutes, and the app's normal count per 10 minutes over the 24 hours before that. */
+async function failureRates(env: Env, appId: string, release: number): Promise<{ recentReports: number; normalRate: number }> {
+  const failedList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
+  const now = Date.now(), iso = (ms: number) => new Date(ms).toISOString();
+  const r = (await env.DB.prepare(
+    `SELECT SUM(received_at >= ?) AS recent, SUM(received_at < ?) AS earlier FROM telemetry WHERE app_id = ? AND verified = 1 AND event IN (${failedList}) AND received_at >= ?`
+  ).bind(iso(now - 600_000), iso(now - 600_000), appId, iso(now - 600_000 - 86_400_000)).all<{ recent: number | null; earlier: number | null }>()).results?.[0];
+  void release;
+  return { recentReports: Number(r?.recent ?? 0), normalRate: Number(r?.earlier ?? 0) / 144 };
+}
+
 /**
  * Write KV `halt/<app>` when a release fails on too many devices. Settings live in KV `halt-config/<app>`:
  * {"threshold": number, "min_reports": number}. No config key means halting is off.
@@ -173,15 +184,28 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const failedList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
   const healthyList = HEALTHY_EVENTS.map((e) => `'${e}'`).join(",");
   const rows = (await env.DB.prepare(
-    `SELECT t.install_id AS install_id, i.net_hash AS net_hash, MAX(t.event IN (${failedList})) AS failed, MAX(t.event IN (${healthyList})) AS healthy ` +
+    `SELECT t.install_id AS install_id, i.net_hash AS net_hash, i.created_at AS created_at, MAX(t.event IN (${failedList})) AS failed, MAX(t.event IN (${healthyList})) AS healthy ` +
     "FROM telemetry t LEFT JOIN installs i ON i.app_id = t.app_id AND i.install_id = t.install_id " +
-    "WHERE t.app_id = ? AND t.release = ? AND t.verified = 1 AND t.install_id IS NOT NULL GROUP BY t.install_id, i.net_hash"
-  ).bind(appId, release).all<{ install_id: string; net_hash: string | null; failed: number; healthy: number }>()).results ?? [];
+    "WHERE t.app_id = ? AND t.release = ? AND t.verified = 1 AND t.install_id IS NOT NULL GROUP BY t.install_id, i.net_hash, i.created_at"
+  ).bind(appId, release).all<{ install_id: string; net_hash: string | null; created_at?: string | null; failed: number; healthy: number }>()).results ?? [];
   const votes: InstallVote[] = rows.map((r) => ({ install_id: r.install_id, net_hash: r.net_hash, failed: !!r.failed, healthy: !!r.healthy }));
   const counts = tallyVotes(votes);
   const verdict = shouldHalt(counts, { threshold, minReports, minInstalls });
   if (!verdict.halt) return;
   const key = `halt/${appId}`;
+  // Fresh fake installs or a sudden burst: keep the release at its band and ask the owner instead of halting.
+  const failingInstalls = rows.filter((r) => r.failed).map((r) => {
+    const t = r.created_at ? Date.parse(r.created_at) : NaN;
+    // No registration time means no evidence that the install is fresh, so it counts as established.
+    return { install_id: r.install_id, registered_at: Number.isNaN(t) ? 0 : t };
+  });
+  const attack = looksLikeAttack({ failingInstalls, ...(await failureRates(env, appId, release)) });
+  if (attack.suspicious) {
+    const cur = await env.POINTERS.get(key);
+    if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* fall through */ } }
+    await holdRelease({ kv: env.POINTERS, appId, actor: "halt-rule" }, release, attack.reason!, { reports: verdict.reports, failed: counts.failed, threshold });
+    return;
+  }
   // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
   const cur = await env.POINTERS.get(key);
   if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
@@ -189,6 +213,15 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   await env.POINTERS.put(key, JSON.stringify(halted));
   // recordAudit never throws, so a failed audit write cannot undo or block the halt.
   await recordAudit(env.DB, { app_id: appId, actor: "halt-rule", actor_kind: "system", action: "halt", release, before: null, after: JSON.stringify({ release, reports: verdict.reports, failed: counts.failed, threshold }) });
+}
+
+/** Owner confirmed a held release: halt it now. A dismissed hold needs nothing, the pending entry is already cleared. */
+async function applyHold(env: Env, appId: string, ch: { release?: number; id: string }, actor: string): Promise<void> {
+  const release = ch.release;
+  if (!Number.isInteger(release)) return;
+  const halted = { release, halted_at: new Date().toISOString(), confirmed_by: actor, approval_id: ch.id };
+  await env.POINTERS.put(`halt/${appId}`, JSON.stringify(halted));
+  await recordAudit(env.DB, { app_id: appId, actor, actor_kind: "person", action: "halt", release: release!, before: null, after: JSON.stringify(halted) });
 }
 
 /** Device telemetry for the spike: applied / reverted / timings. */
@@ -459,6 +492,7 @@ for (const verb of ["approve", "deny"] as const) app.post(`/app/:id/api/approval
   if (!actor) return c.json({ error: "unauthorized" }, 401);
   if (actor === AGENT_ACTOR) return c.json({ ok: false, error: { code: "agent_cannot_approve", message: "Only the owner signed in to the admin can decide an approval. A token cannot." } }, 403);
   const r = await resolveChallenge({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, c.req.param("cid"), verb, actor, "admin session");
+  if (r.ok && r.challenge.command === HOLD_COMMAND && verb === "approve") await applyHold(c.env, appId, r.challenge, actor);
   return c.json(r, r.ok ? 200 : r.error.code === "approval_not_found" ? 404 : 409);
 });
 
