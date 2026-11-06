@@ -11,12 +11,17 @@ export function screenRoute(name: string): string | null {
   return name === "home" ? "/" : `/${name}`;
 }
 
+/** The screens to capture or walk: routable ones only, first four. Shared by `ci shots` and `explore --changed-from`. */
+export function routableScreens(screens: string[]): (readonly [string, string])[] {
+  return screens.map((s) => [s, screenRoute(s)] as const).filter((r): r is readonly [string, string] => r[1] !== null).slice(0, MAX);
+}
+
 export type Shoot = (route: string) => Promise<Uint8Array>;
 
 /** Capture up to four screens. A screen that fails is reported and skipped. Returns the files written. */
 export async function captureScreens(screens: string[], shoot: Shoot, outDir: string, log: (s: string) => void = console.log): Promise<string[]> {
   const written: string[] = [];
-  const routes = screens.map((s) => [s, screenRoute(s)] as const).filter((r): r is readonly [string, string] => r[1] !== null).slice(0, MAX);
+  const routes = routableScreens(screens);
   if (!routes.length) return written;
   mkdirSync(outDir, { recursive: true });
   for (const [name, route] of routes) {
