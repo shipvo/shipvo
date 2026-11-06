@@ -9,6 +9,15 @@ const yaml = createRequire(import.meta.url)("js-yaml") as { load: (s: string) =>
 const TEMPLATE = join(__dirname, "..", "..", "..", "templates", "capacitor", "github-actions", "build.yml");
 const quiet = () => { vi.spyOn(console, "log").mockImplementation(() => {}); vi.spyOn(console, "error").mockImplementation(() => {}); };
 
+describe("shipvo ci check --changed-from", () => {
+  it.each([[["check", "--changed-from"]], [["check", "--changed-from", "--foo"]]])("rejects a missing value %j with exit 2", async (argv) => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await ci(argv)).toBe(2);
+    expect(err.mock.calls[0]![0]).toMatch(/needs a commit sha/);
+    err.mockRestore();
+  });
+});
+
 describe("shipvo ci init", () => {
   it("writes the workflow file", async () => {
     quiet();

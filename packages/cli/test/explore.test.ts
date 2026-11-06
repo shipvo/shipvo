@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { walk, elements, renderMarkdown, explore, type Driver, type Reply } from "../src/explore.js";
+import { walk, elements, renderMarkdown, explore, routesFromChange, type Driver, type Reply } from "../src/explore.js";
+
+const changed = vi.hoisted(() => ({ files: [] as string[], fail: false }));
+vi.mock("../src/ci-comment.js", async (orig) => ({
+  ...(await orig<typeof import("../src/ci-comment.js")>()),
+  changedFiles: () => { if (changed.fail) throw new Error("bad revision"); return changed.files; },
+}));
 
 // A fixture app: Home has a button that crashes, an unnamed button, a link to Settings and a link to a dead end.
 const SCREENS: Record<string, string> = {
@@ -191,5 +197,27 @@ describe("explore --json", () => {
     expect(doc).toMatchObject({ ok: false, code: "findings" });
     expect(doc.data.findings[0].kind).toBe("dead_end");
     expect(doc.next.length).toBeGreaterThan(0);
+  });
+});
+
+describe("routesFromChange", () => {
+  it("walks only changed routable screens, at most four", async () => {
+    changed.fail = false;
+    changed.files = ["app/a.tsx", "app/b.tsx", "app/c.tsx", "app/d.tsx", "app/e.tsx", "app/[id].tsx", "README.md"];
+    const r = await routesFromChange("abc");
+    expect(r.onlyRoutes).toBe(true);
+    expect(r.routes).toEqual(["/a", "/b", "/c", "/d"]);
+  });
+  it("walks nothing when no screen changed", async () => {
+    changed.fail = false; changed.files = ["README.md", "app/[id].tsx"];
+    expect(await routesFromChange("abc")).toEqual({ routes: [], onlyRoutes: true });
+  });
+  it("falls back to the full walk when the diff cannot be read", async () => {
+    changed.fail = true;
+    const logs: string[] = [];
+    const r = await routesFromChange("abc", (s) => logs.push(s));
+    changed.fail = false;
+    expect(r).toEqual({ onlyRoutes: false });
+    expect(logs[0]).toMatch(/^could not read the diff: bad revision/);
   });
 });

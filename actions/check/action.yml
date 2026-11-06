@@ -31,6 +31,7 @@ runs:
         for i in $(seq 1 90); do curl -sf http://localhost:4545/app/ > /dev/null && break; sleep 2; done
         rc=0
         cr=0
+        # BASE_SHA is empty on push events, so the full walk runs there.
         npx shipvo ci check ${BASE_SHA:+--changed-from "$BASE_SHA"} || rc=$?
         if [ "$EVENT_NAME" = "pull_request" ]; then
           # Screenshots need the PR build on port 4545, so they run before the PR simulator is stopped.

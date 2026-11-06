@@ -233,6 +233,19 @@ export async function explore(argv: string[]): Promise<number> {
   }
 }
 
+/**
+ * Routes to walk for `--changed-from <sha>`: the changed, routable screens (up to four).
+ * If the diff cannot be read (for example a shallow checkout without the base commit), say so and fall back to the full walk.
+ */
+export async function routesFromChange(sha: string, log: (s: string) => void = console.error): Promise<{ routes?: string[]; onlyRoutes: boolean }> {
+  const { changedFiles, changedScreens } = await import("./ci-comment.js");
+  const { routableScreens } = await import("./ci-shots.js");
+  let files: string[];
+  try { files = changedFiles(sha); }
+  catch (e) { log(`could not read the diff: ${e instanceof Error ? e.message : e}. Walking the whole app.`); return { onlyRoutes: false }; }
+  return { routes: routableScreens(changedScreens(files)).map(([, r]) => r), onlyRoutes: true };
+}
+
 async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const a = parse(argv); const cfg = loadConfig();
   const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
@@ -243,15 +256,12 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     let routes = cfg.routes, onlyRoutes = false;
     if (a["changed-from"] !== undefined) {
       if (a["changed-from"] === "true") throw new Error("--changed-from needs a commit sha");
-      // Walk only the screens whose files changed. No routable change means nothing to walk.
-      const { changedFiles, changedScreens } = await import("./ci-comment.js");
-      const { screenRoute } = await import("./ci-shots.js");
-      routes = changedScreens(changedFiles(a["changed-from"])).map(screenRoute).filter((r): r is string => r !== null).slice(0, 4);
-      onlyRoutes = true;
+      ({ routes = cfg.routes, onlyRoutes } = await routesFromChange(a["changed-from"]));
     }
     const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
-    writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
+    const nothingChanged = onlyRoutes && !routes?.length;
+    writeFileSync(`${out}.md`, (nothingChanged ? "No screens changed, nothing explored.\n\n" : "") + renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
     let issueInfo: Record<string, unknown> = {};
     const line = `${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`;
     if (a["issues-dir"] !== undefined) {
