@@ -20,7 +20,7 @@ const ADDED = /\badded\b|in (?:your )?(?:cart|bag|basket)/i;
 const ADD_BTN = /^add\b.*\b(cart|bag|basket)\b|^add (?:\d+ )?to (?:cart|bag|basket)/i;
 const CART_NAV = /\b(cart|bag|basket|checkout)\b/i;
 /** Controls that look like a product: a price in the label, or the word product. */
-const PRODUCT = /\d[\d\s.,]*\s?(?:FCFA|XAF|USD|EUR|GBP|[$€£])|[$€£]\s?\d|\bproduct\b/i;
+const PRODUCT = /\d[\d\s.,]*\s?(?:FCFA|XAF|USD|EUR|GBP|[$€£])|[$€£]\s?\d/i;
 const NAV_ONLY = /^(back|go back|close|home|menu|settings|about)\b/i;
 
 class Fail extends Error {}
@@ -157,15 +157,20 @@ async function checkoutFlow(s: Session, invalid: boolean): Promise<FlowRun> {
   const isCheckout = (t: string) => (elements(t).find((e) => /check ?out|choose delivery|place order|proceed to pay/i.test(e.name)) ? t : null);
   if (!(await locate(s, isCheckout, CART_NAV))) return { status: "not_found", message: "No checkout control found after adding to the cart", steps: s.steps };
   const tapped = new Set<string>();
+  let submitted = false;
   for (let i = 0; i < 10; i++) {
     if (ORDER_DONE.test(s.screen)) return invalid ? { status: "failed", message: "The order went through with invalid input", step: describeStep(s.steps[s.steps.length - 1]!), steps: s.steps } : { status: "passed", message: "The order was placed", steps: s.steps };
+    // Invalid input: once a submit leaves the form in place, the app rejected it. Picking another option (such as pickup) would skip the bad field.
+    if (invalid && submitted && fieldsOf(s.screen).length) break;
     await s.fill(invalid);
     const key = (e: El) => `${signature(s.screen)}|${e.role}|${e.name}|${e.nth}`;
     const cands = [...s.buttons(FINAL), ...s.buttons(CHOICE), ...s.buttons(/check ?out|choose delivery/i), ...s.buttons(NEXT)].filter((e) => !tapped.has(key(e)) && !FIELD_ROLES.has(e.role));
     const next = cands[0];
     if (!next) break;
     tapped.add(key(next));
+    const hadFields = fieldsOf(s.screen).length > 0;
     await s.tap(next);
+    if (hadFields && FINAL.test(next.name)) submitted = true;
   }
   if (ORDER_DONE.test(s.screen)) return invalid ? { status: "failed", message: "The order went through with invalid input", step: describeStep(s.steps[s.steps.length - 1]!), steps: s.steps } : { status: "passed", message: "The order was placed", steps: s.steps };
   if (invalid) return { status: "passed", message: "Checkout did not complete with invalid input", steps: s.steps };
