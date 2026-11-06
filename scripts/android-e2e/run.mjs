@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { startServer } from "./server.mjs";
 import { publishRelease } from "./release.mjs";
-import { FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, releaseReached, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
+import { FULL_BUNDLE_SCENARIO, ROLLBACK_SCENARIO, rollbackVerdict, rolledBackEvent, tapTarget, firstRunFrom, hermesVersionOf, median, otherHermesVersion, parseLog, refusalReason, releaseReached, withHermesVersion, phaseTimeline, sha256, steadyTrials, telemetry } from "./lib.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const APK = resolve(arg("apk", "shell.apk")), BUNDLES = resolve(arg("bundles", "bundles")), KEY = JSON.parse(readFileSync(arg("key", "key.json"), "utf8"));
@@ -163,6 +163,29 @@ await scenario("rollback to the previous release", async () => {
     trials.push({ ...t, rolledBackToRelease: target.rel, deviceBundleMatches: onDevice === sha256(target.bytes) });
   }
   return { pass: trials.every((t) => t.ok && t.deviceBundleMatches), trials, median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "applyMs"]) };
+});
+
+await scenario(ROLLBACK_SCENARIO, async () => {
+  // A and B are both healthy releases. A is the one running before the last update, so the runtime keeps it as `previous`.
+  const a = await updateTrial(bundle("v" + AFTER_PATCH), []); if (!a.ok) throw new Error("release A did not become healthy");
+  const b = await updateTrial(bundle("v1"), []); if (!b.ok) throw new Error("release B did not become healthy");
+  if (!pid()) launch();
+  const dump = () => { sh("uiautomator dump /sdcard/ui.xml"); return sh("cat /sdcard/ui.xml"); };
+  let target = null; await waitFor(() => (target = tapTarget(dump(), "Roll back to previous release")), 20_000, 1000);
+  if (!target) throw new Error("the rollback button was not found on screen");
+  const t0 = Date.now(); sh(`input tap ${target.x} ${target.y}`);
+  const goodEv = await waitFor(() => healthy(a.release, t0), 30_000);
+  const goodActiveMs = goodEv ? goodEv.at - t0 : null;
+  await sleep(25_000); // two or more check-ins while the pointer still names B
+  const badRefetched = entries().some((e) => e.t >= t0 && e.path.startsWith("/b/") && e.path.includes(`r${b.release}.`));
+  stop(); await sleep(800); const t1 = Date.now(); launch();
+  const again = await waitFor(() => healthy(a.release, t1), 30_000);
+  const wrong = tele().find((e) => e.event === "applied" && e.release === b.release && e.at >= t1 && e.bytes_downloaded === undefined);
+  const ev = await waitFor(() => rolledBackEvent(tele(), b.release, t0), 15_000);
+  const prefsAfter = prefs(), running = wrong ? b.release : again ? a.release : null;
+  const v = rollbackVerdict({ good: a.release, bad: b.release, prefs: prefsAfter, runningAfterRelaunch: running, badRefetched, telemetryEvent: ev, goodActiveMs });
+  if (running === a.release) history.pop(); // the device runs A again, so later scenarios must treat A as the running release
+  return { pass: v.pass && !fatal(), failures: v.failures, goodRelease: a.release, rolledBackRelease: b.release, rollbackToGoodActiveMs: goodActiveMs, runningAfterRelaunch: running, currentAfter: prefsAfter.current_release, blockedAfter: prefsAfter.blocked_release ?? 0, badRefetched, telemetryEvent: ev?.event ?? null };
 });
 
 // Runs before the crash-loop scenarios: a crash-loop failure can leave the app open but dead (see the late-crash notes), and

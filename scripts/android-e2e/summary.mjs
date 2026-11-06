@@ -11,6 +11,7 @@ export function rows(report) {
     const t = [m.pointerToHealthyMs != null && `pointer to healthy ${ms(m.pointerToHealthyMs)}`, m.downloadMs != null && `download ${ms(m.downloadMs)}`, m.applyMs != null && `apply ${ms(m.applyMs)}`,
       m.totalMs != null && `am start -W ${ms(m.totalMs)}`, m.reportedColdStartMs != null && `reported cold start ${ms(m.reportedColdStartMs)}`, m.restoredMs != null && `restored ${ms(m.restoredMs)} after publish`, m.boots != null && `${m.boots} launches`,
       s.pointerToHealthyMs != null && `pointer to healthy ${ms(s.pointerToHealthyMs)}`, s.joinedAfterWideningMs != null && `joined ${ms(s.joinedAfterWideningMs)} after widening`,
+      s.rollbackToGoodActiveMs !== undefined && (s.pass ? `rollback call to previous release active ${ms(s.rollbackToGoodActiveMs)}; kept after restart; rolled_back reported` : `rollback ${s.rollbackToGoodActiveMs == null ? "never took effect" : "active " + ms(s.rollbackToGoodActiveMs)}: ${(s.failures ?? []).join("; ") || s.error || "failed"}`),
       s.refusalReason !== undefined && `${s.pass ? "refused" : "not refused"}, reason from telemetry: ${s.refusalReason ?? "none"}`].filter(Boolean).join("; ") || "-";
     const size = m.downloadBytes != null ? kb(m.downloadBytes) : s.downloadBytes != null ? kb(s.downloadBytes) : "-";
     return `| ${s.name} | ${s.pass ? "pass" : "FAIL"} | ${t} | ${size} |`;

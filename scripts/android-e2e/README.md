@@ -27,6 +27,10 @@ How times are taken: the server and the runner share one clock. "Pointer publish
 
 Run time: a full run takes about 18 minutes (the crash-loop scenarios alone take about 10). If you run it from a tool with a time limit, set the limit above 20 minutes. The staged-rollout scenario runs before the crash-loop scenarios on purpose: a failed late-crash run leaves the app open with a dead React host, and the staged check needs a device that is polling.
 
+## Rollback scenario
+
+`on-device Runtime.rollback(): previous release restored and kept after a restart` publishes release A, then B (both healthy), taps the sample app's "Roll back to previous release" button (found with `uiautomator dump`), and times the call until the server receives `applied` telemetry for A (`rollbackToGoodActiveMs`). It then waits for two or more check-ins while the pointer still names B, force-stops and relaunches, and checks that A runs, B is blocked and was not downloaded again, and `rolled_back` telemetry arrived for B. If B comes back after the relaunch, the scenario fails and the row says so. The `rolled_back` event is sent when the app next mounts.
+
 ## Patch update timeline
 
 The patch scenario runs `--patch-trials` trials (default 5). Each trial records a `timeline`: pointer seen, patch received, staged (runtime finished download and verify) and healthy (`applied` telemetry after `markHealthy`), all in ms after publish, from the server log and telemetry. `phaseMedianMs` in the report gives the median gap between phases and `unaccountedMs`, the time that the runtime's own download and apply numbers do not explain. Poll misses (pointer fetched more than 3 s after publish) and the trial after one are left out of the median. The scenario needs `v1` to `v10` bundles (`make-bundles.sh bundles 10`).
