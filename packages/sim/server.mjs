@@ -230,7 +230,7 @@ async function act(id, body) {
         }
       } catch (e) { throw e.code ? new SimError(e.code, e.message) : e; }
     }
-    case "device_log": return { log: [X, ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log, ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
