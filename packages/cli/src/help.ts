@@ -40,8 +40,8 @@ Ship
                               Show each store's steps and what to do next
   ci init --framework capacitor [--dry-run] [--force]
                               Write .github/workflows/shipvo-build.yml (signed Android and iOS builds)
-  status [--app id] [--json]  Show how the newest releases are doing on phones; --json gives agents the next steps (exit 0 ok, 1 action needed, 2 error)
-  agents setup [--dry-run] [--json]  Write the Shipvo section of AGENTS.md and add @shipvo/mcp to .mcp.json
+  status [--app id] [--json]  Show how releases do; --json lists what to do next (exit 0 ok, 1 action needed, 2 error)
+  agents setup [--dry-run] [--json]  Write AGENTS.md section and .mcp.json for AI agents
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
   test [files] [--repair [--write]] [--report <file> [--release <id>]]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
   doctor [--port <n>]         Check setup before first publish

@@ -1,98 +1,106 @@
-// `shipvo agents setup`: tell coding agents how to drive this project (AGENTS.md section, MCP config).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
+import { args } from "./config.js";
 
 export type ProjectKind = "shipvo" | "expo" | "react-native" | "capacitor" | "unknown";
 
-const readJson = (p: string): any => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
+export const BEGIN = "<!-- shipvo:begin -->";
+export const END = "<!-- shipvo:end -->";
+export const SKILL_LINE = "npx skills add shipvo/shipvo --skill shipvo -g";
 
-/** Which kind of app lives in `dir`. A shipvo.json wins; then Capacitor, Expo, bare React Native. */
+/** What kind of app lives in `dir`. A shipvo.json wins; then Capacitor, Expo, bare React Native. */
 export function detectProject(dir: string): ProjectKind {
   if (existsSync(join(dir, "shipvo.json"))) return "shipvo";
-  const pkg = readJson(join(dir, "package.json"));
-  const deps = { ...(pkg?.dependencies ?? {}), ...(pkg?.devDependencies ?? {}) };
-  if (["capacitor.config.ts", "capacitor.config.json", "capacitor.config.js"].some((f) => existsSync(join(dir, f))) || deps["@capacitor/core"]) return "capacitor";
-  if (deps.expo || existsSync(join(dir, "app.json")) && readJson(join(dir, "app.json"))?.expo) return "expo";
-  if (deps["react-native"]) return "react-native";
+  let deps: Record<string, unknown> = {};
+  try {
+    const p = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+    deps = { ...p.devDependencies, ...p.dependencies };
+  } catch { /* no package.json */ }
+  if (existsSync(join(dir, "capacitor.config.ts")) || existsSync(join(dir, "capacitor.config.json")) || "@capacitor/core" in deps) return "capacitor";
+  if ("expo" in deps) return "expo";
+  if ("react-native" in deps) return "react-native";
   return "unknown";
 }
 
-export const AGENTS_BEGIN = "<!-- shipvo:agents:begin -->";
-export const AGENTS_END = "<!-- shipvo:agents:end -->";
-export const SKILL_LINE = "npx skills add shipvo/shipvo --skill shipvo -g";
-
 const LABEL: Record<ProjectKind, string> = { shipvo: "a Shipvo app", expo: "an Expo app", "react-native": "a bare React Native app", capacitor: "a Capacitor app", unknown: "an app" };
 
-/** The text between our markers (markers included). */
+/** The text between (and including) our markers. */
 export function agentsSection(kind: ProjectKind): string {
   return [
-    AGENTS_BEGIN,
+    BEGIN,
     "## Shipvo",
     "",
-    `This project is ${LABEL[kind]} that uses Shipvo. Use \`shipvo\` commands instead of ad-hoc scripts.`,
+    `This project is ${LABEL[kind]} that uses Shipvo for over-the-air updates and the app simulator.`,
     "",
-    "- Not sure what to do next? Run `shipvo status --json`. It lists `next` commands, each with a reason. Exit code 0 means nothing to do, 1 means action needed, 2 means an error.",
-    "- Run and check the app in the simulator: `shipvo run android` or `shipvo run ios`, and `shipvo test`.",
-    "- Check a release before you ship it: `shipvo publish --dry-run`.",
-    "- Never print or commit signing seeds, tokens or `.env` files.",
-    "- The simulator is also available over MCP (`@shipvo/mcp`, see `.mcp.json`).",
-    AGENTS_END,
+    "- Use `shipvo` commands instead of editing release or signing files by hand.",
+    "- When you are not sure what to do next, run `shipvo status --json`. It prints `next`: the commands to run and why.",
+    "- Exit codes of `shipvo status --json`: 0 ok, 1 action needed, 2 error.",
+    "- To drive the app, use the `shipvo` MCP server from `.mcp.json` (`@shipvo/mcp`).",
+    END,
   ].join("\n");
 }
 
-/** Insert or replace our marked section; text outside the markers is never changed. */
-export function applyAgentsSection(existing: string | null, section: string): string {
-  if (existing === null || existing.trim() === "") return `# AGENTS.md\n\n${section}\n`;
-  const b = existing.indexOf(AGENTS_BEGIN);
-  const e = b >= 0 ? existing.indexOf(AGENTS_END, b) : -1;
-  if (b >= 0 && e >= 0) return existing.slice(0, b) + section + existing.slice(e + AGENTS_END.length);
-  return existing + (existing.endsWith("\n") ? "\n" : "\n\n") + section + "\n";
+/** Put `section` between the markers. Text outside the markers is never changed. Returns null when the markers are broken (one missing, or END before BEGIN). */
+export function upsertSection(text: string, section: string): string | null {
+  const b = text.indexOf(BEGIN);
+  const e = text.indexOf(END);
+  if ((b === -1) !== (e === -1) || (b !== -1 && e < b)) return null;
+  if (b !== -1 && e !== -1) return text.slice(0, b) + section + text.slice(e + END.length);
+  if (!text.trim()) return section + "\n";
+  return text.replace(/\n*$/, "\n\n") + section + "\n";
 }
 
-const MCP_ENTRY = { command: "npx", args: ["-y", "@shipvo/mcp"] };
+const SERVER = { command: "npx", args: ["-y", "@shipvo/mcp"] };
 
-/** Add the shipvo server to an MCP config file's text. Other servers and keys stay. Throws on invalid JSON. */
-export function mergeMcpConfig(existing: string | null): string {
-  let cfg: any = {};
-  if (existing !== null && existing.trim() !== "") {
-    cfg = JSON.parse(existing);
-    if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) throw new Error("not a JSON object");
+/** Add the `shipvo` server and keep every other server and key. Returns null if the file is not valid JSON. */
+export function mergeMcp(text: string | null): string | null {
+  let doc: Record<string, unknown> = {};
+  if (text !== null && text.trim()) {
+    try { doc = JSON.parse(text); } catch { return null; }
+    if (!doc || typeof doc !== "object" || Array.isArray(doc)) return null;
   }
-  if (cfg.mcpServers !== undefined && (typeof cfg.mcpServers !== "object" || cfg.mcpServers === null)) throw new Error('"mcpServers" is not an object');
-  cfg.mcpServers = { ...(cfg.mcpServers ?? {}), shipvo: MCP_ENTRY };
-  return JSON.stringify(cfg, null, 2) + "\n";
+  const servers = (doc.mcpServers && typeof doc.mcpServers === "object" ? doc.mcpServers : {}) as Record<string, unknown>;
+  servers.shipvo = SERVER;
+  return JSON.stringify({ ...doc, mcpServers: servers }, null, 2) + "\n";
 }
 
-type FileResult = { path: string; action: "created" | "updated" | "unchanged" | "error"; error?: string };
+type Change = { file: string; action: "create" | "update" | "unchanged" | "skip"; note?: string };
 
-function plan(dir: string, rel: string, make: (old: string | null) => string, dry: boolean): FileResult {
-  const path = join(dir, rel);
-  const old = existsSync(path) ? readFileSync(path, "utf8") : null;
-  let text: string;
-  try { text = make(old); } catch (e) { return { path: rel, action: "error", error: `${rel} is not valid: ${e instanceof Error ? e.message : String(e)}. Fix it by hand; nothing was changed in it.` }; }
-  if (text === old) return { path: rel, action: "unchanged" };
-  if (!dry) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text); }
-  return { path: rel, action: old === null ? "created" : "updated" };
-}
-
+/** `shipvo agents setup [--dry-run] [--json]`. Exit 0 done, 2 error. */
 export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<number> {
-  const root = resolve(dir);
-  if (argv[0] !== "setup") { console.error("Usage: shipvo agents setup [--dry-run] [--json]"); return 2; }
-  const dry = argv.includes("--dry-run"), json = argv.includes("--json");
-  const kind = detectProject(root);
-  const files: FileResult[] = [
-    plan(root, "AGENTS.md", (o) => applyAgentsSection(o, agentsSection(kind)), dry),
-    plan(root, ".mcp.json", mergeMcpConfig, dry),
-    ...(existsSync(join(root, ".cursor")) ? [plan(root, ".cursor/mcp.json", mergeMcpConfig, dry)] : []),
-  ];
-  const failed = files.some((f) => f.action === "error");
-  if (json) {
-    console.log(JSON.stringify({ ok: !failed, code: failed ? "invalid_file" : "ok", dry_run: dry, project: kind, files, skill_install: SKILL_LINE }, null, 2));
-  } else {
-    console.log(`Project: ${LABEL[kind]}.`);
-    for (const f of files) console.log(f.action === "error" ? `  error      ${f.error}` : `  ${(dry && f.action !== "unchanged" ? `would be ${f.action}` : f.action).padEnd(10)} ${f.path}`);
-    if (dry) console.log("Dry run: nothing was written.");
-    console.log(`\nInstall the skill for your coding agent:\n  ${SKILL_LINE}`);
+  const [sub, ...rest] = argv;
+  if (sub !== "setup") { console.error("Usage: shipvo agents setup [--dry-run] [--json]"); return 2; }
+  const a = args(rest);
+  const dry = a["dry-run"] !== undefined, json = a.json !== undefined;
+  const kind = detectProject(dir);
+  const changes: Change[] = [];
+  const writes: { path: string; text: string }[] = [];
+  const plan = (file: string, next: string | null, note?: string) => {
+    const path = join(dir, file);
+    const old = existsSync(path) ? readFileSync(path, "utf8") : null;
+    if (next === null) { changes.push({ file, action: "skip", note }); return; }
+    if (old === next) { changes.push({ file, action: "unchanged" }); return; }
+    changes.push({ file, action: old === null ? "create" : "update" });
+    writes.push({ path, text: next });
+  };
+  const read = (f: string) => existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : null;
+
+  plan("AGENTS.md", upsertSection(read("AGENTS.md") ?? "", agentsSection(kind)), "AGENTS.md has a broken shipvo marker; fix it and run again.");
+  const targets = [".mcp.json", ...(existsSync(join(dir, ".cursor")) ? [".cursor/mcp.json"] : [])];
+  for (const f of targets) {
+    const merged = mergeMcp(read(f));
+    plan(f, merged, `${f} is not valid JSON; I left it alone. Fix it and run again.`);
   }
-  return failed ? 2 : 0;
+  const bad = changes.some((c) => c.action === "skip");
+  if (!dry && !bad) for (const w of writes) { mkdirSync(dirname(w.path), { recursive: true }); writeFileSync(w.path, w.text); }
+  const wrote = !dry && !bad;
+  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, changes, skill_install: SKILL_LINE }));
+  else {
+    console.log(`Project: ${LABEL[kind]}.`);
+    for (const c of changes) console.log(`  ${c.file}: ${c.action === "skip" ? c.note : c.action === "unchanged" ? "already up to date" : `${dry ? "would " : ""}${c.action}${dry ? "" : "d"}`}`);
+    if (dry) console.log("Dry run: nothing was written.");
+    else if (wrote && !changes.some((c) => c.action !== "unchanged")) console.log("Nothing to change.");
+    console.log(`Install the skill: ${SKILL_LINE}`);
+  }
+  return bad ? 2 : 0;
 }

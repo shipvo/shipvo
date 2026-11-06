@@ -1,88 +1,92 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { agentsCmd, applyAgentsSection, agentsSection, mergeMcpConfig, detectProject, AGENTS_BEGIN, AGENTS_END } from "../src/agents";
+import { agentsCmd, detectProject, upsertSection, mergeMcp, BEGIN, END } from "../src/agents";
 
-const tmp = () => mkdtempSync(join(tmpdir(), "shipvo-agents-"));
+const tmp = () => mkdtempSync(join(tmpdir(), "shipvo-ag-"));
 afterEach(() => vi.restoreAllMocks());
 const quiet = () => vi.spyOn(console, "log").mockImplementation(() => {});
 
-describe("AGENTS.md section", () => {
-  const sec = agentsSection("expo");
-  it("creates the file when missing", () => {
-    const t = applyAgentsSection(null, sec);
-    expect(t).toContain(AGENTS_BEGIN);
-    expect(t).toContain("shipvo status --json");
-  });
-  it("appends after existing text and leaves it alone", () => {
-    const t = applyAgentsSection("# Mine\n\nKeep this.\n", sec);
-    expect(t.startsWith("# Mine\n\nKeep this.\n")).toBe(true);
-    expect(t).toContain(AGENTS_END);
-  });
-  it("updates only between the markers", () => {
-    const old = `before\n${AGENTS_BEGIN}\nold text\n${AGENTS_END}\nafter\n`;
-    const t = applyAgentsSection(old, sec);
-    expect(t.startsWith("before\n")).toBe(true);
-    expect(t.endsWith("\nafter\n")).toBe(true);
-    expect(t).not.toContain("old text");
-  });
-  it("is idempotent", () => {
-    const once = applyAgentsSection("# Mine\n", sec);
-    expect(applyAgentsSection(once, sec)).toBe(once);
+describe("detectProject", () => {
+  it("tells the four kinds apart", () => {
+    const pkg = (deps: object) => { const d = tmp(); writeFileSync(join(d, "package.json"), JSON.stringify({ dependencies: deps })); return d; };
+    const s = tmp(); writeFileSync(join(s, "shipvo.json"), "{}");
+    expect(detectProject(s)).toBe("shipvo");
+    expect(detectProject(pkg({ expo: "1", "react-native": "1" }))).toBe("expo");
+    expect(detectProject(pkg({ "react-native": "1" }))).toBe("react-native");
+    expect(detectProject(pkg({ "@capacitor/core": "1" }))).toBe("capacitor");
+    expect(detectProject(tmp())).toBe("unknown");
   });
 });
 
-describe("MCP config merge", () => {
-  it("keeps other servers and keys", () => {
-    const out = JSON.parse(mergeMcpConfig(JSON.stringify({ x: 1, mcpServers: { other: { url: "u" } } })));
-    expect(out.x).toBe(1);
-    expect(out.mcpServers.other).toEqual({ url: "u" });
-    expect(out.mcpServers.shipvo).toEqual({ command: "npx", args: ["-y", "@shipvo/mcp"] });
-  });
-  it("rejects invalid JSON", () => { expect(() => mergeMcpConfig("{nope")).toThrow(); });
-});
-
-describe("shipvo agents setup", () => {
-  it("writes AGENTS.md and .mcp.json, then changes nothing the second time", async () => {
-    const d = tmp(); quiet();
-    writeFileSync(join(d, "package.json"), JSON.stringify({ dependencies: { expo: "52" } }));
+describe("AGENTS.md", () => {
+  it("creates the file when missing", async () => {
+    quiet(); const d = tmp();
     expect(await agentsCmd(["setup"], d)).toBe(0);
-    const a = readFileSync(join(d, "AGENTS.md"), "utf8"), m = readFileSync(join(d, ".mcp.json"), "utf8");
-    expect(a).toContain("an Expo app");
-    expect(existsSync(join(d, ".cursor"))).toBe(false);
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    expect(await agentsCmd(["setup", "--json"], d)).toBe(0);
-    const out = JSON.parse(String(log.mock.calls[0][0]));
-    expect(out.files.map((f: any) => f.action)).toEqual(["unchanged", "unchanged"]);
-    expect(readFileSync(join(d, "AGENTS.md"), "utf8")).toBe(a);
-    expect(readFileSync(join(d, ".mcp.json"), "utf8")).toBe(m);
+    const t = readFileSync(join(d, "AGENTS.md"), "utf8");
+    expect(t).toContain(BEGIN); expect(t).toContain("shipvo status --json");
   });
-  it("also writes .cursor/mcp.json when .cursor exists", async () => {
-    const d = tmp(); quiet(); mkdirSync(join(d, ".cursor"));
+  it("appends, then updates only between the markers", () => {
+    const before = "# Mine\n\nKeep me.\n";
+    const a = upsertSection(before, `${BEGIN}\nold\n${END}`);
+    expect(a.startsWith(before)).toBe(true);
+    const wrapped = `top\n${a}\nbottom\n`;
+    const b = upsertSection(wrapped, `${BEGIN}\nnew\n${END}`);
+    expect(b).toBe(`top\n${before}\n${BEGIN}\nnew\n${END}\n\nbottom\n`);
+    expect(b).not.toContain("old");
+  });
+  it("is idempotent", async () => {
+    quiet(); const d = tmp();
+    writeFileSync(join(d, "AGENTS.md"), "# Mine\n");
     await agentsCmd(["setup"], d);
-    expect(JSON.parse(readFileSync(join(d, ".cursor", "mcp.json"), "utf8")).mcpServers.shipvo).toBeTruthy();
+    const files = [".mcp.json", "AGENTS.md"].map((f) => readFileSync(join(d, f), "utf8"));
+    await agentsCmd(["setup"], d);
+    expect([".mcp.json", "AGENTS.md"].map((f) => readFileSync(join(d, f), "utf8"))).toEqual(files);
+    expect(files[1].startsWith("# Mine\n")).toBe(true);
   });
-  it("--dry-run writes nothing", async () => {
-    const d = tmp(); quiet();
-    expect(await agentsCmd(["setup", "--dry-run"], d)).toBe(0);
-    expect(existsSync(join(d, "AGENTS.md"))).toBe(false);
-    expect(existsSync(join(d, ".mcp.json"))).toBe(false);
+});
+
+describe(".mcp.json", () => {
+  it("keeps other servers and keys", () => {
+    const out = JSON.parse(mergeMcp(JSON.stringify({ other: 1, mcpServers: { foo: { command: "x" } } }))!);
+    expect(out.other).toBe(1); expect(out.mcpServers.foo).toEqual({ command: "x" });
+    expect(out.mcpServers.shipvo.args).toContain("@shipvo/mcp");
   });
-  it("leaves a broken .mcp.json untouched and exits 2", async () => {
-    const d = tmp(); quiet(); vi.spyOn(console, "log");
+  it("returns null for invalid JSON and leaves the file alone", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {}); const d = tmp();
     writeFileSync(join(d, ".mcp.json"), "{nope");
     expect(await agentsCmd(["setup"], d)).toBe(2);
     expect(readFileSync(join(d, ".mcp.json"), "utf8")).toBe("{nope");
+    expect(existsSync(join(d, "AGENTS.md"))).toBe(false);
   });
-  it("detects project kinds", () => {
-    const d = tmp();
-    expect(detectProject(d)).toBe("unknown");
-    writeFileSync(join(d, "package.json"), JSON.stringify({ dependencies: { "react-native": "0.76" } }));
-    expect(detectProject(d)).toBe("react-native");
-    writeFileSync(join(d, "capacitor.config.ts"), "");
-    expect(detectProject(d)).toBe("capacitor");
-    writeFileSync(join(d, "shipvo.json"), "{}");
-    expect(detectProject(d)).toBe("shipvo");
+  it("leaves AGENTS.md alone and exits 2 when a marker is orphaned", async () => {
+    quiet();
+    for (const text of [`mine\n${BEGIN}\nold\nnotes\n`, `mine\n${END}\n${BEGIN}\n`, `${END}\nmine\n`]) {
+      const d = tmp(); writeFileSync(join(d, "AGENTS.md"), text);
+      expect(upsertSection(text, "x")).toBeNull();
+      expect(await agentsCmd(["setup"], d)).toBe(2);
+      expect(readFileSync(join(d, "AGENTS.md"), "utf8")).toBe(text);
+      expect(existsSync(join(d, ".mcp.json"))).toBe(false);
+    }
+  });
+  it("writes .cursor/mcp.json only when .cursor exists", async () => {
+    quiet(); const d = tmp();
+    await agentsCmd(["setup"], d);
+    expect(existsSync(join(d, ".cursor"))).toBe(false);
+    mkdirSync(join(d, ".cursor"));
+    await agentsCmd(["setup"], d);
+    expect(JSON.parse(readFileSync(join(d, ".cursor/mcp.json"), "utf8")).mcpServers.shipvo).toBeTruthy();
+  });
+});
+
+describe("flags", () => {
+  it("--dry-run writes nothing; --json prints changes and the skill line", async () => {
+    const log = quiet(); const d = tmp();
+    expect(await agentsCmd(["setup", "--dry-run", "--json"], d)).toBe(0);
+    expect(existsSync(join(d, "AGENTS.md"))).toBe(false);
+    const j = JSON.parse(String(log.mock.calls[0][0]));
+    expect(j.dry_run).toBe(true); expect(j.changes.map((c: any) => c.action)).toEqual(["create", "create"]);
+    expect(j.skill_install).toContain("skills add");
   });
 });

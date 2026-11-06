@@ -35,6 +35,9 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan. | Show the plan to the owner, then call again with `confirm: true`. |
 | `bad_url` | `open_url` got a URL the app cannot take. | Fix the URL and call again. |
 | `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
+| `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
+| `already_locked` | `lock` was called on a locked phone. | Call `unlock` if you want to use the app. |
+| `not_locked` | `unlock` was called on a phone that is not locked. | Carry on; nothing to do. |
 | `mock_invalid` | A network mock rule is not valid. | Fix the rule. |
 
 Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `export_test`, `end_session`, `owner_describe`, `owner_command`.

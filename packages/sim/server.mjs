@@ -15,6 +15,7 @@ import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
+import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -74,7 +75,7 @@ async function newSession(id, opts = {}) {
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString() });
+  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -137,7 +138,19 @@ async function act(id, body) {
     });
     if (covered) throw fail("covered", String(body.ref));
   };
+  // A locked phone takes no input: say so with a typed error before anything reaches the app.
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification"].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   switch (body.action) {
+    // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
+    case "lock": case "unlock": {
+      try { (body.action === "lock" ? lock : unlock)(s.life); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
+      return { locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
+    }
+    case "restart": {
+      restart(s.life);
+      await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
+      return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
+    }
     case "screen": break;
     case "tap": { const t = await resolve(body.ref); await ready(t); await t.click({ timeout: 3000 }); break; }
     case "type": {
@@ -191,7 +204,7 @@ async function act(id, body) {
       }
       break;
     }
-    case "device_log": return { log: await page.evaluate(() => globalThis.__pnDevice?.log() ?? []), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
@@ -211,7 +224,7 @@ async function act(id, body) {
       const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, device_log, device_reset, set_network_mocks`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { routeStore } from "@shipvo/store";
 import { args, loadConfig } from "./config.js";
-import { detectProject, type ProjectKind } from "./agents.js";
+import { detectProject } from "./agents.js";
+import { portFree } from "./sim.js";
 
 type Row = { release: number; events: Record<string, number>; apply_ms_median: number | null; cold_start_ms_median: number | null };
 
@@ -27,72 +28,91 @@ export function describeAutoHalt(c: AutoHalt | undefined): string {
   return `auto-halt: on at ${Math.round(c.threshold * 1000) / 10}% after ${n} report${n === 1 ? "" : "s"}`;
 }
 
-type Step = { command: string; why: string; blocking: boolean };
-type Summary = { releases?: Row[]; halted?: Halted | null; auto_halt?: AutoHalt };
+export type Next = { command: string; why: string };
+export type StatusJson = {
+  ok: boolean;
+  code: "ok" | "no_project" | "no_signing_key" | "release_halted" | "no_release" | "error";
+  summary: string;
+  data: {
+    project: { kind: string; app_id: string | null };
+    sim: { running: boolean; port: number };
+    run_server: { running: boolean; port: number | null };
+    signing_key: { present: boolean };
+    pending_release: { newest: number | null; halted: Halted | null; auto_halt: AutoHalt | null } | null;
+    store_step: { id: string; title: string; state: string } | null;
+  };
+  next: Next[];
+};
 
-const readJson = (p: string): any => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
-const alive = (pid: unknown) => { if (typeof pid !== "number") return false; try { process.kill(pid, 0); return true; } catch { return false; } };
+const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
-/** First store step that is not done, from store-plan.json. Null when there is no plan or every step is done. */
-function storeStep(dir: string): { id: string; store: string; state: string } | null {
-  const plan = readJson(join(dir, "store-plan.json"));
-  if (!plan?.answers) return null;
+/** Local facts for `status --json`: no network. */
+async function localFacts(dir: string, simPort = 4545) {
+  const hasKey = !!(process.env.SHIPVO_SIGNING_SEED || process.env.PURENATIVE_SIGNING_SEED || (process.env.SHIPVO_SIGNING_SEED_FILE && existsSync(process.env.SHIPVO_SIGNING_SEED_FILE)) || (process.env.PURENATIVE_SIGNING_SEED_FILE && existsSync(process.env.PURENATIVE_SIGNING_SEED_FILE)) || existsSync(join(dir, ".shipvo", "seed.txt")));
+  let run = { running: false, port: null as number | null };
   try {
+    const r = JSON.parse(readFileSync(join(dir, ".shipvo", "run.json"), "utf8"));
+    if (typeof r.pid === "number" && alive(r.pid)) run = { running: true, port: typeof r.port === "number" ? r.port : null };
+  } catch { /* not running */ }
+  let storeStep: StatusJson["data"]["store_step"] = null;
+  try {
+    const plan = JSON.parse(readFileSync(join(dir, "store-plan.json"), "utf8"));
     const r = routeStore(plan.answers);
-    for (const [store, route] of [["play", r.play], ["apple", r.apple]] as const) {
-      for (const st of route.steps) { const m = plan.marks?.[st.id] ?? "todo"; if (m !== "done") return { id: st.id, store, state: m }; }
-    }
-  } catch { /* a broken plan is reported by `shipvo store status` */ }
-  return null;
+    const step = [...r.play.steps, ...r.apple.steps].find((x) => (plan.marks?.[x.id] ?? "todo") !== "done");
+    if (step) storeStep = { id: step.id, title: step.title, state: plan.marks?.[step.id] ?? "todo" };
+  } catch { /* no plan */ }
+  return { hasKey, run, storeStep, sim: { running: !(await portFree(simPort)), port: simPort } };
 }
 
-/** Everything `shipvo status --json` reports, built from local files plus an optional control-plane summary. */
-export function buildAgentStatus(dir: string, summary: Summary | null, fetchError: string | null) {
-  const project: ProjectKind = detectProject(dir);
-  const hasConfig = project === "shipvo";
-  const runInfo = readJson(join(dir, ".shipvo", "run.json"));
-  const run_server = runInfo && alive(runInfo.pid) ? { running: true, port: runInfo.port ?? null, platform: runInfo.platform ?? null } : { running: false, port: null, platform: null };
-  const e = process.env;
-  const signing_key = { present: !!(e.SHIPVO_SIGNING_SEED || e.PURENATIVE_SIGNING_SEED || e.SHIPVO_SIGNING_SEED_FILE || e.PURENATIVE_SIGNING_SEED_FILE || existsSync(join(dir, ".shipvo", "seed.txt"))) };
-  const sim = { supported: project === "shipvo" || project === "expo" || project === "react-native" };
-  const releases = summary?.releases ?? [];
-  const h = summary?.halted && typeof summary.halted === "object" ? summary.halted : null;
-  const pending_release = summary
-    ? { latest: releases.length ? Math.max(...releases.map((r) => r.release)) : null, halted: h ? { release: h.release, failed: h.failed, reports: h.reports } : null }
-    : null;
-  const store_step = storeStep(dir);
-
-  const next: Step[] = [];
-  let code = "ok", summaryText = "Nothing needs doing.";
-  if (!hasConfig) {
-    code = "no_shipvo_project";
-    summaryText = `This folder is ${project === "unknown" ? "not an app Shipvo knows" : `a ${project} app without shipvo.json`}.`;
-    if (project === "capacitor") next.push({ command: "shipvo eas setup --dry-run", why: "Prepare this Capacitor repo for store builds; Shipvo OTA and the simulator need a React Native app.", blocking: true });
-    else if (project === "unknown") next.push({ command: "shipvo init <dir>", why: "Create a new app wired to Shipvo, or run this inside a React Native app.", blocking: true });
-    else next.push({ command: "shipvo init", why: "Make this app Shipvo-ready: writes shipvo.json and a signing key.", blocking: true });
-  } else {
-    if (!signing_key.present) next.push({ command: "shipvo keys import --file <seed file>", why: "No signing seed here (SHIPVO_SIGNING_SEED or .shipvo/seed.txt). Restore the one that matches shipvo.json.", blocking: true });
-    if (fetchError) { code = "control_plane_unreachable"; summaryText = fetchError; next.push({ command: "shipvo doctor", why: "Check the control plane address and your setup.", blocking: true }); }
-    else if (h) next.push({ command: `shipvo rollback --to ${Math.max(0, h.release - 1)}`, why: `Release ${h.release} is halted: ${h.failed} of ${h.reports} devices failed. Publish a fix or roll back.`, blocking: true });
-    else if (pending_release && pending_release.latest === null) next.push({ command: "shipvo publish --dry-run", why: "No release yet. Check one offline, then run shipvo publish.", blocking: false });
-    if (store_step) {
-      if (store_step.state === "waiting") next.push({ command: "shipvo store status", why: `Waiting on store step "${store_step.id}" (${store_step.store}). Mark it done when it clears.`, blocking: false });
-      else next.push({ command: "shipvo store status", why: `Store step "${store_step.id}" (${store_step.store}) is next.`, blocking: true });
-    }
-    if (!run_server.running && sim.supported) next.push({ command: "shipvo run android", why: "Open the app in the phone frame so you can see and test it.", blocking: false });
+/** `shipvo status --json`: exit 0 ok, 1 action needed, 2 error. */
+export async function statusJson(appArg: string | undefined, fetchFn: typeof fetch, dir = process.cwd()): Promise<{ doc: StatusJson; exit: number }> {
+  const kind = detectProject(dir);
+  const f = await localFacts(dir);
+  const shared = { sim: f.sim, run_server: f.run, signing_key: { present: f.hasKey }, store_step: f.storeStep };
+  const mk = (code: StatusJson["code"], summary: string, next: Next[], appId: string | null, pending: StatusJson["data"]["pending_release"], exit: number) => ({
+    doc: { ok: exit === 0, code, summary, data: { project: { kind, app_id: appId }, ...shared, pending_release: pending }, next } as StatusJson, exit,
+  });
+  if (!existsSync(join(dir, "shipvo.json"))) {
+    return mk("no_project", "No shipvo.json here.", [{ command: kind === "unknown" ? "shipvo init myapp" : "shipvo init .", why: "This folder is not set up for Shipvo yet." }], null, null, 1);
   }
-  const blocking = next.some((n) => n.blocking);
-  if (code === "ok" && blocking) { code = "action_needed"; summaryText = next.find((n) => n.blocking)!.why; }
-  const exit = code === "control_plane_unreachable" ? 2 : blocking ? 1 : 0;
-  return {
-    exit,
-    body: { ok: exit === 0, code, summary: summaryText, data: { project, sim, run_server, signing_key, pending_release, store_step }, next: next.map(({ command, why }) => ({ command, why })) },
-  };
+  let cfg;
+  try { cfg = loadConfig(dir); } catch (e) { return mk("error", e instanceof Error ? e.message : String(e), [{ command: "shipvo doctor", why: "shipvo.json is missing a field." }], null, null, 2); }
+  const appId = appArg ?? cfg.appId;
+  let data: { releases?: Row[]; halted?: Halted | null; auto_halt?: AutoHalt };
+  const baseUrl = cfg.controlPlane.replace(/\/$/, "");
+  try {
+    const r = await fetchFn(`${baseUrl}/t/${encodeURIComponent(appId)}/summary`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    data = (await r.json()) as typeof data;
+  } catch (e) {
+    return mk("error", `Could not reach the control plane at ${baseUrl} (${e instanceof Error ? e.message : String(e)}).`, [{ command: "shipvo doctor", why: "Check the control plane URL and network." }], appId, null, 2);
+  }
+  const releases = data.releases ?? [];
+  const pending = { newest: releases.length ? Math.max(...releases.map((r) => r.release)) : null, halted: data.halted ?? null, auto_halt: data.auto_halt ?? null };
+  const next: Next[] = [];
+  let code: StatusJson["code"] = "ok", exit = 0;
+  let summary = pending.newest === null ? `No releases with telemetry yet for "${appId}".` : `Newest release ${pending.newest} is reporting for "${appId}".`;
+  if (!f.hasKey) { code = "no_signing_key"; exit = 1; summary = "No signing key found."; next.push({ command: "shipvo keygen --out .shipvo/seed.txt", why: "You cannot publish without a signing key." }); }
+  if (pending.halted) {
+    code = "release_halted"; exit = 1; summary = `Release ${pending.halted.release} is halted: ${pending.halted.failed} of ${pending.halted.reports} devices failed.`;
+    const prev = releases.map((r) => r.release).filter((n) => n < pending.halted!.release);
+    const to = prev.length ? String(Math.max(...prev)) : "<release>";
+    next.unshift({ command: `shipvo rollback --to ${to}`, why: "Send devices back to a release that works, or publish a fixed one." });
+  } else if (code === "ok" && pending.newest === null) {
+    code = "no_release"; next.push({ command: "shipvo publish --dry-run", why: "Check a first release before you publish it." });
+  }
+  if (!f.sim.running && !f.run.running) next.push({ command: "shipvo sim", why: "Start the simulator to try the app." });
+  if (f.storeStep) next.push({ command: f.storeStep.state === "waiting" ? "shipvo store status" : `shipvo store status --mark ${f.storeStep.id}`, why: `Store step "${f.storeStep.title}" is ${f.storeStep.state === "todo" ? "next" : f.storeStep.state}.` });
+  return mk(code, summary, next, appId, pending, exit);
 }
 
 export async function status(argv: string[], fetchFn: typeof fetch = fetch): Promise<number> {
   const a = args(argv);
-  if (argv.includes("--json")) return statusJson(a, fetchFn);
+  if (argv.includes("--json")) {
+    const { doc, exit } = await statusJson(a.app && a.app !== "true" ? a.app : undefined, fetchFn);
+    console.log(JSON.stringify(doc));
+    return exit;
+  }
   const cfg = loadConfig();
   const appId = a.app && a.app !== "true" ? a.app : cfg.appId;
   const base = cfg.controlPlane.replace(/\/$/, "");
@@ -117,22 +137,4 @@ export async function status(argv: string[], fetchFn: typeof fetch = fetch): Pro
   }
   console.log(formatStatus(releases));
   return 0;
-}
-
-/** `shipvo status --json`: what to do next in this project. Exit 0 ok, 1 action needed, 2 error. Never throws. */
-async function statusJson(a: Record<string, string | undefined>, fetchFn: typeof fetch): Promise<number> {
-  const dir = process.cwd();
-  let summary: Summary | null = null, err: string | null = null;
-  if (existsSync(join(dir, "shipvo.json"))) {
-    try {
-      const cfg = loadConfig(dir);
-      const appId = a.app && a.app !== "true" ? a.app : cfg.appId;
-      const r = await fetchFn(`${cfg.controlPlane.replace(/\/$/, "")}/t/${encodeURIComponent(appId)}/summary`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      summary = (await r.json()) as Summary;
-    } catch (e) { err = `Could not read shipvo.json or reach the control plane (${e instanceof Error ? e.message : String(e)}).`; }
-  }
-  const { exit, body } = buildAgentStatus(dir, summary, err);
-  console.log(JSON.stringify(body, null, 2));
-  return exit;
 }
