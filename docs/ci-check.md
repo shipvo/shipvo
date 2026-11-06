@@ -23,7 +23,7 @@ steps:
 1. Installs Node 22 and your dependencies.
 2. Builds the app for web.
 3. Runs `shipvo test` on `tests/*.steps`.
-4. On a pull request, runs `shipvo explore --changed-from <base sha>`, which walks only the screens whose files changed (up to four, from `app/` or `screens/`). If no screen changed, it walks nothing and the report says so. This needs the base commit, so the checkout needs `fetch-depth: 0`; without it, the diff cannot be read, a message is printed and the whole app is walked. Writes `explore-report.md` and `explore-report.json`.
+4. On a pull request, runs `shipvo explore --changed-from <base sha>`. It walks only the screens whose files changed (up to four, from `app/` or `screens/`). Each one is opened as a deep link, `<scheme>://<screen>`, with the scheme from `expo.scheme` in `app.json`; your app needs an `onUrl` listener. The changed screens replace the `routes` in `shipvo.json` for this run. If no screen changed, it walks nothing and says so in the log and the report. The checkout needs `fetch-depth: 0` to read the diff. Without it, or without a scheme, a message is printed and the whole app is walked, using `routes` as usual. Writes `explore-report.md` and `explore-report.json`.
 5. Uploads the reports as the `shipvo-check` artifact.
 
 The job fails when a flow fails or `shipvo explore` crashes. Findings from exploration are in the report only. A failing flow does not skip exploration, so you still get the report.

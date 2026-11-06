@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { walk, elements, renderMarkdown, explore, routesFromChange, type Driver, type Reply } from "../src/explore.js";
+import { walk, elements, renderMarkdown, explore, routesFromChange, appScheme, type Driver, type Reply } from "../src/explore.js";
 
 const changed = vi.hoisted(() => ({ files: [] as string[], fail: false }));
 vi.mock("../src/ci-comment.js", async (orig) => ({
@@ -204,13 +204,13 @@ describe("routesFromChange", () => {
   it("walks only changed routable screens, at most four", async () => {
     changed.fail = false;
     changed.files = ["app/a.tsx", "app/b.tsx", "app/c.tsx", "app/d.tsx", "app/e.tsx", "app/[id].tsx", "README.md"];
-    const r = await routesFromChange("abc");
+    const r = await routesFromChange("abc", () => {}, "tide");
     expect(r.onlyRoutes).toBe(true);
-    expect(r.routes).toEqual(["/a", "/b", "/c", "/d"]);
+    expect(r.routes).toEqual(["tide://a", "tide://b", "tide://c", "tide://d"]);
   });
   it("walks nothing when no screen changed", async () => {
     changed.fail = false; changed.files = ["README.md", "app/[id].tsx"];
-    expect(await routesFromChange("abc")).toEqual({ routes: [], onlyRoutes: true });
+    expect(await routesFromChange("abc", () => {}, "tide")).toEqual({ routes: [], onlyRoutes: true });
   });
   it("falls back to the full walk when the diff cannot be read", async () => {
     changed.fail = true;
@@ -219,5 +219,29 @@ describe("routesFromChange", () => {
     changed.fail = false;
     expect(r).toEqual({ onlyRoutes: false });
     expect(logs[0]).toMatch(/^could not read the diff: bad revision/);
+  });
+  it("falls back to the full walk when the app has no known scheme", async () => {
+    changed.fail = false; changed.files = ["app/settings.tsx"];
+    const logs: string[] = [];
+    expect(await routesFromChange("abc", (s) => logs.push(s))).toEqual({ onlyRoutes: false });
+    expect(logs[0]).toMatch(/URL scheme/);
+  });
+  it("produces links the walker can open, on a driver that rejects other shapes", async () => {
+    changed.fail = false; changed.files = ["app/settings.tsx"];
+    const { routes, onlyRoutes } = await routesFromChange("abc", () => {}, "app");
+    const fx = fixture();
+    const opened: string[] = [];
+    const strict: Driver = { ...fx.driver, async openUrl(url) { opened.push(url); if (!/^app:\/\/[a-z-]+$/.test(url)) throw new Error(`bad url ${url}`); return fx.driver.openUrl(url); } };
+    const rep = await walk(strict, { routes, onlyRoutes, maxDepth: 3, maxSteps: 50 });
+    expect(rep.error).toBeNull();
+    expect(opened).toContain("app://settings");
+    expect(rep.screens).toBeGreaterThan(0);
+  });
+  it("reads the scheme from app.json, else from a configured route", () => {
+    const d = mkdtempSync(join(tmpdir(), "scheme-"));
+    expect(appScheme(["tide://cart"], d)).toBe("tide");
+    expect(appScheme(undefined, d)).toBeUndefined();
+    writeFileSync(join(d, "app.json"), JSON.stringify({ expo: { scheme: "shop" } }));
+    expect(appScheme(["tide://cart"], d)).toBe("shop");
   });
 });

@@ -55,10 +55,12 @@ function templatePath(framework: string): string {
 /** `shipvo ci init --framework capacitor [--dry-run] [--force]`. Returns the exit code. */
 export async function ci(argv: string[], cwd = process.cwd()): Promise<number> {
   const [sub, ...rest] = argv;
-  if (sub === "check") { const i = rest.indexOf("--changed-from");
+  if (sub === "check") {
+    const i = rest.indexOf("--changed-from");
     const v = i >= 0 ? rest[i + 1] : undefined;
     if (i >= 0 && (v === undefined || v.startsWith("--"))) { console.error("shipvo ci check: --changed-from needs a commit sha"); return 2; }
-    return check(testCmd, explore, v); }
+    return check(testCmd, explore, v);
+  }
   if (sub === "shots") return shotsCmd(rest);
   if (sub === "comment") return commentCmd(rest);
   if (sub !== "init") { console.error("Usage: shipvo ci init --check | --framework capacitor [--dry-run] [--force]\n       shipvo ci check"); return 2; }

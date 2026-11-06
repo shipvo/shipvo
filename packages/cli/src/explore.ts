@@ -1,7 +1,8 @@
 // `shipvo explore`: a deterministic walker over the simulator's accessibility tree. No LLM call.
 // The walker (`walk`) only needs a `Driver`, so tests run it against a fake app. `explore` wires it to the simulator.
 import { execSync, spawn } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
 import { portFree, waitListening } from "./sim.js";
@@ -233,17 +234,32 @@ export async function explore(argv: string[]): Promise<number> {
   }
 }
 
+/** The app's URL scheme: `expo.scheme` in app.json, else the scheme of a configured route such as "tide://cart". */
+export function appScheme(routes: string[] | undefined, dir = process.cwd()): string | undefined {
+  try {
+    const j = JSON.parse(readFileSync(join(dir, "app.json"), "utf8")) as { expo?: { scheme?: string | string[] }; scheme?: string };
+    const sc = j.expo?.scheme ?? j.scheme;
+    const first = Array.isArray(sc) ? sc[0] : sc;
+    if (first) return first;
+  } catch { /* no app.json: try the configured routes */ }
+  return routes?.map((r) => /^([a-z][a-z0-9+.-]*):\/\//i.exec(r)?.[1]).find(Boolean);
+}
+
 /**
- * Routes to walk for `--changed-from <sha>`: the changed, routable screens (up to four).
- * If the diff cannot be read (for example a shallow checkout without the base commit), say so and fall back to the full walk.
+ * Deep links to walk for `--changed-from <sha>`: the changed, routable screens (up to four), as `<scheme>://<screen>`.
+ * The walker opens them with the simulator's `open_url` action, which needs a URL the app's `onUrl` listener understands.
+ * If the diff cannot be read (for example a shallow checkout), or the app has no known scheme, say so and fall back to the full walk.
  */
-export async function routesFromChange(sha: string, log: (s: string) => void = console.error): Promise<{ routes?: string[]; onlyRoutes: boolean }> {
+export async function routesFromChange(sha: string, log: (s: string) => void = console.error, scheme?: string): Promise<{ routes?: string[]; onlyRoutes: boolean }> {
   const { changedFiles, changedScreens } = await import("./ci-comment.js");
   const { routableScreens } = await import("./ci-shots.js");
   let files: string[];
   try { files = changedFiles(sha); }
   catch (e) { log(`could not read the diff: ${e instanceof Error ? e.message : e}. Walking the whole app.`); return { onlyRoutes: false }; }
-  return { routes: routableScreens(changedScreens(files)).map(([, r]) => r), onlyRoutes: true };
+  const screens = routableScreens(changedScreens(files));
+  if (!screens.length) return { routes: [], onlyRoutes: true };
+  if (!scheme) { log("could not find the app's URL scheme (expo.scheme in app.json), so changed screens cannot be opened. Walking the whole app."); return { onlyRoutes: false }; }
+  return { routes: screens.map(([, r]) => `${scheme}://${r === "/" ? "" : r.slice(1)}`), onlyRoutes: true };
 }
 
 async function exploreRun(argv: string[], json: boolean): Promise<number> {
@@ -256,11 +272,13 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     let routes = cfg.routes, onlyRoutes = false;
     if (a["changed-from"] !== undefined) {
       if (a["changed-from"] === "true") throw new Error("--changed-from needs a commit sha");
-      ({ routes = cfg.routes, onlyRoutes } = await routesFromChange(a["changed-from"]));
+      // With --changed-from, the changed screens replace the configured routes. Only a failed diff falls back to them.
+      ({ routes = cfg.routes, onlyRoutes } = await routesFromChange(a["changed-from"], console.error, appScheme(cfg.routes)));
     }
     const report = await walk(simDriver(base, cfg.appId), { routes, onlyRoutes, maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
     const nothingChanged = onlyRoutes && !routes?.length;
+    if (nothingChanged) console.error("No screens changed, nothing explored.");
     writeFileSync(`${out}.md`, (nothingChanged ? "No screens changed, nothing explored.\n\n" : "") + renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
     let issueInfo: Record<string, unknown> = {};
     const line = `${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`;
