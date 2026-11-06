@@ -36,17 +36,30 @@ export function createLifecycle() {
 
 const STYLE = "position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;font-family:system-ui,sans-serif;color:#fff;";
 
-/** Runs in the page. Shows the lock screen with the time. The element hides the app from the accessibility tree. */
+/** Runs in the page. Shows the lock screen with the time. The rest of the page is made inert and aria-hidden until `removeLockOverlay`. */
 export function lockOverlay(style) {
   const d = new Date(); const t = `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
   document.querySelector("[data-pn-lock]")?.remove();
+  // Hide the app from the accessibility tree and from input, as a locked phone shows no app content.
+  for (const c of document.body.children) {
+    if (c.hasAttribute("data-pn-hid")) continue;
+    c.setAttribute("data-pn-hid", `${c.hasAttribute("inert") ? "i" : ""}${c.getAttribute("aria-hidden") ?? ""}`);
+    c.setAttribute("inert", ""); c.setAttribute("aria-hidden", "true");
+  }
   const el = document.createElement("div");
   el.setAttribute("data-pn-lock", ""); el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Lock screen");
   el.style.cssText = style + "background:linear-gradient(#10243a,#050b14);justify-content:space-between;padding:120px 0 40px;";
   el.innerHTML = `<div style="font-size:72px;font-weight:300">${t}</div><div>Swipe up to unlock</div>`;
   document.body.appendChild(el);
 }
-export function removeLockOverlay() { document.querySelector("[data-pn-lock]")?.remove(); }
+export function removeLockOverlay() {
+  document.querySelector("[data-pn-lock]")?.remove();
+  for (const c of document.querySelectorAll("[data-pn-hid]")) {
+    const prev = c.getAttribute("data-pn-hid"); c.removeAttribute("data-pn-hid");
+    if (!prev.startsWith("i")) c.removeAttribute("inert");
+    const aria = prev.replace(/^i/, ""); if (aria) c.setAttribute("aria-hidden", aria); else c.removeAttribute("aria-hidden");
+  }
+}
 
 /** Runs in the page. Boot screen with the Shipvo logo (our own mark: a rounded square with an arrow). */
 export function bootOverlay(style) {

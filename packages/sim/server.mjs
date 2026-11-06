@@ -199,7 +199,8 @@ async function act(id, body) {
     case "restart": {
       await page.evaluate(`(${bootOverlay})(${JSON.stringify(OVERLAY_STYLE)})`).catch(() => {});
       await page.waitForTimeout(300);
-      await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
+      try { await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+      catch (e) { await page.evaluate(() => document.querySelector("[data-pn-boot]")?.remove()).catch(() => {}); throw e; }
       life.restart(); break;
     }
     case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...life.log()].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)), capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };

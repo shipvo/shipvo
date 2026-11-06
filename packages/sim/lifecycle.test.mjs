@@ -65,6 +65,7 @@ test("lock then unlock returns to the same screen", async () => {
   const locked = await act("l1", { action: "lock" });
   assert.equal(locked.ok, true, locked.error);
   assert.match(locked.screen, /Swipe up to unlock/);
+  assert.doesNotMatch(locked.screen, /Detail|Open detail/);
   const blocked = await act("l1", { action: "tap", ref: "e1" });
   assert.equal(blocked.ok, false); assert.equal(blocked.code, "locked"); assert.equal(blocked.delivery, "not_delivered");
   assert.equal((await act("l1", { action: "lock" })).code, "already_locked");
