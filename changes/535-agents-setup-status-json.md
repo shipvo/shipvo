@@ -1,0 +1,3 @@
+- `@shipvo/cli`: new `shipvo agents setup` writes a marked section in `AGENTS.md` and adds `@shipvo/mcp` to `.mcp.json` (and `.cursor/mcp.json`). `--dry-run` and `--json` supported.
+- `@shipvo/cli`: `shipvo status --json` now returns `{ ok, code, summary, data, next }` with exit codes 0, 1 and 2.
+- Migration: `status --json` used to print the raw control-plane summary. Read `data.pending_release` instead, or call `/t/<app>/summary` directly.

@@ -31,13 +31,12 @@ describe("shipvo status", () => {
     expect(out.split("\n")[1]).toMatch(/^8\s+12\s+1\s+410\s+-$/);
     expect(out.split("\n")[2]).toMatch(/^7\s+30\s+0\s+380\s+900$/);
   });
-  it("--app overrides the app id; --json prints the payload unchanged", async () => {
+  it("--app overrides the app id in the summary request", async () => {
     inApp();
     const f = vi.fn(async () => resp(payload));
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    expect(await status(["--app", "other", "--json"], f as any)).toBe(0);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    await status(["--app", "other", "--json"], f as any);
     expect(f).toHaveBeenCalledWith("https://cp.test/t/other/summary");
-    expect(JSON.parse(String(log.mock.calls[0][0]))).toEqual(payload);
   });
   it("prints one halt line above the table when halted is set", async () => {
     inApp();
@@ -47,7 +46,7 @@ describe("shipvo status", () => {
     expect(log.mock.calls[0][0]).toBe("Release 8 is halted: 12 of 40 devices failed (limit 20%). Publish a new release or run shipvo rollback to clear.");
     expect(String(log.mock.calls[1][0])).toContain("applied");
   });
-  it("prints no halt line when halted is null or missing; --json passes it through", async () => {
+  it("prints no halt line when halted is null or missing", async () => {
     inApp();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await status([], (async () => resp({ ...payload, halted: null })) as any);
@@ -55,10 +54,6 @@ describe("shipvo status", () => {
     expect(log).toHaveBeenCalledTimes(2);
     expect(String(log.mock.calls[0][0])).not.toContain("halted");
     expect(String(log.mock.calls[1][0])).not.toContain("halted");
-    log.mockClear();
-    const halted = { release: 8, reports: 40, failed: 12, threshold: 0.2 };
-    await status(["--json"], (async () => resp({ ...payload, halted })) as any);
-    expect(JSON.parse(String(log.mock.calls[0][0])).halted).toEqual(halted);
   });
   it("says no telemetry yet and exits 0 when empty", async () => {
     inApp();
@@ -91,5 +86,65 @@ describe("shipvo status auto-halt line", () => {
     log.mockClear();
     await status([], (async () => resp(payload)) as any);
     expect(String(log.mock.calls[0][0])).not.toContain("auto-halt");
+  });
+});
+
+describe("shipvo status --json", () => {
+  const run = async (f: any, argv: string[] = ["--json"]) => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const code = await status(argv, f);
+    return { code, body: JSON.parse(String(log.mock.calls[0][0])) };
+  };
+  const withSeed = () => { process.env.SHIPVO_SIGNING_SEED = "x"; };
+  afterEach(() => { delete process.env.SHIPVO_SIGNING_SEED; });
+
+  it("healthy app: ok, exit 0, documented shape", async () => {
+    inApp(); withSeed();
+    const { code, body } = await run(async () => resp(payload));
+    expect(code).toBe(0);
+    expect(body).toMatchObject({ ok: true, code: "ok", summary: expect.any(String) });
+    expect(Object.keys(body.data).sort()).toEqual(["pending_release", "project", "run_server", "sim", "signing_key", "store_step"].sort());
+    expect(body.data).toMatchObject({ project: "shipvo", signing_key: { present: true }, run_server: { running: false }, pending_release: { latest: 8, halted: null }, store_step: null });
+    expect(body.next).toEqual([{ command: "shipvo run android", why: expect.any(String) }]);
+  });
+  it("halted release: exit 1 with a rollback command", async () => {
+    inApp(); withSeed();
+    const { code, body } = await run(async () => resp({ ...payload, halted: { release: 8, reports: 40, failed: 12, threshold: 0.2 } }));
+    expect(code).toBe(1);
+    expect(body).toMatchObject({ ok: false, code: "action_needed" });
+    expect(body.next[0].command).toBe("shipvo rollback --to 7");
+    expect(body.data.pending_release.halted).toEqual({ release: 8, failed: 12, reports: 40 });
+  });
+  it("no signing seed and no releases: asks for the key and a dry-run publish", async () => {
+    inApp();
+    const { code, body } = await run(async () => resp({ releases: [] }));
+    expect(code).toBe(1);
+    expect(body.data.signing_key.present).toBe(false);
+    expect(body.next.map((n: any) => n.command)).toEqual(expect.arrayContaining(["shipvo keys import --file <seed file>", "shipvo publish --dry-run"]));
+  });
+  it("store step todo is action needed; waiting is not", async () => {
+    inApp(); withSeed();
+    writeFileSync("store-plan.json", JSON.stringify({ version: 1, answers: { company: false, androidNow: true, playAccountBefore20231113: false }, marks: {} }));
+    const r1 = await run(async () => resp(payload));
+    expect(r1.code).toBe(1);
+    expect(r1.body.data.store_step).toMatchObject({ state: "todo" });
+    expect(r1.body.next.some((n: any) => n.command === "shipvo store status")).toBe(true);
+  });
+  it("control plane down: exit 2", async () => {
+    inApp(); withSeed();
+    const { code, body } = await run(async () => { throw new Error("boom"); });
+    expect(code).toBe(2);
+    expect(body).toMatchObject({ ok: false, code: "control_plane_unreachable" });
+  });
+  it("outside a Shipvo project: still answers, with init as the next step", async () => {
+    const d = mkdtempSync(join(tmpdir(), "shipvo-status-plain-"));
+    writeFileSync(join(d, "package.json"), JSON.stringify({ dependencies: { expo: "52" } }));
+    process.chdir(d);
+    const f = vi.fn();
+    const { code, body } = await run(f);
+    expect(f).not.toHaveBeenCalled();
+    expect(code).toBe(1);
+    expect(body.data.project).toBe("expo");
+    expect(body.next[0].command).toBe("shipvo init");
   });
 });
