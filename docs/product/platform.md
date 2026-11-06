@@ -60,7 +60,7 @@ This section is set by the owner. The Head of Product plans from it and does not
 
 ### Infrastructure: one Cloudflare account (owner, 6 Nov 2026)
 
-Everything runs in one Cloudflare account. The Shipvo Runner starts as one shared Worker that executes app specs (no user code) on Workers Paid ($5 a month), upgraded as usage grows. User-written code (spec levels 2 and 3) never runs in the shared runner; it waits for Workers for Platforms with one script per person, and heavy jobs go to E2B. See `docs/design/app-spec.md` section 15.7.
+Everything runs in one Cloudflare account. The Shipvo Runner starts as one shared Worker that executes app specs (no user code) on the Workers Free plan (100,000 requests a day); we move to Workers Paid ($5 a month) only when usage reaches the free limits, with an alert at 70%. User-written code (spec levels 2 and 3) never runs in the shared runner; it waits for Workers for Platforms with one script per person, and heavy jobs go to E2B. See `docs/design/app-spec.md` section 15.7.
 
 ### Shipvo for coding agents (owner, 6 Nov 2026)
 
