@@ -22,6 +22,7 @@ import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
 import { AppsError, loadProfile, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
+import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
@@ -44,6 +45,8 @@ let PROFILE = null, PROFILE_ERR = null;
 { const given = arg("phone", null);
   try { PROFILE = readFileSync(given ?? join(process.cwd(), "phone.json"), "utf8"); }
   catch (e) { if (given || e?.code !== "ENOENT") PROFILE_ERR = `cannot read ${given ?? "phone.json"}: ${e?.code ?? e?.message}`; } }
+// Simulated OTA source: a control plane stub that serves <url>/pointer.json (signed) and the bundle. The key is the app's public key.
+const UPDATE = { url: arg("update-url", process.env.PN_UPDATE_URL || ""), key: arg("update-key", process.env.PN_UPDATE_KEY || "") };
 const DEFAULT_APP = arg("app", CFG.appId || "tide"), APP_NAME = CFG.name || "Tide & Tackle";
 // Published releases: open_app("tide@r13") loads the web artifact that `shipvo publish` stored next to the phone bundle.
 const CONTROL = (process.env.PN_CONTROL || process.env.CONTENT_FROM || CFG.controlPlane || "https://api.shipvo.dev").replace(/\/$/, "");
@@ -130,12 +133,13 @@ async function newSession(id, opts = {}) {
   const errors = [];
   // phone.json: the apps and settings this phone starts with. The same profile gives the same phone every run.
   let apps; try { if (PROFILE_ERR && opts.phone === undefined) throw new AppsError("bad_profile", PROFILE_ERR); apps = loadProfile(opts.phone ?? PROFILE ?? {}); } catch (e) { await ctx.close(); throw e instanceof AppsError ? new SimError(e.code, e.message) : e; }
-  page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
+  const pageErrors = { n: 0 };
+  page.on("pageerror", (e) => { pageErrors.n++; errors.push(String(e?.message ?? e).split("\n")[0]); });
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
-  sessions.set(id, { apps, ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
+  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -146,6 +150,24 @@ async function epochOf(page) {
   const d = DOCS.get(page);
   if (!d) DOCS.set(page, { id, epoch: 0 }); else if (d.id !== id) { d.id = id; d.epoch++; }
   return DOCS.get(page).epoch;
+}
+// The update banner is a status element in the page, so it is in the accessibility tree. A reload drops it, so boot puts it back.
+async function showBanner(s) {
+  const text = bannerText(s.update);
+  await s.page.evaluate((t) => { document.querySelector("[data-pn-update-banner]")?.remove(); if (!t) return;
+    const d = document.createElement("div"); d.setAttribute("data-pn-update-banner", ""); d.setAttribute("role", "status"); d.setAttribute("aria-label", t); d.textContent = t;
+    d.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:2147483647;padding:8px 12px;border-radius:12px;background:#1d2733;color:#fff;font:600 13px system-ui,sans-serif;pointer-events:none";
+    document.body.appendChild(d); }, text).catch(() => {});
+}
+// One boot of the app. `url` loads that bundle, else the page reloads (a cold start). A page error while loading is a failed boot: three in a row
+// on a new release send the phone back to the release it had.
+async function boot(s, url) {
+  const before = s.pageErrors.n;
+  if (url) await s.page.goto(url, { waitUntil: "networkidle" }); else await s.page.reload({ waitUntil: "networkidle" });
+  await s.page.waitForTimeout(300);
+  const r = bootDone(s.update, s.pageErrors.n > before);
+  if (r.revert) { await s.page.goto(r.url, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); }
+  await showBanner(s);
 }
 class SimError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
@@ -211,7 +233,7 @@ async function act(id, body) {
       try { ev = body.action === "press_home" ? pressHome(s.nav) : body.action === "open_recents" ? openRecents(s.nav) : body.action === "resume_app" ? resume(s.nav) : (killApp(s.nav), null); }
       catch (e) { if (e instanceof NavError) throw new SimError(e.code, e.message); throw e; }
       if (ev) await page.evaluate(setVisibilityInPage, ev);
-      if (body.action === "kill_app") { s.life.reloads++; await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300); await page.evaluate(setVisibilityInPage, "background"); }
+      if (body.action === "kill_app") { s.life.reloads++; await boot(s); await page.evaluate(setVisibilityInPage, "background"); }
       const where = s.nav.where;
       return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)\n${describeApps(s.apps)}` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
     }
@@ -247,9 +269,21 @@ async function act(id, body) {
       try { (body.action === "lock" ? lock : unlock)(s.life); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
       return { locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
     }
+    // Simulated OTA: check (signed pointer, hash), apply (restart on the new bundle), state. Errors: no_update, not_ready. Every change is in device_log.
+    case "get_update_state": case "check_for_update": case "apply_update": {
+      try {
+        if (body.action === "check_for_update") { await checkForUpdate(s.update, { url: s.updateSrc.url, publicKey: s.updateSrc.key }); await showBanner(s); }
+        else if (body.action === "apply_update") {
+          applyUpdate(s.update, (n) => `http://localhost:${PORT}/u/${body.session}/r${n}/index.html`);
+          s.life.reloads++; s.shade.open = "none"; s.nav.where = "app"; s.life.locked = false;
+          await boot(s, s.update.running.url);
+        }
+      } catch (e) { if (e instanceof UpdateError) throw new SimError(e.code, e.message); throw e; }
+      return { update: updateView(s.update), banner: bannerText(s.update), reloads: s.life.reloads, screen: await screen(page) };
+    }
     case "restart": {
       restart(s.life); s.shade.open = "none"; s.nav.where = "app";
-      await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
+      await boot(s);
       return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
     }
     case "screen": break;
@@ -339,7 +373,7 @@ async function act(id, body) {
         }
       } catch (e) { throw e.code ? new SimError(e.code, e.message) : e; }
     }
-    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log, ...s.apps.log, ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log, ...s.apps.log, ...s.update.log, ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
@@ -372,7 +406,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -398,6 +432,9 @@ const server = http.createServer(async (req, res) => {
       if (!hit) { const r = await fetch(`${CONTROL}${key}`); if (!r.ok) return send(r.status, { error: "artifact" }); hit = { type: r.headers.get("content-type") ?? "application/octet-stream", body: Buffer.from(await r.arrayBuffer()) }; WCACHE.set(key, hit); }
       return send(200, hit.body, hit.type);
     }
+    // a bundle this session downloaded and verified: the page that runs is the page that was checked
+    { const um = url.pathname.match(/^\/u\/([\w-]+)\/r(\d+)\/index\.html$/);
+      if (um) { const b = sessions.get(um[1])?.update.bundles.get(Number(um[2])); return b ? send(200, b, MIME[".html"]) : send(404, { error: "no_bundle" }); } }
     // a founder opening the printed link lands on the app
     if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/") { res.writeHead(302, { location: "/app/", ...CORS }); return res.end(); }
     if (url.pathname.startsWith("/app/")) {
