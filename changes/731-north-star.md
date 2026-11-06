@@ -1,1 +1,0 @@
-- `scripts/metrics/north-star.mjs`: read-only north-star query (outside apps with a healthy release in the last 7 days).

@@ -1,2 +1,0 @@
-- `@shipvo/control-plane`: secret vault, slice 1 of #841. `POST /vault/tickets` returns a one-time ticket and a vault page URL (10 minutes). `GET /vault/t/<ticket>` shows the form. `POST /vault/t/<ticket>` stores the key, encrypted at rest. No endpoint returns a value.
-- Migration: apply `0021_vault.sql` and set the `VAULT_MASTER_KEY` Worker secret (32 random bytes, base64). Without it the vault answers 503.

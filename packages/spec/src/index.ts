@@ -5,3 +5,5 @@ export { evaluate, evaluateTemplate, ExpressionError, MAX_COST } from "./eval.js
 export type { EvalOptions } from "./eval.js";
 export { renderScreen, describeTree, unlabelled, toSnapshot } from "./render.js";
 export type { ScreenNode, PhoneStyle, RenderOptions, RenderResult } from "./render.js";
+export { toolsFromSpec } from "./tools.js";
+export type { SpecTool, ToolsFromSpecOptions } from "./tools.js";

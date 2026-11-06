@@ -1,2 +1,0 @@
-- `@shipvo/runtime` (iOS): the runtime accepts root-signed key rotation statements. Set `ShipvoRootKey` (and optionally `ShipvoMinSequence`) in Info.plist; pointer signatures are then checked against the current release key.
-- Migration: none. Shells without `ShipvoRootKey` behave as before.

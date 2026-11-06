@@ -1,1 +1,0 @@
-- mcp: while recording, `tap` draws a soft finger dot and ripple and `scroll` draws a trail (along the element when `ref` is given); `record_start` takes `show_taps` (default true). `@shipvo/sim` gets a `locate` action: centre and size of an element as 0..1 of the viewport. Videos recorded with taps now show the dot; pass `show_taps: false` for the old look (#522).

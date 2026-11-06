@@ -1,2 +1,0 @@
-- `control-plane`: publish tokens are now checked against their role (`can(role, action)`) on publish, promote, rollback, halt settings, audit and summary. A denied call returns 403 `{ error: "forbidden", action, role }`.
-- Migration: none. A token with no role acts as `admin`, so existing tokens work as before.

@@ -1,1 +1,0 @@
-- sim: the @shipvo/sim package now includes `network-profiles.mjs` and `apps.mjs`, so `shipvo sim` starts from an installed package. A test checks that every imported module is packed.

@@ -1,1 +1,0 @@
-- docs: `docs/threat-model.md` explains what signing protects on a device, the threats and the code and test behind each, and what is not covered.

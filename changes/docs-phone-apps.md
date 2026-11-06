@@ -1,1 +1,0 @@
-- docs: new page "Phone Browser, Settings and system controls" covers `get_settings`, `set_setting` and the `browser_*` tools, with options, errors and troubleshooting.
