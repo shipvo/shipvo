@@ -4,14 +4,14 @@ Shipvo stores the orders your app sends. It does not take payment. You, or your 
 
 ## Who verifies payment
 
-You do. Shipvo never checks that money arrived. Every new order starts as `unverified`. Check your mobile money or card account, then call `settle` for that order. There are no payment-provider webhooks yet.
+You do. Shipvo never checks that money arrived. Every new order starts as `unverified`. Check your mobile money or card account, then call `settle` for that order with the owner token. There is no settle button in the admin yet. There are no payment-provider webhooks yet.
 
 ## Order statuses
 
 | Status | Meaning | Shown as paid? |
 | --- | --- | --- |
 | `unverified` | Received and price-checked. Payment not confirmed. | No |
-| `settled` | You confirmed payment with the owner token or in the admin. | Yes |
+| `settled` | You confirmed payment with the owner token (or a signed-in admin session calling the same endpoint). | Yes |
 | `price_mismatch` | The prices or total did not match your published content. | No |
 | `simulated` | A test order sent with `simulated: true`. | No |
 

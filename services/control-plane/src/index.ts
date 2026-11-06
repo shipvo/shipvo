@@ -358,7 +358,9 @@ app.post("/app/:id/api/orders/:order/settle", async (c) => {
     return c.json({ error: "not_settleable", status, message: `An order that is ${status} cannot be settled.` }, 409);
   }
   const now = new Date().toISOString();
-  await c.env.DB.prepare("UPDATE orders SET status = 'settled' WHERE app_id = ? AND order_id = ? AND status = 'unverified'").bind(appId, orderId).run();
+  const upd: any = await c.env.DB.prepare("UPDATE orders SET status = 'settled' WHERE app_id = ? AND order_id = ? AND status = 'unverified'").bind(appId, orderId).run();
+  // A concurrent call may have settled it between our check and the update: then do not audit twice.
+  if (upd?.meta?.changes !== 1) return c.json({ ok: true, order_id: orderId, status: "settled", already_settled: true });
   await c.env.DB.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
     .bind(appId, now, actor, "settle_order", JSON.stringify({ order_id: orderId }), 1).run();
   return c.json({ ok: true, order_id: orderId, status: "settled" });
