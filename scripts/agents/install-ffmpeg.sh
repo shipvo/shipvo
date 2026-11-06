@@ -16,6 +16,28 @@ set -uo pipefail
 if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then ffmpeg -version | head -1; exit 0; fi
 
 SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo"
+
+# First choice: a static ffmpeg build (GPL, includes libx264) from GitHub releases. apt stalled on every
+# mirror for a whole hour (escalations #561, #563, #564, #572; ci run 42141993808), while GitHub release
+# downloads are fast and reliable from runners. apt below is only the fallback.
+static_ffmpeg() {
+  local arch url dir
+  case "$(uname -m)" in x86_64) arch=linux64 ;; aarch64|arm64) arch=linuxarm64 ;; *) return 1 ;; esac
+  url="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-${arch}-gpl.tar.xz"
+  dir=$(mktemp -d)
+  for t in 1 2 3; do
+    if curl -fsSL --retry 2 --connect-timeout 20 --max-time 240 "$url" -o "$dir/ff.tar.xz" &&
+       tar -xJf "$dir/ff.tar.xz" -C "$dir" --wildcards --strip-components=2 '*/bin/ffmpeg' '*/bin/ffprobe'; then
+      $SUDO install -m 0755 "$dir/ffmpeg" "$dir/ffprobe" /usr/local/bin/ && rm -rf "$dir" && hash -r && return 0
+    fi
+    echo "static ffmpeg download failed (try $t)"; sleep 5
+  done
+  rm -rf "$dir"; return 1
+}
+if static_ffmpeg && ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264; then
+  echo "Installed static ffmpeg"; ffmpeg -version | head -1; exit 0
+fi
+echo "Static ffmpeg not available, falling back to apt"
 APT_OPTS=(-o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
 MIRRORS=("" "http://archive.ubuntu.com/ubuntu/" "http://mirrors.edge.kernel.org/ubuntu/")
 LOG=$(mktemp)
