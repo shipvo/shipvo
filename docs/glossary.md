@@ -57,4 +57,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Port.** A number that tells your computer which program a web address belongs to. `shipvo run` picks a free one. If it says the port is in use, pick another number with `--port`.
 
 **Shipvo Phone.** The simulated phone Shipvo shows in your browser, in an Android style or an iPhone style. It runs your app on your computer, so you need no real phone.
+
 **Phone Browser.** A web browser inside the simulated phone, separate from your app. Your app opens web links in it, and your assistant can read and click the pages. See [phone-apps](phone-apps.md).
