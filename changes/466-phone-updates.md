@@ -1,4 +1,0 @@
-- `@shipvo/mcp`: new tools `get_update_state`, `check_for_update` and `apply_update`. Typed errors: `no_update`, `not_ready`.
-- `@shipvo/sim`: the phone keeps an update state (`idle`, `checking`, `downloading`, `ready`, `applied`, `reverted`) with the release and the last reason (`verify_failed`, `download_failed`, `crash_loop`). It checks a signed release pointer and the bundle hash, applies with a restart, and reverts after 3 failed boots. Each state change is in `device_log` as simulated. A "Simulated" status banner shows for `ready`, `applied` and `reverted` in both skins.
-- New simulator options: `--update-url` and `--update-key` (or `PN_UPDATE_URL`, `PN_UPDATE_KEY`); a session can pass `update_url` and `update_key`.
-- Migration: none. Without an update source `check_for_update` returns `no_update`.

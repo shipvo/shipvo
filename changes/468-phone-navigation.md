@@ -1,4 +1,0 @@
-- `@shipvo/sim`: the phone frame has a home screen with the app icon, an app switcher card, Android 3-button navigation (switch in the power menu) and iPhone/Android swipe gestures (up = home, up and hold = recents, along the bar = switch on iPhone, left edge = back). The app hears `AppState` `background` and `active`; killing the card is a cold start. The frame page owns the state: it reports changes to its parent with `postMessage({ type: "pn:nav-state", where })` and accepts `{ type: "pn:nav", where }`. The home screen and switcher follow the dark and light theme.
-- `@shipvo/mcp`: new tools `press_home`, `open_recents`, `resume_app` and `kill_app`. While the home screen or switcher shows, `tap`, `type`, `scroll`, `back`, `open_url` and `open_notification` fail with `app_not_foreground`.
-- `@shipvo/sim`: `screenshot` of a headless session shows the home screen or the app switcher while the phone is away from the app.
-- Migration: none; new tools.

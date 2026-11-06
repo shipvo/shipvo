@@ -1,1 +1,0 @@
-- Docs: `docs/migrate-from-eas-update.md` shows real `shipvo migrate --plan` output, and the concept map. Linked from getting-started and the README.

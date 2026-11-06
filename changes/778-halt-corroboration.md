@@ -1,3 +1,0 @@
-- control-plane: auto-halt counts only verified reports, one vote per install per release. A halt needs at least `min_installs` (default 20) distinct installs and failures from at least 3 distinct networks. `PUT /app/<id>/api/halt-config` accepts an optional `min_installs`.
-- control-plane: new migration `0020_telemetry_install_id.sql` adds `telemetry.install_id` (additive). Run it before deploying.
-- Migration: apps with no signing runtime will not auto-halt until updated. The KV fallback counts no longer halt. Details in `docs/auto-halt.md`.

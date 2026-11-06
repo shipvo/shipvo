@@ -1,3 +1,0 @@
-- schema: new optional `policy.requireApprovalAbove` band (default off). Additive; no migration needed.
-- control-plane: a promote above that band answers 202 with an approval id and changes nothing until another owner calls `POST /apps/:app/approvals/:id/approve` (or `/reject`). The proposer cannot approve. Proposed, approved and rejected each write an audit row (action `publish`, with `approval` in `after`).
-- control-plane: approval audit rows reuse action `publish`; filter on `approval` in `after` to tell them apart from real publishes. Approve re-checks `maxBand` and `agentMaxBand` (403 `policy_refused`) and the app storage budget (413).

@@ -5,3 +5,5 @@ export { evaluate, evaluateTemplate, ExpressionError, MAX_COST } from "./eval.js
 export type { EvalOptions } from "./eval.js";
 export { runSource, runAction, RunError, memoryCache, trimResponse, usedFields } from "./run.js";
 export type { RunContext, RunCache, RunErrorCode } from "./run.js";
+export { toolsFromSpec } from "./tools.js";
+export type { SpecTool, ToolsFromSpecOptions } from "./tools.js";
