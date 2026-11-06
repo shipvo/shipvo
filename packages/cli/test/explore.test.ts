@@ -122,3 +122,33 @@ describe("renderMarkdown", () => {
     expect(full).toContain("```json");
   });
 });
+
+describe("accessibility findings", () => {
+  const drv = (screen: string, sizes: Record<string, [number, number]>): Driver => ({
+    open: async () => ({ ok: true, screen }), openUrl: async () => ({ ok: true, screen }), tap: async () => ({ ok: true, screen, delivery: "delivered" }),
+    back: async () => ({ ok: true, screen }), errors: async () => [], sizes: async () => sizes,
+  });
+  it("flags a 20 px button and not a 48 px one", async () => {
+    const r = await walk(drv(`- button "Tiny" [ref=e1]\n- button "Fine" [ref=e2]`, { e1: [20, 20], e2: [48, 48] }));
+    const f = r.findings.filter((x) => x.kind === "small_target");
+    expect(f).toHaveLength(1);
+    expect(f[0]!.message).toContain("Tiny");
+    expect(f[0]!.steps).toEqual([{ action: "open" }]);
+    expect(renderMarkdown(r)).toContain("Small target");
+  });
+  it("uses 44 for the ios skin", async () => {
+    const d = drv(`- button "Mid" [ref=e1]`, { e1: [46, 46] });
+    expect((await walk(d)).findings.filter((x) => x.kind === "small_target")).toHaveLength(1);
+    expect((await walk(d, { skin: "ios" })).findings.filter((x) => x.kind === "small_target")).toHaveLength(0);
+  });
+  it("flags two buttons named Add once", async () => {
+    const r = await walk(drv(`- button "Add" [ref=e1]\n- button "Add" [ref=e2]\n- button "Add" [ref=e3]`, {}));
+    expect(r.findings.filter((x) => x.kind === "duplicate_name")).toHaveLength(1);
+  });
+  it("skips the size check when sizes() throws", async () => {
+    const d = { ...drv(`- button "Tiny" [ref=e1]`, {}), sizes: async () => { throw new Error("unknown action 'sizes'"); } };
+    const r = await walk(d);
+    expect(r.findings.filter((x) => x.kind === "small_target")).toHaveLength(0);
+    expect(r.stoppedEarly).toBeNull();
+  });
+});
