@@ -53,15 +53,17 @@ export const PARITY_LIMITS = [
   "See docs/parity-results.md for what was measured against Android emulators and the iOS Simulator.",
 ];
 
-const ACTIONABLE = new Set(["button", "link", "tab", "checkbox", "switch", "radio", "menuitem"]);
+export const ACTIONABLE = new Set(["button", "link", "tab", "checkbox", "switch", "radio", "menuitem"]);
 const FIELDS = new Set(["textbox", "searchbox"]);
 /** Labels that end a session or destroy data. The walker taps them last. `cancel` is here too; being last, it is still tapped, so a modal is not skipped. */
 const RISKY = /\b(log ?out|sign ?out|delete|remove|cancel|erase|deactivate|clear all|unsubscribe)\b/i;
-const NETWORK = /network request failed|network error|networkerror|failed to fetch|no internet|you(?:'| a)re offline|(?:can't|cannot|couldn't|unable to) connect|connection (?:failed|lost|error)|ERR_(?:INTERNET|CONNECTION|NAME_NOT)\w*/i;
+export const NETWORK = /network request failed|network error|networkerror|failed to fetch|no internet|you(?:'| a)re offline|(?:can't|cannot|couldn't|unable to) connect|connection (?:failed|lost|error)|ERR_(?:INTERNET|CONNECTION|NAME_NOT)\w*/i;
 /** Only loading indicators count. Text such as a heading "Loading history" does not. */
-const loading = (tree: string) => /^\s*- (?:progressbar|spinner|activity ?indicator)\b/im.test(tree);
+export const LOADING = /^\s*- (?:progressbar|spinner|activity ?indicator)\b/im;
+const loading = (tree: string) => LOADING.test(tree);
 /** Nothing drawn: no names and no text anywhere in the tree. */
-const blank = (tree: string) => !/"|: \S/.test(tree);
+export const NONBLANK = /"|: \S/;
+const blank = (tree: string) => !NONBLANK.test(tree);
 /** Small seeded random numbers (mulberry32), so a seed repeats a run exactly. */
 function rng(seed: number): () => number {
   let a = seed >>> 0;
@@ -107,7 +109,8 @@ function parseEls(tree: string, roles: Set<string>): El[] {
 export const fieldElements = (tree: string): El[] => parseEls(tree, FIELDS);
 /** The tree without refs, to tell whether two screens are the same. */
 export const signature = (tree: string) => tree.replace(/\s*\[ref=\w+\]/g, "");
-const redScreen = (tree: string) => /Uncaught (\w*Error)|Unhandled Runtime Error|Application error|Something went wrong/i.exec(tree)?.[0];
+export const RED_SCREEN = /Uncaught (\w*Error)|Unhandled Runtime Error|Application error|Something went wrong/i;
+const redScreen = (tree: string) => RED_SCREEN.exec(tree)?.[0];
 // Accepts "close" too, but the sim `back` action only clicks a button named exactly "Back"; the replay fallback covers the rest.
 const hasBack = (els: El[]) => els.some((e) => /^(back|go back|close)$/i.test(e.name));
 const label = (e: { role: string; name: string }) => `${e.role} "${e.name}"`;
