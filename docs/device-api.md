@@ -175,7 +175,7 @@ const mic = await device.microphone.open();   // web and simulator only; optiona
 
 - The simulated permission always comes first. If `permissions.location` is `"denied"`, location is denied even when a person is present.
 - Every `device_log` entry has `source: "real"` or `"simulated"`. `set_device({ source: "simulated" })` forces simulated mode. `set_device({ microphone: { level } })` sets the simulated microphone.
-- `"microphone"` is a `PermissionName` and a `Capability`. On native it reports `"unavailable"`. On the web `capabilities()` reports `"real"` when real hardware may be used. Code that switches over `PermissionName` or `Capability` exhaustively needs a `"microphone"` case.
+- `"microphone"` is a `PermissionName` and a `Capability`. On native, `capabilities()` reports `"unavailable"` for it, and the microphone permission reads `"denied"`. On the web `capabilities()` reports `"real"` when real hardware may be used. Code that switches over `PermissionName` or `Capability` exhaustively needs a `"microphone"` case.
 
 ## Troubleshooting
 

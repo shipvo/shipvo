@@ -60,6 +60,7 @@ shipvo run android|ios [--no-open] [--port <n>] [--native]
 | `--port needs a number from 0 to 65535` | The value is not a port. | Use digits only. |
 | `Unknown argument` | A flag is mistyped. | The message shows the usage line. |
 | Assistant says `headless session` | `shipvo run` is not running in that project, or the app name differs. | Start `shipvo run` in the project, then call `open_app` again. Pass `attach: "always"` to get an error instead of a fallback. |
+| `no_live_run` | You passed `attach: "always"` and no `shipvo run` is live. | Start `shipvo run` in the project, then call `open_app` again. |
 | `attach_failed` with "attach needs Node 22+" | Old Node. | Install Node 22. |
 
 ## Next steps
