@@ -18,6 +18,8 @@ import { PhoneBrowser } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
 import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
+import { shadeAction, SHADE_ACTIONS, applyScheme } from "./shade-actions.mjs";
+import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
@@ -123,7 +125,7 @@ async function newSession(id, opts = {}) {
   page.on("console", (m) => { if (m.type() === "error" && !/^Failed to load resource/.test(m.text())) consoleErrors.push(m.text().split("\n")[0]); });
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, errors, consoleErrors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), nav: createNav() });
+  sessions.set(id, { ctx, page, errors, consoleErrors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -187,9 +189,11 @@ async function act(id, body) {
     if (covered) throw fail("covered", String(body.ref));
   };
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification"].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification", ...SHADE_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   // Home screen or app switcher showing: the app is in the background and takes no input.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
+  // An open panel covers the app on a phone, so input to the app is refused until it is closed.
+  if (["tap", "type", "scroll"].includes(body.action) && s.shade.open !== "none") throw new SimError("panel_open", `a panel (${s.shade.open}) is open and covers the app, so nothing was sent to it. Close it first (close_panels).`);
   switch (body.action) {
     // Home, recents, resume and kill. The app hears them as AppState changes (document.visibilityState). Kill is a cold start.
     case "press_home": case "open_recents": case "resume_app": case "kill_app": {
@@ -203,11 +207,12 @@ async function act(id, body) {
     }
     // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
     case "lock": case "unlock": {
+      if (body.action === "lock") s.shade.open = "none";
       try { (body.action === "lock" ? lock : unlock)(s.life); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
       return { locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
     }
     case "restart": {
-      restart(s.life); s.nav.where = "app";
+      restart(s.life); s.shade.open = "none"; s.nav.where = "app";
       await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
       return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
     }
@@ -244,10 +249,13 @@ async function act(id, body) {
       break;
     }
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
-    case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); break;
+    case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); if (typeof body.device?.darkMode === "boolean") await applyScheme(page, body.device.darkMode); break;
+    case "open_notifications": case "open_control_center": case "close_panels": case "toggle_tile": case "dismiss_notification": {
+      try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
+    }
     case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
     case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
-    case "open_notification": { const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
+    case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {
       if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
       const handled = await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url);
@@ -302,7 +310,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
+    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await applyScheme(page, !!body.device?.darkMode); s.shade.open = "none"; break;
     // console.error output since the last call to this action. Reading them clears the list.
     case "console_errors": return { errors: s.consoleErrors.splice(0), screen: await screen(page) };
     // Uncaught page errors since the last call to this action. Reading them clears the list.
@@ -317,7 +325,7 @@ async function act(id, body) {
       }
       return { sizes, screen: text };
     }
-    case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) { await ready(b.first()); await b.first().click(); } else throw new Error("no Back button on this screen"); break; }
+    case "back": { if (s.shade.open !== "none") { s.shade.open = "none"; break; } const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) { await ready(b.first()); await b.first().click(); } else throw new Error("no Back button on this screen"); break; }
     case "screenshot": {
       // format "jpeg" has no alpha channel, which the stores require. inline: true also returns the bytes as base64 for clients on another machine.
       const jpeg = body.format === "jpeg"; const p = join(DIR, `${id}-${Date.now()}.${jpeg ? "jpg" : "png"}`);
@@ -327,7 +335,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, console_errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, console_errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

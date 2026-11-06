@@ -17,6 +17,7 @@ const NO_SESSION: Record<string, string> = {
   publish_preview: "builds the app folder, takes no session",
   owner_describe: "owner tool, works on an app",
   owner_command: "owner tool, works on an app",
+  audit_log: "owner tool, works on an app",
   list_sessions: "lists all sessions, takes no session id",
   record_start: "records the phone frame page, takes no session id",
   record_marker: "adds a chapter to the running recording, takes no session id",
