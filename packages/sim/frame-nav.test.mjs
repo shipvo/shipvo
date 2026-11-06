@@ -66,11 +66,14 @@ for (const skin of ["android", "ios"]) test(`${skin}: swipe up goes home, swipe 
   try {
     const bar = await t.p.locator(".sf-bar").boundingBox();
     const x = bar.x + bar.width / 2;
-    await t.p.mouse.move(x, bar.y + 8); await t.p.mouse.down(); await t.p.mouse.move(x, bar.y - 200, { steps: 6 }); await t.p.mouse.up();
+    // The frame times a swipe with Date.now(). Use a clock the test sets, so a slow runner cannot turn a quick swipe into a hold.
+    await t.p.evaluate(() => { window.__now = 1000; Date.now = () => window.__now; });
+    const tick = (ms) => t.p.evaluate((n) => { window.__now += n; }, ms);
+    await t.p.mouse.move(x, bar.y + 8); await t.p.mouse.down(); await t.p.mouse.move(x, bar.y - 200, { steps: 6 }); await tick(100); await t.p.mouse.up();
     assert.equal(await t.where(), "home", "a quick swipe up on the bar goes home");
     await t.click("app-icon");
     await t.p.mouse.move(x, bar.y + 8); await t.p.mouse.down(); await t.p.mouse.move(x, bar.y - 200, { steps: 4 });
-    await t.p.waitForTimeout(500); await t.p.mouse.up();
+    await tick(500); await t.p.mouse.up();
     assert.equal(await t.where(), "recents", "up and hold opens the switcher");
     await t.p.keyboard.press("Escape");
     // A swipe from the left edge is Back: the app's Back button is clicked.
