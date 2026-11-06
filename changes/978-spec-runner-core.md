@@ -1,0 +1,2 @@
+- `@shipvo/spec`: new `runSource` and `runAction` run a spec's http data sources and actions with injected `fetch`, secrets and cache, trimmed responses and a CEL cost limit. Errors are typed `RunError`s.
+- Migration: none; new exports.
