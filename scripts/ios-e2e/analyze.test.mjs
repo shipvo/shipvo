@@ -213,14 +213,36 @@ test("Crash-loop reverted: failing logs", () => {
   const never = analyzeCrashLoop(none, { ...cm, running_release: 3, launches: 4 });
   assert.equal(never.pass, false);
   assert.match(never.detail, /no crash_loop_revert/);
-  // event for another release only
-  assert.equal(analyzeCrashLoop(parseTelemetry(tl({ release: 2, event: "crash_loop_revert" })), cm).pass, false);
+  // event for an unrelated release only
+  assert.equal(analyzeCrashLoop(parseTelemetry(tl({ release: 7, event: "crash_loop_revert" })), cm).pass, false);
   // wrong final release
   const wrong = analyzeCrashLoop(ok, { ...cm, running_release: 0 });
   assert.equal(wrong.pass, false);
   assert.match(wrong.detail, /ends on release 0, expected 2/);
   assert.match(crashLoopTable(wrong), /\| fail \| 4 \|/);
   assert.throws(() => analyzeCrashLoop(ok, {}), /missing release/);
+});
+
+test("Crash-loop reverted: the app reports the revert under the previous release", () => {
+  // runtimeEvents.ts sends crash_loop_revert with the running release, which is the previous one after the revert.
+  const ev = parseTelemetry([tl({ release: 2, event: "applied" }), tl({ release: 2, event: "crash_loop_revert" })].join("\n"));
+  assert.equal(analyzeCrashLoop(ev, cm).pass, true);
+});
+
+test("make-release puts the bundle's Hermes bytecode version in the pointer, the mismatched one with MISMATCH_HERMES", () => {
+  const dir = mkdtempSync(join(tmpdir(), "hbc-")), root = join(dir, "cp"), file = join(dir, "r.hbc");
+  const b = new Uint8Array(64); b.set([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f]); new DataView(b.buffer).setUint32(8, 96, true);
+  writeFileSync(file, b);
+  const seed = JSON.parse(execFileSync(process.execPath, [new URL("./keygen.mjs", import.meta.url).pathname])).seed;
+  const script = new URL("./make-release.mjs", import.meta.url).pathname;
+  const body = () => JSON.parse(JSON.parse(readFileSync(join(root, "p/e2e/1/ios/b0.json"), "utf8")).body);
+  execFileSync(process.execPath, [script, root, "e2e", seed, "1", file]);
+  assert.equal(body().hermes_bytecode_version, 96);
+  execFileSync(process.execPath, [script, root, "e2e", seed, "2", file], { env: { ...process.env, MISMATCH_HERMES: "1" } });
+  assert.equal(body().hermes_bytecode_version, 95);
+  writeFileSync(file, "console.log(1);");
+  execFileSync(process.execPath, [script, root, "e2e", seed, "3", file]);
+  assert.equal("hermes_bytecode_version" in body(), false);
 });
 
 test("make-release CRASH_ON_START compiles a throwing script with HERMESC", () => {
