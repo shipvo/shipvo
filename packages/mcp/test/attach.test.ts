@@ -106,6 +106,8 @@ describe("open_app attach", { timeout: 30_000 }, () => {
     expect(r.isError).toBeFalsy();
     expect(r.content[0].text).toContain("app: founder");
     expect(r.content[0].text).toContain("attached to the live shipvo run phone");
+    const other = await c.callTool({ name: "attach_session", arguments: { app: "someotherapp" } }) as { isError?: boolean; content: { text: string }[] };
+    expect(other.isError).toBe(true); expect(other.content[0].text).toContain("no_live_run");
     runJson(2 ** 22 + 12345);
     const n = await c.callTool({ name: "attach_session", arguments: {} }) as { isError?: boolean; content: { text: string }[] };
     expect(n.isError).toBe(true); expect(n.content[0].text).toContain("no_live_run");
