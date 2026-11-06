@@ -1,4 +1,4 @@
-// OIDC ID token verification and claim-to-role mapping. Not wired to any route or to auth.ts yet.
+// OIDC ID token verification and claim-to-role mapping. Used by the single sign-on routes in sso.ts.
 import type { Role } from "./roles.js";
 
 export type OidcAlg = "RS256" | "ES256";

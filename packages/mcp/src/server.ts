@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { z } from "zod";
-import { tools, type ToolDef } from "@shipvo/mcp-tools";
+import { tools, inputHasKey, KEY_REFUSAL, KEY_IN_INPUT, type ToolDef } from "@shipvo/mcp-tools";
 import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
@@ -141,7 +141,11 @@ const result = (sid: string, r: Act) => {
 const need = (_sid: string) => {};
 
 // Register a tool from the shared registry (@shipvo/mcp-tools): name, description, schema and hints come from there.
-const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => server.tool(t.name, t.description, t.input, t.annotations, cb);
+const keyRefusal = () => ({ content: [{ type: "text" as const, text: KEY_REFUSAL }], isError: true as const, structuredContent: { ok: false, code: KEY_IN_INPUT, error: KEY_REFUSAL } });
+const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => {
+  const guarded = (args: unknown, extra: unknown) => inputHasKey(args) ? keyRefusal() : (cb as (a: unknown, e: unknown) => unknown)(args, extra);
+  return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
+};
 type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
 const SERVER_VERSION = "0.0.4";
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
@@ -525,6 +529,33 @@ use(server, tools.secret_status, async ({ app, name }) => {
   const out = { saved: b.body.saved === true, valid: typeof b.body.valid === "boolean" ? b.body.valid : null, access: b.body.access === "read" || b.body.access === "write" ? b.body.access : null };
   return { ...text(JSON.stringify(out)), structuredContent: out };
 });
+
+// The person's persistent phone. The assistant token can ask and read; only the person's own session approves.
+async function phoneCall(path: string, init: { method: string; body?: string }): Promise<{ fail: ReturnType<typeof text> } | { body: Record<string, any> }> {
+  const fail = (code: string, error: string) => ({ ...text(JSON.stringify({ ok: false, code, error })), structuredContent: { ok: false, code, error }, isError: true });
+  const token = process.env.PN_ASSISTANT_TOKEN ?? "";
+  if (!token) return { fail: fail("unauthorized", "no assistant token: the person creates one for their phone and sets PN_ASSISTANT_TOKEN.") };
+  let r: Response;
+  try { r = await fetch(`${CONTROL}/phone${path}`, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, signal: AbortSignal.timeout(simTimeoutMs()) }); }
+  catch { return { fail: fail("unreachable", "could not reach the control plane. Try again in a minute.") }; }
+  const body = (await r.json().catch(() => ({}))) as Record<string, any>;
+  if (r.status === 401) return { fail: fail("unauthorized", "the assistant token was not accepted (it may have expired).") };
+  if (!r.ok) return { fail: fail(typeof body.error === "string" ? body.error : "unreachable", typeof body.message === "string" ? body.message : `the control plane answered ${r.status}`) };
+  return { body };
+}
+use(server, tools.request_app_install, async ({ app }) => {
+  const b = await phoneCall("/install-cards", { method: "POST", body: JSON.stringify({ app }) });
+  if ("fail" in b) return b.fail;
+  const out = { ok: true, ...b.body, notice: "Show this card to the person. They open approve_url or decline_url themselves. Nothing is installed until they approve, and you cannot approve for them." };
+  return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
+});
+use(server, tools.list_installed_apps, async () => {
+  const b = await phoneCall("/assistant/apps", { method: "GET" });
+  if ("fail" in b) return b.fail;
+  const out = { apps: b.body.apps ?? [] };
+  return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
+});
+
 
 // Deterministic order: tools/list is sorted by tool name, whatever the registration order.
 const rh = (server.server as any)._requestHandlers as Map<string, (r: unknown, e: unknown) => Promise<{ tools: { name: string }[] }>>;

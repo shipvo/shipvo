@@ -28,3 +28,9 @@ export function redact(text: string): string {
 export function resolveSecrets(text: string): string {
   return text.replace(/\{secret:([A-Za-z0-9_]+)\}/g, (_m, n: string) => secret(n));
 }
+
+/** Read a named test account: `SHIPVO_TEST_ACCOUNT_<NAME>_USER` and `SHIPVO_TEST_ACCOUNT_<NAME>_PASSWORD`. Throws, naming the missing variable, never a value. Both values are masked as `***` afterwards. */
+export function account(name: string): { user: string; password: string } {
+  const key = name.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  return { user: secret(`ACCOUNT_${key}_USER`), password: secret(`ACCOUNT_${key}_PASSWORD`) };
+}

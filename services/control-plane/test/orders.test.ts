@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import app from "../src/index";
 
 const content = {
@@ -26,6 +26,9 @@ const order = { id: "TT-1", lines: [{ sku: "a", quantity: 1 }], total: 100 };
 const ver = { content_version: 1 };
 
 describe("orders", () => {
+  // The limiter uses fixed 60 s windows; pin the clock so a test cannot straddle a window edge.
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-01-01T00:00:10Z")); });
+  afterEach(() => { vi.useRealTimers(); });
   it("stores new orders as unverified and simulated ones as simulated", async () => {
     const { rows, env } = fake();
     expect(await (await send(env, { order, ...ver, install_id: "a" })).json()).toMatchObject({ status: "unverified" });

@@ -1,0 +1,1 @@
+- `@shipvo/cli`: no API change. Adds `scripts/lumi/bench.mjs`, a step-budgeted benchmark for Lumi Autotest with planted bugs (see `docs/lumi-bench.md`).
