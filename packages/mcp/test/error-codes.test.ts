@@ -24,6 +24,12 @@ beforeAll(async () => {
     if (req.url === "/act" && body.session !== "live") return res.end(JSON.stringify({ ok: false, code: "no_session", error: `no session '${body.session}': call /session first`, screen: null }));
     if (req.url === "/act" && body.ref === "e999") return res.end(JSON.stringify({ ok: false, code: "stale_ref", error: "stale ref e999: the screen changed. Take a new snapshot (action \"screen\") and use a ref from it.", screen: "heading Menu" }));
     if (req.url === "/act" && body.ref === "e998") return res.end(JSON.stringify({ ok: false, code: "disabled", delivery: "not_delivered", reason: "disabled", safe_to_retry: true, error: "e998 is disabled", screen: "heading Menu" }));
+    if (req.url === "/act" && ["lock", "unlock", "tap"].includes(body.action) && body.ref !== "e1x") {
+      const st = (globalThis as any).__locked ??= { v: false };
+      if (body.action === "lock") { if (st.v) return res.end(JSON.stringify({ ok: false, code: "already_locked", error: "the phone is already locked: call unlock first" })); st.v = true; return res.end(JSON.stringify({ ok: true, locked: true, screen: "Lock screen" })); }
+      if (body.action === "unlock") { if (!st.v) return res.end(JSON.stringify({ ok: false, code: "not_locked", error: "the phone is not locked" })); st.v = false; return res.end(JSON.stringify({ ok: true, locked: false, screen: "heading Menu" })); }
+      if (st.v) return res.end(JSON.stringify({ ok: false, code: "phone_locked", error: "the phone is locked, so nothing was sent to the app. Call unlock first." }));
+    }
     if (req.url === "/act" && body.action === "type") return res.end(JSON.stringify({ ok: true, delivery: "delivered", value: body.text, screen: "- textbox \"Name\" [ref=e1]: ignored" }));
     if (req.url === "/act" && body.action === "push_notification") return res.end(JSON.stringify({ ok: true, delivered: body.title !== "blocked", screen: "heading Menu" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Menu" }));
@@ -55,6 +61,19 @@ describe("unknown session", () => {
     expect(typeof r.structuredContent?.code).toBe("string");
     expect(r.structuredContent.code).toBe("no_session");
     expect(r.structuredContent.error).toMatch(/no session 'ghost'/);
+    await c.close();
+  });
+});
+
+describe("lock and unlock", () => {
+  it("return typed errors for out-of-order calls and input while locked", async () => {
+    const c = await connect();
+    const call = (name: string, args: Record<string, unknown> = {}) => c.callTool({ name, arguments: { session: "live", ...args } }) as Promise<any>;
+    const a = await call("unlock"); expect(a.isError).toBe(true); expect(a.structuredContent.code).toBe("not_locked");
+    expect((await call("lock")).isError).toBeFalsy();
+    const b = await call("lock"); expect(b.isError).toBe(true); expect(b.structuredContent.code).toBe("already_locked");
+    const t = await call("tap", { ref: "e1" }); expect(t.isError).toBe(true); expect(t.structuredContent.code).toBe("phone_locked");
+    expect((await call("unlock")).isError).toBeFalsy();
     await c.close();
   });
 });
