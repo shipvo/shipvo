@@ -104,6 +104,8 @@ test("Lumi on or off: app screenshot, recorded frames and labelled screen tree a
       const out = {};
       for (const lumi of [true, false]) {
         const p = await b.newPage({ viewport: { width: 460, height: 960 } });
+        // The status bar shows the time. Fix it so a minute rolling over between the two pages is not read as a Lumi difference.
+        await p.clock.setFixedTime(new Date("2026-01-01T12:00:00Z"));
         await p.setContent(page(withApp(skin, lumi)));
         const frame = await (async () => { for (let i = 0; i < 100; i++) { const f = p.frames().find((x) => x !== p.mainFrame()); if (f && await f.locator("button").count()) return f; await p.waitForTimeout(50); } throw new Error("app frame did not load"); })();
         await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
