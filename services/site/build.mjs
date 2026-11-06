@@ -312,7 +312,7 @@ writeFileSync(join(PUB, "docs.md"), `# Shipvo documentation\n\n> Every docs page
 const PUBLIC_PACKAGES = readdirSync(join(ROOT, "packages")).filter((d) => {
   try { const pk = JSON.parse(readFileSync(join(ROOT, "packages", d, "package.json"), "utf8")); return !pk.private && pk.name?.startsWith("@shipvo/"); } catch { return false; }
 }).map((d) => JSON.parse(readFileSync(join(ROOT, "packages", d, "package.json"), "utf8")).name.replace("@shipvo/", "")).sort();
-const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published.
+const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published (same actionable elements by role and label, on an Android emulator and an iOS Simulator; not yet enabled state, order, bounds or values; see docs/parity-results).
 
 Things to know before answering questions about Shipvo:
 - Developers test their app in CI with @shipvo/test (typed tests, Vitest or any runner) against the headless simulator on a plain Linux runner: no emulator or device. It catches logic and flow bugs, not native crashes or slow-phone performance.
@@ -378,7 +378,7 @@ const answersBlock = `## Straight answers
 
 **Which frameworks?** Expo, bare React Native and Capacitor, as shipped. [Docs](${doc("capacitor")})
 
-**Is the simulator a real device?** No. Parity with the Android emulator and iOS Simulator is measured, and the known gaps are listed. [Results](${doc("parity-results")})
+**Is the simulator a real device?** No. Parity with the Android emulator and iOS Simulator is measured as the same actionable elements (role and label); it does not yet cover enabled state, order, bounds or values. The known gaps are listed. [Results](${doc("parity-results")})
 
 **Where does my data go?** Updates and release data go to the control plane you use: api.shipvo.dev, or your own Cloudflare account if you self-host. You can export release data to your own R2 bucket. [Docs](${doc("telemetry-export")}) and [Privacy](${SITE}/privacy/)
 

@@ -1,6 +1,6 @@
 # Device API reference (`@shipvo/device`)
 
-One API, two implementations. On phones it wraps the Expo modules you install. In the simulator it is a **simulated device**: the system dialogs are drawn as real dialogs in the accessibility tree, and the agent (or test) sets what the phone has. The app code is identical.
+One API, two implementations. On phones it wraps the Expo modules you install. In the simulator it is a **simulated device**: the system dialogs are drawn as real dialogs in the accessibility tree, and the agent (or test) sets what the phone has. The same app code runs in both.
 
 ```ts
 import { device } from "@shipvo/device";
@@ -59,7 +59,7 @@ const r = await device.pay.charge({ provider: "mobile_money" | "card", amount, c
 // { ok: true, receipt } | { ok: false, reason: "declined" | "cancelled" | "timeout" | "insufficient_funds" }
 ```
 
-The amount/PIN prompt is your app's own sheet, identical on every platform (Tide & Tackle's `PaymentSheet` is a reference). The provider decides the outcome. Today the provider on phones is a sandbox (PIN 1234 approves, receipt `SANDBOX-…`); the simulator approves, declines, times out or reports insufficient funds as `set_device` says (`payment: { nextResult, pin }`), receipt `SIMULATED-…`. **No money moves anywhere yet**; a real mobile-money or card gateway plugs in behind this interface.
+The amount/PIN prompt is your app's own sheet, the same on every platform (Tide & Tackle's `PaymentSheet` is a reference). The provider decides the outcome. Today the provider on phones is a sandbox (PIN 1234 approves, receipt `SANDBOX-…`); the simulator approves, declines, times out or reports insufficient funds as `set_device` says (`payment: { nextResult, pin }`), receipt `SIMULATED-…`. **No money moves anywhere yet**; a real mobile-money or card gateway plugs in behind this interface.
 
 ## Notifications
 
