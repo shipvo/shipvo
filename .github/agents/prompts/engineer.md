@@ -31,3 +31,6 @@ Chromium is installed on this runner. For every change to UI (site pages, the ph
 
 
 A new site check is a new file `services/site/scripts/check-<name>.mjs`; `run-checks.mjs` picks it up. Do not edit the `test` script in `services/site/package.json`.
+
+
+Follow "Internal details stay private" in `CLAUDE.md`: never write hosting plans, vendor tiers, limits, quota numbers or costs in anything public.

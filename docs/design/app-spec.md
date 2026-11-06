@@ -293,7 +293,16 @@ Most apps never leave the spec. Those that need more climb one step and keep the
 
 Only for real phones (Bluetooth devices, background location, custom native SDKs). On Shipvo Phone a native-only feature needs a web fallback or a simulated version in `@shipvo/device`; publish checks flag anything that will not work there.
 
-### 15.7 Specs on real phones: the Shipvo player app
+### 15.7 The Shipvo Runner
+
+App specs run on Shipvo's edge in one shared runner: it reads each app's spec and executes its data sources (vault keys added server-side), CEL expressions, actions, schedules and webhooks.
+
+- **It never runs code written by users or assistants.** No `eval`, no dynamic import: such code would run with Shipvo's credentials and could see other people's data. User-written code (levels 2 and 3) runs only in a separate isolated tier, one isolate per person, never in the shared runner.
+- **Built to be efficient:** each call does little CPU work (upstream responses are trimmed to the fields the spec uses; CEL has a cost limit), all schedules go through one dispatcher instead of one timer per app, and upstream calls are cached per the spec's `cache` setting.
+- **Fair use.** Each person and app has usage quotas. When a quota is reached, the person sees a plain message and how to get more; quota numbers are set in configuration, not in this document.
+- **Stdio parity.** The local stdio MCP runs the same runner with `workerd` (the open-source Workers runtime), so a coding agent tests exactly what runs on the edge.
+
+### 15.8 Specs on real phones: the Shipvo player app
 
 One Shipvo app on Google Play and the App Store, containing the engine. People install it once; every app their assistant builds for them appears inside it, updated over the air, with no store submission per app. Android first. iOS needs a policy check before we commit: Apple's guidelines on apps that run downloaded content allow some mini-app and HTML5 experiences under conditions (no change of the app's main purpose, no downloaded executable native code, reviewable content). Specs are data, not code, which helps; islands and functions need a careful reading. This is a decision for the owner (strategy doc).
 
