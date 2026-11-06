@@ -8,7 +8,8 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { join, extname, normalize, resolve, sep } from "node:path";
 import { loadConfig } from "./config.js";
-import { AGENT_PATH, isAgentRole, isLoopback, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
+import { AGENT_PATH, hostAllowed, isAgentRole, isLoopback, originAllowed, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
+import { bridgeScript } from "./run-bridge.js";
 import { acceptWebSocket, type Peer } from "./run-ws.js";
 import { portFree, rebuildInto } from "./sim.js";
 
@@ -60,7 +61,7 @@ export async function loadFrameRenderer(bases: string[] = [process.cwd() + "/pac
 }
 
 /** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. The phone body comes from @shipvo/sim's renderFrame. */
-export function runFramePage(platform: Platform, name: string, render: RenderFrame, dark = false): string {
+export function runFramePage(platform: Platform, name: string, render: RenderFrame, dark = false, token?: string): string {
   const f = FRAMES[platform];
   const title = name.replace(/[<>&"']/g, "");
   const sheet = `<div class="sheet" id="sheet" role="dialog" aria-label="${f.label} system sheet" data-part="system-sheet"><div class="box"><p>${f.sheet.title}</p><button type="button" data-act="allow">${f.sheet.allow}</button><button type="button" data-act="deny">${f.sheet.deny}</button></div></div>`;
@@ -90,7 +91,7 @@ sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
 function fit(){var s=Math.min(1,(innerWidth-24)/${frame.outerWidth},(innerHeight-60)/${frame.outerHeight});var e=document.getElementById("fit");e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
-</script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}</body></html>`;
+</script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
 
 const TYPES: Record<string, string> = {
@@ -115,9 +116,15 @@ export function ensureShipvoIgnored(dir: string): void {
  */
 export async function startRunServer(opts: { dir: string; platform: Platform; name: string; port?: number; projectDir?: string; render?: RenderFrame }): Promise<{ server: Server; port: number; token: string; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
+  const token = randomBytes(24).toString("hex");
+  // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
+  const pageToken = randomBytes(24).toString("hex");
   const render = opts.render ?? await loadFrameRenderer();
-  const pages = { light: runFramePage(opts.platform, opts.name, render), dark: runFramePage(opts.platform, opts.name, render, true) };
+  const pages = { light: runFramePage(opts.platform, opts.name, render, false, pageToken), dark: runFramePage(opts.platform, opts.name, render, true, pageToken) };
+  const bridge = bridgeScript();
+  let boundPort = -1; // set once the server listens; Host and Origin must match it
   const server = createServer((req, res) => {
+    if (!hostAllowed(req.headers.host, boundPort)) { res.writeHead(403); return void res.end("Forbidden"); }
     let path: string;
     try { path = decodeURIComponent((req.url ?? "/").split("?")[0]); }
     catch { res.writeHead(400); return void res.end("Bad request"); }
@@ -126,6 +133,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
       const dark = new URL(req.url ?? "/", "http://x").searchParams.get("dark") === "1";
       res.writeHead(200, { "content-type": TYPES[".html"] }); return void res.end(dark ? pages.dark : pages.light);
     }
+    if (path === "/__shipvo/bridge.js") { res.writeHead(200, { "content-type": TYPES[".js"], "cache-control": "no-store" }); return void res.end(bridge); }
     let rel = path.startsWith("/app/") ? path.slice(4) : path;
     if (rel.endsWith("/")) rel += "index.html";
     const file = normalize(join(root, rel));
@@ -140,15 +148,17 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     res.writeHead(200, { "content-type": TYPES[extname(target).toLowerCase()] ?? "application/octet-stream" });
     res.end(readFileSync(target));
   });
-  const token = randomBytes(24).toString("hex");
   const peers: Partial<Record<AgentRole, Peer>> = {};
   server.on("upgrade", (req, socket) => {
     const refuse = (line: string) => socket.end(`HTTP/1.1 ${line}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== AGENT_PATH) return refuse("404 Not Found");
     if (!isLoopback(req.socket.remoteAddress)) return refuse("403 Forbidden");
-    if (!tokenMatches(url.searchParams.get("token"), token)) return refuse("401 Unauthorized");
+    if (!hostAllowed(req.headers.host, boundPort) || !originAllowed(req.headers.origin, boundPort)) return refuse("403 Forbidden");
+    const given = url.searchParams.get("token");
     const role = url.searchParams.get("role");
+    const ok = tokenMatches(given, token) || (role === "screen" && tokenMatches(given, pageToken));
+    if (!ok) return refuse("401 Unauthorized");
     if (!isAgentRole(role)) return refuse("400 Bad Request");
     const other: AgentRole = role === "screen" ? "driver" : "screen";
     const peer = acceptWebSocket(req, socket, (text) => {
@@ -166,6 +176,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     server.once("error", fail);
     server.listen(opts.port ?? 0, "127.0.0.1", () => {
       const port = (server.address() as { port: number }).port;
+      boundPort = port;
       if (infoPath) {
         const info: RunInfo = { port, platform: opts.platform, app: opts.name, token, pid: process.pid };
         mkdirSync(join(infoPath, ".."), { recursive: true });
