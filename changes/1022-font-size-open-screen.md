@@ -1,0 +1,1 @@
+- sim: changing the text size now fires the `Dimensions` change event with the new `fontScale`, so an open screen that listens (for example `useWindowDimensions`) redraws. The `set_setting` result for `font_size` adds a `note` saying when a screen reads the size.

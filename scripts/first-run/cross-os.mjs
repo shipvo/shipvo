@@ -86,9 +86,20 @@ export function withOverrides(pkg, tarballs) {
   const cli = pathToFileURL(tarballs.cli).href, sv = pathToFileURL(tarballs.shipvo).href;
   // The scaffold already depends on @shipvo/cli, so set it directly and make `shipvo` reuse it with "$".
   // Every other @shipvo/* tarball is an override with its file URL, so transitive deps never hit the registry.
+  // npm refuses (EOVERRIDE) an override that differs from a direct dependency, so a package the scaffold
+  // depends on directly gets the file URL in its own section and a "$" override that reuses it.
+  const deps = { ...(pkg.dependencies ?? {}) }, devDeps = { ...(pkg.devDependencies ?? {}), "@shipvo/cli": cli, shipvo: sv };
   const others = {};
-  for (const [name, path] of Object.entries(tarballs.all ?? {})) if (name !== "@shipvo/cli") others[name] = pathToFileURL(path).href;
-  return { ...pkg, devDependencies: { ...(pkg.devDependencies ?? {}), "@shipvo/cli": cli, shipvo: sv }, overrides: { ...(pkg.overrides ?? {}), ...others, "@shipvo/cli": "$@shipvo/cli" } };
+  for (const [name, path] of Object.entries(tarballs.all ?? {})) {
+    if (name === "@shipvo/cli") continue;
+    const url = pathToFileURL(path).href;
+    if (name in deps) { deps[name] = url; others[name] = `$${name}`; }
+    else if (name in devDeps) { devDeps[name] = url; others[name] = `$${name}`; }
+    else others[name] = url;
+  }
+  const out = { ...pkg, devDependencies: devDeps, overrides: { ...(pkg.overrides ?? {}), ...others, "@shipvo/cli": "$@shipvo/cli" } };
+  if (pkg.dependencies) out.dependencies = deps;
+  return out;
 }
 
 /** On Windows npm and npx are .cmd files and need a shell, so quote args that hold spaces. */
