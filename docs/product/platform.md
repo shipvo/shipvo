@@ -89,6 +89,8 @@ Use this wording, or close to it, on the site, in docs, blog posts, tutorials an
 
 **Proof:** every claim about Shipvo Phone is backed by published parity results against the Android emulator and iOS Simulator (`docs/parity-results.md`). Talk about parity, with the measured numbers and links, rather than general claims.
 
+**Say exactly what parity measures (owner, 6 Nov 2026).** "100% actionable parity" means the simulator and the native app expose the same actionable elements with the same roles and labels on the measured screens. It does not mean the two behave identically: it does not yet cover enabled or disabled state, element order, bounds or field values. Always name what was measured, where (Android emulator, iOS Simulator, a low-end Android phone) and on which flow, with the link, and list known gaps beside the number (for example the iOS text-coverage gap on the order-confirmation screen). Keep measurements from different environments separate: the iOS 4.2 s launch-to-healthy is an iOS Simulator figure, the 2 GB numbers are a physical Android phone. Never round "18 of 21 screens at 100%" up to "100%".
+
 ### Win the lane, and keep the gap growing (5 Nov 2026)
 
 Shipvo aims to be the clear best in its lane, so far ahead that a copy cannot catch up, because we ship, refine and measure every day. In practice:
