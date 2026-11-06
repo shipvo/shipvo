@@ -41,7 +41,8 @@ public class ShipvoPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func kvSet(_ call: CAPPluginCall) {
         guard let key = call.getString("key"), let value = call.getString("value") else { return call.reject("key and value are required") }
         defaults.set(value, forKey: Self.prefix + key)
-        // The boot counter must be on disk before the page runs.
+        // The boot counter must be on disk before the page runs. Apple discourages synchronize(), but a
+        // crash right after this call would otherwise lose the increment and defeat crash-loop detection.
         defaults.synchronize()
         call.resolve()
     }
@@ -79,6 +80,8 @@ public class ShipvoPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 self.lock.lock(); self.serving = name; self.servingPath = path; self.lock.unlock()
                 vc.setServerBasePath(path: path)
+                // The web view now points at the new directory, so the old ones can go.
+                self.store.retire(keeping: dir)
                 call.resolve()
             }
         } catch { call.reject("\(error)") }

@@ -62,6 +62,14 @@ public final class BundleStore {
         try? fm.removeItem(at: served)
     }
 
+    /// Removes every unpacked directory except `keep`. Call it once the web view points at `keep`.
+    public func retire(keeping keep: URL) {
+        let keepName = keep.standardizedFileURL.lastPathComponent
+        for n in (try? fm.contentsOfDirectory(atPath: served.path)) ?? [] where n != keepName {
+            try? fm.removeItem(at: served.appendingPathComponent(n))
+        }
+    }
+
     /// Unpacks a stored zip into a fresh directory, but only if its sha-256 equals the hash the core
     /// verified against the signed pointer. Entries that escape the directory are refused.
     public func unpack(_ name: String?, expectedSha256: String?) throws -> URL {
@@ -69,14 +77,15 @@ public final class BundleStore {
         guard let expected = expectedSha256, sha256Hex(bytes).lowercased() == expected.lowercased() else {
             throw BundleError("bundle hash does not match")
         }
-        try? fm.removeItem(at: served)
-        let target = served.appendingPathComponent(name!, isDirectory: true)
+        // A fresh directory per call: the web view may still be serving the previous one.
+        // The caller removes the old ones with `retire(keeping:)` after the switch succeeds.
+        let target = served.appendingPathComponent("\(name!)-\(UUID().uuidString)", isDirectory: true)
         do {
             try fm.createDirectory(at: target, withIntermediateDirectories: true)
             try Zip.extract([UInt8](bytes), to: target, limit: Self.maxUnpackedBytes)
             guard fm.fileExists(atPath: target.appendingPathComponent("index.html").path) else { throw BundleError("bundle has no index.html") }
         } catch {
-            try? fm.removeItem(at: served)
+            try? fm.removeItem(at: target)
             throw (error as? BundleError) ?? BundleError("bad entry in bundle")
         }
         return target

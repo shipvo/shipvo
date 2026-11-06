@@ -106,4 +106,28 @@ final class BundleStoreTests: XCTestCase {
         try store.write("junk.bundle", junk)
         XCTAssertThrowsError(try store.unpack("junk.bundle", expectedSha256: sha256Hex(junk)))
     }
+
+    func testSecondUnpackKeepsTheFirstUntilRetired() throws {
+        let z = storedZip([("index.html", "<p>hi</p>")])
+        try store.write("a.bundle", z)
+        let first = try store.unpack("a.bundle", expectedSha256: sha256Hex(z))
+        let second = try store.unpack("a.bundle", expectedSha256: sha256Hex(z))
+        XCTAssertNotEqual(first, second)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: first.appendingPathComponent("index.html").path))
+        store.retire(keeping: second)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.appendingPathComponent("index.html").path))
+    }
+
+    func testRefusesTruncatedZipAndTooManyEntries() throws {
+        let z = [UInt8](storedZip([("index.html", "x")]))
+        let truncated = Data(z.dropLast(10))
+        try store.write("t.bundle", truncated)
+        XCTAssertThrowsError(try store.unpack("t.bundle", expectedSha256: sha256Hex(truncated)))
+        var many = z
+        many[many.count - 22 + 10] = 5 // central directory claims 5 entries, only 1 exists
+        let manyData = Data(many)
+        try store.write("m.bundle", manyData)
+        XCTAssertThrowsError(try store.unpack("m.bundle", expectedSha256: sha256Hex(manyData)))
+    }
 }
