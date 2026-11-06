@@ -177,7 +177,7 @@ it("CodePush --apply edits code, keys and dependency only, lists manual steps, a
   expect(rd("android/app/src/main/res/values/strings.xml")).toBe('<resources>\n    <string name="app_name">A</string>\n</resources>\n');
   expect(rd("ios/App/Info.plist")).toBe("<dict>\n  <key>CFBundleName</key>\n  <string>A</string>\n</dict>\n");
   const pkg = JSON.parse(rd("package.json"));
-  expect(pkg.dependencies).toEqual({ expo: "~58.0.0", "@shipvo/device": "^0.1.0", "@shipvo/runtime": "^0.1.0" });
+  expect(pkg.dependencies).toEqual({ expo: "~58.0.0", "@shipvo/runtime": "^0.1.0", "@shipvo/device": "^0.1.0" });
   expect(pkg.devDependencies).toEqual({ "@shipvo/cli": "^0.1.0" });
   expect(pkg.scripts.release).toContain("appcenter codepush");
   expect(rd(".github/workflows/r.yml")).toBe(ci);
@@ -189,6 +189,22 @@ it("CodePush --apply edits code, keys and dependency only, lists manual steps, a
   expect(await migrate(["--apply"], tmp)).toBe(0);
   expect(out.join("\n")).toContain("Nothing left to do");
   expect(rd("App.tsx") + rd("package.json")).toBe(after);
+});
+
+it("CodePush --apply leaves native bootstrap files alone and lists them as manual", async () => {
+  cpFixture();
+  const native = '#import <CodePush/CodePush.h>\n- (NSURL *)bundleURL { return [CodePush bundleURL]; }\n';
+  w("ios/App/AppDelegate.mm", native);
+  mkdirSync(join(tmp, "android/app/src/main/java"), { recursive: true });
+  w("android/app/src/main/java/MainApplication.kt", "override fun getJSBundleFile() = CodePush.getJSBundleFile()\n");
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  out.length = 0;
+  expect(await migrate(["--apply", "--json"], tmp)).toBe(0);
+  const doc = JSON.parse(out.join(""));
+  expect(rd("ios/App/AppDelegate.mm")).toBe(native);
+  const where = doc.data.manual.map((m: { where: string }) => m.where);
+  expect(where).toContain("ios/App/AppDelegate.mm:1");
+  expect(where).toContain("android/app/src/main/java/MainApplication.kt:1");
 });
 
 it("CodePush --apply refuses a dirty tree with dirty_tree, and --json works", async () => {

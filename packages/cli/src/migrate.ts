@@ -254,10 +254,7 @@ export function applyCodePushEdits(dir: string, dry = false): CpEdit[] {
         o.devDependencies = { ...(o.devDependencies ?? {}) };
         for (const n of ["@shipvo/runtime", "@shipvo/device"]) if (!o.dependencies[n]) { o.dependencies[n] = "^0.1.0"; r.push(`package.json dependencies: added ${n}`); }
         if (!o.devDependencies["@shipvo/cli"]) { o.devDependencies["@shipvo/cli"] = "^0.1.0"; r.push("package.json devDependencies: added @shipvo/cli"); }
-        for (const sec of ["dependencies", "devDependencies"]) {
-          o[sec] = Object.fromEntries(Object.entries(o[sec]).sort(([a], [b]) => a.localeCompare(b)));
-          if (!Object.keys(o[sec]).length) delete o[sec];
-        }
+        for (const sec of ["dependencies", "devDependencies"]) if (!Object.keys(o[sec]).length) delete o[sec];
         return r;
       });
     } catch { /* unreadable package.json: leave it */ }
@@ -282,6 +279,20 @@ function applyCodePush(dir: string, force: boolean): CpEdit[] {
     if (d.length) throw new CliFailure(`Git tree is not clean (${d.length} changed path(s)). Commit or stash first, or pass --force.`, "dirty_tree", 1, [{ command: "git status", why: "See what changed." }, { command: "shipvo migrate --apply --force", why: "Apply anyway. Backups go in " + BACKUP + "." }]);
   }
   return applyCodePushEdits(dir);
+}
+
+const NATIVE_SRC = /(?:\.(?:java|kt|m|mm|swift|gradle)|(?:^|\/)Podfile)$/;
+
+/** Native bootstrap files that still mention CodePush. --apply never edits them, so they are listed as manual. */
+function scanNativeBootstrap(dir: string) {
+  const out: { where: string; entry: string; why: string }[] = [];
+  for (const file of walk(dir)) {
+    if (!NATIVE_SRC.test(file)) continue;
+    let lines: string[]; try { lines = readFileSync(join(dir, file), "utf8").split("\n"); } catch { continue; }
+    const i = lines.findIndex((l) => /CodePush|code-push/.test(l));
+    if (i >= 0) out.push({ where: `${file}:${i + 1}`, entry: lines[i].trim().slice(0, 120), why: "Native code still uses CodePush and --apply does not edit native files: remove it by hand or the native build will fail once the dependency is gone" });
+  }
+  return out;
 }
 
 const buildPlanPm = (dir: string) => detectProject(dir).packageManager;
@@ -317,8 +328,8 @@ export async function migrate(argv: string[], dir = process.cwd()): Promise<numb
     if (apply && plan.system === "codepush") {
       const edits = applyCodePush(dir, argv.includes("--force"));
       const left = scanCodePush(dir);
-      const manual = left.filter((f) => f.kind === "command" || f.kind === "wrapper" || f.kind === "sync")
-        .map((f) => ({ where: f.where, entry: f.entry, why: f.kind === "command" ? "appcenter codepush command: replace with shipvo publish or shipvo rollback" : "CodePush call --apply could not rewrite: change it by hand" }));
+      const manual = [...left.filter((f) => f.kind === "command" || f.kind === "wrapper" || f.kind === "sync")
+        .map((f) => ({ where: f.where, entry: f.entry, why: f.kind === "command" ? "appcenter codepush command: replace with shipvo publish or shipvo rollback" : "CodePush call --apply could not rewrite: change it by hand" })), ...scanNativeBootstrap(dir)];
       const pm = buildPlanPm(dir);
       if (!edits.length) {
         if (!json) {
