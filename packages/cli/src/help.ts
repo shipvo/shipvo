@@ -13,7 +13,7 @@ Start
                               Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.
   run android|ios [--no-open] [--port n]  Open the app in a phone frame in your browser (no Playwright)
   run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
-  explore [--max-depth 3] [--max-steps 100] [--fail-on-findings]  Walk the app in the simulator, write explore-report.md and .json
+  explore [--max-depth 3] [--max-steps 100] [--fail-on-findings] [--json]  Walk the app in the simulator, write explore-report.md and .json
   smoke [android|ios] [--timeout 30] [--json]  Does the app load? Exit 0 ok, 1 failed, 2 setup error
   preview [--json]            Publish a public 24-hour preview link (here.now, no account)
 
@@ -45,8 +45,8 @@ Ship
   status [--app id] [--json]  Show how releases do; --json lists what to do next (exit 0 ok, 1 action needed, 2 error)
   agents setup [--dry-run] [--json]  Write AGENTS.md section and .mcp.json for AI agents
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
-  test [files] [--repair [--write]] [--report <file> [--release <id>]]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
-  doctor [--port <n>]         Check setup before first publish
+  test [files] [--repair [--write]] [--report <file> [--release <id>]] [--json]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
+  doctor [--port <n>] [--json]  Check setup before first publish
   keys                        Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine
