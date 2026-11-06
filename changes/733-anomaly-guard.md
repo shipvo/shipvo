@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: auto-halt holds a release for owner approval (instead of halting) when failures spike or most failing installs are fresh. `POST /t` now answers 429 over per-IP, per-install and per-app limits. Unsigned revert reports get a separate, smaller alert webhook lane.
+- Migration: none. Approve or deny a held release in the admin; `halt-hold/<app>` is a new KV key.

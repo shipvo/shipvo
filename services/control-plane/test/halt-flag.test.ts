@@ -42,7 +42,7 @@ describe("halt flag on POST /t", () => {
     const old = JSON.stringify({ release: 5, halted_at: "2026-01-01T00:00:00.000Z", reports: 20, failed: 6, threshold: 0.2 });
     const s = setup({ threshold: 0.2 }, 14, 7, { "halt/tide": old });
     await fail(s.env);
-    expect(s.puts).toEqual([]);
+    expect(s.puts.filter((k) => !k.startsWith("t_rl/"))).toEqual([]);
     expect(s.store["halt/tide"]).toBe(old);
   });
   it("scopes the count query to app and release", async () => {

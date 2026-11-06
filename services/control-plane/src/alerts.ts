@@ -6,6 +6,9 @@ export const REVERT_EVENTS = new Set(["rolled_back", "crash_loop_revert"]);
 export const ALERT_WINDOW_MS = 3600_000;
 /** Most alerts one app can send per window, whatever the release numbers. `POST /t` is unauthenticated. */
 export const MAX_ALERTS_PER_APP = 10;
+/** Of those, at most this many may come from unverified reports. Anyone can post those, so they get their own small lane
+ *  (rows stored with a negative release) and cannot use up the slots that verified reverts need. */
+export const MAX_UNVERIFIED_ALERTS_PER_APP = 3;
 
 /** Accepts only https URLs without credentials. Throws OwnerError("bad_webhook_url"). */
 export function parseWebhookUrl(raw: string): string {
@@ -19,7 +22,7 @@ export function parseWebhookUrl(raw: string): string {
 
 /** Send the alert if the app has a webhook and none was sent for this release in the last hour,
  *  and the app is under its hourly cap. A slot is claimed before the POST, so a failed POST is not retried. Never throws. */
-export async function sendRevertAlert(db: D1Database, appId: string, release: number, event: string): Promise<void> {
+export async function sendRevertAlert(db: D1Database, appId: string, release: number, event: string, verified = true): Promise<void> {
   try {
     const row = await db.prepare("SELECT webhook FROM app_alerts WHERE app_id = ?").bind(appId).first<{ webhook: string }>();
     if (!row?.webhook) return;
@@ -28,11 +31,16 @@ export async function sendRevertAlert(db: D1Database, appId: string, release: nu
     // Drop rows older than the window, then enforce the per-app cap. The delete, count and claim are separate
     // statements, so concurrent reverts can slightly exceed the cap. That is fine for a flood guard.
     await db.prepare("DELETE FROM alert_sent WHERE app_id = ? AND sent_at <= ?").bind(appId, cutoff).run();
-    const n = await db.prepare("SELECT COUNT(*) AS n FROM alert_sent WHERE app_id = ?").bind(appId).first<{ n: number }>();
-    if ((n?.n ?? 0) >= MAX_ALERTS_PER_APP) return;
+    const lane = verified ? 1 : -1, slot = verified ? release : -release;
+    const n = await db.prepare(`SELECT COUNT(*) AS n FROM alert_sent WHERE app_id = ? AND release ${verified ? ">=" : "<"} 0`).bind(appId).first<{ n: number }>();
+    if ((n?.n ?? 0) >= (verified ? MAX_ALERTS_PER_APP : MAX_UNVERIFIED_ALERTS_PER_APP)) return;
+    if (lane < 0) { // the unverified lane also counts against the app total, so verified reverts keep their own room
+      const all = await db.prepare("SELECT COUNT(*) AS n FROM alert_sent WHERE app_id = ?").bind(appId).first<{ n: number }>();
+      if ((all?.n ?? 0) >= MAX_ALERTS_PER_APP) return;
+    }
     // Claim the slot in one statement: insert, or take over a row older than one hour.
     const claim = await db.prepare("INSERT INTO alert_sent (app_id, release, sent_at) VALUES (?,?,?) ON CONFLICT(app_id, release) DO UPDATE SET sent_at = excluded.sent_at WHERE alert_sent.sent_at <= ?")
-      .bind(appId, release, time, cutoff).run();
+      .bind(appId, slot, time, cutoff).run();
     if (!claim.meta?.changes) return;
     await fetch(row.webhook, { method: "POST", headers: { "content-type": "application/json" }, redirect: "manual",
       body: JSON.stringify({ app: appId, release, event, time }), signal: AbortSignal.timeout(5000) });

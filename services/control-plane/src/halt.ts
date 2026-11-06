@@ -44,3 +44,40 @@ export function shouldHalt(
   const halt = valid && reports > 0 && reports >= opts.minReports && installsOk && netsOk && failureShare > t;
   return { halt, reports, failureShare };
 }
+
+/** A failing install counts as fresh if it registered within this window. */
+export const FRESH_WINDOW_MS = 3600_000;
+/** If at least this share of failing installs is fresh, the failures look manufactured. */
+export const FRESH_SHARE = 0.5;
+/** The "jump" window, in minutes, and how many times the app's normal rate in that window counts as far above. */
+export const SPIKE_WINDOW_MIN = 10;
+export const SPIKE_FACTOR = 5;
+/** Fewer verified failures than this inside the window is never a spike. */
+export const SPIKE_FLOOR = 10;
+/** The spike rule needs this much verified history older than a day, or there is no "normal" to compare with. */
+export const SPIKE_MIN_HISTORY = 20;
+
+export type AnomalyInput = {
+  failedInstalls: number;
+  /** Failing installs that registered inside FRESH_WINDOW_MS. */
+  freshFailedInstalls: number;
+  /** Verified failure reports (any release) in the last SPIKE_WINDOW_MIN minutes. */
+  recentFailures: number;
+  /** Verified failure reports for the app over the previous 7 days, before that window. Null if unknown. */
+  baselineFailures: number | null;
+  /** Verified reports older than one day, as a measure of how much history there is. */
+  history: number;
+};
+
+/** Does a halt verdict look attacked? Returns the reason, or null. A held release is not halted: the owner decides. */
+export function detectAnomaly(i: AnomalyInput): string | null {
+  if (i.failedInstalls > 0 && i.freshFailedInstalls / i.failedInstalls >= FRESH_SHARE) {
+    return `${i.freshFailedInstalls} of ${i.failedInstalls} failing installs registered in the last hour`;
+  }
+  if (i.baselineFailures !== null && i.history >= SPIKE_MIN_HISTORY && i.recentFailures >= SPIKE_FLOOR) {
+    const windows = (7 * 24 * 60) / SPIKE_WINDOW_MIN;
+    const normal = Math.max(i.baselineFailures / windows, 0.5);
+    if (i.recentFailures >= normal * SPIKE_FACTOR) return `${i.recentFailures} failures in ${SPIKE_WINDOW_MIN} minutes, against a normal ${normal.toFixed(1)}`;
+  }
+  return null;
+}

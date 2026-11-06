@@ -71,7 +71,7 @@ Trust boundaries, from least to most trusted:
 - **Withholding.** A compromised control plane, CDN or network can serve nothing, or serve a stale pointer. Devices then keep running what they have. There is no signed freshness proof, so a device cannot tell "no update" from "update hidden".
 - **Native code changes.** An update is JavaScript on the shell's existing native modules. It cannot add permissions or native modules, but it can use any that the shell already has.
 - **A compromised phone or a rooted device.** The staged bundle sits in the app's own storage. We do not defend against code that can already write there.
-- **Telemetry integrity.** Update reports sent by devices are unsigned. The auto-halt feature acts on them, so a flood of false reports could halt a good release.
+- **Telemetry integrity, in full.** Auto-halt counts only reports signed by a registered install, with at least 3 networks and enough installs. A flood of fake installs that registered earlier than an hour ago, and that fail slowly, can still halt a good release. Bursts of fresh installs or sudden spikes are held for owner approval instead of halting, `POST /t` is rate limited (per IP, install and app), and unsigned reports get a small share of the alert webhook slots. See [auto-halt.md](auto-halt.md). Tests: `services/control-plane/test/anomaly-guard.test.ts`.
 - **Denial of service** against the control plane.
 - **Android device-side platform check.** See the platform row: not covered.
 - **Anything in the hosted simulator or the sample app.** This page is about signed updates only.

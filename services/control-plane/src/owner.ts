@@ -67,6 +67,19 @@ async function loadChallenge(env: { kv: KVNamespace; appId: string }, id: string
 }
 const saveChallenge = (env: { kv: KVNamespace }, c: Challenge) => env.kv.put(challengeKey(c.app_id, c.id), JSON.stringify(c), { expirationTtl: 86400 });
 const expired = (c: Challenge) => Date.parse(c.expires_at) <= Date.now();
+export const HOLD_COMMAND = "confirm_halt";
+export const HOLD_TTL_MS = 24 * 3600_000;
+/** Park a halt that looks attacked as an owner approval. Only the signed-in owner can decide it (see resolveChallenge). */
+export async function createHoldChallenge(env: { kv: KVNamespace; appId: string }, release: number, reason: string, stats: { reports: number; failed: number; threshold: number }): Promise<Challenge> {
+  const now = Date.now();
+  const id = crypto.randomUUID();
+  const ch: Challenge = { id, app_id: env.appId, command: HOLD_COMMAND, args_hash: await argsHash(HOLD_COMMAND, { release }), requester: "halt-rule", status: "pending",
+    plan: [`Release ${release} looks like it is failing, but the reports look suspicious: ${reason}.`, "It is held at its current band, not halted. Approve to halt it. Deny to dismiss and keep serving it."],
+    created_at: new Date(now).toISOString(), expires_at: new Date(now + HOLD_TTL_MS).toISOString() };
+  await saveChallenge(env, ch);
+  await env.kv.put(`halt-hold/${env.appId}`, JSON.stringify({ release, held_at: ch.created_at, reason, approval_id: id, reports: stats.reports, failed: stats.failed, threshold: stats.threshold }), { expirationTtl: HOLD_TTL_MS / 1000 });
+  return ch;
+}
 /** Pending, unexpired challenges, oldest first. */
 export async function listChallenges(env: { kv: KVNamespace; appId: string }): Promise<Challenge[]> {
   const out: Challenge[] = []; let cursor: string | undefined;
@@ -85,6 +98,15 @@ export async function resolveChallenge(env: OwnerEnv, id: string, verb: "approve
   if (expired(c)) return { ok: false, error: { code: "approval_expired", message: "This approval expired. Ask the agent to try again." } };
   const next: Challenge = { ...c, status: verb === "approve" ? "approved" : "denied", approved_by: approver, approved_how: how, resolved_at: new Date().toISOString() };
   await saveChallenge(env, next);
+  if (c.command === HOLD_COMMAND) {
+    // The owner's decision is the effect: approve writes the halt, deny drops the hold. Nothing else runs.
+    const holdRaw = await env.kv.get(`halt-hold/${env.appId}`);
+    let hold: any = null; try { hold = holdRaw ? JSON.parse(holdRaw) : null; } catch { /* corrupt hold: nothing to apply */ }
+    if (hold?.approval_id === c.id) {
+      if (verb === "approve") await env.kv.put(`halt/${env.appId}`, JSON.stringify({ release: hold.release, halted_at: next.resolved_at, reports: hold.reports, failed: hold.failed, threshold: hold.threshold, confirmed_by: approver }));
+      await env.kv.delete(`halt-hold/${env.appId}`);
+    }
+  }
   await env.db.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
     .bind(env.appId, next.resolved_at, approver, "approval", JSON.stringify({ command: c.command, approval: next.status, approval_id: c.id, approved_by: approver, approved_how: how, args_hash: c.args_hash }), 1).run();
   return { ok: true, challenge: next };

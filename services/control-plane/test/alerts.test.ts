@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import app from "../src/index";
 import { runOwnerCommand } from "../src/owner";
-import { MAX_ALERTS_PER_APP } from "../src/alerts";
+import { MAX_UNVERIFIED_ALERTS_PER_APP } from "../src/alerts";
 
 // A tiny D1 stand-in for the three statements the alert code uses.
 function fakeDb(webhook: string | null) {
@@ -64,15 +64,15 @@ describe("revert webhook alert", () => {
     expect(f).toHaveBeenCalledTimes(2);
     now.mockRestore();
   });
-  it("caps alerts per app across distinct releases, and frees the cap after the hour", async () => {
+  it("caps unsigned alerts per app across distinct releases, and frees the cap after the hour", async () => {
     const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
     const { d } = fakeDb("https://hooks.example.com/x"); const x = ctx();
     const t0 = Date.now(); const now = vi.spyOn(Date, "now"); now.mockReturnValue(t0);
     for (let r = 1; r <= 25; r++) await send(d, ev("rolled_back", r), x.c);
     await x.done();
-    expect(f).toHaveBeenCalledTimes(MAX_ALERTS_PER_APP);
+    expect(f).toHaveBeenCalledTimes(MAX_UNVERIFIED_ALERTS_PER_APP);
     now.mockReturnValue(t0 + 3600_000 + 1000); await send(d, ev("rolled_back", 99), x.c); await x.done();
-    expect(f).toHaveBeenCalledTimes(MAX_ALERTS_PER_APP + 1);
+    expect(f).toHaveBeenCalledTimes(MAX_UNVERIFIED_ALERTS_PER_APP + 1);
     now.mockRestore();
   });
   it("sends nothing without a webhook, or for events that are not reverts", async () => {

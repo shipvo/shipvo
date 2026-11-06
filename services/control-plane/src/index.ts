@@ -6,12 +6,14 @@ import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerC
 import { auth } from "./auth";
 import { forbidden, type Action } from "./roles";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
+import { telemetryLimited } from "./ratelimit";
+import { createHoldChallenge } from "./owner";
 import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
 import { installs, verifyReport } from "./installs";
-import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, type InstallVote } from "./halt";
+import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, detectAnomaly, FRESH_WINDOW_MS, SPIKE_WINDOW_MIN, type InstallVote } from "./halt";
 
 type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string };
 const app = new Hono<{ Bindings: Env }>();
@@ -120,6 +122,20 @@ app.get("/b/:app/:file", async (c) => {
   return new Response(buf, { headers });
 });
 
+/** Failure counts for the spike rule. Any storage error means "unknown", which never holds a release. */
+async function loadSpikeStats(db: D1Database, appId: string): Promise<{ recentFailures: number; baselineFailures: number | null; history: number }> {
+  try {
+    const failedList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
+    const now = Date.now(), iso = (ms: number) => new Date(ms).toISOString();
+    const r = await db.prepare(
+      `SELECT SUM(received_at >= ? AND event IN (${failedList})) AS recent, SUM(received_at < ? AND received_at >= ? AND event IN (${failedList})) AS base, SUM(received_at < ?) AS history ` +
+      "FROM telemetry WHERE app_id = ? AND verified = 1 AND received_at >= ?"
+    ).bind(iso(now - SPIKE_WINDOW_MIN * 60_000), iso(now - SPIKE_WINDOW_MIN * 60_000), iso(now - 7 * 86400_000), iso(now - 86400_000), appId, iso(now - 7 * 86400_000)).first<{ recent: number | null; base: number | null; history: number | null }>();
+    if (!r) return { recentFailures: 0, baselineFailures: null, history: 0 };
+    return { recentFailures: r.recent ?? 0, baselineFailures: r.base ?? 0, history: r.history ?? 0 };
+  } catch { return { recentFailures: 0, baselineFailures: null, history: 0 }; }
+}
+
 /**
  * Write KV `halt/<app>` when a release fails on too many devices. Settings live in KV `halt-config/<app>`:
  * {"threshold": number, "min_reports": number}. No config key means halting is off.
@@ -138,15 +154,29 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const failedList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
   const healthyList = HEALTHY_EVENTS.map((e) => `'${e}'`).join(",");
   const rows = (await env.DB.prepare(
-    `SELECT t.install_id AS install_id, i.net_hash AS net_hash, MAX(t.event IN (${failedList})) AS failed, MAX(t.event IN (${healthyList})) AS healthy ` +
+    `SELECT t.install_id AS install_id, i.net_hash AS net_hash, i.created_at AS created_at, MAX(t.event IN (${failedList})) AS failed, MAX(t.event IN (${healthyList})) AS healthy ` +
     "FROM telemetry t LEFT JOIN installs i ON i.app_id = t.app_id AND i.install_id = t.install_id " +
-    "WHERE t.app_id = ? AND t.release = ? AND t.verified = 1 AND t.install_id IS NOT NULL GROUP BY t.install_id, i.net_hash"
-  ).bind(appId, release).all<{ install_id: string; net_hash: string | null; failed: number; healthy: number }>()).results ?? [];
+    "WHERE t.app_id = ? AND t.release = ? AND t.verified = 1 AND t.install_id IS NOT NULL GROUP BY t.install_id, i.net_hash, i.created_at"
+  ).bind(appId, release).all<{ install_id: string; net_hash: string | null; created_at?: string | null; failed: number; healthy: number }>()).results ?? [];
   const votes: InstallVote[] = rows.map((r) => ({ install_id: r.install_id, net_hash: r.net_hash, failed: !!r.failed, healthy: !!r.healthy }));
   const counts = tallyVotes(votes);
   const verdict = shouldHalt(counts, { threshold, minReports, minInstalls });
   if (!verdict.halt) return;
   const key = `halt/${appId}`;
+  // Anomaly guard: reports that look manufactured hold the release for the owner instead of halting it.
+  const heldRaw = await env.POINTERS.get(`halt-hold/${appId}`);
+  if (heldRaw) { try { if (JSON.parse(heldRaw).release === release) return; } catch { /* corrupt hold: evaluate again */ } }
+  const freshCut = Date.now() - FRESH_WINDOW_MS;
+  const failedSet = new Set(rows.filter((r) => r.failed).map((r) => r.install_id));
+  const fresh = rows.filter((r) => r.failed && r.created_at && Date.parse(r.created_at.length <= 19 ? r.created_at.replace(" ", "T") + "Z" : r.created_at) >= freshCut).length;
+  const stats = await loadSpikeStats(env.DB, appId);
+  const why = detectAnomaly({ failedInstalls: failedSet.size, freshFailedInstalls: fresh, ...stats });
+  if (why) {
+    const ch = await createHoldChallenge({ kv: env.POINTERS, appId }, release, why, { reports: verdict.reports, failed: counts.failed, threshold: threshold! });
+    await recordAudit(env.DB, { app_id: appId, actor: "halt-rule", actor_kind: "system", action: "halt_held", release, before: null, after: JSON.stringify({ release, reason: why, approval_id: ch.id }) });
+    await sendRevertAlert(env.DB, appId, release, "halt_held", true); // never throws
+    return;
+  }
   // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
   const cur = await env.POINTERS.get(key);
   if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
@@ -159,12 +189,16 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
 /** Device telemetry for the spike: applied / reverted / timings. */
 app.route("/", installs);
 app.post("/t", async (c) => {
+  const tooMany = () => c.json({ error: "rate_limited" }, 429, { "retry-after": "60" });
+  if (await telemetryLimited(c.env.POINTERS, "ip", c.req.header("cf-connecting-ip") ?? "unknown")) return tooMany();
   let body: any;
   const raw = await c.req.text();
   try { body = JSON.parse(raw); } catch { return c.json({ error: "bad_json" }, 400); }
   const t = Telemetry.safeParse(body);
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
+  if (await telemetryLimited(c.env.POINTERS, "app", d.app_id)) return tooMany();
+  if (typeof extra.install_id === "string" && extra.install_id.length <= 64 && await telemetryLimited(c.env.POINTERS, "install", `${d.app_id}/${extra.install_id}`)) return tooMany();
   let stored = true;
   // Signed reports are marked verified. Everything else is still stored for dashboards.
   // The signature is the `x-shipvo-sig` header or a `sig` field. A body signature covers the raw body with that field removed.
@@ -195,7 +229,7 @@ app.post("/t", async (c) => {
   // Halting is a best-effort side effect: never fail the response.
   if (FAILED_EVENTS.includes(d.event)) { try { await maybeHalt(c.env, d.app_id, d.release); } catch (e) { console.error("halt check failed", e); } }
   if (stored && REVERT_EVENTS.has(d.event)) {
-    const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event);
+    const job = sendRevertAlert(c.env.DB, d.app_id, d.release, d.event, verified === 1);
     try { c.executionCtx.waitUntil(job); } catch { /* no execution context (tests, local): the job runs on its own */ }
   }
   return c.json(stored ? { ok: true } : { ok: true, stored: false }, 202);
