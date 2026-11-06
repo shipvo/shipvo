@@ -19,9 +19,16 @@ export function screenRulesSource(): string {
 /** Runs in the page. Everything it needs is nested inside, because it is serialised with `String(fn)`. */
 function bridgeMain(win: any, token: string) {
   const doc = win.document;
-  const refs = new WeakMap<object, number>();
+  // A ref names one element with one role and name. If the element's content changes, it gets a new ref and the old one is stale.
+  const refs = new WeakMap<object, { n: number; sig: string }>();
+  const byRef = new Map<string, { el: any; sig: string }>();
   let counter = 0;
-  const refOf = (el: object) => { let n = refs.get(el); if (!n) { n = ++counter; refs.set(el, n); } return "e" + n; };
+  const refOf = (el: any, sig: string) => {
+    let r = refs.get(el);
+    if (!r || r.sig !== sig) { r = { n: ++counter, sig }; refs.set(el, r); }
+    byRef.set("e" + r.n, { el, sig });
+    return "e" + r.n;
+  };
 
   const INPUT_ROLE: Record<string, string> = { checkbox: "checkbox", radio: "radio", range: "slider", button: "button", submit: "button", reset: "button", image: "button", search: "searchbox", number: "spinbutton" };
   const TAG_ROLE: Record<string, string> = { button: "button", textarea: "textbox", select: "combobox", img: "img", ul: "list", ol: "list", li: "listitem", nav: "navigation", main: "main", dialog: "dialog", form: "form", table: "table", tr: "row", td: "cell", th: "columnheader", p: "paragraph", progress: "progressbar", article: "article", aside: "complementary" };
@@ -112,7 +119,7 @@ function bridgeMain(win: any, token: string) {
     const pad = "  ".repeat(depth);
     if (role) {
       const { name, fromContent } = nameOf(el, role);
-      const key = role + (name ? " " + quote(name) : "") + states(el, role) + " [ref=" + refOf(el) + "]";
+      const key = role + (name ? " " + quote(name) : "") + states(el, role) + " [ref=" + refOf(el, role + "|" + name) + "]";
       if (tag === "input" || tag === "textarea") { const v = el.value; out.push(keyLine(pad, key, v && !/^(checkbox|radio|button|submit|reset)$/.test(el.type) ? ": " + val(v) : "")); return; }
       if (fromContent || tag === "img") { out.push(keyLine(pad, key, "")); return; }
       const mark = out.length; out.push("");
@@ -122,7 +129,7 @@ function bridgeMain(win: any, token: string) {
     }
     // No role: keep the text, drop the wrapper. A wrapper with only text becomes one generic line.
     const hasEl = [...el.children].length > 0;
-    if (!hasEl) { const t = norm(el.textContent); if (t) out.push(pad + "- generic [ref=" + refOf(el) + "]: " + val(t)); return; }
+    if (!hasEl) { const t = norm(el.textContent); if (t) out.push(pad + "- generic [ref=" + refOf(el, "generic|" + t) + "]: " + val(t)); return; }
     for (const c of el.childNodes) child(c, depth, out);
   }
   function child(c: any, depth: number, out: string[]) {
@@ -143,12 +150,115 @@ function bridgeMain(win: any, token: string) {
     } finally { (globalThis as any).__shipvoRules.clearScreenRules(d); }
   }
 
+  /** Same code and message shape as the simulator's typed errors. */
+  class ActError extends Error { code: string; constructor(code: string, msg: string) { super(msg); this.code = code; } }
+  const sigOf = (el: any): string => { const role = roleOf(el); return role ? role + "|" + nameOf(el, role).name : "generic|" + norm(el.textContent); };
+  const appDoc = () => { const f = doc.getElementById("app"); return f && f.contentDocument; };
+
+  /** The element for a ref from a snapshot, or `stale_ref` if it is unknown, gone, left the page, or changed role or name. */
+  function resolve(ref: unknown): any {
+    const stale = () => new ActError("stale_ref", `stale ref ${ref}: the screen changed. Take a new snapshot (action "screen") and use a ref from it.`);
+    const d = appDoc();
+    const rec = byRef.get(String(ref));
+    if (!d || !rec || !rec.el.isConnected || rec.el.ownerDocument !== d) throw stale();
+    if (sigOf(rec.el) !== rec.sig || refs.get(rec.el)?.sig !== rec.sig) throw stale();
+    return rec.el;
+  }
+
+  /** Say why an element cannot receive a tap. Nothing has reached the app when this throws. */
+  function ready(el: any, ref: unknown) {
+    const fail = (code: string, why: string) => new ActError(code, `${ref} ${why}, so nothing was sent to the app.`);
+    if (hidden(el, win.getComputedStyle(el)) || el.getClientRects().length === 0) throw fail("not_visible", "is not visible");
+    if (el.disabled === true || el.getAttribute("aria-disabled") === "true" || (el.closest && el.closest("fieldset[disabled]"))) throw fail("disabled", "is disabled");
+    el.scrollIntoView({ block: "center", inline: "center" });
+    const r = el.getBoundingClientRect(); const w = el.ownerDocument.defaultView;
+    if (r.right <= 0 || r.bottom <= 0 || r.left >= w.innerWidth || r.top >= w.innerHeight) throw fail("not_visible", "is not visible");
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const top = el.ownerDocument.elementFromPoint(x, y);
+    if (top && top !== el && !el.contains(top) && !top.contains(el)) throw fail("covered", "is covered by another element");
+    return { x, y, target: top && el.contains(top) ? top : el };
+  }
+
+  function tap(el: any, ref: unknown) {
+    const { x, y, target } = ready(el, ref);
+    const w = el.ownerDocument.defaultView;
+    const init = { bubbles: true, cancelable: true, composed: true, view: w, clientX: x, clientY: y, button: 0, pointerId: 1, pointerType: "mouse", isPrimary: true };
+    const fire = (Ctor: any, type: string, buttons: number) => target.dispatchEvent(new Ctor(type, { ...init, buttons }));
+    fire(w.PointerEvent, "pointerdown", 1); fire(w.MouseEvent, "mousedown", 1);
+    if (typeof el.focus === "function") el.focus({ preventScroll: true });
+    fire(w.PointerEvent, "pointerup", 0); fire(w.MouseEvent, "mouseup", 0); fire(w.MouseEvent, "click", 0);
+  }
+
+  function type(el: any, ref: unknown, text: string, enter: boolean) {
+    const field = /^(INPUT|TEXTAREA)$/.test(el.tagName) ? el : el.querySelector("input, textarea");
+    if (!field) throw new ActError("not_a_field", `${ref} is not a text field. Type into a "textbox" ref.`);
+    ready(field, ref);
+    const w = field.ownerDocument.defaultView;
+    field.focus();
+    const proto = field.tagName === "TEXTAREA" ? w.HTMLTextAreaElement.prototype : w.HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(field, text);
+    field.dispatchEvent(new w.InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    field.dispatchEvent(new w.Event("change", { bubbles: true }));
+    if (enter) for (const t of ["keydown", "keypress", "keyup"]) field.dispatchEvent(new w.KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    return field.value as string;
+  }
+
+  function scroll(ref: unknown, direction: string) {
+    const d = appDoc()!; const w = d.defaultView;
+    const dx = direction === "right" ? 300 : direction === "left" ? -300 : 0;
+    const dy = direction === "down" ? 600 : direction === "up" ? -600 : 0;
+    if (!dx && !dy) throw new ActError("bad_direction", "scroll needs a direction: up, down, left or right.");
+    let el: any = ref ? resolve(ref) : d.body;
+    // The nearest ancestor that can scroll that way. Fall back to the page.
+    for (; el && el !== d.body && el !== d.documentElement; el = el.parentElement) {
+      const cs = w.getComputedStyle(el);
+      if (dy && /auto|scroll/.test(cs.overflowY) && el.scrollHeight > el.clientHeight) break;
+      if (dx && /auto|scroll/.test(cs.overflowX) && el.scrollWidth > el.clientWidth) break;
+    }
+    if (!el || el === d.body || el === d.documentElement) el = d.scrollingElement || d.documentElement;
+    el.scrollBy({ left: dx, top: dy, behavior: "instant" });
+  }
+
+  function back() {
+    const d = appDoc()!;
+    for (const el of d.querySelectorAll("button, [role=button], input[type=button], input[type=submit]") as any) {
+      const role = roleOf(el);
+      if (role === "button" && !hidden(el, win.getComputedStyle(el)) && nameOf(el, role).name === "Back") { tap(el, "Back"); return; }
+    }
+    throw new Error("no Back button on this screen");
+  }
+
+  const sleep = (ms: number) => new Promise((r) => win.setTimeout(r, ms));
+  /** Give the app a moment to react, and wait for a page load a tap started. */
+  async function settle() {
+    await sleep(250);
+    for (let i = 0; i < 30; i++) { const d = appDoc(); if (d && d.readyState === "complete" && d.body) break; await sleep(100); }
+    await sleep(50);
+  }
+  const screenOrUndefined = () => { try { return tree(); } catch { return undefined; } };
+
+  async function act(m: any) {
+    switch (m.type) {
+      case "tap": tap(resolve(m.ref), m.ref); break;
+      case "type": { const value = type(resolve(m.ref), m.ref, String(m.text ?? ""), !!m.enter); await settle(); return { delivery: "delivered", value, screen: tree() }; }
+      case "scroll": scroll(m.ref, m.direction); break;
+      case "back": back(); break;
+      default: throw new Error("unknown request: " + m.type);
+    }
+    await settle();
+    return { delivery: "delivered", screen: tree() };
+  }
+
   const ws = new win.WebSocket((win.location.protocol === "https:" ? "wss://" : "ws://") + win.location.host + "/__shipvo/agent?role=screen&token=" + encodeURIComponent(token));
   ws.onmessage = (e: any) => {
     let m: any; try { m = JSON.parse(String(e.data)); } catch { return; }
     if (!m || typeof m.id !== "number") return;
     try {
       if (m.type === "tree") ws.send(JSON.stringify({ id: m.id, type: "tree", ok: true, tree: tree() }));
+      else if (/^(tap|type|scroll|back)$/.test(m.type)) {
+        act(m).then((r) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r })),
+          (err: any) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, ...(err && err.code ? { code: err.code } : {}), error: String(err && err.message || err), screen: screenOrUndefined() })));
+      }
       else ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: "unknown request: " + m.type }));
     } catch (err: any) { ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: String(err && err.message || err) })); }
   };
