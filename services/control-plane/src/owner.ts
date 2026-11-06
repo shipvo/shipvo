@@ -242,6 +242,9 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
         if (!a.stagePercent || !a.stageMinHours) return fail("bad_param", "stagePercent and stageMinHours go together");
         v.requireStageBeforeFull = { percent: Number(a.stagePercent), minHours: Number(a.stageMinHours) };
       }
+      // This command has no requireApprovalAbove param. Keep the stored value so tightening other rules does not switch the approval gate off.
+      const kept = (await loadReleasePolicy(env)).requireApprovalAbove;
+      if (kept) v.requireApprovalAbove = kept;
       const r = ShipvoPolicy.safeParse(v);
       if (!r.success) return fail("bad_param", r.error.issues.map((i) => `${i.path.join(".") || "policy"}: ${i.message}`).join("; "));
       await env.kv.put(RELEASE_POLICY_KEY(env.appId), JSON.stringify(r.data)); return r.data;

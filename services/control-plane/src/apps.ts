@@ -297,6 +297,16 @@ async function resolveApproval(c: any, verb: "approve" | "reject") {
   if (verb === "approve" && who.actor === a.proposer) return c.json({ error: "self_approval", message: "The actor that proposed this release cannot approve it." }, 403);
   const approved = verb === "approve";
   if (approved) {
+    // Never roll a band back: if a newer release went live while this waited, refuse and close the approval.
+    // Note: KV read-then-put is not atomic, so two concurrent approves could both apply. Fine for a first slice.
+    let cur: any = null;
+    try { const live = await c.env.POINTERS.get(a.key); cur = live ? JSON.parse(JSON.parse(live).body) : null; } catch { /* unreadable pointer: nothing to compare */ }
+    if (cur && typeof cur.release === "number" && cur.release > a.release) {
+      await c.env.POINTERS.put(approvalKey(id, aid), JSON.stringify({ ...a, status: "rejected", resolved_by: who.actor, resolved_at: now(), reason: "stale" }));
+      await recordAudit(c.env.DB, { app_id: id, actor: who.actor, actor_kind: who.kind, action: "publish", release: a.release, release_id: a.key,
+        after: JSON.stringify({ approval: "rejected", reason: "stale", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
+      return c.json({ error: "stale", message: `Release ${cur.release} is already live at this band; release ${a.release} was not applied.` }, 409);
+    }
     const buf = new TextEncoder().encode(a.pointer);
     await c.env.POINTERS.put(a.key, buf);
     await recordStaged(c.env.POINTERS, id, buf.buffer as ArrayBuffer);

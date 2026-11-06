@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import app from "../src/index";
+import { runOwnerCommand } from "../src/owner";
 
 const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const PUB = "sv_publish_tide", ANN = "sv_login_ann", BOB = "sv_login_bob";
@@ -55,7 +56,7 @@ describe("requireApprovalAbove", () => {
     expect(audits).toHaveLength(1);
     expect(JSON.parse(audits[0]![8] as string)).toMatchObject({ approval: "proposed", approval_id: j.approval_id });
   });
-  it("a different owner approves: promote applied, three audit rows in all", async () => {
+  it("a different owner approves: promote applied, proposed and approved audit rows", async () => {
     const { r, store, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2");
     const { approval_id } = (await r.json()) as any;
     const a = await act(approval_id, "approve", "owner-secret");
@@ -63,6 +64,23 @@ describe("requireApprovalAbove", () => {
     expect(audits.map((x) => JSON.parse(x[8] as string).approval)).toEqual(["proposed", "approved"]);
     expect(audits[1]![2]).toBe("agent (owner token)");
     expect((await act(approval_id, "approve", "owner-secret")).status).toBe(409);
+  });
+  it("a stale proposal is refused with 409 and the newer pointer stays", async () => {
+    const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2");
+    const { approval_id } = (await r.json()) as any;
+    const newer = JSON.stringify({ body: JSON.stringify({ band: "b2", release: 8 }), signature: "x" });
+    store[PTR] = newer;
+    const a = await act(approval_id, "approve", "owner-secret");
+    expect(a.status).toBe(409); expect(((await a.json()) as any).error).toBe("stale");
+    expect(store[PTR]).toBe(newer);
+    expect((await act(approval_id, "approve", "owner-secret")).status).toBe(409);
+  });
+  it("set_release_policy keeps requireApprovalAbove", async () => {
+    const m: Record<string, string> = { "c/tide/release_policy": JSON.stringify({ requireApprovalAbove: "b1" }) };
+    const env: any = { kv: { get: async (k: string) => m[k] ?? null, put: async (k: string, v: string) => { m[k] = v; } }, appId: "tide", actor: "owner", isAgent: false, db: { prepare: () => ({ bind: () => ({ first: async () => ({ json: JSON.stringify({ x: 1 }) }), run: async () => ({}) }) }) } };
+    const out: any = await runOwnerCommand(env, "set_release_policy", { maxBand: "b2" });
+    expect(out).toMatchObject({ ok: true }); expect(out.result).toEqual({ maxBand: "b2", requireApprovalAbove: "b1" });
+    expect(JSON.parse(m["c/tide/release_policy"]!)).toEqual({ maxBand: "b2", requireApprovalAbove: "b1" });
   });
   it("the proposer cannot approve", async () => {
     const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2");
