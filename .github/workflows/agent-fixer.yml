@@ -85,7 +85,9 @@ jobs:
           rounds = max([int(x.split(":")[1]) for x in names if re.fullmatch(r"fix:\d+", x)] or [0])
           # A conflict caused by other PRs landing on main is not the engineer's failure: resolving it
           # never uses up a fix round, so an approved PR is never closed just because main moved.
-          free = E["EVENT"] != "workflow_run" and E["LABEL"] == "agent:conflict" and not ({"agent:changes-requested", "contract:drift"} & set(names))
+          # This holds even when review changes are also pending: the conflict round never spends the round those
+          # changes need (PR #895 was closed when a conflict fix used up the round granted for its screenshots).
+          free = E["EVENT"] != "workflow_run" and E["LABEL"] == "agent:conflict"
           if free: rounds_cap = False
           else: rounds_cap = rounds >= int(E["MAX_ROUNDS"])
           if rounds_cap and "contract:drift" in names:
