@@ -44,7 +44,7 @@ async function localApps(): Promise<AppInfo> {
   return TIDE;
 }
 
-type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; locate?: { x: number; y: number; w: number; h: number }; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
+type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; locate?: { x: number; y: number; w: number; h: number }; image?: string; mime?: string; source?: string; unsupported?: string[]; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
@@ -79,7 +79,7 @@ async function storeApps(): Promise<{ ok: true; apps: StoreApp[]; fixture: boole
 const recorder = new Recorder();
 // Sessions attached to a live `shipvo run` phone. Module level: HTTP mode builds a server per request.
 const attached = new Map<string, Driver>();
-const ATTACH_TYPES = new Set(["screen", "tap", "type", "scroll", "back"]);
+const ATTACH_TYPES = new Set(["screen", "screenshot", "tap", "type", "scroll", "back"]);
 // One action on a session: through the driver connection when attached, else the simulator.
 async function act(body: Record<string, unknown>): Promise<Act> {
   const end = recorder.actionSpan();
@@ -91,7 +91,7 @@ async function act1(body: Record<string, unknown>): Promise<Act> {
   const { session: _s, action, ...args } = body;
   if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone yet. Use screen, tap, type, scroll or back, or open a headless session with attach: "never".` };
   const m = await d.request(String(action), args);
-  return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code };
+  return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code, ...(typeof m.image === "string" ? { image: m.image } : {}), ...(typeof m.mime === "string" ? { mime: m.mime } : {}), ...(typeof m.source === "string" ? { source: m.source } : {}), ...(Array.isArray(m.unsupported) ? { unsupported: m.unsupported as string[] } : {}) };
 }
 // While recording with show_taps, ask the simulator where an element is (0..1 of the viewport). Unknown element or attached phone: undefined, so no dot.
 async function locating(session: string, ref: string, whole = false) {
@@ -234,8 +234,11 @@ use(server, tools.back, async ({ session, compact, wait_for, timeout_ms, settle 
 use(server, tools.screenshot, async ({ session }) => {
   need(session); const r = await act({ session, action: "screenshot" });
   if (!r.ok) return result(session, r);
-  if (!r.path) throw new Error("no screenshot");
-  return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
+  if (!r.image && !r.path) throw new Error("no screenshot");
+  // `source` says where the pixels came from: the live tab, a DOM drawing, or the headless browser.
+  const source = r.source ?? "headless";
+  const head = `source: ${source}` + (r.unsupported?.length ? `\nnot drawn: ${r.unsupported.join(", ")}` : "");
+  return { content: [{ type: "image" as const, data: r.image ?? readFileSync(r.path!).toString("base64"), mimeType: r.image && r.mime === "image/jpeg" ? "image/jpeg" : "image/png" }, { type: "text" as const, text: `${head}\n\n${r.screen ?? ""}` }] };
 });
 // The simulated device: what the phone has, and what happens to it.
 use(server, tools.set_device, async ({ session, ...device }) => { need(session); const r = await act({ session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
