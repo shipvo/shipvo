@@ -261,6 +261,21 @@ export function dryRunSummary(release: number, bytes: number, outDir: string, in
   return lines.join("\n");
 }
 
+/** The line for a listing file that is not there. It says the file is optional and what to do. */
+export function missingListingNote(file: string, name: string) {
+  if (name === "icon") return `No app icon yet (optional). Add ${file} to show one in the store.`;
+  if (name.startsWith("shot-")) return `No screenshot yet (optional). Add ${file} to show it in the store.`;
+  return `No ${name} yet (optional). Add ${file} to show it in the store.`;
+}
+
+/** Upload one listing file to the store prefix. A missing file prints a note and returns null. */
+export async function uploadListingFile(kv: { put: (k: string, b: BodyInit, m: string) => Promise<unknown> }, store: string, file: string, name: string) {
+  if (!existsSync(file)) { console.error(missingListingNote(file, name)); return null; }
+  const ext = file.slice(file.lastIndexOf(".")).toLowerCase();
+  await kv.put(`${store}/${name}${ext}`, new Uint8Array(readFileSync(file)), MIME[ext] ?? "application/octet-stream");
+  return `${name}${ext}`;
+}
+
 async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number, outDir?: string, io: "inherit" | ["inherit", 2, 2] = "inherit") {
   execSync("npx expo export --platform web --output-dir dist-web --clear", { stdio: io, env: { ...process.env, PN_SIM: "1" } });
   const base = `w/${APP}/r${release}`; const files: string[] = []; let indexSha = "";
@@ -280,7 +295,7 @@ async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof l
   console.error(`web artifact: ${files.length} files at ${where}`);
   // Store listing assets (icon, screenshots) and the release note, read by shipvo.dev/apps and list_apps.
   const L = cfg.listing ?? {}; const store = `w/${APP}/store`;
-  const up = async (file: string, name: string) => { if (!existsSync(file)) { console.error(`listing: ${file} not found, skipped`); return null; } const ext = file.slice(file.lastIndexOf(".")).toLowerCase(); await kv.put(`${store}/${name}${ext}`, new Uint8Array(readFileSync(file)), MIME[ext] ?? "application/octet-stream"); return `${name}${ext}`; };
+  const up = (file: string, name: string) => uploadListingFile(kv, store, file, name);
   const icon = L.icon ? await up(L.icon, "icon") : null;
   const shots: string[] = []; for (const [i, f] of (L.screenshots ?? []).entries()) { const n = await up(f, `shot-${i + 1}`); if (n) shots.push(n); }
   let note: { headline?: string; note?: string } = {};

@@ -1,0 +1,2 @@
+- `@shipvo/device`: on web, `device.net.online()` follows the network profile (`offline` is not connected) and the new `device.net.type()` reports `none`, `wifi`, `cellular` or the cellular generation (`2g`, `3g`, `4g`) of the active profile. `net.onChange` subscribers are called when the profile changes. With no profile set, nothing changes.
+- Migration: none; `net.type` is new and optional in the `Device` type.
