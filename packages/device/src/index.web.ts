@@ -28,6 +28,8 @@ export type DeviceState = {
   online: boolean;
   /** Airplane mode: the network is off and the status bar shows the airplane icon. */
   airplane: boolean;
+  /** Quick-settings switches (notification shade and Control Center). Wi-Fi and mobile data both off means no network. */
+  wifi: boolean; mobileData: boolean; locationServices: boolean; darkMode: boolean; dnd: boolean; autoRotate: boolean; flashlight: boolean; orientationLock: boolean; brightness: number;
   /** The battery the status bar shows. */
   battery: { level: number; charging: boolean };
   clipboard: string;
@@ -49,16 +51,21 @@ const state: DeviceState = {
   camera: { barcode: null, delayMs: 800 },
   biometrics: { enrolled: true, nextResult: "success" },
   payment: { nextResult: "approve", pin: "1234" },
-  online: true, airplane: false, battery: { level: 100, charging: false }, clipboard: "", log: [],
+  online: true, airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70,
+  battery: { level: 100, charging: false }, clipboard: "", log: [],
   ...(cfg.device ?? {}),
 };
 // Every entry is marked simulated: a simulated fingerprint or payment is for testing and is never a real verification or money movement.
 // Readings from real hardware are marked source "real".
 const log = (kind: string, detail?: unknown, source: Source = "simulated") => state.log.push({ at: Date.now(), kind, detail, source, simulated: source === "simulated" } as any);
 // Network, airplane and battery feed the phone frame's status bar. Every change is logged (simulated) and announced as a "pn:status" event.
-const isOnline = () => state.online && !state.airplane;
-const statusKey = () => JSON.stringify([state.online, state.airplane, state.battery.level, state.battery.charging]);
-function announceStatus(before: string, record = true) {
+const isOnline = () => state.online && !state.airplane && (state.wifi || state.mobileData);
+const SETTINGS = ["wifi", "mobileData", "locationServices", "darkMode", "dnd", "autoRotate", "flashlight", "orientationLock", "brightness", "airplane"] as const;
+const settings = () => Object.fromEntries(SETTINGS.map((k) => [k, state[k]]));
+const settingsKey = () => JSON.stringify(settings());
+const statusKey = () => JSON.stringify([state.online, state.airplane, isOnline(), state.battery.level, state.battery.charging]);
+function announceStatus(before: string, record = true, beforeSettings = "") {
+  if (beforeSettings && settingsKey() !== beforeSettings && typeof window !== "undefined") { if (record) log("settings", settings()); window.dispatchEvent(new CustomEvent("pn:settings", { detail: settings() })); }
   if (statusKey() === before) return;
   const detail = { online: isOnline(), airplane: state.airplane, battery: { ...state.battery } };
   if (record) log("status", detail);
@@ -116,6 +123,7 @@ export const device: Device = {
   location: {
     async current() {
       if ((await askPermission("location")) !== "granted") throw new Error("Location permission denied");
+      if (!state.locationServices) { log("location_off", {}); throw new Error("Location services are turned off"); }
       if (mayUseReal(state.source)) {
         const pos = await realPosition(); // the browser's own prompt is a second gate
         if (pos) { log("location", pos, "real"); return pos; }
@@ -247,11 +255,13 @@ let seq = 0;
 /** Deliver a notification to the app. Returns its id, or null when notification permission is not granted (nothing reaches the app). */
 function deliver(n: Omit<Notification, "id">): string | null {
   if (state.permissions.notifications !== "granted") { log("notification_blocked", { title: n.title, permission: state.permissions.notifications }); return null; }
-  const full: Notification = { id: `n${Date.now().toString(36)}${(seq++).toString(36)}`, ...n };
-  showBanner(full); log("notification", { ...full }); recvSubs.forEach((f) => f(full)); return full.id;
+  const full: Notification = { id: `n${Date.now().toString(36)}${(seq++).toString(36)}`, at: Date.now(), app: state.appName, ...n };
+  // Do Not Disturb keeps the notification in the shade but shows no heads-up banner.
+  showBanner(full, !state.dnd); log("notification", { ...full }); recvSubs.forEach((f) => f(full)); return full.id;
 }
-function showBanner(n: Notification) {
+function showBanner(n: Notification, popup = true) {
   recent.push(n); if (recent.length > 20) recent.shift();
+  if (!popup) return;
   const b = document.createElement("div"); b.setAttribute("role", "button"); b.setAttribute("aria-label", `Notification: ${n.title}. ${n.body}`); b.tabIndex = 0; b.setAttribute("data-pn-banner", "1");
   // Like a heads-up notification: slim, over the status bar, gone after 5 s unless tapped.
   Object.assign(b.style, { position: "fixed", top: "4px", left: "8px", right: "8px", height: "44px", overflow: "hidden", background: "#fff", color: "#111", borderRadius: "12px", padding: "6px 12px", boxShadow: "0 6px 24px rgba(0,0,0,.25)", zIndex: "9998", fontFamily: "system-ui, sans-serif", whiteSpace: "nowrap", textOverflow: "ellipsis" });
@@ -263,12 +273,18 @@ function showBanner(n: Notification) {
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
 g.__pnDevice = {
   state,
-  set(patch: Partial<DeviceState>) { const before = statusKey(), wasOnline = isOnline(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (isOnline() !== wasOnline) netSubs.forEach((f) => f(isOnline())); announceStatus(before); },
+  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), wasOnline = isOnline(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (isOnline() !== wasOnline) netSubs.forEach((f) => f(isOnline())); announceStatus(before, true, bs); },
   /** Push a notification to the app. Returns its id, or null when permission is not granted. */
   push(n: Omit<Notification, "id">) { return deliver(n); },
   log: () => state.log,
   /** Notifications delivered so far (the banner is gone after 5 s, like a heads-up on a phone; this is the notification shade). */
-  notifications: () => recent.map((n) => ({ id: n.id, title: n.title, body: n.body })),
+  notifications: () => recent.map((n) => ({ id: n.id, title: n.title, body: n.body, at: n.at, app: n.app, data: n.data })),
+  /** Swipe one notification away (it stays in the log). False if there is no such notification. */
+  dismiss(id: string) { const i = recent.findIndex((x) => x.id === id); if (i < 0) return false; recent.splice(i, 1); log("notification_dismissed", { id }); return true; },
+  /** "Clear all". Returns how many were removed. */
+  clearAll() { const n = recent.length; recent.length = 0; log("notifications_cleared", { count: n }); return n; },
+  /** The quick-settings switches: Wi-Fi, mobile data, airplane, location, dark mode, Do Not Disturb, auto-rotate, flashlight, orientation lock, brightness. */
+  settings,
   /** Tap a notification from the shade: same handler as tapping its banner. */
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
@@ -278,11 +294,11 @@ g.__pnDevice = {
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
-    const before = statusKey();
+    const before = statusKey(), bs = settingsKey();
     Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: (profile?.platform ?? state.platform) === "android" && (profile?.api ?? state.api) < 33 ? "granted" : "undetermined" },
-      source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, airplane: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
+      source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
     recent.length = 0; seq = 0;
-    announceStatus(before, false);
+    announceStatus(before, false, bs);
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
 };
