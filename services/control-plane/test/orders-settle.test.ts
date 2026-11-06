@@ -10,7 +10,11 @@ function fake(statuses: Record<string, string[]>, opts: { changes?: number } = {
     all: async () => ({ results: rows.filter((r) => r.app_id === a[0] && r.order_id === a[1]).map((r) => ({ status: r.status })) }),
     run: async () => {
       if (/^UPDATE orders/.test(sql) && opts.changes === 0) return { meta: { changes: 0 } };
-      if (/^UPDATE orders/.test(sql)) rows.filter((r) => r.app_id === a[0] && r.order_id === a[1] && r.status === "unverified").forEach((r) => { r.status = "settled"; });
+      if (/^UPDATE orders/.test(sql)) {
+        const hit = rows.filter((r) => r.app_id === a[0] && r.order_id === a[1] && r.status === "unverified");
+        hit.forEach((r) => { r.status = "settled"; });
+        return { meta: { changes: hit.length } };
+      }
       if (/^INSERT INTO audit/.test(sql)) audit.push(a);
       return { meta: { changes: 1 } };
     },
@@ -68,6 +72,15 @@ describe("settle order", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ already_settled: true });
     expect(audit).toHaveLength(0);
+  });
+  it("audits once when two unverified rows share an order id", async () => {
+    const { rows, audit, env } = fake({ A: ["unverified", "unverified"] });
+    const r = await settle(env, "A", "owner-secret");
+    expect(r.status).toBe(200);
+    const body: any = await r.json();
+    expect(body.already_settled).toBeUndefined();
+    expect(rows.map((x) => x.status)).toEqual(["settled", "settled"]);
+    expect(audit).toHaveLength(1);
   });
   it("does not settle simulated or price_mismatch orders", async () => {
     const { rows, env } = fake({ S: ["simulated"], P: ["price_mismatch"] });

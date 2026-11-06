@@ -4,7 +4,7 @@ Shipvo stores the orders your app sends. It does not take payment. You, or your 
 
 ## Who verifies payment
 
-You do. Shipvo never checks that money arrived. Every new order starts as `unverified`. Check your mobile money or card account, then call `settle` for that order with the owner token. There is no settle button in the admin yet. There are no payment-provider webhooks yet.
+You do. Shipvo never checks that money arrived. Every new order starts as `unverified`. Check your mobile money or card account, then call `settle` for that order with the owner token. Settling covers every `unverified` row that has that order id. There is no settle button in the admin yet. There are no payment-provider webhooks yet.
 
 ## Order statuses
 
