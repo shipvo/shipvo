@@ -48,4 +48,8 @@ The workflow must check out the full history (`fetch-depth: 0`) so the diff agai
 
 Run it by hand with `npx shipvo ci comment --changed-from <sha> --pr <number>`. Without a token it prints the comment.
 
-Not yet covered: recordings and comparing with the base branch.
+### Compared with base
+
+The action also builds the base commit in a second folder and runs the same flows there. The comment then has a "Compared with base" section: regressions first (flows that passed on base and fail now, with the first failing step), then fixed, then still failing. Flows only on the pull request are not regressions. The check fails on a regression because the action passes `--fail-on-regression`; by hand, use `npx shipvo ci comment --base-report base.json --report shipvo-report.json --fail-on-regression`. If the base report is missing, the comment has no such section.
+
+Not yet covered: recordings and running `shipvo explore` on the base.
