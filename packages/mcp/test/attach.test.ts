@@ -13,6 +13,8 @@ import { acceptWebSocket } from "../../cli/src/run-ws.js";
 const root = resolve(__dirname, "..");
 let out = "", work = "", sim: http.Server, host: http.Server, simPort = 0, hostPort = 0;
 const seen: { type: string; [k: string]: unknown }[] = [];
+let shotSource = "tab-capture";
+const PNG = Buffer.from("png-bytes").toString("base64");
 const TREE = '- button "Buy" [ref=e1]';
 
 beforeAll(async () => {
@@ -20,12 +22,14 @@ beforeAll(async () => {
   const b = spawnSync(process.execPath, [createRequire(join(root, "package.json")).resolve("typescript/bin/tsc"), "-p", root, "--outDir", out], { encoding: "utf8" });
   if (b.status !== 0) throw new Error(b.stdout + b.stderr);
   work = mkdtempSync(join(tmpdir(), "attach-"));
+  writeFileSync(join(work, "headless.png"), "headless-bytes");
   mkdirSync(join(work, ".git"));
   sim = http.createServer(async (req, res) => {
     let raw = ""; for await (const c of req) raw += c;
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, release: "local", screen: "heading Headless" }));
+    if (JSON.parse(raw || "{}").action === "screenshot") return res.end(JSON.stringify({ ok: true, path: join(work, "headless.png"), screen: "heading Headless" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Headless" }));
   });
   host = http.createServer();
@@ -34,6 +38,7 @@ beforeAll(async () => {
     if (url.searchParams.get("token") !== "tok" || url.searchParams.get("role") !== "driver") return void socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
     const peer = acceptWebSocket(req, socket, (t) => {
       const m = JSON.parse(t); seen.push(m);
+      if (m.type === "screenshot") return void peer?.send(JSON.stringify({ id: m.id, ok: true, source: shotSource, image: PNG, unsupported: shotSource === "rendered" ? ["video"] : undefined, screen: TREE }));
       if (m.type === "back") return void peer?.send(JSON.stringify({ id: m.id, ok: false, code: "taken_over", error: "the person took over" }));
       peer?.send(JSON.stringify({ id: m.id, ok: true, screen: TREE }));
     }, () => {});
@@ -126,5 +131,31 @@ describe("open_app attach", { timeout: 30_000 }, () => {
     (globalThis as { WebSocket?: unknown }).WebSocket = undefined;
     try { await expect(connectDriver({ port: 1, platform: "android", app: "menu", token: "t", pid: 1 })).rejects.toThrow("attach needs Node 22+"); }
     finally { globalThis.WebSocket = orig; }
+  });
+});
+
+// Slice 5 of #448: every screenshot result says where the pixels came from.
+describe("screenshot source", { timeout: 30_000 }, () => {
+  type R = { content: { type: string; text?: string; data?: string }[] };
+  const shot = async (c: Client, text: string) => await c.callTool({ name: "screenshot", arguments: { session: /session: (\S+)/.exec(text)![1] } }) as R;
+  it("tab-capture: the attached phone's image and source come through", async () => {
+    runJson(process.pid); shotSource = "tab-capture";
+    const { c, text } = await open({}); const r = await shot(c, text);
+    expect(r.content[0].data).toBe(PNG);
+    expect(r.content[1].text).toMatch(/^source: tab-capture\n/); expect(r.content[1].text).toContain(TREE);
+    await c.close();
+  });
+  it("rendered: says what could not be drawn", async () => {
+    runJson(process.pid); shotSource = "rendered";
+    const { c, text } = await open({}); const r = await shot(c, text);
+    expect(r.content[1].text).toMatch(/^source: rendered\nnot drawn: video\n/);
+    await c.close();
+  });
+  it("headless: the simulator's screenshot says so", async () => {
+    runJson(process.pid);
+    const { c, text } = await open({ attach: "never" }); const r = await shot(c, text);
+    expect(r.content[0].data).toBe(Buffer.from("headless-bytes").toString("base64"));
+    expect(r.content[1].text).toMatch(/^source: headless\n/); expect(r.content[1].text).toContain("Headless");
+    await c.close();
   });
 });
