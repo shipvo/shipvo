@@ -6,7 +6,7 @@ Short videos for people who are new to Shipvo. Each one has captions and a writt
 
 ### See your app on a phone in your browser with shipvo run
 
-<video controls preload="metadata" playsinline tabindex="0" data-title="See your app on a phone in your browser with shipvo run" data-length="1 min 33 s" poster="/videos/run-your-app-on-a-phone.jpg" src="/media/videos/run-your-app-on-a-phone-807378b0.mp4"><track kind="captions" src="/videos/run-your-app-on-a-phone.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+<video controls preload="metadata" playsinline tabindex="0" data-title="See your app on a phone in your browser with shipvo run" data-length="1 min 33 s" poster="/videos/run-your-app-on-a-phone.jpg" src="/media/videos/run-your-app-on-a-phone-e56797e1.mp4"><track kind="captions" src="/videos/run-your-app-on-a-phone.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
 
 1 minute 33 seconds. One command, `npx shipvo run android`, opens a simulated phone in your browser with no account and no Android Studio or Xcode. It covers the iPhone look, the dark frame, how your AI assistant drives the same phone with `open_app`, and the `--port` and `--native` options. It follows [Run your app on a phone in your browser](run.md).
 

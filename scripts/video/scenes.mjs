@@ -340,20 +340,20 @@ ${["Open an app another founder shared", "Opt in", "Keep it installed for 14 day
 const bigPhone = (x, y, ios, inner, scale = 1) => `<div class="abs pop" style="left:${x}px;top:${y}px;width:${ios ? 262 : 275}px;height:${ios ? 568 : 610}px;--d:.6s;transform-origin:top left;scale:${scale}"><div style="position:absolute;inset:0;border-radius:${ios ? 48 : 36}px;background:#05080f;border:7px solid #2b3a5c;overflow:hidden">
   ${ios ? `<div style="position:absolute;left:50%;top:10px;width:84px;height:24px;margin-left:-42px;border-radius:14px;background:#000"></div><div style="position:absolute;left:50%;bottom:8px;width:90px;height:5px;margin-left:-45px;border-radius:3px;background:#B6BDCB"></div>` : `<div style="position:absolute;left:50%;top:12px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#000"></div><div style="position:absolute;left:50%;bottom:8px;width:90px;height:5px;margin-left:-45px;border-radius:3px;background:#B6BDCB"></div>`}
   <div style="position:absolute;inset:0;padding:52px 20px 24px">${inner}</div></div></div>`;
-const shopScr = (d0, tapAt) => `<div class="mute mono" style="font-size:14px">Tide and Tackle</div>
-  <div style="font-weight:800;font-size:26px;margin:10px 0 14px">Fishing line</div>
-  <div class="card" style="padding:12px 14px;font-size:20px;margin-bottom:10px">Net, large <span class="or" style="float:right">4 200</span></div>
-  <div class="card" style="padding:12px 14px;font-size:20px;margin-bottom:18px">Hook set <span class="or" style="float:right">1 500</span></div>
-  <div class="btn" style="font-size:20px">Add to cart</div>
-  <div class="badge pop" style="--d:${tapAt}s;margin-top:18px;background:#12382b;color:var(--green);font-size:17px">1 in cart</div>`;
-const simLabel = (d) => `<div class="abs pop" style="--d:${d}s"><span class="badge" style="background:#3a2a10;color:var(--or);font-size:20px">Simulated</span></div>`;
+const shopScr = (d0, tapAt) => `<div class="mute mono" style="font-size:18px">Tide and Tackle</div>
+  <div style="font-weight:800;font-size:30px;margin:10px 0 14px">Fishing line</div>
+  <div class="card" style="padding:12px 12px;font-size:22px;margin-bottom:10px">Net, large <span class="or" style="float:right">4 200</span></div>
+  <div class="card" style="padding:12px 12px;font-size:22px;margin-bottom:18px">Hook set <span class="or" style="float:right">1 500</span></div>
+  <div class="btn" style="font-size:24px">Add to cart</div>
+  <div class="badge pop" style="--d:${tapAt}s;margin-top:18px;background:#12382b;color:var(--green);font-size:22px">1 in cart</div>`;
+const simLabel = (d) => `<div class="abs pop" style="--d:${d}s"><span class="badge" style="background:#3a2a10;color:var(--or);font-size:24px">Simulated</span></div>`;
 
 Object.assign(SCENES, {
   rpHook: () => `
 ${chip("Shipvo Phone")}
 <h1 class="abs in" style="left:72px;top:130px;width:700px;--d:.5s">A phone in<br><span class="or">your browser.</span></h1>
 <div class="abs in mute" style="left:72px;top:400px;width:620px;font-size:30px;line-height:1.35;--d:2.4s">No Android Studio. No Xcode. No phone.</div>
-${bigPhone(880, 36, false, shopScr(0, 5.6), .78)}
+${bigPhone(880, 36, false, shopScr(0, 5.6), .9)}
 <div class="abs flight" style="left:640px;top:110px;width:130px;--fx:-100px;--fy:120px;--tx:120px;--ty:-20px;--d:3.4s">${plane(130)}</div>`,
 
   rpCmd: () => `
@@ -367,24 +367,24 @@ ${chip("Step 2")}
 <h2 class="abs in" style="left:72px;top:100px;--d:.3s">Click it like a tap</h2>
 <div class="abs in" style="left:72px;top:230px;width:560px;font-size:32px;line-height:1.45;--d:1s">A page with a phone in the middle.<br><span class="mute">The label says it is a copy.</span></div>
 <div class="abs" style="left:72px;top:470px">${simLabel(2.4)}</div>
-${bigPhone(800, 20, false, shopScr(0, 7), .8)}
+${bigPhone(800, 20, false, shopScr(0, 7), .9)}
 <div class="abs pop" style="left:895px;top:232px;width:44px;height:44px;border-radius:50%;border:4px solid var(--or);--d:6.4s"></div>`,
 
   rpIos: () => `
 ${chip("Or an iPhone")}
 <h2 class="abs in" style="left:72px;top:100px;--d:.3s">Type <span class="or">ios</span></h2>
 ${tcmd([{ t: "npx shipvo run ios", tt: 1.4, d: 1, out: "", od: 3 }], 72, 230, 620, .6, 30)}
-<div class="abs in mute" style="left:72px;top:400px;width:600px;font-size:26px;line-height:1.45;--d:3.6s">The page scales the phone to your window.</div>
-<div class="abs card in mono" style="left:72px;top:490px;padding:14px 22px;font-size:24px;--d:7s">...?<span class="or">dark=1</span> for the dark frame</div>
-${bigPhone(800, 20, true, shopScr(0, 99), .8)}`,
+<div class="abs in mute" style="left:72px;top:400px;width:600px;font-size:30px;line-height:1.45;--d:3.6s">The page scales the phone to your window.</div>
+<div class="abs card in mono" style="left:72px;top:490px;padding:14px 22px;font-size:28px;--d:7s">...?<span class="or">dark=1</span> for the dark frame</div>
+${bigPhone(800, 20, true, shopScr(0, 99), .9)}`,
 
   rpAssistant: () => `
 ${chip("Your assistant too")}
 <h2 class="abs in" style="left:72px;top:100px;--d:.3s">It drives the same phone</h2>
-${chat("You", "Add the net to my cart.", 72, 230, 560, 1.2, "var(--or)")}
-<div class="abs card in mono" style="left:72px;top:370px;width:560px;padding:18px 24px;font-size:22px;line-height:1.6;--d:4s"><div class="sky">open_app</div><div class="mute fade" style="--d:5.4s;font-size:18px">attached to the live shipvo run phone</div><div class="fade" style="--d:9s">tap [ref=e3]</div></div>
-<div class="abs in mute" style="left:72px;top:590px;font-size:24px;--d:11s">You watch every move.</div>
-${bigPhone(840, 20, false, shopScr(0, 10), .78)}`,
+${chat("You", "Add the net to my cart.", 72, 230, 640, 1.2, "var(--or)")}
+<div class="abs card in mono" style="left:72px;top:370px;width:640px;padding:18px 24px;font-size:28px;line-height:1.6;--d:4s"><div class="sky">open_app</div><div class="mute fade" style="--d:5.4s;font-size:24px">attached to the live shipvo run phone</div><div class="fade" style="--d:9s">tap [ref=e3]</div></div>
+<div class="abs in mute" style="left:72px;top:610px;font-size:28px;--d:11s">You watch every move.</div>
+${bigPhone(840, 20, false, shopScr(0, 10), .9)}`,
 
   rpStop: () => `
 ${chip("Options")}
