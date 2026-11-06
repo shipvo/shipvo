@@ -59,9 +59,10 @@ export function phoneRoutes() {
     const { app, key } = c.req.param();
     if (!ID.test(app) || !KEY.test(key) || !(await installed(c, me, app))) return c.json({ error: "not_found" }, 404);
     const raw = await c.req.text();
-    if (raw.length > MAX_VALUE_BYTES) return c.json({ error: "too_large" }, 413);
+    if (bytes(raw) > MAX_VALUE_BYTES) return c.json({ error: "too_large" }, 413);
     let body: any; try { body = JSON.parse(raw); } catch { body = null; }
     if (!body || typeof body.value !== "string") return c.json({ error: "bad_request", message: 'body must be {"value": "<string>"}' }, 400);
+    // The cap check and the write are not atomic: concurrent PUTs can overshoot the cap slightly. Fine for a storage guard.
     const cap = appDataCap(c.env);
     const used = (await c.env.DB.prepare("SELECT COALESCE(SUM(LENGTH(CAST(key AS BLOB)) + LENGTH(CAST(value AS BLOB))), 0) AS n FROM phone_data WHERE person_id = ? AND app_id = ? AND key != ?").bind(me, app, key).first<{ n: number }>())?.n ?? 0;
     if (used + bytes(key) + bytes(body.value) > cap) return c.json({ error: "app_data_full", cap_bytes: cap }, 413);

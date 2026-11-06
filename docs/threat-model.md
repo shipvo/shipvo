@@ -107,6 +107,7 @@ A person signs in with an email magic link and gets one phone: an installed-apps
 | Login link reused or raced | The link token is claimed in one conditional `UPDATE`. It works once and lasts 15 minutes. | "login token works once" |
 | Database read | Login and session tokens are stored only as SHA-256 hashes. | "stores only hashes of tokens" |
 | Finding which emails have accounts | The login route gives the same answer for every valid address. | "rejects a bad email and answers the same for any valid one" |
+| Mail-bombing an address, or filling the database, through the login route | Sign-in link requests are limited per IP and per hashed email, per hour. Over the limit the route answers 429 with `retry-after`. No raw email is stored in KV. A failed mail send deletes the stored link token. | "limits sign-in requests per IP and per email" |
 | One app filling storage | Each app's data has a size cap set in configuration. | "caps per-app data by configuration" |
 | Data left behind or inherited | Taking an app off the phone deletes its data. Installing it again starts empty. | "removing an app removes its data" |
 

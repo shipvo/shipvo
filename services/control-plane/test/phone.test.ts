@@ -25,7 +25,7 @@ function setup(extra: any = {}) {
     const r = await call("/people/verify", "POST", undefined, { token: t });
     return { t, r, session: r.status === 200 ? ((await r.json()) as any).session as string : "" };
   };
-  return { sql, call, signIn, mails };
+  return { sql, db, call, signIn, mails };
 }
 
 describe("people sign-in", () => {
@@ -33,6 +33,31 @@ describe("people sign-in", () => {
     const { call } = setup();
     expect((await call("/people/login", "POST", undefined, { email: "nope" })).status).toBe(400);
     expect((await call("/people/login", "POST", undefined, { email: "a@b.dev" })).status).toBe(202);
+  });
+  it("limits sign-in requests per IP and per email", async () => {
+    const kv = new Map<string, string>();
+    const POINTERS = { get: async (k: string) => kv.get(k) ?? null, put: async (k: string, v: string) => { kv.set(k, v); } } as any;
+    const { db, mails } = setup({ POINTERS });
+    const post = (email: string, ip: string) => {
+      const h = new Hono(); h.route("/people", peopleRoutes(async (_e, m) => { mails.push(m); }));
+      return h.request("/people/login", { method: "POST", headers: { "cf-connecting-ip": ip, "content-type": "application/json" }, body: JSON.stringify({ email }) }, { DB: db, POINTERS });
+    };
+    for (let i = 0; i < 3; i++) expect((await post("v@x.dev", "1.1.1.1")).status).toBe(202);
+    const over = await post("V@x.dev", "2.2.2.2");
+    expect(over.status).toBe(429);
+    expect(Number(over.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect((await post("other@x.dev", "2.2.2.2")).status).toBe(202);
+    for (let i = 0; i < 10; i++) await post(`u${i}@x.dev`, "3.3.3.3");
+    expect((await post("late@x.dev", "3.3.3.3")).status).toBe(429);
+    expect((await post("late@x.dev", "4.4.4.4")).status).toBe(202);
+    expect([...kv.keys()].join()).not.toContain("x.dev");
+  });
+  it("deletes the stored link when mail fails", async () => {
+    const { db, sql } = setup();
+    const h = new Hono(); h.route("/people", peopleRoutes(async () => { throw new Error("down"); }));
+    const r = await h.request("/people/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "a@b.dev" }) }, { DB: db });
+    expect(r.status).toBe(503);
+    expect(sql.prepare("SELECT COUNT(*) n FROM people_login_tokens").get().n).toBe(0);
   });
   it("login token works once", async () => {
     const { signIn, call } = setup();

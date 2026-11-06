@@ -1,12 +1,15 @@
 // People sign in with an email magic link. This is separate from developer auth (auth.ts).
 // Login tokens and session tokens are stored only as SHA-256 hashes.
 import { Hono } from "hono";
+import { hit } from "./ratelimit";
 
-export type PeopleEnv = { DB: D1Database; MAIL_WEBHOOK_URL?: string; PEOPLE_LOGIN_URL?: string };
+export type PeopleEnv = { DB: D1Database; POINTERS?: KVNamespace; MAIL_WEBHOOK_URL?: string; PEOPLE_LOGIN_URL?: string };
 export type Mailer = (env: PeopleEnv, mail: { to: string; subject: string; text: string }) => Promise<void>;
 
 export const LOGIN_TTL_MS = 15 * 60_000;
 export const SESSION_TTL_MS = 30 * 86400_000;
+/** Sign-in link requests per hour. Per IP and per email; the email is hashed before it reaches KV. */
+export const LOGIN_LIMITS = { perIp: 10, perInstall: 3, perApp: 0, windowSeconds: 3600 };
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,63}$/;
 
 const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -35,14 +38,22 @@ export function peopleRoutes(send: Mailer = webhookMailer) {
     const { email } = (await c.req.json().catch(() => ({}))) as { email?: unknown };
     const e = typeof email === "string" ? email.trim().toLowerCase() : "";
     if (!EMAIL.test(e)) return c.json({ error: "bad_request", message: "a valid email is required" }, 400);
+    // The route has no auth, so cap how many mails one source or one address can trigger. Skipped when KV is unbound, as in ratelimit.check.
+    if (c.env.POINTERS) {
+      const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+      const wait = (await hit(c.env.POINTERS, "people_login", LOGIN_LIMITS, "ip", ip)) || (await hit(c.env.POINTERS, "people_login", LOGIN_LIMITS, "install", await sha256(e)));
+      if (wait) return c.json({ error: "rate_limited", message: "Too many sign-in requests. Try again later." }, 429, { "retry-after": String(wait) });
+    }
     const t = token("sv_login");
     const now = new Date();
+    const th = await sha256(t);
     await c.env.DB.prepare("INSERT INTO people_login_tokens (token_hash, email, created_at, expires_at) VALUES (?,?,?,?)")
-      .bind(await sha256(t), e, now.toISOString(), new Date(now.getTime() + LOGIN_TTL_MS).toISOString()).run();
+      .bind(th, e, now.toISOString(), new Date(now.getTime() + LOGIN_TTL_MS).toISOString()).run();
     const link = c.env.PEOPLE_LOGIN_URL ? `${c.env.PEOPLE_LOGIN_URL}${c.env.PEOPLE_LOGIN_URL.includes("?") ? "&" : "?"}token=${t}` : t;
     try { await send(c.env, { to: e, subject: "Your Shipvo sign-in link", text: `Use this to sign in to Shipvo. It works once and expires in 15 minutes.\n\n${link}\n` }); }
     catch (err) {
       console.error("people login mail failed", (err as Error).message);
+      await c.env.DB.prepare("DELETE FROM people_login_tokens WHERE token_hash = ?").bind(th).run().catch(() => {});
       return c.json({ error: "mail_unavailable", message: "Sign-in email could not be sent. Try again later." }, 503);
     }
     return c.json({ ok: true, message: "If the address is valid, a sign-in link is on its way." }, 202, { "cache-control": "no-store" });
