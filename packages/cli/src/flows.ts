@@ -19,6 +19,8 @@ const ORDER_DONE = /\border\b[^\n]{0,40}\b(placed|confirmed|complete|successful)
 const ADDED = /\badded\b|in (?:your )?(?:cart|bag|basket)/i;
 const ADD_BTN = /^add\b.*\b(cart|bag|basket)\b|^add (?:\d+ )?to (?:cart|bag|basket)/i;
 const CART_NAV = /\b(cart|bag|basket|checkout)\b/i;
+/** Controls that look like a product: a price in the label, or the word product. */
+const PRODUCT = /\d[\d\s.,]*\s?(?:FCFA|XAF|USD|EUR|GBP|[$€£])|[$€£]\s?\d|\bproduct\b/i;
 const NAV_ONLY = /^(back|go back|close|home|menu|settings|about)\b/i;
 
 class Fail extends Error {}
@@ -124,7 +126,7 @@ async function searchFlow(s: Session, invalid: boolean): Promise<FlowRun> {
 
 async function addToCart(s: Session, invalid: boolean): Promise<FlowRun | null> {
   const addIn = (t: string) => (elements(t).find((e) => ADD_BTN.test(e.name)) ? t : null);
-  if (!(await locate(s, addIn))) return null;
+  if (!(await locate(s, addIn, PRODUCT))) return null;
   const qty = fieldsOf(s.screen).find((f) => /qty|quantity/i.test(f.name));
   if (invalid) {
     if (!qty) return { status: "not_run", message: "No quantity field to give a bad value", steps: s.steps };
@@ -197,10 +199,10 @@ export async function runFlows(d: Driver, o: { flows?: FlowName[]; app?: string 
 
 export function renderFlows(r: FlowReport): string {
   const L = [`# Flow report: ${r.app}`, "", "| Flow | Valid input | Invalid input |", "| --- | --- | --- |"];
-  for (const f of r.flows) L.push(`| ${f.flow.replace("_", " ")} | ${f.status} | ${f.invalid.status === "not_run" ? "not run" : f.invalid.status} |`);
+  for (const f of r.flows) L.push(`| ${f.flow.replaceAll("_", " ")} | ${f.status} | ${f.invalid.status === "not_run" ? "not run" : f.invalid.status} |`);
   L.push("");
   for (const f of r.flows) {
-    L.push(`## ${f.flow.replace("_", " ")}`, "", `- Valid input: ${f.status}. ${f.message}.${f.step ? ` Failed at: ${f.step}.` : ""}`, `- Invalid input: ${f.invalid.status === "not_run" ? "not run" : f.invalid.status}. ${f.invalid.message}.${f.invalid.step ? ` Failed at: ${f.invalid.step}.` : ""}`, "");
+    L.push(`## ${f.flow.replaceAll("_", " ")}`, "", `- Valid input: ${f.status}. ${f.message}.${f.step ? ` Failed at: ${f.step}.` : ""}`, `- Invalid input: ${f.invalid.status === "not_run" ? "not run" : f.invalid.status}. ${f.invalid.message}.${f.invalid.step ? ` Failed at: ${f.invalid.step}.` : ""}`, "");
     if (f.status === "failed") L.push("Steps to reproduce:", "", ...f.steps.map((s, i) => `${i + 1}. ${describeStep(s)}`), "");
   }
   return L.join("\n");

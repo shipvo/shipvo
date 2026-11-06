@@ -9,10 +9,11 @@ function shop(bug: Bug = "none"): Driver {
   let at = "home"; let q = ""; let carted = false; let address = ""; const stack: string[] = [];
   const S = (): string => {
     switch (at) {
-      case "home": return `- heading "Tide & Tackle" [ref=e1]\n- searchbox "Search rods, lures, line…" [ref=e2]\n- button "Surface Popper 9 cm" [ref=e3]\n- button "Open cart" [ref=e4]${q ? `\n- text: Results for ${q}` : ""}`;
+      case "home": return `- heading "Tide & Tackle" [ref=e1]\n- searchbox "Search rods, lures, line…" [ref=e2]\n- button "Surface Popper 9 cm, 4 500 FCFA" [ref=e3]\n- button "Department Lures" [ref=e5]\n- button "Open cart" [ref=e4]${q ? `\n- text: Results for ${q}` : ""}`;
       case "product": return `- heading "Surface Popper 9 cm" [ref=e1]\n- button "Add 1 to cart" [ref=e2]\n- button "Back" [ref=e3]${carted && bug !== "add_noop" ? "\n- text: Added" : ""}`;
       case "cart": return carted ? `- heading "Cart" [ref=e1]\n- button "Choose delivery and pay" [ref=e2]\n- button "Back" [ref=e3]` : `- heading "Cart" [ref=e1]\n- text: Empty\n- button "Back" [ref=e3]`;
       case "pay": return `- heading "Delivery" [ref=e1]\n- textbox "Delivery address" [ref=e2]\n- button "Shop pickup" [ref=e3]\n- button "Place order" [ref=e4]\n- button "Back" [ref=e5]${address === "" ? "\n- text: Enter an address" : ""}`;
+      case "home2": return `- heading "Lures" [ref=e1]\n- button "Back" [ref=e2]`;
       default: return `- heading "Order TT-1001 placed" [ref=e1]\n- button "Back to shop" [ref=e2]`;
     }
   };
@@ -23,8 +24,9 @@ function shop(bug: Bug = "none"): Driver {
     async openUrl() { return view(); },
     async tap(ref) {
       const name = new RegExp(`- (?:button|searchbox) "([^"]+)" \\[ref=${ref}\\]`).exec(S())?.[1] ?? "?";
-      if (name === "Surface Popper 9 cm") go("product");
+      if (name.startsWith("Surface Popper")) go("product");
       else if (name === "Add 1 to cart") carted = true;
+      else if (name === "Department Lures") go("home2")
       else if (name === "Open cart") go("cart");
       else if (name === "Choose delivery and pay") go("pay");
       else if (name === "Back to shop") { at = "home"; stack.length = 0; }
