@@ -16,3 +16,6 @@ Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (on
 ## Screenshots for anything people see (required)
 
 Chromium is installed on this runner. Take screenshots with `node scripts/agents/shot.mjs <url|file.html> /tmp/agent/media/pr-shots/launch/<name>.png --size 390x844` (and `--size 1440x900`). Files saved there are uploaded before the PR opens; put them in the PR body as `![name](https://shipvo.dev/media/pr-shots/launch/<name>.png)`.
+
+
+Follow "Internal details stay private" in `CLAUDE.md`: never write hosting plans, vendor tiers, limits, quota numbers or costs in anything public.

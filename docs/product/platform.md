@@ -58,9 +58,9 @@ This section is set by the owner. The Head of Product plans from it and does not
 
 **Risks to watch:** Apple and Google rules on updates (stay on interpreted code and declared capabilities, and document compliance publicly); trust in AI-written code (the merge contract and test evidence are the answer, never hidden); and adoption (only real users prove anything).
 
-### Infrastructure: one Cloudflare account (owner, 6 Nov 2026)
+### Infrastructure (owner, 6 Nov 2026)
 
-Everything runs in one Cloudflare account. The Shipvo Runner starts as one shared Worker that executes app specs (no user code) on the Workers Free plan (100,000 requests a day); we move to Workers Paid ($5 a month) only when usage reaches the free limits, with an alert at 70%. User-written code (spec levels 2 and 3) never runs in the shared runner; it waits for Workers for Platforms with one script per person, and heavy jobs go to E2B. See `docs/design/app-spec.md` section 15.7.
+The Shipvo Runner is one shared runner that executes app specs and never runs user-written code; user code runs only in a separate isolated tier. Hosting plans, vendor tiers, limits, quotas and costs are internal and are never written in this repository or any public text (see "Internal details stay private" in `CLAUDE.md`).
 
 ### Shipvo for coding agents (owner, 6 Nov 2026)
 
