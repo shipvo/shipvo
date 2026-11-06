@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { existsSync, mkdtempSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -91,6 +91,27 @@ describe("shipvo doctor checks", () => {
     expect(nameOf(fail, "hermesBytecodeVersion (if present) is set").ok).toBe(false);
   });
 
+  describe("Hermes engine build", () => {
+    const setup = (engine?: string, installed?: string) => {
+      const seed = makeSeed();
+      const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed), ...(engine ? { hermesEngine: engine } : {}) }), seed);
+      if (installed) {
+        mkdirSync(join(cwd, "node_modules/hermes-compiler"), { recursive: true });
+        writeFileSync(join(cwd, "node_modules/hermes-compiler/package.json"), JSON.stringify({ version: installed }));
+      }
+      return runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response("ok")) as typeof fetch }).then((r) => r.find((c) => c.name === "Hermes engine build"));
+    };
+    it("passes on a match", async () => expect(await setup("250829098.0.10", "250829098.0.10")).toMatchObject({ ok: true, note: "250829098.0.10, matches hermesEngine" }));
+    it("fails on a mismatch and names both", async () => {
+      const c = await setup("250829098.0.10", "250829098.0.16");
+      expect(c?.ok).toBe(false);
+      expect(c?.fix).toContain("250829098.0.10");
+      expect(c?.fix).toContain("250829098.0.16");
+    });
+    it("reports the installed build when undeclared", async () => expect(await setup(undefined, "250829098.0.16")).toMatchObject({ ok: true, note: expect.stringContaining("not declared") }));
+    it("adds no row when nothing is declared or installed", async () => expect(await setup()).toBeUndefined());
+  });
+
   it("never prints seed or token values", async () => {
     const seed = makeSeed();
     const token = "shipvo-publish-token-value";
@@ -128,6 +149,17 @@ describe("shipvo doctor checks", () => {
     const r = await runDoctorChecks({ cwd, fetchFn: fetchFn as unknown as typeof fetch });
     expect(fetchFn).toHaveBeenCalled();
     expect(nameOf(r, "control plane reachable").ok).toBe(false);
+  });
+
+  it("notes telemetry_dropped_today from /health, and stays quiet for null or missing", async () => {
+    const seed = makeSeed();
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
+    const run = (body: unknown) => runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response(JSON.stringify(body))) as unknown as typeof fetch });
+    const withDrops = nameOf(await run({ ok: true, telemetry_dropped_today: 3 }), "control plane /health returns JSON");
+    expect(withDrops.ok).toBe(true);
+    expect(withDrops.note).toContain("telemetry_dropped_today: 3");
+    expect(nameOf(await run({ ok: true, telemetry_dropped_today: null }), "control plane /health returns JSON").note).toBeUndefined();
+    expect(nameOf(await run({ ok: true }), "control plane /health returns JSON").note).toBeUndefined();
   });
 
   it("fails control plane check on HTTP 503 and says so", async () => {
@@ -306,5 +338,53 @@ describe("shipvo doctor sim checks", () => {
     expect(await portFree(busy)).toBe(false);
     await new Promise((r) => srv.close(r));
     expect(await portFree(busy)).toBe(true);
+  });
+});
+
+describe("doctor --json", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+  it("gives a runnable next command for a busy port", async () => {
+    const { createServer } = await import("node:net");
+    const srv = createServer();
+    await new Promise<void>((r) => srv.listen(0, r));
+    const busy = (srv.address() as { port: number }).port;
+    const seed = makeSeed();
+    const simCwd = withConfig(JSON.stringify({ appId: "a", publicKey: makePub(seed) }), seed);
+    writeFileSync(join(simCwd, "package.json"), JSON.stringify({ scripts: { sim: "shipvo sim" } }));
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(process, "cwd").mockReturnValue(simCwd);
+    vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await expect(doctor(["--json", "--offline", "--port", String(busy)])).rejects.toThrow("exit");
+    await new Promise((r) => srv.close(r));
+    const cmds: string[] = JSON.parse(logs[0]!).next.map((n: { command: string }) => n.command);
+    expect(cmds).toContain(`shipvo doctor --json --port ${busy + 1}`);
+    expect(cmds.join("\n")).not.toContain("<n>");
+  });
+  it("prints one envelope with a fix in next and exits 1 on a failed check", async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(process, "cwd").mockReturnValue(mkdtempSync(join(tmpdir(), "doctor-json-")));
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await expect(doctor(["--json", "--offline"])).rejects.toThrow("exit");
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(logs).toHaveLength(1);
+    const doc = JSON.parse(logs[0]!);
+    expect(doc.ok).toBe(false);
+    expect(doc.code).toBe("checks_failed");
+    expect(doc.data.checks.some((c: { ok: boolean; fix: string }) => !c.ok && c.fix)).toBe(true);
+    expect(doc.next.length).toBeGreaterThanOrEqual(1);
+    expect(doc.next.length).toBeLessThanOrEqual(3);
+    expect(doc.next[0].command).toBe("shipvo init .");
+    vi.restoreAllMocks();
+  });
+  it("exits 2 with an envelope on bad usage", async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await expect(doctor(["--json", "extra"])).rejects.toThrow("exit");
+    expect(exit).toHaveBeenCalledWith(2);
+    expect(JSON.parse(logs[0]!).code).toBe("usage");
+    vi.restoreAllMocks();
   });
 });

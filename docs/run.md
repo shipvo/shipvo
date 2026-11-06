@@ -2,6 +2,10 @@
 
 For anyone who has made an app with `shipvo init` and wants to see it on a phone-shaped screen in seconds, without installing Android Studio, Xcode or Playwright. You will get a simulated Android or iPhone in a browser tab. Your AI assistant can drive the same phone while you watch.
 
+<video controls preload="metadata" playsinline tabindex="0" data-title="See your app on a phone in your browser with shipvo run" data-length="1 min 33 s" poster="/videos/run-your-app-on-a-phone.jpg" src="/media/videos/run-your-app-on-a-phone-e56797e1.mp4"><track kind="captions" src="/videos/run-your-app-on-a-phone.vtt" srclang="en" label="English">Your browser cannot play this video. Read the steps below.</video>
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Princess of my heart" by Zero-project (<a href="https://www.jamendo.com">Jamendo</a>, <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>). Source: <a href="https://www.jamendo.com/track/633200">https://www.jamendo.com/track/633200</a></details>
+
 ## Start here (no technical background needed)
 
 You need the app folder from [Build your first app](getting-started.md) and a terminal open in it. A terminal is a window where you type commands (see the [glossary](glossary.md)).

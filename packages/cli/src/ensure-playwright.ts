@@ -15,6 +15,13 @@ export interface EnsurePlaywrightDeps {
   log: (line: string) => void;
   /** True when `playwright` resolves from the app. Defaults to the same lookup order as `doctor`. */
   resolves?: (cwd: string) => boolean;
+  /** Keep stdout clean (for `--json`): the notice and the installer's output go to stderr. */
+  quiet?: boolean;
+}
+
+/** stdio for the installer: stderr for both streams when quiet, so stdout stays clean. */
+export function installerStdio(quiet: boolean): "inherit" | ["ignore", 2, 2] {
+  return quiet ? ["ignore", 2, 2] : "inherit";
 }
 
 const LOCKFILES: Array<[string, PackageManager]> = [
@@ -57,8 +64,9 @@ export function ensurePlaywright(deps: Partial<EnsurePlaywrightDeps> & { cwd: st
   const { cwd } = deps;
   const env = deps.env ?? process.env;
   const exists = deps.exists ?? existsSync;
-  const run = deps.run ?? ((cmd, args, dir) => { execFileSync(cmd, args, { cwd: dir, stdio: "inherit" }); });
-  const log = deps.log ?? ((line) => console.log(line));
+  const quiet = deps.quiet ?? false;
+  const run = deps.run ?? ((cmd, args, dir) => { execFileSync(cmd, args, { cwd: dir, stdio: installerStdio(quiet) }); });
+  const log = deps.log ?? ((line) => (quiet ? console.error(line) : console.log(line)));
   if ((deps.resolves ?? playwrightResolves)(cwd)) return;
 
   const { cmd, args } = installCommand(detectPackageManager(cwd, exists));

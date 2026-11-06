@@ -43,6 +43,66 @@ Not covered:
 - `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login does not work offline, so only the routes the smoke script uses are exercised.
 - This is not a production setup.
 
+## D1 Free plan limits
+
+On the Workers Free plan, D1 allows 5 million rows read and 100,000 rows written per day. Past a limit, D1 returns errors until 00:00 UTC ([D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/)). Each telemetry event writes a row plus index entries.
+
+When D1 refuses a telemetry write, Shipvo:
+
+- answers the phone `202` with `{"ok":true,"stored":false}`, never a 5xx;
+- adds one to the KV counter `telemetry_dropped/<app>/<yyyy-mm-dd>`;
+- for failure and healthy events, keeps KV counts per release (kept for one hour); auto-halt uses the larger of each KV count and the D1 count, so a halt still needs the failure ratio over the threshold;
+- reports the day's total (one KV key, `telemetry_dropped_total/<day>`) as `telemetry_dropped_today` in `GET /health` and in `shipvo doctor`.
+
+Release pointers come from KV, so updates keep flowing. Dropped events are not stored, and a dropped revert event does not send a revert alert, so dashboards undercount until the limit resets or you move to a paid plan.
+
+## Back up and upgrade
+
+This is for the Docker control plane above. All state (the local D1 database and KV data) is in one place: the Docker volume `control-plane-data`, mounted at `/data`. Compose prefixes the project name, so from `services/control-plane` the volume is called `control-plane_control-plane-data` (check with `docker volume ls`). The image holds no state, and `docker compose down -v` deletes the volume.
+
+`scripts/selfhost-upgrade-check.mjs` proves the data survived. `seed` registers an app, publishes a signed pointer and writes `{appId, pointer}` to `selfhost-upgrade-check.json` (change the path with `UPGRADE_CHECK_FILE`). `verify` reads that file and exits 1 unless the server still serves the same pointer. Both use `SHIPVO_LOCAL_DEV_KEY` like the smoke script.
+
+### Back up
+
+Stop the control plane first, so the files are not copied mid-write. Run these in `services/control-plane`:
+
+```bash
+docker compose stop
+mkdir -p backup
+docker run --rm -v control-plane_control-plane-data:/data:ro -v "$PWD/backup":/backup node:22-bookworm-slim \
+  tar czf /backup/control-plane-data.tgz -C /data .
+docker compose start
+```
+
+### Restore
+
+Into a new, empty volume (after `docker compose down -v`, or on another machine):
+
+```bash
+docker volume create control-plane_control-plane-data
+docker run --rm -v control-plane_control-plane-data:/data -v "$PWD/backup":/backup:ro node:22-bookworm-slim \
+  tar xzf /backup/control-plane-data.tgz -C /data
+docker compose up -d
+```
+
+### Upgrade
+
+The compose file builds the image from this repository (`build:`), so there is no image to pull. You upgrade by updating the checkout and rebuilding.
+
+1. Before you change anything, with the server running, record a pointer: `node ../../scripts/selfhost-upgrade-check.mjs seed http://localhost:8787`. Do this once per environment; skip it if you already have a `selfhost-upgrade-check.json` from the same server.
+2. Back up the volume (above).
+3. Note the version you run now: `git rev-parse HEAD`.
+4. Update the code: `git pull`.
+5. Rebuild and restart: `docker compose up --build -d`. On start the container applies any new files in `migrations/` to the existing database.
+6. Run `node ../../scripts/selfhost-upgrade-check.mjs verify http://localhost:8787`. It prints `PASS` and exits 0 when the earlier release is still served. If it exits 1, the message says what is missing; roll back.
+
+### Roll back
+
+1. `docker compose down` (no `-v`).
+2. Check out the version from step 3: `git checkout <commit>`.
+3. If the failed upgrade changed or lost data, restore the backup into an empty volume (see Restore). Run `docker compose down -v` first so the volume is empty.
+4. `docker compose up --build -d`, then run `verify` again.
+
 ## Point apps at it
 
 In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `controlPlane: "https://your-domain"`, and in `shipvo.json`: `kv: { namespaceId: "<POINTERS id>" }`. Publishing needs a Cloudflare API token with *Workers KV Storage: Edit* on the account (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), plus `SHIPVO_SIGNING_SEED`.
@@ -65,6 +125,19 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 ## Routes
 
 `GET /p/:app/:major/:band` pointer · `GET /b/:app/:file` bundle · `GET /w/:app/releases.json`, `GET /w/:app/:rel/*` web artifact · `GET /c/:app/content.json` live content · `POST /o/:app` orders · `POST /t` telemetry, `GET /t/:app` summary · `GET /app/:id/admin` admin · `GET /app/:id/api/describe`, `POST /app/:id/api/command` owner API (bearer `OWNER_TOKEN` or admin session).
+
+## Roles
+
+The control plane defines four roles. **Roles are not enforced yet.** Today the existing tokens and admin session decide access. A later change will tie roles to tokens and SSO.
+
+| Action | viewer | developer | release_manager | admin |
+|---|---|---|---|---|
+| `read_summary`, `read_audit` | yes | yes | yes | yes |
+| `publish` (lowest band) | no | yes | yes | yes |
+| `promote`, `approve_hold`, `rollback`, `halt` | no | no | yes | yes |
+| `manage_tokens`, `manage_app` | no | no | no | yes |
+
+Each role has everything the one before it has. Unknown roles and actions are denied. The table is in `services/control-plane/src/roles.ts`.
 
 ## Revert alerts (webhook)
 

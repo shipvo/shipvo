@@ -295,6 +295,34 @@ jobs:
           { echo; echo "### iOS interrupted download"; echo; RESUME_MARKS="$RUNNER_TEMP/resume-marks.json" node scripts/ios-e2e/analyze.mjs "$RUNNER_TEMP/server.log.jsonl" "$RUNNER_TEMP/marks.json" "" "" "$RUNNER_TEMP/resume-server.log" | tail -3; } | tee "$RUNNER_TEMP/resume.md"
           cat "$RUNNER_TEMP/resume.md" >> "$GITHUB_STEP_SUMMARY"; ! grep -q '| fail |' "$RUNNER_TEMP/resume.md"
 
+      - name: "First applied OTA, publish to healthy (release 6, #668)"
+        # Escalations #672 and #678. Times signing and writing the pointer (make-release.mjs, the same wire format as
+        # `shipvo publish --platform ios`), then a fresh install's download, apply and healthy, and runs
+        # scripts/first-run/apply-ios.mjs on the marks. Skipped until that script is on main (PR #673).
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          [ -f scripts/first-run/apply-ios.mjs ] || { echo "scripts/first-run/apply-ios.mjs is not on this ref yet; skipping"; exit 0; }
+          APP=$(ls -d apps/tide-and-tackle/ios/build/Build/Products/Release-iphonesimulator/*.app | head -1)
+          HBC=$(ls apps/tide-and-tackle/dist-e2e/_expo/static/js/ios/*.hbc | head -1)
+          SEED=$(node -p "require(process.env.RUNNER_TEMP + '/key.json').seed")
+          ms() { python3 -c 'import time; print(int(time.time()*1000))'; }
+          xcrun simctl terminate "$UDID" "$BID" 2>/dev/null || true
+          xcrun simctl uninstall "$UDID" "$BID"; xcrun simctl install "$UDID" "$APP"
+          : > "$RUNNER_TEMP/server.log"
+          PS=$(ms); node scripts/ios-e2e/make-release.mjs "$RUNNER_TEMP/cp" e2e "$SEED" 6 "$HBC"; PD=$(ms)
+          T0=$(ms); xcrun simctl launch "$UDID" "$BID" > /dev/null
+          H=""
+          for i in $(seq 1 480); do
+            if grep -q '^POST /t .*"release":6' "$RUNNER_TEMP/server.log"; then H=$(ms); break; fi
+            sleep 0.25
+          done
+          [ -n "$H" ] || { echo "app did not report release 6 within 120 s"; exit 1; }
+          echo "{\"publish_start\": $PS, \"publish_done\": $PD, \"app_launched\": $T0, \"healthy\": $H}" > "$RUNNER_TEMP/first-run-marks.json"
+          cat "$RUNNER_TEMP/first-run-marks.json"
+          node scripts/first-run/apply-ios.mjs --server-log "$RUNNER_TEMP/server.log.jsonl" --marks "$RUNNER_TEMP/first-run-marks.json" --out "$RUNNER_TEMP/apply-ios.json"
+          { echo; echo "### iOS first applied OTA (apply-ios.mjs)"; echo; echo '```'; cat "$RUNNER_TEMP/apply-ios.json"; echo '```'; echo "Publish is make-release.mjs (sign and write the pointer). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -307,6 +335,8 @@ jobs:
             ${{ runner.temp }}/hermes-marks.json
             ${{ runner.temp }}/crash-marks.json
             ${{ runner.temp }}/resume-marks.json
+            ${{ runner.temp }}/first-run-marks.json
+            ${{ runner.temp }}/apply-ios.json
             ${{ runner.temp }}/*-server.log
             ${{ runner.temp }}/hermes.md
             ${{ runner.temp }}/crash.md

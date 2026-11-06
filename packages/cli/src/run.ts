@@ -13,6 +13,7 @@ import { AGENT_PATH, hostAllowed, isAgentRole, isLoopback, originAllowed, tokenM
 import { bridgeScript } from "./run-bridge.js";
 import { acceptWebSocket, type Peer } from "./run-ws.js";
 import { qrMatrix, qrToTerminal } from "./qr.js";
+import { spawnBin } from "./spawn-bin.js";
 import { portFree, rebuildInto } from "./sim.js";
 
 export type Platform = "android" | "ios";
@@ -251,7 +252,8 @@ export async function run(argv: string[]): Promise<number> {
   if (o.native) {
     const { cmd, args } = nativeCommand(o.platform);
     console.error(`Running natively: ${cmd} ${args.join(" ")} (not the simulated device)`);
-    return spawnSync(cmd, args, { stdio: "inherit" }).status ?? 1;
+    const call = spawnBin(cmd, args);
+    return spawnSync(call.command, call.args, { stdio: "inherit", shell: call.shell }).status ?? 1;
   }
   let name: string;
   try { name = loadConfig().name; } catch (e) { console.error((e as Error).message); return 1; }
