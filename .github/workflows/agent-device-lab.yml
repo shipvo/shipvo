@@ -45,7 +45,7 @@ jobs:
         if: steps.chk.outputs.ok == 'true'
         run: |
           pnpm install --frozen-lockfile && pnpm --filter @shipvo/schema build
-          git config user.name "Shipvo Agent (Claude)"; git config user.email "agents@shipvo.dev"
+          git config user.name "Anye Happiness Ade"; git config user.email "hans@pipilot.dev"
           git checkout -b "$BRANCH"; mkdir -p /tmp/agent; git rev-parse HEAD > /tmp/agent/start_sha
           T=$(date -u +%Y-%m-%d)
           sed -e "s#{{BRANCH}}#$BRANCH#g" -e "s#{{TODAY}}#$T#g" .github/agents/prompts/device-lab.md > /tmp/agent/prompt.md
