@@ -6,7 +6,7 @@ export type ProjectKind = "shipvo" | "expo" | "react-native" | "capacitor" | "un
 
 export const BEGIN = "<!-- shipvo:begin -->";
 export const END = "<!-- shipvo:end -->";
-export const SKILL_LINE = "npx skills add shipvo/shipvo";
+export const SKILL_LINE = "npx skills add shipvo/shipvo --skill shipvo -g";
 
 /** What kind of app lives in `dir`. A shipvo.json wins; then Capacitor, Expo, bare React Native. */
 export function detectProject(dir: string): ProjectKind {
@@ -40,10 +40,11 @@ export function agentsSection(kind: ProjectKind): string {
   ].join("\n");
 }
 
-/** Put `section` between the markers. Text outside the markers is never changed. */
-export function upsertSection(text: string, section: string): string {
+/** Put `section` between the markers. Text outside the markers is never changed. Returns null when the markers are broken (one missing, or END before BEGIN). */
+export function upsertSection(text: string, section: string): string | null {
   const b = text.indexOf(BEGIN);
-  const e = b === -1 ? -1 : text.indexOf(END, b);
+  const e = text.indexOf(END);
+  if ((b === -1) !== (e === -1) || (b !== -1 && e < b)) return null;
   if (b !== -1 && e !== -1) return text.slice(0, b) + section + text.slice(e + END.length);
   if (!text.trim()) return section + "\n";
   return text.replace(/\n*$/, "\n\n") + section + "\n";
@@ -84,7 +85,7 @@ export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<nu
   };
   const read = (f: string) => existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : null;
 
-  plan("AGENTS.md", upsertSection(read("AGENTS.md") ?? "", agentsSection(kind)));
+  plan("AGENTS.md", upsertSection(read("AGENTS.md") ?? "", agentsSection(kind)), "AGENTS.md has a broken shipvo marker; fix it and run again.");
   const targets = [".mcp.json", ...(existsSync(join(dir, ".cursor")) ? [".cursor/mcp.json"] : [])];
   for (const f of targets) {
     const merged = mergeMcp(read(f));

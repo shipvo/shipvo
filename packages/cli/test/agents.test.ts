@@ -60,6 +60,16 @@ describe(".mcp.json", () => {
     expect(readFileSync(join(d, ".mcp.json"), "utf8")).toBe("{nope");
     expect(existsSync(join(d, "AGENTS.md"))).toBe(false);
   });
+  it("leaves AGENTS.md alone and exits 2 when a marker is orphaned", async () => {
+    quiet();
+    for (const text of [`mine\n${BEGIN}\nold\nnotes\n`, `mine\n${END}\n${BEGIN}\n`, `${END}\nmine\n`]) {
+      const d = tmp(); writeFileSync(join(d, "AGENTS.md"), text);
+      expect(upsertSection(text, "x")).toBeNull();
+      expect(await agentsCmd(["setup"], d)).toBe(2);
+      expect(readFileSync(join(d, "AGENTS.md"), "utf8")).toBe(text);
+      expect(existsSync(join(d, ".mcp.json"))).toBe(false);
+    }
+  });
   it("writes .cursor/mcp.json only when .cursor exists", async () => {
     quiet(); const d = tmp();
     await agentsCmd(["setup"], d);
