@@ -30,3 +30,13 @@ test("--help and --dry-run need no Simulator", () => {
   assert.equal(JSON.parse(out[1]).dryRun, true);
   assert.equal(main([], io), 2);
 });
+test("eventsFrom throws when app_launched is missing", () => {
+  assert.throws(() => eventsFrom([{ t: 1, path: "/b/x" }], { publish_start: 1, healthy: 2 }), /missing mark app_launched/);
+});
+test("flags without a value exit 2", () => {
+  const err = [];
+  const io = { out: () => {}, err: (s) => err.push(s) };
+  assert.equal(main(["--server-log", "a", "--marks", "b", "--out"], io), 2);
+  assert.equal(main(["--server-log", "--marks", "b"], io), 2);
+  assert.match(err.join("\n"), /missing value for --out/);
+});

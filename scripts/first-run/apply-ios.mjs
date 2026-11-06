@@ -14,6 +14,7 @@
 //   healthyMs  = healthy - publish_done           (published to healthy on the Simulator)
 //   totalMs    = healthy - publish_start
 // A marker that is missing makes the numbers that need it null, never 0. Markers out of order throw.
+// This slice only reads marks and the server log. It does not publish, serve or launch the Simulator; a workflow does.
 // Not timed: store builds, installing the app on the Simulator before launch, reading docs, `npm install`.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -49,7 +50,8 @@ export function summarise(events) {
 export function eventsFrom(entries, marks) {
   const ev = [];
   for (const k of ["publish_start", "publish_done", "healthy"]) if (typeof marks[k] === "number") ev.push({ name: k, t: marks[k] });
-  const reqs = entries.filter((e) => typeof marks.app_launched === "number" && e.t >= marks.app_launched && e.t <= (marks.healthy ?? Infinity) && e.path.startsWith("/b/")).sort((a, b) => a.t - b.t);
+  if (typeof marks.app_launched !== "number") throw new Error("missing mark app_launched");
+  const reqs = entries.filter((e) => e.t >= marks.app_launched && e.t <= (marks.healthy ?? Infinity) && e.path.startsWith("/b/")).sort((a, b) => a.t - b.t);
   if (reqs.length) ev.push({ name: "download_start", t: reqs[0].t }, { name: "download_done", t: reqs[reqs.length - 1].t });
   return ev;
 }
@@ -60,18 +62,26 @@ Prints {publishMs, downloadMs, applyMs, healthyMs, totalMs}. A value is null whe
 Timed: publish, download, apply, healthy on the iOS Simulator. Not timed: store builds, Simulator install, reading docs, npm install.`;
 
 export function main(argv, io = { out: console.log, err: console.error }) {
-  const opt = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
+  const bad = [];
+  const opt = (n) => {
+    const i = argv.indexOf(n);
+    if (i < 0) return undefined;
+    const v = argv[i + 1];
+    if (v === undefined || v.startsWith("--")) { bad.push(n); return undefined; }
+    return v;
+  };
   if (argv.includes("--help") || argv.includes("-h")) { io.out(HELP); return 0; }
   if (argv.includes("--dry-run")) {
     io.out(JSON.stringify({ dryRun: true, steps: ["scaffold with measure.mjs", "shipvo publish", "serve with scripts/ios-e2e/server.mjs", "launch on the iOS Simulator", "read marks and server log"], markers: ORDER }, null, 2));
     return 0;
   }
   const [logFile, marksFile] = [opt("--server-log"), opt("--marks")];
-  if (!logFile || !marksFile) { io.err(HELP); return 2; }
+  const outFile = opt("--out");
+  if (bad.length || !logFile || !marksFile) { if (bad.length) io.err(`missing value for ${bad.join(", ")}`); io.err(HELP); return 2; }
   try {
     const result = summarise(eventsFrom(parseLog(readFileSync(logFile, "utf8")), JSON.parse(readFileSync(marksFile, "utf8"))));
     const json = JSON.stringify(result);
-    if (opt("--out")) writeFileSync(opt("--out"), json + "\n");
+    if (outFile) writeFileSync(outFile, json + "\n");
     io.out(json);
     return 0;
   } catch (e) { io.err(String(e.message ?? e)); return 1; }
