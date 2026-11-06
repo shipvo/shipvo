@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { createPublicKey, verify } from "node:crypto";
 import { b64, keyFromSeed } from "../../packages/cli/dist/index.js";
-import { buildPointer, median, parseLog, telemetry, pctChange, sha256, FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion } from "./lib.mjs";
+import { buildPointer, median, parseLog, telemetry, pctChange, sha256, FULL_BUNDLE_SCENARIO, firstRunFrom, hermesVersionOf, otherHermesVersion, refusalReason, withHermesVersion, releaseReached } from "./lib.mjs";
 
 const seed = b64(randomBytes(32)), pub = b64(keyFromSeed(seed).publicKey);
 const bytes = new Uint8Array(randomBytes(500));
@@ -72,4 +72,11 @@ test("buildPointer signs hermes_bytecode_version into the body only when given",
   const base = { app: "tide", seed: Buffer.alloc(32, 1).toString("base64"), release: 1, band: "b0", bytes: new Uint8Array(3), url: "u" };
   assert.equal(JSON.parse(buildPointer({ ...base, hermesBytecodeVersion: 98 }).body).hermes_bytecode_version, 98);
   assert.equal("hermes_bytecode_version" in JSON.parse(buildPointer(base).body), false);
+});
+
+test("releaseReached stops waiting when the stage was too short to see", () => {
+  assert.equal(releaseReached({ pending_release: 5 }, 5), "pending");
+  assert.equal(releaseReached({ pending_release: 0, current_release: 5 }, 5), "current");
+  assert.equal(releaseReached({ current_release: 4 }, 5), null);
+  assert.equal(releaseReached({}, 5), null);
 });
