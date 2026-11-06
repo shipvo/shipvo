@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: new read-only tool `audit_log` (`app`, `limit`, `action`) returns the release audit log newest first, with typed `unauthorized` and `not_found` errors.
+- Migration: none; new tool.

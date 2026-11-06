@@ -4,7 +4,7 @@
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
 // Tools: list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
-//        owner_describe, owner_command (the app's live content, prices, orders: owner token required).
+//        owner_describe, owner_command, audit_log (the app's live content, prices, orders: owner token required).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -248,6 +248,7 @@ server.tool("set_device", "Change what the simulated phone has: location, the ad
   biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
   payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),
+  wifi: z.boolean().optional(), mobileData: z.boolean().optional(), airplane: z.boolean().optional(), locationServices: z.boolean().optional(), darkMode: z.boolean().optional().describe("The app's colour scheme (prefers-color-scheme)"), dnd: z.boolean().optional().describe("Do Not Disturb: notifications go to the shade without a banner"), autoRotate: z.boolean().optional(), flashlight: z.boolean().optional(), orientationLock: z.boolean().optional(), brightness: z.number().min(0).max(100).optional(),
   source: z.enum(["auto", "simulated"]).optional().describe("\"simulated\" forces the simulated camera, microphone and location even when a person could grant the real ones, for reproducible runs"),
   microphone: z.object({ level: z.number().min(0).max(1).optional() }).optional(),
 }, WR, async ({ session, ...device }) => { need(session); const r = await act({ session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
@@ -270,6 +271,28 @@ server.tool("unlock", "Swipe up on the lock screen. Returns to the same screen a
   async ({ session }) => { need(session); return result(session, await act({ session, action: "unlock" })); });
 server.tool("restart", "Restart the simulated phone from the power menu: a boot screen, then the app starts fresh (cold start). Storage is kept. Returns the first screen. Logged in device_log as simulated.", { session: sid }, WR,
   async ({ session }) => { need(session); return result(session, await act({ session, action: "restart" })); });
+server.tool("open_notifications", "Pull down from the top. Android: the first call opens the notification shade (a few quick-settings tiles and the notifications); a second call expands all tiles. iPhone: opens Notification Center (grouped by app). Returns the tiles and notifications.", { session: sid, expand: z.boolean().optional().describe("Android: go straight to all tiles") }, WR,
+  async ({ session, expand }) => { need(session); return result(session, await act({ session, action: "open_notifications", expand })); });
+server.tool("open_control_center", "iPhone only: swipe down from the top right to open Control Center (airplane, Wi-Fi, mobile data, focus, orientation lock, brightness, dark mode). Android fails with no_control_center: use open_notifications.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "open_control_center" })); });
+server.tool("toggle_tile", "Flip a quick-settings tile in the open shade or Control Center. It changes the simulated device like set_device: Wi-Fi and mobile data both off take the network offline, dark_mode changes the app's colour scheme, dnd stops banners. Tiles: wifi, mobile_data, airplane, location, dark_mode, dnd, auto_rotate, flashlight (Android); airplane, wifi, mobile_data, focus, orientation_lock, brightness, dark_mode (iPhone). Fails with tile_not_visible if the panel is closed.", { session: sid, tile: z.string(), value: z.union([z.boolean(), z.number()]).optional().describe("true or false; 0 to 100 for brightness. Omit to flip.") }, WR,
+  async ({ session, tile, value }) => { need(session); return result(session, await act({ session, action: "toggle_tile", tile, value })); });
+server.tool("get_settings", "Read the phone's system settings from the Settings screen: dark_mode, font_size (small, default, large, largest), bold_text, reduce_motion, language (en, fr, ar) and rtl. Returns each setting and the screen as rows.", { session: sid }, RO,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "get_settings" })); });
+server.tool("set_setting", "Change one system setting, as a person would in the phone's Settings screen. The app sees it through Appearance (dark_mode), PixelRatio.getFontScale (font_size), AccessibilityInfo (bold_text, reduce_motion), I18nManager (rtl) and Intl (language). Setting language to ar turns rtl on; en and fr turn it off. Fails with unknown_setting for a key that does not exist and bad_value for a value it does not take. Logged in device_log as simulated.", { session: sid, key: z.string().describe("dark_mode, font_size, bold_text, reduce_motion, language or rtl"), value: z.union([z.boolean(), z.string()]).describe("true or false for switches; small, default, large or largest for font_size; en, fr or ar for language") }, WR,
+  async ({ session, key, value }) => { need(session); return result(session, await act({ session, action: "set_setting", key, value })); });
+server.tool("dismiss_notification", "Swipe a notification away in the open shade (newest if no id), or Clear all with all: true.", { session: sid, id: z.string().optional(), all: z.boolean().optional() }, WR,
+  async ({ session, id, all }) => { need(session); return result(session, await act({ session, action: "dismiss_notification", id, all })); });
+server.tool("close_panels", "Close the notification shade, Notification Center or Control Center (swipe up).", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "close_panels" })); });
+server.tool("press_home", "Press Home: the app goes to the background (it receives AppState \"background\") and the phone shows the home screen with the app icon. While there, tap, type, scroll and back fail with app_not_foreground. Call resume_app to bring the app back (AppState \"active\"). Logged as simulated.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "press_home" })); });
+server.tool("open_recents", "Open the app switcher: the app goes to the background and its card is shown. resume_app opens the card again; kill_app swipes it away.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "open_recents" })); });
+server.tool("resume_app", "Tap the app icon on the home screen, or its card in the app switcher: the app comes back (AppState \"active\") with its screen kept. Fails with app_in_foreground if it is already in front.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "resume_app" })); });
+server.tool("kill_app", "Swipe the app's card away in the app switcher (call open_recents first). The app is killed: the next resume_app is a cold start, with storage kept. Fails with recents_not_open otherwise.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "kill_app" })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
@@ -355,8 +378,11 @@ server.tool("record_start", "Start recording the phone frame to an MP4 under .sh
 server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
 });
-server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters.", {}, WR, async () => {
-  try { const r = await recorder.stop(); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
+server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters. With music: true, mixes a ducked music bed under the video and writes a credits JSON next to it (credit the track where you publish).", {
+  music: z.boolean().optional().describe("Mix a music bed under the video (default false). Needs python3, ffmpeg and ffprobe; picks a track from Jamendo unless SHIPVO_MUSIC_FILE is set."),
+  narration: z.string().optional().describe("Path to a wav with a voice track. It is mixed over the video, trimmed to the video length (the result says so), and ducks the music when music is true."),
+}, WR, async ({ music, narration }) => {
+  try { const r = await recorder.stop({ music, narration }); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 
 // Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.
@@ -392,6 +418,35 @@ server.tool("owner_command", "Run an owner command against the live app (changes
     if (!token) throw new Error("owner commands are not enabled on this server.");
     const r = await fetch(`${CONTROL}/app/${app}/api/command`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...agentRules() }, body: JSON.stringify({ name: command, args: { ...Object.fromEntries(Object.entries(args ?? {}).filter(([k]) => k !== "confirm")), ...(confirm === true ? { confirm: true } : {}) } }) });
     return text(await r.text());
+  });
+
+// Read-only: the app's audit log from the control plane (the endpoint `shipvo audit` pages through), newest first.
+const AUDIT_PAGE = 200, AUDIT_MAX_PAGES = 10;
+server.tool("audit_log", "Read the app's release audit log, newest first: who (actor) did what (action) to which release (subject) and when (at). Read-only. Needs an owner token.", { app: z.string(), limit: z.number().int().optional().describe("Rows to return (default 50, max 200; values outside are clamped)"), action: z.string().optional().describe("Only rows with this action, for example rollback") }, RO,
+  async ({ app, limit, action }) => {
+    const fail = (code: string, error: string) => ({ ...text(`Error [${code}]: ${error}`), isError: true as const, structuredContent: { ok: false, code, error } });
+    if (ctx.scope && ctx.scope !== "owner") return fail("unauthorized", `this key has scope "${ctx.scope}": the audit log needs an owner key`);
+    if (keyApps && !keyApps.includes(app)) return fail("unauthorized", `this key is for: ${keyApps.join(", ")}`);
+    const token = ctx.ownerToken || OWNER_TOKEN;
+    if (!token) return fail("unauthorized", "the audit log is not enabled on this server (no owner token).");
+    const want = Math.min(200, Math.max(1, Math.trunc(limit ?? 50)));
+    const rows: Array<{ actor: unknown; action: unknown; subject: unknown; at: unknown }> = [];
+    let before: number | undefined;
+    for (let page = 0; page < AUDIT_MAX_PAGES && rows.length < want; page++) {
+      const url = `${CONTROL}/audit/${encodeURIComponent(app)}?limit=${action ? AUDIT_PAGE : want}${before !== undefined ? `&before=${before}` : ""}`;
+      let r: Response;
+      try { r = await fetch(url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(simTimeoutMs()) }); }
+      catch { return fail("unreachable", "could not reach the control plane."); }
+      if (r.status === 401 || r.status === 403) return fail("unauthorized", "the token was not accepted for this app.");
+      if (r.status === 404) return fail("not_found", `no app "${app}".`);
+      if (!r.ok) return fail("audit_failed", `the control plane answered HTTP ${r.status}.`);
+      const got = ((await r.json()) as { rows?: Array<Record<string, unknown> & { id: number }> }).rows ?? [];
+      for (const g of got) if (!action || g.action === action) rows.push({ actor: g.actor, action: g.action, subject: g.release ?? g.release_id ?? null, at: g.at });
+      if (got.length < (action ? AUDIT_PAGE : want)) break;
+      before = got[got.length - 1].id;
+    }
+    const out = rows.slice(0, want);
+    return { ...text(JSON.stringify(out, null, 2)), structuredContent: { app, rows: out } };
   });
 
 return server;

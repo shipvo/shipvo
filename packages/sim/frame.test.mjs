@@ -125,3 +125,14 @@ test("the client script picks light status text for a dark app background", () =
   c.setColor("rgb(255, 255, 255)"); c.timers[0]();
   assert.equal(c.attrs["data-theme"], "light");
 });
+
+test("the frame draws home screen, recents and (Android only) 3-button navigation", async () => {
+  const { renderFrame, statusClientScript } = await import("./frame.mjs");
+  for (const skin of ["android", "ios"]) {
+    const { html } = renderFrame({ skin });
+    for (const p of ["home-screen", "app-icon", "recents", "recents-card", "edge-swipe"]) assert.ok(html.includes(`data-part="${p}"`), `${skin} ${p}`);
+    assert.equal(html.includes('data-part="nav-buttons"'), skin === "android");
+    assert.equal(html.includes('data-part="nav-style-toggle"'), skin === "android");
+  }
+  assert.match(statusClientScript(), /classifySwipe/);
+});

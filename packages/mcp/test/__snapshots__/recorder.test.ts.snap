@@ -62,7 +62,17 @@ exports[`MCP tools > lists the three tools with their schemas 1`] = `
   {
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {},
+      "additionalProperties": false,
+      "properties": {
+        "music": {
+          "description": "Mix a music bed under the video (default false). Needs python3, ffmpeg and ffprobe; picks a track from Jamendo unless SHIPVO_MUSIC_FILE is set.",
+          "type": "boolean",
+        },
+        "narration": {
+          "description": "Path to a wav with a voice track. It is mixed over the video, trimmed to the video length (the result says so), and ducks the music when music is true.",
+          "type": "string",
+        },
+      },
       "type": "object",
     },
     "name": "record_stop",

@@ -135,8 +135,8 @@ function layout(page, body, headings, prev, next) {
   const learn = page.base === "learn";
   const link = (p) => `<a href="${url(p)}"${p === page ? ' aria-current="page"' : ""}>${esc(p.title)}</a>`;
   const groups = learn
-    ? [{ group: "Learn", html: '<a href="/learn/">All of Learn</a>' }, { group: "Tutorials", pages: tutorials }, { group: "Videos", html: `<a href="/learn/videos/">All videos</a>${videos.map((v) => `<a href="/learn/videos/#${v.id}">${esc(v.title)}</a>`).join("")}` }, { group: "Glossary", html: `<a href="/learn/glossary/">All terms</a>${glossaryTerms.map((g) => `<a href="/learn/glossary/#${g.id}">${esc(g.title)}</a>`).join("")}` }]
-    : NAV.map((g) => g.group === "Get started" ? { ...g, html: '<a href="/learn/">Learn: tutorials and videos</a>' } : g);
+    ? [{ group: "Learn", html: '<a href="/learn/">All of Learn</a><a href="/setup/">Set up with your agent</a>' }, { group: "Tutorials", pages: tutorials }, { group: "Videos", html: `<a href="/learn/videos/">All videos</a>${videos.map((v) => `<a href="/learn/videos/#${v.id}">${esc(v.title)}</a>`).join("")}` }, { group: "Glossary", html: `<a href="/learn/glossary/">All terms</a>${glossaryTerms.map((g) => `<a href="/learn/glossary/#${g.id}">${esc(g.title)}</a>`).join("")}` }]
+    : NAV.map((g) => g.group === "Get started" ? { ...g, html: '<a href="/learn/">Learn: tutorials and videos</a><a href="/setup/">Set up with your agent</a>' } : g);
   const side = groups.map((g) => `<div class="side-group"><div class="side-title">${esc(g.group)}</div>${(g.pages || []).map(link).join("")}${g.html || ""}</div>`).join("");
   const section = learn ? ["Learn", "/learn/", "learn"] : ["Docs", "/docs/overview/", "docs"];
   const toc = headings.filter((h) => h.depth === 2 || h.depth === 3).map((h) => `<a href="#${h.id}" class="d${h.depth}">${esc(h.text)}</a>`).join("");
@@ -212,6 +212,7 @@ writeFileSync(join(OUT, "index.json"), JSON.stringify(index));
 <div class="lgrid">${videos.map(videoCard).join("")}</div>
 <h2 id="glossary">Glossary</h2><p class="lsub">Stuck on a word? <a class="link" href="/learn/glossary/">Open the glossary</a> for plain-English meanings.</p>
 </div>
+<h2 id="setup">Set up with your agent</h2><p class="lsub">Let your coding agent do the setup. <a class="link" href="/setup/">Three ways to install Shipvo for it</a>.</p>
 <h2 id="next">Next: Docs</h2><p class="lsub">Ready for reference material? Go to the <a class="link" href="/docs/overview/">Docs</a>, or start with <a class="link" href="/docs/getting-started/">Build your first app</a>.</p>
 </div></section></main>${footTag()}<script type="module" src="/learn.js"></script></body></html>`);
 }
@@ -231,11 +232,12 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
     "pricing.html": [crumbs([["Home", "/"], ["Pricing", "/pricing/"]])],
     "apps.html": [crumbs([["Home", "/"], ["Apps", "/apps"]])],
     "brand.html": [crumbs([["Home", "/"], ["Brand", "/brand"]])],
+    "setup.html": [crumbs([["Home", "/"], ["Set up with your agent", "/setup/"]])],
   };
   s = s.replace(/<!--HEAD (.*?)-->/s, (_, attrs) => { const a = Object.fromEntries([...attrs.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]])); return headTag({ ...a, ld: PAGE_LD[f] || [] }); });
   s = s.replace(/<!--NAV ?(\w*)-->/, (_, k) => navTag(k)).replace("<!--FOOTER-->", footTag()).replace(/<main(?![^>]*\bid=)/, '<main id="main"');
   s = s.replace("<!--CORONA-->", corona({ logoHref: "/logo-256.png", id: "cor" }));
-  const dirPage = ["compare.html", "pricing.html"].includes(f);   // served as /compare/ and /pricing/
+  const dirPage = ["compare.html", "pricing.html", "setup.html"].includes(f);   // served as /compare/, /pricing/ and /setup/
   if (dirPage) { const d = join(PUB, f.replace(".html", "")); mkdirSync(d, { recursive: true }); writeFileSync(join(d, "index.html"), s); rmSync(join(PUB, f), { force: true }); }
   else writeFileSync(join(PUB, f), s);
 }
@@ -380,10 +382,10 @@ const answersBlock = `## Straight answers
 
 **Is it open source?** Yes, Apache-2.0: https://github.com/shipvo/shipvo`;
 const packagesBlock = `## Packages\n\n${pkgInfo.map((p) => `- [${p.name}](https://www.npmjs.com/package/${p.name}): ${p.description || ""}`.trimEnd()).join("\n")}`;
-writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${positioning} Shipvo is open source (Apache-2.0).\n\n${agentBlock}\n\n${howBlock}\n\n${answersBlock}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n${packagesBlock}\n\n## Product\n\n- [Learn](${SITE}/learn/): tutorials, videos and a glossary for people who are new to Shipvo\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Roadmap](${SITE}/roadmap/): what is in flight, what shipped and when, and what we are not doing\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
+writeFileSync(join(PUB, "llms.txt"), `# Shipvo\n\n> ${positioning} Shipvo is open source (Apache-2.0).\n\n${agentBlock}\n\n${howBlock}\n\n${answersBlock}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${groups.map((g) => `## ${g}\n\n${mdList(mdDocs.filter((p) => p.group === g))}`).join("\n\n")}\n\n${packagesBlock}\n\n## Product\n\n- [Learn](${SITE}/learn/): tutorials, videos and a glossary for people who are new to Shipvo\n- [Marketplace](${SITE}/apps): apps listed by their owners that any signed-in agent can open with open_app\n- [Brand](${SITE}/brand): logo, symbols, colours, type and usage rules, with a downloadable kit\n- [Changelog](${SITE}/changelog/): what shipped, dated\n- [Roadmap](${SITE}/roadmap/): what is in flight, what shipped and when, and what we are not doing\n- [Shipvo vs Expo](${SITE}/compare/): side-by-side comparison with Expo, and with Phone Harness, including where each is the better choice\n- [Pricing](${SITE}/pricing/): what Shipvo costs and how it compares with Expo (EAS) pricing\n- [Set up with your agent](${SITE}/setup/): the install lines for your coding agent, in one place\n- [install.sh](${SITE}/install.sh): the script behind the curl line; it checks Node 22 and runs \`npx -y @shipvo/cli agents setup\`\n${posts.map((p) => `- [${p.title}](${SITE}/blog/${p.slug}.md): ${p.summary}`).join("\n")}\n- [All docs in one file](${SITE}/llms-full.txt): the complete documentation as Markdown\n\n## Optional\n\n${legalLinks}\n`);
 writeFileSync(join(PUB, "llms-full.txt"), `# Shipvo: full documentation\n\n> ${FACTS.split("\n")[0]}\n\n${FACTS.split("\n").slice(2).join("\n")}\n\n${mdDocs.map((p) => `---\n\n# ${p.title}\n\nSource: ${SITE}${url(p)}\n\n${p.md.replace(/^(#{1,6}) /gm, (m, h) => "#".repeat(Math.min(6, h.length + 1)) + " ")}\n`).join("\n")}`);
 writeFileSync(join(PUB, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /hq/\n\nSitemap: ${SITE}/sitemap.xml\n# For AI tools: ${SITE}/llms.txt and ${SITE}/llms-full.txt\n`);
-const staticPaths = [["/", "services/site/pages/index.html"], ["/apps", "services/site/pages/apps.html"], ["/brand", "services/site/pages/brand.html"], ["/changelog/", "CHANGELOG.md"], ["/roadmap/", "docs/ROADMAP.md"], ["/blog/", "blog"], ["/compare/", "services/site/pages/compare.html"], ["/pricing/", "services/site/pages/pricing.html"],
+const staticPaths = [["/", "services/site/pages/index.html"], ["/apps", "services/site/pages/apps.html"], ["/brand", "services/site/pages/brand.html"], ["/changelog/", "CHANGELOG.md"], ["/roadmap/", "docs/ROADMAP.md"], ["/blog/", "blog"], ["/compare/", "services/site/pages/compare.html"], ["/pricing/", "services/site/pages/pricing.html"], ["/setup/", "services/site/pages/setup.html"],
   ...posts.map((p) => [`/blog/${p.slug}/`, `blog/${p.slug}.md`]), ...all.map((p) => [url(p), p.src]), ["/learn/", "docs/tutorials/index.md"], ...LEGAL.map((l) => [`/${l.slug}/`, l.src])];
 writeFileSync(join(PUB, "sitemap-static.txt"), staticPaths.map(([path, src]) => `${path}\t${lastmod(src)}`).join("\n") + "\n");
 writeFileSync(join(PUB, "security.txt"), `Contact: mailto:hans@pipilot.dev\nExpires: ${new Date(Date.now() + 365 * 864e5).toISOString().replace(/\.\d+Z$/, "Z")}\nPreferred-Languages: en, fr\nCanonical: ${SITE}/.well-known/security.txt\nPolicy: ${SITE}/security/\n`);

@@ -16,7 +16,7 @@ export type PickedFile = { name: string; mimeType: string; size: number; uri: st
 /** Options for the file picker. `type` is a MIME filter such as `image/*` or `application/pdf` (or a list of them). Default: any file. */
 export type PickFileOptions = { type?: string | string[] };
 export type PermissionName = "camera" | "microphone" | "location" | "notifications" | "contacts" | "calendar";
-export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
+export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown>; /** When it arrived, in ms since 1970. Set by the simulated device. */ at?: number; /** The app that sent it. Set by the simulated device. */ app?: string };
 
 export type Capability = "camera" | "location" | "biometrics" | "payments" | "notifications" | "share" | "clipboard" | "network" | "microphone" | "contacts" | "calendar" | "files";
 export type MicrophoneSession = { source: "real" | "simulated"; stream?: unknown; /** Loudness, 0 to 1. Present for the simulated microphone, and for a real one when the browser has Web Audio. */ level?(): number; stop(): void };
