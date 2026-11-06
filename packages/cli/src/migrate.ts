@@ -1,17 +1,83 @@
 // `shipvo migrate --plan`: read-only plan for switching an Expo app from EAS Update (expo-updates) to Shipvo.
 // It reads package.json and the app config and prints steps. It writes nothing.
 // `--apply` makes the safe edits (backups first). See applyEdits.
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { detectProject } from "./adopt.js";
 import { CliFailure, runJson, UsageError, type Done } from "./json-out.js";
 
-export type Found = { kind: "dependency" | "plugin" | "config-key" | "package"; where: string; entry: string };
+export type Found = { kind: "dependency" | "plugin" | "config-key" | "package" | "wrapper" | "sync" | "deployment-key" | "public-key" | "command"; where: string; entry: string; file?: string; line?: number };
 export type MigratePlan = { system: "expo-updates" | "codepush" | null; found: Found[]; steps: string[] };
 
 const readJson = (p: string): any => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
 const DOC = "docs/migrate-from-eas-update.md";
+
+const SKIP_DIRS = new Set(["node_modules", ".git", "Pods", "build", "dist", "dist-ota", "dist-web", ".shipvo", ".gradle", "DerivedData", ".expo"]);
+const CODE_EXT = /\.(?:[cm]?[jt]sx?)$/;
+const CI_FILE = /(?:\.ya?ml|\.sh|Fastfile|Makefile)$/;
+
+function walk(dir: string, rel = "", depth = 0, out: string[] = []): string[] {
+  if (depth > 8 || out.length > 5000) return out;
+  let names: string[]; try { names = readdirSync(join(dir, rel)).sort(); } catch { return out; }
+  for (const n of names) {
+    if (SKIP_DIRS.has(n)) continue;
+    const r = rel ? `${rel}/${n}` : n;
+    let st; try { st = statSync(join(dir, r)); } catch { continue; }
+    if (st.isDirectory()) walk(dir, r, depth + 1, out);
+    else if (st.size < 1_000_000) out.push(r);
+  }
+  return out;
+}
+
+/** Finds CodePush entries with file and line. Reads only. */
+function scanCodePush(dir: string): Found[] {
+  const found: Found[] = [];
+  const add = (kind: Found["kind"], file: string, line: number, entry: string) => found.push({ kind, where: `${file}:${line}`, entry, file, line });
+  for (const file of walk(dir)) {
+    const base = file.split("/").pop()!;
+    const isPkg = file === "package.json";
+    const isCode = CODE_EXT.test(file);
+    const isNative = base === "Info.plist" || base === "strings.xml";
+    const isCi = CI_FILE.test(base) || base === ".gitlab-ci.yml";
+    if (!isPkg && !isCode && !isNative && !isCi) continue;
+    let lines: string[]; try { lines = readFileSync(join(dir, file), "utf8").split("\n"); } catch { continue; }
+    lines.forEach((text, i) => {
+      const n = i + 1; const t = text.trim();
+      if (isPkg) {
+        const d = /"((?:@revopush\/)?react-native-code-push)"\s*:\s*"([^"]*)"/.exec(text);
+        if (d) add("dependency", file, n, `${d[1]}@${d[2]}`);
+      }
+      if (isCode && !isPkg) {
+        if (/\bcodePush\s*\(/.test(text) && !/^\s*(\/\/|\*)/.test(text)) add("wrapper", file, n, t);
+        else if (/\bCodePush\.(sync|checkForUpdate|getUpdateMetadata|notifyAppReady|restartApp|allowRestart|disallowRestart)\b/.test(text) && !/^\s*(\/\/|\*)/.test(text)) add("sync", file, n, t);
+      }
+      if (isNative) {
+        if (/CodePushDeploymentKey/.test(text)) add("deployment-key", file, n, "CodePushDeploymentKey");
+        if (/CodePushPublicKey/.test(text)) add("public-key", file, n, "CodePushPublicKey");
+      }
+      if ((isPkg || isCi) && /appcenter\s+codepush/.test(text)) add("command", file, n, t.replace(/^"[^"]*":\s*/, "").replace(/,$/, "").replace(/^"|"$/g, ""));
+    });
+  }
+  return found;
+}
+
+function codePushSteps(found: Found[]): string[] {
+  const has = (k: Found["kind"]) => found.filter((f) => f.kind === k);
+  const at = (k: Found["kind"]) => [...new Set(has(k).map((f) => f.where))].join(", ");
+  const steps = ["Commit your work. Installed apps keep using CodePush until a new store build ships."];
+  if (has("wrapper").length || has("sync").length) steps.push(`Replace the codePush() wrapper and CodePush.sync calls (${[at("wrapper"), at("sync")].filter(Boolean).join(", ")}) with @shipvo/runtime: call Runtime.markHealthy() once the first screen renders and Runtime.checkForUpdate(true) to look for a release.`);
+  if (has("deployment-key").length || has("public-key").length) steps.push(`Remove the native keys (${[at("deployment-key"), at("public-key")].filter(Boolean).join(", ")}). Shipvo pins one control plane URL and one public key in the app config, not a per-environment deployment key.`);
+  steps.push("Remove react-native-code-push from package.json" + (has("dependency").length ? ` (${at("dependency")})` : "") + " and reinstall, so no build has two update mechanisms.");
+  steps.push("Add @shipvo/runtime and @shipvo/device, and @shipvo/cli as a dev dependency.");
+  steps.push("Create the Shipvo config: run shipvo init in a scratch folder and copy shipvo.json and the @shipvo/runtime plugin entry into your app config. Back up the signing seed (shipvo keys export); if you lose it, installed apps will not accept another update.");
+  if (has("command").length) steps.push(`Replace the appcenter codepush commands (${at("command")}) with shipvo publish, and appcenter codepush rollback with shipvo rollback --to <release>. --rollout <n> has no direct equivalent: Shipvo releases to cohort bands (--bands b0,b1,b2), then shipvo promote widens a release.`);
+  else steps.push("Publish with shipvo publish --bands b0, then shipvo promote. CodePush --rollout <n> has no direct equivalent: Shipvo uses cohort bands.");
+  steps.push("Run shipvo doctor and shipvo publish --dry-run.");
+  steps.push("Build and submit one new store build. Only this build uses Shipvo; older binaries keep using CodePush.");
+  steps.push("Run shipvo publish for the first Shipvo release once the new build is on devices.");
+  return steps;
+}
 
 /** Reads the app and builds the plan. Changes nothing. */
 export function buildPlan(dir: string): MigratePlan {
@@ -35,8 +101,8 @@ export function buildPlan(dir: string): MigratePlan {
   if (!system) return { system, found, steps: [] };
   const steps: string[] = [];
   if (system === "codepush") {
-    steps.push(`Follow docs/migrate-from-codepush.md. This command only plans an EAS Update switch.`);
-    return { system, found, steps };
+    const cp = [...found.filter((f) => !/react-native-code-push/.test(f.entry)), ...scanCodePush(dir)];
+    return { system, found: cp, steps: codePushSteps(cp) };
   }
   steps.push("Commit your work. Installed apps keep using EAS Update until a new store build ships, so do not stop publishing to EAS yet.");
   if (configNote) steps.push(`Open ${p.configFile} and look for the same entries by hand: the expo-updates plugin and the updates and runtimeVersion keys. This plan cannot read a code config.`);
@@ -141,7 +207,7 @@ export async function migrate(argv: string[], dir = process.cwd()): Promise<numb
       }
       return { code: "applied", summary: `Removed ${edits.reduce((n, e) => n + e.removed.length, 0)} entries from ${edits.length} file(s). Backups in ${BACKUP}.`, data: { changed: edits, backupDir: BACKUP, steps: rest }, next: [{ command: `${pm} install`, why: "Refresh the lockfile after removing expo-updates." }, { command: "shipvo init", why: "Add Shipvo. It is not run for you." }] };
     }
-    if (apply && plan.system === "codepush") throw new UsageError("--apply only supports EAS Update. For CodePush see docs/migrate-from-codepush.md.");
+    if (apply && plan.system === "codepush") throw new UsageError("--apply only supports EAS Update. For CodePush the apply step is manual: run shipvo migrate --plan and see docs/migrate-from-codepush.md.");
     if (!plan.system) {
       if (!json) console.log(apply ? "Nothing left to do: this app has no expo-updates or CodePush." : "Nothing to migrate: this app has no expo-updates or CodePush.");
       return { code: "nothing_to_migrate", summary: "Nothing to migrate: no expo-updates or CodePush found.", data: plan, next: [{ command: "shipvo init", why: "Add Shipvo to this app." }] };
@@ -151,13 +217,13 @@ export async function migrate(argv: string[], dir = process.cwd()): Promise<numb
       for (const f of plan.found) console.log(`  - ${f.where}: ${f.entry}`);
       console.log("\nSteps, in this order:");
       plan.steps.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
-      console.log(`\nNo files were changed. Details: ${DOC}`);
+      console.log(`\nNo files were changed. Details: ${plan.system === "codepush" ? "docs/migrate-from-codepush.md" : DOC}`);
     }
     return {
       code: "plan", summary: `${plan.found.length} entries found, ${plan.steps.length} steps. No files changed.`, data: plan,
       next: plan.system === "expo-updates"
         ? [{ command: `${buildPlanPm(dir)} remove expo-updates`, why: "Step 1 of the plan." }, { command: "shipvo init --dry-run", why: "Preview what init adds once expo-updates is gone." }]
-        : [{ command: "cat docs/migrate-from-codepush.md", why: "Follow the CodePush guide." }],
+        : [{ command: "shipvo init --dry-run", why: "Preview what init adds." }, { command: "cat docs/migrate-from-codepush.md", why: "Read the CodePush guide." }],
     };
   };
   if (json) { await runJson(run, [{ command: "shipvo help", why: "See the commands and flags." }]); return Number(process.exitCode ?? 0); }
