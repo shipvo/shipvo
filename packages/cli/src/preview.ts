@@ -1,6 +1,7 @@
 // `shipvo preview`: build the web artifact with the simulated device, wrap it in a phone-sized frame page
 // and publish it to here.now with no account. The link is public and lasts 24 hours unless claimed.
 import { spawn } from "node:child_process";
+import { spawnBin } from "./spawn-bin.js";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep, extname } from "node:path";
 import { args as parse, loadConfig } from "./config.js";
@@ -298,7 +299,8 @@ export async function publishToHereNow(files: PreviewFile[], o: PreviewOpts = {}
 function build(root: string, out: string): Promise<void> {
   rmSync(out, { recursive: true, force: true }); mkdirSync(join(root, ".shipvo"), { recursive: true });
   return new Promise((resolve, reject) => {
-    const p = spawn("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out], { cwd: root, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });
+    const sb = spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out]);
+    const p = spawn(sb.command, sb.args, { shell: sb.shell, cwd: root, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });
     p.on("error", reject);
     p.on("exit", (c) => (c === 0 ? resolve() : reject(new Error(`The web build failed (exit ${c}). Run \`npx expo export --platform web\` to see why.`))));
   });

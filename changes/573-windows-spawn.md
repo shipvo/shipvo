@@ -1,0 +1,2 @@
+- `@shipvo/cli`: new `spawnBin` helper starts `npx`, `pnpm`, `npm` and `node_modules/.bin` programs through their `.cmd` shim with quoted args on Windows. `shipvo preview` and `shipvo run --native` use it. Linux and macOS behaviour is unchanged. `shipvo sim` already runs its build command through a shell, so it needs no change.
+- Migration: none.
