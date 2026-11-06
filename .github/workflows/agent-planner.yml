@@ -14,6 +14,6 @@ jobs:
       role: planner
       mode: read
       model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
-      max_turns: 80
+      max_turns: 120
       timeout: 40
       vars: '{"MAX_BACKLOG": "${{ vars.AGENT_MAX_BACKLOG || 20 }}", "MAX_NEW": "${{ vars.AGENT_MAX_NEW_ISSUES || 4 }}"}'
