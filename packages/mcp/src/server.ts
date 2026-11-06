@@ -3,7 +3,7 @@
 //   PN_SIM=http://localhost:4545  PN_CONTROL=https://api.shipvo.dev  PN_OWNER_TOKEN=...  shipvo-mcp
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
-// Tools: list_store_apps, install_app, uninstall_app, switch_app (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
+// Tools: list_store_apps, install_app, uninstall_app, switch_app, share_to (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
 //        owner_describe, owner_command, audit_log (the app's live content, prices, orders: owner token required).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -59,19 +59,19 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
   }
 }
 // The marketplace list for the phone's Store: the control plane's public apps. PN_STORE_FIXTURE=1 uses a local list (tests, offline demos).
-type StoreApp = { id: string; name: string; url: string; version: string };
+type StoreApp = { id: string; name: string; url: string; version: string; schemes?: string[]; shares?: boolean };
 const STORE_FIXTURE: StoreApp[] = [
-  { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0" },
-  { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1" },
-  { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0" },
+  { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0", schemes: ["tide"] },
+  { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1", schemes: ["notes"], shares: true },
+  { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0", schemes: ["weather"] },
 ];
 async function storeApps(): Promise<{ ok: true; apps: StoreApp[]; fixture: boolean } | { ok: false; code: "store_unreachable"; error: string }> {
   if (process.env.PN_STORE_FIXTURE === "1") return { ok: true, apps: STORE_FIXTURE, fixture: true };
   try {
     const r = await fetch(`${CONTROL}/apps/public`, { signal: AbortSignal.timeout(simTimeoutMs()) });
     if (!r.ok) throw new Error(`status ${r.status}`);
-    const list = ((await r.json()) as { apps?: { app_id: string; name?: string; latest_release?: number }[] }).apps ?? [];
-    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, url: a.latest_release != null ? `app://${a.app_id}@r${a.latest_release}` : `app://${a.app_id}@latest`, version: a.latest_release != null ? `r${a.latest_release}` : "latest" })) };
+    const list = ((await r.json()) as { apps?: { app_id: string; name?: string; latest_release?: number; schemes?: string[]; shares?: boolean }[] }).apps ?? [];
+    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, url: a.latest_release != null ? `app://${a.app_id}@r${a.latest_release}` : `app://${a.app_id}@latest`, version: a.latest_release != null ? `r${a.latest_release}` : "latest", ...(Array.isArray(a.schemes) ? { schemes: a.schemes } : {}), ...(a.shares ? { shares: true } : {}) })) };
   } catch (e) { return { ok: false, code: "store_unreachable", error: `the marketplace at ${CONTROL} did not answer (${(e as Error).message}). Try again when the network is back.` }; }
 }
 const recorder = new Recorder();
@@ -280,7 +280,7 @@ server.tool("notifications", "The notification shade: notifications delivered to
   async ({ session }) => { need(session); const r = await act({ session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() }, WR,
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "open_notification", id })); });
-server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+server.tool("open_url", "Open a deep link (such as myapp://item/3), as a push tap, auth callback or share link would. When apps are installed on the phone, the app that declares the scheme comes to the front and gets the URL (Linking.getInitialURL and the url event); fails with no_handler if none does and invalid_url if the text is not a URL. With no installed apps the running app gets it and fails with no_url_listener if it does not listen for URLs. Logged in device_log as simulated.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   async ({ session, url }) => { need(session); return result(session, await act({ session, action: "open_url", url })); });
 server.tool("lock", "Press the power button: the simulated phone locks and shows the lock screen. The app and its screen are kept. While locked, tap, type, scroll and back fail with phone_locked. Logged in device_log as simulated.", { session: sid }, WR,
   async ({ session }) => { need(session); return result(session, await act({ session, action: "lock" })); });
@@ -321,6 +321,8 @@ server.tool("uninstall_app", "Remove an installed app from the phone. If it was 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "uninstall_app", id })); });
 server.tool("switch_app", "Open an installed app (tap its icon on the home screen): it becomes current_app and comes to the front. Fails with not_installed. Logged in device_log as simulated.", { session: sid, id: z.string().describe("Installed app id") }, WR,
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "switch_app", id })); });
+server.tool("share_to", "Pick a target on the open share sheet (the app called Share.share): the installed app app_id comes to the front and receives the message and url. Use app_id \"copy\" for Copy. Fails with no_share_sheet when no sheet is open, and not_share_target when the app is not on the sheet. Logged in device_log as simulated.", { session: sid, app_id: z.string().describe("Installed app id on the sheet, or \"copy\"") }, WR,
+  async ({ session, app_id }) => { need(session); return result(session, await act({ session, action: "share_to", app_id })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 

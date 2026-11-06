@@ -1,0 +1,3 @@
+- phone: installed apps can declare URL schemes (`schemes` in `phone.json` and Store entries). `open_url` and `openUrl` switch to the app that owns the scheme and deliver the URL; unknown schemes fail with `no_handler`, bad text with `invalid_url`. (#466)
+- phone: new MCP tool `share_to { app_id }` and a share sheet listing installed apps that accept shares plus Copy, in both skins. Errors: `no_share_sheet`, `not_share_target`. (#466)
+- device: added `getInitialUrl`, `onShared` and `device.share.share({ message, url })`. `device.share.text` takes an optional `url`. The fake WhatsApp and Messages rows are gone from the simulated sheet; the sheet lists installed apps. Migration: tests that tapped those rows should use `share_to` or tap an installed app. (#466)

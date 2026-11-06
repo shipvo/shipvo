@@ -21,7 +21,7 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
-import { AppsError, loadProfile, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
+import { AppsError, loadProfile, profilePatch, installApp, uninstallApp, switchApp, describeApps, openLink, shareToApp, shareTargets } from "./apps.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
@@ -125,6 +125,10 @@ async function newSession(id, opts = {}) {
   const ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
+  // Linking.openURL for another app's scheme, and the share sheet (see @shipvo/device). With no installed apps the page keeps the URL itself.
+  await ctx.exposeFunction("__pnOpenLink", (url) => openLinkInPhone(id, String(url)));
+  await ctx.exposeFunction("__pnShareTargets", () => shareTargets(sessions.get(id)?.apps ?? { installed_apps: [] }));
+  await ctx.exposeFunction("__pnShareTo", (target, content) => shareInPhone(id, String(target), content));
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
   const errors = [];
@@ -136,6 +140,26 @@ async function newSession(id, opts = {}) {
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
   sessions.set(id, { apps, ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
+}
+
+// A link opened on the phone. The app that owns the scheme comes to the front and gets the URL as its initial URL and as a "url" event.
+// Returns { local: true } when the phone has no installed apps (the page handles the URL itself), or { ok, code }.
+async function openLinkInPhone(id, url) {
+  const s = sessions.get(id); if (!s) return { ok: false, code: "no_session" };
+  if (!s.apps.installed_apps.length) return { local: true };
+  try { openLink(s.apps, url, s.nav); } catch (e) { if (e instanceof AppsError) return { ok: false, code: e.code, error: e.message }; throw e; }
+  await s.page.evaluate((u) => globalThis.__pnDevice?.deliverUrl?.(u), url.trim());
+  await s.page.evaluate(setVisibilityInPage, "active").catch(() => {});
+  return { ok: true, app: s.apps.current_app };
+}
+// A share picked in the sheet (by tap or by share_to): the target app comes to the front and receives the content.
+async function shareInPhone(id, target, content) {
+  const s = sessions.get(id); if (!s) return { ok: false, code: "no_session" };
+  const c = { message: String(content?.message ?? ""), ...(content?.url ? { url: String(content.url) } : {}) };
+  try { shareToApp(s.apps, target, c, s.nav); } catch (e) { if (e instanceof AppsError) return { ok: false, code: e.code, error: e.message }; throw e; }
+  await s.page.evaluate((x) => globalThis.__pnDevice?.deliverShare?.(x), c);
+  await s.page.evaluate(setVisibilityInPage, "active").catch(() => {});
+  return { ok: true };
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -199,9 +223,9 @@ async function act(id, body) {
     if (covered) throw fail("covered", String(body.ref));
   };
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification", "install_app", "uninstall_app", "switch_app", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification", "install_app", "uninstall_app", "switch_app", "share_to", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   // Home screen or app switcher showing: the app is in the background and takes no input.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (!(body.action === "open_url" && s.apps.installed_apps.length) && ["tap", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
   // An open panel covers the app on a phone, so input to the app is refused until it is closed.
   if (["tap", "type", "scroll"].includes(body.action) && s.shade.open !== "none") throw new SimError("panel_open", `a panel (${s.shade.open}) is open and covers the app, so nothing was sent to it. Close it first (close_panels).`);
   switch (body.action) {
@@ -297,9 +321,25 @@ async function act(id, body) {
     case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {
       if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
+      // Phone with installed apps: the app that owns the scheme opens. Errors are no_handler and invalid_url. http(s) opens the Browser as before.
+      if (s.apps.installed_apps.length && !/^https?:\/\//i.test(body.url.trim())) {
+        const r = await openLinkInPhone(body.session, body.url);
+        if (!r.ok) throw new SimError(r.code, r.error ?? r.code);
+        await page.waitForTimeout(300);
+        return { where: s.nav.where, current_app: s.apps.current_app, url: body.url.trim(), screen: await screen(page) };
+      }
       const handled = await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url);
       if (!handled) throw new SimError("no_url_listener", `the app has no URL listener, so it did not handle ${body.url}. Register one with onUrl from @shipvo/device.`);
       await page.waitForTimeout(400); break;
+    }
+    // Pick a target in the open share sheet. no_share_sheet when none is open; not_share_target when the app is not listed on it.
+    case "share_to": {
+      const id = String(body.app_id ?? "");
+      const r = await page.evaluate((x) => globalThis.__pnDevice?.shareTo?.(x), id);
+      if (r === "no_share_sheet" || r == null) throw new SimError("no_share_sheet", "no share sheet is open. The app has to call Share.share first.");
+      if (r === "no_target") throw new SimError("not_share_target", `'${id}' is not on the share sheet. Targets: ${shareTargets(s.apps).map((t) => t.id).join(", ") || "none"}, or copy`);
+      await page.waitForTimeout(400);
+      return { where: s.nav.where, current_app: s.apps.current_app, screen: await screen(page) };
     }
     // Stub fetch/XHR on the page. Rules live on the session; unmatched requests continue untouched.
     case "set_network_mocks": {
@@ -372,7 +412,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, install_app, uninstall_app, switch_app, share_to, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

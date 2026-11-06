@@ -72,3 +72,34 @@ test("the Store screen lists the fixture apps and a tap installs one, in both sk
     }
   } finally { await b.close(); }
 });
+
+test("a link opens the app that owns the scheme, which becomes current and records the URL", async () => {
+  const { openLink, loadProfile } = await import("./apps.mjs");
+  const st = loadProfile({ apps: [{ id: "a", name: "A", schemes: ["aaa"] }, { id: "b", name: "B", schemes: ["Bee://", "bee2"] }] });
+  const nav = { where: "home" };
+  const app = openLink(st, "bee://item/42", nav);
+  assert.equal(app.id, "b"); assert.equal(st.current_app, "b"); assert.equal(nav.where, "app");
+  assert.deepEqual(st.links, [{ app: "b", url: "bee://item/42" }]);
+  assert.deepEqual(st.log.at(-1), { ...st.log.at(-1), name: "open_url", app: "b", source: "simulated", url: "bee://item/42" });
+});
+
+test("an unknown scheme is no_handler and text without a scheme is invalid_url", async () => {
+  const { openLink, loadProfile } = await import("./apps.mjs");
+  const st = loadProfile({ apps: [{ id: "a", name: "A", schemes: ["aaa"] }] });
+  assert.throws(() => openLink(st, "nope://x"), { code: "no_handler" });
+  assert.throws(() => openLink(st, "just words"), { code: "invalid_url" });
+  assert.throws(() => openLink(st, ""), { code: "invalid_url" });
+  assert.throws(() => openLink(st, "https://example.com"), { code: "no_handler" });
+  assert.equal(st.current_app, null); assert.equal(st.links.length, 0);
+});
+
+test("only apps that accept shares are targets; a share brings the target to the front", async () => {
+  const { shareToApp, shareTargets, loadProfile } = await import("./apps.mjs");
+  const st = loadProfile({ apps: [{ id: "a", name: "A" }, { id: "n", name: "Notes", shares: true }] });
+  assert.deepEqual(shareTargets(st), [{ id: "n", name: "Notes" }]);
+  assert.throws(() => shareToApp(st, "a", { message: "hi" }), { code: "not_share_target" });
+  assert.throws(() => shareToApp(st, "zz", { message: "hi" }), { code: "not_installed" });
+  shareToApp(st, "n", { message: "hi", url: "https://x.test" });
+  assert.equal(st.current_app, "n"); assert.equal(st.shared[0].message, "hi");
+  assert.equal(st.log.at(-1).source, "simulated");
+});

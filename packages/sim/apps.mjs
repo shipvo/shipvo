@@ -3,22 +3,25 @@
 // functions (serialised into the page) to draw the home screen icons and the Store. Our own artwork: no vendor marks.
 import { SETTINGS, settingPatch } from "./settings.mjs";
 
-/** Typed error: unknown_app, already_installed, not_installed or bad_profile. */
+/** Typed error: unknown_app, already_installed, not_installed, bad_profile, no_handler, invalid_url or not_share_target. */
 export class AppsError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
 /** The apps the Store lists when there is no network or no marketplace. Used by tests and offline runs. */
 export const STORE_FIXTURE = [
-  { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0" },
-  { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1" },
-  { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0" },
+  { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0", schemes: ["tide"] },
+  { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1", schemes: ["notes"], shares: true },
+  { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0", schemes: ["weather"] },
 ];
 
 const text = (v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n);
-const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20) });
+const SCHEME = /^[a-z][a-z0-9+.-]{0,29}$/;
+/** URL schemes an app declares (lowercase, without "://"). Entries that are not valid schemes are dropped; http(s) belong to the Browser. */
+const schemesOf = (v) => (Array.isArray(v) ? v : []).map((x) => String(x ?? "").toLowerCase().replace(/:(\/\/)?$/, "")).filter((x) => SCHEME.test(x) && x !== "http" && x !== "https");
+const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), schemes: schemesOf(a.schemes), shares: a.shares === true });
 
 /** Phone state for apps. `installed_apps` is a list of { id, name, url, version }; `current_app` is an id or null (the app the phone was started with). */
 export function createApps(profile = {}) {
-  return { installed_apps: [], current_app: null, store: STORE_FIXTURE.map(entry), settings: {}, log: [], ...profile };
+  return { installed_apps: [], current_app: null, store: STORE_FIXTURE.map(entry), settings: {}, log: [], links: [], shared: [], ...profile };
 }
 
 /**
@@ -76,6 +79,34 @@ export function switchApp(st, id, nav) {
   st.current_app = id; if (nav) nav.where = "app"; note(st, "switch_app", id); return st;
 }
 
+/** Which installed app owns this URL's scheme. Throws invalid_url (not a URL with a scheme) or no_handler. http(s) is the Browser's, not an app's. */
+export function findHandler(st, url) {
+  const m = /^([a-z][a-z0-9+.-]*):(?:\/\/)?\S+$/i.exec(String(url ?? "").trim());
+  if (!m) throw new AppsError("invalid_url", `not a URL with a scheme: ${String(url ?? "").slice(0, 80)}. Use something like myapp://item/42`);
+  const scheme = m[1].toLowerCase();
+  const app = st.installed_apps.find((a) => a.schemes.includes(scheme));
+  if (!app) throw new AppsError("no_handler", `no installed app handles '${scheme}://'. Schemes: ${st.installed_apps.flatMap((a) => a.schemes.map((x) => `${x}:// (${a.id})`)).join(", ") || "none"}`);
+  return app;
+}
+/** Open a URL on the phone: the owning app comes to the front and the URL is its initial URL. Returns the app. */
+export function openLink(st, url, nav) {
+  const app = findHandler(st, url);
+  st.current_app = app.id; if (nav) nav.where = "app";
+  st.links.push({ app: app.id, url: String(url).trim() }); note(st, "open_url", app.id); st.log[st.log.length - 1].url = String(url).trim();
+  return app;
+}
+/** Apps on the share sheet: installed apps that accept shares. */
+export const shareTargets = (st) => st.installed_apps.filter((a) => a.shares).map((a) => ({ id: a.id, name: a.name }));
+/** Deliver shared content to an app: it comes to the front. Throws not_installed or not_share_target. */
+export function shareToApp(st, id, content, nav) {
+  const app = st.installed_apps.find((a) => a.id === id);
+  if (!app) throw new AppsError("not_installed", `'${id}' is not installed`);
+  if (!app.shares) throw new AppsError("not_share_target", `'${id}' does not accept shares. Targets: ${shareTargets(st).map((t) => t.id).join(", ") || "none"}`);
+  st.current_app = id; if (nav) nav.where = "app";
+  st.shared.push({ app: id, ...content }); note(st, "share_to", id); st.log[st.log.length - 1].message = content.message;
+  return app;
+}
+
 /** Plain text for an agent: the installed apps, then the Store. */
 export function describeApps(st) {
   const l = ["Installed apps"];
@@ -117,7 +148,7 @@ export const storeCss = [
 export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
 var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=${JSON.stringify(STORE_FIXTURE)};
-var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
+var SCHEME=${SCHEME.toString()},schemesOf=${schemesOf.toString()},entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;

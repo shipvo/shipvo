@@ -45,7 +45,7 @@ export interface Device {
     /** Calls `cb` when the person taps a notification, with its `data`. Returns an unsubscribe function. */
     onTapped(cb: (n: Notification) => void): () => void;
   };
-  share: { text(text: string, title?: string): Promise<boolean> };
+  share: { text(text: string, title?: string, url?: string): Promise<boolean>; share(opts: { message?: string; url?: string; title?: string }): Promise<boolean> };
   /** Reads the address book. Asks for permission first; throws `Contacts permission denied` when refused. Read-only. */
   contacts: { getAll(): Promise<Contact[]> };
   /** Reads calendar events that overlap `range`, ordered by start. Asks for permission first; throws `Calendar permission denied` when refused. Read-only. */

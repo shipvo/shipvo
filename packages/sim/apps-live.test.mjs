@@ -19,8 +19,11 @@ let proc;
 const PAGE = `<!doctype html><html><head><title>fx</title></head><body><h1 id="h">Home</h1>
 <script>
 let listening = false;
-window.__pnDevice = { openUrl(u) { if (!listening) return false; document.getElementById("h").textContent = "Opened " + u; return true; } };
-</script><button onclick="listening = true">Start listening</button></body></html>`;
+const inbox = [];
+window.__pnDevice = { log: () => [], capabilities: () => null, deliverUrl(u) { document.getElementById("h").textContent = "Got " + u; return true; }, deliverShare(c) { inbox.push(c); document.getElementById("h").textContent = "Shared " + c.message; return true; },
+  shareSheet: () => window.__sheet ?? null, shareTo(id) { if (!window.__sheet) return "no_share_sheet"; if (!window.__sheet.includes(id)) return "no_target"; window.__shared = id; window.__pnShareTo(id, { message: "hello", url: "https://x.test" }); return "ok"; },
+  openUrl(u) { if (!listening) return false; document.getElementById("h").textContent = "Opened " + u; return true; } };
+</script><button onclick="listening = true">Start listening</button><button onclick="window.__pnOpenLink('nope://x').then((r) => { document.getElementById('h').textContent = 'Link ' + JSON.stringify(r); })">Open link</button><button onclick="window.__sheet = ['b', 'copy']">Open share sheet</button></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
 
@@ -66,4 +69,62 @@ test("an explicit phone for a session can still start, and a private app url is 
   const ok = await act("p", { action: "switch_app", id: "ok" });
   assert.equal(ok.ok, true, JSON.stringify(ok));
   assert.equal(ok.current_app, "ok");
+});
+
+const TWO = { apps: [{ id: "a", name: "App A", url: "fixture://a", schemes: ["aaa"] }, { id: "b", name: "App B", url: "fixture://b", schemes: ["bee"], shares: true }], current_app: "a" };
+
+test("app A opens app B's scheme: B becomes current and gets the URL", async () => {
+  assert.ok((await call("/session", { session: "l1", phone: TWO })).ok);
+  // The app calls Linking.openURL; the page-side function is what @shipvo/device calls.
+  const page = await act("l1", { action: "open_url", url: "bee://item/42" });
+  assert.equal(page.ok, true, JSON.stringify(page));
+  assert.equal(page.current_app, "b");
+  assert.match(page.screen, /Got bee:\/\/item\/42/);
+  const log = await act("l1", { action: "device_log" });
+  const e = log.log.find((x) => x.name === "open_url");
+  assert.equal(e.app, "b"); assert.equal(e.source, "simulated");
+});
+
+test("an unknown scheme is no_handler and a non-URL is invalid_url; nothing changes", async () => {
+  assert.ok((await call("/session", { session: "l2", phone: TWO })).ok);
+  const r = await act("l2", { action: "open_url", url: "nope://x" });
+  assert.equal(r.ok, false); assert.equal(r.code, "no_handler");
+  const bad = await act("l2", { action: "open_url", url: "not a url" });
+  assert.equal(bad.code, "invalid_url");
+  const st = await act("l2", { action: "switch_app", id: "a" });
+  assert.equal(st.current_app, "a");
+});
+
+test("share_to without a sheet is no_share_sheet", async () => {
+  assert.ok((await call("/session", { session: "l3", phone: TWO })).ok);
+  const r = await act("l3", { action: "share_to", app_id: "b" });
+  assert.equal(r.ok, false); assert.equal(r.code, "no_share_sheet");
+});
+
+test("share_to delivers to the target app, which comes to the front", async () => {
+  assert.ok((await call("/session", { session: "l4", phone: TWO })).ok);
+  // Stand in for Share.share: tapping the button opens a "sheet" that lists app b and copy.
+  const scr = await act("l4", { action: "screen" });
+  const ref = /button "Open share sheet" \[ref=(\w+)\]/.exec(scr.screen)?.[1];
+  assert.ok(ref, scr.screen);
+  await act("l4", { action: "tap", ref });
+  const miss = await act("l4", { action: "share_to", app_id: "zz" });
+  assert.equal(miss.code, "not_share_target");
+  const r = await act("l4", { action: "share_to", app_id: "b" });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.current_app, "b");
+  assert.match(r.screen, /Shared hello/);
+  const log = await act("l4", { action: "device_log" });
+  assert.equal(log.log.find((x) => x.name === "share_to").source, "simulated");
+});
+
+test("the page-side Linking route reports no_handler for an unknown scheme", async () => {
+  assert.ok((await call("/session", { session: "l5", phone: TWO })).ok);
+  const scr = await act("l5", { action: "screen" });
+  const ref = /button "Open link" \[ref=(\w+)\]/.exec(scr.screen)?.[1];
+  assert.ok(ref, scr.screen);
+  await act("l5", { action: "tap", ref });
+  const after = await act("l5", { action: "screen" });
+  assert.match(after.screen, /Link .*no_handler/);
+  assert.equal((await act("l5", { action: "switch_app", id: "a" })).current_app, "a");
 });

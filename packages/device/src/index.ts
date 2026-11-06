@@ -91,7 +91,10 @@ export const device: Device = {
       return () => sub.remove();
     },
   },
-  share: { async text(text, title) { try { const r = await Share.share(Platform.OS === "ios" ? { message: text, title } : { message: text, title }); return r.action !== Share.dismissedAction; } catch { return false; } } },
+  share: {
+    async share(o) { try { const r = await Share.share({ message: o.message ?? "", url: o.url, title: o.title }); return r.action !== Share.dismissedAction; } catch { return false; } },
+    text(text, title, url) { return device.share.share({ message: text, title, url }); },
+  },
   contacts: {
     async getAll() {
       const K = opt<any>("expo-contacts"); if (!K) throw new Error("expo-contacts is not installed");
@@ -136,6 +139,10 @@ export const device: Device = {
 export const setOnline = (o: boolean) => { online = o; netSubs.forEach((f) => f(o)); };
 export const openUrl = (url: string) => Linking.openURL(url);
 /** Call `cb` with each URL opened in the app (deep links). Returns an unsubscribe function. */
+/** The URL that opened the app, or null. */
+export const getInitialUrl = async (): Promise<string | null> => (await Linking.getInitialURL()) ?? null;
+/** Content shared to this app by another app. Native shares arrive through the OS, so there is nothing to subscribe to here. */
+export const onShared = (_cb: (c: { message: string; url?: string }) => void) => () => {};
 export const onUrl = (cb: (url: string) => void) => { const s = Linking.addEventListener("url", (e) => cb(e.url)); return () => s.remove(); };
 
 // Bridges: UI-owned flows (scanner, payment prompt) resolve a promise when the screen reports back.

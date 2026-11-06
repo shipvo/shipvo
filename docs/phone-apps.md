@@ -121,3 +121,24 @@ switch_app { session, id: "notes" }    -> current_app is notes
 uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app, switch_app, uninstall_app, all source "simulated"
 ```
+
+## Deep links and the share sheet between apps
+
+Each installed app can declare URL schemes. In `phone.json`, add `schemes` (without `://`) and, for apps that take shares, `"shares": true`. Store entries can carry the same two fields.
+
+```json
+{ "id": "notes", "name": "Pocket Notes", "schemes": ["notes"], "shares": true }
+```
+
+| Tool | What it does | Typed errors |
+| --- | --- | --- |
+| `open_url { url }` | The app that owns the scheme comes to the front. It gets the URL from `getInitialUrl()` and the `onUrl` callback (the `url` event) | `no_handler` (no installed app owns the scheme), `invalid_url` (not a URL with a scheme) |
+| `share_to { app_id }` | Picks a target on the open share sheet. `copy` picks Copy | `no_share_sheet` (no sheet open), `not_share_target` (app not on the sheet) |
+
+Inside an app, `openUrl(url)` from `@shipvo/device` (or `Linking.openURL` on a device) takes the same route. A refused link is logged as `url_refused` and `openUrl` resolves without delivering it. With no installed apps, `open_url` keeps its old behaviour: the running app gets the URL, or `no_url_listener`. `http` and `https` links still open the Browser.
+
+`device.share.share({ message, url })` opens a bottom sheet that lists the installed apps that accept shares, then **Copy** and **Cancel**. It is a dialog labelled "Share" in the accessibility tree, in the Android and iOS skins. Tap a row, or call `share_to`. The target app comes to the front and its `onShared` callback gets `{ message, url }`. Copy writes the simulated clipboard.
+
+Every link and share is recorded in `device_log` with `source: "simulated"`.
+
+**Limit today:** apps on the phone are state only, so the fixture apps share one page. The deep link and the shared content reach the page's `onUrl` and `onShared` callbacks. Universal links and app links are not checked.

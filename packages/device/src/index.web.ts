@@ -85,6 +85,10 @@ function announceStatus(before: string, record = true, beforeSettings = "") {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pn:status", { detail }));
 }
 const urlSubs = new Set<(url: string) => void>();
+const sharedSubs = new Set<(c: { message: string; url?: string }) => void>();
+let initialUrl: string | null = null;
+// The open share sheet's target buttons by app id (null when no sheet is open). The simulator's share_to presses one.
+let shareTargets: Map<string, HTMLElement> | null = null;
 const netSubs = new Set<(o: boolean) => void>(); const openSubs = new Set<(n: Notification) => void>(); const recvSubs = new Set<(n: Notification) => void>();
 
 // ---- system sheets (plain DOM so they sit above the app and read as dialogs) ----
@@ -215,13 +219,31 @@ export const device: Device = {
     onReceived(cb) { recvSubs.add(cb); return () => { recvSubs.delete(cb); }; },
   },
   share: {
-    async text(text, title) {
+    text(text, title, url) { return device.share.share({ message: text, title, url }); },
+    /** Share.share({ message, url }): a bottom sheet with the installed apps that accept shares, plus Copy. True when a target was picked. */
+    async share(opts) {
       let ok = false;
+      const message = opts.message ?? ""; const payload = { message, url: opts.url };
+      const gx = g as { __pnShareTargets?: () => Promise<{ id: string; name: string }[]> | { id: string; name: string }[]; __pnShareTo?: (id: string, p: unknown) => unknown };
+      let targets: { id: string; name: string }[] = [];
+      try { targets = (await gx.__pnShareTargets?.()) ?? []; } catch { targets = []; }
       await sheet("Share", (card, close) => {
-        card.append(p(title ?? text));
-        for (const t of ["WhatsApp", "Messages", "Copy"]) card.append(btn(t, () => { ok = true; if (t === "Copy") state.clipboard = text; log("share", { target: t, text }); close(); }));
-        card.append(btn("Cancel", () => close()));
+        card.setAttribute("data-pn-share", state.platform);
+        // Two skins: the iOS sheet floats with round corners and centred text; the Android sheet is flush with the bottom edge.
+        if (state.platform === "ios") Object.assign(card.style, { width: "calc(100% - 16px)", margin: "0 8px 8px", borderRadius: "20px", textAlign: "center" });
+        card.append(p(opts.title ?? (message || opts.url || "")));
+        const pick = (id: string, name: string) => {
+          ok = true;
+          if (id === "copy") state.clipboard = [message, opts.url].filter(Boolean).join(" ");
+          else try { void Promise.resolve(gx.__pnShareTo?.(id, payload)).catch(() => {}); } catch { /* no simulator */ }
+          log("share", { target: name, targetId: id, text: message, url: opts.url }); close();
+        };
+        shareTargets = new Map();
+        for (const t of targets) { const b = btn(t.name, () => pick(t.id, t.name)); b.setAttribute("data-pn-share-target", t.id); shareTargets.set(t.id, b); card.append(b); }
+        const c = btn("Copy", () => pick("copy", "Copy")); c.setAttribute("data-pn-share-target", "copy"); shareTargets.set("copy", c); card.append(c);
+        card.append(btn("Cancel", () => { shareTargets = null; close(); }));
       });
+      shareTargets = null;
       return ok;
     },
   },
@@ -304,6 +326,14 @@ g.__pnDevice = {
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
+  /** Hand a URL to the app on this page without routing it to another app (the simulator already chose this app). Also sets the initial URL. */
+  deliverUrl(url: string): boolean { initialUrl = url; return deliverLocal(url); },
+  /** Content another app shared to this one. Returns true if an `onShared` listener received it. */
+  deliverShare(c: { message: string; url?: string }): boolean { sharedSubs.forEach((f) => f(c)); log("share_received", { text: c.message, url: c.url, handled: sharedSubs.size > 0 }); return sharedSubs.size > 0; },
+  /** The ids a share sheet offers right now, or null when no sheet is open. */
+  shareSheet: () => (shareTargets ? [...shareTargets.keys()] : null),
+  /** Press a target in the open share sheet. "no_share_sheet" when none is open, "no_target" when the id is not listed. */
+  shareTo(id: string): "ok" | "no_share_sheet" | "no_target" { if (!shareTargets) return "no_share_sheet"; const b = shareTargets.get(id); if (!b) return "no_target"; b.click(); return "ok"; },
   capabilities: () => device.capabilities(),
   /** What the status bar shows: network, airplane and battery. */
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
@@ -340,10 +370,26 @@ function deliverUrl(url: string): boolean | Promise<boolean> {
     }
     log("browser_opened", { url }); return true;
   }
+  // Another app may own the scheme. The simulator answers { local: true } when the phone has no installed apps, and then this page gets the URL.
+  const route = (g as { __pnOpenLink?: (u: string) => Promise<{ ok?: boolean; local?: boolean; code?: string }> }).__pnOpenLink;
+  if (route && /^[a-z][a-z0-9+.-]*:/i.test(url)) {
+    return route(url).then((r) => {
+      if (r?.local) return deliverLocal(url);
+      if (r?.ok === false) { log("url_refused", { url, code: String(r.code ?? "error") }); return false; }
+      return true;
+    }, () => deliverLocal(url));
+  }
+  return deliverLocal(url);
+}
+function deliverLocal(url: string): boolean {
   window.dispatchEvent(new CustomEvent("pn:url", { detail: url }));
   urlSubs.forEach((f) => f(url)); log("url_opened", { url, handled: urlSubs.size > 0 });
   return urlSubs.size > 0;
 }
+/** The URL that opened this app (a deep link from another app), or null. */
+export const getInitialUrl = async (): Promise<string | null> => initialUrl;
+/** Call `cb` with content another app shared to this one. Returns an unsubscribe function. */
+export const onShared = (cb: (c: { message: string; url?: string }) => void) => { sharedSubs.add(cb); return () => { sharedSubs.delete(cb); }; };
 export const openUrl = async (url: string) => { deliverUrl(url); };
 // UI-owned bridges exist on native; on the simulated device the sheets are the UI, so they resolve immediately.
 export const scanBridge = { subscribe: () => () => {}, current: () => null, finish: () => {} };

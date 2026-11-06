@@ -25,6 +25,8 @@ beforeAll(async () => {
     seen.push(body);
     const fail = (code: string, error: string) => res.end(JSON.stringify({ ok: false, code, error }));
     const ok = () => res.end(JSON.stringify({ ok: true, screen: `Home screen\ninstalled: ${[...installed.keys()].join(",")} current: ${current}` }));
+    if (body.action === "open_url") return /^[a-z]+:\/\/\S/.test(body.url) ? (body.url.startsWith("bee:") ? ok() : fail("no_handler", "no handler")) : fail("invalid_url", "not a url");
+    if (body.action === "share_to") return fail("no_share_sheet", "no sheet");
     if (body.action === "install_app") {
       const app = (body.catalog ?? []).find((a: any) => a.id === body.id);
       if (!app) return fail("unknown_app", "no such app");
@@ -51,9 +53,9 @@ async function connect(extra: Record<string, string> = {}) {
 const call = async (c: Client, name: string, args: Record<string, unknown> = {}) => (await c.callTool({ name, arguments: args })) as any;
 
 describe("phone app tools", () => {
-  it("lists the four tools with their schemas", async () => {
+  it("lists the app, link and share tools with their schemas", async () => {
     const c = await connect();
-    const tools = (await c.listTools()).tools.filter((t) => ["list_store_apps", "install_app", "uninstall_app", "switch_app"].includes(t.name)).sort((a, b) => a.name.localeCompare(b.name));
+    const tools = (await c.listTools()).tools.filter((t) => ["list_store_apps", "install_app", "uninstall_app", "switch_app", "open_url", "share_to"].includes(t.name)).sort((a, b) => a.name.localeCompare(b.name));
     expect(tools.map((t) => ({ name: t.name, inputSchema: t.inputSchema }))).toMatchSnapshot();
     await c.close();
   });
@@ -90,5 +92,21 @@ describe("phone app tools", () => {
     const r = await call(c, "list_store_apps");
     expect(r.structuredContent.apps.map((a: any) => a.url)).toEqual(["app://tide@r13", "app://fresh@latest"]);
     await c.close(); cp.close();
+  });
+  it("open_url and share_to return their typed codes", async () => {
+    const c = await connect({ PN_STORE_FIXTURE: "1" });
+    expect((await call(c, "open_url", { session: "s2", url: "nope://x" })).structuredContent.code).toBe("no_handler");
+    expect((await call(c, "open_url", { session: "s2", url: "words" })).structuredContent.code).toBe("invalid_url");
+    expect((await call(c, "open_url", { session: "s2", url: "bee://item/42" })).isError).toBeFalsy();
+    const r = await call(c, "share_to", { session: "s2", app_id: "notes" });
+    expect(r.structuredContent.code).toBe("no_share_sheet");
+    expect(seen.at(-1)).toMatchObject({ action: "share_to", app_id: "notes" });
+    await c.close();
+  });
+  it("the Store list keeps schemes and shares for the fixture apps", async () => {
+    const c = await connect({ PN_STORE_FIXTURE: "1" });
+    const apps = (await call(c, "list_store_apps")).structuredContent.apps;
+    expect(apps.find((a: any) => a.id === "notes")).toMatchObject({ schemes: ["notes"], shares: true });
+    await c.close();
   });
 });
