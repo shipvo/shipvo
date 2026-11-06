@@ -258,3 +258,12 @@ describe("shipvo test secrets", () => {
     }
   });
 });
+
+describe("shipvo test --device", () => {
+  it("rejects an unknown device", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await testCmd(["--device", "toaster"])).toBe(2);
+    expect(err.mock.calls.join("\n")).toContain('--device must be "agent-device" or "phone"');
+    err.mockRestore();
+  });
+});

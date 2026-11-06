@@ -5,6 +5,8 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import { args as parse, loadConfig } from "./config.js";
 import { elements, fieldElements, signature, describeStep, walk, startSim, simDriver, type Driver, type Finding, type Skin, type Step, type WalkOptions } from "./explore.js";
 import { portFree } from "./sim.js";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { loadFrameRenderer, openBrowser } from "./run.js";
 
 export type Mood = "idle" | "working" | "happy" | "worried";
@@ -252,7 +254,17 @@ export function startLumiServer(o: LumiServerOptions): Promise<Server> {
   return new Promise((resolve, reject) => { server.once("error", reject); server.listen(o.port, "127.0.0.1", () => resolve(server)); });
 }
 
-const USAGE = "Usage: shipvo lumi [android|ios] [--port 4546] [--ui-port 4547] [--sim <url>] [--skip-build] [--no-open] [--max-steps 100] [--max-depth 3, at least 1] [--seed 1]";
+/** The agent-device driver from the app's own @shipvo/test. */
+async function loadAgentDevice(skin: Skin, app: string): Promise<{ driver: Driver & { screenshot(): Promise<Uint8Array> } }> {
+  let path: string;
+  try { path = createRequire(process.cwd() + "/package.json").resolve("@shipvo/test"); }
+  catch { throw new Error("Install @shipvo/test in this app: npm i -D @shipvo/test"); }
+  const kit = (await import(pathToFileURL(path).href)) as { agentDeviceDriver?: (app: string, o: { platform: Skin }) => Driver & { screenshot(): Promise<Uint8Array> } };
+  if (!kit.agentDeviceDriver) throw new Error("This @shipvo/test is too old for --device agent-device. Update it: npm i -D @shipvo/test@latest");
+  return { driver: kit.agentDeviceDriver(app, { platform: skin }) };
+}
+
+const USAGE = "Usage: shipvo lumi [android|ios] [--port 4546] [--ui-port 4547] [--sim <url>] [--device agent-device] [--skip-build] [--no-open] [--max-steps 100] [--max-depth 3, at least 1] [--seed 1]";
 
 /** Builds the app, opens it on Shipvo Phone in the browser with the Lumi sidebar. Runs until Ctrl-C. */
 export async function lumi(argv: string[]): Promise<number> {
@@ -262,15 +274,18 @@ export async function lumi(argv: string[]): Promise<number> {
   const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 0) throw new Error(`--${k} must be a whole number`); return n; };
   const uiPort = num("ui-port", 4547);
   if (!(await portFree(uiPort))) throw new Error(`Port ${uiPort} is in use. Pass --ui-port <n>.`);
-  const sim = await startSim(a, cfg);
+  const mode = a.device ?? cfg.device ?? "phone";
+  if (mode !== "phone" && mode !== "agent-device") throw new Error('--device must be "agent-device" or "phone"');
+  const real = mode === "agent-device" ? await loadAgentDevice(skin, cfg.appId) : undefined;
+  const sim = real ? { base: "", stop: () => {} } : await startSim(a, cfg);
   let server: Server | undefined;
   try {
-    const driver = simDriver(sim.base, cfg.appId, "lumi", skin);
+    const driver = real?.driver ?? simDriver(sim.base, cfg.appId, "lumi", skin);
     const engine = new Lumi(driver, { routes: cfg.routes, maxDepth: num("max-depth", 3) || 3, maxSteps: num("max-steps", 100) || 100, seed: a.seed !== undefined ? num("seed", 1) : undefined, skin, app: cfg.appId });
     const first = await driver.open();
     if (!first.ok) throw new Error(`the app did not open: ${first.error ?? "no screen"}`);
     const frame = (await loadFrameRenderer())({ skin, lumi: true, screen: `<img data-part="screen" alt="The app on the phone, live" draggable="false">` });
-    const shot = async () => {
+    const shot = real ? () => real.driver.screenshot().then((b) => Buffer.from(b)).catch(() => null) : async () => {
       const r = await fetch(`${sim.base}/act`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session: "lumi", action: "screenshot", format: "jpeg", inline: true }), signal: AbortSignal.timeout(10000) });
       if (!r.ok) return null;
       const j = (await r.json()) as { ok?: boolean; data?: string };
