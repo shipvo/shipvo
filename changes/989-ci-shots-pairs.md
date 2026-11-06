@@ -1,0 +1,1 @@
+- cli: `shipvo ci shots --before <dir> --after <dir> --json` pairs before and after screenshots per screen and skin (Android and iOS), changed screens first, at most six pairs and a `moreCount`. Screenshots sit in `<dir>/android/` and `<dir>/ios/`. New export `pairShots` in the CLI; nothing changes for existing callers.
