@@ -15,6 +15,7 @@ async function pointer(band: string) {
 
 // One keypair per test so the registered key matches the signed pointer.
 async function run(policy: object | undefined, band: string, headers: Record<string, string> = {}) {
+  const state = { bytes: 0 };
   const p = await pointer(band);
   const store: Record<string, string> = {}, audits: any[][] = [];
   const DB = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
@@ -27,15 +28,15 @@ async function run(policy: object | undefined, band: string, headers: Record<str
         return null;
       }
       if (sql.includes("JOIN accounts")) return { login: "ann" };
-      if (sql.includes("FROM apps")) return { public_key: p.pk, bytes_used: 0, account_id: 1 };
+      if (sql.includes("FROM apps")) return { public_key: p.pk, bytes_used: state.bytes, account_id: 1 };
       return null;
     },
   }) }) } as any;
-  const POINTERS = { put: async (k: string, v: unknown) => { store[k] = typeof v === "string" ? v : new TextDecoder().decode(v as ArrayBuffer); }, get: async (k: string) => (k === "c/tide/release_policy" && policy ? JSON.stringify(policy) : store[k] ?? null) } as any;
+  const POINTERS = { put: async (k: string, v: unknown) => { store[k] = typeof v === "string" ? v : new TextDecoder().decode(v as ArrayBuffer); }, get: async (k: string) => (k === "c/tide/release_policy" && policy && !store[k] ? JSON.stringify(policy) : store[k] ?? null) } as any;
   const env = { DB, POINTERS, OWNER_TOKEN: "owner-secret" } as any;
   const r = await app.request(`/apps/tide/kv/p/tide/1/${band}`, { method: "PUT", headers: { authorization: `Bearer ${PUB}`, ...headers }, body: p.buf }, env);
   const act = (aid: string, verb: string, token: string) => app.request(`/apps/tide/approvals/${aid}/${verb}`, { method: "POST", headers: { authorization: `Bearer ${token}` } }, env);
-  return { r, store, audits, act };
+  return { r, store, audits, act, state };
 }
 const PTR = "p/tide/1/b2";
 
@@ -66,14 +67,32 @@ describe("requireApprovalAbove", () => {
     expect((await act(approval_id, "approve", "owner-secret")).status).toBe(409);
   });
   it("a stale proposal is refused with 409 and the newer pointer stays", async () => {
-    const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2");
+    const { r, store, act, audits } = await run({ requireApprovalAbove: "b1" }, "b2");
     const { approval_id } = (await r.json()) as any;
     const newer = JSON.stringify({ body: JSON.stringify({ band: "b2", release: 8 }), signature: "x" });
     store[PTR] = newer;
     const a = await act(approval_id, "approve", "owner-secret");
     expect(a.status).toBe(409); expect(((await a.json()) as any).error).toBe("stale");
     expect(store[PTR]).toBe(newer);
+    expect(audits.map((x) => JSON.parse(x[8] as string).approval)).toEqual(["proposed", "rejected"]);
     expect((await act(approval_id, "approve", "owner-secret")).status).toBe(409);
+  });
+  it("approve re-checks maxBand: a tightened policy refuses with 403 and the approval stays pending", async () => {
+    const { r, store, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2");
+    const { approval_id } = (await r.json()) as any;
+    store["c/tide/release_policy"] = JSON.stringify({ requireApprovalAbove: "b1", maxBand: "b1" });
+    const a = await act(approval_id, "approve", "owner-secret");
+    expect(a.status).toBe(403); expect(((await a.json()) as any).error).toBe("policy_refused");
+    expect(store[PTR]).toBeUndefined(); expect(audits).toHaveLength(1);
+    store["c/tide/release_policy"] = JSON.stringify({ requireApprovalAbove: "b1" });
+    expect((await act(approval_id, "approve", "owner-secret")).status).toBe(200);
+  });
+  it("approve checks the app storage budget", async () => {
+    const { r, store, act, state } = await run({ requireApprovalAbove: "b1" }, "b2");
+    const { approval_id } = (await r.json()) as any;
+    state.bytes = 500 * 1024 * 1024;
+    const a = await act(approval_id, "approve", "owner-secret");
+    expect(a.status).toBe(413); expect(store[PTR]).toBeUndefined();
   });
   it("set_release_policy keeps requireApprovalAbove", async () => {
     const m: Record<string, string> = { "c/tide/release_policy": JSON.stringify({ requireApprovalAbove: "b1" }) };

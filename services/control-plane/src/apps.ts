@@ -307,7 +307,14 @@ async function resolveApproval(c: any, verb: "approve" | "reject") {
         after: JSON.stringify({ approval: "rejected", reason: "stale", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
       return c.json({ error: "stale", message: `Release ${cur.release} is already live at this band; release ${a.release} was not applied.` }, 409);
     }
+    // Approval does not override policy: re-check the rules that do not depend on the clock (maxBand, agentMaxBand), as the proposer's kind.
+    // blockedWeekdays and requireStageBeforeFull were checked when the proposal was made and are not re-run here. A refusal leaves the approval pending.
+    const policy = await loadReleasePolicy({ kv: c.env.POINTERS, appId: id });
+    const verdict = checkPolicy({ maxBand: policy.maxBand, agentMaxBand: policy.agentMaxBand } as typeof policy, { band: a.band as any, actorKind: a.proposer.startsWith("agent") ? "agent" : "human", now: new Date() });
+    if (!verdict.ok) return c.json({ error: "policy_refused", code: "policy_refused", rule: verdict.rule, reason: verdict.reason }, 403);
     const buf = new TextEncoder().encode(a.pointer);
+    const row: any = await c.env.DB.prepare("SELECT bytes_used FROM apps WHERE app_id = ?").bind(id).first();
+    if ((row?.bytes_used ?? 0) + buf.byteLength > MAX_APP_BYTES) return c.json({ error: "app_storage_exceeded", message: `This app has used its ${MAX_APP_BYTES / 1048576} MB beta storage.` }, 413);
     await c.env.POINTERS.put(a.key, buf);
     await recordStaged(c.env.POINTERS, id, buf.buffer as ArrayBuffer);
     await c.env.DB.prepare("UPDATE apps SET bytes_used = bytes_used + ? WHERE app_id = ?").bind(buf.byteLength, id).run();
