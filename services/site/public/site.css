@@ -435,3 +435,12 @@ main p a:not(.btn):not(.card){text-decoration:underline;text-underline-offset:2p
 :not(pre)>code{overflow-wrap:anywhere}
 .burger:focus-visible,.mobile-menu a:focus-visible,.mobile-menu button:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:8px}
 @media(max-width:980px){html body .mobile-menu a{min-height:44px;display:flex;align-items:center}}
+/* Copy button on command boxes (added by shell.js) */
+pre.term.has-copy{padding-right:92px}
+pre.term .term-copy{position:absolute;top:50%;right:12px;transform:translateY(-50%);font:600 13px/1 var(--sans,inherit);color:#F4F2EC;background:#1A2230;border:1px solid #2A3850;border-radius:8px;padding:0 14px;min-height:36px;min-width:64px;cursor:pointer}
+pre.term .term-copy:hover{background:#243045}
+pre.term .term-copy:focus-visible{outline:2px solid #FF9A2E;outline-offset:2px}
+pre.term .term-copy.done{color:#0B0F0E;background:#FF9A2E;border-color:#FF9A2E}
+@media (pointer:coarse){pre.term .term-copy{min-height:44px}}
+@media(max-width:600px){pre.term.has-copy{padding-right:20px;padding-bottom:62px}pre.term .term-copy{top:auto;bottom:10px;transform:none}}
+

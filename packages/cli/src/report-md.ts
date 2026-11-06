@@ -10,7 +10,7 @@ function code(s: string): string {
   const fence = "`".repeat(Math.max(0, ...[...t.matchAll(/`+/g)].map((m) => m[0].length)) + 1);
   return `${fence}${t.startsWith("`") || t.endsWith("`") ? ` ${t} ` : t}${fence}`;
 }
-function stepText(s: Step): string {
+export function stepText(s: Step): string {
   const kind = s.kind ?? "step";
   if (kind === "tap") return `tap "${s.target ?? ""}"`;
   if (kind === "type") return `type "${s.text ?? ""}" into "${s.target ?? ""}"${s.enter ? " and press enter" : ""}`;
