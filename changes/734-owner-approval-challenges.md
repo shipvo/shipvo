@@ -1,0 +1,3 @@
+- `@shipvo/control-plane`: under `agentPolicy: "ask"`, irreversible owner commands return a server-issued one-time challenge (10 minutes, bound to the exact arguments). Only the signed-in admin can approve it. `confirm: true` no longer runs them. The audit log records `approved_by`, `approval_id` and `approved_how`.
+- `@shipvo/mcp`: `owner_command` takes `approval: <challenge id>` instead of `confirm`; `approvals_list` also returns pending `challenges`.
+- Migration: agents that sent `confirm: true` must now send `approval` with the id of a challenge the owner approved in the admin. `agentPolicy: "allow"` is unchanged.
