@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
 import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
+import { emit, envelope } from "./json-out.js";
 
 export type Step =
   | { action: "open" }
@@ -199,16 +200,16 @@ export function simDriver(base: string, app: string, session = `explore-${Date.n
 }
 
 /** Use the simulator at `--sim <url>`, or build the app and start one on `--port` (default 4546). `stop` kills the one we started. */
-export async function startSim(a: Record<string, string | undefined>, cfg: { name: string; appId: string; controlPlane: string }): Promise<{ base: string; stop: () => void }> {
+export async function startSim(a: Record<string, string | undefined>, cfg: { name: string; appId: string; controlPlane: string }, quiet = false): Promise<{ base: string; stop: () => void }> {
   let base = a.sim; let child: ReturnType<typeof spawn> | undefined;
   if (!base) {
     const port = a.port || "4546";
     if (!(await portFree(Number(port)))) throw new Error(`Port ${port} is in use. Stop the other simulator, pass --port <n>, or pass --sim <url> to use one that is running.`);
     if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
       console.error(`Building ${cfg.name} for the simulator…`);
-      execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
+      execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio: quiet ? ["ignore", 2, 2] : "inherit", env: { ...process.env, PN_SIM: "1" } });
     }
-    ensurePlaywright({ cwd: process.cwd() });
+    ensurePlaywright({ cwd: process.cwd(), quiet });
     let server: string;
     try { server = createRequire(process.cwd() + "/package.json").resolve("@shipvo/sim/server.mjs"); }
     catch { throw new Error("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager)."); }
@@ -221,19 +222,38 @@ export async function startSim(a: Record<string, string | undefined>, cfg: { nam
   return { base, stop: () => { child?.kill(); } };
 }
 
-/** Returns the exit code. */
+/** Returns the exit code. With `--json`, stdout is one envelope and everything else goes to stderr. */
 export async function explore(argv: string[]): Promise<number> {
+  if (!argv.includes("--json")) return exploreRun(argv, false);
+  try { return await exploreRun(argv, true); }
+  catch (e) {
+    emit(envelope("error", e instanceof Error ? e.message : String(e), { findings: [] }, [{ command: "shipvo doctor --json", why: "Check the setup." }], 2));
+    return 2;
+  }
+}
+
+async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const a = parse(argv); const cfg = loadConfig();
   const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
   const maxDepth = num("max-depth", 3), maxSteps = num("max-steps", 100);
-  const sim = await startSim(a, cfg); const base = sim.base;
+  const sim = await startSim(a, cfg, json); const base = sim.base;
   try {
     if (a.skin !== undefined && a.skin !== "ios" && a.skin !== "android") throw new Error("--skin must be android or ios");
     const report = await walk(simDriver(base, cfg.appId), { routes: cfg.routes, maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
     writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
-    console.log(`${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`);
-    if (report.error) { console.error(report.error); return 1; }
-    return report.findings.length && a["fail-on-findings"] === "true" ? 1 : 0;
+    const line = `${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`;
+    const failOn = a["fail-on-findings"] === "true";
+    const exit = report.error ? 1 : report.findings.length && failOn ? 1 : 0;
+    if (json) {
+      const data = { report_files: [`${out}.md`, `${out}.json`], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
+      const code = report.error ? "walk_failed" : report.findings.length ? "findings" : "ok";
+      const next = report.error ? [{ command: "shipvo doctor --json", why: "Check the simulator setup." }]
+        : report.findings.length ? [{ command: `open ${out}.md`, why: "Read the steps to reproduce each finding." }, { command: "shipvo explore --json", why: "Run again after fixing to confirm." }]
+        : [{ command: "shipvo test --json", why: "Run your step files." }];
+      emit(envelope(code, report.error ?? line, data, next, exit));
+    } else console.log(line);
+    if (report.error && !json) console.error(report.error);
+    return exit;
   } finally { sim.stop(); }
 }
