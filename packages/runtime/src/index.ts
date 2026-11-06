@@ -1,7 +1,10 @@
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { forwardRuntimeEvents, FORWARDED_EVENTS, type ForwardedEvent } from "./runtimeEvents";
 
-export { forwardRuntimeEvents, FORWARDED_EVENTS };
+import { ensureInstallIdentity, signReport, webCrypto, type InstallIdentity, type TelemetryCrypto, type TelemetryStorage } from "./install";
+
+export { forwardRuntimeEvents, FORWARDED_EVENTS, ensureInstallIdentity, signReport, webCrypto };
+export type { InstallIdentity, TelemetryCrypto, TelemetryStorage };
 export type { ForwardedEvent };
 
 export type RuntimeState = {
@@ -62,6 +65,19 @@ function installCrashHook() {
   });
 }
 
+let identity: InstallIdentity | null = null;
+let identityCrypto: TelemetryCrypto = webCrypto;
+/**
+ * Turn on signed telemetry. Registers this install once (see `ensureInstallIdentity`); until that finishes, and if it
+ * fails, reports are sent unsigned. Pass your own `crypto` on React Native. Never throws. The identity is module-global:
+ * calling this again replaces the previous identity and crypto.
+ */
+export async function enableSignedTelemetry(opts: { storage: TelemetryStorage; registerUrl: string; crypto?: TelemetryCrypto }): Promise<InstallIdentity | null> {
+  identityCrypto = opts.crypto ?? webCrypto;
+  identity = await ensureInstallIdentity(opts.storage, identityCrypto, opts.registerUrl);
+  return identity;
+}
+
 const listeners = new Set<(events: string[]) => void>();
 /** Called with every batch of queued events the runtime drains, in `reportRuntimeEvents`. Returns an unsubscribe function. */
 export function onRuntimeEvents(fn: (events: string[]) => void): () => void {
@@ -96,8 +112,17 @@ export function reportRuntimeEvents(): string[] {
       // Same payload the sample app sent before this moved here: device_class is fixed to "low", android_api is set on Android only.
       const body = { schema_version: "1.0", app_id: appId, release: release ?? state.runningRelease ?? 0, event,
         device_class: "low", android_api: androidApi };
-      Promise.resolve(fetch(`${baseUrl}/t`, { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify(body) })).catch(() => {});
+      const post = (b: string) => Promise.resolve(fetch(`${baseUrl}/t`, { method: "POST", headers: { "content-type": "application/json" },
+        body: b })).catch(() => {});
+      const id = identity;
+      if (!id) { post(JSON.stringify(body)); return; }
+      const plain = JSON.stringify(body);
+      // `sig` is the HMAC of `signed`, closing `}` included. We send `signed` with that `}` replaced by
+      // `,"sig":"<hex>"}`. The server cuts that suffix, appends `}` and checks the HMAC. If signing fails, send unsigned.
+      const signed = JSON.stringify({ ...body, install_id: id.install_id });
+      signReport(id, signed, identityCrypto).then(
+        (r) => post(`${signed.slice(0, -1)},"sig":"${r.sig}"}`),
+        () => post(plain));
     } catch {}
   });
   return events;
