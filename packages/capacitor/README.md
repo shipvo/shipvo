@@ -6,8 +6,8 @@ The core is TypeScript and makes every decision: it verifies the signature and t
 
 | Platform | Native layer |
 |---|---|
-| Android | In this package, `android/`: applies a signed web bundle with crash-loop rollback |
-| iOS | Next slice: the same two interfaces and the same web view switch |
+| Android | `android/`: stores the verified bundle zip in app-private files and the state in SharedPreferences; switches the web view with `Bridge.setServerBasePath` to the unpacked bundle |
+| iOS | `ios/`: stores the verified bundle zip in the app's Application Support directory and the state in UserDefaults; switches the web view by setting the Capacitor server base path to the unpacked bundle |
 
 ## Android
 

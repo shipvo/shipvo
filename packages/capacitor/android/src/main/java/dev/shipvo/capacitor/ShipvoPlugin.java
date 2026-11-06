@@ -19,7 +19,10 @@ import java.io.File;
 @CapacitorPlugin(name = "Shipvo")
 public class ShipvoPlugin extends Plugin {
     private static final String PREFS = "shipvo";
-    private static volatile String serving;
+    // An instance field: a Plugin lives as long as its Bridge, and the web view's base path belongs to the Bridge.
+    // A new Bridge (Activity recreated in the same process) starts on the embedded assets, so it must boot again.
+    private volatile String serving;
+    private volatile String servingPath;
     private BundleStore store;
 
     private BundleStore store() {
@@ -77,7 +80,7 @@ public class ShipvoPlugin extends Plugin {
 
     @PluginMethod
     public void fileClear(PluginCall call) {
-        store().clear(); serving = null; call.resolve();
+        store().clear(); serving = null; servingPath = null; call.resolve();
     }
 
     /** Serve a stored bundle. `sha256` is the hash the core verified; it is checked again before unpacking. */
@@ -86,8 +89,9 @@ public class ShipvoPlugin extends Plugin {
         try {
             String name = call.getString("name");
             File dir = store().unpack(name, call.getString("sha256"));
-            serving = name;
             getBridge().setServerBasePath(dir.getAbsolutePath());
+            serving = name;
+            servingPath = dir.getAbsolutePath();
             call.resolve();
         } catch (Exception e) { call.reject(e.getMessage()); }
     }
@@ -96,7 +100,8 @@ public class ShipvoPlugin extends Plugin {
     @PluginMethod
     public void status(PluginCall call) {
         JSObject r = new JSObject();
-        if (serving != null) r.put("serving", serving);
+        // Report serving only while this Bridge still points at the unpacked directory.
+        if (serving != null && servingPath != null && servingPath.equals(getBridge().getServerBasePath())) r.put("serving", serving);
         call.resolve(r);
     }
 }

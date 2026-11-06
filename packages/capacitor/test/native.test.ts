@@ -21,6 +21,8 @@ class FakeNative implements ShipvoNativePlugin {
   async status() { return { serving: this.serving }; }
   /** A process restart: the web view starts on the embedded bundle again; stored data stays. */
   restart() { this.serving = undefined; }
+  /** Same process, new Bridge (Activity recreated): the web view is back on the embedded assets. */
+  newBridge() { this.serving = undefined; }
 }
 
 const enc = new TextEncoder();
@@ -76,6 +78,24 @@ describe("native bridge", () => {
     const st = await sc.getState();
     expect(st).toMatchObject({ currentRelease: 1, pendingRelease: 0, blockedRelease: 2 });
     expect((await sc.consumeEvents()).events).toContain("crash_loop_revert");
+  });
+
+  it("boots again when a new bridge starts in the same process", async () => {
+    const n = new FakeNative(); const now = () => 7;
+    let sc = core(n, await server(1), now);
+    await sc.checkForUpdate({ apply: true });
+    expect(await bootAndServe(sc, n)).toEqual({ release: 1, served: true });
+    n.newBridge(); sc = core(n, await server(1), now);
+    expect(await bootAndServe(sc, n)).toEqual({ release: 1, served: true });
+    expect(n.served).toEqual(["release-1.bundle", "release-1.bundle"]);
+    expect((await sc.getState()).runningRelease).toBe(1);
+  });
+
+  it("resume ignores a release that is neither pending nor current", async () => {
+    const n = new FakeNative(); const sc = core(n, await server(1), () => 9);
+    await sc.checkForUpdate({ apply: false });
+    await sc.resume(5);
+    expect((await sc.getState()).runningRelease).not.toBe(5);
   });
 
   it("never serves a file whose bytes changed after staging", async () => {

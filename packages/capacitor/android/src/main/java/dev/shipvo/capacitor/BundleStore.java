@@ -40,7 +40,8 @@ public final class BundleStore {
         File f = file(name);
         File tmp = new File(dir, name + ".tmp");
         try (FileOutputStream o = new FileOutputStream(tmp)) { o.write(bytes); o.getFD().sync(); }
-        if (!tmp.renameTo(f)) { tmp.delete(); throw new IOException("could not write " + name); }
+        try { java.nio.file.Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); }
+        catch (IOException e) { tmp.delete(); throw new IOException("could not write " + name); }
     }
 
     public byte[] read(String name) throws IOException { 

@@ -1,4 +1,4 @@
-import { registerPlugin } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { ShipvoCapacitor, NativeStore, NativeFiles, bootAndServe, bootAndSwitch } from "@shipvo/capacitor";
 import type { ShipvoNativePlugin } from "@shipvo/capacitor";
 
@@ -10,7 +10,7 @@ export async function startShipvo(): Promise<ShipvoCapacitor | undefined> {
   if (!__SHIPVO_PUBLIC_KEY__ || !__SHIPVO_BASE_URL__) return undefined;
   const native = registerPlugin<ShipvoNativePlugin>("Shipvo");
   const shipvo: ShipvoCapacitor = new ShipvoCapacitor({
-    appId: "capacitor-sample", shellMajor: 1, shellVersion: "1.0.0", platform: "android",
+    appId: "capacitor-sample", shellMajor: 1, shellVersion: "1.0.0", platform: Capacitor.getPlatform() === "ios" ? "ios" : "android",
     publicKey: __SHIPVO_PUBLIC_KEY__, baseUrl: __SHIPVO_BASE_URL__,
     store: new NativeStore(native), files: new NativeFiles(native),
     onReload: async () => { await bootAndSwitch(shipvo, native); },
