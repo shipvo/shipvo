@@ -77,6 +77,7 @@ async function openPage(url) {
 export async function measureRun({ cli, app, timeoutMs = 120000, now = () => performance.now(), open = openPage, drive = (p, t) => driverClient(p, t), poll = 200 }) {
   const t = { start: now() };
   const out = [];
+  // spawn directly (not the CLI helper): we need the live child and its streams to stamp the ready line and stop the process group.
   const child = spawn(process.execPath, [cli, "run", "android", "--no-open"], { cwd: app, env: cleanEnv(), detached: process.platform !== "win32" });
   let exited = null;
   const sink = (d) => { out.push(String(d)); if (t.listening === undefined && parseListening(out.join(""))) t.listening = now(); };
@@ -108,12 +109,12 @@ export async function measureRun({ cli, app, timeoutMs = 120000, now = () => per
     for (;;) {
       if (exited !== null || left() <= 0) throw fail("the phone page never reported the app loaded");
       const r = await driver.request("tree", {}, Math.max(1000, Math.min(5000, left())));
-      if (r.ok && r.tree) { tree = r.tree; break; }
+      // A blank first frame has a body but no refs, so keep polling until something is tappable.
+      if (r.ok && r.tree && firstTapRef(r.tree) !== null) { tree = r.tree; break; }
       await sleep(poll);
     }
     t.ready = now();
     const ref = firstTapRef(tree);
-    if (!ref) throw new Error(`the app has nothing to tap on its first screen:\n${tree}`);
     const tap = await driver.request("tap", { ref });
     if (!tap.ok) throw new Error(`the tap on ${ref} failed: ${tap.error}`);
     t.tapped = now();

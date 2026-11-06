@@ -60,3 +60,20 @@ test("a page that never reports the app loaded fails with a clear message", asyn
   const drive = () => ({ opened: Promise.resolve(), close() {}, request: async () => ({ ok: false, error: "the app is not loaded yet" }) });
   await assert.rejects(measureRun({ ...f, timeoutMs: 1500, open: async () => () => {}, drive, poll: 20 }), /never reported the app loaded/);
 });
+
+test("an empty first tree is not ready; ready is stamped once a ref shows up", async () => {
+  const f = fakeCli(0);
+  let calls = 0, secondAt = 0;
+  const drive = () => ({ opened: Promise.resolve(), close() {}, request: async (type) => {
+    if (type !== "tree") return { ok: true };
+    calls++;
+    if (calls === 1) return { ok: true, tree: "- text: loading" };
+    secondAt = performance.now();
+    return { ok: true, tree: '- button "Go" [ref=e1]' };
+  } });
+  let start = null;
+  const now = () => { const n = performance.now(); start ??= n; return n; };
+  const rows = await measureRun({ ...f, timeoutMs: 20000, open: async () => () => {}, drive, poll: 20, now });
+  assert.ok(calls >= 2);
+  assert.ok(rows[2].ms >= Math.floor(secondAt - start), `ready at ${rows[2].ms} ms, second reply at ${secondAt - start}`);
+});
