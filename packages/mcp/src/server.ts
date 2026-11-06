@@ -246,6 +246,12 @@ server.tool("open_notification", "Tap a notification from the shade (newest if n
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "open_notification", id })); });
 server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   async ({ session, url }) => { need(session); return result(session, await act({ session, action: "open_url", url })); });
+server.tool("lock", "Press the power button: the simulated phone locks and shows the lock screen. The app and its screen are kept. While locked, tap, type, scroll and back fail with phone_locked. Logged in device_log as simulated.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "lock" })); });
+server.tool("unlock", "Swipe up on the lock screen. Returns to the same screen as before the lock. Fails with not_locked if the phone is not locked. Logged in device_log as simulated.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "unlock" })); });
+server.tool("restart", "Restart the simulated phone from the power menu: a boot screen, then the app starts fresh (cold start). Storage is kept. Returns the first screen. Logged in device_log as simulated.", { session: sid }, WR,
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "restart" })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
   async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 

@@ -2,6 +2,8 @@
 // Our own artwork. It does not copy any vendor's icons, fonts or exact device outlines.
 // Scaling to fit the window is done by the page with a CSS transform on the element this markup sits in.
 
+import { lockScreenHtml, bootScreenHtml } from "./lifecycle.mjs";
+
 export const SKINS = {
   android: { label: "Android", width: 412, height: 915, radius: 36, bezel: 10, status: 36, bar: 24, pad: 22, indicator: 108, part: "punch-hole", bottom: "gesture-bar" },
   ios: { label: "iPhone", width: 393, height: 852, radius: 55, bezel: 12, status: 54, bar: 34, pad: 36, indicator: 134, part: "dynamic-island", bottom: "home-indicator" },
@@ -71,6 +73,21 @@ function hook(){var f=document.getElementById(${JSON.stringify(iframeId)});var w
 if(w.__pnDevice&&w.__pnDevice.status)dev=w.__pnDevice.status();draw();theme(w);
 if(!w.__shipvoStatusHooked){w.__shipvoStatusHooked=true;w.addEventListener("pn:status",function(e){dev=e.detail;draw();theme(w)})}}
 var f=document.getElementById(${JSON.stringify(iframeId)});if(f){f.addEventListener("load",hook);hook()}
+(function buttons(){var r=root();if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')},vol=50,hold,volT;
+if(!q("power-button")||!q("lock-screen")||!q("power-menu"))return;
+function show(el,on){if(el)el.hidden=!on}
+function lockNow(){show(q("lock-screen"),true)}
+q("lock-screen").addEventListener("click",function(){});
+var sy=null;q("lock-screen").addEventListener("pointerdown",function(e){sy=e.clientY});
+q("lock-screen").addEventListener("pointerup",function(e){if(sy!=null&&sy-e.clientY>60)show(q("lock-screen"),false);sy=null});
+var pw=q("power-button");
+pw.addEventListener("pointerdown",function(){hold=setTimeout(function(){hold=null;show(q("power-menu"),true)},700)});
+pw.addEventListener("pointerup",function(){if(hold){clearTimeout(hold);hold=null;lockNow()}});
+function bump(d){vol=Math.max(0,Math.min(100,vol+d));q("volume-level").textContent=vol;show(q("volume-overlay"),true);clearTimeout(volT);volT=setTimeout(function(){show(q("volume-overlay"),false)},1500)}
+q("volume-up-button").addEventListener("click",function(){bump(10)});q("volume-down-button").addEventListener("click",function(){bump(-10)});
+q("power-menu").addEventListener("click",function(e){var a=e.target.getAttribute&&e.target.getAttribute("data-act");if(!a)return;show(q("power-menu"),false);
+if(a==="restart"){show(q("boot-screen"),true);var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)f.contentWindow.location.reload();setTimeout(function(){show(q("boot-screen"),false)},1200)}
+else{show(q("boot-screen"),true)}})})();
 (function tick(){draw();var n=new Date();setTimeout(tick,(60-n.getSeconds())*1000-n.getMilliseconds()+50)})();
 // The app can change its top colour (a theme switch) without any event we can hear, so look again every 2 seconds. Skipped while the page is hidden.
 setInterval(function(){if(document.hidden)return;var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)theme(f.contentWindow)},2000);
@@ -117,7 +134,10 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
   const html = `<div class="sf-body" data-skin="${skin}" data-theme="${dark ? "dark" : "light"}" data-part="phone-body">`
     + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}<span class="sf-icons">${icons(st)}</span></div>`
     + `<div class="sf-content">${screen}</div>`
+    + lockScreenHtml(st.time) + bootScreenHtml()
+    + `<div class="sf-vol" data-part="volume-overlay" hidden><span data-part="volume-level">50</span></div><div class="sf-menu" data-part="power-menu" hidden><button data-act="restart">Restart</button><button data-act="poweroff">Power off</button></div>`
     + `<div class="sf-bar" data-part="${k.bottom}"><i></i></div></div>`
+    + `<button class="sf-btn sf-power" data-part="power-button" aria-label="Power"></button><button class="sf-btn sf-volup" data-part="volume-up-button" aria-label="Volume up"></button><button class="sf-btn sf-voldown" data-part="volume-down-button" aria-label="Volume down"></button>`
     + `<span class="sf-label" data-part="simulated-label">Simulated</span></div>`;
   const css = [
     `.sf-body{--sf-bg:${dark ? "#000" : "#fff"};--sf-fg:${dark ? "#fff" : "#111"};position:relative;box-sizing:border-box;width:${outerWidth}px;height:${outerHeight}px;padding:${k.bezel}px ${k.bezel}px ${k.bezel + FOOT}px;`
@@ -132,6 +152,12 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-content iframe{border:0;background:#fff;width:100%;height:100%;display:block}`,
     `.sf-bar{flex:none;height:${k.bar}px;display:flex;justify-content:center;align-items:center;background:var(--sf-bg)}`,
     `.sf-bar i{display:block;width:${k.indicator}px;height:5px;border-radius:3px;background:var(--sf-fg);opacity:.85}`,
+    `.sf-btn{position:absolute;right:-4px;width:4px;padding:0;border:0;border-radius:0 2px 2px 0;background:#2a2d31;cursor:pointer}.sf-power{top:200px;height:80px}.sf-volup{top:310px;height:56px}.sf-voldown{top:376px;height:56px}`,
+    `.sf-lock,.sf-boot,.sf-menu,.sf-vol{position:absolute;z-index:5}.sf-lock[hidden],.sf-boot[hidden],.sf-menu[hidden],.sf-vol[hidden]{display:none}`,
+    `.sf-lock{inset:0;background:#10151c;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif}.sf-lock-time{font-size:64px;font-weight:300}.sf-lock-hint{font-size:14px;opacity:.7}`,
+    `.sf-boot{inset:0;z-index:6;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font:700 34px system-ui,sans-serif;letter-spacing:.04em}`,
+    `.sf-vol{top:80px;right:12px;padding:8px 14px;border-radius:14px;background:#222d;color:#fff;font:600 14px system-ui,sans-serif}`,
+    `.sf-menu{left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:16px;background:#222;box-shadow:0 8px 30px #0008}.sf-menu button{padding:10px 24px;border:0;border-radius:10px;background:#3a3d42;color:#fff;font:600 15px system-ui,sans-serif}`,
     `.sf-label{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:600 9px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa0a6}`,
   ].join("\n");
   return { skin, width: k.width, height: k.height, outerWidth, outerHeight, html, css };
