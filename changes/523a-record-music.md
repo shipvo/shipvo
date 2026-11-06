@@ -1,1 +1,0 @@
-- mcp: `record_stop` takes `music: true`. It mixes a ducked music bed under the MP4 with `scripts/video/bgmusic.py` and writes `<name>.credits.json` next to it. Without `music` the output is unchanged. Errors: `music_unavailable`, `music_failed` (#523).

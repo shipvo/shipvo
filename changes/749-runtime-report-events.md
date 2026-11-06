@@ -1,2 +1,0 @@
-- `@shipvo/runtime`: refused and reverted releases are now reported to the control plane by the runtime itself, in the same session. `Runtime.markHealthy()` and `Runtime.checkForUpdate()` drain the event queue and send each forwarded event to `POST /t`. New exports: `reportRuntimeEvents`, `onRuntimeEvents`, `forwardRuntimeEvents`, `FORWARDED_EVENTS`. The config plugin accepts `reportEvents: false` to turn it off.
-- Migration: none; additive. If your app already forwards events itself, remove that code so events are not sent twice (or pass `reportEvents: false`).
