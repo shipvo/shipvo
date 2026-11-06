@@ -23,6 +23,8 @@ export async function settingsAction(page, body) {
   await read(page);
   await page.evaluate((p) => globalThis.__pnDevice.set(p), patch);
   await syncMedia(page);
-  return view(await read(page));
+  const out = view(await read(page));
+  if (body.key === "font_size") out.note = "The open screen is told through Dimensions (change event, fontScale). A screen that reads PixelRatio.getFontScale() only while it draws shows the new size the next time it draws.";
+  return out;
 }
 export const SETTINGS_ACTIONS = ["get_settings", "set_setting"];

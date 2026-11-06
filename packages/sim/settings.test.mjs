@@ -39,6 +39,9 @@ test("get_settings and set_setting read and write the page's device", async () =
   const page = { evaluate: async (fn, arg) => { globalThis.__pnDevice = dev; return fn(arg); }, emulateMedia: async (m) => media.push(m) };
   const r = await settingsAction(page, { action: "set_setting", key: "language", value: "ar" });
   assert.equal(r.settings.language, "ar"); assert.equal(r.settings.rtl, true);
+  assert.equal(r.note, undefined);
+  const f = await settingsAction(page, { action: "set_setting", key: "font_size", value: "largest" });
+  assert.match(f.note, /PixelRatio\.getFontScale/);
   await settingsAction(page, { action: "set_setting", key: "dark_mode", value: true });
   assert.deepEqual(media.at(-1), { colorScheme: "dark", reducedMotion: "no-preference" });
   await settingsAction(page, { action: "set_setting", key: "reduce_motion", value: true });
