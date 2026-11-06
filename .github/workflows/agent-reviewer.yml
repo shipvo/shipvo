@@ -38,7 +38,7 @@ jobs:
     with:
       role: reviewer
       mode: read
-      pr: ${{ needs.gate.outputs.pr }}
+      pr: ${{ fromJSON(needs.gate.outputs.pr) }}
       model: ${{ vars.AGENT_MODEL_LEAD || vars.AGENT_MODEL || 'claude-sonnet-5-5' }}
       max_turns: 60
       timeout: 40
