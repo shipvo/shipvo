@@ -62,7 +62,7 @@ The release train publishes every non-private package automatically. Keep packag
 
 ## Branches, commits and PRs
 
-- Aider branches: `agent/aider/issue-<n>`. Mistral branches: `agent/mistral/issue-<n>`. Claude branches: `agent/claude/issue-<n>`, `agent/pm/<n>`, `agent/design/<n>`, `agent/dogfood/<n>`, `agent/device-lab/<n>`, `agent/qa/<date>`, `agent/security/<date>`, `agent/docs/<n>`, `agent/blog/<n>`, `agent/tutorial/<n>`, `agent/video/<n>`, `agent/steward/<n>`. Copilot branches: `copilot/*`.
+- Aider branches: `agent/aider/issue-<n>`. Mistral branches: `agent/mistral/issue-<n>`. Claude branches: `agent/claude/issue-<n>`, `agent/pm/<n>`, `agent/design/<n>`, `agent/dogfood/<n>`, `agent/device-lab/<n>`, `agent/qa/<date>`, `agent/security/<date>`, `agent/docs/<n>`, `agent/blog/<n>`, `agent/tutorial/<n>`, `agent/video/<n>`, `agent/steward/<n>`, `agent/launch/<n>`. Copilot branches: `copilot/*`.
 - Commit messages: `<area>: <what changed>` (for example `sim: keep refs stable across scroll`).
 - PR body: what changed, why, how it was tested, and `Fixes #<n>`.
 
