@@ -38,7 +38,7 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
 | `already_locked` | `lock` was called on a locked phone. | Call `unlock` if you want to use the app. |
 | `not_locked` | `unlock` was called on a phone that is not locked. | Carry on; nothing to do. |
-| `app_not_foreground` | The home screen or app switcher is showing, so tap, type, scroll and back were not sent. | Call `resume_app`. |
+| `app_not_foreground` | The home screen or app switcher is showing, so tap, type, scroll, back, `open_url` and `open_notification` were not sent. | Call `resume_app`. |
 | `recents_not_open` | `kill_app` was called without the app switcher open. | Call `open_recents` first. |
 | `mock_invalid` | A network mock rule is not valid. | Fix the rule. |
 

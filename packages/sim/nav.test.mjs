@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createNav, pressHome, openRecents, resume, killApp, setNavStyle, assertForeground, classifySwipe } from "./nav.mjs";
+import { createNav, pressHome, openRecents, resume, killApp, assertForeground, classifySwipe } from "./nav.mjs";
 
 test("home backgrounds the app, resume brings it back, kill needs recents", () => {
   const st = createNav();
@@ -13,11 +13,6 @@ test("home backgrounds the app, resume brings it back, kill needs recents", () =
   assert.equal(openRecents(st), "background");
   killApp(st); assert.equal(st.where, "home"); assert.equal(st.kills, 1);
   assert.deepEqual(st.log.map((e) => e.name), ["press_home", "press_home", "resume", "open_recents", "kill_app"]);
-});
-
-test("navigation style", () => {
-  const st = createNav(); setNavStyle(st, "buttons"); assert.equal(st.navStyle, "buttons");
-  assert.throws(() => setNavStyle(st, "x"), { code: "bad_nav_style" });
 });
 
 test("swipes: up is home, up and hold is recents, along the bar switches on iPhone, left edge is back", () => {

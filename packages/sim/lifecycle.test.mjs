@@ -119,3 +119,34 @@ test("the page sees background then active (document.visibilityState) in order",
     assert.match(last.screen, /seen:hidden,visible,hidden,visible/);
   } finally { writeFileSync(join(dist, "index.html"), PAGE); }
 });
+
+test("while away, open_url and open_notification are blocked too, and a screenshot shows the home screen and switcher", async () => {
+  const { readFileSync } = await import("node:fs");
+  assert.ok((await call("/session", { session: "a" })).ok);
+  const shot = async () => { const r = await act("a", { action: "screenshot" }); assert.ok(r.ok); return readFileSync(r.path); };
+  const appShot = await shot();
+  await act("a", { action: "press_home" });
+  assert.equal((await act("a", { action: "open_url", url: "myapp://x" })).code, "app_not_foreground");
+  assert.equal((await act("a", { action: "open_notification", id: "n1" })).code, "app_not_foreground");
+  const homeShot = await shot();
+  assert.notDeepEqual(homeShot, appShot, "home screen shot differs from the app");
+  await act("a", { action: "open_recents" });
+  const recentsShot = await shot();
+  assert.notDeepEqual(recentsShot, homeShot, "switcher shot differs from the home screen");
+  const r = await act("a", { action: "resume_app" });
+  assert.doesNotMatch(r.screen, /Home screen/);
+  assert.deepEqual(await shot(), appShot, "the overlay is removed after the shot");
+});
+
+test("after kill_app the reloaded app is hidden until resumed", async () => {
+  const PAGE3 = `<!doctype html><html><body><h1>Boot</h1><p id="s">now:</p><script>const seen=[];function put(){document.getElementById("s").textContent="now:"+document.visibilityState+" seen:"+seen.join(",")}document.addEventListener("visibilitychange",()=>{seen.push(document.visibilityState);put()});addEventListener("DOMContentLoaded",put)</script></body></html>`;
+  writeFileSync(join(dist, "index.html"), PAGE3);
+  try {
+    assert.ok((await call("/session", { session: "k" })).ok);
+    await act("k", { action: "open_recents" });
+    const k = await act("k", { action: "kill_app" });
+    assert.ok(k.ok);
+    const r = await act("k", { action: "resume_app" });
+    assert.match(r.screen, /now:visible seen:hidden,visible/);
+  } finally { writeFileSync(join(dist, "index.html"), PAGE); }
+});

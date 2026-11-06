@@ -5,8 +5,8 @@
 export class NavError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
 /** Where the phone is: the app in front ("app"), the home screen ("home") or the app switcher ("recents"). */
-export function createNav(navStyle = "gesture") {
-  return { where: "app", navStyle, kills: 0, log: [] };
+export function createNav() {
+  return { where: "app", kills: 0, log: [] };
 }
 
 const note = (st, name) => { st.log.push({ at: Date.now(), name, source: "simulated" }); };
@@ -33,12 +33,6 @@ export function resume(st) {
 export function killApp(st) {
   if (st.where !== "recents") throw new NavError("recents_not_open", "open the app switcher first (open_recents), then kill_app");
   st.where = "home"; st.kills++; note(st, "kill_app"); return st;
-}
-
-/** "gesture" or "buttons" (Android). */
-export function setNavStyle(st, style) {
-  if (style !== "gesture" && style !== "buttons") throw new NavError("bad_nav_style", 'navigation style is "gesture" or "buttons"');
-  st.navStyle = style; return st;
 }
 
 /** Throws app_not_foreground while the home screen or the app switcher is showing, so no input reaches a backgrounded app. */
@@ -84,4 +78,21 @@ export function recentsHtml(appName = "App") {
 /** The three buttons of Android 3-button navigation. */
 export function navButtonsHtml() {
   return `<div class="sf-navbtns" data-part="nav-buttons" hidden><button type="button" data-part="nav-back" aria-label="Back">◀</button><button type="button" data-part="nav-home" aria-label="Home">●</button><button type="button" data-part="nav-recents" aria-label="Recents">■</button></div>`;
+}
+
+/** CSS for the home screen and the app switcher. Colours follow the theme (data-theme on the phone body, or on any parent). Dark is the default. */
+export function navScreensCss() {
+  return [
+    `.sf-home,.sf-recents{position:absolute;inset:0;z-index:4;background:linear-gradient(160deg,#1d3557,#0b1320);color:#fff;font-family:system-ui,sans-serif}`,
+    `[data-theme="light"] .sf-home{background:linear-gradient(160deg,#dbe7f5,#f4f7fb);color:#111}`,
+    `.sf-icon{position:absolute;left:28px;top:70px;width:76px;padding:0;border:0;background:none;color:inherit;display:flex;flex-direction:column;align-items:center;gap:6px;font:600 12px system-ui,sans-serif;cursor:pointer}.sf-icon b{display:flex;width:60px;height:60px;border-radius:16px;background:#f4a261;color:#102030;align-items:center;justify-content:center;font-size:28px}`,
+    `.sf-recents{display:flex;align-items:center;justify-content:center;background:#10151cee;color:#fff}[data-theme="light"] .sf-recents{background:#eef1f5ee;color:#111}`,
+    `.sf-card{width:230px;height:420px;border-radius:20px;background:#fff;color:#111;border:1px solid #8884;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:14px;box-sizing:border-box;transition:transform .2s}[data-theme="dark"] .sf-card{background:#1c232d;color:#fff}.sf-card button{border:0;border-radius:10px;padding:8px 18px;background:#8883;color:inherit;font:600 14px system-ui,sans-serif;cursor:pointer}`,
+  ].join("");
+}
+
+/** The home screen or switcher as plain markup, shown (not hidden), for a screenshot of a headless session. */
+export function awayScreenHtml(where, appName = "App") {
+  const inner = (where === "home" ? homeScreenHtml(appName) : recentsHtml(appName)).replace(" hidden>", ">");
+  return `<style>${navScreensCss()}</style><div data-theme="dark" style="position:fixed;inset:0;z-index:2147483647">${inner}</div>`;
 }
