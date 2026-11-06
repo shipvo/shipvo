@@ -4,6 +4,8 @@ Status: draft for review by the owner, 6 Nov 2026. Nothing here is built yet.
 
 A Shipvo app spec is a JSON document that describes a whole app: its look, its data, its screens, its logic and the actions agents can call. An assistant writes the spec; the Shipvo app engine validates it and renders it as a native-feeling app on Shipvo Phone (and, later, on real phones through the native shell). No AI runs after the spec is written: the same spec always gives the same app.
 
+Two parts, two jobs: the spec's structure (screens, blocks, theme, data, permissions, actions, schedules) is JSON, validated against a JSON Schema; the small formulas inside it, written between `{{ }}` in string values, are CEL expressions (section 7). Example: in `{ "type": "stat", "value": "{{ money(revenueToday, 'EUR') }}" }` the block is JSON and `money(revenueToday, 'EUR')` is CEL.
+
 ## 1. Goals and non-goals
 
 Goals:
