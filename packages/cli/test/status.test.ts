@@ -11,7 +11,7 @@ const payload = { releases: [
 const resp = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
 
 let cwd = process.cwd();
-afterEach(() => { process.chdir(cwd); vi.restoreAllMocks(); });
+afterEach(() => { process.chdir(cwd); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 function inApp() {
   const d = mkdtempSync(join(tmpdir(), "shipvo-status-"));
   writeFileSync(join(d, "shipvo.json"), JSON.stringify({ appId: "shop", controlPlane: "https://cp.test/", publicKey: "k" }));
@@ -31,12 +31,15 @@ describe("shipvo status", () => {
     expect(out.split("\n")[1]).toMatch(/^8\s+12\s+1\s+410\s+-$/);
     expect(out.split("\n")[2]).toMatch(/^7\s+30\s+0\s+380\s+900$/);
   });
-  it("--app overrides the app id in the summary URL", async () => {
-    inApp();
+  it("--app overrides the app id; --json prints the agent shape", async () => {
+    inApp(); vi.stubEnv("SHIPVO_SIGNING_SEED", "x");
     const f = vi.fn(async () => resp(payload));
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    expect(await status(["--app", "other"], f as any)).toBe(0);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    expect(await status(["--app", "other", "--json"], f as any)).toBe(0);
     expect(f).toHaveBeenCalledWith("https://cp.test/t/other/summary");
+    const doc = JSON.parse(String(log.mock.calls[0][0]));
+    expect(doc.data.project.app_id).toBe("other");
+    expect(doc.data.pending_release.newest).toBe(8);
   });
   it("prints one halt line above the table when halted is set", async () => {
     inApp();
@@ -46,7 +49,7 @@ describe("shipvo status", () => {
     expect(log.mock.calls[0][0]).toBe("Release 8 is halted: 12 of 40 devices failed (limit 20%). Publish a new release or run shipvo rollback to clear.");
     expect(String(log.mock.calls[1][0])).toContain("applied");
   });
-  it("prints no halt line when halted is null or missing", async () => {
+  it("prints no halt line when halted is null or missing; --json passes it through", async () => {
     inApp();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await status([], (async () => resp({ ...payload, halted: null })) as any);
@@ -54,6 +57,10 @@ describe("shipvo status", () => {
     expect(log).toHaveBeenCalledTimes(2);
     expect(String(log.mock.calls[0][0])).not.toContain("halted");
     expect(String(log.mock.calls[1][0])).not.toContain("halted");
+    log.mockClear();
+    const halted = { release: 8, reports: 40, failed: 12, threshold: 0.2 };
+    expect(await status(["--json"], (async () => resp({ ...payload, halted })) as any)).toBe(1);
+    expect(JSON.parse(String(log.mock.calls[0][0])).data.pending_release.halted).toEqual(halted);
   });
   it("says no telemetry yet and exits 0 when empty", async () => {
     inApp();

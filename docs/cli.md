@@ -150,6 +150,43 @@ shipvo auto-halt --threshold 0.2 --dry-run         # print the change, write not
 - `shipvo status` shows the setting: `auto-halt: off` or `auto-halt: on at 20% after 20 reports`.
 - The route behind it is `GET`, `PUT` and `DELETE` on `/app/<app>/api/halt-config`. A bad value is a 400 with `error: "bad_halt_config"`.
 
+## `shipvo agents setup`
+
+Sets a project up for AI coding agents.
+
+```bash
+shipvo agents setup              # write the files
+shipvo agents setup --dry-run    # show what would change, write nothing
+shipvo agents setup --json       # machine-readable result
+```
+
+- It detects the project: Shipvo app (`shipvo.json`), Capacitor, Expo, bare React Native.
+- It writes a section to `AGENTS.md` between `<!-- shipvo:begin -->` and `<!-- shipvo:end -->`. A missing file is created. Text outside the markers is never changed.
+- It adds the `shipvo` server (`npx -y @shipvo/mcp`) to `.mcp.json`, and to `.cursor/mcp.json` if `.cursor/` exists. Other servers stay. A file that is not valid JSON is left alone and the command exits 2.
+- It prints the skill install line.
+- Running it again changes nothing.
+
+## `shipvo status --json`
+
+The agent's "what next" command. It prints one JSON line:
+
+```json
+{ "ok": true, "code": "ok", "summary": "...",
+  "data": { "project": {}, "sim": {}, "run_server": {}, "signing_key": {}, "pending_release": {}, "store_step": {} },
+  "next": [{ "command": "shipvo sim", "why": "..." }] }
+```
+
+- `data.project`: `{ kind, app_id }`. `sim`: is something on port 4545. `run_server`: is `shipvo run` up (from `.shipvo/run.json`). `signing_key.present`: a seed in the environment or `.shipvo/seed.txt`. `pending_release`: `{ newest, halted, auto_halt }`. `store_step`: the next open step of `store-plan.json`, or `null`.
+- `code` is one of `ok`, `no_release`, `no_project`, `no_signing_key`, `release_halted`, `error`.
+- `next` lists commands to run, most urgent first.
+- Without `--json` the output is the same table as before.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | ok: nothing needs doing (`next` may still have optional steps) |
+| 1 | action needed: no project, no signing key, or a halted release |
+| 2 | error: shipvo.json is invalid or the control plane could not be reached |
+
 ## `shipvo audit`
 
 Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.
@@ -177,59 +214,6 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 - `--native` runs `npx expo run:android` or `npx expo run:ios` instead and says so.
 - If the app cannot build for web, the command exits with code 1 and names the module or file that failed.
 - Ctrl+C stops the server.
-
-## `shipvo agents setup`
-
-Makes a project ready for coding agents (Claude Code, Cursor, Codex and others).
-
-```bash
-npx -y @shipvo/cli agents setup [--dry-run] [--json]
-```
-
-- Detects the project: `shipvo` (has `shipvo.json`), `capacitor`, `expo`, `react-native` or `unknown`.
-- Writes a section into `AGENTS.md` between `<!-- shipvo:begin -->` and `<!-- shipvo:end -->`. It creates the file if missing, replaces only that section on later runs, and never touches text outside the markers. The section tells agents to use `shipvo` commands and to run `shipvo status --json` when unsure.
-- Adds the `shipvo` server (`npx -y @shipvo/mcp`) to `.mcp.json`, and to `.cursor/mcp.json` if `.cursor/` exists. Other servers and keys stay. An existing `shipvo` entry is kept. A file with invalid JSON is left alone and the command exits 1.
-- Prints the skill install line: `npx skills add shipvo/shipvo --skill shipvo -g`.
-- `--dry-run` shows what would change and writes nothing. `--json` prints `{ ok, dry_run, project, files: [{ path, action }], skill }`. `action` is `created`, `updated`, `unchanged` or `skipped`. Running it twice changes nothing the second time.
-
-## `shipvo status --json`
-
-The "what next" command for a project. Without `--json`, `shipvo status` prints the release table as before.
-
-```json
-{
-  "ok": false,
-  "code": "action_needed",
-  "summary": "1 thing to do: the simulator is not running; start it so you can drive the app over MCP",
-  "data": {
-    "project": { "kind": "shipvo", "app_id": "shop" },
-    "sim": { "running": false, "url": "http://127.0.0.1:4545" },
-    "run_server": { "running": false, "port": null },
-    "signing_key": { "present": true, "source": "file" },
-    "pending_release": { "latest": 3, "halted": null, "dry_run_ready": false },
-    "store_step": null
-  },
-  "next": [{ "command": "npx -y @shipvo/cli sim", "why": "the simulator is not running; start it so you can drive the app over MCP" }]
-}
-```
-
-- `sim`: whether something answers on `--port` (default 4545).
-- `run_server`: whether `shipvo run` is alive, from `.shipvo/run.json`.
-- `signing_key.source`: `env`, `file` (`.shipvo/seed.txt`) or `none`. The seed is never printed.
-- `pending_release`: newest release with telemetry, the halted release if any, and whether `.shipvo/dry-run` exists.
-- `store_step`: the first step not done in `store-plan.json`, or `null`.
-- `next`: commands to run, most important first. Empty when `ok` is true.
-- If the control plane cannot be read, `next` starts with `shipvo doctor`.
-
-### Exit codes
-
-| Code | `code` field | Meaning |
-| --- | --- | --- |
-| 0 | `ok` | Nothing to do. |
-| 1 | `action_needed` | Run the commands in `next`. |
-| 2 | `error` | The command could not run (for example a broken `shipvo.json`). `data` is `null`. |
-
-These codes apply to `status --json`. Plain `shipvo status` exits 0, or 1 when the control plane is unreachable.
 
 ## `shipvo promote`
 

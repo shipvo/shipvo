@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { routeStore } from "@shipvo/store";
 import { args, loadConfig } from "./config.js";
 import { detectProject } from "./agents.js";
-import type { ProjectKind } from "./agents.js";
+import { portFree } from "./sim.js";
 
 type Row = { release: number; events: Record<string, number>; apply_ms_median: number | null; cold_start_ms_median: number | null };
 
@@ -28,96 +28,91 @@ export function describeAutoHalt(c: AutoHalt | undefined): string {
   return `auto-halt: on at ${Math.round(c.threshold * 1000) / 10}% after ${n} report${n === 1 ? "" : "s"}`;
 }
 
-export type NextStep = { command: string; why: string };
+export type Next = { command: string; why: string };
 export type StatusJson = {
   ok: boolean;
-  code: "ok" | "action_needed";
+  code: "ok" | "no_project" | "no_signing_key" | "release_halted" | "no_release" | "error";
   summary: string;
   data: {
-    project: { kind: ProjectKind; app_id: string | null };
-    sim: { running: boolean; url: string };
+    project: { kind: string; app_id: string | null };
+    sim: { running: boolean; port: number };
     run_server: { running: boolean; port: number | null };
-    signing_key: { present: boolean; source: "env" | "file" | "none" };
-    pending_release: { latest: number | null; halted: number | null; dry_run_ready: boolean };
-    store_step: { id: string; title: string } | null;
+    signing_key: { present: boolean };
+    pending_release: { newest: number | null; halted: Halted | null; auto_halt: AutoHalt | null } | null;
+    store_step: { id: string; title: string; state: string } | null;
   };
-  next: NextStep[];
+  next: Next[];
 };
 
-export type StatusDeps = { probe: (url: string) => Promise<boolean>; alive: (pid: number) => boolean; dir: string };
-const defaultDeps = (): StatusDeps => ({
-  dir: process.cwd(),
-  probe: async (url) => { try { return (await fetch(url, { signal: AbortSignal.timeout(500) })).status < 500; } catch { return false; } },
-  alive: (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } },
-});
+const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
-const readJson = (p: string): any => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
-
-type Local = Omit<StatusJson["data"], "pending_release"> & { dry_run_ready: boolean };
-
-/** Everything `status --json` says about the folder, except the control plane. */
-export async function localState(simPort: string, deps: StatusDeps): Promise<Local> {
-  const { dir } = deps;
-  const kind = detectProject(dir);
-  const cfg = readJson(join(dir, "shipvo.json"));
-  const url = `http://127.0.0.1:${simPort}`;
-  const run = readJson(join(dir, ".shipvo", "run.json"));
-  const runUp = Boolean(run && typeof run.pid === "number" && deps.alive(run.pid));
-  const e = process.env;
-  const envSeed = e.SHIPVO_SIGNING_SEED || e.PURENATIVE_SIGNING_SEED || e.SHIPVO_SIGNING_SEED_FILE || e.PURENATIVE_SIGNING_SEED_FILE;
-  const fileSeed = existsSync(join(dir, ".shipvo", "seed.txt"));
-  const plan = readJson(join(dir, "store-plan.json"));
-  return {
-    project: { kind, app_id: typeof cfg?.appId === "string" ? cfg.appId : null },
-    sim: { running: await deps.probe(url), url },
-    run_server: { running: runUp, port: runUp && typeof run.port === "number" ? run.port : null },
-    signing_key: { present: Boolean(envSeed) || fileSeed, source: envSeed ? "env" : fileSeed ? "file" : "none" },
-    store_step: plan ? nextStoreStep(plan) : null,
-    dry_run_ready: existsSync(join(dir, ".shipvo", "dry-run")),
-  };
-}
-
-function nextStoreStep(plan: any): { id: string; title: string } | null {
+/** Local facts for `status --json`: no network. */
+async function localFacts(dir: string, simPort = 4545) {
+  const hasKey = !!(process.env.SHIPVO_SIGNING_SEED || process.env.PURENATIVE_SIGNING_SEED || (process.env.SHIPVO_SIGNING_SEED_FILE && existsSync(process.env.SHIPVO_SIGNING_SEED_FILE)) || (process.env.PURENATIVE_SIGNING_SEED_FILE && existsSync(process.env.PURENATIVE_SIGNING_SEED_FILE)) || existsSync(join(dir, ".shipvo", "seed.txt")));
+  let run = { running: false, port: null as number | null };
   try {
+    const r = JSON.parse(readFileSync(join(dir, ".shipvo", "run.json"), "utf8"));
+    if (typeof r.pid === "number" && alive(r.pid)) run = { running: true, port: typeof r.port === "number" ? r.port : null };
+  } catch { /* not running */ }
+  let storeStep: StatusJson["data"]["store_step"] = null;
+  try {
+    const plan = JSON.parse(readFileSync(join(dir, "store-plan.json"), "utf8"));
     const r = routeStore(plan.answers);
-    for (const s of [...r.play.steps, ...r.apple.steps]) if ((plan.marks?.[s.id] ?? "todo") !== "done") return { id: s.id, title: s.title };
-  } catch { /* unreadable plan */ }
-  return null;
+    const step = [...r.play.steps, ...r.apple.steps].find((x) => (plan.marks?.[x.id] ?? "todo") !== "done");
+    if (step) storeStep = { id: step.id, title: step.title, state: plan.marks?.[step.id] ?? "todo" };
+  } catch { /* no plan */ }
+  return { hasKey, run, storeStep, sim: { running: !(await portFree(simPort)), port: simPort } };
 }
 
-/** Build the agent-facing document. `summary` is the control plane's /summary, or null when it could not be read. */
-export function buildStatus(local: Local, summary: { releases?: Row[]; halted?: Halted | null } | null, cpError: string | null): StatusJson {
-  const { dry_run_ready, ...rest } = local;
-  const latest = summary?.releases?.length ? Math.max(...summary.releases.map((r) => r.release)) : null;
-  const halted = summary?.halted && typeof summary.halted === "object" ? summary.halted.release : null;
-  const data = { ...rest, pending_release: { latest, halted, dry_run_ready } };
-  const next: NextStep[] = [];
-  const kind = data.project.kind;
-  if (kind !== "shipvo") {
-    next.push(kind === "unknown"
-      ? { command: "npx -y @shipvo/cli init <dir>", why: "this folder is not a React Native or Capacitor app; start a new Shipvo app" }
-      : { command: "npx -y @shipvo/cli init", why: `this ${kind} app has no shipvo.json yet; adopt it` });
-  } else {
-    if (!data.signing_key.present) next.push({ command: "npx -y @shipvo/cli keys import --file <seed file>", why: "no signing key found; restore it, or releases cannot be signed" });
-    if (cpError) next.push({ command: "npx -y @shipvo/cli doctor", why: `could not read releases: ${cpError}` });
-    if (halted !== null) next.push({ command: `npx -y @shipvo/cli rollback --to ${Math.max(1, halted - 1)}`, why: `release ${halted} was halted because devices failed; roll back or publish a fix` });
-    else if (dry_run_ready && !cpError) next.push({ command: "npx -y @shipvo/cli publish", why: "a dry run is ready; publish it when you are happy" });
-    else if (latest === null && !cpError && data.signing_key.present) next.push({ command: "npx -y @shipvo/cli publish --dry-run", why: "nothing has been published yet; check a release offline first" });
-    if (!data.run_server.running && !data.sim.running) next.push({ command: "npx -y @shipvo/cli sim", why: "the simulator is not running; start it so you can drive the app over MCP" });
+/** `shipvo status --json`: exit 0 ok, 1 action needed, 2 error. */
+export async function statusJson(appArg: string | undefined, fetchFn: typeof fetch, dir = process.cwd()): Promise<{ doc: StatusJson; exit: number }> {
+  const kind = detectProject(dir);
+  const f = await localFacts(dir);
+  const shared = { sim: f.sim, run_server: f.run, signing_key: { present: f.hasKey }, store_step: f.storeStep };
+  const mk = (code: StatusJson["code"], summary: string, next: Next[], appId: string | null, pending: StatusJson["data"]["pending_release"], exit: number) => ({
+    doc: { ok: exit === 0, code, summary, data: { project: { kind, app_id: appId }, ...shared, pending_release: pending }, next } as StatusJson, exit,
+  });
+  if (!existsSync(join(dir, "shipvo.json"))) {
+    return mk("no_project", "No shipvo.json here.", [{ command: kind === "unknown" ? "shipvo init myapp" : "shipvo init .", why: "This folder is not set up for Shipvo yet." }], null, null, 1);
   }
-  if (data.store_step) next.push({ command: "npx -y @shipvo/cli store status", why: `next store step: ${data.store_step.title}` });
-  const ok = next.length === 0;
-  return {
-    ok, code: ok ? "ok" : "action_needed",
-    summary: ok ? "Nothing to do." : `${next.length} thing${next.length === 1 ? "" : "s"} to do: ${next[0].why}`,
-    data, next,
-  };
+  let cfg;
+  try { cfg = loadConfig(dir); } catch (e) { return mk("error", e instanceof Error ? e.message : String(e), [{ command: "shipvo doctor", why: "shipvo.json is missing a field." }], null, null, 2); }
+  const appId = appArg ?? cfg.appId;
+  let data: { releases?: Row[]; halted?: Halted | null; auto_halt?: AutoHalt };
+  const baseUrl = cfg.controlPlane.replace(/\/$/, "");
+  try {
+    const r = await fetchFn(`${baseUrl}/t/${encodeURIComponent(appId)}/summary`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    data = (await r.json()) as typeof data;
+  } catch (e) {
+    return mk("error", `Could not reach the control plane at ${baseUrl} (${e instanceof Error ? e.message : String(e)}).`, [{ command: "shipvo doctor", why: "Check the control plane URL and network." }], appId, null, 2);
+  }
+  const releases = data.releases ?? [];
+  const pending = { newest: releases.length ? Math.max(...releases.map((r) => r.release)) : null, halted: data.halted ?? null, auto_halt: data.auto_halt ?? null };
+  const next: Next[] = [];
+  let code: StatusJson["code"] = "ok", exit = 0;
+  let summary = pending.newest === null ? `No releases with telemetry yet for "${appId}".` : `Newest release ${pending.newest} is reporting for "${appId}".`;
+  if (!f.hasKey) { code = "no_signing_key"; exit = 1; summary = "No signing key found."; next.push({ command: "shipvo keygen --out .shipvo/seed.txt", why: "You cannot publish without a signing key." }); }
+  if (pending.halted) {
+    code = "release_halted"; exit = 1; summary = `Release ${pending.halted.release} is halted: ${pending.halted.failed} of ${pending.halted.reports} devices failed.`;
+    const prev = releases.map((r) => r.release).filter((n) => n < pending.halted!.release);
+    const to = prev.length ? String(Math.max(...prev)) : "<release>";
+    next.unshift({ command: `shipvo rollback --to ${to}`, why: "Send devices back to a release that works, or publish a fixed one." });
+  } else if (code === "ok" && pending.newest === null) {
+    code = "no_release"; next.push({ command: "shipvo publish --dry-run", why: "Check a first release before you publish it." });
+  }
+  if (!f.sim.running && !f.run.running) next.push({ command: "shipvo sim", why: "Start the simulator to try the app." });
+  if (f.storeStep) next.push({ command: f.storeStep.state === "waiting" ? "shipvo store status" : `shipvo store status --mark ${f.storeStep.id}`, why: `Store step "${f.storeStep.title}" is ${f.storeStep.state === "todo" ? "next" : f.storeStep.state}.` });
+  return mk(code, summary, next, appId, pending, exit);
 }
 
-/** With --json: 0 ok, 1 action needed, 2 error. Without it: 0, or 1 when the control plane is unreachable. */
-export async function status(argv: string[], fetchFn: typeof fetch = fetch, deps: StatusDeps = defaultDeps()): Promise<number> {
+export async function status(argv: string[], fetchFn: typeof fetch = fetch): Promise<number> {
   const a = args(argv);
-  if (argv.includes("--json")) return statusJson(a, fetchFn, deps);
+  if (argv.includes("--json")) {
+    const { doc, exit } = await statusJson(a.app && a.app !== "true" ? a.app : undefined, fetchFn);
+    console.log(JSON.stringify(doc));
+    return exit;
+  }
   const cfg = loadConfig();
   const appId = a.app && a.app !== "true" ? a.app : cfg.appId;
   const base = cfg.controlPlane.replace(/\/$/, "");
@@ -142,26 +137,4 @@ export async function status(argv: string[], fetchFn: typeof fetch = fetch, deps
   }
   console.log(formatStatus(releases));
   return 0;
-}
-
-async function statusJson(a: Record<string, string | undefined>, fetchFn: typeof fetch, deps: StatusDeps): Promise<number> {
-  try {
-    const local = await localState(a.port && a.port !== "true" ? a.port : "4545", deps);
-    let summary: Parameters<typeof buildStatus>[1] = null, cpError: string | null = null;
-    if (local.project.kind === "shipvo") {
-      const cfg = loadConfig(deps.dir);
-      const appId = a.app && a.app !== "true" ? a.app : cfg.appId;
-      try {
-        const r = await fetchFn(`${cfg.controlPlane.replace(/\/$/, "")}/t/${encodeURIComponent(appId)}/summary`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        summary = (await r.json()) as typeof summary;
-      } catch (e) { cpError = e instanceof Error ? e.message : String(e); }
-    }
-    const doc = buildStatus(local, summary, cpError);
-    console.log(JSON.stringify(doc, null, 2));
-    return doc.ok ? 0 : 1;
-  } catch (e) {
-    console.log(JSON.stringify({ ok: false, code: "error", summary: e instanceof Error ? e.message : String(e), data: null, next: [] }, null, 2));
-    return 2;
-  }
 }
