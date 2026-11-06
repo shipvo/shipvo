@@ -54,7 +54,7 @@ jobs:
           const c = fs.readFileSync("CHANGELOG.md", "utf8"); const i = c.indexOf("\n## ");
           fs.writeFileSync("CHANGELOG.md", i < 0 ? c + "\n" + entry : c.slice(0, i + 1) + entry + c.slice(i + 1));
           JS
-          git config user.name "Shipvo Release Bot"; git config user.email "agents@shipvo.dev"
+          git config user.name "Anye Happiness Ade"; git config user.email "hans@pipilot.dev"
           git add -A packages CHANGELOG.md changes
           git commit -qm "release: $(node -e "console.log(require('/tmp/release.json').map(p=>p.name+' '+p.to).join(', '))")"
           git tag -a "$TAG" -m "Release $DATE"
