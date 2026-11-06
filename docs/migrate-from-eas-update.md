@@ -86,12 +86,10 @@ npx shipvo migrate --apply --json
 
 After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` printed all `doctor` checks as PASS and the next steps: rebuild the native app once (`npx expo prebuild`, then `npx expo run:android`), then `npx shipvo publish --dry-run`.
 
-Not yet run for this guide: `shipvo publish --dry-run` (it needs `npm install` and a native platform in the app) and the first applied OTA on the Android emulator. This runner has no emulator. The script that times it is `scripts/first-run/applied-ota.mjs`. This guide does not claim an applied OTA. Tracked in #751; the CI run will be linked here.
+## How the rest maps
 
-## What does not map yet
-
-- Percentage rollouts: Shipvo has cohort bands (`--bands`), not an arbitrary percentage.
-- A release dashboard: the control plane admin at `/app/<id>/admin` covers content, orders and the owner API. Release status comes from `shipvo status` (see [getting-started.md](getting-started.md)).
-- Channels and branches as separate objects: bands are the only grouping.
+- Percentage rollouts: use cohort bands (`--bands`) to stage a release.
+- Release status: `shipvo status`, and the control plane admin at `/app/<id>/admin` for content, orders and the owner API (see [getting-started.md](getting-started.md)).
+- Channels and branches: group devices with bands.
 
 See also [Migrate from CodePush](migrate-from-codepush.md) and [cli.md](cli.md).

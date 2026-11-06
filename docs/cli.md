@@ -348,6 +348,8 @@ These four commands take `--json` and print the same `{ ok, code, summary, data,
 
 Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`. On failure `data` is `{}` and `summary` is the error message.
 
+Without `--json`, `publish` and `rollback` print a single plain sentence.
+
 `next` suggests the follow-up. After `publish` it is `shipvo status --json` (and `shipvo promote --to ...` when some bands are left). After a dry run it is the real command. After a failure it is the likely fix, for example `shipvo doctor --json`.
 
 ## shipvo migrate --plan

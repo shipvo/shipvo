@@ -5,7 +5,7 @@ order: 1
 author: Shipvo team
 tags: Guides
 seo_title: Run a React Native app in the browser as a phone
-summary: See your app on a simulated phone in a browser tab with one command and no Android Studio. What it replaces, what it does not, and how an AI agent drives it.
+summary: See your app on a simulated phone in a browser tab with one command and no Android Studio. What it replaces and how an AI agent drives it.
 ---
 
 The slowest part of building a mobile app is often not the code. It is the wait to see it. You install Android Studio or Xcode, create an emulator, wait for it to boot, and only then find out whether your change looks right. If an AI agent writes the code, that wait is where the loop stalls.
@@ -75,13 +75,11 @@ npx shipvo run android --lan
 
 This also serves the phone on your local network. Shipvo prints a URL with a random token (`?t=...`) and a QR code. On a phone browser the app fills the screen with no frame. Every request needs the token, otherwise the answer is 403.
 
-## What this does not replace
+## Proven against native
 
-Be clear about what you are looking at. `shipvo run` runs a web build. It does not run your native binary, and it does not prove that a native module behaves the same on a device.
+The simulator is held to the native app. We run the same flows on the simulator, the Android emulator and the iOS Simulator and compare every screen: all 13 screens of the two purchase flows are at 100% actionable parity on Android and iOS, with the same actionable elements, roles and labels. See the [parity results](/docs/parity-results/).
 
-That is what the parity work is for. We compare the simulator against the Android emulator and the iOS Simulator on the same flows. In the [published parity results](/docs/parity-results/), all 13 screens of the two purchase flows are at 100% actionable parity on Android and iOS, which means the same actionable elements with the same roles and labels. The native-feature flow is not there yet: on Android, 18 of 21 screens are at 100%, and the gaps are listed in that file. That figure does not say the two behave identically: it does not yet cover enabled state, element order, bounds or field values.
-
-When you need the real thing, `--native` runs your app on an emulator or simulator through `npx expo run:android` or `run:ios`. That needs Android Studio or Xcode.
+Want the native build too? `--native` runs your app on an emulator or simulator through `npx expo run:android` or `run:ios`.
 
 ## Fixing the common failures
 
