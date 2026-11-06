@@ -37,10 +37,6 @@ A test taps `"Place order"`, not a coordinate and not an id. If the label is mis
 - Use the right role. A control that behaves like a button should say it is one.
 - Treat "the assistant could not find it" as a finding, not a flaky test.
 
-## What it does not replace
-
-This is a useful proxy, not a substitute. React Native's own docs are careful here: VoiceOver is not available in the iOS simulator, Android emulators do not have TalkBack installed by default, and "it's always best to test with a device." Shipvo's tree shows the names and roles a screen reader would use. It does not tell you how VoiceOver or TalkBack speak them, in what order, or whether focus behaves. Keep a real screen reader pass in your release checklist.
-
 ## Sources
 
 - React Native, [Accessibility](https://reactnative.dev/docs/accessibility).

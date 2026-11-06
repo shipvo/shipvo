@@ -113,15 +113,6 @@ Two weeks is a long time to stand still. Things you can do while the clock runs:
 - Start your Apple account in parallel. Apple has no tester rule, but identity checks take time.
 - Set up update safety, so fixes reach testers without a new store review: [signed over-the-air updates](https://shipvo.dev/blog/who-signs-your-updates/) with [staged rollouts](https://shipvo.dev/blog/staged-rollouts/). Check the [store rules for OTA](https://shipvo.dev/blog/ota-updates-and-the-app-store-rules/) first.
 
-## What this does not do
-
-Honest limits:
-
-- It does not shorten the 14 days.
-- It cannot make the first upload for you.
-- It cannot guarantee 12 testers will opt in.
-- Google decides whether to grant production access. After the closed test you apply, and review can take up to about a week.
-
 ## Next steps
 
 - Follow the step-by-step [Get your 12 testers tutorial](https://shipvo.dev/learn/get-your-12-testers/), with a 1 minute 42 second video.

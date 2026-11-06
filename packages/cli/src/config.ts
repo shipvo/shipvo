@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 
 /** shipvo.json at the app root: what `shipvo init` writes and every other command reads. */
 export type ShipvoConfig = {
@@ -94,6 +94,26 @@ function hostedKv(cfg: ShipvoConfig, token: string) {
       const r = await call(path(k), { method: "PUT", headers: { ...auth, "content-type": type }, body }, k);
       if (!r.ok) { let m = ""; try { const j: any = await r.json(); m = j.message ?? j.error; } catch {} throw new Error(`publish ${k}: ${r.status} ${m}`); }
     },
+  };
+}
+
+/** True when publish/rollback/promote have somewhere real to read and write: Cloudflare KV or a publish token. */
+export function hasStore(): boolean {
+  const NS = process.env.SHIPVO_KV_ID || process.env.PURENATIVE_KV_ID || readConfigKvId();
+  return !!(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN && NS) || !!publishToken();
+}
+function readConfigKvId(): string | undefined { try { return loadConfig().kv?.namespaceId; } catch { return undefined; } }
+
+/** A read-only store over the files `shipvo publish --dry-run` wrote. Lets `promote --dry-run` and `rollback --dry-run` run with no login. Writes throw. */
+export function offlineKv(dir = ".shipvo/dry-run") {
+  const root = resolve(dir);
+  const file = (k: string) => { const f = resolve(root, k); return f.startsWith(root + sep) ? f : null; };
+  const walk = (d: string): string[] => readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : [join(d, n)]));
+  return {
+    async get(k: string) { const f = file(k); try { return f ? readFileSync(f, "utf8") : null; } catch { return null; } },
+    async getBytes(k: string) { const f = file(k); try { return f ? new Uint8Array(readFileSync(f)) : null; } catch { return null; } },
+    async keys(prefix: string) { try { return walk(root).map((f) => relative(root, f).split(sep).join("/")).filter((k) => k.startsWith(prefix)); } catch { return []; } },
+    async put(k: string, _body: BodyInit, _type: string): Promise<void> { throw new Error(`offline dry run cannot write ${k}`); },
   };
 }
 
