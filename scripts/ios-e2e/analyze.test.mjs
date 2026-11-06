@@ -110,3 +110,28 @@ test("make-release builds release 2 with patches from the embedded bundle and fr
   const dup = JSON.parse(JSON.parse(readFileSync(join(root2, "p/e2e/1/ios/b0.json"), "utf8")).body);
   assert.equal(dup.core.patches.length, 1);
 });
+
+import { analyzeHermesRefusal, hermesRefusalTable, parseTelemetry } from "./analyze.mjs";
+
+const tl = (o) => `POST /t ${JSON.stringify({ schema_version: "1.0", app_id: "e2e", ...o })}`;
+const hm = { release: 3, previous_release: 2, running_release: 2 };
+
+test("Hermes mismatch refused: passing log", () => {
+  const ev = parseTelemetry(["GET /p/e2e/1/ios/b0 200", tl({ release: 2, event: "applied" }), tl({ release: 3, event: "hermes_bytecode_mismatch" })].join("\n"));
+  const r = analyzeHermesRefusal(ev, hm);
+  assert.equal(r.pass, true);
+  assert.match(hermesRefusalTable(r), /Hermes mismatch refused \| pass/);
+});
+
+test("Hermes mismatch refused: failing logs", () => {
+  const applied = parseTelemetry(tl({ release: 3, event: "applied" }));
+  assert.equal(analyzeHermesRefusal(applied, { ...hm, running_release: 3 }).pass, false);
+  const none = parseTelemetry(tl({ release: 2, event: "applied" }));
+  assert.match(analyzeHermesRefusal(none, hm).detail, /no hermes_bytecode_mismatch/);
+  const wrong = parseTelemetry(tl({ release: 3, event: "verify_failed" }));
+  assert.equal(analyzeHermesRefusal(wrong, hm).pass, false);
+  const ok = parseTelemetry(tl({ release: 3, event: "hermes_bytecode_mismatch" }));
+  assert.equal(analyzeHermesRefusal(ok, { ...hm, running_release: 3 }).pass, false);
+  assert.match(hermesRefusalTable({ pass: false, detail: "x" }), /\| fail \|/);
+  assert.throws(() => analyzeHermesRefusal(ok, {}), /missing release/);
+});
