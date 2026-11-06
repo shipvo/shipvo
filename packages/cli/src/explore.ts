@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
 import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
+import { writeIssues } from "./explore-issues.js";
 
 export type Step =
   | { action: "open" }
@@ -233,6 +234,12 @@ export async function explore(argv: string[]): Promise<number> {
     const out = a.out ?? "explore-report";
     writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
     console.log(`${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`);
+    if (a["issues-dir"] !== undefined) {
+      if (a["issues-dir"] === "true") throw new Error("--issues-dir needs a directory");
+      const { files, commands } = writeIssues(report.findings, (a.skin as Skin | undefined) ?? "android", a["issues-dir"]);
+      if (!files.length) console.log("No findings, so no issue files written.");
+      else console.log(`Wrote ${files.length} issue file${files.length === 1 ? "" : "s"} to ${a["issues-dir"]}. To file them:\n${commands.join("\n")}`);
+    }
     if (report.error) { console.error(report.error); return 1; }
     return report.findings.length && a["fail-on-findings"] === "true" ? 1 : 0;
   } finally { sim.stop(); }
