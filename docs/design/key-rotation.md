@@ -33,7 +33,7 @@ Key set the runtime trusts at any moment:
 
 **Old key revoked after a set time.** Each statement carries `old_key_valid_until`. The default is 14 days after `valid_from`, and the CLI refuses a value over 30 days, and the runtime rejects it too (section 4). Both sides check the cap. After that time the runtime rejects pointers signed by the old key. For a leak the owner sets it to `valid_from` (zero grace); the cost is that devices that have not yet fetched the statement stop receiving updates until they do.
 
-**One time rule: the device clock decides.** The runtime reads its own clock, `now`, once per check. It never uses a pointer's `issued_at` for key decisions, because whoever holds the old key can forge it.
+**One time rule: the device clock decides.** The runtime reads its own clock, `now`, once per check. It never uses a pointer's `issued_at` for key decisions, because whoever holds the old key can forge it. `now` is the wall clock (`System.currentTimeMillis()` on Android, `Date()` on iOS). Do not use `Store.now()`: it is `SystemClock.elapsedRealtime()` / `ProcessInfo.systemUptime`, which are monotonic and reset on reboot.
 
 - A statement is promoted (becomes the current key) when `now >= valid_from`.
 - The previous key is accepted only while `now < previous_valid_until`.
@@ -73,7 +73,7 @@ So the publish token alone can never rotate. An attacker needs the root seed.
 
 **M-of-N: not in v1.** Reason: the threat we close is "stolen publish token", and a single offline root key already closes it. M-of-N protects against one stolen root key, but it costs a multi-party signing flow, more shell-pinned keys (a larger and harder-to-change surface) and more ways to lose enough keys to be locked out. Teams with that need can keep the root key in a hardware token or a split-secret vault. The wire format reserves a `signatures` array so M-of-N can be added later without a new format (see section 4).
 
-**Recovery delay: yes, a short one for non-emergency rotations.** The runtime promotes a statement at `valid_from` (section 4, "Between fetch and `valid_from`"), and the CLI sets `valid_from` to now plus 24 hours by default for planned rotation (this is the one place the default is defined; other sections refer here), so an owner watching alerts can notice an unexpected rotation. This does not protect against a stolen root key (the attacker chooses `valid_from`), so the runtime does not enforce a minimum delay. The control plane emails/log-events the owner on every statement upload; that is the only real signal and it is weak. Say so in docs. Emergency rotation (`--emergency`) sets `valid_from` to now.
+**Recovery delay: yes, a short one for non-emergency rotations.** The runtime promotes a statement at `valid_from` (section 4, "Between fetch and `valid_from`"), and the CLI sets `valid_from` to now plus 24 hours by default for planned rotation (this is the one place the default is defined; other sections refer here), so an owner watching alerts can notice an unexpected rotation. This does not protect against a stolen root key (the attacker chooses `valid_from`), so the runtime does not enforce a minimum delay. The control plane would notify the owner on every statement upload (proposed; the channel is an open question, see below). That is the only real signal and it is weak. Say so in docs. Emergency rotation (`--emergency`) sets `valid_from` to now.
 
 ## 4. Wire format, replay protection, storage
 
@@ -181,7 +181,7 @@ Each slice stays under 400 changed lines including tests. Slices 3 to 5 touch gu
 | 1 | This document. | `docs/design/key-rotation.md`, `changes/736-key-rotation-design.md` | doc |
 | 2 | Statement schema and canonical test vectors. Zod/TS type, `type`/`v` constants, a JSON file of vectors (valid, wrong app, wrong type, gap sequence, bad signature) generated once and shared by every platform. | `packages/schema/src/rotation.ts`, `packages/schema/src/index.ts`, `packages/schema/test/rotation.test.ts`, `packages/schema/test/vectors/rotation.json` | ~200 |
 | 3 | CLI: `shipvo keys root init` and `shipvo keys rotate` (new seed, build and root-sign the statement, writes it to `.shipvo/rotation/`). Root seed read from file or stdin, never from the publish token. Does not edit `signing.ts` checks. | `packages/cli/src/rotation.ts`, `packages/cli/src/index.ts` (command table only), `packages/cli/test/rotation.test.ts` | ~300 |
-| 4 | Control plane: store and serve statements and the chain; accept an upload only if it verifies against the app's root key and sequence increases; reject publish-token-only attempts to change root. Migration is additive. Must keep `auth.ts` unchanged. | `services/control-plane/src/rotation.ts`, `services/control-plane/src/index.ts` (route), `services/control-plane/migrations/` (new file), `services/control-plane/test/rotation.test.ts` | ~350 |
+| 4 | Control plane: store and serve statements and the chain; accept an upload only if it verifies against the app's root key and sequence increases; reject publish-token-only attempts to change root. Migration is additive. Writes an audit entry for each accepted or rejected statement upload through `audit.ts` (table from `0016_audit_log.sql`, no new audit migration). Must keep `auth.ts` unchanged. | `services/control-plane/src/rotation.ts`, `services/control-plane/src/index.ts` (route), `services/control-plane/migrations/` (new file), `services/control-plane/test/rotation.test.ts` | ~350 |
 | 5 | Android runtime: parse and verify statements, key set in `Store`, pointer verification uses the key set, exclude the file from auto backup. | `packages/runtime/android/.../KeyRotation.kt` (new), `Store.kt`, `ShipvoRuntimeModule.kt` (key lookup line), `packages/runtime/android/src/test/.../KeyRotationTest.kt` | ~300 |
 | 6 | iOS runtime: same as 5. | `packages/runtime/ios/KeyRotation.swift` (new), `Store.swift`, `Updater.swift` (key lookup line), `packages/runtime/ios/Tests/KeyRotationTests.swift` | ~300 |
 | 7 | Build-time config: `ShipvoRootPublicKey` / `dev.shipvo.ROOT_PUBLIC_KEY`, Expo config plugin and `shipvo init` write it. Shells with no root key keep today's behaviour (rotation off). | `packages/cli/src/init.ts` (or the file that writes the plist and manifest), config plugin file, tests | ~200 |
@@ -201,10 +201,10 @@ Each runs on both platforms, in CI, against a shell built with a known root key 
 3. **Forged root rejected.** Serve a statement signed by a key that is not the pinned root (including a statement signed by the release key itself). Expect: rejected, `key_sequence` unchanged, genesis key still the one used.
 4. **Replayed statement rejected.** Apply sequence 1, then 2. Replay sequence 1, and replay sequence 2. Expect both rejected, key unchanged. Also a gap (sequence 4 when stored is 2) is rejected.
 
-5. **Fetched, not yet valid.** Fetch a statement at T with `valid_from = T+24h`. Expect `key_sequence` advanced and `pending_statement` stored. At T+1h a pointer signed by the new key is rejected, and a pointer signed by the current key is accepted. At T+24h the next check promotes the statement and the new key is accepted.
+5. **Fetched, not yet valid.** Fetch a statement at T with `valid_from = T+24h`. Expect `key_sequence` advanced and `pending_statement` stored. At T+1h a pointer signed by the new key is rejected with `pointer signature invalid`, and a pointer signed by the current key is accepted. At T+24h the next check promotes the statement and the new key is accepted.
 6. **Cap.** A statement with `old_key_valid_until` more than 30 days after `valid_from` is rejected, state unchanged.
 7. **Chain.** Device at genesis, chain of two statements. Expect the second key current, the first key as previous with the second statement's `old_key_valid_until`, and a genesis-signed pointer rejected.
-8. **Clock.** Device clock behind `valid_from` keeps the old key; clock ahead of `old_key_valid_until` rejects the old key.
+8. **Clock.** Device clock behind `valid_from` keeps the old key; clock ahead of `old_key_valid_until` rejects the old key. Also: relaunch the app (process restart) between fetch and `valid_from` and check the decision still follows the wall clock, not uptime.
 
 Extra cases in the same run: wrong `app_id`; wrong `type`; corrupted stored state falls back to the genesis key; relaunch keeps the rotated key.
 
@@ -212,6 +212,6 @@ Record what CI measured and on what image. Do not report results from other devi
 
 ## Open questions
 
-- Cap the length of the `statements` chain a device will verify (for example 16), so a hostile server cannot make a device verify an unbounded chain. A device further behind than the cap would need a new store build. The number is not chosen.
+- The `statements` chain a device will verify is capped at 16 (slices 5 and 6 use this number), so a hostile server cannot make a device verify an unbounded chain. Whether 16 is the right number is open. A device further behind than the cap would need a new store build. The number is not chosen.
 - Should the control plane send the owner a message on every statement upload? Proposed yes; delivery channel is not chosen.
 - Do we offer `keys root` as a separate offline command that never needs a network? Proposed yes, so a root seed never has to touch a machine with a publish token.
