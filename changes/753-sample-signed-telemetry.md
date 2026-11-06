@@ -1,2 +1,2 @@
-- `tide-and-tackle` (sample app): reports to `/t` are now signed, so auto-halt counts them. Needs a new shell build (adds `expo-secure-store` and `expo-crypto`).
+- `tide-and-tackle` (sample app): reports to `/t` are now signed, and the runtime's own events (rollback, crash) use the same install identity, so auto-halt counts both. No new native modules: it uses `expo-file-system` from the shell and `@noble/hashes`. The control plane needs `TELEMETRY_SECRET` set for the signature check.
 - Migration: none for exported APIs.

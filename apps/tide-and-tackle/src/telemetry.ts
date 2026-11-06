@@ -1,32 +1,48 @@
 // Signed telemetry for the sample app. Reports to `/t` carry an install id and an HMAC signature, so the
-// control plane's auto-halt counts them. Storage and crypto are native modules on a phone, so they are loaded
-// lazily. If they are missing (an older shell build) or registration fails, reports go out unsigned.
+// control plane's auto-halt counts them. The identity is created once by the runtime's `enableSignedTelemetry`, so
+// the runtime's own events (rollback, crash) and the app's reports share one install id.
+// No new native modules: storage is expo-file-system (already in the shell), HMAC is pure JS from @noble/hashes.
+// If registration fails, reports go out unsigned and the next report tries again.
+import { hmac } from "@noble/hashes/hmac";
+import { sha256 } from "@noble/hashes/sha256";
 import {
-  ensureInstallIdentity, signReport,
+  enableSignedTelemetry, signReport,
   type InstallIdentity, type TelemetryCrypto, type TelemetryStorage,
 } from "@shipvo/runtime";
 
-/** Keeps the install key in the platform keystore (iOS Keychain, Android Keystore). */
-export function secureStorage(): TelemetryStorage {
-  const SS = require("expo-secure-store");
-  return {
-    getItem: (k) => SS.getItemAsync(k),
-    setItem: (k, v) => SS.setItemAsync(k, v),
-  };
+/** Keeps the identity in a file in the app's document folder. Falls back to memory if the file module is missing. */
+export function fileStorage(): TelemetryStorage {
+  try {
+    const { File, Paths } = require("expo-file-system");
+    const f = new File(Paths.document, "shipvo-install.json");
+    return {
+      getItem: () => (f.exists ? f.textSync() : null),
+      setItem: (_k, v) => { f.write(v); },
+    };
+  } catch {
+    let v: string | null = null;
+    return { getItem: () => v, setItem: (_k, s) => { v = s; } };
+  }
 }
 
-/** Random bytes from expo-crypto, HMAC-SHA256 from @noble/hashes (pure JS, works on Hermes). */
-export function nativeCrypto(): TelemetryCrypto {
-  const { getRandomBytes } = require("expo-crypto");
-  const { hmac } = require("@noble/hashes/hmac");
-  const { sha256 } = require("@noble/hashes/sha256");
+/**
+ * Pure-JS crypto. The install id only has to be unique (the secret key comes from the server), so when
+ * `crypto.getRandomValues` is missing on the JS engine we fall back to `Math.random`.
+ */
+export function portableCrypto(): TelemetryCrypto {
   return {
-    randomBytes: (n) => getRandomBytes(n),
+    randomBytes: (n) => {
+      const out = new Uint8Array(n);
+      const c = (globalThis as any).crypto;
+      if (typeof c?.getRandomValues === "function") c.getRandomValues(out);
+      else for (let i = 0; i < n; i++) out[i] = Math.floor(Math.random() * 256);
+      return out;
+    },
     hmacSha256: (key, data) => hmac(sha256, key, data),
   };
 }
 
-/** The exact body to POST: `unsigned` with `install_id` added and the `sig` suffix. Falls back to plain JSON. */
+/** The exact body to POST: `body` with `install_id` added and the `sig` suffix. Falls back to plain JSON. */
 export async function signedBody(
   identity: InstallIdentity | null, body: Record<string, unknown>, crypto: TelemetryCrypto,
 ): Promise<string> {
@@ -42,25 +58,45 @@ export async function signedBody(
 
 export type Reporter = { body(b: Record<string, unknown>): Promise<string> };
 
-/** One reporter per base URL. Registers the install on first use (once per launch). Never throws. */
+/**
+ * One reporter per base URL. It calls the runtime's `enableSignedTelemetry` (which the runtime's own event reports
+ * use too) and signs the app's reports with the same identity. A failed registration is retried by the next report.
+ * Never throws.
+ */
 export function createReporter(
-  baseUrl: string, storage?: TelemetryStorage, crypto?: TelemetryCrypto,
-): Reporter {
-  let ready: Promise<{ id: InstallIdentity | null; crypto: TelemetryCrypto | null }> | null = null;
-  const init = async () => {
-    try {
-      const c = crypto ?? nativeCrypto();
-      const id = await ensureInstallIdentity(storage ?? secureStorage(), c, `${baseUrl}/t/register`);
-      return { id, crypto: c };
-    } catch {
-      return { id: null, crypto: null };
-    }
+  baseUrl: string, storage: TelemetryStorage = fileStorage(), crypto: TelemetryCrypto = portableCrypto(),
+): Reporter & { start(): Promise<InstallIdentity | null> } {
+  let ready: Promise<InstallIdentity | null> | null = null;
+  const start = () => {
+    ready ??= enableSignedTelemetry({ storage, crypto, registerUrl: `${baseUrl}/t/register` })
+      .catch(() => null)
+      .then((id) => { if (!id) ready = null; return id; });
+    return ready;
   };
   return {
-    async body(b) {
-      ready ??= init();
-      const { id, crypto: c } = await ready;
-      return c ? signedBody(id, b, c) : JSON.stringify(b);
-    },
+    start,
+    async body(b) { return signedBody(await start(), b, crypto); },
   };
+}
+
+const reporters = new Map<string, ReturnType<typeof createReporter>>();
+/** POST `body` to `${baseUrl}${path}`, signed when `sign` is set. Best effort: never throws. */
+export async function postJson(
+  baseUrl: string | undefined, path: string, body: Record<string, unknown>, sign = false,
+  fetchFn: typeof fetch = fetch, reporterFor: (u: string) => Reporter = (u) => {
+    let r = reporters.get(u); if (!r) { r = createReporter(u); reporters.set(u, r); } return r;
+  },
+) {
+  if (!baseUrl) return;
+  try {
+    const text = sign ? await reporterFor(baseUrl).body(body) : JSON.stringify(body);
+    await fetchFn(`${baseUrl}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: text });
+  } catch {}
+}
+
+/** Start registration early (at app launch) so the runtime's own events can be signed too. */
+export function startTelemetry(baseUrl: string | undefined) {
+  if (!baseUrl) return;
+  let r = reporters.get(baseUrl); if (!r) { r = createReporter(baseUrl); reporters.set(baseUrl, r); }
+  void r.start();
 }

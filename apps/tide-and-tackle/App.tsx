@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Runtime, onRuntimeEvents, type RuntimeState } from "@shipvo/runtime";
-import { createReporter, type Reporter } from "./src/telemetry";
+import { postJson, startTelemetry } from "./src/telemetry";
 import { RELEASE } from "./src/release";
 import { useContent } from "./src/content/useContent";
 import { ShopApp } from "./src/ui/Shop";
@@ -12,19 +12,8 @@ import type { Order } from "./src/domain/shop";
 const POLL_MS = 10_000;
 type Line = { at: string; text: string };
 
-const reporters = new Map<string, Reporter>();
-async function post(state: RuntimeState | null, path: string, body: Record<string, unknown>, sign = false) {
-  if (!state?.baseUrl) return;
-  try {
-    let text = JSON.stringify(body);
-    if (sign) {
-      let r = reporters.get(state.baseUrl);
-      if (!r) { r = createReporter(state.baseUrl); reporters.set(state.baseUrl, r); }
-      text = await r.body(body);
-    }
-    await fetch(`${state.baseUrl}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: text });
-  } catch {}
-}
+const post = (state: RuntimeState | null, path: string, body: Record<string, unknown>, sign = false) =>
+  postJson(state?.baseUrl, path, body, sign);
 const report = (state: RuntimeState, event: string, extra: Record<string, unknown> = {}) =>
   post(state, "/t", { schema_version: "1.0", app_id: state.appId, release: state.runningRelease, event, device_class: "low",
     android_api: typeof Platform.Version === "number" ? Platform.Version : undefined, ...extra }, true);
@@ -43,6 +32,7 @@ export default function App() {
   useEffect(() => onRuntimeEvents((events) => events.forEach((e) => add(e.replace(":", " release ")))), []);
 
   useEffect(() => {
+    try { startTelemetry(Runtime.getState().baseUrl); } catch {}
     try {
       const h = Runtime.markHealthy();
       const s = Runtime.getState();

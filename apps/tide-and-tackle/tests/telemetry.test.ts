@@ -1,48 +1,108 @@
-import { test, expect, vi } from "vitest";
+import { test, expect, vi, beforeEach } from "vitest";
 import { createHmac } from "node:crypto";
-// The runtime index pulls in React Native native-module code that Node cannot parse. The signing code under test is in install.ts.
-vi.mock("@shipvo/runtime", async () => await import("../../../packages/runtime/src/install"));
-import { createReporter, signedBody } from "../src/telemetry";
 
-const crypto = {
-  randomBytes: (n: number) => new Uint8Array(n).fill(7),
-  hmacSha256: (k: Uint8Array, d: Uint8Array) => new Uint8Array(createHmac("sha256", k).update(d).digest()),
-};
 const memory = () => { const m = new Map<string, string>(); return { m, getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); } }; };
+
+// Tests set `globalThis.__native` before the runtime is imported (see the runtime's stub).
+const queue: string[] = [];
+async function load() {
+  vi.resetModules();
+  queue.length = 0;
+  (globalThis as any).__native = {
+    getState: () => ({ baseUrl: "https://cp.test", appId: "tide", runningRelease: 4 }),
+    consumeEvents: () => queue.splice(0),
+    checkForUpdate: async () => ({ status: "none" }), markHealthy: () => ({}), rollback() {}, reload() {},
+  };
+  const tel = await import("../src/telemetry");
+  const rt = await import("@shipvo/runtime");
+  return { tel, rt };
+}
 
 function verify(sent: string, key: string) {
   const m = /,"sig":"([0-9a-f]{64})"\}$/.exec(sent)!;
+  expect(m).not.toBeNull();
   const unsigned = sent.slice(0, m.index) + "}";
   expect(createHmac("sha256", key).update(unsigned).digest("hex")).toBe(m[1]);
   return JSON.parse(sent);
 }
 
-test("reports are signed with the registered key and verify the way the server checks them", async () => {
-  const realFetch = globalThis.fetch;
-  const calls: string[] = [];
-  globalThis.fetch = (async (url: string) => { calls.push(url); return new Response(JSON.stringify({ key: "k-secret" })); }) as any;
-  try {
-    const st = memory();
-    const r = createReporter("https://cp.test", st, crypto);
-    const sent = await r.body({ schema_version: "1.0", event: "applied", release: 3 });
-    const parsed = verify(sent, "k-secret");
-    expect(parsed.install_id).toBe("07".repeat(16));
-    expect(parsed.event).toBe("applied");
-    await r.body({ event: "x" });
-    expect(calls).toEqual(["https://cp.test/t/register"]); // registered once
-    expect(st.m.size).toBe(1);
-  } finally { globalThis.fetch = realFetch; }
+let sent: { url: string; body: string }[] = [];
+let registerStatus = 200;
+beforeEach(() => {
+  sent = []; registerStatus = 200;
+  globalThis.fetch = (async (url: string, init?: any) => {
+    sent.push({ url, body: init?.body ?? "" });
+    if (url.endsWith("/t/register")) return new Response(registerStatus === 200 ? JSON.stringify({ key: "k-secret" }) : "no", { status: registerStatus });
+    return new Response("{}");
+  }) as any;
+});
+const flush = () => new Promise((r) => setTimeout(r, 20));
+
+test("portableCrypto: hmac matches node:crypto, random bytes have the right length", async () => {
+  const { tel } = await load();
+  const c = tel.portableCrypto();
+  const key = new TextEncoder().encode("k-secret"), data = new TextEncoder().encode('{"a":1}');
+  expect(Buffer.from(await c.hmacSha256(key, data)).toString("hex")).toBe(createHmac("sha256", "k-secret").update(data).digest("hex"));
+  expect((await c.randomBytes(16)).length).toBe(16);
 });
 
-test("when registration fails, the report goes out unsigned", async () => {
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async () => new Response("no", { status: 503 })) as any;
-  try {
-    const sent = await createReporter("https://cp.test", memory(), crypto).body({ event: "applied" });
-    expect(sent).toBe('{"event":"applied"}');
-  } finally { globalThis.fetch = realFetch; }
+test("portableCrypto: random bytes fall back to Math.random without crypto.getRandomValues", async () => {
+  const { tel } = await load();
+  const orig = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  Object.defineProperty(globalThis, "crypto", { value: undefined, configurable: true });
+  try { expect((await tel.portableCrypto().randomBytes(16)).length).toBe(16); }
+  finally { if (orig) Object.defineProperty(globalThis, "crypto", orig); }
+});
+
+test("fileStorage falls back to memory when expo-file-system is missing", async () => {
+  const { tel } = await load();
+  const s = tel.fileStorage();
+  expect(await s.getItem("k")).toBeNull();
+  await s.setItem("k", "v");
+  expect(await s.getItem("k")).toBe("v");
+});
+
+test("app reports and runtime events are signed with one identity, registered once", async () => {
+  const { tel, rt } = await load();
+  const st = memory();
+  const r = tel.createReporter("https://cp.test", st, tel.portableCrypto());
+  const body = verify(await r.body({ schema_version: "1.0", event: "applied", release: 3 }), "k-secret");
+  expect(body.event).toBe("applied");
+
+  queue.push("crash_loop_revert");
+  rt.reportRuntimeEvents();
+  await flush();
+  const t = sent.filter((s) => s.url === "https://cp.test/t");
+  expect(t).toHaveLength(1);
+  const ev = verify(t[0].body, "k-secret");
+  expect(ev.install_id).toBe(body.install_id);
+  expect(sent.filter((s) => s.url.endsWith("/t/register"))).toHaveLength(1);
+  expect(st.m.size).toBe(1);
+});
+
+test("a failed registration goes out unsigned, and the next report retries", async () => {
+  const { tel } = await load();
+  const r = tel.createReporter("https://cp.test", memory(), tel.portableCrypto());
+  registerStatus = 503;
+  expect(await r.body({ event: "applied" })).toBe('{"event":"applied"}');
+  registerStatus = 200;
+  verify(await r.body({ event: "applied" }), "k-secret");
+});
+
+test("postJson signs /t reports but leaves /o orders unsigned", async () => {
+  const { tel } = await load();
+  const reporter = tel.createReporter("https://cp.test", memory(), tel.portableCrypto());
+  const fetchFn = (async (url: string, init: any) => { sent.push({ url, body: init.body }); return new Response("{}"); }) as any;
+  await tel.postJson("https://cp.test", "/t", { event: "applied" }, true, fetchFn, () => reporter);
+  await tel.postJson("https://cp.test", "/o/tide", { order: { id: 1 } }, false, fetchFn, () => reporter);
+  const t = sent.find((s) => s.url === "https://cp.test/t")!;
+  verify(t.body, "k-secret");
+  expect(sent.find((s) => s.url === "https://cp.test/o/tide")!.body).toBe('{"order":{"id":1}}');
+  await tel.postJson(undefined, "/t", {}, true, fetchFn, () => reporter); // no base URL: nothing sent
+  expect(sent.filter((s) => s.url.endsWith("/t") || s.url.includes("/o/"))).toHaveLength(2);
 });
 
 test("signedBody falls back to plain JSON without an identity", async () => {
-  expect(await signedBody(null, { a: 1 }, crypto)).toBe('{"a":1}');
+  const { tel } = await load();
+  expect(await tel.signedBody(null, { a: 1 }, tel.portableCrypto())).toBe('{"a":1}');
 });
