@@ -36,6 +36,17 @@ describe("approval routes", () => {
     expect(r.status).toBe(200);
     expect(JSON.parse(m["c/tide/challenge/c1"]!)).toMatchObject({ status: "approved", approved_by: "owner (admin)", approved_how: "admin session", args_hash: "h" });
   });
+  it("an unknown id answers 404 and an already decided one 409", async () => {
+    const { e } = env();
+    const ck = await cookie("pw", "tide");
+    const gone = await app.request("/app/tide/api/approvals/nope/approve", { method: "POST", headers: { cookie: ck } }, e);
+    expect(gone.status).toBe(404);
+    expect(((await gone.json()) as any).error.code).toBe("approval_not_found");
+    expect((await post(e, { cookie: ck })).status).toBe(200);
+    const again = await post(e, { cookie: ck }, "deny");
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as any).error.code).toBe("approval_not_pending");
+  });
   it("the owner token can list pending approvals", async () => {
     const { e } = env();
     const r: any = await (await app.request("/app/tide/api/approvals", { headers: { authorization: "Bearer owner-secret" } }, e)).json();

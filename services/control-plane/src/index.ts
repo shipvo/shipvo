@@ -330,7 +330,7 @@ for (const verb of ["approve", "deny"] as const) app.post(`/app/:id/api/approval
   if (!actor) return c.json({ error: "unauthorized" }, 401);
   if (actor === AGENT_ACTOR) return c.json({ ok: false, error: { code: "agent_cannot_approve", message: "Only the owner signed in to the admin can decide an approval. A token cannot." } }, 403);
   const r = await resolveChallenge({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, c.req.param("cid"), verb, actor, "admin session");
-  return c.json(r, r.ok ? 200 : 409);
+  return c.json(r, r.ok ? 200 : r.error.code === "approval_not_found" ? 404 : 409);
 });
 
 /**
