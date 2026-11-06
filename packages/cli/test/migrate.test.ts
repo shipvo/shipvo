@@ -60,3 +60,48 @@ it("--json for nothing to migrate prints one envelope", async () => {
 it("needs --plan", async () => {
   expect(await migrate([], tmp)).toBe(2);
 });
+
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+
+const fixture = () => {
+  w("package.json", JSON.stringify({ name: "a", dependencies: { expo: "~58.0.0", "expo-updates": "~58.0.0" } }, null, 2) + "\n");
+  w("app.json", JSON.stringify({ expo: { slug: "a", plugins: ["expo-router", "expo-updates"], updates: { url: "x" }, runtimeVersion: { policy: "appVersion" }, ios: { runtimeVersion: "1", bundleIdentifier: "a.b" } } }, null, 2) + "\n");
+};
+const git = (...a: string[]) => execFileSync("git", ["-c", "user.email=a@b.c", "-c", "user.name=t", ...a], { cwd: tmp, stdio: "ignore" });
+
+it("--apply removes exactly the planned entries, backs up, and a second run is a no-op", async () => {
+  fixture();
+  expect(await migrate(["--apply", "--force"], tmp)).toBe(0);
+  expect(JSON.parse(readFileSync(join(tmp, "package.json"), "utf8"))).toEqual({ name: "a", dependencies: { expo: "~58.0.0" } });
+  expect(JSON.parse(readFileSync(join(tmp, "app.json"), "utf8"))).toEqual({ expo: { slug: "a", plugins: ["expo-router"], ios: { bundleIdentifier: "a.b" } } });
+  expect(JSON.parse(readFileSync(join(tmp, ".shipvo/migrate-backup/package.json"), "utf8")).dependencies["expo-updates"]).toBe("~58.0.0");
+  expect(existsSync(join(tmp, ".shipvo/migrate-backup/app.json"))).toBe(true);
+  expect(out.join("\n")).toContain("shipvo init");
+  out.length = 0;
+  expect(await migrate(["--apply"], tmp)).toBe(0);
+  expect(out.join("\n")).toContain("Nothing left to do");
+});
+
+it("--apply refuses a dirty git tree without --force", async () => {
+  fixture();
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  w("README.md", "dirty");
+  expect(await migrate(["--apply"], tmp)).toBe(1);
+  expect(readFileSync(join(tmp, "package.json"), "utf8")).toContain("expo-updates");
+  expect(existsSync(join(tmp, ".shipvo"))).toBe(false);
+  expect(await migrate(["--apply", "--force"], tmp)).toBe(0);
+  expect(readFileSync(join(tmp, "package.json"), "utf8")).not.toContain("expo-updates");
+});
+
+it("--apply on a clean git tree works, and --json has next steps", async () => {
+  fixture();
+  git("init", "-q"); git("add", "."); git("commit", "-qm", "x");
+  const lines: string[] = [];
+  vi.mocked(console.log).mockRestore();
+  vi.spyOn(console, "log").mockImplementation((...a) => { lines.push(a.join(" ")); });
+  await migrate(["--apply", "--json"], tmp);
+  const doc = JSON.parse(lines[0]);
+  expect(doc).toMatchObject({ ok: true, code: "applied" });
+  expect(doc.next.map((n: any) => n.command)).toContain("shipvo init");
+});
