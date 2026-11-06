@@ -25,6 +25,7 @@
     "browser-resolver.mjs",
     "app-name.mjs",
     "frame.mjs",
+    "lumi.mjs",
     "phone-browser.mjs",
     "browser-app.mjs",
     "ws-lite.mjs",

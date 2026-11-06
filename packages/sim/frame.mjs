@@ -7,6 +7,7 @@ import { shadeHtml, shadeCss, shadeClientScript } from "./shade.mjs";
 import { settingsHtml, settingsIconHtml, settingsCss, settingsClientScript } from "./settings.mjs";
 import { storeIconHtml, storeScreenHtml, storeCss, appsClientScript } from "./apps.mjs";
 import { updateBannerHtml, updateCss, updateClientScript } from "./update.mjs";
+import { lumiHtml, lumiCss, lumiClientScript, lumiDefault } from "./lumi.mjs";
 import { homeScreenHtml, recentsHtml, navButtonsHtml, navScreensCss, classifySwipe, setVisibilityInPage } from "./nav.mjs";
 
 export const SKINS = {
@@ -118,6 +119,7 @@ ${shadeClientScript(iframeId, skin)}
 ${settingsClientScript(iframeId)}
 ${appsClientScript(iframeId, phone)}
 ${updateClientScript()}
+${lumiClientScript()}
 (function nav(){var r=root();if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')};
 if(!q("home-screen")||!q("recents"))return;
 var classifySwipe=${classifySwipe.toString()},setVisibilityInPage=${setVisibilityInPage.toString()};
@@ -182,9 +184,10 @@ function battery(b) {
  * - dark: true gives light status text on a dark bar, false gives dark text on a light bar.
  * - status: { time, signal 0-4, wifi, airplane, battery (0-100, or { level, charging }) }.
  * - screen: optional HTML placed in the screen area (the page puts its iframe there).
+ * - lumi: draw Lumi beside the cutout (outside the app's screen). Default: on, but off in CI; SHIPVO_LUMI=off hides it anywhere.
  * Returns { skin, width, height, outerWidth, outerHeight, html, css }. width and height are the screen size.
  */
-export function renderFrame({ skin = "android", dark = false, status, screen = "" } = {}) {
+export function renderFrame({ skin = "android", dark = false, status, screen = "", lumi = lumiDefault() } = {}) {
   const k = SKINS[skin];
   if (!k) throw new Error(`Unknown skin "${skin}". Use "android" or "ios".`);
   const st = normalizeStatus(status);
@@ -193,7 +196,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     ? `<span class="sf-cut sf-island" data-part="dynamic-island"></span>`
     : `<span class="sf-cut sf-hole" data-part="punch-hole"></span>`;
   const html = `<div class="sf-body" data-skin="${skin}" data-theme="${dark ? "dark" : "light"}" data-part="phone-body">`
-    + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}<span class="sf-icons">${icons(st)}</span></div>`
+    + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}${lumi ? lumiHtml() : ""}<span class="sf-icons">${icons(st)}</span></div>`
     + `<div class="sf-content">${screen}</div>` + updateBannerHtml()
     + shadeHtml(skin) + `<span class="sf-edge" data-part="edge-swipe"></span>` + homeScreenHtml().replace(/<\/div>$/, settingsIconHtml() + storeIconHtml() + "</div>") + settingsHtml() + storeScreenHtml() + recentsHtml() + lockScreenHtml(st.time) + bootScreenHtml() + offScreenHtml()
     + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button>${skin === "android" ? `<button role="menuitem" data-act="navstyle" data-part="nav-style-toggle">3-button navigation</button>` : ""}<button role="menuitem" data-act="cancel">Cancel</button></div>`
@@ -219,6 +222,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-boot{inset:0;z-index:6;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font:700 34px system-ui,sans-serif;letter-spacing:.04em}`,
     `.sf-vbar{display:block;width:90px;height:4px;margin-top:6px;border-radius:2px;background:#fff4}.sf-vbar b{display:block;height:100%;border-radius:2px;background:#fff}.sf-vol{top:80px;right:12px;padding:8px 14px;border-radius:14px;background:#222d;color:#fff;font:600 14px system-ui,sans-serif}`,
     `.sf-menu{left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:16px;background:#222;box-shadow:0 8px 30px #0008}.sf-menu button{padding:10px 24px;border:0;border-radius:10px;background:#3a3d42;color:#fff;font:600 15px system-ui,sans-serif}`,
+    ...(lumi ? [lumiCss(k)] : []),
     shadeCss,
     settingsCss,
     storeCss,
