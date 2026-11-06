@@ -69,6 +69,8 @@ describe("open_app attach", { timeout: 30_000 }, () => {
     const t = await c.callTool({ name: "tap", arguments: { session: /session: (\S+)/.exec(text)![1], ref: "e1" } }) as { content: { text: string }[] };
     expect(t.content[0].text).toContain(TREE);
     expect(seen.some((m) => m.type === "tap" && m.ref === "e1")).toBe(true);
+    // Lumi is told about the open from the real result (#874); the page captions tap, type, scroll and back itself.
+    expect(seen.some((m) => m.type === "lumi" && m.caption === "Opened menu" && m.state === "working")).toBe(true);
     await c.close();
   });
   it("attaches to the live run's app without a simulator that knows it", async () => {
