@@ -9,8 +9,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 1. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 2. Shipvo Phone and `shipvo run` (Phone's own features and attach still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
 3. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
-2. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
-3. Store path: `shipvo store` from working app to both stores (video, blog)
 4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
 5. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
 6. Record demo videos (`record_*`) (tutorial, video, blog; docs done)
