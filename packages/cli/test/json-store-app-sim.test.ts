@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
+import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { store } from "../src/store";
 import { appCmd } from "../src/app";
 import { sim } from "../src/sim";
+
+const simMock = vi.hoisted(() => ({ spawn: null as null | ((args: string[]) => unknown) }));
+vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), spawn: (_cmd: string, args: string[]) => simMock.spawn?.(args) }));
+vi.mock("../src/ensure-playwright.js", () => ({ ensurePlaywright: () => undefined }));
 
 const cwd = process.cwd();
 let out: string[], err: string[], home: string;
@@ -96,6 +102,35 @@ describe("store --json", () => {
   });
 });
 
+describe("store screenshots --json", () => {
+  const jpeg = (w: number, h: number) => Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 8, h >> 8, h & 255, w >> 8, w & 255, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xff, 0xd9]).toString("base64");
+  const fakeSim = (wrongSize: boolean) => {
+    let size = { width: 0, height: 0 };
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: { body: string }) => {
+      const body = JSON.parse(init.body);
+      if (body.width) size = body;
+      const data = wrongSize ? jpeg(100, 100) : jpeg(size.width, size.height);
+      return new Response(JSON.stringify({ ok: true, data }), { status: 200 });
+    }));
+  };
+  it("success reports screenshots_ready with the output folder", async () => {
+    appDir(); fakeSim(false);
+    process.exitCode = 1; // a stale value must not leak into the result
+    const { doc, code } = await run(() => store(["screenshots", "--sim", "http://sim.test", "--out", "shots", "--json"]));
+    expect(code).toBe(0); expect(doc.code).toBe("screenshots_ready"); expect(doc.data.out).toBe("shots");
+  });
+  it("a wrong size fails with screenshots_failed and exit 1", async () => {
+    appDir(); fakeSim(true);
+    const { doc, code } = await run(() => store(["screenshots", "--sim", "http://sim.test", "--json"]));
+    expect(code).toBe(1); expect(doc.ok).toBe(false); expect(doc.code).toBe("screenshots_failed");
+  });
+  it("outside an app folder fails with no_config and exit 1", async () => {
+    process.chdir(mkdtempSync(join(tmpdir(), "shipvo-empty-")));
+    const { doc, code } = await run(() => store(["details", "--dry-run", "--json"]));
+    expect(code).toBe(1); expect(doc.code).toBe("no_config");
+  });
+});
+
 describe("app --json", () => {
   it("fails with not_signed_in when there are no credentials", async () => {
     appDir();
@@ -155,5 +190,33 @@ describe("sim --json", () => {
     process.chdir(mkdtempSync(join(tmpdir(), "shipvo-empty-")));
     const { doc, code } = await run(() => sim(["--json"]));
     expect(code).toBe(1); expect(doc.ok).toBe(false); expect(doc.code).toBe("failed");
+  });
+  describe("with a stub simulator", () => {
+    let listener: Server | undefined;
+    function simApp() {
+      const d = appDir();
+      mkdirSync(join(d, "sim-dist"), { recursive: true }); writeFileSync(join(d, "sim-dist/index.html"), "<html></html>");
+      const pkg = join(d, "node_modules/@shipvo/sim"); mkdirSync(pkg, { recursive: true });
+      writeFileSync(join(pkg, "package.json"), JSON.stringify({ name: "@shipvo/sim", version: "0.0.0" })); writeFileSync(join(pkg, "server.mjs"), "");
+    }
+    afterEach(() => { listener?.close(); listener = undefined; simMock.spawn = null; });
+    it("prints one listening envelope", async () => {
+      simApp();
+      simMock.spawn = (args) => { listener = createServer(); listener.listen(Number(args[args.indexOf("--port") + 1]), "127.0.0.1"); return new EventEmitter(); };
+      const { createServer: probe } = await import("node:net");
+      const p = probe(); await new Promise<void>((r) => p.listen(0, r)); const port = (p.address() as { port: number }).port; await new Promise((r) => p.close(r));
+      const { doc, code } = await run(() => sim(["--port", String(port), "--skip-build", "--json"]));
+      expect(code).toBe(0); expect(out).toHaveLength(1);
+      expect(doc.code).toBe("listening");
+      expect(doc.data).toMatchObject({ url: `http://localhost:${port}/app/`, port, app_id: "shop" });
+    });
+    it("fails with sim_exited when the child exits before listening", async () => {
+      simApp();
+      const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+      simMock.spawn = () => { const e = new EventEmitter(); setTimeout(() => e.emit("exit", 1), 20); return e; };
+      const { doc, code } = await run(() => sim(["--port", "45987", "--skip-build", "--json"]));
+      expect(code).toBe(1); expect(doc.ok).toBe(false); expect(doc.code).toBe("sim_exited");
+      expect(exit).toHaveBeenCalled();
+    });
   });
 });

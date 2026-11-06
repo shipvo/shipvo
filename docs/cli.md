@@ -432,6 +432,7 @@ Failure codes and their exit codes:
 | `no_plan` | 2 | `store status` found no `store-plan.json` |
 | `unknown_step` | 2 | `store status --mark` named a step that does not exist |
 | `no_browser`, `no_sim` | 2 | `sim` could not find Chromium or `@shipvo/sim` |
+| `no_config` | 1 | `store` ran in a folder with no `shipvo.json` |
 | `not_signed_in` | 1 | `app` needs `shipvo login` first |
 | `not_found` | 1 | `app delete` found no such app on your account |
 | `register_failed` | 1 | `app create` was refused by the control plane |

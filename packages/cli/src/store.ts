@@ -33,7 +33,13 @@ async function storeJson(argv: string[]): Promise<void> {
   await runJson(async (): Promise<Done> => {
     // `testers` builds its own envelope data, so it runs apart from the text-mode wrapper.
     if (sub === "testers") return testersDone(argv.slice(1));
-    await trapExit(() => storeRun(argv), classifyExit(STORE_RULES, STORE_NEXT));
+    process.exitCode = undefined; // a stale value must not turn a success into screenshots_failed
+    try { await trapExit(() => storeRun(argv), classifyExit(STORE_RULES, STORE_NEXT)); }
+    catch (e) {
+      // `loadConfig` throws instead of exiting, so classify its message here.
+      if (e instanceof Error && !(e instanceof CliFailure) && /^No shipvo\.json/.test(e.message)) throw new CliFailure(e.message, "no_config", 1, STORE_NEXT);
+      throw e;
+    }
     const plan = read();
     if (sub === "setup") return { code: "plan_written", summary: `Wrote ${PLAN_FILE}.`, data: { file: PLAN_FILE, answers: plan?.answers ?? null }, next: plan ? stepNext(plan) : STORE_NEXT };
     if (sub === "status" && plan) {
