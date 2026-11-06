@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 const exec = vi.hoisted(() => ({ fn: (_cmd: string) => {} }));
-vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string) => exec.fn(c) }));
+vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string) => exec.fn(c), spawnSync: (c: string, a: string[]) => { try { exec.fn(`${c} ${a.join(" ")}`); return { status: 0 }; } catch { return { status: 1 }; } } }));
 
 const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown }));
 const puts: string[] = [];

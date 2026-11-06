@@ -3,9 +3,9 @@
 // it writes the Shipvo values into AndroidManifest.xml and Info.plist (adopt-bare.ts).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { join, resolve } from "node:path";
+import { runBin } from "./spawn-bin.js";
 import { b64, keyFromSeed } from "./index.js";
 import { runDoctorChecks } from "./doctor.js";
 import { adoptNextSteps, applyAndroidConfig, checkExpoModules, findAndroidManifest, findIosInfoPlist, iosConfigChanged, writeAndroidConfig, writeIosConfig } from "./adopt-bare.js";
@@ -53,12 +53,12 @@ export type AdoptDeps = { install: (pm: PackageManager, pkgs: string[], dir: str
 const defaultDeps: AdoptDeps = {
   install(pm, pkgs, dir, dev = false) {
     const devFlag = dev ? [pm === "npm" ? "--save-dev" : pm === "yarn" || pm === "bun" ? "--dev" : "-D"] : [];
-    const r = spawnSync(pm, [pm === "npm" ? "install" : "add", ...devFlag, ...pkgs], { cwd: dir, stdio: "inherit" });
-    if (r.status !== 0) throw new Error(`${pm} could not install ${pkgs.join(", ")}`);
+    const status = runBin(pm, [pm === "npm" ? "install" : "add", ...devFlag, ...pkgs], { cwd: dir });
+    if (status !== 0) throw new Error(`${pm} could not install ${pkgs.join(", ")}`);
   },
   installExpoModules(dir) {
-    const r = spawnSync("npx", ["install-expo-modules@latest", "--non-interactive"], { cwd: dir, stdio: "inherit" });
-    if (r.status !== 0) throw new Error("npx install-expo-modules@latest failed");
+    const status = runBin("npx", ["install-expo-modules@latest", "--non-interactive"], { cwd: dir });
+    if (status !== 0) throw new Error("npx install-expo-modules@latest failed");
   },
   async confirm(q) {
     if (!process.stdin.isTTY) { console.error("shipvo: this is not a terminal, so I cannot ask. Re-run with --yes to apply the plan, or --dry-run to only read it."); process.exit(2); }

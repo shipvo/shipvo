@@ -4,6 +4,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { runBin } from "./spawn-bin.js";
 import { sha256Hex, signBytes } from "./index.js";
 import { checkBundle, parseDeclared } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
@@ -215,7 +216,7 @@ export function dryRunSummary(release: number, bytes: number, outDir: string, in
 }
 
 async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof loadConfig>, APP: string, release: number, outDir?: string) {
-  execSync("PN_SIM=1 npx expo export --platform web --output-dir dist-web --clear", { stdio: "inherit" });
+  if (runBin("npx", ["expo", "export", "--platform", "web", "--output-dir", "dist-web", "--clear"], { env: { ...process.env, PN_SIM: "1" } }) !== 0) throw new Error("The web build failed. Run `npx expo export --platform web` to see why.");
   const base = `w/${APP}/r${release}`; const files: string[] = []; let indexSha = "";
   for (const f of walk("dist-web")) {
     const rel = f.slice("dist-web/".length); if (rel === "metadata.json") continue;

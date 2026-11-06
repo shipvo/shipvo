@@ -1,9 +1,10 @@
 // `shipvo sim`: build the app's web bundle with the simulated device and serve it in the simulator.
-import { execSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync, watch } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
+import { runBin } from "./spawn-bin.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
 
@@ -124,7 +125,10 @@ export async function sim(argv: string[]) {
   }
   if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
     console.error(`Building ${cfg.name} for the simulator…`);
-    execSync("PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear", { stdio: "inherit", env: { ...process.env, PN_SIM: "1" } });
+    if (runBin("npx", ["expo", "export", "--platform", "web", "--output-dir", "sim-dist", "--clear"], { env: { ...process.env, PN_SIM: "1" } }) !== 0) {
+      console.error("The web build failed. Run `npx expo export --platform web` to see why.");
+      process.exit(1);
+    }
   }
   try { ensurePlaywright({ cwd: process.cwd() }); }
   catch (e) { console.error(e instanceof Error ? e.message : String(e)); process.exit(2); }

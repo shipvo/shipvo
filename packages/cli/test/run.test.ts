@@ -168,6 +168,15 @@ describe("run()", () => {
     try { expect(await run(["ios", "--native"])).toBe(0); } finally { spy.mockRestore(); delete process.env.RUN_TEST_FAKE_NATIVE; }
     expect(err.join("\n")).toContain("not the simulated device");
   });
+  it("--native starts npx.cmd through a shell on Windows", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const orig = Object.getOwnPropertyDescriptor(process, "platform")!;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    Object.defineProperty(process, "platform", { value: "win32" });
+    process.env.RUN_TEST_FAKE_NATIVE = "1";
+    try { await run(["android", "--native"]); } finally { Object.defineProperty(process, "platform", orig); spy.mockRestore(); delete process.env.RUN_TEST_FAKE_NATIVE; }
+    expect(vi.mocked(spawnSync)).toHaveBeenLastCalledWith("npx.cmd", ["expo", "run:android"], expect.objectContaining({ shell: true }));
+  });
 });
 
 describe("no playwright (source grep guard)", () => {

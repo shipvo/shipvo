@@ -1,9 +1,9 @@
 // `shipvo preview`: build the web artifact with the simulated device, wrap it in a phone-sized frame page
 // and publish it to here.now with no account. The link is public and lasts 24 hours unless claimed.
 import { spawn } from "node:child_process";
-import { spawnBin } from "./spawn-bin.js";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep, extname } from "node:path";
+import { spawnBin } from "./spawn-bin.js";
 import { args as parse, loadConfig } from "./config.js";
 import { RECORDER_JS } from "./preview-recorder.js";
 

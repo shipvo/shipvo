@@ -11,7 +11,7 @@ vi.mock("../src/config.js", async (orig) => ({
 const ensure = vi.hoisted(() => vi.fn());
 vi.mock("../src/ensure-playwright.js", () => ({ ensurePlaywright: ensure }));
 const exec = vi.hoisted(() => vi.fn());
-vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: exec }));
+vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: exec, spawnSync: exec }));
 import { sim } from "../src/sim";
 
 let srv: Server | undefined;

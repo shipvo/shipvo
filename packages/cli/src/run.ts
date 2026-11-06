@@ -1,13 +1,13 @@
 // `shipvo run android|ios`: build the web export with the simulated device, serve it on a local port and
 // open a phone frame page in the default browser. No browser automation. `--native` runs `npx expo run:<platform>`.
-import { spawn, spawnSync } from "node:child_process";
-import { spawnBin } from "./spawn-bin.js";
+import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { join, extname, normalize, resolve, sep } from "node:path";
+import { runBin } from "./spawn-bin.js";
 import { loadConfig } from "./config.js";
 import { AGENT_PATH, hostAllowed, isAgentRole, isLoopback, originAllowed, tokenMatches, type AgentRole, type RunInfo } from "./run-protocol.js";
 import { bridgeScript } from "./run-bridge.js";
@@ -219,8 +219,7 @@ export async function run(argv: string[]): Promise<number> {
   if (o.native) {
     const { cmd, args } = nativeCommand(o.platform);
     console.error(`Running natively: ${cmd} ${args.join(" ")} (not the simulated device)`);
-    const sb = spawnBin(cmd, args);
-    return spawnSync(sb.command, sb.args, { stdio: "inherit", shell: sb.shell }).status ?? 1;
+    return runBin(cmd, args);
   }
   let name: string;
   try { name = loadConfig().name; } catch (e) { console.error((e as Error).message); return 1; }
