@@ -5,6 +5,7 @@
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
 // Tools: get_update_state, check_for_update, apply_update (OTA updates on the phone), list_store_apps, install_app, uninstall_app, switch_app (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
 //        owner_describe, owner_command, audit_log (the app's live content, prices, orders: owner token required).
+import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -13,12 +14,13 @@ import { readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { z } from "zod";
+import { tools, type ToolDef } from "@shipvo/mcp-tools";
 import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
 import { Recorder, RecorderError } from "./recorder.js";
 import { connectDriver, findLiveRun, type Driver } from "./attach.js";
-import { satisfied, sameTree, wantsMatch, type WaitFor, type Waited } from "./wait.js";
+import { satisfied, sameTree, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
 const CONTROL = (process.env.PN_CONTROL ?? "https://api.shipvo.dev").replace(/\/$/, "");
@@ -110,10 +112,6 @@ const sessions = new Map<string, { app: string; steps: number; startedAt: number
 const trees = new Map<string, string>();
 // Recorded steps per session, for export_test. Dropped when the session ends.
 const steps = new Map<string, Step[]>();
-// Tool annotations (MCP hints): clients use them to decide what to run without asking.
-const RO = { readOnlyHint: true, destructiveHint: false };
-const WR = { readOnlyHint: false, destructiveHint: false };
-const DEST = { readOnlyHint: false, destructiveHint: true };
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
@@ -141,6 +139,8 @@ const result = (sid: string, r: Act) => {
 // (ChatGPT does), so an unknown id is forwarded and the simulator answers if it knows it.
 const need = (_sid: string) => {};
 
+// Register a tool from the shared registry (@shipvo/mcp-tools): name, description, schema and hints come from there.
+const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => server.tool(t.name, t.description, t.input, t.annotations, cb);
 type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
 const SERVER_VERSION = "0.0.4";
 const SUPPORTED_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -154,7 +154,7 @@ Finish a task by checking the final screen says what you expected (for example "
 
 // ctx.app: the app(s) this key opens, comma-separated (the beta app plus any the key owner has registered).
 const keyApps = ctx.app ? ctx.app.split(",").map((s) => s.trim()).filter(Boolean) : null;
-server.tool("list_apps", "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').", { query: z.string().optional() }, RO, async ({ query }) => {
+use(server, tools.list_apps, async ({ query }) => {
   const APPS = await localApps(); const ids = keyApps ?? Object.keys(APPS); const q = (query ?? "").toLowerCase();
   let dir: Record<string, { name: string; description: string; category: string }> = {};
   try { const r = await fetch(`${CONTROL}/apps/public${q ? `?q=${encodeURIComponent(q)}` : ""}`); if (r.ok) for (const a of ((await r.json()) as any).apps) dir[a.app_id] = a; } catch {}
@@ -165,13 +165,7 @@ server.tool("list_apps", "Apps this server can open, with what each one does. Op
   return text(lines.join("\n") || `no apps match "${query}"`);
 });
 
-server.tool("open_app", "Open an app in a fresh phone-sized session and return its first screen.", {
-  app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"),
-  session: z.string().optional().describe("Session name (default: generated). One session is one phone."),
-  seed_cart: z.array(z.object({ product_id: z.string().optional(), id: z.string().optional(), quantity: z.number().int().positive().optional(), qty: z.number().int().positive().optional() }).refine((l) => (l.product_id ?? l.id) && (l.quantity ?? l.qty), "each line needs product_id (or id) and quantity (or qty)")).optional().describe("Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."),
-  dark: z.boolean().optional().describe("Dark mode"),
-  attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
-}, WR, async ({ app, session, seed_cart, dark, attach }) => {
+use(server, tools.open_app, async ({ app, session, seed_cart, dark, attach }) => {
   const id = app.split("@")[0];
   const live = attach === "never" ? undefined : findLiveRun(id);
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
@@ -206,21 +200,12 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
 });
 
-server.tool("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, RO, async () => {
+use(server, tools.list_sessions, async () => {
   const r = await sim("/sessions", {}) as Act & { sessions?: { session: string; app: string; release: string | number; started_at: string | null }[] };
   if (r.code === "sim_timeout") return result("", r);
   const rows = (r.sessions ?? []).filter((s) => !keyApps || keyApps.includes(s.app));
   return text(rows.length ? rows.map((s) => `${s.session}: ${s.app} release ${s.release}${s.started_at ? ` since ${s.started_at}` : ""}`).join("\n") : "no open sessions");
 });
-const sid = z.string().describe("Session from open_app");
-const compact = z.boolean().optional().describe("When the change is 'content changed', return only the added/removed lines, not the whole screen");
-const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
-const ASYNC = " Work that starts on a tap (paying, saving, loading) can finish after this returns, so the screen may show 'Paying...' or a spinner. Do not report that as the result: pass wait_for with the text you expect (and gone: true for the spinner), or settle: true, before you read the outcome or do anything else.";
-const waitFor = z.object({ ref: z.string().regex(/^e\d+$/).optional(), text: z.string().optional(), role: z.string().optional(), name: z.string().optional(), gone: z.boolean().optional() })
-  .refine((w) => wantsMatch(w), "give ref, text, or role and name").optional()
-  .describe("Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out.");
-const timeoutMs = z.number().int().min(0).max(30000).optional().describe("How long wait_for and settle may take, in ms (default 2000)");
-const settle = z.boolean().optional().describe("Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text.");
 type Wait = { wait_for?: WaitFor; timeout_ms?: number; settle?: boolean };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Poll the screen after an action. The polling reads are not action spans, so the wait counts as idle time in a recording. Returns the latest result and what happened. On timeout the action result is kept as is.
@@ -239,87 +224,72 @@ async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; wait
   }
   return { r: cur, waited: { matched, ms: Date.now() - t0 } };
 }
-const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
-server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await act({ session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const at = await locating(session, ref); const first = await act({ session, action: "tap", ref }); if (first.ok && at) void recorder.tap(at); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
-server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
+use(server, tools.screen, async ({ session }) => { need(session); const r = await act({ session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
+use(server, tools.tap, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const at = await locating(session, ref); const first = await act({ session, action: "tap", ref }); if (first.ok && at) void recorder.tap(at); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
+use(server, tools.type, 
   async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await act({ session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
-server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
+use(server, tools.scroll, 
   async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const box = ref ? await locating(session, ref, true) : undefined; const first = await act({ session, action: "scroll", direction, ref }); if (first.ok && recorder.drawing) void recorder.trail(...scrollTrail(direction, box)); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
-server.tool("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
-server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
+use(server, tools.back, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
+use(server, tools.screenshot, async ({ session }) => {
   need(session); const r = await act({ session, action: "screenshot" });
   if (!r.ok) return result(session, r);
   if (!r.path) throw new Error("no screenshot");
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
 });
 // The simulated device: what the phone has, and what happens to it.
-server.tool("set_device", "Change what the simulated phone has: location, the address book (contacts), calendar events, files for the file picker, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
-  session: sid,
-  location: z.object({ latitude: z.number(), longitude: z.number(), accuracy: z.number().optional() }).optional(),
-  camera: z.object({ barcode: z.object({ type: z.string(), data: z.string() }).nullable().optional(), delayMs: z.number().optional() }).optional(),
-  permissions: z.object({ camera: z.enum(["granted", "denied", "undetermined"]).optional(), location: z.enum(["granted", "denied", "undetermined"]).optional(), notifications: z.enum(["granted", "denied", "undetermined"]).optional(), contacts: z.enum(["granted", "denied", "undetermined"]).optional(), calendar: z.enum(["granted", "denied", "undetermined"]).optional() }).optional(),
-  contacts: z.array(z.object({ id: z.string(), name: z.string(), phoneNumbers: z.array(z.string()).optional(), emails: z.array(z.string()).optional() })).optional().describe("Replace the address book the app can read (needs contacts permission)"),
-  calendar: z.array(z.object({ id: z.string(), title: z.string(), start: z.string().describe("ISO 8601"), end: z.string().describe("ISO 8601"), allDay: z.boolean().optional(), location: z.string().optional(), notes: z.string().optional() })).optional().describe("Replace the calendar events the app can read (needs calendar permission)"),
-  files: z.array(z.object({ name: z.string(), mimeType: z.string(), content: z.string().describe("The file's text") })).optional().describe("Replace the files the file picker offers"),
-  biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
-  payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
-  online: z.boolean().optional(),
-  wifi: z.boolean().optional(), mobileData: z.boolean().optional(), airplane: z.boolean().optional(), locationServices: z.boolean().optional(), darkMode: z.boolean().optional().describe("The app's colour scheme (prefers-color-scheme)"), dnd: z.boolean().optional().describe("Do Not Disturb: notifications go to the shade without a banner"), autoRotate: z.boolean().optional(), flashlight: z.boolean().optional(), orientationLock: z.boolean().optional(), brightness: z.number().min(0).max(100).optional(),
-  source: z.enum(["auto", "simulated"]).optional().describe("\"simulated\" forces the simulated camera, microphone and location even when a person could grant the real ones, for reproducible runs"),
-  microphone: z.object({ level: z.number().min(0).max(1).optional() }).optional(),
-}, WR, async ({ session, ...device }) => { need(session); const r = await act({ session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
-server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap. The app receives it only if notification permission is granted; otherwise nothing is delivered.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
+use(server, tools.set_device, async ({ session, ...device }) => { need(session); const r = await act({ session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
+use(server, tools.push_notification, 
   async ({ session, title, body, data }) => {
     need(session); const r = await act({ session, action: "push_notification", title, body, data });
     // The simulator answers ok when permission blocks the push, so say so: otherwise it looks like a delivery.
     if (r.ok && r.delivered === false) return result(session, { ...r, screen: `Not delivered: notification permission is not granted (use set_device permissions.notifications).\n\n${r.screen ?? ""}` });
     return result(session, r);
   });
-server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,
+use(server, tools.notifications, 
   async ({ session }) => { need(session); const r = await act({ session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
-server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() }, WR,
+use(server, tools.open_notification, 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "open_notification", id })); });
-server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+use(server, tools.open_url, 
   async ({ session, url }) => { need(session); return result(session, await act({ session, action: "open_url", url })); });
-server.tool("lock", "Press the power button: the simulated phone locks and shows the lock screen. The app and its screen are kept. While locked, tap, type, scroll and back fail with phone_locked. Logged in device_log as simulated.", { session: sid }, WR,
+use(server, tools.lock, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "lock" })); });
-server.tool("unlock", "Swipe up on the lock screen. Returns to the same screen as before the lock. Fails with not_locked if the phone is not locked. Logged in device_log as simulated.", { session: sid }, WR,
+use(server, tools.unlock, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "unlock" })); });
-server.tool("restart", "Restart the simulated phone from the power menu: a boot screen, then the app starts fresh (cold start). Storage is kept. Returns the first screen. Logged in device_log as simulated.", { session: sid }, WR,
+use(server, tools.restart, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "restart" })); });
-server.tool("open_notifications", "Pull down from the top. Android: the first call opens the notification shade (a few quick-settings tiles and the notifications); a second call expands all tiles. iPhone: opens Notification Center (grouped by app). Returns the tiles and notifications.", { session: sid, expand: z.boolean().optional().describe("Android: go straight to all tiles") }, WR,
+use(server, tools.open_notifications, 
   async ({ session, expand }) => { need(session); return result(session, await act({ session, action: "open_notifications", expand })); });
-server.tool("open_control_center", "iPhone only: swipe down from the top right to open Control Center (airplane, Wi-Fi, mobile data, focus, orientation lock, brightness, dark mode). Android fails with no_control_center: use open_notifications.", { session: sid }, WR,
+use(server, tools.open_control_center, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "open_control_center" })); });
-server.tool("toggle_tile", "Flip a quick-settings tile in the open shade or Control Center. It changes the simulated device like set_device: Wi-Fi and mobile data both off take the network offline, dark_mode changes the app's colour scheme, dnd stops banners. Tiles: wifi, mobile_data, airplane, location, dark_mode, dnd, auto_rotate, flashlight (Android); airplane, wifi, mobile_data, focus, orientation_lock, brightness, dark_mode (iPhone). Fails with tile_not_visible if the panel is closed.", { session: sid, tile: z.string(), value: z.union([z.boolean(), z.number()]).optional().describe("true or false; 0 to 100 for brightness. Omit to flip.") }, WR,
+use(server, tools.toggle_tile, 
   async ({ session, tile, value }) => { need(session); return result(session, await act({ session, action: "toggle_tile", tile, value })); });
-server.tool("get_settings", "Read the phone's system settings from the Settings screen: dark_mode, font_size (small, default, large, largest), bold_text, reduce_motion, language (en, fr, ar) and rtl. Returns each setting and the screen as rows.", { session: sid }, RO,
+use(server, tools.get_settings, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "get_settings" })); });
-server.tool("set_setting", "Change one system setting, as a person would in the phone's Settings screen. The app sees it through Appearance (dark_mode), PixelRatio.getFontScale (font_size), AccessibilityInfo (bold_text, reduce_motion), I18nManager (rtl) and Intl (language). Setting language to ar turns rtl on; en and fr turn it off. Fails with unknown_setting for a key that does not exist and bad_value for a value it does not take. Logged in device_log as simulated.", { session: sid, key: z.string().describe("dark_mode, font_size, bold_text, reduce_motion, language or rtl"), value: z.union([z.boolean(), z.string()]).describe("true or false for switches; small, default, large or largest for font_size; en, fr or ar for language") }, WR,
+use(server, tools.set_setting, 
   async ({ session, key, value }) => { need(session); return result(session, await act({ session, action: "set_setting", key, value })); });
-server.tool("dismiss_notification", "Swipe a notification away in the open shade (newest if no id), or Clear all with all: true.", { session: sid, id: z.string().optional(), all: z.boolean().optional() }, WR,
+use(server, tools.dismiss_notification, 
   async ({ session, id, all }) => { need(session); return result(session, await act({ session, action: "dismiss_notification", id, all })); });
-server.tool("close_panels", "Close the notification shade, Notification Center or Control Center (swipe up).", { session: sid }, WR,
+use(server, tools.close_panels, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "close_panels" })); });
-server.tool("press_home", "Press Home: the app goes to the background (it receives AppState \"background\") and the phone shows the home screen with the app icon. While there, tap, type, scroll and back fail with app_not_foreground. Call resume_app to bring the app back (AppState \"active\"). Logged as simulated.", { session: sid }, WR,
+use(server, tools.press_home, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "press_home" })); });
-server.tool("open_recents", "Open the app switcher: the app goes to the background and its card is shown. resume_app opens the card again; kill_app swipes it away.", { session: sid }, WR,
+use(server, tools.open_recents, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "open_recents" })); });
-server.tool("resume_app", "Tap the app icon on the home screen, or its card in the app switcher: the app comes back (AppState \"active\") with its screen kept. Fails with app_in_foreground if it is already in front.", { session: sid }, WR,
+use(server, tools.resume_app, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "resume_app" })); });
-server.tool("kill_app", "Swipe the app's card away in the app switcher (call open_recents first). The app is killed: the next resume_app is a cold start, with storage kept. Fails with recents_not_open otherwise.", { session: sid }, WR,
+use(server, tools.kill_app, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "kill_app" })); });
-server.tool("list_store_apps", "List the apps in the phone's Store: the marketplace apps from the control plane, each with id, name, bundle url and version. Fails with store_unreachable when the marketplace cannot be reached (nothing is guessed). Install one with install_app.", {}, RO, async () => {
+use(server, tools.list_store_apps, async () => {
   const r = await storeApps();
   if (!r.ok) return result("", r);
   return { ...text(JSON.stringify(r.apps, null, 2)), structuredContent: { apps: r.apps } };
 });
-server.tool("install_app", "Install a Store app on the phone, as tapping Install in the Store screen does. The app icon appears on the home screen. Fails with unknown_app (not in the Store) or already_installed. If the marketplace is unreachable the phone's own Store list is used. Logged in device_log as simulated: nothing real is installed.", { session: sid, id: z.string().describe("App id from list_store_apps") }, WR,
+use(server, tools.install_app, 
   async ({ session, id }) => { need(session); const st = await storeApps(); return result(session, await act({ session, action: "install_app", id, ...(st.ok ? { catalog: st.apps } : {}) })); });
-server.tool("uninstall_app", "Remove an installed app from the phone. If it was open, the phone returns to the home screen. Fails with not_installed. Logged in device_log as simulated.", { session: sid, id: z.string().describe("Installed app id") }, DEST,
+use(server, tools.uninstall_app, 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "uninstall_app", id })); });
-server.tool("switch_app", "Open an installed app (tap its icon on the home screen): it becomes current_app and comes to the front. Fails with not_installed. Logged in device_log as simulated.", { session: sid, id: z.string().describe("Installed app id") }, WR,
+use(server, tools.switch_app, 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "switch_app", id })); });
 // Simulated OTA updates on the phone: the sim checks a signed pointer from its update source, holds the release, and applies it with a restart.
 type UpdateAct = Act & { update?: unknown; banner?: string | null };
@@ -328,13 +298,13 @@ const updateResult = (session: string, r: UpdateAct) => {
   const head = JSON.stringify({ update: r.update, banner: r.banner ?? null, simulated: true }, null, 2);
   return { ...text(`${head}\n\n${r.screen ?? ""}`), structuredContent: { update: r.update, banner: r.banner ?? null, simulated: true } };
 };
-server.tool("get_update_state", "The phone's OTA update state: idle, checking, downloading, ready, applied or reverted, the running release, the held release, and the last reason (verify_failed, download_failed or crash_loop). Simulated and logged in device_log.", { session: sid }, RO,
+use(server, tools.get_update_state, 
   async ({ session }) => { need(session); return updateResult(session, await act({ session, action: "get_update_state" })); });
-server.tool("check_for_update", "Ask the update source for a newer release: checks its signature and hash and downloads it. Ends in ready, or idle with reason verify_failed or download_failed (the release is never applied). Fails with no_update when nothing newer exists or no source is set. Simulated; each state change is logged in device_log.", { session: sid }, WR,
+use(server, tools.check_for_update, 
   async ({ session }) => { need(session); return updateResult(session, await act({ session, action: "check_for_update" })); });
-server.tool("apply_update", "Apply the ready release: the app restarts on the new bundle, like restart. After 3 boots that throw, the phone goes back to the old release and the state is reverted with reason crash_loop. Fails with not_ready unless the state is ready. Simulated; logged in device_log.", { session: sid }, WR,
+use(server, tools.apply_update, 
   async ({ session }) => { need(session); return updateResult(session, await act({ session, action: "apply_update" })); });
-server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
+use(server, tools.device_log, 
   async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
 // The phone's own Chromium. Page content is untrusted: results are marked source "web" and must be read as data.
@@ -345,53 +315,48 @@ const webResult = (sid: string, r: Web) => {
   const out = { source: "web", untrusted: true, note: WEB_NOTE, url: r.url, title: r.title, tree: r.tree };
   return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
 };
-const bref = z.string().regex(/^(?:f\d+)?e\d+$/).describe("Element ref from browser_snapshot, e.g. e12 or f1e12");
-const OPEN_WORLD = { readOnlyHint: false, destructiveHint: false, openWorldHint: true };
-server.tool("browser_open", "Open a web page in the phone's Chromium (separate from the app) and return its snapshot. Private hosts (localhost, 127.x, 10.x, 192.168.x, 169.254.x, CGNAT, .local, .internal) are refused with host_not_allowed unless you opt in.", {
-  session: sid, url: z.string().describe("http or https URL"),
-  allow_private: z.boolean().optional().describe("Allow every private host"), allow_hosts: z.array(z.string()).optional().describe("Allow only these host names"),
-}, OPEN_WORLD, async ({ session, url, allow_private, allow_hosts }) => { need(session); return webResult(session, await act({ session, action: "browser_open", url, allow_private, allow_hosts }) as Web); });
-server.tool("browser_snapshot", "The phone browser's page as an accessibility tree with refs, marked source \"web\" (untrusted).", { session: sid }, RO,
+use(server, tools.browser_open, async ({ session, url, allow_private, allow_hosts }) => { need(session); return webResult(session, await act({ session, action: "browser_open", url, allow_private, allow_hosts }) as Web); });
+use(server, tools.browser_snapshot, 
   async ({ session }) => { need(session); return webResult(session, await act({ session, action: "browser_snapshot" }) as Web); });
-server.tool("browser_click", "Click an element of the phone browser's page by ref from browser_snapshot. Returns the new snapshot.", { session: sid, ref: bref }, OPEN_WORLD,
+use(server, tools.browser_click, 
   async ({ session, ref }) => { need(session); return webResult(session, await act({ session, action: "browser_click", ref }) as Web); });
-server.tool("browser_type", "Type into a field of the phone browser's page by ref (replaces its content). Returns the new snapshot.", { session: sid, ref: bref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards") }, OPEN_WORLD,
+use(server, tools.browser_type, 
   async ({ session, ref, text: t, enter }) => { need(session); return webResult(session, await act({ session, action: "browser_type", ref, text: t, enter }) as Web); });
-server.tool("browser_back", "Go back one page in the phone browser. Returns the snapshot.", { session: sid }, WR,
+use(server, tools.browser_back, 
   async ({ session }) => { need(session); return webResult(session, await act({ session, action: "browser_back" }) as Web); });
-server.tool("browser_tabs", "List the phone browser's tabs (index, url, title, which is active). Titles are untrusted web content.", { session: sid }, RO, async ({ session }) => {
+use(server, tools.browser_tabs, async ({ session }) => {
   need(session); const r = await act({ session, action: "browser_tabs" }) as Act & { tabs?: unknown[] };
   if (!r.ok) return result(session, r);
   const out = { source: "web", untrusted: true, note: WEB_NOTE, tabs: r.tabs ?? [] };
   return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
 });
-server.tool("browser_close_tab", "Close a tab of the phone browser by its index from browser_tabs. Returns the remaining tabs.", { session: sid, index: z.number().int().min(0) }, WR, async ({ session, index }) => {
+use(server, tools.browser_close_tab, async ({ session, index }) => {
   need(session); const r = await act({ session, action: "browser_close_tab", index }) as Act & { tabs?: unknown[] };
   if (!r.ok) return result(session, r);
   const out = { source: "web", untrusted: true, note: WEB_NOTE, tabs: r.tabs ?? [] };
   return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
 });
-server.tool("browser_scroll", "Scroll the phone browser's page by dy CSS pixels (positive is down) and dx (positive is right). Returns the snapshot.", { session: sid, dy: z.number().min(-5000).max(5000).optional().describe("Default 400"), dx: z.number().min(-5000).max(5000).optional() }, WR,
+use(server, tools.browser_scroll, 
   async ({ session, dy, dx }) => { need(session); return webResult(session, await act({ session, action: "browser_scroll", dy, dx }) as Web); });
-server.tool("browser_wait_for", "Wait until text appears in the phone browser's page, or is gone (gone: true). Fails with code timeout. Returns the snapshot.", { session: sid, text: z.string().min(1).max(200), gone: z.boolean().optional(), timeout_ms: z.number().int().min(100).max(30000).optional().describe("Default 5000") }, RO,
+use(server, tools.browser_wait_for, 
   async ({ session, text: t, gone, timeout_ms }) => { need(session); return webResult(session, await act({ session, action: "browser_wait_for", text: t, gone, timeout_ms }) as Web); });
-server.tool("browser_screenshot", "A PNG of the phone browser's page.", { session: sid }, RO, async ({ session }) => {
+use(server, tools.browser_screenshot, async ({ session }) => {
   need(session); const r = await act({ session, action: "browser_screenshot" });
   if (!r.ok) return result(session, r);
   if (!r.path) throw new Error("no screenshot");
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: WEB_NOTE }] };
 });
 
-server.tool("device_reset", "Put the simulated phone back to a known state (permissions undetermined, default location, nothing in front of the camera, log cleared), optionally with a new profile.", { session: sid, platform: z.enum(["android", "ios"]).optional(), api: z.number().optional() }, WR,
+use(server, tools.device_reset, 
   async ({ session, ...device }) => { need(session); return result(session, await act({ session, action: "device_reset", device })); });
 
-server.tool("export_test", "Turn the steps taken in this session (tap, type, scroll, back, set_device) into a @shipvo/test script and return its source. Read-only. Targets are named by their visible text; ambiguous ones become TODO comments and password fields use an environment variable instead of the typed value.", { session: sid }, RO, async ({ session }) => {
+use(server, tools.export_test, async ({ session }) => {
   const rec = steps.get(session), s = sessions.get(session);
   if (!rec || !s) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
   return text(exportTest(s.app, rec));
 });
 
-server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, DEST, async ({ session }) => {
+use(server, tools.end_session, async ({ session }) => {
   need(session);
   const live = attached.get(session);
   if (live) { const s = sessions.get(session); live.close(); attached.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session); return text(JSON.stringify({ session, app: s?.app, mode: "attached", steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000) }, null, 2)); }
@@ -407,27 +372,18 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
 
 // Record the phone frame page to an MP4 (one recording per server). Page: SHIPVO_FRAME_URL, default the simulator's root.
 const recFail = (e: unknown) => { if (e instanceof RecorderError) return result("", { ok: false, code: e.code, error: e.message }); throw e; };
-server.tool("record_start", "Start recording the phone frame to an MP4 under .shipvo/recordings/. Use record_marker for chapters and record_stop to finish.", {
-  format: z.enum(["9:16", "16:9", "1:1"]).optional().describe("Video shape (default 9:16: 1080x1920; 16:9 is 1920x1080; 1:1 is 1080x1080)"),
-  fps: z.union([z.literal(30), z.literal(60)]).optional().describe("Frames per second (default 30)"),
-  title: z.string().optional().describe("Used in the file name"),
-  show_taps: z.boolean().optional().describe("Draw a finger dot and ripple on taps and a trail on scrolls (default true)"),
-  background: z.string().min(1).optional().describe('Behind the phone: "brand", "plain" (white) or a CSS colour such as "#102030"'),
-}, WR, async ({ format, fps, title, show_taps, background }) => {
+use(server, tools.record_start, async ({ format, fps, title, show_taps, background }) => {
   try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
 });
-server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
+use(server, tools.record_marker, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
 });
-server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters. With music: true, mixes a ducked music bed under the video and writes a credits JSON next to it (credit the track where you publish).", {
-  music: z.boolean().optional().describe("Mix a music bed under the video (default false). Needs python3, ffmpeg and ffprobe; picks a track from Jamendo unless SHIPVO_MUSIC_FILE is set."),
-  narration: z.string().optional().describe("Path to a wav with a voice track. It is mixed over the video, trimmed to the video length (the result says so), and ducks the music when music is true."),
-}, WR, async ({ music, narration }) => {
+use(server, tools.record_stop, async ({ music, narration }) => {
   try { const r = await recorder.stop({ music, narration }); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 
 // Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.
-server.tool("publish_preview", "Build the app in PN_APP_DIR (or the current folder) with the simulated device and publish a shareable web preview to here.now, no account. The link is PUBLIC and expires in 24 hours; claimUrl keeps it. Returns { url, claimUrl, expiresAt }. Needs @shipvo/cli (npx).", {}, { title: "Publish a public preview", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+use(server, tools.publish_preview, 
   async () => {
     if (ctx.scope && ctx.scope !== "owner" && ctx.scope !== "test") throw new Error(`this key has scope "${ctx.scope}": it cannot publish a preview`);
     const cwd = process.env.PN_APP_DIR || process.cwd();
@@ -438,7 +394,7 @@ server.tool("publish_preview", "Build the app in PN_APP_DIR (or the current fold
   });
 
 // Owner side: the same typed commands the admin at /app/<id>/admin uses.
-server.tool("owner_describe", "List the owner commands of an app (content, prices, offers, orders, publish). Needs PN_OWNER_TOKEN.", { app: z.string() }, RO, async ({ app }) => {
+use(server, tools.owner_describe, async ({ app }) => {
   const r = await fetch(`${CONTROL}/app/${app}/api/describe`); return text(await r.text());
 });
 // The owner's agent rules from shipvo.json (agentPolicy, agentDeny) in PN_APP_DIR or the current folder. Sent to the control plane, which only lets them tighten its own rules.
@@ -451,7 +407,7 @@ function agentRules(): Record<string, string> {
     return h;
   } catch { return {}; }
 }
-server.tool("owner_command", "Run an owner command against the live app (changes are audited). Commands that cannot be undone or reach users (publish, prices, offers, deletes, API keys) do nothing and return { code: \"needs_confirm\", plan } first: show the plan to the owner, then ask the owner to approve the returned challenge in the admin (approval_url). You cannot approve it yourself, and confirm: true alone does nothing. Once approved, call again with the same args and approval: <challenge id>. An approval works once, for 10 minutes, for exactly those args.", { app: z.string(), command: z.string(), args: z.record(z.unknown()).optional(), approval: z.string().optional().describe("Challenge id the owner approved; pass the same args") }, DEST,
+use(server, tools.owner_command, 
   async ({ app, command, args, approval }) => {
     if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": owner commands need an owner key`);
     if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
@@ -471,7 +427,7 @@ async function approvalsCall(app: string, path: string, method: "GET" | "POST") 
   const body: any = await r.json().catch(() => ({}));
   return { r, body };
 }
-server.tool("approvals_list", "List what waits for an owner. approvals: promotes held above the app's policy band (hold id, release, band, proposer, age). challenges: owner commands waiting for the owner to approve in the admin (id, command, plan, expiry, approval_url). Agents cannot approve either. Needs an owner token.", { app: z.string() }, RO, async ({ app }) => {
+use(server, tools.approvals_list, async ({ app }) => {
   const { r, body } = await approvalsCall(app, "", "GET");
   if (!r.ok) return { ...text(JSON.stringify({ ok: false, status: r.status, ...body })), isError: true };
   const t = Date.now();
@@ -484,7 +440,7 @@ server.tool("approvals_list", "List what waits for an owner. approvals: promotes
   const approvals = (body.approvals ?? []).map((h: any) => ({ id: h.id, release: h.release, band: h.band, proposer: h.proposer, proposed_at: h.proposed_at, age_seconds: Number.isFinite(Date.parse(h.proposed_at)) ? Math.max(0, Math.round((t - Date.parse(h.proposed_at)) / 1000)) : null }));
   return { ...text(JSON.stringify({ ok: true, app, approvals, challenges }, null, 2)), structuredContent: { ok: true, app, approvals, challenges } };
 });
-server.tool("approval_approve", "Approve a held promote so it goes live. The proposer cannot approve it, and an agent cannot approve an agent's proposal: that is refused with rule self_approval. Ask the owner to approve in that case. Both outcomes are audited.", { app: z.string(), id: z.string().describe("Hold id from approvals_list") }, DEST, async ({ app, id }) => {
+use(server, tools.approval_approve, async ({ app, id }) => {
   const { r, body } = await approvalsCall(app, `/${encodeURIComponent(id)}/approve`, "POST");
   if (!r.ok) return { ...text(JSON.stringify({ ok: false, status: r.status, ...body })), isError: true };
   return text(JSON.stringify({ ok: true, app, approval_id: body.approval_id ?? id, status: body.status }));
@@ -492,7 +448,7 @@ server.tool("approval_approve", "Approve a held promote so it goes live. The pro
 
 // Read-only: the app's audit log from the control plane (the endpoint `shipvo audit` pages through), newest first.
 const AUDIT_PAGE = 200, AUDIT_MAX_PAGES = 10;
-server.tool("audit_log", "Read the app's release audit log, newest first: who (actor) did what (action) to which release (subject) and when (at). Read-only. Needs an owner token.", { app: z.string(), limit: z.number().int().optional().describe("Rows to return (default 50, max 200; values outside are clamped)"), action: z.string().optional().describe("Only rows with this action, for example rollback") }, RO,
+use(server, tools.audit_log, 
   async ({ app, limit, action }) => {
     const fail = (code: string, error: string) => ({ ...text(`Error [${code}]: ${error}`), isError: true as const, structuredContent: { ok: false, code, error } });
     if (ctx.scope && ctx.scope !== "owner") return fail("unauthorized", `this key has scope "${ctx.scope}": the audit log needs an owner key`);

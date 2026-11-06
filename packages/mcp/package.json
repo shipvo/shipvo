@@ -9,7 +9,7 @@
   },
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/inline-tools.mjs",
     "prepublishOnly": "pnpm build",
     "test": "vitest run"
   },
@@ -21,7 +21,9 @@
     "typescript": "^5.6.3",
     "@types/node": "^22.8.0",
     "vitest": "^2.1.4",
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "@shipvo/mcp-tools": "workspace:*",
+    "esbuild": "^0.21.5"
   },
   "keywords": [
     "mcp",

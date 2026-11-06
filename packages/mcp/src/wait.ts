@@ -12,7 +12,6 @@ export function present(tree: string, w: WaitFor): boolean {
   if (w.role && w.name) return ls.some((l) => { const p = parse(l); return !!p && p.role === w.role && p.text.includes(w.name!); });
   return false;
 }
-export const wantsMatch = (w: WaitFor) => !!(w.ref || w.text || (w.role && w.name));
 export const satisfied = (tree: string, w: WaitFor) => present(tree, w) !== !!w.gone;
 
 // Two reads are equal when they differ only in ref numbers.
