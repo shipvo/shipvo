@@ -1,19 +1,10 @@
 // Publishes one signed release into the local server tree, like `shipvo publish` does for the real control plane:
 // bundle at b/<app>/r<N>.hbc, bsdiff patches against given bases, and one signed pointer per band.
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { bsdiff } from "../../packages/cli/dist/bsdiff.js";
 import { buildPointer, sha256 } from "./lib.mjs";
 
-function bsdiff(oldBytes, newBytes) {
-  const w = mkdtempSync(join(tmpdir(), "bsd-"));
-  try {
-    writeFileSync(join(w, "o"), oldBytes); writeFileSync(join(w, "n"), newBytes);
-    execFileSync("python3", ["-c", "import sys,bsdiff4; bsdiff4.file_diff(*sys.argv[1:4])", join(w, "o"), join(w, "n"), join(w, "p")]);
-    return new Uint8Array(readFileSync(join(w, "p")));
-  } finally { rmSync(w, { recursive: true, force: true }); }
-}
 const put = (file, data) => { mkdirSync(dirname(file), { recursive: true }); const t = file + ".tmp"; writeFileSync(t, data); renameSync(t, file); };
 
 /**
