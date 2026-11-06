@@ -15,6 +15,7 @@ const repo = resolve(root, "../..");
 const app = join(repo, "apps/tide-and-tackle");
 const require_ = createRequire(join(root, "package.json"));
 let out = ""; let work = ""; let sim: ChildProcess | undefined; let simErr = "";
+const SIM_START_MS = 180_000;
 const port = 4900 + Math.floor(Math.random() * 300);
 
 beforeAll(async () => {
@@ -29,12 +30,14 @@ beforeAll(async () => {
   if (!existsSync(pw.chromium.executablePath())) throw new Error("Chromium is not installed: run scripts/agents/install-chromium.sh");
   sim = spawn(process.execPath, [join(repo, "packages/sim/server.mjs"), "--port", String(port), "--dir", join(work, "state"), "--dist", join(work, "dist")], { cwd: app, stdio: ["ignore", "ignore", "pipe"] });
   sim.stderr!.on("data", (d) => { simErr += d; });
+  // Wait by wall clock, not by attempt count: on a loaded runner a probe can take longer than its sleep.
+  const deadline = Date.now() + SIM_START_MS;
   let up = false;
-  for (let i = 0; i < 450 && !up; i++) {
-    try { await fetch(`http://localhost:${port}/`); up = true; } catch { if (sim.exitCode !== null) throw new Error("sim exited: " + simErr); await new Promise((r) => setTimeout(r, 200)); }
+  while (!up && Date.now() < deadline) {
+    try { await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(5_000) }); up = true; } catch { if (sim.exitCode !== null) throw new Error("sim exited: " + simErr); await new Promise((r) => setTimeout(r, 200)); }
   }
-  if (!up) throw new Error(`sim did not start on port ${port} within 90 s. stderr: ${simErr || "(empty)"}`);
-}, 240_000);
+  if (!up) throw new Error(`sim did not start on port ${port} within ${SIM_START_MS / 1000} s. stderr: ${simErr || "(empty)"}`);
+}, 420_000);
 afterAll(async () => {
   if (sim && sim.exitCode === null) { const done = new Promise((r) => sim!.once("exit", r)); sim.kill("SIGKILL"); await done; }
   sim?.stderr?.destroy();
