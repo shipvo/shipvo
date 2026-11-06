@@ -112,7 +112,7 @@ The only change in the callers is the key passed to `ed25519` for the pointer en
 
 - **Signing.** The root key holder signs offline with `shipvo keys rotate sign` (slice 4). The command reads the root seed from a file the holder gives it, never from the control plane, and prints the envelope.
 - **Upload.** `shipvo keys rotate upload` sends the envelope to `POST /rotation/<app>` on the control plane. The route needs the *owner* token. A publish token gets 403. The control plane checks the root signature and the same field rules as section 3 using the root key registered for the app, then stores the envelope. It is a courier only: phones verify again and never trust the control plane's check.
-- **Fetch.** The pointer response gains a `rotations` array of envelopes, oldest sequence first, with at most 8 entries (the cap in section 8). The runtime handles `rotations` before it looks at the pointer, so a release signed by a new key can arrive in the same fetch.
+- **Fetch.** The pointer response gains a `rotations` array of envelopes with at most 8 entries (the cap in section 8). If more than 8 are stored, the server sends the 8 with the highest sequences, listed in ascending order, so the newest statement always reaches a phone that is behind. The runtime handles `rotations` before it looks at the pointer, so a release signed by a new key can arrive in the same fetch.
 - **Owner token.** The owner token is a different secret from the publish token and is not stored in CI. If your setup puts both in one place, the abuse analysis in section 10 does not hold for you.
 
 ## 7. Pending statements and emergency rotation
@@ -158,7 +158,7 @@ The wall clock can be wrong, or changed by the user. The effect is limited, beca
 
 ## 10. Abuse
 
-**A publish token alone can never rotate.** The runtime requires a root signature, the root key is not on the control plane or in CI, and the upload route needs the owner token (section 6). A thief with the publish token can ship a release signed only if they also have the release seed.
+**A publish token alone can never rotate.** The runtime requires a root signature, the root key is not on the control plane or in CI, and the upload route needs the owner token (section 6). A publish token can upload releases, but phones load them only if they are signed by the current release key. A publish token cannot change which key phones trust.
 
 **M-of-N is not in v1.** One offline root key already blocks the main threat, a stolen CI token. M-of-N would need a new wire format and a signing ceremony, and it does not help a team of one. The format has room for it later (a `signatures` list), which would be a new `type` and a migration note.
 
@@ -188,6 +188,7 @@ Run on the Android emulator and the iOS Simulator in CI, with the test clock fro
 | 6 | Statement 1 (`validFrom` in 7 days) pending, then statement 2 (`validFrom` now, naming K3) | K3 applies at once. Statement 1 is dropped. At day 7, nothing changes. |
 | 7 | A `rotations` array with 9 entries (the last valid, the rest invalid) | Rejected whole. The test counts signature verifications and expects 0. An 8-entry array with a valid last entry is accepted. |
 | 8 | Statement pending, app killed and relaunched, clock moved past `validFrom` | Pending list survives. The statement applies on launch before the first pointer check. |
+| 9 | Control plane holds 10 statements (sequences 1 to 10); a phone that pinned sequence 0 fetches | The response has 8 entries, sequences 3 to 10 in ascending order. The phone accepts the array and applies sequence 10 (if due). The server side is also tested in `services/control-plane/test/rotation.test.ts`. |
 
 Also in the Android and iOS unit suites: same sequence with different bytes (rule 4 in section 7), a corrupt `rotation.pending`, and `validFrom` more than 90 days ahead.
 
@@ -197,7 +198,7 @@ Each is under 400 changed lines. Slice 1 is this document.
 
 | Slice | What | Files it touches |
 | --- | --- | --- |
-| 2 | Android: `Clock`, `Rotation.kt` (checks, pending list, apply), storage in `Store.kt`, manifest entries, wired into the pointer check, instrumented tests 1 to 8 | `packages/runtime/android/src/main/java/dev/shipvo/runtime/Rotation.kt`, `Store.kt`, `ShipvoRuntimeModule.kt`, `AndroidManifest.xml`, `packages/runtime/android/src/androidTest/` |
+| 2 | Android: `Clock`, `Rotation.kt` (checks, pending list, apply), storage in `Store.kt`, manifest entries, wired into the pointer check, instrumented tests 1 to 9 | `packages/runtime/android/src/main/java/dev/shipvo/runtime/Rotation.kt`, `Store.kt`, `ShipvoRuntimeModule.kt`, `AndroidManifest.xml`, `packages/runtime/android/src/androidTest/` |
 | 3 | iOS: the same, with the same test vectors | `packages/runtime/ios/Rotation.swift`, `Store.swift`, `Updater.swift`, `packages/runtime/ios/Tests/` |
 | 4 | CLI: `shipvo keys rotate sign` and `upload`, a shared vector file for slices 2 and 3 | `packages/cli/src/signing.ts` (new commands only, no change to the existing checks in section 5), `packages/cli/src/rotation.ts`, `packages/cli/test/rotation.test.ts` |
 | 5 | Control plane: `POST /rotation/<app>` (owner token only), storage, `rotations` in the pointer response, audit entry | `services/control-plane/src/rotation.ts`, `index.ts`, `audit.ts` (add `key-rotation` to the `action` type), `services/control-plane/test/rotation.test.ts` |
@@ -205,6 +206,6 @@ Each is under 400 changed lines. Slice 1 is this document.
 
 The CLI `packages/cli/src/audit.ts` needs no code change: it prints whatever rows the control plane returns. Slice 6 adds the test that proves it.
 
-**Migration needed.** `services/control-plane/migrations/0016_audit_log.sql` has `CHECK (action IN ('publish','rollback','halt'))`, so a `key-rotation` row is refused until a new migration widens it. Agents may not write migrations. Slice 5 therefore waits for a human-written migration, and its issue must say so. Until then the upload route can still work, because `recordAudit` never throws, but it would write no audit row. Slice 5 must not ship without the row.
+**Migration needed.** `services/control-plane/migrations/0016_audit_log.sql` has `CHECK (action IN ('publish','rollback','halt'))`, so a `key-rotation` row is refused until a new migration widens it. Agents may not write migrations. Slice 5 therefore waits for a human-written migration, and its issue must say so. Slice 5 is blocked until that migration lands, and the upload route does not ship without the audit row.
 
 Slices 2 and 3 change guarded code. Both must pass the merge contract (`.github/agents/contract.md`) on their head commit. Slice 4 changes guarded signing code and the same applies.
