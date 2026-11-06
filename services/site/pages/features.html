@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--HEAD title="Features: everything Shipvo ships — Shipvo" desc="Every shipped Shipvo feature in one place: Shipvo Phone, shipvo run, agent testing, store testers and signed over-the-air updates, with docs and demos." path="/features/"-->
+<link rel="stylesheet" href="/blog.css">
+</head>
+<body>
+<!--NAV-->
+<main>
+<section class="cmp-hero">
+  <div class="wrap">
+    <div class="eyebrow">Features</div>
+    <h1>Everything Shipvo ships.</h1>
+    <p class="lede">Shipvo is the mobile platform for the AI era: your agent builds the app, tests it on a phone in your browser, records the demo, and ships it to the stores and to every phone. Each feature below links to its docs, and to a tutorial, video or blog post where one exists.</p>
+  </div>
+</section>
+<section class="cmp-sec"><div class="wrap"><h2>Phone and tests</h2><div class="feat-grid">
+<article class="pcard feat"><a class="pcard-art" href="/docs/run/"><img src="/img/run-phones.png" alt="The Android and iPhone frames, drawn by shipvo run, with the Tide &amp;amp; Tackle sample app." width="1200" height="630" loading="lazy"></a><div class="pcard-body"><h3>Shipvo Phone and <code>shipvo run</code></h3><p>Your app on a simulated Android or iPhone in your own browser, with no emulator, Xcode or Playwright.</p><p class="feat-links"><a href="/docs/run/">Docs</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Your assistant drives the phone you watch</h3><p>The <code>open_app</code> tool attaches to the live <code>shipvo run</code> phone, so you see what the agent taps.</p><p class="feat-links"><a href="/docs/run/">Docs</a><a href="/docs/agents/">Agents</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Record demo videos</h3><p><code>record_start</code>, <code>record_marker</code> and <code>record_stop</code> write an MP4 of the phone with chapters.</p><p class="feat-links"><a href="/docs/record/">Docs</a></p></div></article>
+<article class="pcard feat"><a class="pcard-art" href="/docs/test-with-an-assistant/"><img src="/videos/test-with-an-assistant.jpg" alt="Video: have an AI assistant test your shop." width="1200" height="630" loading="lazy"></a><div class="pcard-body"><h3>Test with Claude, ChatGPT or Cursor</h3><p>Connect the assistant you use and let it buy something from your app, step by step.</p><p class="feat-links"><a href="/docs/test-with-an-assistant/">Docs</a><a href="/learn/test-with-an-assistant/">Tutorial</a><a href="/learn/videos/#have-an-ai-assistant-test-your-shop-before-every-release">Video</a><a href="/blog/your-assistant-can-test-your-app/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Agent simulator over MCP</h3><p>A phone-sized session where the screen is an accessibility tree with refs, plus tap, type, scroll and back.</p><p class="feat-links"><a href="/docs/agents/">Docs</a><a href="/blog/mcp-servers-for-mobile-app-testing/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Typed tests and <code>export_test</code></h3><p>Playwright-style tests in Vitest or any runner, run headless on every pull request.</p><p class="feat-links"><a href="/docs/testing/">Docs</a><a href="/blog/the-bug-our-first-typed-test-found/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3><code>shipvo test</code>: repair, reports, secrets</h3><p>Plain-step flows, <code>--repair</code>, Markdown reports and test logins kept out of reports.</p><p class="feat-links"><a href="/docs/testing/">Docs</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Gate a rollout on test results</h3><p><code>shipvo promote --report</code> blocks a release whose test report has failing flows.</p><p class="feat-links"><a href="/docs/testing/">Docs</a><a href="/docs/cli/">CLI</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Simulated device features</h3><p>Camera, location, payments, biometrics and notifications, scriptable and labelled as simulated.</p><p class="feat-links"><a href="/docs/device-api/">Docs</a><a href="/blog/the-permission-you-never-test/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Real camera, microphone and location in the browser</h3><p>Use the browser's real hardware on the phone, with a simulated fallback.</p><p class="feat-links"><a href="/docs/device-api/">Docs</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Measured parity</h3><p>Shipvo Phone checked against the Android emulator and iOS Simulator, with every gap listed.</p><p class="feat-links"><a href="/docs/parity-results/">Results</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>The <code>shipvo</code> skill for coding agents</h3><p>Install it with <code>npx skills add</code> so your coding agent knows the commands.</p><p class="feat-links"><a href="/docs/agents/">Docs</a></p></div></article>
+</div></div></section>
+<section class="cmp-sec"><div class="wrap"><h2>Store path</h2><div class="feat-grid">
+<article class="pcard feat"><a class="pcard-art" href="/docs/store/"><img src="/videos/get-your-12-testers.jpg" alt="Video: get your 12 Google Play testers." width="1200" height="630" loading="lazy"></a><div class="pcard-body"><h3>Shipvo Testers and <code>shipvo store testers</code></h3><p>Get the 12 testers Google Play asks of new personal accounts, with a community that tests each other's apps.</p><p class="feat-links"><a href="/docs/store/">Docs</a><a href="/learn/get-your-12-testers/">Tutorial</a><a href="/learn/videos/#get-your-12-google-play-testers-with-shipvo-testers">Video</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Store details and screenshots</h3><p>Draft Google Play and App Store details from <code>shipvo.json</code> and check screenshot sizes.</p><p class="feat-links"><a href="/docs/store/">Docs</a></p></div></article>
+</div></div></section>
+<section class="cmp-sec"><div class="wrap"><h2>Build</h2><div class="feat-grid">
+<article class="pcard feat"><a class="pcard-art" href="/docs/getting-started/"><img src="/videos/first-app.jpg" alt="Video: create your first app on a simulated phone." width="1200" height="630" loading="lazy"></a><div class="pcard-body"><h3>Create an app and run it in the simulator</h3><p>From nothing to a working app that agents can open.</p><p class="feat-links"><a href="/docs/getting-started/">Docs</a><a href="/learn/first-app/">Tutorial</a><a href="/learn/videos/#create-your-first-app-on-a-simulated-phone">Video</a><a href="/blog/build-a-mobile-app-without-coding/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Shop template with your own products</h3><p>Your products, prices and mobile money checkout in one template.</p><p class="feat-links"><a href="/learn/your-own-shop/">Tutorial</a><a href="/blog/mobile-money-is-the-checkout/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Capacitor support</h3><p>Signed Android and iOS builds for a Capacitor app in your own CI.</p><p class="feat-links"><a href="/docs/capacitor/">Docs</a><a href="/docs/adapters/">Adapters</a></p></div></article>
+</div></div></section>
+<section class="cmp-sec"><div class="wrap"><h2>Over-the-air updates</h2><div class="feat-grid">
+<article class="pcard feat"><div class="pcard-body"><h3>Signed updates</h3><p>Phones verify the signature, hash and size of every release.</p><p class="feat-links"><a href="/docs/getting-started/">Docs</a><a href="/blog/who-signs-your-updates/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Small patches</h3><p>bsdiff patches from the version a phone already has.</p><p class="feat-links"><a href="/docs/spike-results/">Results</a><a href="/blog/react-native-ota-update-size-bsdiff-patches/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Staged rollout, rollback and crash-loop protection</h3><p>Cohorts first, then everyone, and a release that fails to boot is discarded.</p><p class="feat-links"><a href="/docs/cli-commands/">CLI</a><a href="/blog/staged-rollouts/">Blog</a><a href="/blog/roll-back-a-bad-react-native-update/">Blog</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Release policy, audit log and auto-halt</h3><p>Rules the control plane enforces on publish, and a log of what happened.</p><p class="feat-links"><a href="/docs/cli-commands/">CLI</a><a href="/docs/self-hosting/">Self-hosting</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Self-hosting on Cloudflare</h3><p>Your account, your keys, about ten minutes.</p><p class="feat-links"><a href="/docs/self-hosting/">Docs</a></p></div></article>
+<article class="pcard feat"><div class="pcard-body"><h3>Move from CodePush</h3><p>A step-by-step move, with real dry-run output.</p><p class="feat-links"><a href="/docs/migrate-from-codepush/">Docs</a><a href="/blog/a-codepush-alternative-after-app-center/">Blog</a></p></div></article>
+</div></div></section>
+</main>
+<!--FOOTER-->
+</body>
+</html>

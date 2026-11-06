@@ -106,3 +106,7 @@ figure.shot figcaption{max-width:56ch;margin:14px auto 0;text-align:center;color
 
 .pcard p{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;max-height:none;height:auto}
 .pcard.lead p{-webkit-line-clamp:5}
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:18px}
+.feat h3{font-size:19px;line-height:1.25;margin:0;letter-spacing:-.01em}
+.feat .feat-links{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:auto;font-size:14px}
+.feat .feat-links a{color:var(--paper);text-underline-offset:3px;min-height:24px}

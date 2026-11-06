@@ -1,0 +1,1 @@
+- `site`: new features page at `shipvo.dev/features/` (linked from the Product menu and footer) and a What's new strip on the home page. Migration: none.
