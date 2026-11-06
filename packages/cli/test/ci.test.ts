@@ -126,3 +126,18 @@ describe("shipvo ci check exit code", () => {
     expect(await run(0, new Error("boom"))).toBe(1);
   });
 });
+
+describe("check --changed-from", () => {
+  it("exits 2 when the value is missing or another flag", async () => {
+    quiet();
+    expect(await ci(["check", "--changed-from"])).toBe(2);
+    expect(await ci(["check", "--changed-from", "--foo"])).toBe(2);
+    expect(await ci(["check", "--changed-from", "-x"])).toBe(2);
+  });
+  it("passes the sha to explore only", async () => {
+    const { check } = await import("../src/ci");
+    const seen: string[][] = [];
+    await check(async () => 0, async (a) => { seen.push(a); return 0; }, "abc");
+    expect(seen[0]).toEqual(["--sim", "http://localhost:4545", "--changed-from", "abc"]);
+  });
+});
