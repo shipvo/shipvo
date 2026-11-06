@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import http from "node:http";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
@@ -33,6 +33,18 @@ const probe = (file: string) => {
   const r = spawnSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,codec_name:format=duration", "-of", "json", file], { encoding: "utf8" });
   const j = JSON.parse(r.stdout); return { width: j.streams[0].width, height: j.streams[0].height, codec: j.streams[0].codec_name, duration: Number(j.format.duration) };
 };
+// Stand-in for Playwright: the first screenshot is slow, later ones are fast.
+const fake = vi.hoisted(() => ({ on: false, firstDelay: 0, jpeg: Buffer.alloc(0) }));
+vi.mock("playwright", async (orig) => {
+  const real: any = await orig();
+  const chromium = { ...real.chromium, executablePath: real.chromium.executablePath, launch: async (...a: unknown[]) => {
+    if (!fake.on) return real.chromium.launch(...a);
+    let n = 0;
+    const page = { goto: async () => {}, screenshot: async () => { if (n++ === 0) await new Promise((r) => setTimeout(r, fake.firstDelay)); else await new Promise((r) => setTimeout(r, 40)); return fake.jpeg; } };
+    return { newPage: async () => page, close: async () => {} };
+  } };
+  return { ...real, default: { ...real, chromium }, chromium };
+});
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe.skipIf(!encodeOk)("Recorder", () => {
@@ -56,6 +68,22 @@ describe.skipIf(!encodeOk)("Recorder", () => {
     const r = new Recorder(); await r.start({ url, dir: out });
     await expect(r.start({ url, dir: out })).rejects.toMatchObject({ code: "recording_active" });
     await r.stop();
+  }, 60000);
+});
+
+describe.skipIf(!ffmpegOk)("Recorder clock with a slow first screenshot", () => {
+  it("duration_s and chapter times match the video, not the first-screenshot delay", async () => {
+    const jpg = join(out, "frame.jpg");
+    spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=0x113366:s=64x64", "-frames:v", "1", jpg]);
+    fake.jpeg = readFileSync(jpg); fake.firstDelay = 800; fake.on = true;
+    try {
+      const r = new Recorder();
+      await r.start({ url, format: "1:1", title: "slow-first", dir: out });
+      const a = r.marker("first"); await sleep(1300);
+      const res = await r.stop();
+      expect(a.t).toBeLessThan(0.3);
+      expect(Math.abs(probe(res.file).duration - res.duration_s)).toBeLessThan(0.3);
+    } finally { fake.on = false; }
   }, 60000);
 });
 

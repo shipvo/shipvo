@@ -1,5 +1,6 @@
 // Records the phone frame page to an MP4. Playwright takes screenshots while a session runs; ffmpeg encodes them.
 // Frames carry wall-clock timestamps, so the video lasts as long as the recording even when screenshots are slow.
+// The recording clock (duration_s, chapter times) and the video both start at the first frame.
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
