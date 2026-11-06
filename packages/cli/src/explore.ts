@@ -9,7 +9,7 @@ import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
-import { features, train, Ranker, type ActionInfo, type Sample } from "./explore-ranker.js";
+import { features, parseSamples, train, Ranker, type ActionInfo, type Sample } from "./explore-ranker.js";
 
 export type Step =
   | { action: "open" }
@@ -264,6 +264,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
       await checkErrors(after, here);
       const crashed = !r.ok || r.screen == null || !!redScreen(after);
       const next = signature(after);
+      // A crash counts as a hit (y: 1) even if no finding is added: reaching a crash is what the ranker should learn to find.
       if (crashed) { x && o.onSample!({ x, y: 1 }); screen = null; at = null; continue; }
       const fresh = next !== node.sig && !seen.has(next);
       if (fresh) {
@@ -381,7 +382,7 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     // Train a ranker from samples recorded with --record-features. No simulator is started.
     const outFile = a["ranker-out"] ?? "ranker.json";
     if (a.train === "true") throw new Error("--train needs a samples file");
-    const samples = readFileSync(a.train, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Sample);
+    const samples = parseSamples(readFileSync(a.train, "utf8"));
     if (!samples.length) throw new Error("--train: the samples file is empty");
     writeFileSync(outFile, JSON.stringify(train(samples)) + "\n");
     console.log(`Trained a ranker on ${samples.length} samples. Wrote ${outFile}`);

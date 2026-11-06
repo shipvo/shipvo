@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { features, FEATURES, Ranker, train, type ActionInfo } from "../src/explore-ranker.js";
+import { features, FEATURES, parseSamples, Ranker, train, type ActionInfo } from "../src/explore-ranker.js";
 import { walk } from "../src/explore.js";
 import { benchApp, benchmark, run } from "./bench/apps.js";
 
@@ -39,8 +39,17 @@ describe("ranker in the walker", () => {
     const a = await run(benchApp(6), 20, 3, ranker), b = await run(benchApp(6), 20, 3, ranker);
     expect({ ...a, samples: 0 }).toEqual({ ...b, samples: 0 });
   });
+  it("rejects bad sample lines with the line number", () => {
+    const ok = JSON.stringify({ x: FEATURES.map(() => 0), y: 1 });
+    expect(parseSamples(ok + "\n\n" + ok)).toHaveLength(2);
+    expect(() => parseSamples(ok + "\nnot json")).toThrow(/line 2: not valid JSON/);
+    expect(() => parseSamples(JSON.stringify({ x: [1], y: 1 }))).toThrow(/line 1: x must be a list/);
+    expect(() => parseSamples(JSON.stringify({ x: FEATURES.map(() => "a"), y: 1 }))).toThrow(/finite/);
+    expect(() => parseSamples(JSON.stringify({ x: FEATURES.map(() => 0), y: 2 }))).toThrow(/y must be 0 or 1/);
+  });
   it("reaches more screens and findings than the heuristic in the same steps on held-out benchmark apps", async () => {
-    const b = await benchmark([15, 30]);
+    const b = await benchmark([15, 30, 60]);
+    if (process.env.SHOW_BENCH) console.log(JSON.stringify(b.rows));
     for (const row of b.rows) {
       expect(row.ranker.screens).toBeGreaterThan(row.heuristic.screens);
       expect(row.ranker.findings).toBeGreaterThanOrEqual(row.heuristic.findings);

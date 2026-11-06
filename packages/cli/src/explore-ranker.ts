@@ -55,6 +55,23 @@ export function features(a: ActionInfo): number[] {
 /** One recorded action. `reward` is 1 when it reached a new screen or a new finding, else 0. */
 export type Sample = { x: number[]; y: 0 | 1 };
 
+/** Parse a samples file (one JSON object per line). Fails with the line number on the first bad line. */
+export function parseSamples(text: string): Sample[] {
+  const out: Sample[] = [];
+  text.split("\n").forEach((l, i) => {
+    if (!l.trim()) return;
+    const at = `samples line ${i + 1}`;
+    let v: unknown;
+    try { v = JSON.parse(l); } catch { throw new Error(`${at}: not valid JSON`); }
+    const s = v as { x?: unknown; y?: unknown };
+    if (!s || !Array.isArray(s.x) || s.x.length !== FEATURES.length) throw new Error(`${at}: x must be a list of ${FEATURES.length} numbers`);
+    if (s.x.some((n) => typeof n !== "number" || !Number.isFinite(n))) throw new Error(`${at}: x must hold only finite numbers`);
+    if (s.y !== 0 && s.y !== 1) throw new Error(`${at}: y must be 0 or 1`);
+    out.push({ x: s.x as number[], y: s.y });
+  });
+  return out;
+}
+
 export type RankerModel = { version: 1; features: string[]; weights: number[]; bias: number; trained: number };
 
 const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));

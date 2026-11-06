@@ -4,7 +4,7 @@ Question: can a small model, trained on recorded runs, pick the next action in `
 
 ## What was built
 
-- `packages/cli/src/explore-ranker.ts`: a logistic regression over 29 anonymous features. Pure TypeScript, no dependency, no service. It runs in Node and in a browser.
+- `packages/cli/src/explore-ranker.ts`: a logistic regression over 29 anonymous features. Pure TypeScript, no dependency, no service.
 - Features are roles, counts, positions and word-class flags (for example "label looks like Continue or Next"). Label text, screen text and typed values are never recorded. A test checks that two different labels in the same class give the same vector.
 - The label of a sample is 1 when the action reached a new screen or a new finding, else 0.
 - Recording is opt-in: `shipvo explore --record-features samples.jsonl` appends one JSON line per action. Nothing is recorded or sent without that flag.
@@ -12,7 +12,7 @@ Question: can a small model, trained on recorded runs, pick the next action in `
 
 ## Measurement
 
-Run by `packages/cli/test/explore-ranker.test.ts` (apps in `packages/cli/test/bench/apps.ts`).
+Run by `packages/cli/test/explore-ranker.test.ts` (apps in `packages/cli/test/bench/apps.ts`). Re-run it with `pnpm --filter @shipvo/cli test -- explore-ranker`.
 
 - Benchmark: 70 generated fake apps with 18 to 31 screens, behind the walker's `Driver` interface. A button's label hints at what it does about 4 times in 5 and each app shifts the odds. Bugs (network text, spinner, blank) sit on about 14% of screens.
 - Training: 30 apps, 3 heuristic walks each, 40 steps, 3,592 samples.
