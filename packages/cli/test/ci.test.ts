@@ -109,3 +109,12 @@ describe("shipvo ci check exit code", () => {
     expect(await run(0, new Error("boom"))).toBe(1);
   });
 });
+
+describe("check --changed-from", () => {
+  it("passes extra flags to explore only", async () => {
+    const { check } = await import("../src/ci");
+    const seen: string[][] = [];
+    await check(async () => 0, async (a) => { seen.push(a); return 0; }, ["--changed-from", "abc"]);
+    expect(seen[0]).toEqual(["--sim", "http://localhost:4545", "--changed-from", "abc"]);
+  });
+});

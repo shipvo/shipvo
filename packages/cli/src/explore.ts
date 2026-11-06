@@ -8,6 +8,8 @@ import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
+import { changedFiles, changedScreens } from "./ci-comment.js";
+import { screenRoute } from "./ci-shots.js";
 
 export type Step =
   | { action: "open" }
@@ -73,7 +75,7 @@ const label = (e: { role: string; name: string }) => `${e.role} "${e.name}"`;
 /** Steps in plain lines, for the report. */
 export const describeStep = (s: Step) => s.action === "open" ? "open the app" : s.action === "open_url" ? `open_url ${s.url}` : s.action === "tap" ? `tap ${label(s)}${s.nth ? ` (number ${s.nth + 1} with that name)` : ""}` : "back";
 
-export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: number; maxSteps?: number; app?: string; skin?: Skin } = {}): Promise<Report> {
+export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: number; maxSteps?: number; app?: string; skin?: Skin; onlyRoutes?: boolean } = {}): Promise<Report> {
   const skin = o.skin ?? "android", min = MIN_TARGET[skin];
   const maxDepth = o.maxDepth ?? 3, maxSteps = o.maxSteps ?? 100;
   const findings: Finding[] = []; const seenFinding = new Set<string>();
@@ -152,7 +154,7 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
     }
   }
 
-  const starts: (Step[])[] = [[{ action: "open" }], ...(o.routes ?? []).map((url): Step[] => [{ action: "open" }, { action: "open_url", url }])];
+  const starts: (Step[])[] = [...(o.onlyRoutes ? [] : [[{ action: "open" }] as Step[]]), ...(o.routes ?? []).map((url): Step[] => [{ action: "open" }, { action: "open_url", url }])];
   let error: string | null = null;
   try {
     for (const path of starts) {
@@ -166,7 +168,7 @@ export async function walk(driver: Driver, o: { routes?: string[]; maxDepth?: nu
     error = e instanceof Error ? e.message : String(e);
     stopped = `the walk failed: ${error}`;
   }
-  if (!stopped && cut) stopped = `max-depth (${maxDepth}) reached: ${cut} screen${cut === 1 ? "" : "s"} were not walked`;
+  if (!stopped && cut && !o.onlyRoutes) stopped = `max-depth (${maxDepth}) reached: ${cut} screen${cut === 1 ? "" : "s"} were not walked`;
   return { app: o.app ?? "", generatedAt: new Date().toISOString(), steps, screens: seenScreens.size, maxSteps, maxDepth, stoppedEarly: stopped, error, findings, parityLimits: PARITY_LIMITS };
 }
 
@@ -233,6 +235,11 @@ export async function explore(argv: string[]): Promise<number> {
   }
 }
 
+/** Routes of the screens changed since `sha`. Dynamic screens and layouts have no route and are left out. */
+export function changedRoutes(sha: string, diff: (sha: string) => string[] = changedFiles): string[] {
+  return changedScreens(diff(sha)).map(screenRoute).filter((r): r is string => r !== null);
+}
+
 async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const a = parse(argv); const cfg = loadConfig();
   const num = (k: string, d: number) => { if (a[k] === undefined) return d; const n = Number(a[k]); if (!Number.isInteger(n) || n < 1) throw new Error(`--${k} must be a whole number of 1 or more`); return n; };
@@ -240,7 +247,11 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
   const sim = await startSim(a, cfg, json); const base = sim.base;
   try {
     if (a.skin !== undefined && a.skin !== "ios" && a.skin !== "android") throw new Error("--skin must be android or ios");
-    const report = await walk(simDriver(base, cfg.appId), { routes: cfg.routes, maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
+    // --changed-from <sha>: visit only the changed, non-dynamic screens, and do not follow links off them.
+    const from = a["changed-from"];
+    if (from === "true") throw new Error("--changed-from needs a commit sha");
+    const changed = from !== undefined ? changedRoutes(from) : undefined;
+    const report = await walk(simDriver(base, cfg.appId), { routes: changed ?? cfg.routes, onlyRoutes: changed !== undefined, maxDepth: changed ? 1 : maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
     writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
     let issueInfo: Record<string, unknown> = {};

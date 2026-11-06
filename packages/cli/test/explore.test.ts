@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { walk, elements, renderMarkdown, explore, type Driver, type Reply } from "../src/explore.js";
+import { walk, elements, changedRoutes, renderMarkdown, explore, type Driver, type Reply } from "../src/explore.js";
 
 // A fixture app: Home has a button that crashes, an unnamed button, a link to Settings and a link to a dead end.
 const SCREENS: Record<string, string> = {
@@ -182,5 +182,29 @@ describe("explore --json", () => {
     expect(doc).toMatchObject({ ok: false, code: "findings" });
     expect(doc.data.findings[0].kind).toBe("dead_end");
     expect(doc.next.length).toBeGreaterThan(0);
+  });
+});
+
+describe("--changed-from", () => {
+  it("turns a fake diff into routes: changed, non-dynamic screens only", () => {
+    const diff = () => ["app/settings.tsx", "app/item/[id].tsx", "app/_layout.tsx", "app/index.tsx", "README.md", "app/settings.test.tsx"];
+    expect(changedRoutes("abc", diff)).toEqual(["/settings", "/"]);
+  });
+  it("walks only the changed screens and does not follow links off them", async () => {
+    const { driver, taps } = fixture();
+    const visited: string[] = [];
+    const wrapped: Driver = { ...driver, async openUrl(url) { visited.push(url); return driver.openUrl(url === "/settings" ? "app://settings" : url); } };
+    const r = await walk(wrapped, { routes: changedRoutes("abc", () => ["app/settings.tsx", "app/item/[id].tsx"]), onlyRoutes: true, maxDepth: 1 });
+    expect(visited).toEqual(["/settings"]);
+    expect(taps).toEqual(["Deeper"]);
+    expect(r.stoppedEarly).toBeNull();
+    expect(r.findings.some((f) => f.screen.includes('heading "Home"'))).toBe(false);
+    expect(taps).not.toContain("Crash");
+  });
+  it("without the flag, home and every route are still walked", async () => {
+    const { driver } = fixture();
+    const r = await walk(driver, { app: "fx" });
+    expect(r.screens).toBeGreaterThanOrEqual(4);
+    expect(r.findings.some((f) => f.kind === "error")).toBe(true);
   });
 });

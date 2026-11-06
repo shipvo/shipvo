@@ -31,7 +31,11 @@ runs:
         for i in $(seq 1 90); do curl -sf http://localhost:4545/app/ > /dev/null && break; sleep 2; done
         rc=0
         cr=0
-        npx shipvo ci check || rc=$?
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          npx shipvo ci check --changed-from "$BASE_SHA" || rc=$?
+        else
+          npx shipvo ci check || rc=$?
+        fi
         if [ "$EVENT_NAME" = "pull_request" ]; then
           # Screenshots need the PR build on port 4545, so they run before the PR simulator is stopped.
           npx shipvo ci shots --changed-from "$BASE_SHA" || true
