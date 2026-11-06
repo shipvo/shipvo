@@ -397,3 +397,68 @@ ${[["--port 4600", "Pick the port"], ["--native", "A real emulator, later"], ["C
 <div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">npx</span> shipvo run android</div>
 <div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide: <span class="sky">shipvo.dev</span>/learn</div>`,
 });
+
+// --- from-app-to-both-stores ---
+const step = (t, st, d, y, x = 72) => `<div class="abs card in" style="left:${x}px;top:${y}px;width:520px;padding:12px 22px;font-size:24px;--d:${d}s"><span class="mono" style="font-size:16px;color:${st === "wait" ? "var(--or)" : "var(--sky)"}">${st === "wait" ? "WAIT" : "TODO"}</span> &nbsp;${t}</div>`;
+const storeTag = (name, x, y, d) => `<div class="abs pop" style="left:${x}px;top:${y}px;--d:${d}s"><span class="badge" style="background:#1a2540;color:var(--paper);font-size:26px">${name}</span></div>`;
+
+Object.assign(SCENES, {
+  stHook: () => `
+${chip("The store path")}
+<h1 class="abs in" style="left:72px;top:130px;width:700px;--d:.5s">Your app works.<br><span class="or">Now, both stores.</span></h1>
+<div class="abs in mute" style="left:72px;top:440px;width:600px;font-size:30px;line-height:1.35;--d:2.6s">Google Play and the App Store, step by step.</div>
+${storeTag("Google Play", 800, 200, 1.6)}${storeTag("App Store", 800, 300, 2.4)}
+<div class="abs flight" style="left:820px;top:430px;width:130px;--fx:-100px;--fy:120px;--tx:140px;--ty:-30px;--d:3.4s">${plane(130)}</div>`,
+
+  stSetup: () => `
+${chip("Step 1")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Make your plan</h2>
+${tcmd([{ t: "shipvo store setup --company no", tt: 2, d: 1.2, out: "Wrote store-plan.json. Nothing was uploaded.", od: 3.6 }], 72, 210, 1130, .8, 30)}
+<div class="abs card in" style="left:72px;top:400px;width:540px;padding:20px 28px;--d:5.4s"><div class="mono sky" style="font-size:18px">A COMPANY</div><div style="font-size:26px;margin-top:6px;line-height:1.35">Organization accounts. No tester rule on Google Play.</div></div>
+<div class="abs card in" style="left:650px;top:400px;width:540px;padding:20px 28px;--d:8.4s"><div class="mono or" style="font-size:18px">NO COMPANY</div><div style="font-size:26px;margin-top:6px;line-height:1.35">Personal Google Play account. The 12 tester rule applies.</div></div>`,
+
+  stStatus: () => `
+${chip("Step 2")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">See what is next</h2>
+${storeTag("Google Play", 72, 190, .8)}${storeTag("App Store", 690, 190, .8)}
+${step("Open a personal account", "wait", 1.6, 260)}${step("Closed test, 12 testers", "wait", 2.6, 330)}${step("Apply for production", "todo", 3.6, 400)}${step("Production review", "wait", 4.6, 470)}
+${step("Open an individual account", "wait", 2, 260, 690)}${step("Submit to review", "todo", 3.4, 330, 690)}${step("App Store review", "wait", 4.4, 400, 690)}
+<div class="abs mono in" style="left:72px;top:580px;font-size:26px;--d:7s"><span class="or">$</span> shipvo store status --mark play-account</div>`,
+
+  stDetails: () => `
+${chip("Step 3")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Draft the store forms</h2>
+${tcmd([{ t: "shipvo store details --dry-run", tt: 1.8, d: 1, out: "Filled without you: 6 of 9 fields.", od: 3.2 }], 72, 200, 1130, .6, 30)}
+<div class="abs card in" style="left:72px;top:380px;width:540px;padding:20px 28px;--d:5s"><div class="mono sky" style="font-size:18px">FROM YOUR APP</div><div style="font-size:26px;margin-top:6px;line-height:1.4">data-safety.csv<br>privacy-policy.md</div></div>
+<div class="abs card in" style="left:650px;top:380px;width:540px;padding:20px 28px;--d:8s"><div class="mono or" style="font-size:18px">STILL YOURS TO ANSWER</div><div style="font-size:26px;margin-top:6px;line-height:1.4">Third-party SDKs, sign-in, data deletion, a contact address</div></div>`,
+
+  stShots: () => `
+${chip("Step 4")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Store screenshots</h2>
+${tcmd([{ t: "shipvo store screenshots", tt: 1.6, d: 1, out: "fast mode: simulator render, not the native UI", od: 2.8 }], 72, 200, 1130, .6, 30)}
+${["iPhone", "iPad", "Play phone", "Play tablets"].map((t, k) => `<div class="abs card pop" style="left:${72 + k * 280}px;top:400px;width:250px;padding:22px 24px;--d:${4.6 + k * 1.2}s"><div class="mono sky" style="font-size:16px">SIZE CHECKED</div><div style="font-size:28px;font-weight:700;margin-top:8px">${t}</div></div>`).join("")}
+<div class="abs in mute" style="left:72px;top:520px;font-size:24px;--d:10s">Check the sizes against the store pages before you submit.</div>`,
+
+  stTesters: () => `
+${chip("Google Play only")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">The tester rule</h2>
+<div class="abs" style="left:72px;top:230px;width:640px;display:flex;flex-wrap:wrap;gap:14px">${Array.from({ length: 12 }, (_, k) => person(k, 1.2)).join("")}</div>
+<div class="abs in" style="left:72px;top:370px;font-size:32px;--d:3.6s">12 testers. <span class="or">14 days in a row.</span></div>
+${tcmd([{ t: "shipvo store testers", tt: 1.4, d: 5.6, out: "Steps for your app. Shipvo Testers can help.", od: 7.2 }], 72, 430, 1130, 5.2, 28)}
+<div class="abs card in" style="left:790px;top:230px;width:390px;padding:22px 28px;--d:4.4s"><div class="mono sky" style="font-size:18px">SHIPVO TESTERS</div><div style="font-size:26px;margin-top:6px;line-height:1.35">Founders who test each other's apps</div></div>`,
+
+  stHonest: () => `
+${chip("Be clear")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">What Shipvo does not do</h2>
+<div class="abs card in" style="left:72px;top:230px;width:1100px;padding:26px 34px;font-size:30px;line-height:1.7;--d:1s">
+  <div class="fade" style="--d:1.8s"><span class="or">&times;</span> It does not upload your app to a store yet.</div>
+  <div class="fade" style="--d:4s"><span class="or">&times;</span> It does not touch your store accounts.</div>
+  <div class="fade" style="--d:6.4s"><span style="color:var(--green)">&check;</span> It tells you what to do, in order.</div>
+  <div class="fade" style="--d:8.4s"><span style="color:var(--green)">&check;</span> It drafts the answers and checks the sizes.</div></div>`,
+
+  stCta: () => `
+<div class="abs pop" style="left:72px;top:140px;width:330px;--d:.3s">{{MARK}}</div>
+<h1 class="abs in" style="left:470px;top:130px;--d:.8s">Start with<br><span class="or">your plan.</span></h1>
+<div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="or">$</span> shipvo store setup</div>
+<div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide is at shipvo.dev/learn.</div>`,
+});

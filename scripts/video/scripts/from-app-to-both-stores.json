@@ -1,0 +1,33 @@
+{
+  "slug": "from-app-to-both-stores",
+  "posterAt": 4.5,
+  "title": "From working app to Google Play and the App Store",
+  "tutorial": "docs/store.md",
+  "voice": "af_heart",
+  "music": { "id": 341563, "bed": 0.35, "credits": "services/site/public/videos/from-app-to-both-stores.credits.json" },
+  "scenes": [
+    { "id": "hook", "visual": "stHook", "min": 9,
+      "narration": "Your app works. Now you want it on Google Play and the App Store. The stores ask for a lot. Here is the path, one step at a time." },
+    { "id": "setup", "visual": "stSetup", "min": 14,
+      "narration": "Step one. Make your plan. Type shipvo store setup. It asks if you have a registered company. With a company, you get organization accounts, and no tester rule on Google Play. Without one, you get a personal account, and the tester rule applies.",
+      "caption": "Step one. Make your plan. Type shipvo store setup. It asks if you have a registered company. With a company, you get organization accounts, and no tester rule on Google Play. Without one, you get a personal account, and the tester rule applies." },
+    { "id": "status", "visual": "stStatus", "min": 14,
+      "narration": "Step two. Type shipvo store status. You see one timeline for each store. Every step is to do, waiting, or done. It tells you what to do next. When you finish a step, mark it done.",
+      "caption": "Step two. Type shipvo store status. You see one timeline for each store. Every step is to do, waiting, or done. It tells you what to do next. When you finish a step, mark it done." },
+    { "id": "details", "visual": "stDetails", "min": 15,
+      "narration": "Step three. The stores ask what data your app collects. Type shipvo store details, dash dash dry run. Shipvo reads the features your app uses, and drafts the data safety answers and a privacy policy. Some questions only you can answer, like third party tools and a contact address.",
+      "caption": "Step three. The stores ask what data your app collects. Type shipvo store details --dry-run. Shipvo reads the features your app uses, and drafts the data safety answers and a privacy policy. Some questions only you can answer, like third-party tools and a contact address." },
+    { "id": "shots", "visual": "stShots", "min": 14,
+      "narration": "Step four. Screenshots. Type shipvo store screenshots. Shipvo shows your app in the simulator, and saves files in the sizes the stores ask for. It checks each one. This is a simulator picture, not the native screen, so look at them before you submit.",
+      "caption": "Step four. Screenshots. Type shipvo store screenshots. Shipvo shows your app in the simulator, and saves files in the sizes the stores ask for. It checks each one. This is a simulator picture, not the native screen, so look at them before you submit." },
+    { "id": "testers", "visual": "stTesters", "min": 14,
+      "narration": "On Google Play with a personal account, you also need twelve testers for fourteen days in a row. Type shipvo store testers for the steps. Shipvo Testers is a group of founders who test each other's apps. We have a video about it.",
+      "caption": "On Google Play with a personal account, you also need twelve testers for fourteen days in a row. Type shipvo store testers for the steps. Shipvo Testers is a group of founders who test each other's apps. We have a video about it." },
+    { "id": "honest", "visual": "stHonest", "min": 13,
+      "narration": "Be clear about what this is. Shipvo does not upload your app to a store yet. It does not touch your store accounts. It tells you what to do, in order, drafts the answers, and checks the sizes. You press submit.",
+      "caption": "Be clear about what this is. Shipvo does not upload your app to a store yet. It does not touch your store accounts. It tells you what to do, in order, drafts the answers, and checks the sizes. You press submit." },
+    { "id": "cta", "visual": "stCta", "min": 10,
+      "narration": "Start with your plan. Type shipvo store setup in your app folder. The guide is at shipvo dot dev, slash learn.",
+      "caption": "Start with your plan. Type shipvo store setup in your app folder. The guide is at shipvo.dev/learn." }
+  ]
+}

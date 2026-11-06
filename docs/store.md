@@ -1,5 +1,11 @@
 # Store details
 
+<video controls preload="metadata" playsinline tabindex="0" data-title="From working app to Google Play and the App Store" data-length="2 min 2 s" poster="/videos/from-app-to-both-stores.jpg" src="/media/videos/from-app-to-both-stores-d49f90fb.mp4"><track kind="captions" src="/videos/from-app-to-both-stores.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+[Watch with a written transcript on the Videos page](videos.md#from-working-app-to-google-play-and-the-app-store).
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Thrilled hands holding" by Tymphony (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>). Source: <a href="https://www.jamendo.com/track/341563">https://www.jamendo.com/track/341563</a></details>
+
 This page is for developers and founders getting ready to submit to Google Play and the App Store. You will draft the answers the stores ask for and check your screenshot sizes. Nothing is uploaded and no store account is touched.
 
 `shipvo store details --dry-run [--out dir]` drafts what Google Play and the App Store will ask, from `shipvo.json`. This is slice 1 of the store work (#249): it only writes files. Nothing is uploaded and no store credentials are read. Without `--dry-run` the command exits 2 with "upload is not available yet; use --dry-run".
