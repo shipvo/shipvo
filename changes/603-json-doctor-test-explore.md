@@ -1,3 +1,0 @@
-- `@shipvo/cli`: `shipvo doctor`, `shipvo test` and `shipvo explore` take `--json` and print the `{ ok, code, summary, data, next }` envelope on stdout. Progress goes to stderr. Exit codes: 0 ok, 1 failed, 2 usage or setup error (see `docs/cli.md`).
-- `@shipvo/cli`: the envelope type and `emit()` moved to `src/json-out.ts`. `status --json` output is unchanged.
-- Migration: none.

@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo init` next steps now open the app with `npx shipvo run android` (or `run ios`) instead of `shipvo sim`, and say the browser phone needs no Android Studio.
-- Migration: none; text only.

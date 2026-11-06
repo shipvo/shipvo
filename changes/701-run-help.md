@@ -1,1 +1,0 @@
-- cli: `shipvo run --help` and `-h` print usage and exit 0. A missing platform now suggests `shipvo run android`. The first build prints "First build, this can take a minute."

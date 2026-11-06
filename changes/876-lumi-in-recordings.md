@@ -1,2 +1,0 @@
-- `@shipvo/mcp`, `@shipvo/mcp-tools`: `record_start` takes `lumi` (default true) to keep Lumi and its step captions in the video, or hide them with `lumi: false`, and `lumi_voice` (default false) so Lumi speaks its step lines with the `energetic` preset from `scripts/video/dialogue.py`. The result reports `lumi` and `lumi_lines`.
-- Migration: none. Both options are new and optional.

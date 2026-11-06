@@ -1,1 +1,0 @@
-- android-e2e: new "resumed download" scenario. The fake release server can cut the first bundle response part way (`cutFirst` option, off by default) and serves `Range` with a 206; the report records total bytes sent, whether the second request used `Range`, and first request to healthy.
