@@ -8,6 +8,7 @@ import { publish, rollback } from "./publish.js";
 import { promote } from "./promote.js";
 import { autoHalt } from "./autohalt.js";
 import { explore } from "./explore.js";
+import { lumi } from "./lumi.js";
 import { smoke } from "./smoke.js";
 import { sim } from "./sim.js";
 import { preview } from "./preview.js";
@@ -34,6 +35,7 @@ switch (cmd) {
   case "init": await init(rest); break;
   case "sim": await sim(rest); break;
   case "explore": process.exitCode = await explore(rest); break;
+  case "lumi": process.exitCode = await lumi(rest); break;
   case "smoke": process.exitCode = await smoke(rest); break;
   case "run": process.exitCode = await run(rest); break;
   case "preview": await preview(rest); break;

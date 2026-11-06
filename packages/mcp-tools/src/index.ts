@@ -47,6 +47,10 @@ export const tools = {
   dark: z.boolean().optional().describe("Dark mode"),
   attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
 }, WR, ["attach_failed","no_live_run","unknown_app"]),
+  attach_session: def("attach_session", "Attach to the phone of a live `shipvo run` in this project (read from .shipvo/run.json) and return its screen. The person sees every action in their browser. Same as open_app with attach: 'always', without needing the app id.", {
+  app: z.string().optional().describe("App id; default: the app of the live run"),
+  session: z.string().optional().describe("Session name (default: generated)"),
+}, WR, ["attach_failed","no_live_run"]),
   list_sessions: def("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, RO, []),
   screen: def("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, []),
   tap: def("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, []),

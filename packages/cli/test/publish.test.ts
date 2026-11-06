@@ -6,6 +6,11 @@ import { createHash } from "node:crypto";
 
 const exec = vi.hoisted(() => ({ fn: (_cmd: string, _opts?: { env?: NodeJS.ProcessEnv }) => {} }));
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string, o?: { env?: NodeJS.ProcessEnv }) => exec.fn(c, o) }));
+const realDiff = vi.hoisted(() => ({ on: false, fail: false }));
+vi.mock("../src/bsdiff.js", async (orig) => {
+  const actual = await orig<typeof import("../src/bsdiff.js")>();
+  return { ...actual, bsdiff: (a: Uint8Array, b: Uint8Array) => { if (realDiff.fail) throw new Error("boom"); return (realDiff.on ? actual.bsdiff(a, b) : new Uint8Array(10).fill(1)); } };
+});
 
 const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown, engine: undefined as string | undefined }));
 const puts: string[] = [];
@@ -374,19 +379,6 @@ describe("publish and the Hermes bytecode check", () => {
     expect(all).not.toMatch(/pip/);
   });
 
-  it("shows the pip hint when older bundles exist but bsdiff4 is missing", async () => {
-    withBundle(96);
-    values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: "abc" }));
-    const realKeys = stub.keys;
-    stub.keys = async (p: string) => (p === "h/demo/r" ? ["h/demo/r1"] : []);
-    exec.fn = (c) => { if (c.includes("import bsdiff4")) throw new Error("no module"); };
-    await publish([...flags, "--release", "2"]);
-    stub.keys = realKeys; // put the shared stub back so later tests see real keys
-    const err = (console.error as any).mock.calls.join("\n");
-    expect(err).toMatch(/pip install bsdiff4/);
-    expect(err).toMatch(/Updates still work/);
-  });
-
   it("dry run with --release 5 does not say first release", async () => {
     withBundle(96);
     await publish([...flags, "--dry-run", "--release", "5"]);
@@ -395,15 +387,15 @@ describe("publish and the Hermes bytecode check", () => {
     expect(text).toContain("Patches are not built in a dry run");
   });
 
-  it("summary: bases exist but bsdiff4 is missing points to pip", () => {
-    const text = dryRunSummary(2, 5000, "out", { bases: 2, bsdiff: false, patches: 0 });
-    expect(text).not.toContain("first release");
-    expect(text).toContain("Patches were skipped");
-    expect(text).toContain("pip install bsdiff4");
+  it("summary: bases exist but no patch was built says full bundles still work", () => {
+    const text = dryRunSummary(2, 5000, "out", { bases: 2, patches: 0 });
+    expect(text).toContain("No small patch was built");
+    expect(text).not.toContain("Patches built: 0");
+    expect(text).not.toContain("pip");
   });
 
   it("summary: bases exist and patches were built shows the count", () => {
-    const text = dryRunSummary(2, 5000, "out", { bases: 2, bsdiff: true, patches: 2 });
+    const text = dryRunSummary(2, 5000, "out", { bases: 2, patches: 2 });
     expect(text).not.toContain("first release");
     expect(text).not.toContain("pip");
     expect(text).toContain("Patches built: 2");
@@ -415,8 +407,6 @@ describe("publish and the Hermes bytecode check", () => {
   });
 
   it("iOS patches start only from earlier iOS releases, Android only from Android", async () => {
-    // Stand-in for bsdiff4: the import check passes and the diff command writes a small patch file.
-    exec.fn = (c) => { const m = c.match(/'([^']*p\.bsdiff)'/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
     const make = (tag: number) => { const b = fakeHbc(96); b[20] = tag; return b; }; // the tag makes each bundle's hash different
     const bundle = (pf: string, tag: number) => {
       mkdirSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}`), { recursive: true });
@@ -436,8 +426,40 @@ describe("publish and the Hermes bytecode check", () => {
     expect(puts).toContain(ios.patches[0].url);
   });
 
+  it("a stored patch is a real BSDIFF40 patch that rebuilds the new bundle", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const big = () => { const b = new Uint8Array(20_000); b.set(fakeHbc(96)); for (let i = 64; i < b.length; i++) b[i] = ((i * 7919) ^ (i >> 3)) & 0xff; return b; };
+    const old = big(), next = big();
+    next[5000] ^= 1; next[300] ^= 1;
+    blobs.set("b/demo/r1.hbc", old);
+    values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: createHash("sha256").update(old).digest("hex") }));
+    writeFileSync(join(cwd, "dist-ota/_expo/static/js/android/index.hbc"), next);
+    realDiff.on = true;
+    try { await publish([...flags, "--release", "2"]); } finally { realDiff.on = false; }
+    const key = puts.find((k) => k.endsWith(".bsdiff"))!;
+    expect(key).toBeTruthy();
+    const patch = blobs.get(key)!;
+    expect(new TextDecoder().decode(patch.subarray(0, 8))).toBe("BSDIFF40");
+    const rd = (o: number) => { let y = 0; for (let i = 6; i >= 0; i--) y = y * 256 + patch[o + i]; return y; };
+    const cl = rd(8), dl = rd(16);
+    const dec = (b: Uint8Array) => { const r = spawnSync("bzip2", ["-dc"], { input: Buffer.from(b) }); if (r.error && !process.env.CI) return null; expect(r.status).toBe(0); return r.stdout; };
+    for (const part of [patch.subarray(32, 32 + cl), patch.subarray(32 + cl, 32 + cl + dl), patch.subarray(32 + cl + dl)]) dec(part);
+    expect(rd(24)).toBe(next.length);
+  });
+
+  it("a patch failure falls back to the full bundle and publish still succeeds", async () => {
+    const old = fakeHbc(96); old[20] = 1;
+    blobs.set("b/demo/r1.hbc", old);
+    values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: createHash("sha256").update(old).digest("hex") }));
+    const next = fakeHbc(96); next[20] = 2;
+    writeFileSync(join(cwd, "dist-ota/_expo/static/js/android/index.hbc"), next);
+    realDiff.fail = true;
+    try { await publish([...flags, "--release", "2"]); } finally { realDiff.fail = false; }
+    expect(puts.some((k) => k.endsWith(".bsdiff"))).toBe(false);
+    expect(puts.some((k) => k.includes("r2"))).toBe(true);
+  });
+
   it("iOS also patches from a shell's embedded bundle; Android ignores iOS bases", async () => {
-    exec.fn = (c) => { const m = c.match(/'([^']*p\.bsdiff)'/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
     const make = (tag: number) => { const b = fakeHbc(96); b[20] = tag; return b; };
     const sha = (tag: number) => createHash("sha256").update(make(tag)).digest("hex");
     for (const pf of ["android", "ios"]) {
@@ -467,5 +489,31 @@ describe("isInside (dry-run writes stay under the output dir)", () => {
     expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run/b/myshop/r1.hbc", p)).toBe(true);
     expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run-x/r1.hbc", p)).toBe(false);
     expect(isInside("/a/.shipvo/dry-run", "/a/.shipvo/dry-run/../x", p)).toBe(false);
+  });
+});
+
+describe("missing listing files", () => {
+  it("prints an optional note for a missing icon and screenshot, never 'not found'", async () => {
+    const { uploadListingFile } = await import("../src/publish.js");
+    const put = vi.fn();
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await uploadListingFile({ put }, "w/app/store", "/nonexistent/assets/icon.png", "icon")).toBeNull();
+      expect(await uploadListingFile({ put }, "w/app/store", "shots/a.png", "shot-1")).toBeNull();
+      const out = err.mock.calls.map((c) => c.join(" "));
+      expect(out).toEqual([
+        "No app icon yet (optional). Add /nonexistent/assets/icon.png to show one in the store.",
+        "No screenshot yet (optional). Add shots/a.png to show it in the store.",
+      ]);
+      expect(out.join("\n")).not.toContain("not found");
+      expect(put).not.toHaveBeenCalled();
+    } finally { err.mockRestore(); }
+  });
+  it("uploads a file that exists", async () => {
+    const { uploadListingFile } = await import("../src/publish.js");
+    const f = join(mkdtempSync(join(tmpdir(), "lst-")), "icon.PNG"); writeFileSync(f, "x");
+    const put = vi.fn();
+    expect(await uploadListingFile({ put }, "w/app/store", f, "icon")).toBe("icon.png");
+    expect(put).toHaveBeenCalledWith("w/app/store/icon.png", expect.any(Uint8Array), "image/png");
   });
 });
