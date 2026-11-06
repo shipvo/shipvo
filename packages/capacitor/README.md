@@ -2,7 +2,40 @@
 
 Signed over-the-air updates for the web bundle of a Capacitor app. It makes the same release decisions and keeps the same trust model as `@shipvo/runtime` (see `docs/adapters.md`).
 
-This is the core, in TypeScript. It does not yet apply a bundle on a device. The native layer (next slice) backs two small interfaces, `KeyValueStore` and `BundleFiles`, and calls `boot()` when the web view loads.
+The core is TypeScript and makes every decision: it verifies the signature and the hash, stages, promotes and rolls back. The native layer only stores bytes and switches the web view.
+
+| Platform | Native layer |
+|---|---|
+| Android | In this package, `android/`: applies a signed web bundle with crash-loop rollback |
+| iOS | Next slice: the same two interfaces and the same web view switch |
+
+## Android
+
+`android/` is a Capacitor plugin named `Shipvo`. It backs `KeyValueStore` with SharedPreferences and `BundleFiles` with the app-private files directory, and points the web view at the staged bundle. A web bundle is a zip of your web assets with an `index.html` at its root.
+
+1. Register it in `MainActivity` with `registerPlugin(ShipvoPlugin.class)` before `super.onCreate`.
+2. Include the module in `settings.gradle` and add `implementation project(':shipvo-capacitor')` (see `apps/capacitor-sample/android`).
+3. When the page loads, call `bootAndServe`. It runs `boot()` (rollback included) and tells native to serve the chosen file. Native checks the sha-256 the core verified once more before it unpacks, and refuses zip entries that leave the directory.
+
+```ts
+import { registerPlugin } from "@capacitor/core";
+import { ShipvoCapacitor, NativeStore, NativeFiles, bootAndServe, bootAndSwitch } from "@shipvo/capacitor";
+import type { ShipvoNativePlugin } from "@shipvo/capacitor";
+
+const native = registerPlugin<ShipvoNativePlugin>("Shipvo");
+const shipvo: ShipvoCapacitor = new ShipvoCapacitor({
+  appId: "tide", shellMajor: 1, shellVersion: "1.2.0", platform: "android",
+  publicKey: "<base64 Ed25519 key>", baseUrl: "https://cp.example.com",
+  store: new NativeStore(native), files: new NativeFiles(native),
+  onReload: async () => { await bootAndSwitch(shipvo, native); },
+});
+await bootAndServe(shipvo, native);
+await shipvo.markHealthy();
+```
+
+Each launch starts on the embedded bundle, then `bootAndServe` switches to the pending or current release. The page of a served bundle runs the same code; it resumes the release `boot()` already chose and does not count another trial boot.
+
+Tests: `pnpm --filter @shipvo/capacitor test` runs the stage, apply, crash and rollback sequence through the native bridge. The plugin's JVM tests run with `./gradlew :shipvo-capacitor:testDebugUnitTest` in `apps/capacitor-sample/android` (after `pnpm --filter capacitor-sample sync`).
 
 ## Install
 
@@ -19,7 +52,7 @@ const shipvo = new ShipvoCapacitor({
   appId: "tide", shellMajor: 1, shellVersion: "1.2.0", platform: "android",
   publicKey: "<base64 Ed25519 key baked into the shell>",
   baseUrl: "https://cp.example.com",
-  store: new MemoryStore(), files: new MemoryFiles(), // the native layer provides real ones
+  store: new MemoryStore(), files: new MemoryFiles(), // Android: NativeStore and NativeFiles
 });
 
 const { release, file } = await shipvo.boot();      // which bundle to serve
