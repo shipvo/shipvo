@@ -62,7 +62,9 @@ try {
   const ev = async (e) => (await cdp('Runtime.evaluate', { expression: e, returnByValue: true })).result.result.value;
   await cdp('Emulation.setDeviceMetricsOverride', { width: 375, height: 800, deviceScaleFactor: 1, mobile: true });
 
-  await cdp('Page.navigate', { url: base + '/ok' }); await new Promise((r) => setTimeout(r, 1500));
+  await cdp('Page.navigate', { url: base + '/ok' });
+  // Poll instead of a fixed sleep: on a busy CI runner the iframe can take longer than 1.5s.
+  for (let i = 0; i < 100; i++) { await new Promise((r) => setTimeout(r, 150)); if (await ev(`!!document.querySelector('iframe')?.src && document.querySelector('iframe')?.contentDocument?.title === 'app'`)) break; }
   const ok = JSON.parse(await ev(`JSON.stringify({src:document.querySelector('iframe')?.src, title:document.querySelector('iframe')?.title,
     full:document.querySelector('[data-phone-full]').href, sw:document.documentElement.scrollWidth, vw:innerWidth,
     loaded:document.querySelector('iframe')?.contentDocument?.title, h:document.querySelector('.phone-box').getBoundingClientRect().height})`));
