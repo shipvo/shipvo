@@ -104,6 +104,7 @@ export async function resolveChallenge(env: OwnerEnv, id: string, verb: "approve
     let hold: any = null; try { hold = holdRaw ? JSON.parse(holdRaw) : null; } catch { /* corrupt hold: nothing to apply */ }
     if (hold?.approval_id === c.id) {
       if (verb === "approve") await env.kv.put(`halt/${env.appId}`, JSON.stringify({ release: hold.release, halted_at: next.resolved_at, reports: hold.reports, failed: hold.failed, threshold: hold.threshold, confirmed_by: approver }));
+      else await env.kv.put(`halt-hold-denied/${env.appId}`, JSON.stringify({ release: hold.release, denied_at: next.resolved_at }), { expirationTtl: HOLD_TTL_MS / 1000 });
       await env.kv.delete(`halt-hold/${env.appId}`);
     }
   }

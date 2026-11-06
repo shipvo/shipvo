@@ -80,6 +80,25 @@ describe("anomaly guard", () => {
     expect(s.m["halt-hold/tide"]).toBeUndefined();
     expect(await approvals(s.env)).toHaveLength(0);
   });
+  it("a failure report after the owner approves files no new approval and leaves halt/ unchanged", async () => {
+    const s = setup(); await fleet(s, 20, false);
+    const [a] = await approvals(s.env);
+    await app.request(`/app/tide/api/approvals/${a.id}/approve`, { method: "POST", headers: { cookie: await cookie("pw", "tide") } }, s.env);
+    const before = s.m["halt/tide"];
+    await signedFail(s, 50, "203.0.113.50", false);
+    expect(await approvals(s.env)).toHaveLength(0);
+    expect(s.m["halt/tide"]).toBe(before);
+    expect(s.m["halt-hold/tide"]).toBeUndefined();
+  });
+  it("after Deny, more failures for that release are not held again", async () => {
+    const s = setup(); await fleet(s, 20, false);
+    const [a] = await approvals(s.env);
+    await app.request(`/app/tide/api/approvals/${a.id}/deny`, { method: "POST", headers: { cookie: await cookie("pw", "tide") } }, s.env);
+    expect(JSON.parse(s.m["halt-hold-denied/tide"]!)).toMatchObject({ release: 3 });
+    await signedFail(s, 51, "203.0.113.51", false);
+    expect(await approvals(s.env)).toHaveLength(0);
+    expect(s.m["halt-hold/tide"]).toBeUndefined();
+  });
   it("detectAnomaly: spike needs history, a floor, and a multiple of the normal rate", () => {
     const base = { failedInstalls: 20, freshFailedInstalls: 0, recentFailures: 50, baselineFailures: 10, history: 500 };
     expect(detectAnomaly(base)).toMatch(/50 failures/);
@@ -105,6 +124,19 @@ describe("alert slots", () => {
   });
 });
 
+describe("halt_held alert", () => {
+  it("does not suppress the real rolled_back alert for the same release", async () => {
+    const f = vi.fn(async () => new Response("ok")); vi.stubGlobal("fetch", f);
+    const s = setup();
+    s.sql.prepare("INSERT INTO app_alerts (app_id, webhook) VALUES ('tide', 'https://hooks.example.com/x')").run();
+    await fleet(s, 20, false); // fresh installs: the release is held and a halt_held alert is sent
+    await new Promise((r) => setTimeout(r, 20));
+    const events = () => f.mock.calls.map((c: any) => JSON.parse(c[1].body).event);
+    expect(events()).toContain("halt_held");
+    expect(events()).toContain("rolled_back"); // the first signed revert for release 3 still alerted
+  });
+});
+
 describe("POST /t rate limits", () => {
   it("answers 429 per IP", async () => {
     const s = setup(); let last = 0;
@@ -112,11 +144,23 @@ describe("POST /t rate limits", () => {
     expect(last).toBe(429);
     expect((await post(s.env, { ...rb(), event: "applied" }, { "cf-connecting-ip": "198.51.100.2" })).status).toBe(202);
   });
-  it("answers 429 per install, not for another install", async () => {
+  const signedApplied = async (s: ReturnType<typeof setup>, id: string, key: string, ip: string) => {
+    const body = JSON.stringify({ ...rb(), event: "applied", install_id: id });
+    return post(s.env, body, { "x-shipvo-sig": await hmacHex(await signingSecret(key), body), "cf-connecting-ip": ip });
+  };
+  it("answers 429 per verified install, not for another install", async () => {
     const s = setup(); let last = 0;
-    for (let i = 0; i <= TELEMETRY_LIMITS.perInstall; i++) last = (await post(s.env, { ...rb(), event: "applied", install_id: "inst-aaaaaaaa" }, { "cf-connecting-ip": "10.1.0." + i })).status;
+    const ka = ((await (await reg(s.env, "inst-aaaaaaaa", "9.9.9.1")).json()) as any).key;
+    const kb = ((await (await reg(s.env, "inst-bbbbbbbb", "9.9.9.2")).json()) as any).key;
+    for (let i = 0; i <= TELEMETRY_LIMITS.perInstall; i++) last = (await signedApplied(s, "inst-aaaaaaaa", ka, "10.1.0." + i)).status;
     expect(last).toBe(429);
-    expect((await post(s.env, { ...rb(), event: "applied", install_id: "inst-bbbbbbbb" })).status).toBe(202);
+    expect((await signedApplied(s, "inst-bbbbbbbb", kb, "10.2.0.1")).status).toBe(202);
+  });
+  it("unsigned posts with an install id do not use up that install's budget", async () => {
+    const s = setup();
+    const k = ((await (await reg(s.env, "inst-xxxxxxxx", "9.9.9.3")).json()) as any).key;
+    for (let i = 0; i <= TELEMETRY_LIMITS.perInstall; i++) await post(s.env, { ...rb(), event: "applied", install_id: "inst-xxxxxxxx" }, { "cf-connecting-ip": "10.3.0." + i });
+    expect((await signedApplied(s, "inst-xxxxxxxx", k, "10.4.0.1")).status).toBe(202);
   });
   it("answers 429 per app", async () => {
     const s = setup(); let last = 0;

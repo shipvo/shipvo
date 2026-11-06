@@ -163,23 +163,27 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   const verdict = shouldHalt(counts, { threshold, minReports, minInstalls });
   if (!verdict.halt) return;
   const key = `halt/${appId}`;
+  // Already halted at this release: nothing to do. This runs before the hold logic so an owner-approved halt files no new approval.
+  // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
+  const cur = await env.POINTERS.get(key);
+  if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
   // Anomaly guard: reports that look manufactured hold the release for the owner instead of halting it.
   const heldRaw = await env.POINTERS.get(`halt-hold/${appId}`);
   if (heldRaw) { try { if (JSON.parse(heldRaw).release === release) return; } catch { /* corrupt hold: evaluate again */ } }
+  // The owner denied a hold for this release: do not hold it again until the dismissal expires.
+  const deniedRaw = await env.POINTERS.get(`halt-hold-denied/${appId}`);
+  let denied = false;
+  if (deniedRaw) { try { denied = JSON.parse(deniedRaw).release === release; } catch { /* corrupt marker: ignore */ } }
   const freshCut = Date.now() - FRESH_WINDOW_MS;
   const failedSet = new Set(rows.filter((r) => r.failed).map((r) => r.install_id));
   const fresh = rows.filter((r) => r.failed && r.created_at && Date.parse(r.created_at.length <= 19 ? r.created_at.replace(" ", "T") + "Z" : r.created_at) >= freshCut).length;
-  const stats = await loadSpikeStats(env.DB, appId);
-  const why = detectAnomaly({ failedInstalls: failedSet.size, freshFailedInstalls: fresh, ...stats });
+  const why = denied ? null : detectAnomaly({ failedInstalls: failedSet.size, freshFailedInstalls: fresh, ...(await loadSpikeStats(env.DB, appId)) });
   if (why) {
     const ch = await createHoldChallenge({ kv: env.POINTERS, appId }, release, why, { reports: verdict.reports, failed: counts.failed, threshold: threshold! });
     await recordAudit(env.DB, { app_id: appId, actor: "halt-rule", actor_kind: "system", action: "halt_held", release, before: null, after: JSON.stringify({ release, reason: why, approval_id: ch.id }) });
     await sendRevertAlert(env.DB, appId, release, "halt_held", true); // never throws
     return;
   }
-  // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
-  const cur = await env.POINTERS.get(key);
-  if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
   const halted = { release, halted_at: new Date().toISOString(), reports: verdict.reports, failed: counts.failed, threshold };
   await env.POINTERS.put(key, JSON.stringify(halted));
   // recordAudit never throws, so a failed audit write cannot undo or block the halt.
@@ -197,14 +201,16 @@ app.post("/t", async (c) => {
   const t = Telemetry.safeParse(body);
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
-  if (await telemetryLimited(c.env.POINTERS, "app", d.app_id)) return tooMany();
-  if (typeof extra.install_id === "string" && extra.install_id.length <= 64 && await telemetryLimited(c.env.POINTERS, "install", `${d.app_id}/${extra.install_id}`)) return tooMany();
   let stored = true;
   // Signed reports are marked verified. Everything else is still stored for dashboards.
   // The signature is the `x-shipvo-sig` header or a `sig` field. A body signature covers the raw body with that field removed.
   const sig = c.req.header("x-shipvo-sig") ?? extra.sig;
   const signed = typeof extra.sig === "string" && sig === extra.sig ? raw.replace(`,"sig":"${extra.sig}"`, "").replace(`"sig":"${extra.sig}",`, "").replace(`"sig":"${extra.sig}"`, "") : raw;
   const verified = extra.install_id !== undefined && sig !== undefined && await verifyReport(c.env.DB, d.app_id, extra.install_id, sig, signed) ? 1 : 0;
+  // Limits that need an identity count only after the signature is checked, so unsigned traffic cannot use a real install's budget.
+  // Unsigned reports have their own app bucket and cannot starve signed ones.
+  if (await telemetryLimited(c.env.POINTERS, verified ? "app" : "app_unsigned", d.app_id)) return tooMany();
+  if (verified && await telemetryLimited(c.env.POINTERS, "install", `${d.app_id}/${extra.install_id}`)) return tooMany();
   try {
   await c.env.DB.prepare(
     "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via, verified, install_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"

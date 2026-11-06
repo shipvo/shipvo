@@ -3,6 +3,8 @@
 import { OwnerError } from "./owner";
 
 export const REVERT_EVENTS = new Set(["rolled_back", "crash_loop_revert"]);
+/** Slot offset for `halt_held` alerts, above any real release number. */
+export const HOLD_SLOT_BASE = 1_000_000_000;
 export const ALERT_WINDOW_MS = 3600_000;
 /** Most alerts one app can send per window, whatever the release numbers. `POST /t` is unauthenticated. */
 export const MAX_ALERTS_PER_APP = 10;
@@ -31,7 +33,8 @@ export async function sendRevertAlert(db: D1Database, appId: string, release: nu
     // Drop rows older than the window, then enforce the per-app cap. The delete, count and claim are separate
     // statements, so concurrent reverts can slightly exceed the cap. That is fine for a flood guard.
     await db.prepare("DELETE FROM alert_sent WHERE app_id = ? AND sent_at <= ?").bind(appId, cutoff).run();
-    const lane = verified ? 1 : -1, slot = verified ? release : -release;
+    // A hold alert has its own slot, so it never hides the real revert alert for the same release. Unverified slots are -(release + 1), so release 0 works.
+    const lane = verified ? 1 : -1, slot = event === "halt_held" ? HOLD_SLOT_BASE + release : verified ? release : -(release + 1);
     const n = await db.prepare(`SELECT COUNT(*) AS n FROM alert_sent WHERE app_id = ? AND release ${verified ? ">=" : "<"} 0`).bind(appId).first<{ n: number }>();
     if ((n?.n ?? 0) >= (verified ? MAX_ALERTS_PER_APP : MAX_UNVERIFIED_ALERTS_PER_APP)) return;
     if (lane < 0) { // the unverified lane also counts against the app total, so verified reverts keep their own room

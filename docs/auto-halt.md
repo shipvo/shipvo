@@ -29,10 +29,10 @@ Verified reports can still be abused: someone can register many fresh fake insta
 - At least half of the failing installs registered in the last hour.
 - Verified failures in the last 10 minutes are at least 5 times the app's normal rate (and at least 10). The normal rate is the app's verified failures over the previous 7 days. This rule only applies once the app has more than 20 verified reports older than a day.
 
-A held release stays at its current band. The control plane files an approval (`approvals_list`, `GET /app/<id>/api/approvals`, command `confirm_halt`, requested by `halt-rule`) and writes an audit row `halt_held`. It also sends the usual alert webhook (event `halt_held`) if that release has not already alerted in the last hour. The approval shows in the admin under "Waiting for your approval". Only the signed-in owner can decide it, an agent token cannot:
+A held release stays at its current band. The control plane files an approval (`approvals_list`, `GET /app/<id>/api/approvals`, command `confirm_halt`, requested by `halt-rule`) and writes an audit row `halt_held`. It also sends the usual alert webhook (event `halt_held`) with its own hourly slot per release, so it never hides the real `rolled_back` alert. The approval shows in the admin under "Waiting for your approval". Only the signed-in owner can decide it, an agent token cannot:
 
 - **Approve** writes the halt.
-- **Deny** drops the hold and the release keeps being served. If failures continue it can be held again.
+- **Deny** drops the hold and the release keeps being served. That release is not held again for 24 hours, so more failure reports do not refill the approval queue.
 
 A hold expires after 24 hours. A release that is already held does not file a second approval.
 
