@@ -185,3 +185,22 @@ describe("shipvo test --json", () => {
     expect(JSON.parse(logs[0]!)).toMatchObject({ ok: false, code: "usage" });
   });
 });
+
+describe("shipvo test --json errors", () => {
+  it("emits an error envelope and exits 2 when a steps file is missing", async () => {
+    const out: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a) => { out.push(a.join(" ")); });
+    try {
+      const code = await testCmd([join(tmpdir(), "shipvo-no-such-file.steps"), "--json"], kit(), () => {});
+      expect(code).toBe(2);
+      expect(out).toHaveLength(1);
+      const doc = JSON.parse(out[0]!);
+      expect(doc.ok).toBe(false);
+      expect(doc.code).toBe("error");
+      expect(doc.next.length).toBeGreaterThanOrEqual(1);
+    } finally { spy.mockRestore(); }
+  });
+  it("still throws without --json", async () => {
+    await expect(testCmd([join(tmpdir(), "shipvo-no-such-file.steps")], kit(), () => {})).rejects.toThrow();
+  });
+});

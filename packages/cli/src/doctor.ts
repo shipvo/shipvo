@@ -209,8 +209,13 @@ function nextFor(r: CheckResult): Next {
   if (r.name === "shipvo.json parses") return { command: r.fix.startsWith("run this") ? "shipvo init ." : "shipvo doctor", why };
   if (r.name.startsWith("signing key matches")) return { command: "shipvo keys import", why };
   if (r.name === "signing key file is private") return { command: r.fix.match(/`(chmod [^`]+)`/)?.[1] ?? "shipvo doctor", why };
-  if (r.name.startsWith("sim port")) return { command: "shipvo doctor --port <n>", why };
-  return { command: "shipvo doctor", why };
+  if (r.name.startsWith("sim port")) {
+    const n = Number(r.name.match(/\d+/)?.[0]);
+    return { command: `shipvo doctor --json --port ${n < 65535 ? n + 1 : 4546}`, why: `${why}. Try another port.` };
+  }
+  if (r.name === "Browser for the simulator") return { command: "npx playwright install chromium", why };
+  if (r.name.startsWith("control plane")) return { command: "shipvo doctor --json --offline", why: `${why}. Check everything except the network.` };
+  return { command: "shipvo help", why };
 }
 
 export async function doctor(argv: string[]) {

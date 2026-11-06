@@ -189,12 +189,12 @@ The agent's "what next" command. It prints one JSON line:
 
 ## `--json` for `doctor`, `test` and `explore`
 
-`shipvo doctor --json`, `shipvo test --json` and `shipvo explore --json` print the same envelope as `status --json`: `{ ok, code, summary, data, next }`. Stdout holds only that one JSON line. Progress and logs go to stderr. The text output is unchanged without `--json`.
+`shipvo doctor --json`, `shipvo test --json` and `shipvo explore --json` print the same envelope as `status --json`: `{ ok, code, summary, data, next }`. Stdout holds only that one JSON line. Progress and logs go to stderr, including the Playwright install notice for `explore` and the progress lines of `test`. The text output is unchanged without `--json`.
 
 | Command | `code` values | `data` |
 | --- | --- | --- |
 | `doctor` | `ok`, `checks_failed`, `usage` | `checks`: `[{ name, ok, fix, note }]` |
-| `test` | `ok`, `tests_failed`, `usage` | `flows`, `failed`, `repaired`, `unresolved` |
+| `test` | `ok`, `tests_failed`, `usage`, `error` | `flows`, `failed`, `repaired`, `unresolved` |
 | `explore` | `ok`, `findings`, `walk_failed`, `error` | `findings`, `steps`, `screens`, `report_files`, `stopped_early` |
 
 `next` has one to three commands. A failed doctor check adds one entry that names the fix.

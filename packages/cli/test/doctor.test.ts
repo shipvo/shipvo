@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { existsSync, mkdtempSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -310,6 +310,25 @@ describe("shipvo doctor sim checks", () => {
 });
 
 describe("doctor --json", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+  it("gives a runnable next command for a busy port", async () => {
+    const { createServer } = await import("node:net");
+    const srv = createServer();
+    await new Promise<void>((r) => srv.listen(0, r));
+    const busy = (srv.address() as { port: number }).port;
+    const seed = makeSeed();
+    const simCwd = withConfig(JSON.stringify({ appId: "a", publicKey: makePub(seed) }), seed);
+    writeFileSync(join(simCwd, "package.json"), JSON.stringify({ scripts: { sim: "shipvo sim" } }));
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(process, "cwd").mockReturnValue(simCwd);
+    vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+    await expect(doctor(["--json", "--offline", "--port", String(busy)])).rejects.toThrow("exit");
+    await new Promise((r) => srv.close(r));
+    const cmds: string[] = JSON.parse(logs[0]!).next.map((n: { command: string }) => n.command);
+    expect(cmds).toContain(`shipvo doctor --json --port ${busy + 1}`);
+    expect(cmds.join("\n")).not.toContain("<n>");
+  });
   it("prints one envelope with a fix in next and exits 1 on a failed check", async () => {
     const logs: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });

@@ -88,8 +88,8 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string
   // With --json, stdout holds only the document: progress goes to stderr.
   const out = rawLog ?? (json ? (s: string) => console.error(s) : console.log);
   const flows: FlowReport[] = [];
-  const fail = (msg: string, next: { command: string; why: string }[]) => {
-    if (json) emit(envelope("usage", msg, { flows }, next, 2)); else console.error(msg);
+  const fail = (msg: string, next: { command: string; why: string }[], code: "usage" | "error" = "usage") => {
+    if (json) emit(envelope(code, msg, { flows }, next, 2)); else console.error(msg);
     return 2;
   };
   const repair = argv.includes("--repair");
@@ -112,9 +112,15 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string
   const log = (s: string) => out(scrub(s));
   let failed = 0, repaired = 0, unresolved = 0;
   for (const file of files) {
-    const text = readFileSync(file, "utf8");
-    const steps = k.parseSteps(text);
-    const phone = await k.openApp();
+    let text: string, steps: ReturnType<TestKit["parseSteps"]>, phone: Awaited<ReturnType<TestKit["openApp"]>>;
+    try {
+      text = readFileSync(file, "utf8");
+      steps = k.parseSteps(text);
+      phone = await k.openApp();
+    } catch (e) {
+      if (!json) throw e;
+      return fail(`${file}: ${scrub((e as Error).message.split("\n")[0]!)}`, [{ command: "shipvo doctor --json", why: "Check the steps file path, the step syntax and the simulator." }], "error");
+    }
     const edits = new Map<number, string>();
     const flow: FlowReport = { name: file, status: "passed", steps, failedStep: null, message: null };
     flows.push(flow);
@@ -161,7 +167,7 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string
     emit(exit === 0
       ? envelope("ok", failed ? `${failed} failed step(s) repaired and written.` : `All ${flows.length} flow(s) passed.`, data, [{ command: "shipvo explore --json", why: "Walk the app for crashes and accessibility problems." }], 0)
       : envelope("tests_failed", `${bad.length} of ${flows.length} flow(s) failed.`, data,
-        [repair ? { command: "shipvo test --repair --write", why: "Write the proposed repairs to the steps files." } : { command: `shipvo test ${bad[0]?.name ?? ""} --repair`.replace("  ", " "), why: "Show a diff that fixes broken steps." }], 1));
+        [repair ? { command: "shipvo test --repair --write", why: "Write the proposed repairs to the steps files." } : { command: `shipvo test ${bad[0]?.name ?? ""} --repair --json`.replace("  ", " "), why: "Show a diff that fixes broken steps." }], 1));
   }
   return exit;
 }
