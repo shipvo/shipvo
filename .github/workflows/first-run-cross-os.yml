@@ -51,10 +51,10 @@ jobs:
         run: pnpm --filter @shipvo/schema build && pnpm --filter "@shipvo/cli..." build
       - name: Pack tarballs
         if: steps.has.outputs.script == '1'
-        # pnpm pack (not npm pack) rewrites workspace:^ to real versions.
+        # --pack runs pnpm pack (which rewrites workspace:^ to real versions) for cli, shipvo, create-shipvo
+        # and every @shipvo/* workspace dependency, so the whole first run uses this commit's code (#1006).
         run: |
-          mkdir -p "$RUNNER_TEMP/tgz"
-          for p in packages/cli packages/shipvo packages/create-shipvo; do (cd "$p" && pnpm pack --pack-destination "$RUNNER_TEMP/tgz"); done
+          node scripts/first-run/cross-os.mjs --pack "$RUNNER_TEMP/tgz"
           ls -l "$RUNNER_TEMP/tgz"
       - name: First run from tarballs
         if: steps.has.outputs.script == '1'
