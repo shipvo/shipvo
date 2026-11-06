@@ -13,6 +13,7 @@ Founders: you can skip this page. Your assistant uses these controls for you whe
 | Shade, Notification Center, Control Center | Quick tiles and notifications | `open_notifications`, `open_control_center`, `toggle_tile`, `dismiss_notification`, `close_panels` |
 | Settings | System switches your app can read | `get_settings`, `set_setting` |
 | Browser | A separate web browser on the phone | `browser_open` and the other `browser_*` tools |
+| Store and installed apps | Put several apps on one phone and switch between them | `list_store_apps`, `install_app`, `uninstall_app`, `switch_app` |
 
 The first three rows are described in the [tool table in Agents](agents.md#the-tools). This page covers Settings and the Browser.
 
@@ -69,3 +70,54 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 - [Agents and Shipvo apps](agents.md): every tool.
 - [Simulated device features](device-api.md): camera, location, payment, notifications.
 - [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
+
+## Install apps and switch between them
+
+The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools.
+
+**Limit today:** the Store in the phone frame and the tools below are two separate views. A tap-install in the frame page does not change the session's `current_app` or `device_log`, and an MCP install does not draw an icon on a live `shipvo run` phone. Use the tools for state that tests can check.
+
+
+| Tool | What it does | Typed errors |
+| --- | --- | --- |
+| `list_store_apps` | Lists the marketplace apps (id, name, bundle URL, version) from the control plane | `store_unreachable` |
+| `install_app { id }` | Installs a Store app; its icon appears on the home screen | `unknown_app`, `already_installed` |
+| `switch_app { id }` | Opens an installed app; it becomes `current_app` | `not_installed` |
+| `uninstall_app { id }` | Removes it. If it was open, the phone goes home | `not_installed` |
+
+Installing is simulated: nothing real is installed, and `device_log` marks each install, switch and uninstall as `simulated`. If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of three apps (`tide`, `notes`, `weather`) with no network.
+
+Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
+
+### Start from a `phone.json`
+
+A `phone.json` in the folder where the simulator starts (or `--phone <path>`) says what is on the phone at the start. The same file gives the same phone every run.
+
+```json
+{
+  "apps": [
+    { "id": "tide", "name": "Tide & Tackle", "url": "fixture://tide", "version": "1.0.0" },
+    { "id": "notes", "name": "Pocket Notes", "version": "0.3.1" }
+  ],
+  "current_app": "tide",
+  "settings": { "dark_mode": true, "font_size": "large" }
+}
+```
+
+`settings` takes the same keys as `set_setting`. An invalid file, or a `--phone` path that does not exist, fails the session with `bad_profile` and says why. Only a missing default `./phone.json` is ignored.
+
+App `url` values: `fixture://…` loads nothing, `app://<id>@r13` (or `@latest`) loads a published release the way `open_app` does, and any other `http(s)` URL goes through the Browser app's private-host guard. A private or local address fails `switch_app` with `host_not_allowed` and the page does not change. Contacts and photos are not part of the profile yet.
+
+### Example
+
+```bash
+PN_STORE_FIXTURE=1 shipvo-mcp   # then, from your assistant:
+```
+
+```text
+open_app tide                          -> session "tide-abc"
+install_app { session, id: "notes" }   -> Home screen, Pocket Notes is installed
+switch_app { session, id: "notes" }    -> current_app is notes
+uninstall_app { session, id: "notes" } -> back on the home screen
+device_log { session }                 -> install_app, switch_app, uninstall_app, all source "simulated"
+```

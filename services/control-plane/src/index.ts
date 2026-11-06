@@ -10,9 +10,10 @@ import { apps, publisher } from "./apps";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
+import { installs, verifyReport } from "./installs";
 import { FAILED_EVENTS, HEALTHY_EVENTS, shouldHalt } from "./halt";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket };
+type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string };
 const app = new Hono<{ Bindings: Env }>();
 
 /* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
@@ -159,21 +160,28 @@ async function maybeHalt(env: Env, appId: string, release: number, kv?: { failed
 }
 
 /** Device telemetry for the spike: applied / reverted / timings. */
+app.route("/", installs);
 app.post("/t", async (c) => {
   let body: any;
-  try { body = await c.req.json(); } catch { return c.json({ error: "bad_json" }, 400); }
+  const raw = await c.req.text();
+  try { body = JSON.parse(raw); } catch { return c.json({ error: "bad_json" }, 400); }
   const t = Telemetry.safeParse(body);
   if (!t.success || !ID.test(t.data.app_id)) return c.json({ error: "bad_telemetry" }, 400);
   const d = t.data; const extra = body as Record<string, unknown>;
   let stored = true;
+  // Signed reports are marked verified. Everything else is still stored for dashboards.
+  // The signature is the `x-shipvo-sig` header or a `sig` field. A body signature covers the raw body with that field removed.
+  const sig = c.req.header("x-shipvo-sig") ?? extra.sig;
+  const signed = typeof extra.sig === "string" && sig === extra.sig ? raw.replace(`,"sig":"${extra.sig}"`, "").replace(`"sig":"${extra.sig}",`, "").replace(`"sig":"${extra.sig}"`, "") : raw;
+  const verified = extra.install_id !== undefined && sig !== undefined && await verifyReport(c.env.DB, d.app_id, extra.install_id, sig, signed) ? 1 : 0;
   try {
   await c.env.DB.prepare(
-    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+    "INSERT INTO telemetry (app_id, release, event, cold_start_ms, bytes_downloaded, apply_ms, device_class, published_at, device_model, android_api, via, verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
   ).bind(d.app_id, d.release, d.event, d.cold_start_ms ?? null, d.bytes_downloaded ?? null, d.apply_ms ?? null, d.device_class ?? null,
     typeof extra.published_at === "string" ? extra.published_at.slice(0, 40) : null,
     typeof extra.device_model === "string" ? extra.device_model.slice(0, 80) : null,
     Number.isInteger(extra.android_api) ? extra.android_api : null,
-    extra.via === "patch" || extra.via === "full" ? extra.via : null).run();
+    extra.via === "patch" || extra.via === "full" ? extra.via : null, verified).run();
   } catch (e) {
     // D1 can refuse writes (for example the Free plan daily limit). Never send a 5xx to the phone.
     stored = false;
@@ -340,6 +348,30 @@ app.post("/o/:app", async (c) => {
     return c.json({ ok: true, order_id: first?.order_id ?? orderId, status: first?.status ?? status, duplicate: true }, 202);
   }
   return c.json({ ok: true, order_id: orderId, status }, 202);
+});
+
+/** Mark an order paid. Owner only (admin session or owner token). Repeating the call changes nothing. */
+app.post("/app/:id/api/orders/:order/settle", async (c) => {
+  const appId = c.req.param("id");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const actor = await owner(c, appId);
+  if (!actor) return c.json({ error: "unauthorized" }, 401);
+  const orderId = c.req.param("order");
+  const { results } = await c.env.DB.prepare("SELECT status FROM orders WHERE app_id = ? AND order_id = ?").bind(appId, orderId).all();
+  const statuses: string[] = (results ?? []).map((r: any) => r.status);
+  if (!statuses.length) return c.json({ error: "not_found" }, 404);
+  if (!statuses.includes("unverified")) {
+    if (statuses.includes("settled")) return c.json({ ok: true, order_id: orderId, status: "settled", already_settled: true });
+    const status = statuses[0];
+    return c.json({ error: "not_settleable", status, message: `An order that is ${status} cannot be settled.` }, 409);
+  }
+  const now = new Date().toISOString();
+  const upd: any = await c.env.DB.prepare("UPDATE orders SET status = 'settled' WHERE app_id = ? AND order_id = ? AND status = 'unverified'").bind(appId, orderId).run();
+  // A concurrent call may have settled it between our check and the update: then do not audit twice.
+  if (!upd?.meta?.changes) return c.json({ ok: true, order_id: orderId, status: "settled", already_settled: true });
+  await c.env.DB.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
+    .bind(appId, now, actor, "settle_order", JSON.stringify({ order_id: orderId }), 1).run();
+  return c.json({ ok: true, order_id: orderId, status: "settled" });
 });
 
 /* ---------- admin ---------- */
