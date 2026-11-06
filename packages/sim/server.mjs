@@ -169,6 +169,8 @@ async function boot(s, url) {
   const r = bootDone(s.update, s.pageErrors.n > before);
   if (r.revert) { await s.page.goto(r.url, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); }
   await showBanner(s);
+  // A reload makes a fresh device in the page, so put the session's network profile back on it.
+  if (s.netProfile && s.netProfile !== "online") await s.page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
 }
 // Fetch layer. Mock rules win; otherwise fetch/XHR run under the session's network profile (default online, untouched).
 async function ensureNetworkRoute(s, page) {

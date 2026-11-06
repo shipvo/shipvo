@@ -123,3 +123,13 @@ test("the page's device follows the profile, and device_reset brings it back onl
   assert.match(await press("f", "Load items"), /Got 200 real/);
   assert.equal((await netLog("f")).at(-1).profile, "online");
 });
+
+test("kill_app reloads the page and the device still reports the session's profile", async () => {
+  assert.ok((await call("/session", { session: "g" })).ok);
+  await act("g", { action: "set_network_profile", profile: "offline" });
+  await act("g", { action: "open_recents" });
+  assert.equal((await act("g", { action: "kill_app" })).ok, true);
+  await act("g", { action: "resume_app" });
+  assert.match(await press("g", "Device state"), /dev online=false/);
+  assert.match(await press("g", "Load items"), /Failed/);
+});
