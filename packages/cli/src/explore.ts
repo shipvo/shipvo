@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { args as parse, loadConfig } from "./config.js";
 import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
+import { writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
 
 export type Step =
@@ -242,11 +243,20 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     const report = await walk(simDriver(base, cfg.appId), { routes: cfg.routes, maxDepth, maxSteps, app: cfg.appId, skin: a.skin as Skin | undefined });
     const out = a.out ?? "explore-report";
     writeFileSync(`${out}.md`, renderMarkdown(report)); writeFileSync(`${out}.json`, JSON.stringify(report, null, 2) + "\n");
+    let issueInfo: Record<string, unknown> = {};
     const line = `${report.findings.length ? `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"}` : `No findings in ${report.steps} steps`}${report.stoppedEarly ? `. Stopped early: ${report.stoppedEarly}` : ""}. Wrote ${out}.md and ${out}.json`;
+    if (a["issues-dir"] !== undefined) {
+      if (a["issues-dir"] === "true") throw new Error("--issues-dir needs a directory");
+      const { files, commands } = writeIssues(report.findings, (a.skin as Skin | undefined) ?? "android", a["issues-dir"]);
+      if (!json) {
+        if (!files.length) console.log("No findings, so no issue files written.");
+        else console.log(`Wrote ${files.length} issue file${files.length === 1 ? "" : "s"} to ${a["issues-dir"]}. To file them:\n${commands.join("\n")}`);
+      } else issueInfo = { issue_files: files, file_commands: commands };
+    }
     const failOn = a["fail-on-findings"] === "true";
     const exit = report.error ? 1 : report.findings.length && failOn ? 1 : 0;
     if (json) {
-      const data = { report_files: [`${out}.md`, `${out}.json`], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
+      const data = { ...issueInfo, report_files: [`${out}.md`, `${out}.json`], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
       const code = report.error ? "walk_failed" : report.findings.length ? "findings" : "ok";
       const next = report.error ? [{ command: "shipvo doctor --json", why: "Check the simulator setup." }]
         : report.findings.length ? [{ command: `open ${out}.md`, why: "Read the steps to reproduce each finding." }, { command: "shipvo explore --json", why: "Run again after fixing to confirm." }]

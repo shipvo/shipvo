@@ -123,7 +123,10 @@ shipvo explore --max-steps 100 --max-depth 3
 shipvo explore --sim http://localhost:4545   # use a simulator that is already running
 shipvo explore --skin ios                   # small-target minimum 44 instead of 48
 shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
+shipvo explore --issues-dir issues           # one ready-to-file issue per finding
 ```
+
+With `--issues-dir <dir>`, it also writes one Markdown file per distinct finding, `<n>-<kind>.md`. The first line is the title (`explore: <kind> on <screen>`), then the message, the numbered steps, the platform skin and the simulator limits. It does not call GitHub. It prints one `gh issue create --title ... --body-file ...` line per file for you or your agent to run. With no findings it writes nothing and says so.
 
 It writes `explore-report.md` and `explore-report.json`. The report has six kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `back`):
 
