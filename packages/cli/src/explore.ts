@@ -104,6 +104,7 @@ function parseEls(tree: string, roles: Set<string>): El[] {
   }
   return out;
 }
+export const fieldElements = (tree: string): El[] => parseEls(tree, FIELDS);
 /** The tree without refs, to tell whether two screens are the same. */
 export const signature = (tree: string) => tree.replace(/\s*\[ref=\w+\]/g, "");
 const redScreen = (tree: string) => /Uncaught (\w*Error)|Unhandled Runtime Error|Application error|Something went wrong/i.exec(tree)?.[0];
@@ -124,7 +125,19 @@ export type WalkOptions = {
   ranker?: Ranker;
   /** Called after each action with anonymous features and whether it reached a new screen or a finding. Used to train a ranker. */
   onSample?: (s: Sample) => void;
+  /** Start paths to walk instead of the app's start screen and `routes`. Used by `shipvo lumi` to test one flow. */
+  startPaths?: Step[][];
+  /** "bad": only try invalid values in text fields, and try them first. Default "both". */
+  input?: "both" | "bad";
+  /** Called as the walk goes: each action taken, each new screen, each new finding. */
+  onEvent?: (e: WalkEvent) => void;
+  /** Checked before every action. When it returns true the walk ends and says it was stopped. */
+  shouldStop?: () => boolean;
 };
+export type WalkEvent =
+  | { type: "step"; n: number; step: Step; text: string }
+  | { type: "screen"; screens: number; sig: string; controls: { role: string; name: string }[] }
+  | { type: "finding"; n: number; finding: Finding };
 type Act = { kind: "tap" | "type"; el: El; text?: string; enter?: boolean; risky: boolean; done: boolean };
 type Node = { sig: string; path: Step[]; depth: number; acts: Act[]; n: number; reward: number };
 
@@ -140,7 +153,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
   const findings: Finding[] = []; const seenFinding = new Set<string>();
   const seen = new Set<string>(); const nodes = new Map<string, Node>();
   let steps = 0, cut = 0; let stopped: string | null = null;
-  const add = (f: Finding) => { const k = `${f.kind}|${f.message}|${signature(f.screen)}`; if (!seenFinding.has(k)) { seenFinding.add(k); findings.push(f); } };
+  const add = (f: Finding) => { const k = `${f.kind}|${f.message}|${signature(f.screen)}`; if (!seenFinding.has(k)) { seenFinding.add(k); findings.push(f); o.onEvent?.({ type: "finding", n: findings.length, finding: f }); } };
   const need = (r: Reply, what: string) => { if (!r.ok || r.screen == null) throw new Error(`explore: ${what} failed: ${r.error ?? "no screen"}`); return r.screen; };
   const find = (tree: string, s: { role: string; name: string; nth: number }, roles = ACTIONABLE) => parseEls(tree, roles).find((e) => e.role === s.role && e.name === s.name && e.nth === s.nth);
 
@@ -178,6 +191,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
     seen.add(sig);
     await checkErrors(screen, path);
     const els = elements(screen);
+    o.onEvent?.({ type: "screen", screens: seen.size, sig, controls: els.map((e) => ({ role: e.role, name: e.name })) });
     if (!els.length) add({ kind: "dead_end", message: "Dead end: the screen has no actionable element", screen, steps: path });
     if (blank(screen)) add({ kind: "blank_screen", message: "Blank screen: nothing is drawn on it", screen, steps: path });
     for (const e of els) if (!e.name) add({ kind: "unnamed", message: `Unnamed ${e.role}: it has no accessible name`, screen, steps: path });
@@ -206,7 +220,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
     const taps: Act[] = shuffle(els.filter((e) => e.name && !/^(back|go back)$/i.test(e.name)), rand).map((el) => ({ kind: "tap", el, risky: RISKY.test(el.name), done: false }));
     const fs = driver.type ? parseEls(screen, FIELDS) : [];
     const typeActs = (invalid: boolean): Act[] => fs.map((el) => ({ kind: "type", el, text: sampleValue(el.name, invalid), enter: invalid, risky: false, done: false }));
-    nodes.set(sig, { sig, path, depth, acts: [...typeActs(false), ...taps, ...typeActs(true)], n: 0, reward: 0 });
+    nodes.set(sig, { sig, path, depth, acts: o.input === "bad" ? [...typeActs(true), ...taps] : [...typeActs(false), ...taps, ...typeActs(true)], n: 0, reward: 0 });
   }
 
   const todo = (n: Node) => n.acts.filter((a) => !a.done);
@@ -223,7 +237,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
     return best;
   }
 
-  const starts: (Step[])[] = [...(o.onlyRoutes ? [] : [[{ action: "open" }] as Step[]]), ...(o.routes ?? []).map((url): Step[] => [{ action: "open" }, { action: "open_url", url }])];
+  const starts: (Step[])[] = o.startPaths ?? [...(o.onlyRoutes ? [] : [[{ action: "open" }] as Step[]]), ...(o.routes ?? []).map((url): Step[] => [{ action: "open" }, { action: "open_url", url }])];
   let error: string | null = null;
   try {
     for (const path of starts) {
@@ -236,6 +250,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
     for (;;) {
       const node = pick(screen == null ? null : signature(screen), steps);
       if (!node) break;
+      if (o.shouldStop?.()) { stopped = "stopped by you"; break; }
       if (steps >= maxSteps) { stopped = `max-steps (${maxSteps}) reached`; break; }
       // Get to the node's screen: the Back button when it is one step up, a full replay otherwise.
       if (screen == null || signature(screen) !== node.sig) {
@@ -259,6 +274,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
       const here = [...node.path, step]; steps++;
       const x = o.onSample ? features(info(a)) : null; const found = findings.length;
       node.n++;
+      o.onEvent?.({ type: "step", n: steps, step, text: describeStep(step) });
       const r = a.kind === "type" ? await driver.type!(target.ref, a.text!, a.enter) : await driver.tap(target.ref);
       if (r.delivery === "not_delivered") add({ kind: "not_delivered", message: `Not delivered (${r.reason ?? "unknown reason"}): ${r.error ?? "the app did not receive the tap"}`, screen, steps: here });
       else if (!r.ok) add({ kind: "action_failed", message: `Action failed${r.code ? ` [${r.code}]` : ""}: ${r.error ?? "unknown"}`, screen, steps: here });

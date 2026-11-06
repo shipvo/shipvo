@@ -53,5 +53,10 @@ export interface Device {
   /** Opens the system file picker for one file. Resolves with the file, or null if the person cancels. */
   files: { pick(options?: PickFileOptions): Promise<PickedFile | null> };
   clipboard: { set(text: string): Promise<void>; get(): Promise<string> };
-  net: { online(): boolean; onChange(cb: (online: boolean) => void): () => void };
+  net: { online(): boolean; /** Optional: only the simulated device reports it. */ type?(): ConnectionType; onChange(cb: (online: boolean) => void): () => void };
 }
+
+/** What the phone is connected over. A slow network profile reports its cellular generation. */
+export type ConnectionType = "none" | "wifi" | "cellular" | "2g" | "3g" | "4g";
+/** The simulator's network profiles. */
+export type NetworkProfileName = "online" | "offline" | "2g" | "3g" | "slow-4g" | "spotty" | "low-end-4g";

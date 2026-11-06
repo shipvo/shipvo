@@ -2,7 +2,7 @@
 // (permission dialog, camera viewfinder, fingerprint prompt, payment prompt, notification banner, share sheet)
 // drawn as real dialogs so an agent sees and operates them exactly as it would a phone's.
 import { mayUseReal, openStream, levelMeter, stopStream, realPosition, barcodeDetector, type Source } from "./real";
-import type { Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification, Contact, CalendarEvent, PermissionName, PickedFile } from "./types";
+import type { ConnectionType, NetworkProfileName, Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification, Contact, CalendarEvent, PermissionName, PickedFile } from "./types";
 export * from "./types";
 
 export type DeviceState = {
@@ -26,6 +26,8 @@ export type DeviceState = {
   biometrics: { enrolled: boolean; nextResult: "success" | "fail" | "cancel" };
   payment: { nextResult: "approve" | "decline" | "timeout" | "insufficient_funds"; pin?: string };
   online: boolean;
+  /** The network profile the simulator runs under. `online` (the default) leaves connectivity as the switches say. */
+  networkProfile: NetworkProfileName;
   /** Airplane mode: the network is off and the status bar shows the airplane icon. */
   airplane: boolean;
   /** Quick-settings switches (notification shade and Control Center). Wi-Fi and mobile data both off means no network. */
@@ -53,7 +55,7 @@ const state: DeviceState = {
   camera: { barcode: null, delayMs: 800 },
   biometrics: { enrolled: true, nextResult: "success" },
   payment: { nextResult: "approve", pin: "1234" },
-  online: true, airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70,
+  online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70,
   fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false,
   battery: { level: 100, charging: false }, clipboard: "", log: [],
   ...(cfg.device ?? {}),
@@ -62,7 +64,12 @@ const state: DeviceState = {
 // Readings from real hardware are marked source "real".
 const log = (kind: string, detail?: unknown, source: Source = "simulated") => state.log.push({ at: Date.now(), kind, detail, source, simulated: source === "simulated" } as any);
 // Network, airplane and battery feed the phone frame's status bar. Every change is logged (simulated) and announced as a "pn:status" event.
-const isOnline = () => state.online && !state.airplane && (state.wifi || state.mobileData);
+const isOnline = () => state.online && state.networkProfile !== "offline" && !state.airplane && (state.wifi || state.mobileData);
+// A slow profile is a cellular link of the matching generation. `spotty` (500 kbps down in the sim's table) is closest to 3g.
+const PROFILE_GEN: Record<string, ConnectionType> = { "2g": "2g", "3g": "3g", "slow-4g": "4g", "low-end-4g": "4g", spotty: "3g" };
+/** The connection type: "none" when not connected; a slow profile reports its cellular generation; otherwise Wi-Fi if on, else generic cellular. */
+const connectionType = (): ConnectionType => !isOnline() ? "none" : PROFILE_GEN[state.networkProfile] ?? (state.wifi ? "wifi" : "cellular");
+const netKey = () => `${isOnline()}|${connectionType()}`;
 const SETTINGS = ["wifi", "mobileData", "locationServices", "darkMode", "dnd", "autoRotate", "flashlight", "orientationLock", "brightness", "airplane"] as const;
 const settings = () => Object.fromEntries(SETTINGS.map((k) => [k, state[k]]));
 const SYSTEM = ["darkMode", "fontSize", "boldText", "reduceMotion", "language", "rtl"] as const;
@@ -76,7 +83,7 @@ function announceSystem(before: string, record = true) {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pn:system", { detail: now }));
 }
 const settingsKey = () => JSON.stringify(settings());
-const statusKey = () => JSON.stringify([state.online, state.airplane, isOnline(), state.battery.level, state.battery.charging]);
+const statusKey = () => JSON.stringify([state.online, state.networkProfile, state.airplane, isOnline(), state.battery.level, state.battery.charging]);
 function announceStatus(before: string, record = true, beforeSettings = "") {
   if (beforeSettings && settingsKey() !== beforeSettings && typeof window !== "undefined") { if (record) log("settings", settings()); window.dispatchEvent(new CustomEvent("pn:settings", { detail: settings() })); }
   if (statusKey() === before) return;
@@ -259,7 +266,7 @@ export const device: Device = {
     },
   },
   clipboard: { async set(t) { state.clipboard = t; }, async get() { return state.clipboard; } },
-  net: { online: isOnline, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
+  net: { online: isOnline, type: connectionType, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
 };
 
 // A notification banner at the top, like a heads-up notification: tapping it opens the app's handler.
@@ -286,7 +293,7 @@ function showBanner(n: Notification, popup = true) {
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
 g.__pnDevice = {
   state,
-  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasOnline = isOnline(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (isOnline() !== wasOnline) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
+  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
   /** Push a notification to the app. Returns its id, or null when permission is not granted. */
   push(n: Omit<Notification, "id">) { return deliver(n); },
   log: () => state.log,
@@ -309,11 +316,11 @@ g.__pnDevice = {
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
   /** Back to a known state: permissions undetermined, default location, nothing in front of the camera, log cleared. */
   reset(profile?: Partial<DeviceState>) {
-    const before = statusKey(), bs = settingsKey(), sk = systemKey();
+    const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey();
     Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: (profile?.platform ?? state.platform) === "android" && (profile?.api ?? state.api) < 33 ? "granted" : "undetermined" },
-      source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
+      source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
     recent.length = 0; seq = 0;
-    announceSystem(sk, false); announceStatus(before, false, bs);
+    announceSystem(sk, false); announceStatus(before, false, bs); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline()));
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
 };

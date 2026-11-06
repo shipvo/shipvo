@@ -1,0 +1,3 @@
+- `@shipvo/cli`: new `shipvo lumi [android|ios]` builds the app and opens it in the browser on Shipvo Phone with a Lumi sidebar: a live feed of each action, findings as they appear (with a Replay button), coverage (screens and controls tried), and a command box. Commands need no AI: `test my app`, `test <flow>`, `try <flow> with bad input`, `stop`, `replay bug <n>`, `help`. Unknown text gets the short list.
+- `@shipvo/cli`: `walk()` gains optional `onEvent`, `shouldStop`, `startPaths` and `input: "bad"` options, and `fieldElements` is exported. Existing calls behave the same.
+- Migration: none; new command and optional options.

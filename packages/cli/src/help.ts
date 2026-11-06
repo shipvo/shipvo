@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "smoke", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "migrate", "approvals", "test", "keys", "mcp",
+  "init", "sim", "smoke", "run", "explore", "lumi", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "migrate", "approvals", "test", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -17,6 +17,7 @@ Start
   run android|ios --native    Run on an emulator or simulator with npx expo run:android / run:ios
   explore [--max-depth 3] [--max-steps 100] [--seed 1] [--record-features <file>] [--ranker <file>] [--flows [signup,login,search,add-to-cart,checkout]] [--fail-on-findings] [--changed-from <sha>] [--issues-dir <dir>] [--json]  Walk the app in the simulator, write explore-report.md and .json
   explore --train <samples> [--ranker-out ranker.json]  Train a ranker from samples recorded with --record-features (no simulator)
+  lumi [android|ios] [--ui-port 4547] [--no-open]  Open the app on Shipvo Phone with the Lumi sidebar: live feed, findings, coverage, and a command box (test my app, test <flow>, stop, replay bug <n>)
   preview [--json]            Publish a public 24-hour preview link (here.now, no account)
 
 Ship
