@@ -36,6 +36,7 @@
     "nav.mjs",
     "frame.d.mts",
     "mock-rules.mjs",
+    "network-profiles.mjs",
     "screen-rules.mjs",
     "push-notification.mjs",
     "README.md"

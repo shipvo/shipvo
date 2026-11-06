@@ -1,0 +1,3 @@
+- `@shipvo/sim`: network profiles engine (`online`, `offline`, `2g`, `3g`, `slow-4g`, `spotty`, `low-end-4g`) with latency, bandwidth and seeded failures. `set_network_profile` action on the sim server.
+- `@shipvo/device`: on the web simulator, `net.online()` and the status follow the active profile; a profile change is logged as simulated.
+- Migration: none; the default profile is `online`.

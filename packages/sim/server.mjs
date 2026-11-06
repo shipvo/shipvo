@@ -10,6 +10,7 @@ import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
+import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -319,6 +320,8 @@ async function act(id, body) {
       }
       break;
     }
+    // Run the app's fetch/XHR under a named network profile (default "online": no change). Logged in device_log as simulated.
+    case "set_network_profile": return setNetworkProfile(s, page, body.name ?? body.profile, body.seed);
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
     case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
       if (body.action === "browser_open" && body.url) { await phoneBrowser(s); if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
@@ -468,3 +471,30 @@ server.on("upgrade", (req, socket) => {
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
 server.listen(PORT, () => console.log(`Shipvo UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));
 launchBrowser();
+
+// The one entry point for network profiles. Fetch/XHR of the app page go through applyProfile once the profile is not "online".
+// Mock rules still win over the network, but they are slowed and failed like any other request.
+async function setNetworkProfile(s, page, name, seed) {
+  let profile; try { profile = getProfile(name ?? "online"); } catch (e) { throw new SimError(e.code ?? "unknown_profile", e.message); }
+  s.netProfile = profile.name;
+  s.netFetch = profile.name === "online" ? null : applyProfile(async (req) => {
+    const route = req.route; const rule = (s.mocks ?? []).find((m) => (!m.method || m.method === route.request().method()) && m.match(route.request().url()));
+    if (rule) return new Response(rule.body, { status: rule.status, headers: rule.headers });
+    const r = await route.fetch();
+    return new Response(r.status() === 204 || r.status() === 304 ? null : await r.body(), { status: r.status(), headers: r.headers() });
+  }, profile, { seed: Number.isInteger(seed) ? seed : 1 });
+  if (!s.netRoute) {
+    s.netRoute = true;
+    await page.route("**/*", async (route) => {
+      const type = route.request().resourceType();
+      if (!s.netFetch || (type !== "fetch" && type !== "xhr")) return route.fallback();
+      try {
+        const res = await s.netFetch({ route });
+        await route.fulfill({ status: res.status, body: Buffer.from(await res.arrayBuffer()), headers: { "access-control-allow-origin": "*", ...Object.fromEntries(res.headers) } }).catch(() => {});
+      } catch { await route.abort("internetdisconnected").catch(() => {}); }
+    });
+  }
+  await page.evaluate((n) => globalThis.__pnDevice?.set({ networkProfile: n }), profile.name);
+  return { profile: profile.name, ...PROFILE_NUMBERS(profile) };
+}
+const PROFILE_NUMBERS = ({ latencyMs, downKbps, failureRate }) => ({ latencyMs, downKbps: Number.isFinite(downKbps) ? downKbps : null, failureRate, simulated: true });

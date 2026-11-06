@@ -38,3 +38,19 @@ test("reset restores the status and leaves the log empty", () => {
   assert.deepEqual(dev.status(), { online: true, airplane: false, battery: { level: 100, charging: false } });
   assert.equal(dev.log().length, 0);
 });
+
+test("connectivity follows the network profile, and a change is logged as simulated", () => {
+  dev.reset();
+  assert.equal(dev.status().online, true);
+  dev.set({ networkProfile: "offline" });
+  assert.equal(dev.status().online, false);
+  assert.equal(dev.connection(), "none");
+  const entry = dev.log().filter((l) => l.kind === "network_profile").at(-1);
+  assert.deepEqual(entry.detail, { from: "online", to: "offline" });
+  assert.equal(entry.simulated, true);
+  dev.set({ networkProfile: "2g" });
+  assert.equal(dev.status().online, true);
+  assert.equal(dev.connection(), "cellular");
+  dev.reset();
+  assert.equal(dev.networkProfile(), "online");
+});
