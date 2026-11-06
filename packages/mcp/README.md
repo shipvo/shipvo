@@ -38,11 +38,17 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
 | `already_locked` | `lock` was called on a locked phone. | Call `unlock` if you want to use the app. |
 | `not_locked` | `unlock` was called on a phone that is not locked. | Carry on; nothing to do. |
+| `app_not_foreground` | The home screen or app switcher is showing, so tap, type, scroll, back, `open_url` and `open_notification` were not sent. | Call `resume_app`. |
+| `recents_not_open` | `kill_app` was called without the app switcher open. | Call `open_recents` first. |
 | `mock_invalid` | A network mock rule is not valid. | Fix the rule. |
 
 Tools: `list_apps`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `export_test`, `end_session`, `owner_describe`, `owner_command`.
 
 `export_test { session }` is read-only. It turns the taps, typing, scrolls, `back` and `set_device` calls recorded in a session into a `@shipvo/test` script and returns the source. Targets are named by visible text; an ambiguous target becomes a `// TODO` comment, and a password-like field uses `process.env.SHIPVO_TEST_<LABEL>` so the typed value is never in the output. Only sessions opened through this server are recorded; an unknown session returns `no_session`. Steps are dropped when the session ends. `payment.pin` is removed from recorded `set_device` calls. Only labels and roles that look like a password, passcode or PIN are treated as secret; other secret-like fields (card number, token) are exported as typed. `type` with `enter: true` and `scroll` with a `ref` are recorded without the Enter or the ref, so a replay can differ from the session.
+
+## Record a demo video
+
+`record_start`, `record_marker` and `record_stop` write an MP4 of the phone to `.shipvo/recordings/`. `record_stop` takes `music: true` (a ducked music bed and a `.credits.json`) and `narration` (a path to a wav). It needs ffmpeg and `playwright`. Music works only from a repo checkout, or when `SHIPVO_BGMUSIC` points at `scripts/video/bgmusic.py`; otherwise `record_stop` returns `music_unavailable` (and `music_failed` if the mix fails). A runnable example is in [`docs/record-a-demo-video.md`](../../docs/record-a-demo-video.md).
 
 **Owner commands that cannot be undone need `confirm: true`.** `owner_command` takes an optional `confirm`. `publish`, price changes, offers, deletes and API keys first return `{ code: "needs_confirm", plan }` and do nothing; call again with the same `args` and `confirm: true` to run. `agentPolicy` (`ask` default, `deny`, `allow`) and `agentDeny` in `shipvo.json` (read from `PN_APP_DIR` or the current folder) can only tighten the control plane's rules. Details: `docs/agents.md`.
 

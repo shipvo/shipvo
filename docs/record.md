@@ -27,9 +27,11 @@ Waits longer than 0.6 s between actions are cut, including `wait_for` and `settl
 | `record_start` | `format` | `9:16` (1080x1920, default), `16:9` (1920x1080), `1:1` (1080x1080) |
 | | `fps` | `30` (default) or `60` |
 | | `title` | Used in the file name |
+| | `show_taps` | `true` (default) draws a finger dot and ripple on taps and a trail on scrolls; `false` hides them |
 | | `background` | `brand`, `plain` or a CSS colour behind the phone |
 | `record_marker` | `caption` | Required, a chapter title at the current time. It also shows on screen as a lower third until the next marker |
-| `record_stop` | none | |
+| `record_stop` | `music` | `true` mixes a ducked music bed under the video and writes a `.credits.json` next to it. Needs `python3` and `scripts/video/bgmusic.py` (a repo checkout, or set `SHIPVO_BGMUSIC`). Set `SHIPVO_MUSIC_FILE` to use a local track instead of Jamendo |
+| | `narration` | Path to a `.wav` mixed over the video. Cut to the video length if longer; the rest is silent if shorter |
 
 Only one recording runs at a time per server.
 
@@ -42,8 +44,12 @@ Only one recording runs at a time per server.
 | `recording_active` | A recording is already running. | Call `record_stop` first. |
 | `no_recording` | Marker or stop with nothing running. | Call `record_start` first. |
 | `encode_failed` | ffmpeg failed, or is not installed. | Install ffmpeg and retry. |
+| `narration_unreadable` | The narration file is missing or not audio. The silent video is kept. | Fix the path or the file. |
+| `music_unavailable` | `bgmusic.py` was not found (npm installs do not include it). | Use a repo checkout or set `SHIPVO_BGMUSIC`. |
+| `music_failed` | The music mix failed, for example `python3` is missing. The silent video is kept. | Install `python3` and retry. |
 
 ## Next steps
 
 - [Agents and Shipvo apps](agents.md): all MCP tools.
+- [Record a demo video: a worked example](record-a-demo-video.md)
 - [Videos](videos.md)

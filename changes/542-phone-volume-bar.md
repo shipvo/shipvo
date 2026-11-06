@@ -1,0 +1,1 @@
+- sim: the phone's volume overlay now shows a level bar next to the number. No API change.

@@ -15,7 +15,14 @@ import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { PhoneBrowser } from "./phone-browser.mjs";
+import { acceptWebSocket } from "./ws-lite.mjs";
+import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
+import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
+import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
+import { SettingsError } from "./settings.mjs";
+import { ShadeError } from "./shade.mjs";
+import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -62,21 +69,63 @@ const sessions = new Map();
 
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
 
+// The phone's Browser app. Chromium starts on the first open. Pages that link to the app's own scheme hand the link to the app.
+// The instance is shared through s.browserP, so two opens at once make one Chromium context.
+function phoneBrowser(s) {
+  s.browserP ??= (async () => {
+    s.peers = s.peers ?? new Set();
+    const b = new PhoneBrowser(await browserReady, { allowPrivate: false, allowHosts: [], device: phone, onDeepLink: (u) => {
+      s.page.evaluate((x) => globalThis.__pnDevice?.openUrl(x), u).catch(() => {});
+      for (const peer of s.peers) peer.send(JSON.stringify({ type: "app", url: u }));   // the phone goes back to the app
+    } });
+    b.onChange = () => pushState(s);
+    s.browser = b;
+    return b;
+  })();
+  s.browserP.catch(() => { s.browserP = undefined; });
+  return s.browserP;
+}
+// One screencast feeds every viewer of the Browser app.
+function ensureCast(s) {
+  const b = s.browser; if (!b?.page || b.screencast || !s.peers?.size) return;
+  b.startScreencast((f) => { const msg = JSON.stringify({ type: "frame", ...f }); for (const p of s.peers) p.send(msg); }).catch(() => {});
+  pushState(s);
+}
+async function pushState(s) {
+  const b = s.browser; if (!b || !s.peers?.size) return;
+  const tabs = await b.tabs().catch(() => []);
+  const msg = JSON.stringify({ type: "state", tabs, url: b.page?.url() ?? "" });
+  for (const peer of s.peers) peer.send(msg);
+}
+/** Opens a web page in the Browser app. Resolves { ok: true }, or { ok: false, code, message } when the page is refused. Viewers get an `error` message too. */
+async function openInBrowserApp(id, url) {
+  const s = sessions.get(id); if (!s) return { ok: false, code: "no_session", message: "no session" };
+  const b = await phoneBrowser(s);
+  for (const peer of s.peers ?? []) peer.send(JSON.stringify({ type: "browser", url }));   // the phone shows the Browser app
+  try { await b.open(url); ensureCast(s); return { ok: true }; } catch (e) {
+    const r = { ok: false, code: e.code ?? "error", message: String(e.message).split("\n")[0] };
+    for (const peer of s.peers ?? []) peer.send(JSON.stringify({ type: "error", code: r.code, message: r.message }));
+    return r;
+  }
+}
+
 async function newSession(id, opts = {}) {
-  if (sessions.has(id)) { await sessions.get(id).browser?.close(); await sessions.get(id).ctx.close(); }
+  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close(); }
   const target = await resolveApp(opts.app);
   writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
   const browser = await browserReady;
   // Optional width, height (output pixels) and scale (device pixel ratio) make a session render at a store screenshot size.
   const size = Number.isInteger(opts.width) && Number.isInteger(opts.height) && opts.width > 0 && opts.height > 0 ? { viewport: { width: Math.round(opts.width / (opts.scale || 1)), height: Math.round(opts.height / (opts.scale || 1)) }, deviceScaleFactor: opts.scale || 1 } : {};
   const ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
+  // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
+  await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e?.message ?? e).split("\n")[0]));
   await page.goto(target.url, { waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle() });
+  sessions.set(id, { ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -140,15 +189,30 @@ async function act(id, body) {
     if (covered) throw fail("covered", String(body.ref));
   };
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
-  if (["tap", "type", "scroll", "back", "open_url", "open_notification"].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  // Home screen or app switcher showing: the app is in the background and takes no input.
+  if (["tap", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
+  // An open panel covers the app on a phone, so input to the app is refused until it is closed.
+  if (["tap", "type", "scroll"].includes(body.action) && s.shade.open !== "none") throw new SimError("panel_open", `a panel (${s.shade.open}) is open and covers the app, so nothing was sent to it. Close it first (close_panels).`);
   switch (body.action) {
+    // Home, recents, resume and kill. The app hears them as AppState changes (document.visibilityState). Kill is a cold start.
+    case "press_home": case "open_recents": case "resume_app": case "kill_app": {
+      let ev;
+      try { ev = body.action === "press_home" ? pressHome(s.nav) : body.action === "open_recents" ? openRecents(s.nav) : body.action === "resume_app" ? resume(s.nav) : (killApp(s.nav), null); }
+      catch (e) { if (e instanceof NavError) throw new SimError(e.code, e.message); throw e; }
+      if (ev) await page.evaluate(setVisibilityInPage, ev);
+      if (body.action === "kill_app") { s.life.reloads++; await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300); await page.evaluate(setVisibilityInPage, "background"); }
+      const where = s.nav.where;
+      return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
+    }
     // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
     case "lock": case "unlock": {
+      if (body.action === "lock") s.shade.open = "none";
       try { (body.action === "lock" ? lock : unlock)(s.life); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
       return { locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
     }
     case "restart": {
-      restart(s.life);
+      restart(s.life); s.shade.open = "none"; s.nav.where = "app";
       await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(300);
       return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
     }
@@ -185,10 +249,16 @@ async function act(id, body) {
       break;
     }
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
-    case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); break;
+    case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); await syncMedia(page); break;
+    case "open_notifications": case "open_control_center": case "close_panels": case "toggle_tile": case "dismiss_notification": {
+      try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
+    }
+    case "get_settings": case "set_setting": {
+      try { return { ...(await settingsAction(page, body)) }; } catch (e) { if (e instanceof SettingsError) throw new SimError(e.code, e.message); throw e; }
+    }
     case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
     case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
-    case "open_notification": { const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
+    case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {
       if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
       const handled = await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url);
@@ -214,18 +284,21 @@ async function act(id, body) {
       break;
     }
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
-    case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": {
-      if (body.action === "browser_open" && body.url && !s.browser) s.browser = new PhoneBrowser(await browserReady, { allowPrivate: body.allow_private === true, allowHosts: Array.isArray(body.allow_hosts) ? body.allow_hosts.map(String) : [], device: phone });
-      else if (body.action === "browser_open" && s.browser) { if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
+    case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
+      if (body.action === "browser_open" && body.url) { await phoneBrowser(s); if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
       if (!s.browser) { if (body.action === "browser_open") throw new SimError("bad_url", "browser_open needs a url"); throw new SimError("no_page", "no page is open: call browser_open first"); }
       const b = s.browser;
       try {
         switch (body.action) {
-          case "browser_open": return { ...(await b.open(String(body.url ?? ""))) };
+          case "browser_open": { const r = await b.open(String(body.url ?? "")); ensureCast(s); return { ...r }; }
           case "browser_snapshot": return { ...(await b.snapshot()) };
           case "browser_click": return { ...(await b.click(body.ref)) };
           case "browser_type": return { ...(await b.type(body.ref, body.text, body.enter)) };
           case "browser_back": return { ...(await b.back()) };
+          case "browser_tabs": return { source: "web", untrusted: true, tabs: await b.tabs() };
+          case "browser_close_tab": return { source: "web", untrusted: true, tabs: await b.closeTab(Number(body.index)) };
+          case "browser_scroll": return { ...(await b.scroll(Number.isFinite(body.dy) ? body.dy : 400, Number.isFinite(body.dx) ? body.dx : 0)) };
+          case "browser_wait_for": return { ...(await b.waitFor({ text: body.text, gone: body.gone === true, timeoutMs: body.timeout_ms })) };
           default: { const p = join(DIR, `${id}-web-${Date.now()}.png`); writeFileSync(p, await b.screenshot()); return { path: p, source: "web", untrusted: true }; }
         }
       } catch (e) { throw e.code ? new SimError(e.code, e.message) : e; }
@@ -240,7 +313,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); break;
+    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.
@@ -253,14 +326,17 @@ async function act(id, body) {
       }
       return { sizes, screen: text };
     }
-    case "back": { const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) { await ready(b.first()); await b.first().click(); } else throw new Error("no Back button on this screen"); break; }
+    case "back": { if (s.shade.open !== "none") { s.shade.open = "none"; break; } const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) { await ready(b.first()); await b.first().click(); } else throw new Error("no Back button on this screen"); break; }
     case "screenshot": {
       // format "jpeg" has no alpha channel, which the stores require. inline: true also returns the bytes as base64 for clients on another machine.
       const jpeg = body.format === "jpeg"; const p = join(DIR, `${id}-${Date.now()}.${jpeg ? "jpg" : "png"}`);
-      const buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p });
+      // Home screen or switcher showing: draw it over the app for the shot, then take it away. The app stays loaded underneath.
+      const away = s.nav.where !== "app";
+      if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME));
+      let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -310,6 +386,8 @@ const server = http.createServer(async (req, res) => {
       }
       return send(202, { ok: true }); // telemetry etc.
     }
+    // the Browser app, in a phone frame
+    if (req.method === "GET" && url.pathname === "/browser") return send(200, browserAppPage(url.searchParams.get("skin") === "ios" ? "ios" : "android", url.searchParams.get("session") ?? ""), MIME[".html"]);
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
@@ -322,6 +400,33 @@ const server = http.createServer(async (req, res) => {
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }
+});
+// The Browser app's live view: frames out, taps, swipes and typing in. Same trust as the HTTP API (loopback), plus an Origin check
+// so another web page open on this machine cannot drive the phone.
+server.on("upgrade", (req, socket) => {
+  const url = new URL(req.url, "http://x");
+  const refuse = (line) => socket.end(`HTTP/1.1 ${line}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  if (url.pathname !== "/browser/ws") return refuse("404 Not Found");
+  let originHost = null; try { if (req.headers.origin) originHost = new URL(req.headers.origin).host; } catch { originHost = "invalid"; }
+  // A missing Origin is allowed (non-browser clients). The Host comparison does not stop DNS rebinding, since both
+  // values come from the requester; the HTTP API has the same trust level.
+  if (originHost && originHost !== req.headers.host) return refuse("403 Forbidden");
+  const s = sessions.get(url.searchParams.get("session") ?? ""); if (!s) return refuse("404 Not Found");
+  const peer = acceptWebSocket(req, socket, async (text) => {
+    let m; try { m = JSON.parse(text); } catch { return; }
+    const b = s.browser;
+    try {
+      if (m.type === "open") { await openInBrowserApp(url.searchParams.get("session"), String(m.url)); return; }   // a refusal reaches every viewer as an `error` message
+      if (!b) return;
+      if (m.type === "back") await b.back(); else if (m.type === "forward") await b.forward(); else if (m.type === "reload") await b.reload();
+      else if (m.type === "tab") await b.selectTab(Number(m.index)); else if (m.type === "newtab") await b.newTab(); else if (m.type === "closetab") await b.closeTab(Number(m.index));
+      else await b.input(m);
+    } catch (e) { peer.send(JSON.stringify({ type: "error", code: e.code ?? "error", message: String(e.message).split("\n")[0] })); }
+  }, () => { s.peers?.delete(peer); if (!s.peers?.size) s.browser?.stopScreencast(); });
+  if (!peer) return;
+  s.peers = s.peers ?? new Set(); s.peers.add(peer);
+  peer.send(JSON.stringify({ type: "hello", browser: !!s.browser }));
+  ensureCast(s);
 });
 // Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
