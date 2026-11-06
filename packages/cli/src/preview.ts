@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep, extname } from "node:path";
 import { args as parse, loadConfig } from "./config.js";
+import { spawnBin } from "./spawn-bin.js";
 import { RECORDER_JS } from "./preview-recorder.js";
 
 const API = "https://here.now/api/v1";
@@ -295,10 +296,11 @@ export async function publishToHereNow(files: PreviewFile[], o: PreviewOpts = {}
   return { url: done.siteUrl ?? created.siteUrl, claimUrl: created.claimUrl ?? null, expiresAt: created.expiresAt ?? null, files: files.length, warnings };
 }
 
-function build(root: string, out: string): Promise<void> {
+export function build(root: string, out: string): Promise<void> {
   rmSync(out, { recursive: true, force: true }); mkdirSync(join(root, ".shipvo"), { recursive: true });
   return new Promise((resolve, reject) => {
-    const p = spawn("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out], { cwd: root, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });
+    const call = spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out]);
+    const p = spawn(call.command, call.args, { cwd: root, shell: call.shell, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });
     p.on("error", reject);
     p.on("exit", (c) => (c === 0 ? resolve() : reject(new Error(`The web build failed (exit ${c}). Run \`npx expo export --platform web\` to see why.`))));
   });

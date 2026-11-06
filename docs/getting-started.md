@@ -18,6 +18,10 @@ What we measured: on 2026-11-05, on a GitHub Actions Linux runner (4 vCPU, AMD E
 - For phones: Android Studio once (`npx expo run:android`), or EAS Build.
 - For publishing: a control plane. Use the hosted one (`shipvo login`, then `shipvo app create`, both below) or self-host yours on Cloudflare ([self-hosting.md](self-hosting.md)).
 
+## Supported systems
+
+The first-run path (`shipvo init`, `shipvo sim`, `shipvo run android`, `shipvo publish --dry-run`) is proven on Linux, on a GitHub Actions runner: see the first-run numbers above and [`scripts/first-run/`](../scripts/first-run/). We have no run on Windows or macOS yet, so we do not claim them. The `first-run-cross-os` workflow is where those runs will come from.
+
 ## 1. Create the app
 
 Already have an Expo app or a bare React Native app? Run `npx -y @shipvo/cli init` inside it instead: see [adopt mode](cli.md#adopt-mode) and [bare React Native apps](cli.md#bare-react-native-apps). For a bare app, run `cd ios && pod install` and rebuild both apps afterwards. Then continue at step 2 or 3.
