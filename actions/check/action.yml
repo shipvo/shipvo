@@ -1,0 +1,40 @@
+name: Shipvo check
+description: Build the app for web, run shipvo test, then shipvo explore. Fails on test regressions and crashes, not on exploration notes.
+inputs:
+  node-version:
+    description: Node version
+    default: "22"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    - name: Install
+      shell: bash
+      run: |
+        if [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile
+        elif [ -f yarn.lock ]; then corepack enable && yarn install --frozen-lockfile
+        elif [ -f package-lock.json ]; then npm ci
+        else npm install; fi
+    - name: Install Chromium
+      shell: bash
+      run: npx playwright install --with-deps chromium
+    - name: Build for web
+      shell: bash
+      run: PN_SIM=1 npx expo export --platform web --output-dir sim-dist --clear
+    - name: Test and explore
+      shell: bash
+      run: |
+        npx shipvo sim --port 4545 > sim.log 2>&1 &
+        for i in $(seq 1 90); do curl -sf http://localhost:4545/app/ > /dev/null && break; sleep 2; done
+        npx shipvo ci check
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: shipvo-check
+        path: |
+          explore-report.md
+          explore-report.json
+          shipvo-report.json
+        if-no-files-found: ignore
