@@ -8,7 +8,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 
 1. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 2. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
-3. Store path: `shipvo store` from working app to both stores (video, blog)
+3. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
 4. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
 5. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
 6. Record demo videos (`record_*`) (tutorial, video, blog; docs done)
@@ -32,7 +32,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Measured simulator parity | [parity-results](parity-results.md) | | | |
 | Simulated device features (camera, location, payment, biometrics, notifications) | [device-api](device-api.md) | | | [the-permission-you-never-test](../blog/the-permission-you-never-test.md) |
 | Airplane-mode testing | [device-api](device-api.md) | | | [test-airplane-mode](../blog/test-airplane-mode.md) |
-| Store path (`shipvo store`) | [store](store.md) | | | |
+| Store path (`shipvo store`) | [store](store.md) | | [From working app to Google Play and the App Store](videos.md#from-working-app-to-google-play-and-the-app-store) | |
 | Framework adapters and Capacitor | [adapters](adapters.md), [capacitor](capacitor.md) | | | |
 | Self-hosting on Cloudflare | [self-hosting](self-hosting.md) | | | |
 | Share a preview link (`shipvo preview`) | [getting-started](getting-started.md) | | | |
