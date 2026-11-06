@@ -44,6 +44,7 @@ switch (cmd) {
   case "doctor": await doctor(rest); break;
   case "status": process.exitCode = await status(rest); break;
   case "agents": process.exitCode = await agentsCmd(rest); break;
+  case "skills": process.exitCode = rest[0] === "sync" ? await agentsCmd(["skills-sync", ...rest.slice(1)]) : (console.error("Usage: shipvo skills sync [--dry-run] [--json]"), 2); break;
   case "audit": await audit(rest); break;
   case "approvals": process.exitCode = await approvals(rest); break;
   case "test": process.exitCode = await testCmd(rest); break;

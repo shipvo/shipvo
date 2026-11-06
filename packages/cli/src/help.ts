@@ -1,6 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "smoke", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "audit", "approvals", "test", "keys", "mcp",
-  "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
+  "init", "sim", "smoke", "run", "explore", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "approvals", "test", "keys", "mcp",
 ] as const;
 
 export const help = `shipvo <command>
@@ -43,7 +42,8 @@ Ship
   ci init --framework capacitor [--dry-run] [--force]
                               Write .github/workflows/shipvo-build.yml (signed Android and iOS builds)
   status [--app id] [--json]  Show how releases do; --json lists what to do next (exit 0 ok, 1 action needed, 2 error)
-  agents setup [--dry-run] [--json]  Write AGENTS.md section and .mcp.json for AI agents
+  agents setup [--dry-run] [--json]  Write AGENTS.md section and .mcp.json for AI agents, and copy the skills of your @shipvo/* dependencies
+  skills sync [--dry-run] [--json]   Only copy the skills of your @shipvo/* dependencies into .agents/skills and .claude/skills
   approvals list|approve <id> [--app id] [--json]  List promotes held for a second owner, or approve one
   audit <app> [--format json|csv] [--limit n]  Export the audit log to stdout
   test [files] [--repair [--write]] [--report <file> [--release <id>]] [--json]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release

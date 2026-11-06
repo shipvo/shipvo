@@ -163,20 +163,24 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
   }
 
   let healthOk = false;
+  let healthNote: string | undefined;
   let healthFix = "check shipvo.json controlPlane and your network access (5 second timeout)";
   if (!deps.offline && cfg?.controlPlane && typeof cfg.controlPlane === "string") {
     try {
       const res = await deps.fetchFn(cfg.controlPlane.replace(/\/$/, "") + "/health", { signal: AbortSignal.timeout(5000) });
       if (res.status !== 200) healthFix = `/health answered HTTP ${res.status}, expected 200; check the control plane URL and deploy`;
       else {
-        try { await res.json(); healthOk = true; } catch { healthFix = "/health answered 200 but not JSON; controlPlane may point at the wrong service"; }
+        try {
+          const j: any = await res.json(); healthOk = true;
+          if (typeof j?.telemetry_dropped_today === "number") healthNote = `telemetry_dropped_today: ${j.telemetry_dropped_today}${j.telemetry_dropped_today > 0 ? " (D1 refused telemetry writes; see docs/self-hosting.md)" : ""}`;
+        } catch { healthFix = "/health answered 200 but not JSON; controlPlane may point at the wrong service"; }
       }
     } catch (e) {
       healthFix = e instanceof Error && e.name === "TimeoutError" ? "/health did not answer within 5 seconds; check the URL and your network" : healthFix;
     }
   }
   if (deps.offline) results.push({ name: "control plane /health returns JSON", ok: true, fix: "none", note: skipped });
-  else results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix });
+  else results.push({ name: "control plane /health returns JSON", ok: healthOk, fix: !cfg ? needCfg : healthFix, ...(healthOk && healthNote ? { note: healthNote } : {}) });
 
   let hermesOk = true;
   if (cfg && Object.prototype.hasOwnProperty.call(cfg, "hermesBytecodeVersion")) {

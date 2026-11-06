@@ -10,6 +10,10 @@ npx skills add shipvo/shipvo --skill shipvo -g
 
 The skill (`skills/shipvo/SKILL.md`) gives your coding agent the exact `shipvo` commands for setup, running on Shipvo Phone, testing over MCP, publishing and rolling back, the store path and demo recordings. Without npm: `curl -fsSL https://shipvo.dev/install.sh | bash`. Or paste this to your agent: "Set up Shipvo in this project: run `npx -y @shipvo/cli agents setup`, then follow what it prints." All three lines are on [shipvo.dev/setup](https://shipvo.dev/setup/).
 
+## Skills that ship with each package
+
+`@shipvo/mcp`, `@shipvo/test`, `@shipvo/runtime` and `@shipvo/cli` each ship a short skill in `skills/<name>/SKILL.md` (`shipvo-mcp`, `shipvo-test`, `shipvo-runtime`, `shipvo-cli`). `shipvo agents setup` copies the skill of every installed `@shipvo/*` package your `package.json` depends on into `.agents/skills/` and `.claude/skills/`. A package you do not depend on is not copied. A second run changes nothing, and `--dry-run` lists the files without writing. `shipvo skills sync` runs only this step. `shipvo status --json` reports each one in `data.skills` as `{ package, name, synced }`.
+
 ## Three ways to connect
 
 **1. Local, over stdio** (Claude Desktop, Claude Code, Cursor, PiPilot): run `shipvo sim` in the app, then
@@ -48,6 +52,15 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
+
+## Driving the live phone
+
+When `shipvo run` is up for your app, `open_app` attaches to that phone and the person watching sees what the agent does:
+
+- a dot at each tap point, an outline around the target, and an "Agent is driving" banner;
+- a step log in plain words, such as `Tapped button "Add to cart"`. Events from the simulated device are marked "(simulated)". **Hide steps** collapses the log so it never covers the app.
+
+The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on. An action already in flight when the person takes over still finishes, and its step is logged after "You took over".
 
 ## What the tree shows (and hides), on purpose
 
