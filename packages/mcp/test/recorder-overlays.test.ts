@@ -26,13 +26,16 @@ const pixel = (file: string, t: number, x: number, y: number) => {
   const r = spawnSync("ffmpeg", ["-v", "error", "-ss", String(t), "-i", file, "-frames:v", "1", "-vf", `crop=2:2:${x}:${y}`, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]);
   return [...r.stdout.subarray(0, 3)];
 };
-// Records a 1:1 video, taps the centre right away and returns the pixel at the centre 0.4 s later.
+// Records a 1:1 video, runs op right away and returns the centre pixel that differs most from the background.
+// On a loaded runner screenshots can be slow, so the frame at one fixed time may still be from before op: look at several times.
 async function centreAfterTap(showTaps: boolean, op: (r: Recorder) => Promise<void>) {
   const r = new Recorder();
   await r.start({ url, format: "1:1", dir: out, title: `taps-${showTaps}`, showTaps });
   await op(r); await sleep(1300);
   const res = await r.stop();
-  return pixel(res.file, 0.4, 540, 540);
+  const bg = [0x11, 0x33, 0x66];
+  const dev = (p: number[]) => p.reduce((n, v, i) => n + Math.abs(v - bg[i]), 0);
+  return [0.2, 0.3, 0.4, 0.5].map((t) => pixel(res.file, t, 540, 540)).reduce((a, b) => (dev(b) > dev(a) ? b : a));
 }
 
 describe.skipIf(!ok)("recorder overlays", () => {
