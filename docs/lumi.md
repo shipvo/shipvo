@@ -11,17 +11,17 @@ For anyone who runs their app on Shipvo Phone and wants to see what is happening
    ```
 
    Use `npx shipvo lumi ios` for an iPhone-style phone.
-2. Wait while Shipvo builds a web copy of your app. Your browser opens with the phone on the left and the Lumi sidebar on the right.
-3. In the command box, type `test my app` and press Enter. Lumi taps through your app. The sidebar lists each action as it happens.
-4. Look at **Findings**. Each finding is a problem Lumi found, such as a button that does nothing or a screen that stays blank. Press **Replay** to watch it happen again.
+2. Wait while Shipvo builds a web copy of your app. Your browser opens with the phone and the Lumi sidebar. On a wide window the phone is on the left and the sidebar on the right; on a narrow window the sidebar is below the phone.
+3. In the box labelled **Tell Lumi what to do**, type `test my app` and press Enter (or press **Send**). Lumi taps through your app. The sidebar lists each action as it happens.
+4. Look at **Findings** in the sidebar. Each finding is a problem Lumi found, such as a button that does nothing or a screen that stays blank. Press **Replay** to watch it happen again.
 5. When you are done, go back to the terminal and press **Ctrl+C**.
 
 Lumi runs on your computer. It answers only requests from its own page.
 
 **If it fails:**
-- The terminal says it cannot build for web and names a file: that file uses something that only works on a real phone. Ask your assistant to fix it.
-- The page says `Could not reach Lumi. Is shipvo lumi still running?`: the terminal was closed. Run the command again.
-- The port is busy: pass another with `--ui-port 4600`.
+- The terminal shows `Building <your app> for the simulator…` and then an error from `npx expo export --platform web`: the error names a file that uses something that only works on a real phone. Ask your assistant to fix it. Run `npx expo export --platform web` yourself to see the same error.
+- The sidebar says `Could not reach Lumi. Is shipvo lumi still running?`: the terminal was closed. Run the command again.
+- The terminal says `Port 4547 is in use. Pass --ui-port <n>.`: pass another, for example `--ui-port 4600`. For `Port 4546 is in use.`, pass `--port <n>`.
 
 ## What Lumi shows
 

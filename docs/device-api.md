@@ -171,7 +171,7 @@ For people on slow or patchy connections, test your app under a named network. I
 | `spotty` | 400 ms | 500 kbps | 30% |
 | `low-end-4g` | 100 ms | 6300 kbps | 0.5% |
 
-These are simulation settings, not measurements of a real network (from `packages/sim/network-profiles.mjs`). Failures are seeded, so a test repeats the same way. The rate limit applies to response bodies. The profile stays after `device_reset`. `mockNetwork` rules win over the profile.
+These are simulation settings, not measurements of a real network (from `packages/sim/network-profiles.mjs`). Failures are seeded, so a test repeats the same way. The rate limit applies to response bodies. The simulator keeps applying the profile to network requests after `device_reset`, but `device.net.type()` in the page returns to `wifi` after it. `mockNetwork` rules win over the profile.
 
 From a typed test:
 
