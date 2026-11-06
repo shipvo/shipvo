@@ -16,7 +16,7 @@ const INIT_NEEDS_DIR = `shipvo: init needs a folder name.
 Try:  shipvo init myshop
 This creates ./myshop with a ready app. Other options (app id, bundle id, control plane) have defaults; see 'shipvo init --help'.`;
 
-const INIT_HELP = `Usage: shipvo init <dir> [options]
+export const INIT_HELP = `Usage: shipvo init <dir> [options]
        shipvo init [.] [--dry-run] [--yes] [--device]   (adopt mode, inside an existing Expo or bare React Native app)
 
 Adopt mode: run it inside an Expo app (package.json with expo, plus app.json or app.config.js/ts).
