@@ -1,0 +1,2 @@
+- `tide-and-tackle` (sample app): reports to `/t` are now signed, so auto-halt counts them. Needs a new shell build (adds `expo-secure-store` and `expo-crypto`).
+- Migration: none for exported APIs.
