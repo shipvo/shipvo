@@ -4,6 +4,280 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## 2026-11-06 (release)
 
+- **@shipvo/capacitor 0.0.2**: capacitor: Android native layer applies a signed web bundle with rollback
+- **@shipvo/cli 0.1.6**: run: proxy app network calls through the run server so no CORS on the phone; cli: --json envelope for init, login, audit and keys (slice 3e of #533); control-plane: test results by release, which release broke which flow (slice 5 of #317); cli: build small update patches in Node so publish needs no Python; cli: explain a missing listing icon instead of 'not found, skipped'
+- **create-shipvo 0.0.2**: cli: npx shipvo and npm create shipvo work on Windows
+- **@shipvo/device 0.1.4**: run: proxy app network calls through the run server so no CORS on the phone; device: connectivity follows the network profile on web (slice 1c of #802); phone: Settings screen with dark mode, font size, bold text, reduce motion, language and RTL (slice 4 of #466); phone: notification shade, Notification Center and Control Center (slice 3 of #466); phone: Browser app UI, screencast and Linking.openURL (slice 2 of #524)
+- **@shipvo/mcp 0.0.10**: mcp: 2026-07-28 error codes, ttlMs/cacheScope, resultType and sorted tool list; mcp: phone recordings include Lumi, with an optional voice; vault: request_secret and secret_status MCP tools (slice 2 of #841); mcp: attach_session tool for the live shipvo run phone (#448); sim: Lumi shows each agent step live as a caption
+- **@shipvo/runtime 0.1.5**: runtime: Android accepts root-signed key rotations (slice 2 of #736); runtime: iOS accepts root-signed key rotations (slice 3 of #736); runtime: fix type errors in install.ts that broke `tsc --noEmit` in fresh apps; cli: shipvo keys rotate sign and upload, shared test vectors (slice 4 of #736); runtime: send the shell's Hermes engine build with the pointer request (slice 3 of #696)
+- **@shipvo/schema 0.0.6**: cli: record and check the Hermes engine build, not only the bytecode version (slice 1 of #14); control-plane: hold promotes above a policy band until a second owner approves (slice 3a of #295)
+- **shipvo 0.0.2**: cli: npx shipvo and npm create shipvo work on Windows
+- **@shipvo/sim 0.1.6**: sim: fix the clock in the Lumi byte-identical test; run: proxy app network calls through the run server so no CORS on the phone; sim: retry a transient Chromium screenshot failure in the Lumi glow test; sim: Lumi shows each agent step live as a caption; sim: Lumi reacts to results with a real reason
+- **@shipvo/spec 0.0.2**: spec: evaluate CEL with the Shipvo function library and check names (slice 2 of #839)
+- **@shipvo/test 0.1.4**: cli: each @shipvo package ships its own skill, synced by agents setup (slice 4 of #533)
+
+### Changes
+
+- docs: the strategy metrics table now records publish-to-applied time for Android (emulator) and iOS (Simulator) from CI runs, and what is still not timed.
+- first-run: new `scripts/first-run/applied-ota.mjs` times init, install, build, publish and publish-to-healthy for a scaffolded app on the Android emulator. Migration: none.
+- `@shipvo/control-plane`: new OIDC ID token verifier (`verifyIdToken`) and claim-to-role mapping (`mapClaimsToRole`). Not wired to any route yet.
+- Migration: none; new module.
+- `@shipvo/capacitor`: Android native layer. `android/` is a Capacitor plugin (SharedPreferences store, private-files bundle storage, web view switch). New exports `NativeStore`, `NativeFiles`, `bootAndServe`, `bootAndSwitch`, `ShipvoNativePlugin`, and `ShipvoCapacitor.bundleHash` / `resume`.
+- Migration: none; additions only. A web bundle is a zip with `index.html` at its root.
+- `services/control-plane`: `POST /r/:app/:release/tests` stores the latest `shipvo test --report` per release and platform. `GET /r/:app/tests` lists passing and failing flows per release, newest first, with the first release where each failing flow broke.
+- `@shipvo/cli`: `shipvo test --report <file> --release <n> [--platform android|ios] --upload` sends the report. `shipvo status` shows a "tests:" line per release, and `status --json` has a new `data.tests` field.
+- Migration: none; new routes, flags and field.
+- `@shipvo/cli`: `shipvo run --lan` serves the simulated phone on your Wi-Fi and prints a URL with a random token and a QR code. A phone browser shows the app full screen without the phone frame. Requests without the token get 403.
+- Migration: none; new flag. `parseRunArgs` now also returns `lan`.
+- `@shipvo/cli`, `@shipvo/mcp`: `screenshot` works on the live `shipvo run` phone. The frame page asks once "Let the agent see this tab?" and uses tab capture cropped to the phone if you allow it. Without permission it draws the app page to an image and lists what it could not draw (video, iframes, cross-origin images). Headless sessions keep the Playwright screenshot. Every result starts with `source: tab-capture | rendered | headless` and includes the screen tree.
+- Migration: none. The text part of the `screenshot` result now begins with a `source:` line before the tree.
+- Screenshots stay under the 1 MiB socket limit: a large image is re-encoded smaller (scaled PNG, then JPEG) and the result carries `mime`. If it still does not fit, the call returns `ok:false` with a clear error. If the person stops sharing the tab, the next agent action asks again.
+- `@shipvo/mcp`: new `attach_session` tool attaches to the live `shipvo run` phone without an app id.
+- Migration: none; new tool.
+- `@shipvo/mcp`: new tools `list_store_apps`, `install_app`, `uninstall_app` and `switch_app`. Typed errors: `unknown_app`, `already_installed`, `not_installed`, `store_unreachable`. `PN_STORE_FIXTURE=1` uses a local Store list.
+- `@shipvo/sim`: the phone keeps `installed_apps` and `current_app`, and starts from an optional `phone.json` (apps and settings; invalid files fail with `bad_profile`). The home screen has a Store icon and installed apps show as icons, in both skins, all in the accessibility tree. Installs, switches and uninstalls are logged in `device_log` as simulated.
+- Migration: none. Without a `phone.json` the phone behaves as before.
+- `switch_app` refuses private or local URLs with `host_not_allowed`. Marketplace apps use `app://<id>@rN` URLs. A bad `phone.json` or `--phone` path fails with `bad_profile`.
+- `@shipvo/mcp`, `@shipvo/sim`: new tools and actions `get_settings` and `set_setting`. Keys: `dark_mode`, `font_size` (`small`, `default`, `large`, `largest`), `bold_text`, `reduce_motion`, `language` (`en`, `fr`, `ar`) and `rtl`. Unknown keys fail with `unknown_setting`, bad values with `bad_value`. Setting the language to `ar` turns RTL on.
+- `@shipvo/sim`: the phone frame has a Settings screen in both skins, opened from the home screen icon or the gear in the shade, Notification Center and Control Center. Its rows are switches and radio buttons in the accessibility tree.
+- `@shipvo/device`: new switches `fontSize`, `boldText`, `reduceMotion`, `language` and `rtl` (also accepted by `set_device`), `__pnDevice.system()`, and a `pn:system` event. The app sees them through `Appearance`, `PixelRatio.getFontScale()`, `AccessibilityInfo`, `I18nManager` and `Intl` in the web export. Each change is logged in `device_log` as `setting`, simulated.
+- Migration: none. Existing calls behave as before.
+- `@shipvo/mcp`: new tools `get_update_state`, `check_for_update` and `apply_update`. Typed errors: `no_update`, `not_ready`.
+- `@shipvo/sim`: the phone keeps an update state (`idle`, `checking`, `downloading`, `ready`, `applied`, `reverted`) with the release and the last reason (`verify_failed`, `download_failed`, `crash_loop`). It checks a signed release pointer and the bundle hash, applies with a restart, and reverts after 3 failed boots. Each state change is in `device_log` as simulated. A "Simulated" status banner shows for `ready`, `applied` and `reverted` in both skins.
+- New simulator options: `--update-url` and `--update-key` (or `PN_UPDATE_URL`, `PN_UPDATE_KEY`); a session can pass `update_url` and `update_key`.
+- Migration: none. Without an update source `check_for_update` returns `no_update`.
+- `@shipvo/sim`: the phone frame has a home screen with the app icon, an app switcher card, Android 3-button navigation (switch in the power menu) and iPhone/Android swipe gestures (up = home, up and hold = recents, along the bar = switch on iPhone, left edge = back). The app hears `AppState` `background` and `active`; killing the card is a cold start. The frame page owns the state: it reports changes to its parent with `postMessage({ type: "pn:nav-state", where })` and accepts `{ type: "pn:nav", where }`. The home screen and switcher follow the dark and light theme.
+- `@shipvo/mcp`: new tools `press_home`, `open_recents`, `resume_app` and `kill_app`. While the home screen or switcher shows, `tap`, `type`, `scroll`, `back`, `open_url` and `open_notification` fail with `app_not_foreground`.
+- `@shipvo/sim`: `screenshot` of a headless session shows the home screen or the app switcher while the phone is away from the app.
+- Migration: none; new tools.
+- `@shipvo/sim`: the phone frame has a notification shade (Android) and Notification Center and Control Center (iPhone). Pull down from the top; tiles change the simulated device; notifications show app, title, text and time, open their deep link on tap, swipe away, and have "Clear all".
+- `@shipvo/mcp`, `@shipvo/sim`: new tools and actions `open_notifications`, `open_control_center`, `toggle_tile`, `dismiss_notification` and `close_panels`. `set_device` takes `wifi`, `mobileData`, `airplane`, `locationServices`, `darkMode`, `dnd`, `autoRotate`, `flashlight`, `orientationLock` and `brightness`.
+- `@shipvo/device`: new device switches with those names, `__pnDevice.settings()`, `dismiss()` and `clearAll()`, and notifications carry `at` and `app`. With `dnd` on, a notification goes to the shade without a banner. Wi-Fi and mobile data both off take the network offline.
+- Migration: none. Existing calls behave as before.
+- cli: on the `shipvo run` phone, an agent action now shows a finger dot, an outline of the target, an "Agent is driving" banner and a plain-English step log. A touch or key press by the person pauses the agent until they press "Hand back"; the agent's next request fails with `taken_over` ("the person took over"). mcp: attached sessions report `taken_over` as a clear tool error (#499).
+- mcp: while recording, `tap` draws a soft finger dot and ripple and `scroll` draws a trail (along the element when `ref` is given); `record_start` takes `show_taps` (default true). `@shipvo/sim` gets a `locate` action: centre and size of an element as 0..1 of the viewport. Videos recorded with taps now show the dot; pass `show_taps: false` for the old look (#522).
+- mcp: demo videos cut waits longer than 0.6 s between agent actions, and `chapters` and `duration_s` follow the trimmed timeline. `record_marker` captions show as a lower third from the marker until the next one. `record_start` takes `background` (`"brand"`, `"plain"` or a CSS colour; anything else fails with `invalid_background`). Time inside one slow action is never cut, and the tail after the last action is kept. `wait_for` and `settle` waits count as idle and are cut too. Videos recorded before a long wait are now shorter than wall-clock time (#522).
+- mcp: `record_stop` takes `music: true`. It mixes a ducked music bed under the MP4 with `scripts/video/bgmusic.py` and writes `<name>.credits.json` next to it. Without `music` the output is unchanged. Errors: `music_unavailable`, `music_failed` (#523).
+- mcp: `record_stop` takes `narration`, a path to a wav. It is mixed over the video, trimmed to the video length (the result's `notes` says so) and padded with silence if shorter. With `music: true` the music is ducked under the voice into one audio stream. A missing or unreadable wav throws `narration_unreadable` and leaves the silent video (#523).
+- docs: new page `docs/record-a-demo-video.md` with a worked example of `record_start`, `record_marker` and `record_stop` with `music` and `narration`, and a short section in the `@shipvo/mcp` README (#523, #501).
+- `@shipvo/sim`: the phone has a Browser app. `GET /browser?session=<id>&skin=android|ios` shows it in the phone frame: address bar, back, forward, reload and tabs. Frames stream over a WebSocket (`/browser/ws`, CDP screencast, JPEG, acked); taps, swipes and typing go back as input. The socket accepts only the same origin.
+- `@shipvo/device` (web): `openUrl` with an http(s) URL opens the Browser app instead of the app. A link on a web page to an app scheme (for example `tide://item/3`) goes to the app's `onUrl` listener.
+- `@shipvo/mcp`: new tools `browser_tabs`, `browser_close_tab`, `browser_scroll`, `browser_wait_for`.
+- Migration: none. On the web build, an app that relied on `onUrl` receiving http(s) links now gets them only when no Browser app is present (a hosted embed).
+- `@shipvo/device` (web): when the Browser app refuses a page (for example a private host), `openUrl` logs `browser_open_refused` with the code and answers `false`. The result can now be a `Promise<boolean>` in that case. Migration: `await` the result of `openUrl`.
+- `@shipvo/sim`: the phone has its own Chromium page (`PhoneBrowser`): isolated context per phone, mobile viewport and touch, user agent marked "ShipvoPhone". Private hosts (loopback, link-local, RFC1918, CGNAT, `.local`, `.internal`, `localhost`) are refused with `host_not_allowed` unless `allow_private` or `allow_hosts` is set. Every navigation appears in `device_log`.
+- `@shipvo/mcp`: new tools `browser_open`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_back`, `browser_screenshot`. Page content is marked `source: "web"` (untrusted).
+- Migration: none; new tools.
+- cli: `@shipvo/mcp`, `@shipvo/test`, `@shipvo/runtime` and `@shipvo/cli` now ship a skill in `skills/`. `shipvo agents setup` copies the skills of the `@shipvo/*` packages the project depends on into `.agents/skills/` and `.claude/skills/`; the new `shipvo skills sync` does only that. `shipvo status --json` has a new `data.skills` list. `agents setup --json` has a new `skills` field. No migration needed (#533).
+- `@shipvo/cli`: `shipvo init`, `login`, `audit` and `keys` (status, export, import, rotate) take `--json` and print the `{ ok, code, summary, data, next }` envelope on stdout. Progress goes to stderr. Exit codes: 0 ok, 1 failed, 2 usage error. `data` never holds a seed or token. Codes and shapes are in `docs/cli.md`.
+- `@shipvo/cli`: `keys export --json` needs `--out`. `login --json` prints the device URL and code on stderr and repeats them in `data.device`.
+- Migration: `keys rotate sign --json` used to print the bare signed envelope. It now prints the standard envelope; the signed envelope is `data.envelope`. Output without `--json` is unchanged.
+- `@shipvo/cli`: `shipvo publish`, `promote`, `rollback` and `auto-halt` (including `--dry-run`) take `--json` and print the `{ ok, code, summary, data, next }` envelope on stdout. Text and build output go to stderr. Exit codes: 0 ok, 1 failed, 2 usage error. The `data` shape of each is in `docs/cli.md`.
+- `@shipvo/cli`: `runJson`, `CliFailure` and `UsageError` added to `src/json-out.ts`. Output without `--json` is unchanged.
+- Migration: none.
+- sim: the phone's volume overlay now shows a level bar next to the number. No API change.
+- `@shipvo/cli`: `shipvo ci comment` renders one pull request comment for the Shipvo check (pass or fail per flow, explore findings, changed screens) and updates it in place on each push. The check workflow now asks for `pull-requests: write`. Docs: `docs/ci-check.md`.
+- Migration: existing `shipvo-check.yml` files need `pull-requests: write` under `permissions` to get the comment. Also add `with: { fetch-depth: 0 }` to the `actions/checkout` step, or changed screens cannot be found. Re-run `shipvo ci init --check --force` or add both by hand.
+- `@shipvo/cli`: `shipvo ci init --check` writes `.github/workflows/shipvo-check.yml`, which runs the new `actions/check` composite action (build for web, `shipvo test`, `shipvo explore`) on every pull request. `shipvo ci check` fails on test regressions and crashes, not on exploration notes. Docs: `docs/ci-check.md`.
+- Migration: none.
+- `@shipvo/cli`: `shipvo explore --changed-from <sha>` walks only the screens changed since that commit; the Shipvo check uses it on pull requests.
+- Migration: none; new flag.
+- `@shipvo/site`: footer links, the footer logo and the "Captions and transcript" links on Learn pages are at least 44 px tall on phones.
+- Migration: none; CSS only.
+- `shipvo`, `create-shipvo`: `npx shipvo` and `npm create shipvo` work on Windows. They built the path to `@shipvo/cli` as `C:/C:/...` and failed with `ERR_MODULE_NOT_FOUND`.
+- Migration: none.
+- `@shipvo/cli`: `shipvo sim`, `shipvo run --native` and `shipvo preview` start `npx` through the new spawn helper, so Windows runs `npx.cmd`. No change on Linux.
+- Migration: none.
+- `@shipvo/cli`: `shipvo explore` reports `small_target` (under 48 x 48 on Android, 44 x 44 with `--skin ios`) and `duplicate_name` findings.
+- `@shipvo/sim`: new `sizes` action returns the rendered size of each ref on the screen.
+- Migration: none. `Driver.sizes` is optional.
+- `@shipvo/cli`: `shipvo doctor`, `shipvo test` and `shipvo explore` take `--json` and print the `{ ok, code, summary, data, next }` envelope on stdout. Progress goes to stderr. Exit codes: 0 ok, 1 failed, 2 usage or setup error (see `docs/cli.md`).
+- `@shipvo/cli`: the envelope type and `emit()` moved to `src/json-out.ts`. `status --json` output is unchanged.
+- Migration: none.
+- `site`: new page shipvo.dev/setup ("Set up with your agent") with the skill, curl and paste-to-your-agent lines, linked from home, Docs and Learn. `https://shipvo.dev/install.sh` is now served (`text/x-shellscript`, cached 5 minutes): it checks Node 22+ and npm, then runs `npx -y @shipvo/cli agents setup` in the current folder.
+- Migration: none.
+- `shipvo ci shots --changed-from <sha>` saves one simulator screenshot per changed screen (up to four) in `shipvo-shots/`, and the Shipvo check action runs it before posting the comment. New command; no existing API changed.
+- `@shipvo/mcp`: demo videos keep correct timing on a busy machine. Frames are saved with their capture time and encoded once at `record_stop`.
+- Migration: none; no API change.
+- Android e2e harness: crash-loop trials stop waiting once the release is pending or already current, and report `reached`. Migration: none.
+- android-e2e: new "resumed download" scenario. The fake release server can cut the first bundle response part way (`cutFirst` option, off by default) and serves `Range` with a 206; the report records total bytes sent, whether the second request used `Range`, and first request to healthy.
+- ios-e2e: `scripts/ios-e2e` can build a release with a different Hermes bytecode version (`MISMATCH_HERMES=1 make-release.mjs`), and `analyze.mjs` reports a "Hermes mismatch refused" pass or fail from the telemetry log and the app's running release. No change to published packages (#637).
+- android-e2e: new scenario proves on-device `Runtime.rollback()` restores the previous release, keeps it after a restart, does not re-apply the rolled-back release on later check-ins, and reports `rolled_back` telemetry. The report gives the time from the call to the previous release being active.
+- schema: new optional `policy.requireApprovalAbove` band (default off). Additive; no migration needed.
+- control-plane: a promote above that band answers 202 with an approval id and changes nothing until another owner calls `POST /apps/:app/approvals/:id/approve` (or `/reject`). The proposer cannot approve. Proposed, approved and rejected each write an audit row (action `publish`, with `approval` in `after`).
+- control-plane: approval audit rows reuse action `publish`; filter on `approval` in `after` to tell them apart from real publishes. Approve re-checks `maxBand` and `agentMaxBand` (403 `policy_refused`) and the app storage budget (413).
+- `scripts/ios-e2e`: `make-release.mjs` has a `CRASH_ON_START=1` mode, and `analyze.mjs` reports "Crash-loop reverted" (pass only if the bad release ran at most 3 times and the app ends on the previous release).
+- Migration: none; test tooling only.
+- ios-e2e: the iOS simulator end-to-end can cut a bundle download short once (`CUT_ONCE=<path>:<n>` on `scripts/ios-e2e/server.mjs`) and `analyze.mjs` reports "Interrupted download resumed" (Range request with an offset above 0, HTTP 206, release applied). Test tooling only; no package API change (#647).
+- `@shipvo/cli`: new `shipvo approvals list` and `shipvo approvals approve <id>` (with `--json`) for promotes held above `policy.requireApprovalAbove`.
+- `@shipvo/mcp`: new tools `approvals_list` and `approval_approve`. An agent cannot approve an agent's proposal.
+- control-plane: new `GET /apps/:app/approvals` (pending holds). A refused self-approval now writes an audit row (`approval: "refused"`, `rule: "self_approval"`), and an agent can no longer approve an agent's proposal.
+- Behaviour change to the existing approve endpoint: `OWNER_TOKEN` used to approve a hold made with the publish token. It now gets `self_approval` (403), because the owner token counts as an agent.
+- Migration: no schema change. If you automated approvals with the owner token, run `shipvo login` as a person and approve with that instead. A person's hold can still be approved with the owner token.
+- `@shipvo/mcp`: new read-only tool `audit_log` (`app`, `limit`, `action`) returns the release audit log newest first, with typed `unauthorized` and `not_found` errors.
+- Migration: none; new tool.
+- docs: `docs/threat-model.md` explains what signing protects on a device, the threats and the code and test behind each, and what is not covered.
+- `@shipvo/control-plane`: new internal `roles.ts` with the viewer, developer, release manager and admin permission table and `can(role, action)`. It is not wired into auth yet, so nothing is enforced. Migration: none.
+- `scripts`: `selfhost-upgrade-check.mjs` seeds and verifies a release across a restart or upgrade of the Docker control plane; `docs/self-hosting.md` has a "Back up and upgrade" section.
+- Migration: none; new script and docs.
+- `@shipvo/cli`: `shipvo explore --issues-dir <dir>` writes one ready-to-file issue per finding and prints the `gh issue create` line for each.
+- Migration: none; new flag.
+- `scripts`: `scripts/first-run/apply-ios.mjs` turns Simulator marks and the e2e server log into publish, download, apply and healthy times for the first OTA of a scaffolded app.
+- Migration: none; new script.
+- `@shipvo/cli`: `shipvo init` next steps now open the app with `npx shipvo run android` (or `run ios`) instead of `shipvo sim`, and say the browser phone needs no Android Studio.
+- Migration: none; text only.
+- `control-plane`: publish tokens are now checked against their role (`can(role, action)`) on publish, promote, rollback, halt settings, audit and summary. A denied call returns 403 `{ error: "forbidden", action, role }`.
+- Migration: none. A token with no role acts as `admin`, so existing tokens work as before.
+- `@shipvo/control-plane`: publish tokens have a nullable `role` column (migration 0017) and `publisher()` returns it. Nothing enforces it yet.
+- Migration: none; NULL means admin.
+- `@shipvo/cli`: internal helper `spawnBin` that builds a Windows-safe spawn call (`.cmd` shims, `shell: true`, cmd.exe quoting). Not used yet and not exported. Migration: none.
+- `@shipvo/schema`: new optional `hermes_engine` string (for example `250829098.0.10`) on the shell declaration and on the release record.
+- `@shipvo/cli`: `shipvo publish` records the version of the project's `hermes-compiler` as `hermes_engine`, and fails if `hermesEngine` in `shipvo.json` names another build. `shipvo doctor` shows the engine build and fails when installed and declared differ.
+- Migration: none required. The field is optional and absent means unknown, so nothing changes until you add `hermesEngine` to `shipvo.json`. To opt in, set it to the engine id your shell was built with.
+- control-plane: the pointer route reads an optional `?hbe=` Hermes engine id and refuses a release whose `hermes_engine` differs, with the existing `hermes_bytecode_mismatch` reason. Absent or malformed `hbe` is offered as before. Migration: none.
+- `@shipvo/runtime`: a shell can declare its Hermes engine build id (`hermesEngine` plugin prop, Android meta-data `dev.shipvo.HERMES_ENGINE`, iOS Info.plist `ShipvoHermesEngine`). The runtime sends it as `hbe` on the pointer request, only when set.
+- Migration: none. Existing shells keep working and send the same request as before. Set `hermesEngine` (for example `"250829098.0.10"`) in the plugin props to opt in.
+- `control-plane`: `POST /t` no longer returns a 5xx when D1 refuses a write. It answers `202 {ok:true, stored:false}` and counts the drop in KV `telemetry_dropped/<app>/<day>`. Auto-halt falls back to per-release KV counts of failure and healthy events.
+- `control-plane`: `GET /health` has a new field `telemetry_dropped_today`. `shipvo doctor` prints it.
+- Migration: none. Existing calls behave as before.
+- `shipvo run` writes the app id (`appId` from `shipvo.json`) to `.shipvo/run.json`, not the display name. Migration: none; the file is rewritten on every run.
+- `@shipvo/mcp`: `open_app` accepts the app of a live `shipvo run` even when no simulator knows it, and attaching works: the run page now answers the `screen` request.
+- cli: `shipvo run --help` and `-h` print usage and exit 0. A missing platform now suggests `shipvo run android`. The first build prints "First build, this can take a minute."
+- `@shipvo/cli`: new `shipvo smoke [--timeout s] [--json]` checks the app loads in the simulator (no thrown errors, a first screen with elements). Exit 0 ok, 1 failed, 2 setup error.
+- `@shipvo/cli`: `config.ts` now exports `BOOLEAN_FLAGS`; `--json`, `--skip-build` and `--fail-on-findings` no longer take the next word as a value.
+- Migration: none.
+- cli: `shipvo smoke [android|ios]` (default `android`) passes the platform to the simulator session as its device platform. `data.platform` is new and the summary reads "The app loads on <platform>". Any other value exits 2. Migration: none; scripts that match the old summary text should match "The app loads".
+- cli: new `shipvo migrate --plan [--json]` prints a read-only plan to switch from Expo EAS Update to Shipvo. `shipvo init` now points to it when it finds `expo-updates`. Migration: none.
+- Tooling: `scripts/metrics/adoption.mjs` prints npm last-week downloads, GitHub stars, forks and outside issues as JSON. Failed calls give `null` plus an `errors` entry. Migration: none.
+- Docs: `docs/migrate-from-eas-update.md` shows real `shipvo migrate --plan` output, and the concept map. Linked from getting-started and the README.
+- `@shipvo/cli`: `shipvo ci comment` takes `--base-report <file>` and `--report <file>`. The comment gets a "Compared with base" section (regressions, fixed, still failing). `--fail-on-regression` exits 1 only when a flow passed on base and fails on the PR.
+- `actions/check` runs the flows on the base commit and passes both flags.
+- Migration: none; new flags.
+- `@shipvo/cli`: `shipvo migrate --apply` removes `expo-updates` from `package.json` and `app.json` (plugin, `updates`, `runtimeVersion`), keeps backups in `.shipvo/migrate-backup/`, and refuses a dirty git tree unless `--force`.
+- Migration: none; new flag.
+- `scripts/metrics/north-star.mjs`: read-only north-star query (outside apps with a healthy release in the last 7 days).
+- `@shipvo/control-plane`: revert alert webhooks now keep separate slots for verified and unverified reports, so forged rollbacks cannot use up the slots for real ones. Adds migration `0021_alert_sent_unverified.sql`.
+- Docs: `docs/threat-model.md` and `docs/auto-halt.md` list what is protected and what is not.
+- Migration: `sendRevertAlert` gained a required fifth argument; it is internal and not exported by the package. Apply `0021_alert_sent_unverified.sql` (adds one table; no existing data changes).
+- Behaviour change for webhook owners: alerts from unsigned reports now get 3 per app per hour, down from the shared 10. Alerts from signed reports keep 10.
+- `@shipvo/control-plane`: new pure `looksLikeAttack` in `halt.ts` flags failures that come mostly from fresh installs or from a sudden burst.
+- Migration: none; `shouldHalt` is unchanged.
+- `control-plane`: new `POST /t/register { app_id, install_id, shell_version }` returns `{ install_id, key, token }`. The server stores only a hash of the key. A second register for the same install id returns 409 unless the body carries `old_key`, which rotates the key. Limited to 20 calls per IP and 200 per app per hour (429). Needs the `TELEMETRY_SECRET` secret; without it the route returns 503.
+- `control-plane`: `POST /t` accepts optional `install_id` and `sig` (or an `x-shipvo-sig` header). The signature is `HMAC-SHA256(sha256hex(key), rawBody)` in hex; for a `sig` body field the body is signed without that field. A valid signature stores `verified = 1`; anything else stores `verified = 0`. Old runtimes keep working. Auto-halt counts are unchanged.
+- The network of a registering install is kept only as a salted hash of the /24 (IPv4) or /48 (IPv6). The IP is never stored.
+- Migration: run `0019_install_identity.sql` (`wrangler d1 migrations apply`) and set the secret with `wrangler secret put TELEMETRY_SECRET`. It adds the `installs` table and `telemetry.verified INTEGER NOT NULL DEFAULT 0`. Additive only; existing rows get `verified = 0`.
+- `@shipvo/runtime`: new `ensureInstallIdentity(storage, crypto, registerUrl)`, `signReport(identity, body, crypto)`, `enableSignedTelemetry({ storage, registerUrl, crypto? })`, a `webCrypto` default and the `TelemetryStorage`, `TelemetryCrypto` and `InstallIdentity` types. Once an identity exists, telemetry reports carry `install_id` and `sig` (HMAC-SHA256, lower-case hex, keyed with the UTF-8 bytes of the key). Signing rule: the HMAC covers the unsigned JSON string including its closing `}`; the sent body is that string with the closing `}` replaced by `,"sig":"<hex>"}`. The server cuts the suffix `,"sig":"<hex>"}`, appends `}`, then checks the HMAC. Without an identity, reports are sent unsigned as before.
+- Migration: none. Additive. React Native apps pass their own `crypto` because React Native has no `crypto.subtle`.
+- `@shipvo/control-plane`: `POST /t` and `POST /t/register` now limit reports per IP, per install id and per app. Over a limit you get `429` with `Retry-After`. IPs are stored only as hashes.
+- Migration: none. Old runtimes without an install id are limited per IP and per app only.
+- `@shipvo/control-plane`: under `agentPolicy: "ask"`, irreversible owner commands return a server-issued one-time challenge (10 minutes, bound to the exact arguments). Only the signed-in admin can approve it. `confirm: true` no longer runs them. The audit log records `approved_by`, `approval_id` and `approved_how`.
+- `@shipvo/mcp`: `owner_command` takes `approval: <challenge id>` instead of `confirm`; `approvals_list` also returns pending `challenges`.
+- Migration: agents that sent `confirm: true` must now send `approval` with the id of a challenge the owner approved in the admin. `agentPolicy: "allow"` is unchanged.
+- `control-plane`: `POST /o/:app` is idempotent per install, order id and body (an identical retry returns the first result), rate limited per IP (`cf-connecting-ip`) and per install (429), and stores every order as `unverified` (`simulated` when the body says `simulated: true`). New migration `0018_order_status.sql`.
+- Migration: apply `0018_order_status.sql`; it only adds columns and an index. Apps may send `install_id` in the order body; without it all callers share one install bucket.
+- `@shipvo/control-plane`: `POST /o/:app` recomputes line prices, promo and total (exact integer match) from the published content version the order names. A mismatch returns 422 and is stored as `price_mismatch`; an unknown version or empty catalogue returns 422 with a typed `reason`.
+- Migration: orders must now send `content_version` (the published content version number). Orders without a known version are rejected.
+- `control-plane`: new `POST /app/:id/api/orders/:order/settle` marks an `unverified` order `settled`. It needs the owner token or an admin session (401 otherwise), is safe to repeat, refuses `simulated` and `price_mismatch` orders (409), and writes an audit entry. The `list_orders` command now returns each order's `status`, and the admin Orders tab shows `unverified`, `settled`, `price_mismatch` or `simulated` with a plain label. Migration: none.
+- Design doc for signing key rotation (root key, rotation statement, replay protection). No behaviour change.
+- `@shipvo/cli`: new `shipvo keys rotate sign` (offline, signs a key rotation statement with the root seed and prints the envelope) and `shipvo keys rotate upload` (sends it to the control plane with an owner session; the route lands in a later slice). Existing `keys export` and `keys import` are unchanged.
+- `@shipvo/runtime`: adds `test-vectors/rotation.json`, shared rotation test vectors for the Android and iOS runtimes (not published in the package).
+- Migration: none; new commands.
+- docs: every parity claim now says what it measures (role and label) and where (Android emulator, iOS Simulator); new site check `check-claims`.
+- cli: `shipvo migrate --plan` now plans a CodePush switch. It lists the dependency, `codePush()` and `CodePush.sync` calls, native deployment and public keys, and `appcenter codepush` commands with file and line, then prints ordered steps. It changes no files. `--apply` is still EAS Update only.
+- `@shipvo/runtime`: refused and reverted releases are now reported to the control plane by the runtime itself, in the same session. `Runtime.markHealthy()` and `Runtime.checkForUpdate()` drain the event queue and send each forwarded event to `POST /t`. New exports: `reportRuntimeEvents`, `onRuntimeEvents`, `forwardRuntimeEvents`, `FORWARDED_EVENTS`. The config plugin accepts `reportEvents: false` to turn it off.
+- Migration: none; additive. If your app already forwards events itself, remove that code so events are not sent twice (or pass `reportEvents: false`).
+- `tide-and-tackle`: add `src/telemetry.ts` with a pure JS crypto adapter and an in-memory storage adapter for signed telemetry (not wired into `App.tsx` yet).
+- Migration: none.
+- `tide-and-tackle`: the sample app registers its install once and signs its `/t` reports, so they count as verified for auto-halt. If registering fails, reports are sent unsigned as before.
+- Migration: none.
+- cli: `shipvo migrate --apply` now works for CodePush apps. It swaps the `codePush()` wrapper and `CodePush.sync` calls for `@shipvo/runtime`, removes `CodePushDeploymentKey` and `CodePushPublicKey` from `Info.plist` and `strings.xml`, and swaps the dependency in `package.json` (no package manager run). `appcenter codepush` scripts and CI lines stay and are printed as manual steps. Backups go in `.shipvo/migrate-backup/`; a dirty git tree is refused (`dirty_tree`) unless `--force`. Before this, `--apply` on a CodePush app was a usage error.
+- control-plane: auto-halt counts only verified reports, one vote per install per release. A halt needs at least `min_installs` (default 20) distinct installs and failures from at least 3 distinct networks. `PUT /app/<id>/api/halt-config` accepts an optional `min_installs`.
+- control-plane: new migration `0020_telemetry_install_id.sql` adds `telemetry.install_id` (additive). Run it before deploying.
+- Migration: apps with no signing runtime will not auto-halt until updated. The KV fallback counts no longer halt. Details in `docs/auto-halt.md`.
+- `@shipvo/cli`: a test checks that every `shipvo` command and flag in `docs/migrate-from-codepush.md` exists in the CLI help.
+- Migration: none; docs and test only.
+- `@shipvo/device`: on web, `device.net.online()` follows the network profile (`offline` is not connected) and the new `device.net.type()` reports `none`, `wifi`, `cellular` or the cellular generation (`2g`, `3g`, `4g`) of the active profile. `net.onChange` subscribers are called when the profile changes. With no profile set, nothing changes.
+- Migration: none; `net.type` is new and optional in the `Device` type.
+- `@shipvo/sim`: adds a network profile table (`online`, `offline`, `2g`, `3g`, `slow-4g`, `spotty`, `low-end-4g`) and a seeded, deterministic `applyProfile` engine. Not wired into the simulator yet.
+- Migration: none; new internal module.
+- `@shipvo/sim`: new `set_network_profile` action runs the session's fetches under a named network profile (`online` by default, `offline`, `2g`, `3g`, `slow-4g`, `spotty`, `low-end-4g`). A bad name answers `unknown_profile`. Each change is added to `device_log`, marked `simulated`. `mockNetwork` rules still win over the profile.
+- Migration: none; `online` behaves as before.
+- The profile's bandwidth limit now applies to response bodies, and the profile persists across `device_reset`.
+- sim tests: the port picker now skips every port that fetch refuses, not just 5060 and 5061, so `sizes.test.mjs` no longer fails to start when it draws 6566.
+- `@shipvo/sim`: `/act` accepts `tap_xy` (x, y) and `type_keys` (text, enter) for coordinate input. They are not MCP tools; agents using the labelled screen keep tapping by ref.
+- Migration: none; new actions.
+- `@shipvo/spec`: new `evaluate(expression, scope, options)` and `evaluateTemplate(text, scope, options)` run CEL with the Shipvo function library (lists, dates, `money`/`number`/`percent`/`compact` in the person's locale, text, `orElse`), with a length limit and a cost limit. `validate()` now reports unknown names, fields and functions with a JSON path and a "did you mean" suggestion, and expressions over the cost limit.
+- Migration: none for callers of `validate()` except that specs which refer to unknown names now get errors. New dependency: `@bufbuild/cel`.
+- `@shipvo/spec`: new package with the JSON Schema for `shipvo.app/v0` and `validate(spec)`, which returns errors and warnings with a JSON path and a suggested fix.
+- Migration: none; new package.
+- `@shipvo/mcp-tools`, `@shipvo/mcp`: new tools `request_secret` (returns a one-time vault link and a notice for the person) and `secret_status` (returns `{ saved, valid, access }`, never the key). Both servers list them.
+- control-plane: `GET /vault/status/:app/:name`; JSON errors from the vault page post now include a plain `message`.
+- Migration: none; new tools and one new endpoint.
+- `@shipvo/control-plane`: one dispatcher on the existing scheduled tick runs every app schedule, so the number of triggers stays the same as apps are added. New `app_schedules` table (migration `0022_app_schedules.sql`, additive).
+- Migration: none for users; self-hosters apply the new migration.
+- `@shipvo/control-plane`: people sign in with an email magic link (`POST /people/login`, `POST /people/verify`) and get one phone each: `GET/PUT /phone` for installed apps and `GET/PUT /phone/apps/:app/data/:key` for per-app data. Another person's phone and data read as 404. The per-app data cap is set by `PHONE_APP_DATA_MAX_BYTES`. Sign-in mail goes to `MAIL_WEBHOOK_URL`.
+- Migration: run `0022_people_phone.sql` (additive). No exported API changes.
+- Sign-in link requests are limited per IP and per email (429 with `retry-after`).
+- docs: add `docs/research/first-party-apps.md`, the research behind the first five apps (notes and tasks, calendar, wallet and passes, files and photos, shopping).
+- Migration: none; docs only.
+- `@shipvo/control-plane`: secret vault, slice 1 of #841. `POST /vault/tickets` returns a one-time ticket and a vault page URL (10 minutes). `GET /vault/t/<ticket>` shows the form. `POST /vault/t/<ticket>` stores the key, encrypted at rest. No endpoint returns a value.
+- Migration: apply `0021_vault.sql` and set the `VAULT_MASTER_KEY` Worker secret (32 random bytes, base64). Without it the vault answers 503.
+- `@shipvo/mcp`: the tool definitions now live in one shared registry (`@shipvo/mcp-tools`, private, bundled into `@shipvo/mcp`). The stdio and remote servers build their tool lists from it, and a test fails if they differ. The tool list is unchanged.
+- Migration: none.
+- video: new `scripts/video/cast/` (cast bible, SVG character rig) and `scripts/video/camera.mjs` (camera, light and atmosphere helpers) for story ads. Migration: none.
+- `@shipvo/sim`: the Shipvo Phone frame draws Lumi, a small glowing orb, beside the camera cutout on the Android and iPhone skins. Lumi has idle, working, happy and worried states (blink, glow, small float). It sits outside the app screen, so screenshots, recordings for agents and the labelled screen tree are the same with Lumi on or off.
+- Setting: `renderFrame({ lumi: false })` or `SHIPVO_LUMI=off` hides Lumi anywhere. Lumi is off by default in CI (`SHIPVO_LUMI=on` shows it).
+- Migration: none; `renderFrame` gains an optional `lumi` option.
+- `@shipvo/cli`, `@shipvo/mcp`, `@shipvo/sim`: on a live `shipvo run` phone, Lumi shows a short caption for each agent step ("Tapping Checkout", "Typing into Promo code", "Scrolling down", "Going back", "Opened tide") and switches to working. When a step fails Lumi looks worried. The caption comes from the real action and the element it acts on, and clears after a moment. It is drawn in the frame, outside the app's screen tree, and follows the Lumi on/off setting.
+- Migration: none. `window.shipvoLumi` gains `say(text, state, holdMs)`; the agent channel gains a `lumi` message.
+- `@shipvo/sim`: Lumi reacts to results. It is happy on a passed check or a finished flow, and worried on a page error, crash, failed action or failed check. The one-line reason comes from the real error or result and is in Lumi's `data-reason` and `title`. In the page: `shipvoLumi.react({ kind, name?, error?, detail? })`, or a `pn:lumi` message with `event`. New export: `lumiReaction` in `@shipvo/sim/lumi.mjs`.
+- `shipvo run`: Lumi turns worried when an agent action fails or the app throws a page error.
+- Migration: none; `shipvoLumi.set(state)` still works and now takes an optional reason.
+- `@shipvo/mcp`, `@shipvo/mcp-tools`: `record_start` takes `lumi` (default true) to keep Lumi and its step captions in the video, or hide them with `lumi: false`, and `lumi_voice` (default false) so Lumi speaks its step lines with the `energetic` preset from `scripts/video/dialogue.py`. The result reports `lumi` and `lumi_lines`.
+- Migration: none. Both options are new and optional.
+- Shipvo Phone: Lumi shows a first-run guide in 3 short steps (home screen, the Store, connecting an assistant). You can skip it, and it never shows again in that browser. It is off when Lumi is off (default in CI).
+- `@shipvo/sim`: `renderFrame` takes a new option `guide` (default `false`); `shipvo run` turns it on. No migration needed.
+- `@shipvo/cli`: `shipvo explore` picks actions with an upper confidence bound over the screen graph, taps risky labels (log out, delete, cancel, remove) last, fills text fields (a valid value, then an invalid one) and reports three new findings: `network_failed`, `stuck_loading` and `blank_screen`.
+- `@shipvo/cli`: `shipvo explore --seed <n>` repeats a run exactly (default 1).
+- Migration: the exported `Driver` type gains optional `type` and `snapshot`; `Step` gains a `type` action and `Kind` three values. Code that switches over them should handle the new cases. Report fields are unchanged.
+- `@shipvo/cli`: new `shipvo lumi [android|ios]` builds the app and opens it in the browser on Shipvo Phone with a Lumi sidebar: a live feed of each action, findings as they appear (with a Replay button), coverage (screens and controls tried), and a command box. Commands need no AI: `test my app`, `test <flow>`, `try <flow> with bad input`, `stop`, `replay bug <n>`, `help`. Unknown text gets the short list.
+- `@shipvo/cli`: `walk()` gains optional `onEvent`, `shouldStop`, `startPaths` and `input: "bad"` options, and `fieldElements` is exported. Existing calls behave the same.
+- Migration: none; new command and optional options.
+- `@shipvo/cli`: `shipvo explore --flows` recognises sign up, log in, search, add to cart and checkout by control labels and screen text, drives each with valid input and then invalid input, and writes `explore-report-flows.md` and `.json` with each flow passed, failed (with the step) or not found.
+- Migration: none; new option.
+- cli: `shipvo publish` and `shipvo rollback` now print one plain sentence (release number and next step) instead of a JSON line. `--json` is unchanged. Migration: scripts that parsed the old line should pass `--json` and read `data` in the envelope.
+- cli: `shipvo promote --dry-run` and `shipvo rollback --to N --dry-run` now work with no login or token. They read the files `shipvo publish --dry-run` wrote to `.shipvo/dry-run`. With a login or Cloudflare keys set, they behave as before.
+- `@shipvo/cli`: `shipvo publish` now builds small update patches itself, with no Python or `bsdiff4` install. Patches use the same BSDIFF40 format as before, so devices need no change.
+- Migration: none. The `pip install bsdiff4` step is gone from the workflow that `shipvo init` and `shipvo adopt` write; you can remove it from existing workflows.
+- status: `shipvo status` prints a `bands: b0=4 b1=4 b2=4` line with the release each band serves, and, when readable bands differ, a hint to run `shipvo promote` that names the newest release. A band that cannot be read (including a halted release) shows `?`. Migration: none.
+- sim: the @shipvo/sim package now includes `network-profiles.mjs` and `apps.mjs`, so `shipvo sim` starts from an installed package. A test checks that every imported module is packed.
+- `@shipvo/runtime`: `tsc --noEmit` in a fresh app no longer reports type errors in `install.ts`.
+- Migration: none.
+- `@shipvo/cli`: when `listing.icon` or a screenshot file is missing, `shipvo publish` now says it is optional and what to add (for example "No app icon yet (optional). Add assets/icon.png to show one in the store.") instead of "not found, skipped".
+- Migration: none; only the message changed.
+- `@shipvo/runtime`: Android accepts root-signed key rotation statements. The shell can pin a root key (`rootKey`) and a minimum sequence (`minSequence`) in the config plugin; pointers are then verified against the current release key.
+- Migration: none. Without `rootKey`, no statement is accepted and the pinned `publicKey` is used as before.
+- `@shipvo/runtime` (iOS): the runtime accepts root-signed key rotation statements. Set `ShipvoRootKey` (and optionally `ShipvoMinSequence`) in Info.plist; pointer signatures are then checked against the current release key.
+- Migration: none. Shells without `ShipvoRootKey` behave as before.
+- `@shipvo/cli`: `shipvo run` sends the app's cross-origin `fetch` and `XMLHttpRequest` calls through `/__shipvo/net` on the run server, so backends without CORS headers answer on the simulated phone. One cookie jar per phone session; network profiles apply; each call is written to the device log.
+- `@shipvo/sim`: exports `network-profiles.mjs`.
+- `@shipvo/device`: the web device exposes `__pnNet` for the run server's network client.
+- Migration: none.
+- `@shipvo/mcp`: the HTTP endpoint now returns `-32020` (was `-32001`) for a missing or mismatched `Mcp-Method`/`Mcp-Name` header, and `-32022` for a 2026-era request that names an unsupported protocol version.
+- `@shipvo/mcp`: 2026-07-28 requests get `resultType: "complete"` on results, and `tools/list` also gets `ttlMs` and `cacheScope: "private"`. 2025-era responses are unchanged.
+- `@shipvo/mcp`: `tools/list` is now sorted by tool name on stdio and HTTP.
+- Migration: a client that matched on `-32001` for header mismatch must match `-32020`. Clients that read tools by name need no change; clients that relied on registration order should sort or look up by name.
+- mcp: export-replay test no longer picks port 5060 or 5061, which fetch refuses (fixes the CI failure on main)
+- docs: new page "Phone Browser, Settings and system controls" covers `get_settings`, `set_setting` and the `browser_*` tools, with options, errors and troubleshooting.
+- `@shipvo/device`: in the simulator, `reset({ platform, api })` now sets the notification permission default from the new platform and API level, not the old ones.
+- Migration: none.
+- Site: series episodes that open with a recap show "Watch previous episode" and "Skip recap" buttons over the player while the recap plays.
+- `@shipvo/cli`: `shipvo publish --dry-run` works on Windows. It refused every file with "refusing to write outside .shipvo/dry-run" because the path check assumed `/`.
+- Migration: none.
+- `@shipvo/cli`: `shipvo publish`, `shipvo sim` and `shipvo explore` set `PN_SIM=1` for the web export through the environment, so the export also runs under cmd.exe on Windows.
+
+## 2026-11-06 (release)
+
 - **@shipvo/cli 0.1.5**: cli: shipvo and create-shipvo short names on npm; init lists npm install first; cli: shipvo agents setup and status --json with next steps (slice 2 of #533); phone: live status bar from simulated device state (slice 1b of #467); cli: frame-page bridge runs tap, type, scroll and back (slice 3c of #448); skills: the shipvo skill, installable with npx skills add (slice 1 of #533)
 - **@shipvo/device 0.1.3**: phone: live status bar from simulated device state (slice 1b of #467); device: real camera, mic and location in the browser with simulated fallback
 - **@shipvo/mcp 0.0.9**: phone: power and volume buttons, lock, restart (slice 1c of #467); mcp: recorder duration_s matches the video under load; mcp: record_start, record_marker, record_stop write an MP4 of the phone frame; mcp: open_app attaches to a live shipvo run phone (slice 2 of #448); device: real camera, mic and location in the browser with simulated fallback

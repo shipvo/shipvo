@@ -1,1 +1,0 @@
-- docs: every parity claim now says what it measures (role and label) and where (Android emulator, iOS Simulator); new site check `check-claims`.

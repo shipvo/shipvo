@@ -36,6 +36,14 @@ You need the app folder from [Build your first app](getting-started.md) and a te
 
 The page scales the phone to your window. Add `?dark=1` to the address to see the dark frame.
 
+## Edit and save, the phone updates
+
+While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`.
+
+If a rebuild fails (a typo in your code, say), the phone keeps your last good version. The terminal prints the error, and a small red bar under the phone shows it too. Save a fix and the bar goes away and the phone reloads.
+
+The tests in `packages/cli/test/run-live-reload.test.ts` edit a fixture app and check the Android and iOS frames in Chromium, and they print the save-to-visible time for each.
+
 ## Your app reaches its backend, with no CORS errors
 
 On Android and iOS, an app calls its backend directly and there is no CORS. In the simulated phone the app runs in a browser tab, so Shipvo sends every request to another origin (`fetch` and `XMLHttpRequest`) through the `shipvo run` server at `/__shipvo/net`. The server makes the real request from Node and returns the status, headers and body unchanged. Requests to the app's own origin go straight through.

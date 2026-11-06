@@ -1,3 +1,0 @@
-- `@shipvo/cli`: `shipvo init`, `login`, `audit` and `keys` (status, export, import, rotate) take `--json` and print the `{ ok, code, summary, data, next }` envelope on stdout. Progress goes to stderr. Exit codes: 0 ok, 1 failed, 2 usage error. `data` never holds a seed or token. Codes and shapes are in `docs/cli.md`.
-- `@shipvo/cli`: `keys export --json` needs `--out`. `login --json` prints the device URL and code on stderr and repeats them in `data.device`.
-- Migration: `keys rotate sign --json` used to print the bare signed envelope. It now prints the standard envelope; the signed envelope is `data.envelope`. Output without `--json` is unchanged.

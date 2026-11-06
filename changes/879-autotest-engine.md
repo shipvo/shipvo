@@ -1,3 +1,0 @@
-- `@shipvo/cli`: `shipvo explore` picks actions with an upper confidence bound over the screen graph, taps risky labels (log out, delete, cancel, remove) last, fills text fields (a valid value, then an invalid one) and reports three new findings: `network_failed`, `stuck_loading` and `blank_screen`.
-- `@shipvo/cli`: `shipvo explore --seed <n>` repeats a run exactly (default 1).
-- Migration: the exported `Driver` type gains optional `type` and `snapshot`; `Step` gains a `type` action and `Kind` three values. Code that switches over them should handle the new cases. Report fields are unchanged.

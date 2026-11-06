@@ -3,13 +3,15 @@ name: capacitor-sample
 # the iOS Simulator (xcodebuild, no signing), so adapter work on it is checked on every PR (escalation #429).
 # The android job also runs the JVM unit tests, and android-emulator runs the instrumented tests
 # (src/androidTest of the app and of the @shipvo/capacitor plugin when linked) on an API 34 emulator (#934, #941, #947).
+# The ios job also builds the plugin's Swift package (ShipvoPlugin against Capacitor) and runs its Swift tests
+# on the iOS Simulator when packages/capacitor/Package.swift exists (escalation #1003).
 on:
   workflow_dispatch:
   pull_request:
-    paths: ["apps/capacitor-sample/**", "pnpm-lock.yaml", ".github/workflows/capacitor-sample.yml"]
+    paths: ["apps/capacitor-sample/**", "packages/capacitor/**", "pnpm-lock.yaml", ".github/workflows/capacitor-sample.yml"]
   push:
     branches: [main]
-    paths: ["apps/capacitor-sample/**", ".github/workflows/capacitor-sample.yml"]
+    paths: ["apps/capacitor-sample/**", "packages/capacitor/**", ".github/workflows/capacitor-sample.yml"]
 permissions:
   contents: read
 concurrency: { group: "capacitor-sample-${{ github.ref }}", cancel-in-progress: true }
@@ -123,8 +125,21 @@ jobs:
           xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build 2>&1 \
             | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|BUILD (SUCCEEDED|FAILED)" | head -40
+      - name: Swift package tests on the iOS Simulator (@shipvo/capacitor)
+        if: hashFiles('packages/capacitor/Package.swift') != ''
+        working-directory: packages/capacitor
+        run: |
+          set -o pipefail
+          SIM=$(xcrun simctl list devices available | awk -F' [(]' '!f && /^ +iPhone [0-9]/ { sub(/^ +/, "", $1); print $1; f=1 }')
+          echo "simulator: $SIM"
+          xcodebuild test -scheme ShipvoCapacitor-Package -destination "platform=iOS Simulator,name=$SIM" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/xcodetest.log" \
+            | grep -E "error:|Test Suite|Test Case.*(passed|failed)|TEST (SUCCEEDED|FAILED)"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: capacitor-sample-xcodebuild-log
-          path: ${{ runner.temp }}/xcodebuild.log
+          path: |
+            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/xcodetest.log
+          if-no-files-found: ignore

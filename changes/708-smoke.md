@@ -1,3 +1,0 @@
-- `@shipvo/cli`: new `shipvo smoke [--timeout s] [--json]` checks the app loads in the simulator (no thrown errors, a first screen with elements). Exit 0 ok, 1 failed, 2 setup error.
-- `@shipvo/cli`: `config.ts` now exports `BOOLEAN_FLAGS`; `--json`, `--skip-build` and `--fail-on-findings` no longer take the next word as a value.
-- Migration: none.

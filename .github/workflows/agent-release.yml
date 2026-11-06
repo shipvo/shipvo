@@ -32,7 +32,7 @@ jobs:
           for s in $(gh api "repos/$R/commits?sha=main&per_page=15" --jq '.[].sha'); do
             c=$(gh api "repos/$R/commits/$s/check-runs?check_name=test" --jq '[.check_runs[]|.conclusion][0] // "none"')
             if [ "$c" = "success" ]; then SHA=$s; CI=success; break; fi
-            if [ "$c" = "failure" ] || [ "$c" = "cancelled" ] && [ "$c" = "failure" ]; then CI=failure; break; fi
+            if [ "$c" = "failure" ]; then CI=failure; break; fi
           done
           RED=$(gh issue list -R $R --label ci-main --state open --json number --jq length)
           echo "main $SHA ci=$CI open-ci-issues=$RED"
@@ -49,6 +49,8 @@ jobs:
           N=$(node -e "console.log(require('/tmp/release.json').length)")
           [ "$N" != "0" ] || { echo "nothing to release"; exit 0; }
           DATE=$(date -u +%Y-%m-%d); TAG="release-$(date -u +%Y%m%d)"
+          # A second release on the same day (an owner-started one) gets the time in its tag.
+          if gh api "repos/$R/git/ref/tags/$TAG" >/dev/null 2>&1; then TAG="$TAG-$(date -u +%H%M)"; fi
           node - <<'JS'
           const fs = require("fs"); const r = require("/tmp/release.json");
           const date = new Date().toISOString().slice(0, 10);
@@ -65,8 +67,16 @@ jobs:
           git commit -qm "release: $(node -e "console.log(require('/tmp/release.json').map(p=>p.name+' '+p.to).join(', '))")"
           git tag -a "$TAG" -m "Release $DATE"
           U="https://x-access-token:${GH_TOKEN}@github.com/${R}.git"
-          # If main moved since the gate, do not tag or publish this commit; the next pass starts from the new main.
-          git push "$U" HEAD:refs/heads/main || { echo "main moved; trying again on the next pass"; exit 0; }
+          # Publish exactly the green commit plus its version bump (the release branch and tag point at it).
+          # Main moves every few minutes, so the bump commit is then replayed on top of the newest main.
+          REL=$(git rev-parse HEAD)
           git push "$U" "$TAG"
           git push --force "$U" HEAD:refs/heads/release
+          ok=no
+          for i in 1 2 3 4 5; do
+            git fetch -q "$U" main && git checkout -q -B bump FETCH_HEAD
+            if git cherry-pick -X theirs "$REL" >/dev/null 2>&1 && git push "$U" HEAD:refs/heads/main; then ok=yes; break; fi
+            git cherry-pick --abort 2>/dev/null || true; sleep 10
+          done
+          [ "$ok" = yes ] || echo "::warning::Published, but the version bump could not be replayed on main; the next release run catches it up."
           echo "released: $(cat /tmp/release.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).map(p=>p.name+" "+p.to).join(", ")))')" >> "$GITHUB_STEP_SUMMARY"

@@ -1,2 +1,0 @@
-- `@shipvo/cli`: when `listing.icon` or a screenshot file is missing, `shipvo publish` now says it is optional and what to add (for example "No app icon yet (optional). Add assets/icon.png to show one in the store.") instead of "not found, skipped".
-- Migration: none; only the message changed.
