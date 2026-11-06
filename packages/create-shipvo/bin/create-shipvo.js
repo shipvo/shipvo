@@ -6,4 +6,5 @@ const require = createRequire(import.meta.url);
 const pkg = require.resolve("@shipvo/cli/package.json");
 const bin = require("@shipvo/cli/package.json").bin.shipvo;
 process.argv.splice(2, 0, "init");
-await import(pathToFileURL(new URL(bin, pathToFileURL(pkg)).pathname).href);
+// Import the file URL itself. Its path part is "/C:/..." on Windows, and pathToFileURL made that C:/C:/... (#573).
+await import(new URL(bin, pathToFileURL(pkg)).href);
