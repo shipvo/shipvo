@@ -34,6 +34,7 @@ beforeAll(async () => {
     if (url.searchParams.get("token") !== "tok" || url.searchParams.get("role") !== "driver") return void socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
     const peer = acceptWebSocket(req, socket, (t) => {
       const m = JSON.parse(t); seen.push(m);
+      if (m.type === "back") return void peer?.send(JSON.stringify({ id: m.id, ok: false, code: "taken_over", error: "the person took over" }));
       peer?.send(JSON.stringify({ id: m.id, ok: true, screen: TREE }));
     }, () => {});
   });
@@ -62,6 +63,16 @@ describe("open_app attach", () => {
     const t = await c.callTool({ name: "tap", arguments: { session: /session: (\S+)/.exec(text)![1], ref: "e1" } }) as { content: { text: string }[] };
     expect(t.content[0].text).toContain(TREE);
     expect(seen.some((m) => m.type === "tap" && m.ref === "e1")).toBe(true);
+    await c.close();
+  });
+  it("maps taken_over to a clear tool error", async () => {
+    runJson(process.pid);
+    const { c, text } = await open({});
+    const r = await c.callTool({ name: "back", arguments: { session: /session: (\S+)/.exec(text)![1] } }) as { isError?: boolean; content: { text: string }[] };
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain("taken_over");
+    expect(r.content[0].text).toContain("the person took over");
+    expect(r.content[0].text).toContain("Hand back");
     await c.close();
   });
   it("falls back to headless when the pid is dead", async () => {
