@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPlan, sentences, vtt, LEAD } from "./plan.mjs";
+import { buildPlan, sentences, vtt, flashes, LEAD } from "./plan.mjs";
 
 const script = { scenes: [
   { id: "a", visual: "x", min: 2, narration: "One. Two.", caption: "One. 2." },
@@ -34,4 +34,19 @@ test("doc video src points at a key the site media handler accepts", async () =>
     assert.match(key, /^[a-z0-9][a-z0-9/_.-]*$/);
     assert.ok(!key.includes(".."));
   }
+});
+test("flashes start at an offset from the scene start and stop at the scene end", () => {
+  const s = { scenes: [{ ...script.scenes[0], flashes: [{ at: 1, text: "A" }] }, { ...script.scenes[1], flashes: [{ at: 9.5, text: "B" }] }] };
+  const p = buildPlan(s, man);
+  s.scenes[1].flashes[0].at = p.scenes[1].end - p.scenes[1].start - 0.5;
+  const f = flashes(s, p);
+  assert.equal(f[0].start, p.scenes[0].start + 1);
+  assert.equal(f[0].end, f[0].start + 1.5);
+  assert.equal(f[1].start, p.scenes[1].end - 0.5);
+  assert.equal(f[1].end, p.scenes[1].end);
+});
+test("a flash that starts after its scene ends is dropped", () => {
+  const s = { scenes: [{ ...script.scenes[0], flashes: [{ at: 999, text: "late" }] }, script.scenes[1]] };
+  const p = buildPlan(s, man);
+  assert.deepEqual(flashes(s, p), []);
 });
