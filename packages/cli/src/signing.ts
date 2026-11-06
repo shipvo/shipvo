@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "n
 import { join } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { args, loadConfig, seed } from "./config.js";
+import { rotate, RotateError } from "./rotation.js";
 
 const pub = (s: string) => b64(keyFromSeed(s).publicKey);
 const valid = (s: string) => { try { return /^[A-Za-z0-9+/=_-]{43,44}$/.test(s) && !!pub(s); } catch { return false; } };
@@ -12,6 +13,10 @@ const valid = (s: string) => { try { return /^[A-Za-z0-9+/=_-]{43,44}$/.test(s) 
 export async function signingKey(argv: string[]) {
   const [sub, ...rest] = argv, a = args(rest);
   const cfg = loadConfig();
+  if (sub === "rotate") {
+    try { await rotate(rest, cfg); } catch (e) { if (!(e instanceof RotateError)) throw e; console.error(e.message); process.exit(1); }
+    return;
+  }
   if (sub === "export") {
     const s = seed();
     if (pub(s) !== cfg.publicKey) { console.error(`This seed does not match the public key in shipvo.json (${cfg.publicKey.slice(0, 12)}…). It would not be accepted by installed shells.`); process.exit(1); }
