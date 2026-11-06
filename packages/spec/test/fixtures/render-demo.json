@@ -1,0 +1,30 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "harbour-log", "name": "Harbour Log", "icon": "anchor", "description": "Catches and tide notes." },
+  "theme": { "mode": "light", "palette": { "primary": "#0B5FFF", "text": "#111827", "background": "#FFFFFF", "surface": "#F3F4F6", "muted": "#4B5563" }, "radius": "lg", "density": "comfortable", "elevation": "soft" },
+  "data": {
+    "catches": { "source": "collection", "fields": { "species": "text", "weight": "number", "spot": "text" }, "seed": [] },
+    "total": { "source": "computed", "value": "{{ count(catches) }}" }
+  },
+  "screens": [
+    { "id": "home", "title": "Harbour Log", "body": [
+      { "type": "scroll", "label": "Catch log", "children": [
+        { "type": "stack", "gap": "md", "children": [
+          { "type": "image", "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='120'%3E%3Crect width='360' height='120' fill='%2393C5FD'/%3E%3Ccircle cx='290' cy='36' r='18' fill='%23FDE68A'/%3E%3Cpath d='M0 90 Q90 60 180 90 T360 90 V120 H0Z' fill='%231D4ED8'/%3E%3C/svg%3E", "label": "Harbour at dawn", "height": 120 },
+          { "type": "stack", "direction": "horizontal", "gap": "sm", "align": "center", "children": [
+            { "type": "icon", "name": "fish", "label": "Fish" },
+            { "type": "text", "variant": "title", "value": "Today's catches" },
+            { "type": "badge", "value": "{{ total }} logged" }
+          ] },
+          { "type": "grid", "columns": 2, "gap": "sm", "children": [
+            { "type": "text", "variant": "caption", "value": "Best spot: North pier" },
+            { "type": "text", "variant": "caption", "value": "Tide: rising" }
+          ] },
+          { "type": "list", "label": "Catches", "from": "catches",
+            "item": { "title": "{{ item.species }}", "subtitle": "{{ item.spot }}", "trailing": "{{ number(item.weight, 1) }} kg" },
+            "empty": { "message": "No catches yet" } }
+        ] }
+      ] }
+    ] }
+  ]
+}
