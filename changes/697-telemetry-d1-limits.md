@@ -1,3 +1,0 @@
-- `control-plane`: `POST /t` no longer returns a 5xx when D1 refuses a write. It answers `202 {ok:true, stored:false}` and counts the drop in KV `telemetry_dropped/<app>/<day>`. Auto-halt falls back to per-release KV counts of failure and healthy events.
-- `control-plane`: `GET /health` has a new field `telemetry_dropped_today`. `shipvo doctor` prints it.
-- Migration: none. Existing calls behave as before.

@@ -36,8 +36,14 @@ describe("one tool registry for the stdio and remote servers", () => {
     expect(remote).toEqual(stdio);
   });
 
+  it("lists tools sorted by name, the same on every call and on both servers", () => {
+    const names = stdio.map((t) => t.name);
+    expect(names).toEqual([...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+    expect(remote.map((t) => t.name)).toEqual(names);
+  });
+
   it("matches the registry: names, descriptions, input schemas and hints", () => {
-    const reg = describeTools();
+    const reg = describeTools().sort((a, b) => (a.name < b.name ? -1 : 1));
     expect(stdio.map((t) => t.name)).toEqual(reg.map((t) => t.name));
     for (const r of reg) {
       const t = stdio.find((x) => x.name === r.name)!;

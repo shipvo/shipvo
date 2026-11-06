@@ -1,2 +1,0 @@
-- `scripts`: `scripts/first-run/apply-ios.mjs` turns Simulator marks and the e2e server log into publish, download, apply and healthy times for the first OTA of a scaffolded app.
-- Migration: none; new script.
