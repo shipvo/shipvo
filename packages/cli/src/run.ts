@@ -4,7 +4,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { createServer, type Server } from "node:http";
+import { createServer, type Server, type ServerResponse } from "node:http";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { join, extname, normalize, resolve, sep } from "node:path";
@@ -15,7 +15,7 @@ import { NET_PATH, createNetProxy, loadProfiles, netClientSource, type NetRecord
 import { acceptWebSocket, type Peer } from "./run-ws.js";
 import { qrMatrix, qrToTerminal } from "./qr.js";
 import { spawnBin } from "./spawn-bin.js";
-import { portFree, rebuildInto } from "./sim.js";
+import { portFree, rebuildInto, watchAndRebuild } from "./sim.js";
 
 export type Platform = "android" | "ios";
 export type RunOptions = { platform: Platform; open: boolean; port?: number; native: boolean; lan: boolean };
@@ -78,6 +78,15 @@ export async function loadFrameRenderer(bases: string[] = [process.cwd() + "/pac
   return render;
 }
 
+export const RELOAD_PATH = "/__shipvo/reload";
+
+/** Page script: reloads the app iframe (same route) when a rebuild lands, and shows a build error in the banner outside the phone. */
+const RELOAD_CLIENT = `(function(){if(!window.EventSource)return;var b=document.getElementById("banner"),f=document.getElementById("app");
+var es=new EventSource("${RELOAD_PATH}");
+es.onmessage=function(m){var d;try{d=JSON.parse(m.data)}catch(e){return}
+if(d.type==="error"){if(b){b.textContent=d.message;b.hidden=false}}
+else if(d.type==="reload"){if(b)b.hidden=true;try{f.contentWindow.location.reload()}catch(e){f.src=f.src}}}})()`;
+
 /** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. The phone body comes from @shipvo/sim's renderFrame. */
 export function runFramePage(platform: Platform, name: string, render: RenderFrame, dark = false, token?: string): string {
   const f = FRAMES[platform];
@@ -96,10 +105,13 @@ ${frame.css}
 .sheet .box{background:#fff;color:#111;width:${platform === "ios" ? "270px" : "100%"};box-sizing:border-box;padding:20px;border-radius:${platform === "ios" ? "14px" : "28px 28px 0 0"};text-align:center}
 .sheet button{display:block;width:100%;margin-top:8px;padding:10px;border:0;border-radius:${platform === "ios" ? "8px" : "20px"};background:#eee;font:inherit;cursor:pointer}
 .sheetbtn{position:fixed;right:12px;top:10px;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
+.banner{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);max-width:min(90vw,640px);padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
+.banner[hidden]{display:none}
 .tag{position:fixed;left:12px;top:10px;padding:3px 10px;border-radius:12px;background:#111;color:#fff;font-size:12px}
 </style></head><body>
 <div class="tag" role="status">Simulated ${f.label} (${f.width}x${f.height}). The app's web build on the simulated device.</div>
 <button class="sheetbtn" id="sheetbtn" type="button">Show ${f.label} system sheet</button>
+<div class="banner" id="banner" role="alert" data-part="build-error" hidden></div>
 <div id="fit"><div id="phone" data-platform="${platform}">${frame.html}</div></div>
 <script>
 var sh=document.getElementById("sheet");
@@ -109,7 +121,7 @@ sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
 function fit(){var s=Math.min(1,(innerWidth-24)/${frame.outerWidth},(innerHeight-60)/${frame.outerHeight});var e=document.getElementById("fit");e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
-</script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
+</script><script>${RELOAD_CLIENT}</script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
 
 /** True for a phone or tablet browser, by user agent. */
@@ -123,7 +135,7 @@ export function runBarePage(name: string, dark = false): string {
 <title>${title}</title>
 <style>html,body{margin:0;height:100%;overflow:hidden;background:${dark ? "#15171a" : "#fff"}}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head><body>
 <iframe id="app" src="/app/" title="${title}" data-part="bare-app"></iframe>
-</body></html>`;
+<script>${RELOAD_CLIENT}</script></body></html>`;
 }
 
 /** The first private IPv4 address of this machine (or any non-internal one), or undefined. */
@@ -152,7 +164,7 @@ export function ensureShipvoIgnored(dir: string): void {
  * The agent channel is a WebSocket at `/__shipvo/agent?role=screen|driver&token=...`, loopback only. It relays JSON
  * messages between the `screen` and the `driver`. With `projectDir`, `.shipvo/run.json` describes the session while it runs.
  */
-export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string }; onNet?: (r: NetRecord) => void; fetchImpl?: typeof fetch }): Promise<{ server: Server; port: number; token: string; lanToken?: string; netLog: NetRecord[]; close: () => Promise<void> }> {
+export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string }; onNet?: (r: NetRecord) => void; fetchImpl?: typeof fetch }): Promise<{ server: Server; port: number; token: string; lanToken?: string; netLog: NetRecord[]; notify: (ev: { type: "reload" } | { type: "error"; message: string }) => void; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const token = randomBytes(24).toString("hex");
   // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
@@ -166,6 +178,8 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
   // App requests to other origins go through /__shipvo/net, so the browser applies no CORS (see run-net.ts). Only the page's token opens it.
   const net = createNetProxy({ tokens: [pageToken, token], port: () => boundPort, profiles: await loadProfiles(), onRecord: opts.onNet, fetchImpl: opts.fetchImpl });
   const netSnippet = `<script>(${netClientSource()})(window,{token:${JSON.stringify(pageToken)},session:(function(){try{var k="shipvo_net_session";return sessionStorage.getItem(k)||(sessionStorage.setItem(k,crypto.randomUUID()),sessionStorage.getItem(k))}catch(e){return "tab"}})(),profile:function(){return window.__pnNet?window.__pnNet.profile():"online"},online:function(){return window.__pnNet?window.__pnNet.online():true},log:function(d){if(window.__pnNet)window.__pnNet.log(d)}})</script>`;
+  const watchers = new Set<ServerResponse>();
+  const notify = (ev: { type: "reload" } | { type: "error"; message: string }) => { for (const w of watchers) w.write(`data: ${JSON.stringify(ev)}\n\n`); };
   const server = createServer((req, res) => {
     if (!hostAllowed(req.headers.host, boundPort) && !(opts.lan && req.headers.host === `${opts.lan.host}:${boundPort}`)) { res.writeHead(403); return void res.end("Forbidden"); }
     if (lanToken) {
@@ -183,6 +197,13 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
       const bare = isMobileUserAgent(req.headers["user-agent"]);
       res.writeHead(200, { "content-type": TYPES[".html"], vary: "user-agent" }); return void res.end(bare ? runBarePage(opts.name, dark) : dark ? pages.dark : pages.light);
     }
+    if (path === RELOAD_PATH) {
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
+      res.write(": ok\n\n");
+      watchers.add(res);
+      req.on("close", () => watchers.delete(res));
+      return;
+    }
     if (path === NET_PATH) return void net.handle(req, res);
     if (path === "/__shipvo/bridge.js") { res.writeHead(200, { "content-type": TYPES[".js"], "cache-control": "no-store" }); return void res.end(bridge); }
     let rel = path.startsWith("/app/") ? path.slice(4) : path;
@@ -197,7 +218,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
       target = spa;
     }
     const type = TYPES[extname(target).toLowerCase()] ?? "application/octet-stream";
-    res.writeHead(200, { "content-type": type });
+    res.writeHead(200, { "content-type": type, "cache-control": "no-store" });
     if (extname(target).toLowerCase() === ".html") {
       const html = readFileSync(target, "utf8"); // first script in the page, so it wraps fetch before the app's code runs
       // A real phone (not loopback) cannot use the route, which only serves the local page: leave its requests direct.
@@ -239,7 +260,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
         mkdirSync(join(infoPath, ".."), { recursive: true });
         writeFileSync(infoPath, JSON.stringify(info, null, 2) + "\n", { mode: 0o600 });
       }
-      ok({ server, port, token, lanToken, netLog: net.log, close: () => new Promise<void>((r) => { cleanup(); for (const p of Object.values(peers)) p?.close(); server.close(() => r()); server.closeAllConnections?.(); }) });
+      ok({ server, port, token, lanToken, netLog: net.log, notify, close: () => new Promise<void>((r) => { cleanup(); for (const w of watchers) w.end(); for (const p of Object.values(peers)) p?.close(); server.close(() => r()); server.closeAllConnections?.(); }) });
     });
   });
 }
@@ -302,7 +323,14 @@ export async function run(argv: string[]): Promise<number> {
   }
   console.error(`Simulated ${FRAMES[o.platform].label} phone at ${url}  (Ctrl+C to stop)`);
   if (o.open) openBrowser(url);
+  const stopWatching = watchAndRebuild({
+    dir: process.cwd(),
+    build: () => rebuildInto({ root: process.cwd() }),
+    onResult: (r) => s.notify(r.ok ? { type: "reload" } : { type: "error", message: r.message }),
+  });
+  console.error("Watching for changes: the phone reloads when you save.");
   await new Promise<void>((done) => { for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, done); });
+  stopWatching();
   await s.close();
   return 0;
 }
