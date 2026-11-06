@@ -48,7 +48,7 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 /** Local facts for `status --json`: no network. */
 async function localFacts(dir: string, simPort = 4545) {
-  const hasKey = !!(process.env.SHIPVO_SIGNING_SEED || process.env.PURENATIVE_SIGNING_SEED || process.env.SHIPVO_SIGNING_SEED_FILE || process.env.PURENATIVE_SIGNING_SEED_FILE || existsSync(join(dir, ".shipvo", "seed.txt")));
+  const hasKey = !!(process.env.SHIPVO_SIGNING_SEED || process.env.PURENATIVE_SIGNING_SEED || (process.env.SHIPVO_SIGNING_SEED_FILE && existsSync(process.env.SHIPVO_SIGNING_SEED_FILE)) || (process.env.PURENATIVE_SIGNING_SEED_FILE && existsSync(process.env.PURENATIVE_SIGNING_SEED_FILE)) || existsSync(join(dir, ".shipvo", "seed.txt")));
   let run = { running: false, port: null as number | null };
   try {
     const r = JSON.parse(readFileSync(join(dir, ".shipvo", "run.json"), "utf8"));
@@ -73,7 +73,7 @@ export async function statusJson(appArg: string | undefined, fetchFn: typeof fet
     doc: { ok: exit === 0, code, summary, data: { project: { kind, app_id: appId }, ...shared, pending_release: pending }, next } as StatusJson, exit,
   });
   if (!existsSync(join(dir, "shipvo.json"))) {
-    return mk("no_project", "No shipvo.json here.", [{ command: kind === "unknown" ? "shipvo init myapp" : "shipvo init --adopt", why: "This folder is not set up for Shipvo yet." }], null, null, 1);
+    return mk("no_project", "No shipvo.json here.", [{ command: kind === "unknown" ? "shipvo init myapp" : "shipvo init .", why: "This folder is not set up for Shipvo yet." }], null, null, 1);
   }
   let cfg;
   try { cfg = loadConfig(dir); } catch (e) { return mk("error", e instanceof Error ? e.message : String(e), [{ command: "shipvo doctor", why: "shipvo.json is missing a field." }], null, null, 2); }
@@ -95,7 +95,9 @@ export async function statusJson(appArg: string | undefined, fetchFn: typeof fet
   if (!f.hasKey) { code = "no_signing_key"; exit = 1; summary = "No signing key found."; next.push({ command: "shipvo keygen --out .shipvo/seed.txt", why: "You cannot publish without a signing key." }); }
   if (pending.halted) {
     code = "release_halted"; exit = 1; summary = `Release ${pending.halted.release} is halted: ${pending.halted.failed} of ${pending.halted.reports} devices failed.`;
-    next.unshift({ command: "shipvo rollback --to <release>", why: "Send devices back to a release that works, or publish a fixed one." });
+    const prev = releases.map((r) => r.release).filter((n) => n < pending.halted!.release);
+    const to = prev.length ? String(Math.max(...prev)) : "<release>";
+    next.unshift({ command: `shipvo rollback --to ${to}`, why: "Send devices back to a release that works, or publish a fixed one." });
   } else if (code === "ok" && pending.newest === null) {
     code = "no_release"; next.push({ command: "shipvo publish --dry-run", why: "Check a first release before you publish it." });
   }

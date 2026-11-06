@@ -32,6 +32,31 @@ describe("status --json", () => {
     expect(doc.code).toBe("no_project");
     expect(doc.next[0].command).toBe("shipvo init myapp");
   });
+  it("no project in an existing Expo app: suggests init .", async () => {
+    const d = dirWith({ "package.json": JSON.stringify({ dependencies: { expo: "*" } }) });
+    const { doc } = await statusJson(undefined, (async () => resp({})) as any, d);
+    expect(doc.data.project.kind).not.toBe("unknown");
+    expect(doc.next[0].command).toBe("shipvo init .");
+  });
+  it("halted release: rollback names the newest earlier release", async () => {
+    vi.stubEnv("SHIPVO_SIGNING_SEED", "x");
+    const halted = { release: 3, reports: 40, failed: 12, threshold: 0.2 };
+    const releases = [1, 2, 3, 4].map((n) => ({ ...rel, release: n }));
+    const { doc } = await statusJson(undefined, (async () => resp({ releases, halted })) as any, dirWith({ "shipvo.json": cfg }));
+    expect(doc.next[0].command).toBe("shipvo rollback --to 2");
+  });
+  it("halted release with no earlier release keeps the placeholder", async () => {
+    vi.stubEnv("SHIPVO_SIGNING_SEED", "x");
+    const halted = { release: 3, reports: 40, failed: 12, threshold: 0.2 };
+    const { doc } = await statusJson(undefined, (async () => resp({ releases: [rel], halted })) as any, dirWith({ "shipvo.json": cfg }));
+    expect(doc.next[0].command).toBe("shipvo rollback --to <release>");
+  });
+  it("seed file env var that points to a missing file is not a key", async () => {
+    vi.stubEnv("SHIPVO_SIGNING_SEED", ""); vi.stubEnv("PURENATIVE_SIGNING_SEED", ""); vi.stubEnv("PURENATIVE_SIGNING_SEED_FILE", "");
+    vi.stubEnv("SHIPVO_SIGNING_SEED_FILE", "/nonexistent/seed.txt");
+    const { doc } = await statusJson(undefined, (async () => resp({ releases: [rel] })) as any, dirWith({ "shipvo.json": cfg }));
+    expect(doc.data.signing_key.present).toBe(false);
+  });
   it("missing signing key: exit 1 and suggests keygen", async () => {
     vi.stubEnv("SHIPVO_SIGNING_SEED", ""); vi.stubEnv("PURENATIVE_SIGNING_SEED", ""); vi.stubEnv("SHIPVO_SIGNING_SEED_FILE", ""); vi.stubEnv("PURENATIVE_SIGNING_SEED_FILE", "");
     const { doc, exit } = await statusJson(undefined, (async () => resp({ releases: [rel] })) as any, dirWith({ "shipvo.json": cfg }));
