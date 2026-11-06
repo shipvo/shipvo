@@ -6,7 +6,7 @@ Facts about `expo-updates` are from the [Expo EAS Update docs](https://docs.expo
 
 ## How this guide was checked
 
-On 2026-11-06 I ran the commands marked **(run)** below on a Linux runner with Node 22, against a scratch Expo SDK 54 app (`/tmp/eas-demo`) that had `expo-updates` set up the way EAS asks. The sample app `apps/tide-and-tackle` has no `expo-updates`, so on its own it prints "Nothing to migrate". Commands marked **(not run)** need a Shipvo account, a store build or a phone, which that runner did not have. The PR text links the run.
+Run on 2026-11-06: the commands marked **(run)** below on a Linux runner with Node 22, against a scratch Expo SDK 54 app (`/tmp/eas-demo`) that had `expo-updates` set up the way EAS asks, and the output below is from that run. The sample app `apps/tide-and-tackle` has no `expo-updates`, so on its own it prints "Nothing to migrate". Commands marked **(not run)** need a Shipvo account, a store build or a phone, which that runner did not have.
 
 ## Why `shipvo init` stops
 
@@ -52,7 +52,7 @@ No files were changed. Details: docs/migrate-from-eas-update.md
 | Code signing certificate | Ed25519 key made by `shipvo init` | Signing is always on. The public key is pinned in the shell. |
 | `eas update:rollback` | `shipvo rollback --to <release>` | Republishes an earlier release as a new release number. |
 
-**Runtime version.** EAS pairs an update with a build by a `runtimeVersion` string you choose. Shipvo checks facts instead. The shell declares its `shellMajor` and Hermes bytecode version, and `publish` lists the native modules the release needs (the dry run prints them). A mismatched release is refused on the device and by the control plane. The rules are in [adapters.md](adapters.md), rules 2 and 6.
+**Runtime version.** EAS pairs an update with a build by a `runtimeVersion` string you choose. Shipvo checks facts instead. The shell declares its `shellMajor` and Hermes bytecode version, and `publish` lists the native modules the release needs (the dry run prints them). A mismatched release is refused on the device and by the control plane. The rules are in [adapters.md](adapters.md), rules 2 (major), 6 (bytecode) and 7 (native modules).
 
 **Signing.** `shipvo init` creates the key and writes the seed to `.shipvo/seed.txt` (git-ignored). If you lose the seed, installed apps will not accept another update. See [new-machine.md](new-machine.md).
 
@@ -84,13 +84,15 @@ No files were changed. Details: docs/migrate-from-eas-update.md
 
    It writes the seed and prints the public key. Put the seed in a password manager, then delete the file.
 
-6. Check a release offline. **(run)**
+6. Check a release offline. **(run; it failed on the scratch app, see below)**
+
+   The dry run builds the Android and the web export. The web export needs `react-dom` and `react-native-web`. The scratch app did not have them, so the dry run failed at that step. If your app has no web build, remove `web` from `platforms` in the app config first, or install those two packages. Then run:
 
    ```bash
    npx shipvo publish --dry-run --out .shipvo/dry-run
    ```
 
-   On the scratch app it printed `native modules this release requires: @shipvo/runtime@^0.1.4, expo@~54.0.0, react-native@0.81.0`, exported the Android Hermes bundle (`.hbc`, 1.72 MB) and said `patches: none`. A dry run builds no patches. The web export step then failed on the scratch app because it lacked `react-dom` and `react-native-web`. If your app has no web build, remove `web` from `platforms` in the app config. The Android bundle step had finished before that error.
+   Output on the scratch app, before the failure: `native modules this release requires: @shipvo/runtime@^0.1.4, expo@~54.0.0, react-native@0.81.0`. It exported the Android Hermes bundle (`.hbc`, 1.72 MB) and said `patches: none`. A dry run builds no patches. The run after the `platforms` change was not repeated, so this guide does not show a passing dry run.
 
 7. Sign in and create the app on the hosted control plane. **(not run)**
 
