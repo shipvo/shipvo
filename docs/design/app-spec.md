@@ -293,7 +293,16 @@ Most apps never leave the spec. Those that need more climb one step and keep the
 
 Only for real phones (Bluetooth devices, background location, custom native SDKs). On Shipvo Phone a native-only feature needs a web fallback or a simulated version in `@shipvo/device`; publish checks flag anything that will not work there.
 
-### 15.7 Specs on real phones: the Shipvo player app
+### 15.7 The Shipvo Runner (decided 6 Nov 2026)
+
+One Cloudflare account runs everything. Owner decision: start on Workers Paid ($5 a month: 10 million calls and 30 million CPU-ms included, then $0.30 per million calls and $0.02 per million CPU-ms) and upgrade as usage grows. Prices from Cloudflare's published pricing, checked 6 Nov 2026.
+
+- **Shared spec runner (levels 0 and 1).** One Worker that reads each app's spec and executes it: data sources with vault keys added server-side, CEL, actions, schedules (Cron Triggers), webhooks. It never runs code written by users or assistants, so it needs no per-person scripts: cost is calls and CPU only. Data calls use the spec's `cache` so repeated questions hit the upstream service once.
+- **Custom code (levels 2 and 3) waits for its own tier.** User-written code is never run inside the shared runner (no `eval`, no dynamic import): it would run with our credentials and see other people's data. When we enable levels 2 and 3, custom code runs in Workers for Platforms ($25 a month, 20 million calls, 60 million CPU-ms and 1,000 scripts included, then $0.02 per script) with one script per person who writes code, not one per function; heavy jobs go to E2B, metered.
+- **Quotas.** A free monthly allowance of runner calls per person, then metered, so cost follows revenue.
+- **Stdio parity.** The local stdio MCP runs the same runner with `workerd` (the open-source Workers runtime), so a coding agent tests exactly what will run on the edge.
+
+### 15.8 Specs on real phones: the Shipvo player app
 
 One Shipvo app on Google Play and the App Store, containing the engine. People install it once; every app their assistant builds for them appears inside it, updated over the air, with no store submission per app. Android first. iOS needs a policy check before we commit: Apple's guidelines on apps that run downloaded content allow some mini-app and HTML5 experiences under conditions (no change of the app's main purpose, no downloaded executable native code, reviewable content). Specs are data, not code, which helps; islands and functions need a careful reading. This is a decision for the owner (strategy doc).
 
