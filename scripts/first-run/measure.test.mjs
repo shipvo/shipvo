@@ -241,7 +241,8 @@ if (a[2]==="publish" && !a.includes("--dry-run")) {
   const key = createPrivateKey(${JSON.stringify(privateKey.export({ format: "pem", type: "pkcs8" }))});
   const r = await fetch(cfg.controlPlane+"/apps/"+cfg.appId+"/kv/p/"+cfg.appId+"/1/b0", {method:"PUT", headers:{authorization:"Bearer "+process.env.SHIPVO_PUBLISH_TOKEN}, body: JSON.stringify({body, signature: sign(null, Buffer.from(body), key).toString("base64")})});
   if (!r.ok) { console.error("publish p/"+cfg.appId+"/1/b0: "+r.status+" "+(await r.json()).message); process.exit(1); }
-  console.log(JSON.stringify({app:cfg.appId, release:1}));
+  if (process.env.PLAIN_PUBLISH) console.error("Published release 1 to b0. Next: shipvo status.");
+  else console.error(JSON.stringify({app:cfg.appId, release:1}));
 }`);
 const runAsync = ({ cli, out }, extra, env = {}) => new Promise((done) => {
   const c = spawn(process.execPath, [script, "--cli", cli, "--out", out, ...extra], { env: { ...process.env, SHIPVO_LOCAL_DEV_KEY: "sv_test_localdev", ...env } });
@@ -262,6 +263,15 @@ test("--control-url runs a real publish and checks the signed pointer", async ()
     const id = s.log.find((l) => l.startsWith("APPID ")).slice(6);
     assert.match(id, /^first-run-[a-z0-9]{6}$/);
     assert.ok(s.log.includes(`DELETE /apps/${id}`));
+  } finally { s.close(); }
+});
+
+test("--control-url reads the release number from the plain-English publish line", async () => {
+  const s = await stub(); const f = fakeCp();
+  try {
+    const r = await runAsync(f, ["--control-url", s.url], { PLAIN_PUBLISH: "1" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(readFileSync(f.out, "utf8")).map((x) => [x.step, x.exit]).slice(3, 5), [["publish", 0], ["pointer", 0]]);
   } finally { s.close(); }
 });
 
