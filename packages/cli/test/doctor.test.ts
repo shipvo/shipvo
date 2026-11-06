@@ -130,6 +130,17 @@ describe("shipvo doctor checks", () => {
     expect(nameOf(r, "control plane reachable").ok).toBe(false);
   });
 
+  it("notes telemetry_dropped_today from /health, and stays quiet for null or missing", async () => {
+    const seed = makeSeed();
+    const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
+    const run = (body: unknown) => runDoctorChecks({ cwd, fetchFn: vi.fn(async () => new Response(JSON.stringify(body))) as unknown as typeof fetch });
+    const withDrops = nameOf(await run({ ok: true, telemetry_dropped_today: 3 }), "control plane /health returns JSON");
+    expect(withDrops.ok).toBe(true);
+    expect(withDrops.note).toContain("telemetry_dropped_today: 3");
+    expect(nameOf(await run({ ok: true, telemetry_dropped_today: null }), "control plane /health returns JSON").note).toBeUndefined();
+    expect(nameOf(await run({ ok: true }), "control plane /health returns JSON").note).toBeUndefined();
+  });
+
   it("fails control plane check on HTTP 503 and says so", async () => {
     const seed = makeSeed();
     const cwd = withConfig(JSON.stringify({ appId: "a", controlPlane: "https://example.com", publicKey: makePub(seed) }), seed);
