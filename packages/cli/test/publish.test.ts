@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 
 const exec = vi.hoisted(() => ({ fn: (_cmd: string, _opts?: { env?: NodeJS.ProcessEnv }) => {} }));
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execSync: (c: string, o?: { env?: NodeJS.ProcessEnv }) => exec.fn(c, o) }));
+vi.mock("../src/bsdiff.js", () => ({ bsdiff: () => new Uint8Array(10).fill(1) })); // the real one is tested in bsdiff.test.ts
 
 const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown, engine: undefined as string | undefined }));
 const puts: string[] = [];
@@ -363,19 +364,6 @@ describe("publish and the Hermes bytecode check", () => {
     expect(all).not.toMatch(/pip/);
   });
 
-  it("shows the pip hint when older bundles exist but bsdiff4 is missing", async () => {
-    withBundle(96);
-    values.set("h/demo/r1", JSON.stringify({ release: 1, sha256: "abc" }));
-    const realKeys = stub.keys;
-    stub.keys = async (p: string) => (p === "h/demo/r" ? ["h/demo/r1"] : []);
-    exec.fn = (c) => { if (c.includes("import bsdiff4")) throw new Error("no module"); };
-    await publish([...flags, "--release", "2"]);
-    stub.keys = realKeys; // put the shared stub back so later tests see real keys
-    const err = (console.error as any).mock.calls.join("\n");
-    expect(err).toMatch(/pip install bsdiff4/);
-    expect(err).toMatch(/Updates still work/);
-  });
-
   it("dry run with --release 5 does not say first release", async () => {
     withBundle(96);
     await publish([...flags, "--dry-run", "--release", "5"]);
@@ -384,11 +372,10 @@ describe("publish and the Hermes bytecode check", () => {
     expect(text).toContain("Patches are not built in a dry run");
   });
 
-  it("summary: bases exist but bsdiff4 is missing points to pip", () => {
+  it("summary: bases exist but no patch was built says full bundles still work", () => {
     const text = dryRunSummary(2, 5000, "out", { bases: 2, bsdiff: false, patches: 0 });
-    expect(text).not.toContain("first release");
     expect(text).toContain("Patches were skipped");
-    expect(text).toContain("pip install bsdiff4");
+    expect(text).not.toContain("pip");
   });
 
   it("summary: bases exist and patches were built shows the count", () => {
@@ -404,8 +391,6 @@ describe("publish and the Hermes bytecode check", () => {
   });
 
   it("iOS patches start only from earlier iOS releases, Android only from Android", async () => {
-    // Stand-in for bsdiff4: the import check passes and the diff command writes a small patch file.
-    exec.fn = (c) => { const m = c.match(/'([^']*p\.bsdiff)'/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
     const make = (tag: number) => { const b = fakeHbc(96); b[20] = tag; return b; }; // the tag makes each bundle's hash different
     const bundle = (pf: string, tag: number) => {
       mkdirSync(join(cwd, `dist-ota/${pf}/_expo/static/js/${pf}`), { recursive: true });
@@ -426,7 +411,6 @@ describe("publish and the Hermes bytecode check", () => {
   });
 
   it("iOS also patches from a shell's embedded bundle; Android ignores iOS bases", async () => {
-    exec.fn = (c) => { const m = c.match(/'([^']*p\.bsdiff)'/); if (m) writeFileSync(m[1], new Uint8Array(10).fill(1)); };
     const make = (tag: number) => { const b = fakeHbc(96); b[20] = tag; return b; };
     const sha = (tag: number) => createHash("sha256").update(make(tag)).digest("hex");
     for (const pf of ["android", "ios"]) {

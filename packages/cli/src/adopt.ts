@@ -231,7 +231,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: ${pm === "npm" ? "npm ci" : pm === "pnpm" ? "corepack enable && pnpm install --frozen-lockfile" : pm === "yarn" ? "corepack enable && yarn install --immutable" : "npm i -g bun && bun install --frozen-lockfile"}
-      - run: pip install --break-system-packages bsdiff4
       - name: Build, sign and publish over the air
         env:
           SHIPVO_PUBLISH_TOKEN: \${{ secrets.SHIPVO_PUBLISH_TOKEN }}

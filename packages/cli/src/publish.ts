@@ -1,10 +1,10 @@
 // `shipvo publish`: build the Hermes bundle, sign a release pointer, publish bundle + patches + the agent-facing web
 // artifact to the control plane. `shipvo rollback --to N`: republish an earlier bundle as a new release.
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path, { dirname, join, relative, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
+import { bsdiff } from "./bsdiff.js";
 import { checkBundle, checkEngine, installedHermesEngine, parseDeclared, parseEngine } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
 import { checkPublishPolicy } from "./policy.js";
@@ -167,24 +167,20 @@ async function publishRun(argv: string[], json: boolean): Promise<Done> {
         .filter((h) => h && h.release < release).sort((x, y) => y.release - x.release).slice(0, MAX_BASES - 2);
       for (const h of hist) bases.set(h.sha256, `b/${APP}/${bundleName(h.release, pf)}`);
       for (const k of await kv.keys(`base/${APP}/`)) { try { const b = JSON.parse((await kv.get(k))!); if ((b.platform ?? "android") === pf) bases.set(b.sha256, b.key); } catch {} }
-      // Only look for bsdiff4 when there is an older bundle to patch from; a first release needs no patches.
-      let bsdiff = false;
-      if (bases.size > 0) { try { execSync("python3 -c 'import bsdiff4'", { stdio: "ignore" }); bsdiff = true; } catch { console.error("Small patches are off because the Python tool bsdiff4 is not installed (pip install bsdiff4). Full bundles are published instead. Updates still work, they are just bigger."); } }
-      if (bsdiff) {
-        const work = mkdtempSync(join(tmpdir(), "shipvo-")); writeFileSync(join(work, "new.hbc"), bytes);
+      // Patches are built in-process (no Python or other tool); a first release has no older bundle to patch from.
+      const bsdiffOn = bases.size > 0;
+      if (bsdiffOn) {
         for (const [fromSha, key] of bases) {
           if (fromSha === newSha) continue;
           const base = await kv.getBytes(key); if (!base) continue;
-          writeFileSync(join(work, "old.hbc"), base);
-          execSync(`python3 -c "import bsdiff4; bsdiff4.file_diff('${join(work, "old.hbc")}', '${join(work, "new.hbc")}', '${join(work, "p.bsdiff")}')"`);
-          const patch = new Uint8Array(readFileSync(join(work, "p.bsdiff")));
+          const patch = bsdiff(new Uint8Array(base), bytes);
           if (patch.length >= bytes.length * 0.6) continue;
           const pkey = `b/${APP}/${pf === "ios" ? "ios-" : ""}d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
           await kv.put(pkey, patch, "application/octet-stream");
           patches.push({ from_sha256: fromSha, url: pkey, size: patch.length, sha256: sha256Hex(patch) });
         }
       }
-      patchInfo.bases = bases.size; patchInfo.bsdiff = bsdiff; patchInfo.patches = patches.length;
+      patchInfo.bases = bases.size; patchInfo.bsdiff = bsdiffOn; patchInfo.patches = patches.length;
       console.error(`patches: ${patches.map((p) => `${p.from_sha256.slice(0, 8)}=${(p.size / 1024).toFixed(1)}KB`).join(", ") || "none"}`);
     }
 
@@ -244,7 +240,7 @@ export function dryRunSummary(release: number, bytes: number, outDir: string, in
   ];
   if (info.bases === 0 && release > 1) lines.push(`Patches are not built in a dry run, because older releases are not read. Publish for real to build them.`);
   else if (info.bases === 0) lines.push(`Full bundles are fine for a first release. Small patches matter once you have older releases to compare against.`);
-  else if (!info.bsdiff) lines.push(`Patches were skipped because bsdiff4 is not installed (pip install bsdiff4). Full bundles still work.`);
+  else if (!info.bsdiff) lines.push(`Patches were skipped. Full bundles still work.`);
   else lines.push(`Patches built: ${info.patches}.`);
   return lines.join("\n");
 }
