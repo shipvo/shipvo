@@ -1,0 +1,68 @@
+name: first-run-cross-os
+# Runs the getting-started path (create, install, doctor, publish --dry-run) from packed tarballs on
+# Windows, macOS and Linux, with scripts/first-run/cross-os.mjs (#573). Each step prints one JSON line
+# (step, exit, ms) that goes to the run summary. Escalations #577, #581, #601.
+# Skips cleanly until cross-os.mjs is on the branch (it arrives with PR #602).
+on:
+  workflow_dispatch:
+  schedule: [{ cron: "17 5 * * 1" }]
+  pull_request:
+    paths:
+      - "packages/cli/**"
+      - "packages/shipvo/**"
+      - "packages/create-shipvo/**"
+      - "scripts/first-run/**"
+      - ".github/workflows/first-run-cross-os.yml"
+  push:
+    branches: [main]
+    paths: ["packages/cli/**", "packages/shipvo/**", "packages/create-shipvo/**", "scripts/first-run/**"]
+permissions:
+  contents: read
+concurrency: { group: "first-run-cross-os-${{ github.ref }}", cancel-in-progress: true }
+jobs:
+  first-run:
+    name: first-run (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    defaults: { run: { shell: bash } }
+    steps:
+      - uses: actions/checkout@v4
+      - id: has
+        run: |
+          if [ -f scripts/first-run/cross-os.mjs ]; then echo "script=1" >> "$GITHUB_OUTPUT"; else echo "cross-os.mjs not on this ref yet, skipping"; fi
+      - if: steps.has.outputs.script == '1'
+        uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - if: steps.has.outputs.script == '1'
+        uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - if: steps.has.outputs.script == '1'
+        run: pnpm install --frozen-lockfile
+      - if: steps.has.outputs.script == '1'
+        run: pnpm --filter @shipvo/schema build && pnpm --filter "@shipvo/cli..." build
+      - name: Pack tarballs
+        if: steps.has.outputs.script == '1'
+        # pnpm pack (not npm pack) rewrites workspace:^ to real versions.
+        run: |
+          mkdir -p "$RUNNER_TEMP/tgz"
+          for p in packages/cli packages/shipvo packages/create-shipvo; do (cd "$p" && pnpm pack --pack-destination "$RUNNER_TEMP/tgz"); done
+          ls -l "$RUNNER_TEMP/tgz"
+      - name: First run from tarballs
+        if: steps.has.outputs.script == '1'
+        run: |
+          set -o pipefail
+          rc=0
+          node scripts/first-run/cross-os.mjs --tarballs "$RUNNER_TEMP/tgz" | tee "$RUNNER_TEMP/first-run.jsonl" || rc=$?
+          { echo "### First run on ${{ matrix.os }}"; echo; echo '```'; cat "$RUNNER_TEMP/first-run.jsonl"; echo '```'; \
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+      - if: always() && steps.has.outputs.script == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-run-${{ matrix.os }}
+          path: ${{ runner.temp }}/first-run.jsonl
+          if-no-files-found: ignore
