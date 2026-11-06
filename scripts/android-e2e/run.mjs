@@ -146,8 +146,8 @@ await scenario("hermes bytecode mismatch: a release for another bytecode version
   const alive = !!pid();
   stop(); await sleep(800); const t1 = Date.now(); launch();
   const again = await waitFor(() => healthy(cur, t1), 30_000);
-  // The sample app reads the runtime's queued events only when it starts (`consumeEvents` on mount), so the typed
-  // reason reaches telemetry on this relaunch, not while the app stays open.
+  // @shipvo/runtime reports queued events after each checkForUpdate, so the typed reason should already be in telemetry
+  // before this relaunch. The relaunch stays to check the app still runs the old release; the wait below accepts either.
   const reason = await waitFor(() => refusalReason(tele(), p.release, p.at), 30_000);
   return { pass: reason === "hermes_bytecode_mismatch" && sawPointer && !downloaded && !ranIt && alive && after.current_release === cur && !after.pending_release && !!again && !fatal(),
     refusalReason: reason, release: p.release, shellBytecodeVersion: shellVersion, releaseBytecodeVersion: releaseVersion, runningBefore: cur, currentAfter: after.current_release, pendingAfter: after.pending_release ?? 0,
