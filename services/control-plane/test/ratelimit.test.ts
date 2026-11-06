@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import app from "../src/index";
+import { hmacHex } from "../src/installs";
 import { TELEMETRY_LIMITS as T, REGISTER_LIMITS as R } from "../src/ratelimit";
 
 function env() {
@@ -47,6 +48,40 @@ describe("POST /t rate limits", () => {
     const { e, m } = env();
     await post(e, ev(), "4.4.4.4");
     expect(Object.keys(m).some((k) => k.includes("4.4.4.4"))).toBe(false);
+  });
+});
+
+describe("POST /t caps count unverified reports only", () => {
+  const KEY = "key-hash-for-test";
+  const signedEnv = () => {
+    const x = env();
+    const inserts: unknown[][] = [];
+    x.e.DB = { prepare: (q: string) => ({ bind: (...a: unknown[]) => ({
+      run: async () => { if (q.startsWith("INSERT INTO telemetry")) inserts.push(a); return {}; },
+      all: async () => ({ results: [] }),
+      first: async () => (q.includes("FROM installs") ? { key_hash: KEY } : null),
+    }) }) };
+    return { ...x, inserts };
+  };
+  const postSigned = async (e: any, extra: object, ip: string) => {
+    const raw = JSON.stringify(ev(extra));
+    return app.request("/t", { method: "POST", body: raw, headers: { "cf-connecting-ip": ip, "x-shipvo-sig": await hmacHex(KEY, raw) } }, e);
+  };
+  it("accepts a signed report after the per-app unverified budget is full", async () => {
+    const { e, inserts } = signedEnv();
+    for (let i = 0; i < T.perApp; i++) await post(e, ev({ install_id: `install-${i}-xx` }), `10.${i >> 8}.${i & 255}.1`);
+    expect((await post(e, ev({ install_id: "install-fresh01" }), "9.9.9.9")).status).toBe(429);
+    const before = inserts.length;
+    const r = await postSigned(e, { install_id: "install-real001", event: "crash_loop_revert" }, "9.9.9.8");
+    expect(r.status).toBe(202);
+    expect(inserts.length).toBe(before + 1);
+    expect(inserts[inserts.length - 1]).toContain(1); // stored as verified, so it reaches maybeHalt
+  });
+  it("accepts a signed report for an install whose id was spoofed past the install cap", async () => {
+    const { e } = signedEnv();
+    for (let i = 0; i < T.perInstall; i++) await post(e, ev({ install_id: "install-victim" }), `10.0.${i}.1`);
+    expect((await post(e, ev({ install_id: "install-victim" }), "10.9.9.9")).status).toBe(429);
+    expect((await postSigned(e, { install_id: "install-victim" }, "10.9.9.8")).status).toBe(202);
   });
 });
 
