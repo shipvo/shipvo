@@ -66,9 +66,9 @@ describe("POST /t telemetry", () => {
 });
 
 describe("POST /o/:app orders", () => {
-  const order = { id: "TT-1", lines: [], total: 12.6 };
+  const order = { id: "TT-1", lines: [], total: 13 };
   const ok = { content_version: 1 };
-  it("stores a valid order with a rounded total", async () => {
+  it("stores a valid order", async () => {
     const { d, calls } = db();
     expect((await post("/o/tide", { order: { ...order, total: 100, lines: [{ sku: "a", quantity: 1 }] }, ...ok }, { DB: d } as any)).status).toBe(202);
     expect(calls[0].args.slice(0, 3)).toEqual(["tide", "TT-1", 100]);

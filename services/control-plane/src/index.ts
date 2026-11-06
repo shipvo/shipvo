@@ -294,13 +294,13 @@ function checkPrice(o: any, content: any): PriceCheck {
   }
   let discount = 0;
   if (o.promo) {
-    const promo = (content.promos ?? []).find((x: any) => x.active && x.code === o.promo);
+    const promo = (Array.isArray(content.promos) ? content.promos : []).find((x: any) => x.active && x.code === o.promo);
     if (!promo) return { ok: false, reason: "unknown_promo" };
     const base = promo.departments ? priced.filter((l) => promo.departments.includes(l.department)).reduce((a, l) => a + l.total, 0) : subtotal;
     discount = subtotal >= promo.min_subtotal ? Math.round((base * promo.percent) / 100) : 0;
   }
-  const fee = o.slot_id ? ((content.slots ?? []).find((x: any) => x.id === o.slot_id)?.fee ?? 0) : 0;
-  return Math.round(o.total) === subtotal - discount + fee ? { ok: true } : { ok: false, reason: "total" };
+  const fee = o.slot_id ? ((Array.isArray(content.slots) ? content.slots : []).find((x: any) => x.id === o.slot_id)?.fee ?? 0) : 0;
+  return o.total === subtotal - discount + fee ? { ok: true } : { ok: false, reason: "total" };
 }
 
 app.post("/o/:app", async (c) => {
@@ -319,7 +319,8 @@ app.post("/o/:app", async (c) => {
     return c.json({ error: "rate_limited" }, { status: 429, headers: { "retry-after": String(ORDER_WINDOW_S) } });
   const orderId = o.id.slice(0, 40);
   // Prices come from the published content version the order names, never from the caller.
-  const version = Number(body.content_version ?? body.release);
+  const cv = body.content_version;
+  const version = typeof cv === "number" ? cv : typeof cv === "string" && /^\d{1,9}$/.test(cv) ? Number(cv) : NaN;
   const row: any = Number.isInteger(version) && version >= 0
     ? await c.env.DB.prepare("SELECT json FROM content_versions WHERE app_id = ? AND version = ?").bind(appId, version).first() : null;
   if (!row) return c.json({ error: "unknown_release", reason: "unknown_release" }, 422);

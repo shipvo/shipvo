@@ -82,6 +82,42 @@ describe("orders", () => {
     expect(await r.json()).not.toHaveProperty("duplicate");
     expect(rows.map((x) => x.status)).toEqual(["price_mismatch", "unverified"]);
   });
+  it("stores the byte-identical request once the content is fixed", async () => {
+    const { rows, env } = fake();
+    content.products[0].price = 120;
+    const body = { order, ...ver, install_id: "a" };
+    try {
+      expect((await send(env, body)).status).toBe(422);
+    } finally { content.products[0].price = 100; }
+    const r = await send(env, body);
+    expect(r.status).toBe(202);
+    const j = await r.json();
+    expect(j).toMatchObject({ status: "unverified" });
+    expect(j).not.toHaveProperty("duplicate");
+    expect(rows.map((x) => x.status)).toEqual(["price_mismatch", "unverified"]);
+  });
+  it("rejects a fractional total", async () => {
+    const { env } = fake();
+    expect((await send(env, { order: { ...order, total: 100.4 }, ...ver, install_id: "a" })).status).toBe(422);
+  });
+  it("returns 422 missing_catalogue-style errors, not 500, for non-array promos or slots", async () => {
+    const { env } = fake();
+    const saved = [content.promos, content.slots] as any;
+    (content as any).promos = {}; (content as any).slots = "x";
+    try {
+      const r = await send(env, { order: { ...order, promo: "TEN", slot_id: "s1" }, ...ver, install_id: "a" });
+      expect(r.status).toBe(422);
+    } finally { [content.promos, content.slots] = saved; }
+  });
+  it("requires a numeric content_version and ignores release", async () => {
+    const { rows, env } = fake();
+    for (const b of [{ release: 1 }, { content_version: "" }, { content_version: true }, { content_version: null, release: 1 }]) {
+      const r = await send(env, { order, install_id: "a", ...b });
+      expect(r.status).toBe(422);
+      expect(await r.json()).toMatchObject({ reason: "unknown_release" });
+    }
+    expect(rows).toHaveLength(0);
+  });
   it("rejects an unknown release or missing catalogue with a typed reason", async () => {
     const { rows, env } = fake();
     for (const b of [{ content_version: 9 }, {}]) {

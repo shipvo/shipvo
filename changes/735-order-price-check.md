@@ -1,2 +1,2 @@
-- `@shipvo/control-plane`: `POST /o/:app` recomputes line prices, promo and total from the published content version the order names. A mismatch returns 422 and is stored as `price_mismatch`; an unknown version or empty catalogue returns 422 with a typed `reason`.
+- `@shipvo/control-plane`: `POST /o/:app` recomputes line prices, promo and total (exact integer match) from the published content version the order names. A mismatch returns 422 and is stored as `price_mismatch`; an unknown version or empty catalogue returns 422 with a typed `reason`.
 - Migration: orders must now send `content_version` (the published content version number). Orders without a known version are rejected.
