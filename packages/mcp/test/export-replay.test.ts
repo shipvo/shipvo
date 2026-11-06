@@ -32,11 +32,11 @@ beforeAll(async () => {
   sim.stderr!.on("data", (d) => { simErr += d; });
   // Wait by wall clock, not by attempt count: on a loaded runner a probe can take longer than its sleep.
   const deadline = Date.now() + SIM_START_MS;
-  let up = false;
+  let up = false; let lastErr: unknown;
   while (!up && Date.now() < deadline) {
-    try { await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(5_000) }); up = true; } catch { if (sim.exitCode !== null) throw new Error("sim exited: " + simErr); await new Promise((r) => setTimeout(r, 200)); }
+    try { await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(5_000) }); up = true; } catch (e) { lastErr = e; if (sim.exitCode !== null) throw new Error("sim exited: " + simErr); await new Promise((r) => setTimeout(r, 200)); }
   }
-  if (!up) throw new Error(`sim did not start on port ${port} within ${SIM_START_MS / 1000} s. stderr: ${simErr || "(empty)"}`);
+  if (!up) throw new Error(`sim did not start on port ${port} within ${SIM_START_MS / 1000} s. stderr: ${simErr || "(empty)"} last probe error: ${String((lastErr as any)?.cause ?? lastErr)}`);
 }, 420_000);
 afterAll(async () => {
   if (sim && sim.exitCode === null) { const done = new Promise((r) => sim!.once("exit", r)); sim.kill("SIGKILL"); await done; }
