@@ -40,7 +40,7 @@ export function memoryCache(now: () => number = Date.now): RunCache {
 }
 
 export interface RunContext {
-  fetch: (url: string, init: { method: string; headers: Record<string, string> }) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+  fetch: (url: string, init: { method: string; headers: Record<string, string>; redirect: "manual" }) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
   /** Returns the value of a vault key by name. The only place secrets come from. */
   secrets: (name: string) => string | undefined | Promise<string | undefined>;
   cache?: RunCache;
@@ -78,7 +78,6 @@ export function usedFields(spec: unknown): Set<string> {
   };
   if (isObj(spec)) {
     for (const k of ["screens", "actions", "schedules", "data", "state"]) walk(spec[k], k);
-    // Computed values and actions can read any field their expressions name; keep object keys that are field maps too.
   }
   return used;
 }
@@ -138,9 +137,10 @@ function selectPath(value: unknown, path: string | undefined): unknown {
 export async function runSource(spec: unknown, name: string, ctx: RunContext): Promise<unknown> {
   const s = isObj(spec) && isObj(spec.data) ? spec.data[name] : undefined;
   if (!isObj(s) || s.source !== "http") throw new RunError("bad_spec", `"${name}" is not an http data source in this spec.`);
-  const raw = s.get ?? s.post;
+  if (s.post !== undefined) throw new RunError("unsupported_step", `Data source "${name}" uses post, which does not run here yet. Use get.`);
+  const raw = s.get;
   if (typeof raw !== "string") throw new RunError("bad_spec", `Data source "${name}" needs a "get" URL.`);
-  const method = typeof s.get === "string" ? "GET" : "POST";
+  const method = "GET";
 
   let url: URL;
   try {
@@ -178,19 +178,25 @@ export async function runSource(spec: unknown, name: string, ctx: RunContext): P
     if (!value) throw new RunError("secret_missing", `The key ${secretName} is not saved in the vault.`);
     const type = auth.type ?? "bearer";
     if (type === "bearer") headers.authorization = `Bearer ${value}`;
-    else if (type === "basic") headers.authorization = `Basic ${Buffer.from(value).toString("base64")}`;
+    else if (type === "basic") {
+      let bin = "";
+      for (const b of new TextEncoder().encode(value)) bin += String.fromCharCode(b);
+      headers.authorization = `Basic ${btoa(bin)}`;
+    }
     else if (type === "header") headers[String(auth.name ?? "x-api-key").toLowerCase()] = value;
     else if (type === "query") url.searchParams.set(String(auth.name ?? "key"), value);
+    else throw new RunError("bad_spec", `Data source "${name}" has an auth type that is not known.`);
   }
 
   let res;
   try {
-    res = await ctx.fetch(url.toString(), { method, headers });
+    res = await ctx.fetch(url.toString(), { method, headers, redirect: "manual" });
   } catch {
     // The thrown error may echo the URL, which can hold a key. Say only the host.
     throw new RunError("request_failed", `The request to ${url.hostname} failed.`);
   }
   ctx.log?.({ event: "source.fetch", source: name, host: url.hostname, status: res.status });
+  if (res.status >= 300 && res.status < 400) throw new RunError("upstream_error", `${url.hostname} answered with a redirect, which is not followed.`);
   if (!res.ok) throw new RunError("upstream_error", `${url.hostname} answered with status ${res.status}.`);
   const text = await res.text();
   if (text.length > (ctx.maxResponseChars ?? DEFAULT_MAX_CHARS)) {

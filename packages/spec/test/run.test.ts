@@ -83,6 +83,70 @@ describe("runSource", () => {
   });
 });
 
+describe("runSource safety", () => {
+  const mk = (data: unknown) => ({ permissions: { network: ["api.example.com"] }, data: { d: { source: "http", get: "https://api.example.com/x", ...(data as object) } } });
+  const call = async (sp: unknown, over = {}) => {
+    const { ctx, fetch } = mkCtx(over);
+    const r = await runSource(sp, "d", ctx).catch((x) => x);
+    return { r, fetch };
+  };
+  const initOf = (fetch: ReturnType<typeof mkCtx>["fetch"]) => (fetch.mock.calls[0] as unknown as [string, { headers: Record<string, string>; redirect: string }])[1];
+
+  it("sends basic auth as UTF-8 base64", async () => {
+    const { fetch } = await call(mk({ auth: { secret: "STRIPE_KEY", type: "basic" } }));
+    expect(initOf(fetch).headers.authorization).toBe(`Basic ${btoa(SECRET)}`);
+  });
+  it("encodes non-ASCII basic credentials as UTF-8", async () => {
+    const { fetch } = await call(mk({ auth: { secret: "K", type: "basic" } }), { secrets: () => "é:ü" });
+    expect(initOf(fetch).headers.authorization).toBe("Basic " + Buffer.from("é:ü", "utf8").toString("base64"));
+  });
+  it("places a header key under the given name, lower-cased", async () => {
+    const { fetch } = await call(mk({ auth: { secret: "STRIPE_KEY", type: "header", name: "X-Token" } }));
+    expect(initOf(fetch).headers["x-token"]).toBe(SECRET);
+  });
+  it("places a query key in the URL and keeps it out of errors and logs", async () => {
+    const log = vi.fn();
+    const { fetch } = await call(mk({ auth: { secret: "STRIPE_KEY", type: "query", name: "key" } }), { log });
+    expect((fetch.mock.calls[0] as unknown as [string])[0]).toBe(`https://api.example.com/x?key=${SECRET}`);
+    expect(JSON.stringify(log.mock.calls)).not.toContain(SECRET);
+    const { r } = await call(mk({ auth: { secret: "STRIPE_KEY", type: "query" } }), { fetch: async () => ({ ok: false, status: 500, text: async () => "" }) });
+    expect(r.code).toBe("upstream_error");
+    expect(r.message).not.toContain(SECRET);
+  });
+  it("does not follow redirects", async () => {
+    const { fetch } = await call(mk({}));
+    expect(initOf(fetch).redirect).toBe("manual");
+  });
+  it("treats a 3xx as upstream_error", async () => {
+    const { r } = await call(mk({}), { fetch: async () => ({ ok: false, status: 302, text: async () => "" }) });
+    expect(r.code).toBe("upstream_error");
+    expect(r.message).toContain("redirect");
+  });
+  it("throws bad_spec for an unknown auth type", async () => {
+    const { r, fetch } = await call(mk({ auth: { secret: "STRIPE_KEY", type: "magic" } }));
+    expect(r.code).toBe("bad_spec");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("refuses post sources", async () => {
+    const sp = { permissions: { network: ["api.example.com"] }, data: { d: { source: "http", post: "https://api.example.com/x" } } };
+    const { r, fetch } = await call(sp);
+    expect(r.code).toBe("unsupported_step");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("fails with response_too_large", async () => {
+    const { r } = await call(mk({}), { maxResponseChars: 5 });
+    expect(r.code).toBe("response_too_large");
+  });
+  it("fails on a non-JSON response", async () => {
+    const { r } = await call(mk({}), { fetch: async () => ({ ok: true, status: 200, text: async () => "<html>" }) });
+    expect(r.code).toBe("upstream_error");
+  });
+  it("returns null when select names a missing path", async () => {
+    const { r } = await call(mk({ select: "nope.deeper" }));
+    expect(r).toBeNull();
+  });
+});
+
 describe("runAction", () => {
   it("refreshes a source and returns evaluated values", async () => {
     const { ctx } = mkCtx();
