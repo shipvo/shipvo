@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ChessGame } from "./src/actions";
 import { name, squareLabel, type Square } from "./src/engine";
+import { statusText, tapSquare } from "./src/ui";
 
 const GLYPH: Record<string, string> = {
   "white king": "♔", "white queen": "♕", "white rook": "♖", "white bishop": "♗", "white knight": "♘", "white pawn": "♙",
@@ -22,22 +23,19 @@ export default function App() {
 
   const targets = from ? game.legal_moves(from).map((m) => m.to) : [];
   const tap = (at: Square) => {
-    const piece = game.state.board[at];
-    if (from && targets.includes(at)) {
-      const r = game.move(from, at, "queen");
-      setNote(r.ok ? r.move.text : r.error);
-      setFrom(null); bump((n) => n + 1);
-    } else if (piece && piece.color === game.state.turn) { setFrom(at); setNote(`${name(piece)} on ${at} selected. ${game.legal_moves(at).length} moves.`); }
-    else { setFrom(null); setNote(piece ? `It is ${game.state.turn}'s turn.` : "Pick a piece first."); }
+    const r = tapSquare(game, from, at);
+    setFrom(r.from);
+    if (r.note) setNote(r.note);
+    if (r.moved) bump((n) => n + 1);
   };
 
-  const status = board.status.status === "checkmate" ? `Checkmate. ${board.status.winner} wins.`
-    : over ? `Draw: ${board.status.reason}.` : `${board.turn} to move${board.status.status === "check" ? ", in check" : ""}. Timer ${secs} s.`;
+  const status = statusText(game);
 
   return (
     <View style={s.root} accessible={false}>
       <Text style={s.title} accessibilityRole="header">Chess</Text>
       <Text style={s.status} accessibilityLiveRegion="polite">{status}</Text>
+      {!over && <Text style={s.timer} accessibilityLabel="Move timer">Timer {secs} s</Text>}
       <View style={s.board} accessibilityLabel="Chess board">
         {[8, 7, 6, 5, 4, 3, 2, 1].map((r) => (
           <View key={r} style={s.row}>
@@ -70,6 +68,7 @@ const s = StyleSheet.create({
   root: { flex: 1, paddingTop: 48, paddingHorizontal: 8, backgroundColor: "#F6F2EA" },
   title: { fontSize: 22, fontWeight: "700", color: "#222" },
   status: { fontSize: 15, color: "#222", marginVertical: 6 },
+  timer: { fontSize: 13, color: "#555" },
   board: { aspectRatio: 1, width: "100%" },
   row: { flex: 1, flexDirection: "row" },
   sq: { flex: 1, alignItems: "center", justifyContent: "center" },
