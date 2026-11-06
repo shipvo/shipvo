@@ -1,0 +1,1 @@
+- docs: the strategy metrics table now records publish-to-applied time for Android (emulator) and iOS (Simulator) from CI runs, and what is still not timed.
