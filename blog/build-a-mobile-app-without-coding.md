@@ -102,3 +102,5 @@ We have not run this with an outside team. All our evidence comes from our own s
 6. Read the store rules page before you promise a feature.
 
 Start with the [first app tutorial](/learn/first-app/). It takes a few minutes of commands, plus reading time.
+
+Planning your first Play release? Read [how to pass the 12 testers rule](/blog/google-play-12-testers-14-days/).
