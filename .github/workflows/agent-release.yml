@@ -32,7 +32,7 @@ jobs:
           for s in $(gh api "repos/$R/commits?sha=main&per_page=15" --jq '.[].sha'); do
             c=$(gh api "repos/$R/commits/$s/check-runs?check_name=test" --jq '[.check_runs[]|.conclusion][0] // "none"')
             if [ "$c" = "success" ]; then SHA=$s; CI=success; break; fi
-            if [ "$c" = "failure" ] || [ "$c" = "cancelled" ] && [ "$c" = "failure" ]; then CI=failure; break; fi
+            if [ "$c" = "failure" ]; then CI=failure; break; fi
           done
           RED=$(gh issue list -R $R --label ci-main --state open --json number --jq length)
           echo "main $SHA ci=$CI open-ci-issues=$RED"
@@ -49,6 +49,8 @@ jobs:
           N=$(node -e "console.log(require('/tmp/release.json').length)")
           [ "$N" != "0" ] || { echo "nothing to release"; exit 0; }
           DATE=$(date -u +%Y-%m-%d); TAG="release-$(date -u +%Y%m%d)"
+          # A second release on the same day (an owner-started one) gets the time in its tag.
+          if gh api "repos/$R/git/ref/tags/$TAG" >/dev/null 2>&1; then TAG="$TAG-$(date -u +%H%M)"; fi
           node - <<'JS'
           const fs = require("fs"); const r = require("/tmp/release.json");
           const date = new Date().toISOString().slice(0, 10);
