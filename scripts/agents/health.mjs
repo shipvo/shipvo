@@ -2,7 +2,7 @@
 // Team health check (no AI). Runs after every merge-bot pass. It fixes what plain rules can fix, and
 // writes everything else to one open issue labelled `agent:health`, which the steward reads every hour.
 // When the team is healthy again the issue is closed.
-//   Fixes itself: stale `agent:in-progress` labels, `agent:waiting` issues whose dependencies are done,
+//   Fixes itself: stale `agent:in-progress` labels, `agent:ready` issues with no engineer label, `agent:waiting` issues whose dependencies are done,
 //                 an idle team with work waiting, agent PRs whose last push got no review.
 //   Reports: main CI red, many failed agent runs, PRs stuck for hours, no merges for hours with work waiting,
 //            the daily merge cap with approved PRs waiting, items labelled needs-human, agent:blocked or agent:escalate.
@@ -76,6 +76,15 @@ for (const i of issues.filter((i) => !i.labels.some((l) => STATE.includes(l.name
     act(`#${i.number}: no state label, ${prs} merged PRs: add ${label}`, () => gh("api", "-X", "POST", `repos/${REPO}/issues/${i.number}/labels`, "-f", `labels[]=${label}`));
     fixed.push(prs ? `${link(i.number)} had no state label and its slices are merged; asked the planner to close it or file what remains.` : `${link(i.number)} had no state label and no PR; put it back in the queue.`);
   } catch (e) { console.log(`skip orphan #${i.number}:`, e.message); }
+}
+
+// 2c-2. Unrouted: `agent:ready` issues with no engineer label are never picked (each picker wants
+// agent:ready plus its own label). Give them to Claude, the default engineer.
+const ENGINEERS = ["agent:claude", "agent:mistral", "agent:aider"];
+for (const i of issues.filter((i) => has(i, "agent:ready") && !i.labels.some((l) => ENGINEERS.includes(l.name) || ["epic", "device-lab", "video-studio", "needs-human"].includes(l.name)) && mins(i.created_at) > 30)) {
+  const to = /^video:/i.test(i.title) ? "video-studio" : "agent:claude";   // video production goes to the Video Studio
+  act(`route #${i.number} to ${to} (agent:ready with no engineer)`, () => gh("api", "-X", "POST", `repos/${REPO}/issues/${i.number}/labels`, "-f", `labels[]=${to}`));
+  fixed.push(`${link(i.number)} was ready but had no engineer label; gave it to ${to === "video-studio" ? "the Video Studio" : "Claude"}.`);
 }
 
 // 2d. Stalled epics: an open epic with no open slice in the queue (ready, in progress, PR open, waiting or
