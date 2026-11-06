@@ -44,3 +44,5 @@ This is a reading of public policies, not legal advice, and policies change. Rea
 - Shipvo, [spike results](/docs/spike-results/) and [publishing](/docs/getting-started/#5-publish-over-the-air).
 
 Not a developer? See [how to build a mobile app without coding](/blog/build-a-mobile-app-without-coding/) for what to plan for after version one.
+
+If you are stuck on the Google Play tester rule, see [Google Play's 12 testers for 14 days rule](/blog/google-play-12-testers-14-days/).

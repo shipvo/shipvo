@@ -45,11 +45,18 @@ it("ends with the seven next steps, in order, npm install first, using the direc
   const dir = join(tmp, "second-app");
   await init([dir, "--public-key", "AAAA"]);
   const out = logs.join("\n").trimEnd();
-  const steps = [`1. cd ${dir}`, "2. npm install", "3. npx shipvo sim", "4. npx shipvo doctor", "5. npx shipvo app create second-app", "6. npx shipvo publish  ", "7. npx shipvo preview            # get a link you can open on any phone"];
+  const steps = [`1. cd ${dir}`, "2. npm install", "3. npx shipvo run android        # the app on a simulated phone in your browser", "4. npx shipvo doctor", "5. npx shipvo app create second-app", "6. npx shipvo publish  ", "7. npx shipvo preview            # get a link you can open on any phone"];
   const at = steps.map((x) => out.indexOf(x));
   expect(at.every((i) => i >= 0)).toBe(true);
   expect([...at].sort((x, y) => x - y)).toEqual(at);
   expect(out.split("\n").pop()).toContain("7. npx shipvo preview");
+  const next = out.slice(out.indexOf("Next steps:"));
+  expect(next).toContain("npx shipvo run ios");
+  expect(next).not.toContain("shipvo sim");
+  const phones = out.split("\n").find((l) => l.startsWith("Phones:"))!;
+  expect(phones).toContain("needs no Android Studio");
+  expect(phones).toContain("expo run:android");
+  expect(out).toContain("AI agents: npx -y @shipvo/mcp");
 });
 
 it.each(["blank", "content", "shop"])("the %s template prints the preview step", async (tpl) => {
