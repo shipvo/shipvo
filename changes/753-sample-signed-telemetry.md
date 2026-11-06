@@ -1,2 +1,3 @@
 - `tide-and-tackle` (sample app): reports to `/t` are now signed, and the runtime's own events (rollback, crash) use the same install identity, so auto-halt counts both. No new native modules: it uses `expo-file-system` from the shell and `@noble/hashes`. The control plane needs `TELEMETRY_SECRET` set for the signature check.
 - Migration: none for exported APIs.
+- `@shipvo/runtime`: `enableSignedTelemetry` and `ensureInstallIdentity` now send `app_id` and `shell_version` when they register, as `/t/register` requires. `ensureInstallIdentity` takes an optional fourth argument and still works without it. If saving the identity fails, it is still used for that launch. Migration: none.

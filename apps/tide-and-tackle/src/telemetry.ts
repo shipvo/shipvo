@@ -2,7 +2,7 @@
 // control plane's auto-halt counts them. The identity is created once by the runtime's `enableSignedTelemetry`, so
 // the runtime's own events (rollback, crash) and the app's reports share one install id.
 // No new native modules: storage is expo-file-system (already in the shell), HMAC is pure JS from @noble/hashes.
-// If registration fails, reports go out unsigned and the next report tries again.
+// If registration fails, reports go out unsigned for the rest of the launch (one attempt per launch).
 import { hmac } from "@noble/hashes/hmac";
 import { sha256 } from "@noble/hashes/sha256";
 import {
@@ -17,7 +17,10 @@ export function fileStorage(): TelemetryStorage {
     const f = new File(Paths.document, "shipvo-install.json");
     return {
       getItem: () => (f.exists ? f.textSync() : null),
-      setItem: (_k, v) => { f.write(v); },
+      setItem: async (_k, v) => {
+        if (!f.exists) f.create({ intermediates: true });
+        await f.write(v);
+      },
     };
   } catch {
     let v: string | null = null;
@@ -60,7 +63,7 @@ export type Reporter = { body(b: Record<string, unknown>): Promise<string> };
 
 /**
  * One reporter per base URL. It calls the runtime's `enableSignedTelemetry` (which the runtime's own event reports
- * use too) and signs the app's reports with the same identity. A failed registration is retried by the next report.
+ * use too) and signs the app's reports with the same identity. Registration is tried once per launch, so a failure cannot flood the register endpoint.
  * Never throws.
  */
 export function createReporter(
@@ -69,8 +72,7 @@ export function createReporter(
   let ready: Promise<InstallIdentity | null> | null = null;
   const start = () => {
     ready ??= enableSignedTelemetry({ storage, crypto, registerUrl: `${baseUrl}/t/register` })
-      .catch(() => null)
-      .then((id) => { if (!id) ready = null; return id; });
+      .catch(() => null);
     return ready;
   };
   return {

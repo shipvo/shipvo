@@ -1,6 +1,6 @@
 /**
  * Install identity for signed telemetry. On first launch the app makes a random install id and registers it once
- * (`POST registerUrl` with `{ install_id }`, answer `{ key }`). The key is a secret string. Reports are signed with
+ * (`POST registerUrl` with `{ install_id, app_id, shell_version }`, answer `{ key }`). The key is a secret string. Reports are signed with
  * HMAC-SHA256, using the UTF-8 bytes of the key, and the signature is lower-case hex.
  *
  * Signing rule: the sent body is `<unsigned>` with its last `}` replaced by `,"sig":"<hex>"}`. The HMAC covers the
@@ -23,6 +23,9 @@ export interface TelemetryCrypto {
   hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array | Promise<Uint8Array>;
 }
 
+/** Extra fields the control plane's `/t/register` requires: `app_id` and a non-empty `shell_version` (max 40). */
+export type RegisterMeta = { app_id?: string; shell_version?: string };
+
 export const IDENTITY_STORAGE_KEY = "shipvo.install_identity";
 
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
@@ -38,10 +41,10 @@ export const webCrypto: TelemetryCrypto = {
 
 /**
  * Load the stored identity, or create and register one. Returns `null` when registration fails (offline, server
- * error, bad answer); nothing is stored then and the next launch tries again. Never throws.
+ * error, bad answer); nothing is stored then and the next call tries again. Never throws.
  */
 export async function ensureInstallIdentity(
-  storage: TelemetryStorage, crypto: TelemetryCrypto, registerUrl: string,
+  storage: TelemetryStorage, crypto: TelemetryCrypto, registerUrl: string, meta?: RegisterMeta,
 ): Promise<InstallIdentity | null> {
   try {
     const raw = await storage.getItem(IDENTITY_STORAGE_KEY);
@@ -52,12 +55,13 @@ export async function ensureInstallIdentity(
     }
     const install_id = hex(await crypto.randomBytes(16));
     const res = await fetch(registerUrl, { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ install_id }) });
+      body: JSON.stringify({ install_id, ...meta }) });
     if (!res.ok) return null;
     const out: any = await res.json();
     if (typeof out?.key !== "string" || !out.key) return null;
     const identity = { install_id, key: out.key };
-    await storage.setItem(IDENTITY_STORAGE_KEY, JSON.stringify(identity));
+    // The server has the install now. If we cannot save it, still use it for this launch (no second registration).
+    try { await storage.setItem(IDENTITY_STORAGE_KEY, JSON.stringify(identity)); } catch {}
     return identity;
   } catch {
     return null;

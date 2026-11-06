@@ -5,6 +5,17 @@ import { ensureInstallIdentity, signReport, webCrypto } from "../src/install";
 const mem = () => { const m = new Map<string, string>(); return { m, getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); } }; };
 
 describe("install identity", () => {
+  it("sends the meta fields next to install_id, and keeps the identity if saving fails", async () => {
+    const f = vi.fn(async (_u: string, _i: any) => ({ ok: true, json: async () => ({ key: "k1" }) }));
+    (globalThis as any).fetch = f;
+    const storage = { getItem: () => null, setItem: () => { throw new Error("disk"); } };
+    const id = await ensureInstallIdentity(storage, webCrypto, "u", { app_id: "tide", shell_version: "1.0.2" });
+    expect(id?.key).toBe("k1");
+    const body = JSON.parse(f.mock.calls[0][1].body);
+    expect(body).toMatchObject({ app_id: "tide", shell_version: "1.0.2" });
+    expect(body.install_id).toBe(id!.install_id);
+  });
+
   it("registers once, then reuses the stored identity", async () => {
     const storage = mem();
     const f = vi.fn(async () => ({ ok: true, json: async () => ({ key: "k1" }) }));

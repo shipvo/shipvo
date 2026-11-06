@@ -74,7 +74,10 @@ let identityCrypto: TelemetryCrypto = webCrypto;
  */
 export async function enableSignedTelemetry(opts: { storage: TelemetryStorage; registerUrl: string; crypto?: TelemetryCrypto }): Promise<InstallIdentity | null> {
   identityCrypto = opts.crypto ?? webCrypto;
-  identity = await ensureInstallIdentity(opts.storage, identityCrypto, opts.registerUrl);
+  let state: Partial<RuntimeState> = {};
+  try { state = (native ?? fallback).getState() ?? {}; } catch {}
+  const meta = { app_id: state.appId || extra.appId, shell_version: String(state.shellVersion || "unknown").slice(0, 40) };
+  identity = await ensureInstallIdentity(opts.storage, identityCrypto, opts.registerUrl, meta);
   return identity;
 }
 

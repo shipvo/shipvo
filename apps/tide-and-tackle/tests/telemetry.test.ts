@@ -28,11 +28,21 @@ function verify(sent: string, key: string) {
 
 let sent: { url: string; body: string }[] = [];
 let registerStatus = 200;
+let registered: any[] = [];
 beforeEach(() => {
-  sent = []; registerStatus = 200;
+  sent = []; registered = []; registerStatus = 200;
   globalThis.fetch = (async (url: string, init?: any) => {
     sent.push({ url, body: init?.body ?? "" });
-    if (url.endsWith("/t/register")) return new Response(registerStatus === 200 ? JSON.stringify({ key: "k-secret" }) : "no", { status: registerStatus });
+    if (url.endsWith("/t/register")) {
+      // The real contract (services/control-plane/src/installs.ts): app_id, a valid install_id and shell_version.
+      let b: any = {}; try { b = JSON.parse(init?.body ?? "{}"); } catch {}
+      const ok = typeof b.app_id === "string" && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(b.app_id)
+        && typeof b.install_id === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(b.install_id)
+        && typeof b.shell_version === "string" && b.shell_version.length > 0 && b.shell_version.length <= 40;
+      if (!ok) return new Response('{"error":"bad_register"}', { status: 400 });
+      registered.push(b);
+      return new Response(registerStatus === 200 ? JSON.stringify({ key: "k-secret" }) : "no", { status: registerStatus });
+    }
     return new Response("{}");
   }) as any;
 });
@@ -80,13 +90,50 @@ test("app reports and runtime events are signed with one identity, registered on
   expect(st.m.size).toBe(1);
 });
 
-test("a failed registration goes out unsigned, and the next report retries", async () => {
+test("registration sends app_id and shell_version, which the server requires", async () => {
+  const { tel } = await load();
+  const r = tel.createReporter("https://cp.test", memory(), tel.portableCrypto());
+  verify(await r.body({ event: "applied" }), "k-secret");
+  expect(registered).toHaveLength(1);
+  expect(registered[0].app_id).toBe("tide");
+  expect(registered[0].shell_version.length).toBeGreaterThan(0);
+});
+
+test("a failed registration goes out unsigned and is not retried in the same launch", async () => {
   const { tel } = await load();
   const r = tel.createReporter("https://cp.test", memory(), tel.portableCrypto());
   registerStatus = 503;
   expect(await r.body({ event: "applied" })).toBe('{"event":"applied"}');
   registerStatus = 200;
-  verify(await r.body({ event: "applied" }), "k-secret");
+  expect(await r.body({ event: "applied" })).toBe('{"event":"applied"}');
+  expect(registered).toHaveLength(1);
+});
+
+test("fileStorage creates the file, awaits the write, and reads it back", async () => {
+  const files = new Map<string, string>();
+  vi.doMock("expo-file-system", () => ({
+    Paths: { document: "/doc" },
+    File: class { path: string; constructor(d: string, n: string) { this.path = `${d}/${n}`; }
+      get exists() { return files.has(this.path); }
+      create() { files.set(this.path, ""); }
+      textSync() { return files.get(this.path)!; }
+      async write(v: string) { if (!files.has(this.path)) throw new Error("not created"); await Promise.resolve(); files.set(this.path, v); } },
+  }));
+  const { tel } = await load();
+  const s = tel.fileStorage();
+  expect(await s.getItem("k")).toBeNull();
+  await s.setItem("k", "v");
+  expect(await s.getItem("k")).toBe("v");
+  vi.doUnmock("expo-file-system");
+});
+
+test("a failed save does not cause a second registration", async () => {
+  const { tel } = await load();
+  const bad = { getItem: () => null, setItem: () => { throw new Error("disk"); } };
+  const r = tel.createReporter("https://cp.test", bad, tel.portableCrypto());
+  verify(await r.body({ event: "a" }), "k-secret");
+  verify(await r.body({ event: "b" }), "k-secret");
+  expect(registered).toHaveLength(1);
 });
 
 test("postJson signs /t reports but leaves /o orders unsigned", async () => {
