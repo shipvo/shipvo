@@ -79,7 +79,7 @@ A few notes on each step.
 
 This is the hard part. Most founders have five friends who will help, not twelve.
 
-We run a free Google Group called **Shipvo Testers**. Founders add it to their closed track, and join it to test each other's apps. Anyone can join at [shipvo.dev/testers](https://shipvo.dev/testers/). Members cannot see each other's email addresses, and only managers can post.
+We run a free Google Group called **Shipvo Testers**. Founders add it to their closed track, and join it to test each other's apps. Anyone can join at [shipvo.dev/testers](https://shipvo.dev/testers/). Members cannot see each other's email addresses.
 
 Two honest limits:
 
@@ -96,7 +96,7 @@ The command opens a Play edit, reads the groups already on the track, adds Shipv
 
 ## Mistakes that reset the 14-day clock
 
-The count must stay at 12 or more for 14 days in a row. If it drops below 12, the clock starts again. These are the usual causes:
+The count must stay at 12 or more for 14 days in a row. If it drops below 12, the clock starts again. Two common causes:
 
 - **Testers opt out or uninstall.** Ask for more than 12, so a few drop-outs do not reset the clock.
 - **Wrong track.** Opt-in links are per track. Check you shared the link for the closed test, not an internal one.
