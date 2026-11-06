@@ -46,7 +46,7 @@ test("get_settings and set_setting read and write the page's device", async () =
   assert.deepEqual(media.at(-1), { colorScheme: "dark", reducedMotion: "no-preference" });
   await settingsAction(page, { action: "set_setting", key: "reduce_motion", value: true });
   assert.equal(media.at(-1).reducedMotion, "reduce");
-  assert.equal((await settingsAction(page, { action: "get_settings" })).settings.font_size, "default");
+  assert.equal((await settingsAction(page, { action: "get_settings" })).settings.font_size, "largest");
   await assert.rejects(settingsAction(page, { action: "set_setting", key: "nope", value: true }), { code: "unknown_setting" });
   await assert.rejects(settingsAction(page, { action: "set_setting", key: "rtl", value: "x" }), { code: "bad_value" });
   assert.equal(dev.s.rtl, true); delete globalThis.__pnDevice;
