@@ -41,6 +41,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `screenshot(session)` | PNG of the phone |
 | `set_device(...)` · `device_reset(...)` | What the simulated phone has: platform, permissions, location, barcode in view, biometrics, payment outcome, network |
 | `lock` · `unlock` · `restart` | Press the power button (lock screen), swipe up to unlock, or restart the phone (boot screen, the app starts fresh, storage is kept). While locked, tap, type, scroll and back fail with `phone_locked` |
+| `press_home` · `open_recents` · `resume_app` · `kill_app` | Home (app gets `AppState` background, home screen shows the app icon), app switcher card, bring the app back (`active`), swipe the card away (next open is a cold start). While away, tap, type, scroll and back fail with `app_not_foreground` |
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |

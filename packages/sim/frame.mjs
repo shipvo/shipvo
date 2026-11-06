@@ -3,6 +3,7 @@
 // Scaling to fit the window is done by the page with a CSS transform on the element this markup sits in.
 
 import { lockScreenHtml, bootScreenHtml, offScreenHtml } from "./lifecycle.mjs";
+import { homeScreenHtml, recentsHtml, navButtonsHtml, classifySwipe, setVisibilityInPage } from "./nav.mjs";
 
 export const SKINS = {
   android: { label: "Android", width: 412, height: 915, radius: 36, bezel: 10, status: 36, bar: 24, pad: 22, indicator: 108, part: "punch-hole", bottom: "gesture-bar" },
@@ -108,6 +109,33 @@ q("power-menu").addEventListener("click",function(e){var a=e.target.getAttribute
 if(a==="cancel"){pw.focus();return}
 if(a==="restart"){show(q("boot-screen"),true);var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)f.contentWindow.location.reload();clearTimeout(bootT);bootT=setTimeout(function(){show(q("boot-screen"),false)},1200)}
 else{show(q("lock-screen"),false);show(q("off-screen"),true);pw.focus()}})})();
+(function nav(){var r=root();if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')};
+if(!q("home-screen")||!q("recents"))return;
+var classifySwipe=${classifySwipe.toString()},setVisibilityInPage=${setVisibilityInPage.toString()};
+var where="app",style="gesture",skin=${JSON.stringify(skin)};
+function show(el,on){if(el)el.hidden=!on}
+function appWin(){var f=document.getElementById(${JSON.stringify(iframeId)});return f&&f.contentWindow}
+function fire(state){var w=appWin();if(!w)return;try{w.eval("("+setVisibilityInPage.toString()+")("+JSON.stringify(state)+")")}catch(x){}}
+function go(next){var was=where;where=next;show(q("home-screen"),next==="home");show(q("recents"),next==="recents");r.setAttribute("data-where",next);
+if(was==="app"&&next!=="app")fire("background");if(was!=="app"&&next==="app")fire("active")}
+function home(){go("home")}function recents(){go("recents")}
+function back(){if(where!=="app")return go("app");var w=appWin();if(!w)return;var b=w.document.querySelector('[aria-label="Back"],[role=button][aria-label="Back"]');if(b)b.click()}
+function kill(){var w=appWin();go("home");if(w)w.location.reload()}
+function setStyle(st){style=st;r.setAttribute("data-nav",st);show(q("nav-buttons"),st==="buttons");var t=q("nav-style-toggle");if(t)t.textContent=st==="buttons"?"Gesture navigation":"3-button navigation"}
+q("app-icon").addEventListener("click",function(){go("app")});
+q("recents-open").addEventListener("click",function(){go("app")});
+q("recents-close").addEventListener("click",kill);
+var cd=q("recents-card"),cy=null;cd.addEventListener("pointerdown",function(e){cy=e.clientY});cd.addEventListener("pointerup",function(e){if(cy!=null&&cy-e.clientY>80)kill();cy=null});
+if(q("nav-back")){q("nav-back").addEventListener("click",back);q("nav-home").addEventListener("click",home);q("nav-recents").addEventListener("click",recents)}
+var tg=q("nav-style-toggle");if(tg)tg.addEventListener("click",function(){setStyle(style==="buttons"?"gesture":"buttons")});
+var apps=["app"];
+function swipe(el,edge){var x0,y0,t0;el.addEventListener("pointerdown",function(e){x0=e.clientX;y0=e.clientY;t0=Date.now()});
+el.addEventListener("pointerup",function(e){if(x0==null)return;var a=classifySwipe({skin:skin,fromEdge:edge,dx:e.clientX-x0,dy:e.clientY-y0,ms:Date.now()-t0});x0=null;
+if(a==="home")home();else if(a==="recents")recents();else if(a==="back")back()})}
+swipe(q("edge-swipe"),"left");
+var bar=r.querySelector(".sf-bar");if(bar&&!(skin==="android"&&style==="buttons"))swipe(bar,"bottom");
+r.addEventListener("keydown",function(e){if(e.key==="Escape"&&where!=="app")go("app")});
+})();
 (function tick(){draw();var n=new Date();setTimeout(tick,(60-n.getSeconds())*1000-n.getMilliseconds()+50)})();
 // The app can change its top colour (a theme switch) without any event we can hear, so look again every 2 seconds. Skipped while the page is hidden.
 setInterval(function(){if(document.hidden)return;var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)theme(f.contentWindow)},2000);
@@ -154,9 +182,9 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
   const html = `<div class="sf-body" data-skin="${skin}" data-theme="${dark ? "dark" : "light"}" data-part="phone-body">`
     + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}<span class="sf-icons">${icons(st)}</span></div>`
     + `<div class="sf-content">${screen}</div>`
-    + lockScreenHtml(st.time) + bootScreenHtml() + offScreenHtml()
-    + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button><button role="menuitem" data-act="cancel">Cancel</button></div>`
-    + `<div class="sf-bar" data-part="${k.bottom}"><i></i></div></div>`
+    + `<span class="sf-edge" data-part="edge-swipe"></span>` + homeScreenHtml() + recentsHtml() + lockScreenHtml(st.time) + bootScreenHtml() + offScreenHtml()
+    + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button>${skin === "android" ? `<button role="menuitem" data-act="navstyle" data-part="nav-style-toggle">3-button navigation</button>` : ""}<button role="menuitem" data-act="cancel">Cancel</button></div>`
+    + `<div class="sf-bar" data-part="${k.bottom}"><i></i>${skin === "android" ? navButtonsHtml() : ""}</div></div>`
     + `<button class="sf-btn sf-power" data-part="power-button" aria-label="Power"></button><button class="sf-btn sf-volup" data-part="volume-up-button" aria-label="Volume up"></button><button class="sf-btn sf-voldown" data-part="volume-down-button" aria-label="Volume down"></button>`
     + `<span class="sf-label" data-part="simulated-label">Simulated</span></div>`;
   const css = [
@@ -178,6 +206,10 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-boot{inset:0;z-index:6;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font:700 34px system-ui,sans-serif;letter-spacing:.04em}`,
     `.sf-vbar{display:block;width:90px;height:4px;margin-top:6px;border-radius:2px;background:#fff4}.sf-vbar b{display:block;height:100%;border-radius:2px;background:#fff}.sf-vol{top:80px;right:12px;padding:8px 14px;border-radius:14px;background:#222d;color:#fff;font:600 14px system-ui,sans-serif}`,
     `.sf-menu{left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:16px;background:#222;box-shadow:0 8px 30px #0008}.sf-menu button{padding:10px 24px;border:0;border-radius:10px;background:#3a3d42;color:#fff;font:600 15px system-ui,sans-serif}`,
+    `.sf-edge{position:absolute;left:0;top:${k.status}px;bottom:${k.bar}px;width:14px;z-index:3}.sf-home,.sf-recents{position:absolute;inset:0;z-index:4;background:linear-gradient(160deg,#1d3557,#0b1320);color:#fff;font-family:system-ui,sans-serif}.sf-home[hidden],.sf-recents[hidden],.sf-navbtns[hidden]{display:none}`,
+    `.sf-icon{position:absolute;left:28px;top:70px;width:76px;padding:0;border:0;background:none;color:#fff;display:flex;flex-direction:column;align-items:center;gap:6px;font:600 12px system-ui,sans-serif;cursor:pointer}.sf-icon b{display:flex;width:60px;height:60px;border-radius:16px;background:#f4a261;color:#102030;align-items:center;justify-content:center;font-size:28px}`,
+    `.sf-recents{display:flex;align-items:center;justify-content:center;background:#10151cee}.sf-card{width:230px;height:420px;border-radius:20px;background:#fff;color:#111;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:14px;box-sizing:border-box;transition:transform .2s}.sf-card button{border:0;border-radius:10px;padding:8px 18px;background:#e8eaed;font:600 14px system-ui,sans-serif;cursor:pointer}`,
+    `.sf-bar{position:relative}.sf-navbtns{position:absolute;inset:0;display:flex;justify-content:space-around;align-items:center;background:var(--sf-bg)}.sf-navbtns button{border:0;background:none;color:var(--sf-fg);font-size:16px;padding:2px 24px;cursor:pointer}.sf-body[data-nav="buttons"] .sf-bar i{display:none}`,
     `.sf-label{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:600 9px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa0a6}`,
   ].join("\n");
   return { skin, width: k.width, height: k.height, outerWidth, outerHeight, html, css };

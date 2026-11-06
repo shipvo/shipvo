@@ -91,3 +91,31 @@ test("restart cold-starts the app (reload counter up) and storage survives", asy
   const log = (await act("r", { action: "device_log" })).log;
   assert.deepEqual(log.filter((e) => e.source === "simulated").map((e) => e.name), ["restart"]);
 });
+
+// Navigation: the app records every visibilitychange it hears, which is what AppState reads on react-native-web.
+test("home, resume, recents and kill give the app the right AppState events", async () => {
+  assert.ok((await call("/session", { session: "n" })).ok);
+  await screenWith("n", /loads:1/);
+  const h = await act("n", { action: "press_home" });
+  assert.ok(h.ok); assert.equal(h.appState, "background"); assert.match(h.screen, /Home screen/);
+  const blocked = await act("n", { action: "tap", ref: "e3" }); assert.equal(blocked.code, "app_not_foreground");
+  assert.equal((await act("n", { action: "kill_app" })).code, "recents_not_open");
+  const r = await act("n", { action: "resume_app" }); assert.ok(r.ok); assert.equal(r.appState, "active");
+  assert.equal((await act("n", { action: "resume_app" })).code, "app_in_foreground");
+  assert.ok((await act("n", { action: "open_recents" })).ok);
+  const k = await act("n", { action: "kill_app" }); assert.ok(k.ok); assert.equal(k.reloads, 2);
+  const back = await act("n", { action: "resume_app" }); assert.ok(back.ok);
+  assert.match((await screenWith("n", /loads:2/)).screen, /loads:2/);
+});
+
+test("the page sees background then active (document.visibilityState) in order", async () => {
+  const PAGE2 = `<!doctype html><html><body><h1>Seen</h1><p id="s">seen:</p><script>const seen=[];document.addEventListener("visibilitychange",()=>{seen.push(document.visibilityState);document.getElementById("s").textContent="seen:"+seen.join(",")})</script></body></html>`;
+  writeFileSync(join(dist, "index.html"), PAGE2);
+  try {
+    assert.ok((await call("/session", { session: "v" })).ok);
+    await act("v", { action: "press_home" }); await act("v", { action: "resume_app" });
+    await act("v", { action: "open_recents" });
+    const last = await act("v", { action: "resume_app" });
+    assert.match(last.screen, /seen:hidden,visible,hidden,visible/);
+  } finally { writeFileSync(join(dist, "index.html"), PAGE); }
+});
