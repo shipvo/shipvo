@@ -261,6 +261,55 @@ async function recordStaged(kv: KVNamespace, id: string, buf: ArrayBuffer) {
   } catch { console.warn(`stage record failed: app=${id}`); }
 }
 
+const BAND_RANK = ["b0", "b1", "b2"];
+const approvalKey = (id: string, approvalId: string) => `c/${id}/approval/${approvalId}`;
+type Approval = { id: string; key: string; pointer: string; band: string; release: number; proposer: string; status: "pending" | "approved" | "rejected"; proposed_at: string };
+
+/** With policy.requireApprovalAbove set, a pointer above that band is stored as a pending approval instead of going live. Returns the 202 body, or null. */
+async function proposeIfApprovalNeeded(c: any, id: string, buf: ArrayBuffer, key: string) {
+  const policy = await loadReleasePolicy({ kv: c.env.POINTERS, appId: id });
+  const body = JSON.parse(JSON.parse(new TextDecoder().decode(buf)).body);
+  if (!policy.requireApprovalAbove || BAND_RANK.indexOf(body.band) <= BAND_RANK.indexOf(policy.requireApprovalAbove)) return null;
+  const agent = (c.req.header("x-shipvo-actor") ?? "").trim().toLowerCase() === "agent";
+  const owner = await c.env.DB.prepare("SELECT acc.github_login AS login FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ?").bind(id).first();
+  const proposer = agent ? "agent (publish token)" : String(owner?.login ?? id);
+  const a: Approval = { id: crypto.randomUUID(), key, pointer: new TextDecoder().decode(buf), band: body.band, release: body.release, proposer, status: "pending", proposed_at: now() };
+  await c.env.POINTERS.put(approvalKey(id, a.id), JSON.stringify(a));
+  await recordAudit(c.env.DB, { app_id: id, actor: proposer, actor_kind: agent ? "agent" : "person", action: "publish", release: body.release, release_id: key,
+    after: JSON.stringify({ approval: "proposed", approval_id: a.id, band: body.band, release: body.release }) });
+  return { status: "pending_approval", approval_id: a.id, band: body.band, release: body.release, requireApprovalAbove: policy.requireApprovalAbove };
+}
+
+/** Owner auth for approvals: a signed-in owner of the app, or the owner token. Returns the actor, or null. */
+async function approver(c: any, id: string): Promise<{ actor: string; kind: "person" | "agent" } | null> {
+  if (c.env.OWNER_TOKEN && bearer(c) === c.env.OWNER_TOKEN) return { actor: "agent (owner token)", kind: "agent" };
+  const dev = await developer(c); if (!dev) return null;
+  const row: any = await c.env.DB.prepare("SELECT account_id FROM apps WHERE app_id = ?").bind(id).first();
+  return row && row.account_id === dev.account_id ? { actor: dev.login, kind: "person" } : null;
+}
+
+async function resolveApproval(c: any, verb: "approve" | "reject") {
+  const id = c.req.param("app"); const who = await approver(c, id); if (!who) return c.json({ error: "unauthorized" }, 401);
+  const aid = c.req.param("id"); const raw = await c.env.POINTERS.get(approvalKey(id, aid));
+  if (!raw) return c.json({ error: "not_found" }, 404);
+  const a: Approval = JSON.parse(raw);
+  if (a.status !== "pending") return c.json({ error: "not_pending", message: `This approval is already ${a.status}.` }, 409);
+  if (verb === "approve" && who.actor === a.proposer) return c.json({ error: "self_approval", message: "The actor that proposed this release cannot approve it." }, 403);
+  const approved = verb === "approve";
+  if (approved) {
+    const buf = new TextEncoder().encode(a.pointer);
+    await c.env.POINTERS.put(a.key, buf);
+    await recordStaged(c.env.POINTERS, id, buf.buffer as ArrayBuffer);
+    await c.env.DB.prepare("UPDATE apps SET bytes_used = bytes_used + ? WHERE app_id = ?").bind(buf.byteLength, id).run();
+  }
+  await c.env.POINTERS.put(approvalKey(id, aid), JSON.stringify({ ...a, status: approved ? "approved" : "rejected", resolved_by: who.actor, resolved_at: now() }));
+  await recordAudit(c.env.DB, { app_id: id, actor: who.actor, actor_kind: who.kind, action: "publish", release: a.release, release_id: a.key,
+    after: JSON.stringify({ approval: approved ? "approved" : "rejected", approval_id: a.id, proposer: a.proposer, band: a.band, release: a.release }) });
+  return c.json({ ok: true, approval_id: a.id, status: approved ? "approved" : "rejected" });
+}
+apps.post("/:app/approvals/:id/approve", (c) => resolveApproval(c, "approve"));
+apps.post("/:app/approvals/:id/reject", (c) => resolveApproval(c, "reject"));
+
 apps.put("/:id/kv/*", async (c) => {
   const id = c.req.param("id"); const app = await publisher(c, id); if (!app) return c.json({ error: "unauthorized" }, 401);
   const k = keyOf(c, id); if (!keyAllowed(id, k)) return c.json({ error: "forbidden_key", message: `Keys must start with one of ${PREFIXES.map((p) => `${p}/${id}/`).join(", ")}` }, 403);
@@ -270,6 +319,7 @@ apps.put("/:id/kv/*", async (c) => {
   if (k.startsWith(`p/${id}/`)) { const why = await pointerProblem(id, k, app.public_key, buf); if (why) return c.json({ error: "bad_pointer", message: why }, 422); }
   const isPtr = k.startsWith(`p/${id}/`);
   if (isPtr) { const no = await policyRefusal(c, id, buf, k); if (no) return c.json({ error: "policy_refused", code: "policy_refused", rule: no.rule, reason: no.reason }, 403); }
+  if (isPtr) { const pending = await proposeIfApprovalNeeded(c, id, buf, k); if (pending) return c.json(pending, 202); }
   let prev: string | null = null;
   if (isPtr) { try { prev = (await c.env.POINTERS.get(k)) ?? null; } catch { /* before is optional */ } }
   await c.env.POINTERS.put(k, buf);

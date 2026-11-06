@@ -33,7 +33,7 @@ export async function loadReleasePolicy(env: { kv: KVNamespace; appId: string })
     if (!raw || typeof raw !== "object") return {};
     // Keep every field that is valid on its own, so one bad field does not drop the other rules.
     const out: Record<string, unknown> = {};
-    for (const k of ["maxBand", "agentMaxBand", "blockedWeekdays", "blockedAfterHour", "timeZone", "maxCohortForAgents", "requireStageBeforeFull"]) {
+    for (const k of ["maxBand", "agentMaxBand", "requireApprovalAbove", "blockedWeekdays", "blockedAfterHour", "timeZone", "maxCohortForAgents", "requireStageBeforeFull"]) {
       if (!(k in raw)) continue;
       // blockedAfterHour only makes sense with blockedWeekdays, so test it next to a valid one.
       if (ShipvoPolicy.safeParse({ ...(k === "blockedAfterHour" ? { blockedWeekdays: ["mon"] } : {}), [k]: raw[k] }).success) out[k] = raw[k];
