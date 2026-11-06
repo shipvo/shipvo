@@ -1,6 +1,6 @@
 # Launch kit: Shipvo Phone and `shipvo run`
 
-Drafts for the owner to post. Every fact links to a page in this repo or on shipvo.dev.
+Drafts for the owner to post. Check each claim against the linked docs before posting.
 
 **Links:** [docs: run](../../run.md), [docs: record](../../record.md), [parity results](../../parity-results.md), PRs #454, #507, #510, #525. Features page: https://shipvo.dev/features/ . Image: `services/site/public/img/run-phones.png`.
 
