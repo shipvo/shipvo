@@ -106,3 +106,7 @@ figure.shot figcaption{max-width:56ch;margin:14px auto 0;text-align:center;color
 
 .pcard p{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;max-height:none;height:auto}
 .pcard.lead p{-webkit-line-clamp:5}
+/* Commands in terminal blocks: no inline-code chip inside a dark .term box, and no sticky offset outside the home page */
+.cmp-hero pre code,.cmp-sec pre code,.pcard pre code{background:none;border:0;padding:0;border-radius:0;color:var(--paper);font-size:inherit}
+.cmp-sec .term{position:static;color:var(--paper);font-size:15px;white-space:pre-wrap;overflow-wrap:anywhere}
+.cmp-sec h3.os{font-size:15px;font-weight:600;color:var(--mute);margin:22px 0 8px;letter-spacing:.01em}
