@@ -106,6 +106,8 @@ jobs:
         if: steps.chk.outputs.ok == 'true' && inputs.mode != 'read' && inputs.engine == 'claude'
         run: |
           command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && exit 0
+          # Newer branches have the script (apt read timeouts and retries); older PR branches use the loop below.
+          if [ -f scripts/agents/install-ffmpeg.sh ]; then bash scripts/agents/install-ffmpeg.sh && exit 0; fi
           for i in 1 2 3; do
             sudo apt-get -o DPkg::Lock::Timeout=120 update -qq && \
             sudo apt-get -o DPkg::Lock::Timeout=120 install -y -qq --no-install-recommends ffmpeg >/dev/null && break

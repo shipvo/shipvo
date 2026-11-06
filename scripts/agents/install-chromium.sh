@@ -10,6 +10,7 @@ cd "$(dirname "$0")/../.." || exit 1
 
 SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo"
 PW="pnpm exec playwright-core"
+APT_OPTS=(-o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
 
 wait_for_apt() {
   for _ in $(seq 1 120); do
@@ -29,8 +30,9 @@ for a in 1 2 3 4; do
   echo "Installing system packages for Chromium (try $a): $pkgs"
   wait_for_apt
   # shellcheck disable=SC2086
-  $SUDO apt-get -o DPkg::Lock::Timeout=120 update -qq && \
-    $SUDO apt-get -o DPkg::Lock::Timeout=120 install -y -qq --no-install-recommends $pkgs && { ok=1; break; }
+  # Network reads time out and retry, and each call is capped: a stalled mirror otherwise hangs the job (ci run 42128194280).
+  timeout 300 $SUDO apt-get "${APT_OPTS[@]}" update -qq && \
+    timeout 480 $SUDO apt-get "${APT_OPTS[@]}" install -y -qq --no-install-recommends $pkgs && { ok=1; break; }
   sleep $(( a * 10 ))
 done
 [ -n "$ok" ] || { echo "::error::could not install Chromium's system packages"; exit 1; }

@@ -27,7 +27,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | --- | --- |
 | `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
 | `list_sessions` | Open sessions on this server, to resume after a reconnect |
-| `open_app(app, session?, seed_cart?, dark?)` | A phone-sized session; returns the first screen. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
+| `open_app(app, session?, seed_cart?, dark?, attach?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). Attached sessions support screen, tap, type, scroll, back; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `screen(session)` | The accessibility tree with refs (`[ref=e12]`) |
 | `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb |
 | `screenshot(session)` | PNG of the phone |

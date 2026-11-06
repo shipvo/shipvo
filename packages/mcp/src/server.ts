@@ -16,6 +16,8 @@ import { z } from "zod";
 import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
+import { Recorder, RecorderError } from "./recorder.js";
+import { connectDriver, findLiveRun, type Driver } from "./attach.js";
 import { satisfied, sameTree, wantsMatch, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -55,6 +57,19 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
     const what = path === "/act" && typeof body.action === "string" ? `action "${body.action}"` : `request ${path}`;
     return { ok: false, code: "sim_timeout", error: `the simulator did not answer ${what} within ${ms} ms. The action may still have run and the session may still be alive: call screen to see where it is.` };
   }
+}
+const recorder = new Recorder();
+// Sessions attached to a live `shipvo run` phone. Module level: HTTP mode builds a server per request.
+const attached = new Map<string, Driver>();
+const ATTACH_TYPES = new Set(["screen", "tap", "type", "scroll", "back"]);
+// One action on a session: through the driver connection when attached, else the simulator.
+async function act(body: Record<string, unknown>): Promise<Act> {
+  const d = attached.get(String(body.session));
+  if (!d) return sim("/act", body);
+  const { session: _s, action, ...args } = body;
+  if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone yet. Use screen, tap, type, scroll or back, or open a headless session with attach: "never".` };
+  const m = await d.request(String(action), args);
+  return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code };
 }
 const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
@@ -122,17 +137,38 @@ server.tool("open_app", "Open an app in a fresh phone-sized session and return i
   session: z.string().optional().describe("Session name (default: generated). One session is one phone."),
   seed_cart: z.array(z.object({ product_id: z.string().optional(), id: z.string().optional(), quantity: z.number().int().positive().optional(), qty: z.number().int().positive().optional() }).refine((l) => (l.product_id ?? l.id) && (l.quantity ?? l.qty), "each line needs product_id (or id) and quantity (or qty)")).optional().describe("Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."),
   dark: z.boolean().optional().describe("Dark mode"),
-}, WR, async ({ app, session, seed_cart, dark }) => {
+  attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
+}, WR, async ({ app, session, seed_cart, dark, attach }) => {
   const id = app.split("@")[0];
   if (!(await allowed(id))) return result("", { ok: false, code: "unknown_app", error: keyApps ? `this key opens: ${keyApps.join(", ")}` : `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
+  const mode = attach ?? "auto";
+  const live = mode === "never" ? undefined : findLiveRun(id);
+  if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
+  let attachNote = "";
+  if (live) {
+    try {
+      const d = await connectDriver(live);
+      attached.get(sid)?.close(); attached.set(sid, d);
+      const r = await act({ session: sid, action: "screen" });
+      if (!r.ok) { attached.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote = ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
+      else {
+        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() }); steps.set(sid, [{ action: "open" }]);
+        if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
+        return text(`session: ${sid}\napp: ${id} release: local\nmode: attached to the live shipvo run phone\n\n${r.screen ?? ""}`);
+      }
+    } catch (e) {
+      if (mode === "always") return result("", { ok: false, code: "attach_failed", error: (e as Error).message });
+      attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
+    }
+  }
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
   if (r.code === "sim_timeout") return result(sid, r);
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
-  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\n\n${r.screen ?? ""}`);
+  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
 });
 
 server.tool("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, RO, async () => {
@@ -157,7 +193,7 @@ async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; wait
   if (!r.ok || r.screen == null || (!w.wait_for && !w.settle)) return { r };
   const t0 = Date.now(), limit = w.timeout_ms ?? 2000, left = () => limit - (Date.now() - t0);
   let cur = r, matched = true;
-  const read = async () => { const n = await sim("/act", { session, action: "screen" }); if (n.ok && n.screen != null) cur = { ...cur, screen: n.screen }; return n.ok && n.screen != null; };
+  const read = async () => { const n = await act({ session, action: "screen" }); if (n.ok && n.screen != null) cur = { ...cur, screen: n.screen }; return n.ok && n.screen != null; };
   if (w.wait_for) {
     matched = satisfied(cur.screen!, w.wait_for);
     while (!matched && left() > 0) { await sleep(Math.min(100, left())); if (await read()) matched = satisfied(cur.screen!, w.wait_for); }
@@ -169,15 +205,15 @@ async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; wait
   return { r: cur, waited: { matched, ms: Date.now() - t0 } };
 }
 const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
-server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await sim("/act", { session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "tap", ref }), { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
+server.tool("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, async ({ session }) => { need(session); const r = await act({ session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
+server.tool("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "tap", ref }), { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
 server.tool("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
-  async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await sim("/act", { session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
+  async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await act({ session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
 server.tool("scroll", "Scroll the page (down/up) or a horizontal rail (right/left, give the rail's ref). Returns the new screen." + CH, { session: sid, direction: z.enum(["down", "up", "left", "right"]), ref: ref.optional().describe("Scroll inside this element (a rail or list); omit for the page"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR,
-  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "scroll", direction, ref }), { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
-server.tool("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await sim("/act", { session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
+  async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "scroll", direction, ref }), { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
+server.tool("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
 server.tool("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The tree from `screen` is usually enough to act.", { session: sid }, RO, async ({ session }) => {
-  need(session); const r = await sim("/act", { session, action: "screenshot" });
+  need(session); const r = await act({ session, action: "screenshot" });
   if (!r.ok) return result(session, r);
   if (!r.path) throw new Error("no screenshot");
   return { content: [{ type: "image" as const, data: readFileSync(r.path).toString("base64"), mimeType: "image/png" }, { type: "text" as const, text: r.screen ?? "" }] };
@@ -196,25 +232,25 @@ server.tool("set_device", "Change what the simulated phone has: location, the ad
   online: z.boolean().optional(),
   source: z.enum(["auto", "simulated"]).optional().describe("\"simulated\" forces the simulated camera, microphone and location even when a person could grant the real ones, for reproducible runs"),
   microphone: z.object({ level: z.number().min(0).max(1).optional() }).optional(),
-}, WR, async ({ session, ...device }) => { need(session); const r = await sim("/act", { session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
+}, WR, async ({ session, ...device }) => { need(session); const r = await act({ session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
 server.tool("push_notification", "Deliver a push notification to the simulated phone; it appears as a banner the agent can tap. The app receives it only if notification permission is granted; otherwise nothing is delivered.", { session: sid, title: z.string(), body: z.string(), data: z.record(z.unknown()).optional() }, WR,
   async ({ session, title, body, data }) => {
-    need(session); const r = await sim("/act", { session, action: "push_notification", title, body, data });
+    need(session); const r = await act({ session, action: "push_notification", title, body, data });
     // The simulator answers ok when permission blocks the push, so say so: otherwise it looks like a delivery.
     if (r.ok && r.delivered === false) return result(session, { ...r, screen: `Not delivered: notification permission is not granted (use set_device permissions.notifications).\n\n${r.screen ?? ""}` });
     return result(session, r);
   });
 server.tool("notifications", "The notification shade: notifications delivered to the simulated phone in this session (their banners vanish after 5 s, like a heads-up on a real phone).", { session: sid }, RO,
-  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
+  async ({ session }) => { need(session); const r = await act({ session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
 server.tool("open_notification", "Tap a notification from the shade (newest if no id is given): the app handles it exactly as if its banner was tapped.", { session: sid, id: z.string().optional() }, WR,
-  async ({ session, id }) => { need(session); return result(session, await sim("/act", { session, action: "open_notification", id })); });
+  async ({ session, id }) => { need(session); return result(session, await act({ session, action: "open_notification", id })); });
 server.tool("open_url", "Open a deep link (such as myapp://item/3) in the running app, as a push tap, auth callback or share link would. Fails with no_url_listener if the app does not listen for URLs.", { session: sid, url: z.string().describe("The URL to deliver, e.g. myapp://item/3") }, { title: "Open a deep link", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-  async ({ session, url }) => { need(session); return result(session, await sim("/act", { session, action: "open_url", url })); });
+  async ({ session, url }) => { need(session); return result(session, await act({ session, action: "open_url", url })); });
 server.tool("device_log", "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.", { session: sid }, RO,
-  async ({ session }) => { need(session); const r = await sim("/act", { session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
+  async ({ session }) => { need(session); const r = await act({ session, action: "device_log" }) as Act & { log?: unknown[]; capabilities?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ note: "Entries marked source \"simulated\" are simulated: no real biometric check or money movement took place. Camera, microphone and location readings marked source \"real\" came from the browser's hardware.", capabilities: r.capabilities, log: r.log ?? [] }, null, 2)); });
 
 server.tool("device_reset", "Put the simulated phone back to a known state (permissions undetermined, default location, nothing in front of the camera, log cleared), optionally with a new profile.", { session: sid, platform: z.enum(["android", "ios"]).optional(), api: z.number().optional() }, WR,
-  async ({ session, ...device }) => { need(session); return result(session, await sim("/act", { session, action: "device_reset", device })); });
+  async ({ session, ...device }) => { need(session); return result(session, await act({ session, action: "device_reset", device })); });
 
 server.tool("export_test", "Turn the steps taken in this session (tap, type, scroll, back, set_device) into a @shipvo/test script and return its source. Read-only. Targets are named by their visible text; ambiguous ones become TODO comments and password fields use an environment variable instead of the typed value.", { session: sid }, RO, async ({ session }) => {
   const rec = steps.get(session), s = sessions.get(session);
@@ -224,6 +260,8 @@ server.tool("export_test", "Turn the steps taken in this session (tap, type, scr
 
 server.tool("end_session", "Close the session and get a report: steps taken, and the orders the app sent to its backend during the session.", { session: sid }, DEST, async ({ session }) => {
   need(session);
+  const live = attached.get(session);
+  if (live) { const s = sessions.get(session); live.close(); attached.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session); return text(JSON.stringify({ session, app: s?.app, mode: "attached", steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000) }, null, 2)); }
   // The simulator is the source of truth: end a session it lists even if this server did not open it; otherwise no_session.
   const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string }[] };
   if (!listed.ok) return result(session, listed);
@@ -232,6 +270,22 @@ server.tool("end_session", "Close the session and get a report: steps taken, and
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
+});
+
+// Record the phone frame page to an MP4 (one recording per server). Page: SHIPVO_FRAME_URL, default the simulator's root.
+const recFail = (e: unknown) => { if (e instanceof RecorderError) return result("", { ok: false, code: e.code, error: e.message }); throw e; };
+server.tool("record_start", "Start recording the phone frame to an MP4 under .shipvo/recordings/. Use record_marker for chapters and record_stop to finish.", {
+  format: z.enum(["9:16", "16:9", "1:1"]).optional().describe("Video shape (default 9:16: 1080x1920; 16:9 is 1920x1080; 1:1 is 1080x1080)"),
+  fps: z.union([z.literal(30), z.literal(60)]).optional().describe("Frames per second (default 30)"),
+  title: z.string().optional().describe("Used in the file name"),
+}, WR, async ({ format, fps, title }) => {
+  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
+});
+server.tool("record_marker", "Add a chapter at the current time of the running recording.", { caption: z.string().min(1) }, WR, async ({ caption }) => {
+  try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
+});
+server.tool("record_stop", "Stop the recording and write the MP4. Returns the file, duration in seconds, size and chapters.", {}, WR, async () => {
+  try { const r = await recorder.stop(); return { ...text(JSON.stringify(r, null, 2)), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 
 // Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.

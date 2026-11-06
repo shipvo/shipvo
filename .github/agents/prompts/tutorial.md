@@ -11,7 +11,7 @@ Read `docs/product/platform.md` (the mission: easy and accessible to everyone), 
 
 Commit (`git add`, `git commit -m "tutorials: <title>"`). Do not push. Write `/tmp/agent/pr_title.txt` and `/tmp/agent/pr_body.md` (the outcome taught, time it took you, issues filed).
 
-This runs twice a day and builds a growing library: many tutorials, each a different outcome. Keep `docs/tutorials/index.md` ("Learn" hub, first page of the "Learn" group) up to date: every tutorial listed by goal (Start, Sell, Run your app, Test, Ship updates), with time needed and level. Never repeat an existing tutorial; extend or refresh an old one only when the product changed.
+This runs every 4 hours and builds a growing library: many tutorials, each a different outcome. Keep `docs/tutorials/index.md` ("Learn" hub, first page of the "Learn" group) up to date: every tutorial listed by goal (Start, Sell, Run your app, Test, Ship updates), with time needed and level. Never repeat an existing tutorial; extend or refresh an old one only when the product changed.
 
 ## Content follows code (shared with docs, blog, tutorials and videos)
 
@@ -19,3 +19,7 @@ This runs twice a day and builds a growing library: many tutorials, each a diffe
 
 
 Describe Shipvo with the "Positioning" section of `docs/product/platform.md` (one line, the loop, comparisons as facts, parity as proof).
+
+## Goal: every feature has a video and a tutorial (owner, 6 Nov 2026)
+
+Every row in `docs/content-coverage.md` must end with a link in **both** the Tutorial and the Video column. Each run, take the next empty cell in your column: features that ship to users first, newest and most important first (Shipvo Phone, `shipvo run`, the store path and Shipvo Testers, signed updates and rollback, the agent simulator, Capacitor). One feature per run, done properly, never a thin page to fill a cell. If a feature is too small for its own piece, cover it inside a closely related one and link the same piece in both rows. If a row's feature is not shipped yet (only planned), skip it and say so in the PR.

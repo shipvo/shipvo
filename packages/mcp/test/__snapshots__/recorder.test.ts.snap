@@ -1,0 +1,62 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCP tools > lists the three tools with their schemas 1`] = `
+[
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "caption": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "caption",
+      ],
+      "type": "object",
+    },
+    "name": "record_marker",
+  },
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "description": "Video shape (default 9:16: 1080x1920; 16:9 is 1920x1080; 1:1 is 1080x1080)",
+          "enum": [
+            "9:16",
+            "16:9",
+            "1:1",
+          ],
+          "type": "string",
+        },
+        "fps": {
+          "description": "Frames per second (default 30)",
+          "enum": [
+            30,
+            60,
+          ],
+          "type": "number",
+        },
+        "title": {
+          "description": "Used in the file name",
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "record_start",
+  },
+  {
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {},
+      "type": "object",
+    },
+    "name": "record_stop",
+  },
+]
+`;
