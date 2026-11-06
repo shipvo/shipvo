@@ -45,6 +45,25 @@ describe("run bridge: visible agent and take-over", () => {
     expect(await page.textContent("#shipvo-log")).toContain('Tapped button "Add to cart"');
   });
 
+  it("words type and scroll steps in plain English", async () => {
+    const r = await ask({ type: "scroll", direction: "down" });
+    expect(r.ok, r.error).toBe(true);
+    expect(await page.textContent("#shipvo-log")).toContain("Scrolled down");
+  });
+
+  it("keeps the step log inside a phone-width page and lets the person hide it", async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const box = await page.locator("#shipvo-log").boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+    await page.click("#shipvo-log-toggle");
+    expect(await page.isVisible("#shipvo-log")).toBe(false);
+    expect(await page.textContent("#shipvo-agent")).toContain("Agent is driving");
+    await page.click("#shipvo-log-toggle");
+    expect(await page.isVisible("#shipvo-log")).toBe(true);
+    await page.setViewportSize({ width: 500, height: 950 });
+  });
+
   it("marks simulated device events in the step log", async () => {
     await page.evaluate(() => (document.getElementById("app") as HTMLIFrameElement).contentWindow!.parent.postMessage({ type: "shipvo:system-sheet", open: true }, "*"));
     await page.waitForSelector('#shipvo-log li[data-simulated="true"]');

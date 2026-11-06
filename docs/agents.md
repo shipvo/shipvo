@@ -51,9 +51,9 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 When `shipvo run` is up for your app, `open_app` attaches to that phone and the person watching sees what the agent does:
 
 - a dot at each tap point, an outline around the target, and an "Agent is driving" banner;
-- a step log in plain words, such as `Tapped button "Add to cart"`. Events from the simulated device are marked "(simulated)".
+- a step log in plain words, such as `Tapped button "Add to cart"`. Events from the simulated device are marked "(simulated)". **Hide steps** collapses the log so it never covers the app.
 
-The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on.
+The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on. An action already in flight when the person takes over still finishes, and its step is logged after "You took over".
 
 ## What the tree shows (and hides), on purpose
 

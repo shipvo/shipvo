@@ -236,7 +236,8 @@ function bridgeMain(win: any, token: string) {
     "#shipvo-agent.paused{background:#b45309}#shipvo-agent button{border:0;border-radius:10px;padding:2px 10px;font:inherit;cursor:pointer;display:none}#shipvo-agent.paused button{display:inline-block}" +
     "#shipvo-dot{position:fixed;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#4f46e5aa;border:2px solid #fff;box-shadow:0 0 0 2px #4f46e5;pointer-events:none;z-index:2147483000;display:none}" +
     "#shipvo-outline{position:fixed;border:2px solid #4f46e5;border-radius:4px;pointer-events:none;z-index:2147483000;display:none}" +
-    "#shipvo-log{position:fixed;right:12px;bottom:12px;width:240px;max-height:40%;overflow:auto;margin:0;padding:8px 8px 8px 26px;border-radius:8px;background:#111d;color:#fff;font:12px system-ui,sans-serif;z-index:2147483000;display:none}#shipvo-log li{margin:2px 0}";
+    "#shipvo-log{position:fixed;right:12px;bottom:44px;width:240px;max-width:calc(100vw - 24px);box-sizing:border-box;max-height:25%;overflow:auto;margin:0;padding:8px 8px 8px 26px;border-radius:8px;background:#111d;color:#fff;font:12px system-ui,sans-serif;z-index:2147483000;display:none}#shipvo-log li{margin:2px 0}" +
+    "#shipvo-log-toggle{position:fixed;right:12px;bottom:12px;z-index:2147483000;display:none;border:0;border-radius:10px;padding:4px 10px;background:#111d;color:#fff;font:12px system-ui,sans-serif;cursor:pointer}";
   doc.head.appendChild(css);
   const make = (tag: string, id: string) => { const e = doc.createElement(tag); e.id = id; doc.body.appendChild(e); return e; };
   const banner = make("div", "shipvo-agent");
@@ -245,6 +246,12 @@ function bridgeMain(win: any, token: string) {
   const handBack = doc.createElement("button"); handBack.type = "button"; handBack.textContent = "Hand back"; banner.appendChild(handBack);
   const dot = make("div", "shipvo-dot"), outline = make("div", "shipvo-outline"), log = make("ol", "shipvo-log");
   log.setAttribute("aria-label", "Agent steps");
+  // The log can be hidden so it never covers what the agent is tapping.
+  let logHidden = false;
+  const logToggle = make("button", "shipvo-log-toggle") as any;
+  logToggle.type = "button"; logToggle.textContent = "Hide steps"; logToggle.setAttribute("aria-expanded", "true");
+  const showLog = () => { log.style.display = logHidden ? "none" : "block"; logToggle.style.display = "block"; logToggle.textContent = logHidden ? "Show steps" : "Hide steps"; logToggle.setAttribute("aria-expanded", String(!logHidden)); };
+  logToggle.onclick = () => { logHidden = !logHidden; showLog(); };
   const showBanner = () => {
     banner.style.display = "flex"; banner.classList.toggle("paused", taken);
     bannerText.textContent = taken ? "You took over. The agent is paused." : "Agent is driving";
@@ -252,7 +259,7 @@ function bridgeMain(win: any, token: string) {
   const step = (text: string, simulated = false) => {
     const li = doc.createElement("li"); li.textContent = text + (simulated ? " (simulated)" : "");
     if (simulated) li.setAttribute("data-simulated", "true");
-    log.appendChild(li); log.style.display = "block"; log.scrollTop = log.scrollHeight;
+    log.appendChild(li); showLog(); log.scrollTop = log.scrollHeight;
     while (log.children.length > 50) log.removeChild(log.firstChild!);
   };
   /** Where the scaled app iframe is on the frame page. */
@@ -274,7 +281,7 @@ function bridgeMain(win: any, token: string) {
   };
   function takeOver(e: any) {
     if (!e.isTrusted || taken || !seenAgent) return;
-    if (e.target && e.target.closest && e.target.closest("#shipvo-agent")) return;
+    if (e.target && e.target.closest && e.target.closest("#shipvo-agent, #shipvo-log-toggle")) return;
     taken = true; showBanner(); step("You took over. The agent is paused.");
   }
   handBack.onclick = () => { taken = false; showBanner(); step("You handed back. The agent can continue."); };
