@@ -127,3 +127,36 @@ export const refusalReason = (tele, release, since) => tele.find((e) => e.releas
 
 /** Where `release` is in the prefs: "pending" (trial stage seen), "current" (already promoted, stage was too short to see), or null. */
 export const releaseReached = (prefs, release) => (prefs.pending_release === release ? "pending" : prefs.current_release === release ? "current" : null);
+
+export const ROLLBACK_SCENARIO = "on-device Runtime.rollback(): previous release restored and kept after a restart";
+
+/** Center of the node with this content-desc or text in a `uiautomator dump` XML, or null. */
+export function tapTarget(xml, label) {
+  for (const m of xml.matchAll(/<node\b[^>]*>/g)) {
+    const n = m[0], attr = (k) => n.match(new RegExp(`\\s${k}="([^"]*)"`))?.[1];
+    if (attr("content-desc") !== label && attr("text") !== label) continue;
+    const b = attr("bounds")?.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+    if (b) return { x: Math.round((+b[1] + +b[3]) / 2), y: Math.round((+b[2] + +b[4]) / 2) };
+  }
+  return null;
+}
+
+/** The `rolled_back` telemetry event after `since`, or null. The app sends it under the release that is running at that time (the restored one), not the rolled-back one. */
+export const rolledBackEvent = (tele, runningRelease, since) => tele.find((e) => e.event === "rolled_back" && e.release === runningRelease && e.at >= since) ?? null;
+
+/**
+ * Verdict of the rollback scenario. `bad` is the release that was rolled back, `good` the one that must run.
+ * `prefs` are the runtime prefs after the relaunch, `runningAfterRelaunch` the release that reported healthy
+ * after it, `badRefetched` whether the device fetched the bad release's bundle after the rollback call.
+ * Returns { pass, failures[] }; a bad release that comes back is named as such.
+ */
+export function rollbackVerdict({ good, bad, prefs, runningAfterRelaunch, badRefetched, telemetryEvent, goodActiveMs }) {
+  const failures = [];
+  if (goodActiveMs == null) failures.push(`release ${good} was not active after the rollback call`);
+  if (runningAfterRelaunch === bad || prefs.current_release === bad) failures.push(`release ${bad} came back after the relaunch`);
+  else if (runningAfterRelaunch !== good || prefs.current_release !== good) failures.push(`after the relaunch the app ran release ${runningAfterRelaunch ?? "none"}, expected ${good}`);
+  if (badRefetched) failures.push(`release ${bad} was downloaded again after the rollback`);
+  if (!(prefs.blocked_release >= bad)) failures.push(`release ${bad} is not blocked (blocked_release ${prefs.blocked_release ?? 0})`);
+  if (!telemetryEvent) failures.push("no rolled_back telemetry event");
+  return { pass: failures.length === 0, failures };
+}
