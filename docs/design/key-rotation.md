@@ -33,12 +33,22 @@ Key set the runtime trusts at any moment:
 
 **Old key revoked after a set time.** Each statement carries `old_key_valid_until`. The default is 14 days after `valid_from`, and the CLI refuses a value over 30 days. After that time the runtime rejects pointers signed by the old key. For a leak the owner sets it to `valid_from` (zero grace); the cost is that devices that have not yet fetched the statement stop receiving updates until they do.
 
-Time is judged against the device clock, with the pointer's own signed `issued_at` as a lower bound to resist a device clock set backwards: a pointer signed by the old key is accepted only if its `issued_at` is before `old_key_valid_until`. An attacker with the leaked old key can forge `issued_at`, so this is not a security boundary against a leak; for leaks the zero-grace setting is the defence. Do not claim more.
+**One time rule: the device clock decides.** The runtime reads its own clock, `now`, once per check. It never uses a pointer's `issued_at` for key decisions, because whoever holds the old key can forge it.
+
+- A statement is promoted (becomes the current key) when `now >= valid_from`.
+- The previous key is accepted only while `now < previous_valid_until`.
+
+If the device clock is wrong:
+
+- **Clock behind.** Promotion waits longer, and the old key stays accepted past its real deadline. A leaked key keeps working on that device until its clock catches up. Rotation cannot fix this; we say so in the docs.
+- **Clock ahead.** Promotion happens early and the old key is rejected early. Pointers signed by the new key are accepted at once. Pointers signed by the old key are rejected, so that device may stop getting updates until its clock is fixed or the owner signs with the new key (which every release does after rotation).
+
+The runtime does not try to detect a bad clock in v1. For leaks the zero-grace setting (section 2) is the defence. Do not claim more.
 
 ## 2. Recovery paths
 
 **Leaked release key** (root key safe)
-1. `shipvo keys rotate` creates a new release seed, builds a statement with `old_key_valid_until = valid_from`, and signs it with the root key.
+1. `shipvo keys rotate --emergency` creates a new release seed, builds a statement with `valid_from = now` and `old_key_valid_until = valid_from`, and signs it with the root key. The 24-hour default delay in section 3 applies only to planned rotation (`shipvo keys rotate` without the flag). A leak never uses the default delay.
 2. The statement is uploaded to the control plane. The control plane serves it from the pointer endpoint (`statement` field next to `body` and `signature`).
 3. Devices fetch it on the next update check, verify it against the pinned root key, store it, and from then on accept only the new key.
 4. New releases are signed with the new release key. The leaked key can no longer ship updates to any device that has seen the statement.
@@ -63,7 +73,7 @@ So the publish token alone can never rotate. An attacker needs the root seed.
 
 **M-of-N: not in v1.** Reason: the threat we close is "stolen publish token", and a single offline root key already closes it. M-of-N protects against one stolen root key, but it costs a multi-party signing flow, more shell-pinned keys (a larger and harder-to-change surface) and more ways to lose enough keys to be locked out. Teams with that need can keep the root key in a hardware token or a split-secret vault. The wire format reserves a `signatures` array so M-of-N can be added later without a new format (see section 4).
 
-**Recovery delay: yes, a short one for non-emergency rotations.** The runtime applies a statement at `valid_from`, and the CLI sets `valid_from` to now plus 24 hours by default, so an owner watching alerts can notice an unexpected rotation. This does not protect against a stolen root key (the attacker chooses `valid_from`), so the runtime does not enforce a minimum delay. The control plane emails/log-events the owner on every statement upload; that is the only real signal and it is weak. Say so in docs. Emergency rotation sets `valid_from` to now.
+**Recovery delay: yes, a short one for non-emergency rotations.** The runtime promotes a statement at `valid_from` (section 4, "Between fetch and `valid_from`"), and the CLI sets `valid_from` to now plus 24 hours by default for planned rotation, so an owner watching alerts can notice an unexpected rotation. This does not protect against a stolen root key (the attacker chooses `valid_from`), so the runtime does not enforce a minimum delay. The control plane emails/log-events the owner on every statement upload; that is the only real signal and it is weak. Say so in docs. Emergency rotation (`--emergency`) sets `valid_from` to now.
 
 ## 4. Wire format, replay protection, storage
 
@@ -95,6 +105,20 @@ A future M-of-N change replaces `signature` with `signatures: [{ key_id, signatu
 
 The runtime keeps `key_sequence`, the highest sequence it has applied. It accepts a statement only if `sequence == key_sequence + 1`. Rejecting gaps keeps it simple and stops a withheld-then-replayed older statement from rolling the key back. If a device is several rotations behind, the control plane serves the whole chain in order (`statements: [...]`), and the runtime applies them one by one, each verified against the root key.
 
+**Chain result.** The runtime verifies the whole chain first, then writes the result in one atomic write. Until that write succeeds, the old state applies unchanged. After it:
+
+- The current key is the key from the last statement promoted (`now >= valid_from`).
+- The previous key is the key that the last promoted statement replaced, with that statement's `old_key_valid_until` as `previous_valid_until`. Only this one survives.
+- Keys from earlier steps in the chain are dropped at once, including the genesis key if two or more rotations were applied. A device two rotations behind gets no grace window for the oldest key.
+- At most one statement is pending (below). If a statement in the chain has a future `valid_from`, it becomes the pending statement and any later statement in the chain is not stored; the runtime fetches it again after promotion.
+
+### Between fetch and `valid_from`
+
+A fetched statement that passes checks 1 to 5 is stored as `pending_statement` and `key_sequence` advances at once, so replay protection holds from the moment of fetch. Until the first check with `now >= valid_from`:
+
+- The **current key keeps verifying pointers** (the genesis key, or the last promoted key). The pending key verifies nothing: a pointer signed by it is rejected.
+- On the first check with `now >= valid_from`, the runtime promotes in one atomic write: `release_key` = the pending key, `previous_key` = the replaced key, `previous_valid_until` = `old_key_valid_until`, and `pending_statement` is cleared.
+
 An equal or lower sequence is rejected and never changes stored state. A statement for the wrong `app_id` is rejected.
 
 ### Order of checks in the runtime
@@ -104,7 +128,8 @@ An equal or lower sequence is rejected and never changes stored state. A stateme
 3. Parse `body`. Check `type`, `v`, `app_id`.
 4. Check `sequence == key_sequence + 1`.
 5. Check `valid_from` and `old_key_valid_until` shape and the 30-day cap.
-6. Store, in one atomic write: `key_sequence`, `release_key`, `previous_key`, `previous_valid_until`, `key_valid_from`.
+6. Store, in one atomic write: `key_sequence` and `pending_statement` (the verified envelope). Do not change `release_key` yet.
+7. On every pointer check (and after step 6), if a pending statement exists and `now >= valid_from`, promote it as described above.
 
 Pointer verification then reads the key set from the store instead of reading only the pinned value. The pointer checks themselves do not change.
 
@@ -112,7 +137,7 @@ Pointer verification then reads the key set from the store instead of reading on
 
 Not secret (public keys and numbers), but it must not be writable by other apps or by a bundle update.
 
-- **Android:** the existing `shipvo.runtime` SharedPreferences file in the app's private storage, written with `commit()` like the other Store values (`Store.kt`). Keys: `key_sequence`, `release_key`, `previous_key`, `previous_valid_until`, `key_valid_from`. Private storage is not readable by other apps; root or a backup restore are out of scope. Android backup restore could roll `key_sequence` back; the shell must exclude this file from auto backup (`android:fullBackupContent`) as a build-plan item, or a restore re-opens an old key. Even then, a rolled-back device re-fetches the chain and ends up correct.
+- **Android:** the existing `shipvo.runtime` SharedPreferences file in the app's private storage, written with `commit()` like the other Store values (`Store.kt`). Keys: `key_sequence`, `release_key`, `previous_key`, `previous_valid_until`, `pending_statement`. Private storage is not readable by other apps; root or a backup restore are out of scope. Android backup restore could roll `key_sequence` back; the shell must exclude this file from auto backup (`android:fullBackupContent`) as a build-plan item, or a restore re-opens an old key. Even then, a rolled-back device re-fetches the chain and ends up correct.
 - **iOS:** the existing `shipvo.runtime` `UserDefaults` suite (`Store.swift`), same key names. Device backups can restore old values; same mitigation, and the same self-healing by chain fetch.
 
 The pinned genesis keys always remain in the binary. If stored state is corrupt or missing, the runtime falls back to the genesis release key and re-fetches the chain. It never falls back to "no verification".
@@ -172,9 +197,14 @@ No slice makes rotation mandatory. A shell without a pinned root key behaves exa
 Each runs on both platforms, in CI, against a shell built with a known root key and genesis release key. Vectors come from slice 2.
 
 1. **Root-signed accepted.** Serve a statement signed by the root key (sequence 1, new key K1) and then a pointer signed by K1. Expect: statement stored, `key_sequence == 1`, release applied.
-2. **Old-key-signed rejected.** After the statement in test 1 with `old_key_valid_until == valid_from`, serve a pointer signed by the genesis key. Expect: `pointer signature invalid`, no release applied, current bundle still boots. Also: with a 14-day grace window, a genesis-signed pointer is accepted inside the window and rejected after it (fake clock).
+2. **Old-key-signed rejected.** After the statement in test 1 with `old_key_valid_until == valid_from`, serve a pointer signed by the genesis key. Expect: `pointer signature invalid`, no release applied, current bundle still boots. Also: with a 14-day grace window, a genesis-signed pointer is accepted while the fake device clock is before `old_key_valid_until` and rejected at or after it. The pointer's `issued_at` is set to a time before the deadline in both cases and does not change the result.
 3. **Forged root rejected.** Serve a statement signed by a key that is not the pinned root (including a statement signed by the release key itself). Expect: rejected, `key_sequence` unchanged, genesis key still the one used.
 4. **Replayed statement rejected.** Apply sequence 1, then 2. Replay sequence 1, and replay sequence 2. Expect both rejected, key unchanged. Also a gap (sequence 4 when stored is 2) is rejected.
+
+5. **Fetched, not yet valid.** Fetch a statement at T with `valid_from = T+24h`. Expect `key_sequence` advanced and `pending_statement` stored. At T+1h a pointer signed by the new key is rejected, and a pointer signed by the current key is accepted. At T+24h the next check promotes the statement and the new key is accepted.
+6. **Cap.** A statement with `old_key_valid_until` more than 30 days after `valid_from` is rejected, state unchanged.
+7. **Chain.** Device at genesis, chain of two statements. Expect the second key current, the first key as previous with the second statement's `old_key_valid_until`, and a genesis-signed pointer rejected.
+8. **Clock.** Device clock behind `valid_from` keeps the old key; clock ahead of `old_key_valid_until` rejects the old key.
 
 Extra cases in the same run: wrong `app_id`; wrong `type`; corrupted stored state falls back to the genesis key; relaunch keeps the rotated key.
 
