@@ -1,0 +1,2 @@
+- `@shipvo/runtime`: `tsc --noEmit` in a fresh app no longer reports type errors in `install.ts`.
+- Migration: none.
