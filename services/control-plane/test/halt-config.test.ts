@@ -37,7 +37,7 @@ describe("halt-config route", () => {
     expect(r.status).toBe(200);
     expect(JSON.parse(s.store["halt-config/tide"])).toEqual({ threshold: 0.2, min_reports: 20 });
     const g = await app.request("/app/tide/api/halt-config", { headers: H }, s.env);
-    expect(await g.json()).toEqual({ enabled: true, threshold: 0.2, min_reports: 20 });
+    expect(await g.json()).toEqual({ enabled: true, threshold: 0.2, min_reports: 20, min_installs: 20 });
   });
   it("defaults min_reports to 20 and accepts the bounds", async () => {
     const s = setup();
@@ -95,7 +95,7 @@ describe("halt-config route with a publish token", () => {
     expect(JSON.parse(s.store["halt-config/tide"])).toEqual({ threshold: 0.3, min_reports: 10 });
     const g = await get(s.env, PUB);
     expect(g.status).toBe(200);
-    expect(await g.json()).toEqual({ enabled: true, threshold: 0.3, min_reports: 10 });
+    expect(await g.json()).toEqual({ enabled: true, threshold: 0.3, min_reports: 10, min_installs: 20 });
     expect((await del(s.env, PUB)).status).toBe(200);
     expect(s.store["halt-config/tide"]).toBeUndefined();
   });
@@ -117,6 +117,16 @@ describe("summary auto_halt", () => {
     const get = async () => (await (await app.request("/t/tide/summary", {}, s.env)).json() as any).auto_halt;
     expect(await get()).toBeNull();
     await put(s.env, { threshold: 0.2, min_reports: 20 });
-    expect(await get()).toEqual({ threshold: 0.2, min_reports: 20 });
+    expect(await get()).toEqual({ threshold: 0.2, min_reports: 20, min_installs: 20 });
+  });
+  it("returns min_installs, and keeps it when a later PUT omits it", async () => {
+    const s = setup();
+    await put(s.env, { threshold: 0.2, min_installs: 50 });
+    await put(s.env, { threshold: 0.3, min_reports: 25 });
+    expect(JSON.parse(s.store["halt-config/tide"])).toEqual({ threshold: 0.3, min_reports: 25, min_installs: 50 });
+    const g = await app.request("/app/tide/api/halt-config", { headers: H }, s.env);
+    expect(await g.json()).toEqual({ enabled: true, threshold: 0.3, min_reports: 25, min_installs: 50 });
+    const sm = await app.request("/t/tide/summary", {}, s.env);
+    expect(((await sm.json()) as any).auto_halt).toEqual({ threshold: 0.3, min_reports: 25, min_installs: 50 });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shouldHalt, FAILED_EVENTS, HEALTHY_EVENTS } from "../src/halt";
+import { shouldHalt, tallyVotes, FAILED_EVENTS, HEALTHY_EVENTS } from "../src/halt";
 
 describe("shouldHalt", () => {
   it("halts when share is over the threshold", () => {
@@ -28,7 +28,6 @@ describe("shouldHalt", () => {
   });
 });
 
-import { tallyVotes } from "../src/halt";
 const vote = (id: string, net: string | null, failed = true) => ({ install_id: id, net_hash: net, failed, healthy: !failed });
 const decide = (votes: ReturnType<typeof vote>[]) => shouldHalt(tallyVotes(votes), { threshold: 0.2, minReports: 20 }).halt;
 
@@ -55,5 +54,12 @@ describe("corroboration", () => {
   it("min_installs is configurable", () => {
     const t = tallyVotes(Array.from({ length: 5 }, (_, i) => vote("i" + i, "n" + (i % 3))));
     expect(shouldHalt(t, { threshold: 0.2, minReports: 5, minInstalls: 5 }).halt).toBe(true);
+  });
+});
+
+describe("null net_hash", () => {
+  it("cannot satisfy the 3-network rule", () => {
+    const votes = Array.from({ length: 30 }, (_, i) => ({ install_id: "i" + i, net_hash: null, failed: true, healthy: false }));
+    expect(shouldHalt(tallyVotes(votes), { threshold: 0.2, minReports: 20 }).halt).toBe(false);
   });
 });

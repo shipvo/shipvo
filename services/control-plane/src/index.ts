@@ -184,21 +184,12 @@ app.post("/t", async (c) => {
     stored = false;
     console.error("telemetry insert failed (event dropped; if D1 is not at its limit, check for schema errors)", e);
   }
-  let kv: { failed: number; healthy: number } | undefined;
   if (!stored && c.env.POINTERS) {
     try {
       const bump = async (k: string, ttl: number) => { const n = (Number(await c.env.POINTERS.get(k)) || 0) + 1; await c.env.POINTERS.put(k, String(n), { expirationTtl: ttl }); return n; };
       // KV read-then-put is not atomic: concurrent drops can undercount. Fine for an operator signal.
       await bump(`telemetry_dropped/${d.app_id}/${utcDay()}`, 7 * 86400);
       await bump(`telemetry_dropped_total/${utcDay()}`, 7 * 86400);
-      const isFailed = FAILED_EVENTS.includes(d.event), isHealthy = HEALTHY_EVENTS.includes(d.event);
-      if (isFailed || isHealthy) {
-        // Count both sides per release (1h TTL) so the fallback ratio is not failures against zero.
-        const fk = `telemetry_failed/${d.app_id}/${d.release}`, hk = `telemetry_healthy/${d.app_id}/${d.release}`;
-        const f = isFailed ? await bump(fk, 3600) : Number(await c.env.POINTERS.get(fk)) || 0;
-        const h = isHealthy ? await bump(hk, 3600) : Number(await c.env.POINTERS.get(hk)) || 0;
-        kv = { failed: f, healthy: h };
-      }
     } catch (e) { console.error("telemetry fallback counter failed", e); }
   }
   // Halting is a best-effort side effect: never fail the response.
@@ -248,9 +239,9 @@ app.get("/t/:app/summary", async (c) => {
   const haltRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt/${appId}`) : null;
   if (haltRaw) { try { const v = JSON.parse(haltRaw); if (v && typeof v === "object") halted = v; } catch { /* corrupt: null */ } }
   // The auto-halt setting, so `shipvo status` can show it. Not secret. Null means off.
-  let auto_halt: { threshold: number; min_reports: number } | null = null;
+  let auto_halt: { threshold: number; min_reports: number; min_installs: number } | null = null;
   const cfgRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt-config/${appId}`) : null;
-  if (cfgRaw) { try { const v = JSON.parse(cfgRaw); if (v && typeof v.threshold === "number" && v.threshold > 0 && v.threshold <= 1) auto_halt = { threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS }; } catch { /* corrupt: off */ } }
+  if (cfgRaw) { try { const v = JSON.parse(cfgRaw); if (v && typeof v.threshold === "number" && v.threshold > 0 && v.threshold <= 1) auto_halt = { threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS, min_installs: typeof v.min_installs === "number" ? v.min_installs : DEFAULT_MIN_INSTALLS }; } catch { /* corrupt: off */ } }
   return c.json({ releases, halted, auto_halt });
 });
 
@@ -447,7 +438,7 @@ app.get("/app/:id/api/halt-config", async (c) => {
   if (raw) {
     try {
       const v = JSON.parse(raw);
-      if (v && typeof v.threshold === "number") return c.json({ enabled: true, threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS });
+      if (v && typeof v.threshold === "number") return c.json({ enabled: true, threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS, min_installs: typeof v.min_installs === "number" ? v.min_installs : DEFAULT_MIN_INSTALLS });
     } catch { /* corrupt: treated as off */ }
   }
   return c.json({ enabled: false });
@@ -462,8 +453,12 @@ app.put("/app/:id/api/halt-config", async (c) => {
   if (typeof t !== "number" || !Number.isFinite(t) || t <= 0 || t > 1) return bad(c, "threshold must be a number above 0 and at most 1");
   if (typeof m !== "number" || !Number.isInteger(m) || m < 1 || m > 10000) return bad(c, "min_reports must be an integer from 1 to 10000");
   if (mi !== undefined && (typeof mi !== "number" || !Number.isInteger(mi) || mi < 1 || mi > 10000)) return bad(c, "min_installs must be an integer from 1 to 10000");
-  await c.env.POINTERS.put(`halt-config/${appId}`, JSON.stringify({ threshold: t, min_reports: m, ...(mi === undefined ? {} : { min_installs: mi }) }));
-  return c.json({ enabled: true, threshold: t, min_reports: m, ...(mi === undefined ? {} : { min_installs: mi }) });
+  // A body without min_installs keeps the stored value, so re-running `shipvo auto-halt` does not erase it.
+  let kept: number | undefined;
+  if (mi === undefined) { try { const old = JSON.parse((await c.env.POINTERS.get(`halt-config/${appId}`)) ?? "null"); if (typeof old?.min_installs === "number") kept = old.min_installs; } catch { /* corrupt: no value to keep */ } }
+  const minInst = mi ?? kept;
+  await c.env.POINTERS.put(`halt-config/${appId}`, JSON.stringify({ threshold: t, min_reports: m, ...(minInst === undefined ? {} : { min_installs: minInst }) }));
+  return c.json({ enabled: true, threshold: t, min_reports: m, min_installs: minInst ?? DEFAULT_MIN_INSTALLS });
 });
 app.delete("/app/:id/api/halt-config", async (c) => {
   const appId = c.req.param("id");

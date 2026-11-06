@@ -20,7 +20,7 @@ All of these must hold:
 3. There are at least `min_installs` distinct installs. Default 20.
 4. The failed installs come from at least 3 distinct networks (`net_hash`, a salted hash of the /24 or /48; the IP is not stored). This number is fixed.
 
-`min_reports` and `min_installs` are set per app. `PUT /app/<id>/api/halt-config` accepts `min_reports` and `min_installs` (integers, 1 to 10000). Votes are one per install, so `min_reports` above `min_installs` has no extra effect unless you want it higher than 20.
+`min_reports` and `min_installs` are set per app. `PUT /app/<id>/api/halt-config` accepts `min_reports` and `min_installs` (integers, 1 to 10000). Each install is one vote, so a halt needs at least as many installs as the larger of `min_reports` and `min_installs`. If a PUT leaves out `min_installs`, the stored value is kept. `GET` and the status summary return `min_installs`. Deployments with no salt secret store no `net_hash`, so the 3-network rule cannot pass and they will not auto-halt.
 
 ## What does not count
 

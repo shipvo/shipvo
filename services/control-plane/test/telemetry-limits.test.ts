@@ -37,8 +37,8 @@ describe("telemetry when D1 refuses writes", () => {
       expect(r.status).toBe(202);
     }
     expect(m["halt/tide"]).toBeUndefined();
-    expect(m["telemetry_failed/tide/9"]).toBe("6");
-    expect(m["telemetry_healthy/tide/9"]).toBe("95");
+    expect(m["telemetry_failed/tide/9"]).toBeUndefined();
+    expect(m[`telemetry_dropped/tide/${day}`]).toBe("101");
   });
   it("a dropped non-failure event writes no telemetry_failed key", async () => {
     const { m, kv } = kvStore();
