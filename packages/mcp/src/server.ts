@@ -403,7 +403,7 @@ async function approvalsCall(app: string, path: string, method: "GET" | "POST") 
   if (!token) throw new Error("approvals are not enabled on this server: it needs an owner token (PN_OWNER_TOKEN).");
   if (ctx.scope && ctx.scope !== "owner") throw new Error(`this key has scope "${ctx.scope}": approvals need an owner key`);
   if (keyApps && !keyApps.includes(app)) throw new Error(`this key is for: ${keyApps.join(", ")}`);
-  const r = await fetch(`${CONTROL}/apps/${encodeURIComponent(app)}/approvals${path}`, { method, headers: { authorization: `Bearer ${token}`, "x-shipvo-actor": "agent" } });
+  const r = await fetch(`${CONTROL}/apps/${encodeURIComponent(app)}/approvals${path}`, { method, headers: { authorization: `Bearer ${token}` } });
   const body: any = await r.json().catch(() => ({}));
   return { r, body };
 }

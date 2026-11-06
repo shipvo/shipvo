@@ -269,7 +269,7 @@ describe("approvals tools", () => {
     const ok: any = await c.callTool({ name: "approval_approve", arguments: { app: "menu", id: "h1" } });
     expect(JSON.parse(ok.content[0].text)).toMatchObject({ ok: true, status: "approved" });
     expect(seen.at(-1)).toMatchObject({ method: "POST", url: "/apps/menu/approvals/h1/approve" });
-    expect(seen.at(-1)!.headers["x-shipvo-actor"]).toBe("agent");
+    expect(seen.at(-1)!.headers["x-shipvo-actor"]).toBeUndefined();
     const no: any = await c.callTool({ name: "approval_approve", arguments: { app: "menu", id: "bad" } });
     expect(no.isError).toBe(true); expect(JSON.parse(no.content[0].text)).toMatchObject({ ok: false, rule: "self_approval" });
     await c.close();

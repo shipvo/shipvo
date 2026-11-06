@@ -11,7 +11,9 @@ A second owner must approve: the proposer cannot, and an agent cannot approve an
 Exit codes: 0 done, 1 refused by a rule (the rule is named), 2 error.
 With --json, one line: { ok, command, ... } or { ok: false, error, rule?, message }.
 
-Needs SHIPVO_OWNER_TOKEN or a login (shipvo login) to approve. list also works with the publish token.
+Approving a hold that an agent proposed (through the publish token) needs a signed-in person (run shipvo login).
+SHIPVO_OWNER_TOKEN counts as an agent, so it can approve only holds that a person proposed.
+list also works with the publish token.
 `;
 
 type Held = { id: string; release: number; band: string; proposer: string; proposed_at: string };
@@ -51,12 +53,12 @@ export async function approvals(argv: string[], deps: { fetchFn?: typeof fetch; 
   if (!r.ok) {
     const rule = body.rule as string | undefined;
     const msg = body.message ?? body.reason ?? body.error ?? `HTTP ${r.status}`;
-    return fail(body.error ?? `http_${r.status}`, rule ? `Refused by rule ${rule}: ${msg}` : `Request failed: ${msg}${r.status === 401 ? " (the token was not accepted for this app)" : ""}`, { status: r.status, ...(rule ? { rule } : {}) }, r.status === 403 || r.status === 409 ? 1 : 2);
+    return fail(body.error ?? `http_${r.status}`, rule ? `Refused by rule ${rule}: ${msg}${rule === "self_approval" && sub === "approve" ? " If an agent proposed this hold, sign in as a person with shipvo login (SHIPVO_OWNER_TOKEN counts as an agent)." : ""}` : `Request failed: ${msg}${r.status === 401 ? " (the token was not accepted for this app)" : ""}`, { status: r.status, ...(rule ? { rule } : {}) }, r.status === 403 || r.status === 409 ? 1 : 2);
   }
   if (sub === "approve") return out({ ok: true, command: "approve", app: appId, approval_id: body.approval_id ?? id, status: body.status }, `Approved ${id}. The promote is live.`, 0);
   const rows: Held[] = body.approvals ?? [];
   const human = rows.length
     ? ["ID\tRELEASE\tBAND\tPROPOSER\tAGE", ...rows.map((h) => `${h.id}\t${h.release}\t${h.band}\t${h.proposer}\t${age(h.proposed_at, deps.now)}`)].join("\n")
     : "No promotes are waiting for approval.";
-  return out({ ok: true, command: "list", app: appId, approvals: rows.map((h) => ({ id: h.id, release: h.release, band: h.band, proposer: h.proposer, proposed_at: h.proposed_at, age_seconds: Math.max(0, Math.round(((deps.now ?? Date.now()) - Date.parse(h.proposed_at)) / 1000)) })) }, human, 0);
+  return out({ ok: true, command: "list", app: appId, approvals: rows.map((h) => ({ id: h.id, release: h.release, band: h.band, proposer: h.proposer, proposed_at: h.proposed_at, age_seconds: (() => { const n = Math.round(((deps.now ?? Date.now()) - Date.parse(h.proposed_at)) / 1000); return Number.isFinite(n) ? Math.max(0, n) : null; })() })) }, human, 0);
 }

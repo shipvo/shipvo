@@ -14,7 +14,7 @@ async function pointer(band: string) {
 }
 
 // One keypair per test so the registered key matches the signed pointer.
-async function run(policy: object | undefined, band: string, headers: Record<string, string> = {}) {
+async function run(policy: object | undefined, band: string, headers: Record<string, string> = {}, ownerLogin = "ann") {
   const state = { bytes: 0 };
   const p = await pointer(band);
   const store: Record<string, string> = {}, audits: any[][] = [];
@@ -27,7 +27,7 @@ async function run(policy: object | undefined, band: string, headers: Record<str
         if (args[0] === (await sha(BOB))) return { account_id: 2, expires_at: null, github_login: "bob" };
         return null;
       }
-      if (sql.includes("JOIN accounts")) return { login: "ann" };
+      if (sql.includes("JOIN accounts")) return { login: ownerLogin };
       if (sql.includes("FROM apps")) return { public_key: p.pk, bytes_used: state.bytes, account_id: 1 };
       return null;
     },
@@ -126,6 +126,17 @@ describe("requireApprovalAbove", () => {
     const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2", { "x-shipvo-actor": "agent" });
     const { approval_id } = (await r.json()) as any;
     expect((await act(approval_id, "approve", ANN)).status).toBe(200); expect(store[PTR]).toBeTruthy();
+  });
+  it("a person whose login starts with agent is not treated as an agent proposer", async () => {
+    const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2", {}, "agent-smith");
+    const { approval_id } = (await r.json()) as any;
+    expect((await act(approval_id, "approve", "owner-secret")).status).toBe(200); expect(store[PTR]).toBeTruthy();
+  });
+  it("a hold without proposer_kind falls back to the name check", async () => {
+    const { r, store, act } = await run({ requireApprovalAbove: "b1" }, "b2", { "x-shipvo-actor": "agent" });
+    const { approval_id } = (await r.json()) as any;
+    const k = `c/tide/approval/${approval_id}`; const a = JSON.parse(store[k]!); delete a.proposer_kind; store[k] = JSON.stringify(a);
+    expect((await act(approval_id, "approve", "owner-secret")).status).toBe(403);
   });
   it("the proposer's refused approve writes a refused audit row naming the rule", async () => {
     const { r, audits, act } = await run({ requireApprovalAbove: "b1" }, "b2");

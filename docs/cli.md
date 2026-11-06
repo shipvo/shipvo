@@ -197,7 +197,7 @@ shipvo approvals approve <id>         # let the promote go through
 shipvo approvals list --json          # one JSON line: { ok, command, app, approvals }
 ```
 
-- `approve` needs `SHIPVO_OWNER_TOKEN` or a login. `list` also works with the publish token.
+- `approve` needs a signed-in person (`shipvo login`) when an agent proposed the hold, which is the usual case: a promote made with the publish token. `SHIPVO_OWNER_TOKEN` counts as an agent, so it can approve only holds that a person proposed. With the env token on an agent's hold, the CLI prints `Refused by rule self_approval` with a hint to run `shipvo login`, and exits 1. `list` also works with the publish token.
 - The proposer cannot approve its own hold, and an agent cannot approve an agent's hold. The CLI prints the rule (`self_approval`), exits 1, and the control plane writes an audit row for the refusal.
 - Exit codes: 0 done, 1 refused by a rule, 2 error. With `--json` a failure is `{ ok: false, error, message, rule? }`.
 - MCP tools: `approvals_list(app)` and `approval_approve(app, id)`.

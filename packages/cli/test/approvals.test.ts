@@ -46,6 +46,32 @@ describe("shipvo approvals", () => {
     expect(code).toBe(1);
     expect(String(log.mock.calls[0][0])).toContain("self_approval");
   });
+  it("a 401 says the token was not accepted and exits 2", async () => {
+    inApp();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    expect(await approvals(["list"], { fetchFn: (async () => res({ error: "unauthorized" }, 401)) as any })).toBe(2);
+    expect(String(log.mock.calls[0][0])).toContain("the token was not accepted for this app");
+  });
+  it("--app overrides the app id in the URL and the token is sent", async () => {
+    inApp();
+    const f = vi.fn(async () => res({ approvals: [] }));
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    expect(await approvals(["list", "--app", "other app"], { fetchFn: f as any })).toBe(0);
+    expect(String(f.mock.calls[0][0])).toBe("https://cp.test/apps/other%20app/approvals");
+    expect((f.mock.calls[0][1] as any).headers.authorization).toBe("Bearer tok");
+  });
+  it("a self_approval refusal on approve hints at shipvo login", async () => {
+    inApp();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await approvals(["approve", "h1"], { fetchFn: (async () => res({ error: "self_approval", rule: "self_approval", message: "no" }, 403)) as any });
+    expect(String(log.mock.calls[0][0])).toContain("shipvo login");
+  });
+  it("age_seconds is null for an unparsable proposed_at", async () => {
+    inApp();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await approvals(["list", "--json"], { fetchFn: (async () => res({ approvals: [{ ...held, proposed_at: "bad" }] })) as any, now: NOW });
+    expect(JSON.parse(String(log.mock.calls[0][0])).approvals[0].age_seconds).toBeNull();
+  });
   it("needs an id and a known subcommand", async () => {
     inApp();
     vi.spyOn(console, "log").mockImplementation(() => {});
