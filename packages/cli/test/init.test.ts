@@ -296,3 +296,17 @@ it("pins playwright below 1.65.0, whose playwright-core was missing from the reg
   const pkg = JSON.parse(readFileSync(join(tmp, "my-shop/package.json"), "utf8"));
   expect(pkg.devDependencies.playwright).toBe(">=1.63.0 <1.65.0");
 });
+
+it("scaffolded apps report refusals through @shipvo/runtime, with no event glue in App.tsx", async () => {
+  for (const [name, args] of [["ev-default", []], ["ev-content", ["--template", "content"]], ["ev-shop", ["--template", "shop"]]] as const) {
+    const dir = join(tmp, name);
+    await init([dir, ...args, "--public-key", "AAAA"]);
+    const app = readFileSync(join(dir, "App.tsx"), "utf8");
+    expect(app).toContain("Runtime.markHealthy()");
+    expect(app).toContain("Runtime.checkForUpdate(true)");
+    expect(app).not.toContain("consumeEvents");
+    expect(app).not.toContain("forwardRuntimeEvents");
+    const cfg = JSON.parse(readFileSync(join(dir, "app.json"), "utf8"));
+    expect(JSON.stringify(cfg)).toContain("@shipvo/runtime");
+  }
+});

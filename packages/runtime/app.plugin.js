@@ -40,7 +40,7 @@ module.exports = function withShipvo(config, props) {
   if (!baseUrl || !publicKey || !appId) throw new Error("@shipvo/runtime: baseUrl, publicKey and appId are required");
   const hbc = formatBytecodeVersions(props.hermesBytecodeVersions);
   const nm = formatNativeModules(props.nativeModules);
-  config.extra = { ...(config.extra ?? {}), shipvo: { baseUrl, appId, shellMajor } };
+  config.extra = { ...(config.extra ?? {}), shipvo: { baseUrl, appId, shellMajor, ...(props.reportEvents === false ? { reportEvents: false } : {}) } };
   config = withInfoPlist(config, (cfg) => {
     cfg.modResults.ShipvoBaseURL = baseUrl;
     cfg.modResults.ShipvoPublicKey = publicKey;

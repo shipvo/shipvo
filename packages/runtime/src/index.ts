@@ -1,4 +1,8 @@
 import { requireOptionalNativeModule } from "expo-modules-core";
+import { forwardRuntimeEvents, FORWARDED_EVENTS, type ForwardedEvent } from "./runtimeEvents";
+
+export { forwardRuntimeEvents, FORWARDED_EVENTS };
+export type { ForwardedEvent };
 
 export type RuntimeState = {
   cohort: number; band: "b0" | "b1" | "b2";
@@ -58,12 +62,55 @@ function installCrashHook() {
   });
 }
 
+const listeners = new Set<(events: string[]) => void>();
+/** Called with every batch of queued events the runtime drains, in `reportRuntimeEvents`. Returns an unsubscribe function. */
+export function onRuntimeEvents(fn: (events: string[]) => void): () => void {
+  listeners.add(fn);
+  return () => { listeners.delete(fn); };
+}
+
+/**
+ * Drain the device's event queue and send each forwarded event to the control plane (`POST {baseUrl}/t`), using
+ * `baseUrl` and `appId` from the native state or `expo.extra.shipvo`. Best effort: it never throws, a failed send
+ * never blocks the others, and nothing is sent without a `baseUrl`. Returns the drained event strings.
+ * `Runtime.markHealthy` and `Runtime.checkForUpdate` call this for you. Set `extra.shipvo.reportEvents` to `false`
+ * to turn that off.
+ */
+export function reportRuntimeEvents(): string[] {
+  let events: string[] = [];
+  try { events = native ? native.consumeEvents() : []; } catch { return []; }
+  if (!Array.isArray(events) || events.length === 0) return [];
+  for (const l of listeners) { try { l(events); } catch {} }
+  let state: Partial<RuntimeState> = {};
+  try { state = (native ?? fallback).getState() ?? {}; } catch {}
+  const baseUrl = state.baseUrl || extra.baseUrl;
+  const appId = state.appId || extra.appId;
+  if (!baseUrl || !appId) return events;
+  let androidApi: number | undefined;
+  try {
+    const rn = require("react-native");
+    if (rn.Platform?.OS === "android" && typeof rn.Platform.Version === "number") androidApi = rn.Platform.Version;
+  } catch {}
+  forwardRuntimeEvents(events, (event, release) => {
+    try {
+      // Same payload the sample app sent before this moved here: device_class is fixed to "low", android_api is set on Android only.
+      const body = { schema_version: "1.0", app_id: appId, release: release ?? state.runningRelease ?? 0, event,
+        device_class: "low", android_api: androidApi };
+      Promise.resolve(fetch(`${baseUrl}/t`, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify(body) })).catch(() => {});
+    } catch {}
+  });
+  return events;
+}
+
+const autoReport = () => { if (extra.reportEvents !== false) reportRuntimeEvents(); };
+
 // Every `Native` method must be listed here, or it is silently dropped from `Runtime`.
 export const Runtime: Native = native
   ? {
       getState: () => native.getState(),
-      checkForUpdate: (apply) => native.checkForUpdate(apply),
-      markHealthy: () => { const r = native.markHealthy(); installCrashHook(); return r; },
+      checkForUpdate: async (apply) => { try { return await native.checkForUpdate(apply); } finally { autoReport(); } },
+      markHealthy: () => { const r = native.markHealthy(); installCrashHook(); autoReport(); return r; },
       consumeEvents: () => native.consumeEvents(),
       rollback: () => native.rollback(),
       reload: () => native.reload(),

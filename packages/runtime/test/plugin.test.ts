@@ -56,3 +56,10 @@ describe("config plugin", () => {
     expect(() => load()({}, { ...base, nativeModules: { a: "1,2" } })).toThrow(/comma/);
   });
 });
+
+it("keeps reportEvents: false in expo.extra.shipvo, and omits it otherwise", () => {
+  const plugin = require("../app.plugin.js");
+  const base = { baseUrl: "https://x.test", publicKey: "AAAA", appId: "a" };
+  expect(plugin({ name: "n" }, { ...base, reportEvents: false }).extra.shipvo.reportEvents).toBe(false);
+  expect("reportEvents" in plugin({ name: "n" }, base).extra.shipvo).toBe(false);
+});

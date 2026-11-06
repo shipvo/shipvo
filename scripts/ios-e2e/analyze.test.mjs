@@ -224,7 +224,7 @@ test("Crash-loop reverted: failing logs", () => {
 });
 
 test("Crash-loop reverted: the app reports the revert under the previous release", () => {
-  // runtimeEvents.ts sends crash_loop_revert with the running release, which is the previous one after the revert.
+  // packages/runtime/src/runtimeEvents.ts sends crash_loop_revert with the running release, which is the previous one after the revert.
   const ev = parseTelemetry([tl({ release: 2, event: "applied" }), tl({ release: 2, event: "crash_loop_revert" })].join("\n"));
   assert.equal(analyzeCrashLoop(ev, cm).pass, true);
 });
