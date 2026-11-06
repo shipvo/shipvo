@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measure a rendered video's pacing so the retention gate is a check, not an opinion.
 
-  python3 scripts/video/pacing.py video.mp4 [--max-static 2] [--max-gap 6] [--hook 3] [--json out.json]
+  python3 scripts/video/pacing.py video.mp4 [--max-static 2] [--max-gap 6] [--hook 3] [--shots shots.json] [--json out.json]
 
 Reports cuts (scene changes), static stretches (frozen picture), the longest gap
 between visual changes, and whether something changes inside the hook window.
@@ -40,10 +40,14 @@ def main():
     ap.add_argument("--hook", type=float, default=3.0, help="something must change inside the first N seconds")
     ap.add_argument("--scene", type=float, default=0.3, help="scene-change threshold (0 to 1)")
     ap.add_argument("--json", default=None)
+    ap.add_argument("--shots", default=None, help="shots.json from the renderer ([[start, dur], ...]); its cuts count too")
     a = ap.parse_args()
 
     dur = probe_duration(a.video)
     c = cuts(a.video, a.scene)
+    if a.shots:  # cuts the renderer knows about, even when two shots look alike to the detector
+        known = [float(x[0]) if isinstance(x, list) else float(x) for x in json.load(open(a.shots))][1:]
+        c = sorted(set(round(t, 2) for t in c + known))
     fs, fe = freezes(a.video, a.max_static)
     if len(fe) < len(fs):
         fe.append(dur)

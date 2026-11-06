@@ -24,6 +24,42 @@ export function formatStatus(releases: Row[]): string {
   return rows.map((r) => r.map((c, i) => (i === 0 ? c.padEnd(w[i]) : c.padStart(w[i]))).join("  ")).join("\n");
 }
 
+const BANDS = ["b0", "b1", "b2"];
+
+/** What a band serves: a release number, null when it has none (404), or "?" when it cannot be read. */
+export type BandValue = number | null | "?";
+
+/** Release each band serves, from the public pointer. A halted release or a failed read gives "?", not "no release". */
+export async function fetchBands(base: string, appId: string, major: number, fetchFn: typeof fetch): Promise<Record<string, BandValue>> {
+  const out: Record<string, BandValue> = {};
+  await Promise.all(BANDS.map(async (b) => {
+    out[b] = "?";
+    try {
+      const r = await fetchFn(`${base}/p/${encodeURIComponent(appId)}/${major}/${b}`);
+      if (r.status === 404) {
+        // Only "no_release" means none. release_halted and mismatch errors also answer 404.
+        const e = (await r.json().catch(() => null)) as { error?: string } | null;
+        if (e?.error === "no_release") out[b] = null;
+        return;
+      }
+      if (!r.ok) return;
+      const env = (await r.json()) as { body?: string };
+      const rel = JSON.parse(String(env.body)).release;
+      if (typeof rel === "number") out[b] = rel;
+    } catch { /* unreadable: show "?" */ }
+  }));
+  return out;
+}
+
+/** "bands: b0=4 b1=4 b2=4", plus a hint to promote when readable bands differ. "-" is no release, "?" is unreadable. */
+export function describeBands(bands: Record<string, BandValue>): string[] {
+  const line = `bands: ${BANDS.map((b) => `${b}=${bands[b] ?? "-"}`).join(" ")}`;
+  const readable = BANDS.map((b) => bands[b] ?? null).filter((v) => v !== "?") as (number | null)[];
+  if (new Set(readable).size < 2) return [line];
+  const newest = Math.max(...readable.filter((v): v is number => v !== null));
+  return [line, `Bands differ. Run shipvo promote to give every band the newest release (${newest}).`];
+}
+
 /** "auto-halt: off" or "auto-halt: on at 20% after 20 reports". */
 export function describeAutoHalt(c: AutoHalt | undefined): string {
   if (!c || typeof c.threshold !== "number") return "auto-halt: off";
@@ -132,12 +168,14 @@ export async function status(argv: string[], fetchFn: typeof fetch = fetch): Pro
   const releases = data.releases ?? [];
   // An older control plane has no auto_halt field: say nothing rather than a wrong "off".
   if ("auto_halt" in data) console.log(describeAutoHalt(data.auto_halt));
-  if (!releases.length) { console.log(`No telemetry yet for "${appId}".`); return 0; }
+  const printBands = async () => { for (const l of describeBands(await fetchBands(base, appId, cfg.shellMajor, fetchFn))) console.log(l); };
+  if (!releases.length) { console.log(`No telemetry yet for "${appId}".`); await printBands(); return 0; }
   const h = data.halted;
   if (h && typeof h === "object") {
     const pct = Math.round(h.threshold * 1000) / 10;
     console.log(`Release ${h.release} is halted: ${h.failed} of ${h.reports} devices failed (limit ${pct}%). Publish a new release or run shipvo rollback to clear.`);
   }
   console.log(formatStatus(releases));
+  await printBands();
   return 0;
 }

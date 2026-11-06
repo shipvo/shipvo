@@ -231,6 +231,14 @@ describe("publish and the Hermes bytecode check", () => {
     expect(puts).toEqual([]);
   });
 
+  it("a real publish prints plain English, not JSON", async () => {
+    withBundle(96);
+    await publish(flags);
+    const text = String((console.log as any).mock.calls[0][0]);
+    expect(text).toMatch(/^Published release 1 to b0\. Next: shipvo status, then shipvo promote --to b1,b2\./);
+    expect(text).not.toMatch(/^\{/);
+  });
+
   it("--release=5 gets a hint", async () => {
     withBundle(96);
     await expect(publish([...flags, "--release=5"])).rejects.toThrow(/--release 5/);
@@ -263,11 +271,13 @@ describe("publish and the Hermes bytecode check", () => {
       expect(console.error).toHaveBeenCalledWith("Release 9 android bundle not found");
       expect(puts).toEqual([]);
     });
-    it("without the flag, pointers are written and the output is JSON", async () => {
+    it("without the flag, pointers are written and the output is plain English", async () => {
       seedRelease();
       await rollback(["--to", "1", "--bands", "b0,b1"]);
       expect(puts.length).toBe(2);
-      expect(JSON.parse(String((console.log as any).mock.calls[0][0])).rolled_back_to_code_of).toBe(1);
+      const text = String((console.log as any).mock.calls[0][0]);
+      expect(text).toMatch(/^Rolled back to the code of release 1 as new release \d+\./);
+      expect(text).not.toMatch(/^\{/);
     });
   });
 

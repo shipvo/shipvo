@@ -232,6 +232,10 @@ shipvo approvals list --json          # one JSON line: { ok, code, summary, data
 - Exit codes: 0 done, 1 refused by a rule, 2 error. With `--json` the output is the same `{ ok, code, summary, data, next }` envelope as `status --json`. On a refusal `code` is the rule (`self_approval`) and `data.rule` repeats it; other failures use `usage`, `config`, `no_credentials`, `unreachable` or `http_<status>`.
 - MCP tools: `approvals_list(app)` and `approval_approve(app, id)`. Both use the server's owner token (the MCP server holds no publish token), so an MCP agent counts as an agent and can approve only holds that a person proposed.
 
+## `shipvo explore --flows`
+
+`shipvo explore --flows` also looks for sign up, log in, search, add to cart and checkout. It drives each with valid input and then invalid input, and writes `explore-report-flows.md` and `explore-report-flows.json`. Each flow is passed, failed (with the step) or not found. Pass a list to run some: `--flows search,add-to-cart`. A failed flow counts as a finding for `--fail-on-findings`; a flow that is not found does not. With `--json`, `data.flows` lists each flow with `status`, `invalid_status` and `message`, and `report_files` includes the two `-flows` files. When the walk has no findings and a flow failed, `code` is `flows_failed`.
+
 ## `--json` for `doctor`, `test` and `explore`
 
 `shipvo doctor --json`, `shipvo test --json` and `shipvo explore --json` print the same envelope as `status --json`: `{ ok, code, summary, data, next }`. Stdout holds only that one JSON line. Progress and logs go to stderr, including the Playwright install notice for `explore` and the progress lines of `test`. The text output is unchanged without `--json`.
@@ -240,14 +244,14 @@ shipvo approvals list --json          # one JSON line: { ok, code, summary, data
 | --- | --- | --- |
 | `doctor` | `ok`, `checks_failed`, `usage` | `checks`: `[{ name, ok, fix, note }]` |
 | `test` | `ok`, `tests_failed`, `usage`, `error` | `flows`, `failed`, `repaired`, `unresolved` |
-| `explore` | `ok`, `findings`, `walk_failed`, `error` | `findings`, `steps`, `screens`, `report_files`, `stopped_early` |
+| `explore` | `ok`, `findings`, `flows_failed`, `walk_failed`, `error` | `findings`, `flows`, `steps`, `screens`, `report_files`, `stopped_early` |
 
 `next` has one to three commands. A failed doctor check adds one entry that names the fix.
 
 | Exit code | Meaning |
 | --- | --- |
 | 0 | ok |
-| 1 | the check or test failed (`explore` exits 1 on findings only with `--fail-on-findings`, and always when the walk fails) |
+| 1 | the check or test failed (`explore` exits 1 on findings or a failed `--flows` flow only with `--fail-on-findings`, and always when the walk fails) |
 | 2 | usage or setup error |
 
 ## `shipvo audit`
@@ -343,6 +347,8 @@ These four commands take `--json` and print the same `{ ok, code, summary, data,
 | `auto-halt` | `auto_halt_show`, `auto_halt_on`, `auto_halt_off`, `dry_run` | `{ enabled, threshold, min_reports, dry_run, changed }` (`threshold` and `min_reports` are `null` when off) |
 
 Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`. On failure `data` is `{}` and `summary` is the error message.
+
+Without `--json`, `publish` and `rollback` print a single plain sentence.
 
 `next` suggests the follow-up. After `publish` it is `shipvo status --json` (and `shipvo promote --to ...` when some bands are left). After a dry run it is the real command. After a failure it is the likely fix, for example `shipvo doctor --json`.
 

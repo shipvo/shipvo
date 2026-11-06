@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
-import { lumiDefault, lumiHtml, LUMI_STATES } from "./lumi.mjs";
+import { lumiDefault, lumiHtml, lumiReaction, LUMI_STATES } from "./lumi.mjs";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
 const APP = `<!doctype html><title>t</title><body style="margin:0;background:#fff"><h1>Cart</h1><button>Checkout</button><label>Email <input aria-label="Email"></label>`;
@@ -119,6 +119,42 @@ test("Lumi on or off: app screenshot, recorded frames and labelled screen tree a
       assert.equal(out[true].tree, out[false].tree, `${skin}: app screen tree`);
       assert.equal(out[true].page, out[false].page, `${skin}: whole page tree, Lumi is not in it`);
       assert.match(out[true].tree, /Checkout/);
+    }
+  } finally { await b.close(); }
+});
+
+test("each result gives the right state and a one-line reason from the real error or result", () => {
+  const cases = [
+    [{ kind: "check-passed", name: "cart has 2 items" }, "happy", "Check passed: cart has 2 items"],
+    [{ kind: "flow-done", name: "checkout" }, "happy", "Flow finished: checkout"],
+    [{ kind: "page-error", error: new Error("Cannot read properties of undefined (reading 'id')\n    at Cart.js:12") }, "worried", "Page error: Cannot read properties of undefined (reading 'id')"],
+    [{ kind: "crash", error: "Out of memory" }, "worried", "Crash: Out of memory"],
+    [{ kind: "action-failed", name: "tap", error: "no element with ref e9" }, "worried", "Action failed (tap): no element with ref e9"],
+    [{ kind: "check-failed", name: "title", detail: "expected 'Cart' but got 'Cartt'" }, "worried", "Check failed (title): expected 'Cart' but got 'Cartt'"],
+  ];
+  for (const [ev, state, reason] of cases) assert.deepEqual(lumiReaction(ev), { state, reason }, ev.kind);
+  assert.equal(lumiReaction({ kind: "page-error" }).reason, "Page error: the page threw an error");
+  const long = lumiReaction({ kind: "crash", error: "x".repeat(300) }).reason;
+  assert.ok(!long.includes("\n") && long.length <= 98, "one short line");
+  for (const bad of [null, undefined, "x", {}, { kind: "nope" }]) assert.equal(lumiReaction(bad), null);
+});
+
+test("react() and the pn:lumi event message set the state and the reason in the frame, and a new state clears the reason", async () => {
+  const b = await chromium.launch();
+  try {
+    for (const skin of ["android", "ios"]) {
+      const p = await b.newPage({ viewport: { width: 460, height: 960 } });
+      await p.setContent(page(withApp(skin, true)));
+      const read = () => p.$eval('[data-part="lumi"]', (e) => ({ st: e.dataset.state, reason: e.dataset.reason ?? null, title: e.getAttribute("title"), shown: [...e.querySelectorAll("[data-face]")].filter((g) => !g.hidden).map((g) => g.dataset.face) }));
+      await p.evaluate(() => window.shipvoLumi.react({ kind: "page-error", error: "boom is not defined" }));
+      assert.deepEqual(await read(), { st: "worried", reason: "Page error: boom is not defined", title: "Page error: boom is not defined", shown: ["worried"] }, skin);
+      await p.evaluate(() => window.postMessage({ type: "pn:lumi", event: { kind: "check-passed", name: "ok" } }, "*")); await p.waitForTimeout(50);
+      assert.deepEqual(await read(), { st: "happy", reason: "Check passed: ok", title: "Check passed: ok", shown: ["happy"] }, skin);
+      await p.evaluate(() => window.shipvoLumi.set("idle"));
+      assert.deepEqual(await read(), { st: "idle", reason: null, title: null, shown: ["idle"] }, skin);
+      assert.equal(await p.evaluate(() => window.shipvoLumi.react({ kind: "nope" })), null);
+      assert.equal((await read()).st, "idle");
+      await p.close();
     }
   } finally { await b.close(); }
 });
