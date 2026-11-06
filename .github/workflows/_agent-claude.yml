@@ -345,6 +345,20 @@ jobs:
             fi
             gh pr edit "$PR" -R "$REPO" --body-file /tmp/agent/pr_body.md && BODY_FIXED=yes || true
           fi
+          # Locked files (CLAUDE.md, .github, scripts/agents, LICENSE, SECURITY.md, legal) only change through the owner.
+          # An old branch merged with main can bring back stale copies (PR #895 reverted CLAUDE.md): keep them as on main.
+          if [ "${{ inputs.role }}" != "steward" ]; then
+            git fetch -q origin main || true
+            LOCKED=""
+            for p in CLAUDE.md .github scripts/agents LICENSE SECURITY.md legal; do
+              git diff --quiet origin/main -- "$p" 2>/dev/null || LOCKED="$LOCKED $p"
+            done
+            if [ -n "$LOCKED" ]; then
+              for p in $LOCKED; do git checkout origin/main -- "$p" 2>/dev/null || git rm -rq --cached "$p" 2>/dev/null || true; done
+              git commit -qm "chore: keep locked files as on main ($LOCKED )" || true
+              echo "::notice::Restored locked paths to main:$LOCKED"
+            fi
+          fi
           AHEAD=$(git rev-list --count "$(cat /tmp/agent/start_sha)..HEAD")
           if [ "$AHEAD" = "0" ] && [ "$BODY_FIXED" = "yes" ]; then
             # No new commit, so nothing re-triggers review: clear the old verdicts and reopen the PR to ask for a fresh one.
