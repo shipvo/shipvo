@@ -21,7 +21,7 @@ describe("status --json", () => {
     const { doc, exit } = await statusJson(undefined, (async () => resp({ releases: [rel], halted: null })) as any, d);
     expect(exit).toBe(0);
     expect(doc).toMatchObject({ ok: true, code: "ok" });
-    expect(Object.keys(doc.data).sort()).toEqual(["pending_release", "project", "run_server", "signing_key", "sim", "store_step"]);
+    expect(Object.keys(doc.data).sort()).toEqual(["pending_release", "project", "run_server", "signing_key", "sim", "skills", "store_step"]);
     expect(doc.data.project).toEqual({ kind: "shipvo", app_id: "shop" });
     expect(doc.data.signing_key.present).toBe(true);
     for (const n of doc.next) expect(n).toEqual({ command: expect.any(String), why: expect.any(String) });

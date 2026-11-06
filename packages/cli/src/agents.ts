@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { args } from "./config.js";
 
@@ -64,12 +64,59 @@ export function mergeMcp(text: string | null): string | null {
   return JSON.stringify({ ...doc, mcpServers: servers }, null, 2) + "\n";
 }
 
+/** Where synced skills are copied to, relative to the project. */
+export const SKILL_DIRS = [".agents/skills", ".claude/skills"];
+
+export type SkillEntry = { package: string; name: string; source: string };
+
+/** Skills shipped by the `@shipvo/*` packages this project depends on and has installed. */
+export function projectSkills(dir: string): SkillEntry[] {
+  let deps: Record<string, unknown> = {};
+  try {
+    const p = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+    deps = { ...p.peerDependencies, ...p.devDependencies, ...p.dependencies };
+  } catch { return []; }
+  const out: SkillEntry[] = [];
+  for (const pkg of Object.keys(deps).filter((d) => d.startsWith("@shipvo/")).sort()) {
+    let root = dir, found: string | null = null;
+    for (;;) {
+      const c = join(root, "node_modules", pkg, "skills");
+      if (existsSync(c)) { found = c; break; }
+      const up = dirname(root);
+      if (up === root) break;
+      root = up;
+    }
+    if (!found) continue;
+    for (const n of readdirSync(found).sort()) {
+      const source = join(found, n, "SKILL.md");
+      if (existsSync(source)) out.push({ package: pkg, name: n, source });
+    }
+  }
+  return out;
+}
+
+/** Which skill files (project-relative) are missing or out of date. */
+function skillTargets(dir: string, e: SkillEntry): { file: string; text: string; synced: boolean }[] {
+  const text = readFileSync(e.source, "utf8");
+  return SKILL_DIRS.map((d) => {
+    const file = `${d}/${e.name}/SKILL.md`;
+    const path = join(dir, file);
+    return { file, text, synced: existsSync(path) && readFileSync(path, "utf8") === text };
+  });
+}
+
+/** For `status --json`: each package skill and whether every target holds the current copy. */
+export function skillStatus(dir: string): { package: string; name: string; synced: boolean }[] {
+  return projectSkills(dir).map((e) => ({ package: e.package, name: e.name, synced: skillTargets(dir, e).every((t) => t.synced) }));
+}
+
 type Change = { file: string; action: "create" | "update" | "unchanged" | "skip"; note?: string };
 
 /** `shipvo agents setup [--dry-run] [--json]`. Exit 0 done, 2 error. */
 export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<number> {
   const [sub, ...rest] = argv;
-  if (sub !== "setup") { console.error("Usage: shipvo agents setup [--dry-run] [--json]"); return 2; }
+  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--dry-run] [--json]"); return 2; }
+  const only = sub === "skills-sync";
   const a = args(rest);
   const dry = a["dry-run"] !== undefined, json = a.json !== undefined;
   const kind = detectProject(dir);
@@ -85,22 +132,27 @@ export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<nu
   };
   const read = (f: string) => existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : null;
 
-  plan("AGENTS.md", upsertSection(read("AGENTS.md") ?? "", agentsSection(kind)), "AGENTS.md has a broken shipvo marker; fix it and run again.");
-  const targets = [".mcp.json", ...(existsSync(join(dir, ".cursor")) ? [".cursor/mcp.json"] : [])];
-  for (const f of targets) {
-    const merged = mergeMcp(read(f));
-    plan(f, merged, `${f} is not valid JSON; I left it alone. Fix it and run again.`);
+  if (!only) {
+    plan("AGENTS.md", upsertSection(read("AGENTS.md") ?? "", agentsSection(kind)), "AGENTS.md has a broken shipvo marker; fix it and run again.");
+    const targets = [".mcp.json", ...(existsSync(join(dir, ".cursor")) ? [".cursor/mcp.json"] : [])];
+    for (const f of targets) {
+      const merged = mergeMcp(read(f));
+      plan(f, merged, `${f} is not valid JSON; I left it alone. Fix it and run again.`);
+    }
   }
+  const skills = projectSkills(dir);
+  for (const e of skills) for (const t of skillTargets(dir, e)) plan(t.file, t.text);
   const bad = changes.some((c) => c.action === "skip");
   if (!dry && !bad) for (const w of writes) { mkdirSync(dirname(w.path), { recursive: true }); writeFileSync(w.path, w.text); }
   const wrote = !dry && !bad;
-  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, changes, skill_install: SKILL_LINE }));
+  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, changes, skill_install: SKILL_LINE, skills: skills.map((e) => ({ package: e.package, name: e.name })) }));
   else {
     console.log(`Project: ${LABEL[kind]}.`);
     for (const c of changes) console.log(`  ${c.file}: ${c.action === "skip" ? c.note : c.action === "unchanged" ? "already up to date" : `${dry ? "would " : ""}${c.action}${dry ? "" : "d"}`}`);
     if (dry) console.log("Dry run: nothing was written.");
     else if (wrote && !changes.some((c) => c.action !== "unchanged")) console.log("Nothing to change.");
-    console.log(`Install the skill: ${SKILL_LINE}`);
+    if (only && !skills.length) console.log("No installed @shipvo/* dependency ships a skill.");
+    if (!only) console.log(`Install the skill: ${SKILL_LINE}`);
   }
   return bad ? 2 : 0;
 }
