@@ -1,0 +1,1 @@
+- Design doc for release key rotation (`docs/design/key-rotation.md`). No behaviour change.
