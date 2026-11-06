@@ -15,7 +15,7 @@ jobs:
   pick:
     # One picker at a time per engineer, so two runs never take the same issue.
     concurrency: { group: "agent-mistral-pick" }
-    if: vars.AGENTS_PAUSED != 'true' && (github.event_name != 'issues' || github.event.label.name == 'agent:mistral')
+    if: vars.AGENTS_PAUSED != 'true' && (github.event_name != 'issues' || github.event.label.name == 'agent:mistral' || github.event.label.name == 'agent:ready')
     runs-on: ubuntu-latest
     outputs:
       issue: ${{ steps.pick.outputs.issue }}
@@ -24,6 +24,7 @@ jobs:
       GH_TOKEN: ${{ secrets.AGENT_TOKEN }}
       REPO: ${{ github.repository }}
       WANT: ${{ github.event.issue.number || inputs.issue || '' }}
+      EVENT: ${{ github.event_name }}   # a label event only starts work on issues that are also agent:ready
       MAX_ACTIVE: 1   # one docs or test task at a time (see Shipvo HQ merge rates)
     steps:
       - id: pick
@@ -49,6 +50,8 @@ jobs:
           for i in cands:
               names = {l["name"] for l in i["labels"]}
               if i["state"] != "OPEN" or "agent:mistral" not in names or names & skip: continue
+              if os.environ.get("EVENT") == "issues" and "agent:ready" not in names:
+                  print(f"#{i['number']}: not agent:ready yet; skipping"); continue
               perm = json.loads(gh("api", f"repos/{R}/collaborators/{i['author']['login']}/permission"))["permission"] if not i["author"].get("is_bot") else "bot"
               if perm not in ("admin", "maintain", "write", "bot"):
                   print(f"#{i['number']}: author {i['author']['login']} is not on the team; skipping"); continue
