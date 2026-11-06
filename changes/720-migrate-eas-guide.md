@@ -1,0 +1,1 @@
+- docs: new guide, Migrate from EAS Update to Shipvo, from `shipvo migrate --plan` to first publish. Migration: none.

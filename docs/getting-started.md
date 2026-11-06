@@ -161,6 +161,8 @@ Agents open the exact release phones run with `open_app("myshop@r8")` or `open_a
 
 The simulator also runs hosted: one Worker spins up a sandbox per API key and exposes the same MCP tools over HTTPS, so ChatGPT or any remote agent can open an app with a URL and nothing installed. `npx -y @shipvo/cli login` signs you in with GitHub and gives you a key; `shipvo mcp` prints the config (signed out, it prints the local config for `shipvo sim`). Your key opens the sample app and every app you registered with `shipvo app create`: after a publish, `open_app("myshop@latest")` opens the exact release phones run. The beta allows 3 apps per account and 500 MB each; self-hosting is always open. See [agents.md](agents.md).
 
+Coming from EAS Update? See [Migrate from EAS Update](migrate-from-eas-update.md). From CodePush? See [Migrate from CodePush](migrate-from-codepush.md).
+
 ## Where things are measured
 
 Everything above is claimed from measurements on real hardware, published in this repo: OTA sizes and timings on a 2 GB Redmi 9A ([spike-results.md](spike-results.md)), and simulator-vs-device parity on an Android emulator and an iPhone simulator, including what the score does not cover ([parity-results.md](parity-results.md)).
