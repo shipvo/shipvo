@@ -1,0 +1,1 @@
+- spec: new `renderScreen`, `describeTree` and `unlabelled` render a validated app spec as a labelled screen tree and HTML in Android style or iPhone style (stack, grid, scroll, text, image, icon, badge, list). Additive; no migration needed.
