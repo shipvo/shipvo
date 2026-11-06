@@ -1,0 +1,3 @@
+- `@shipvo/sim`: Lumi reacts to results. It is happy on a passed check or a finished flow, and worried on a page error, crash, failed action or failed check. The one-line reason comes from the real error or result and is in Lumi's `data-reason` and `title`. In the page: `shipvoLumi.react({ kind, name?, error?, detail? })`, or a `pn:lumi` message with `event`. New export: `lumiReaction` in `@shipvo/sim/lumi.mjs`.
+- `shipvo run`: Lumi turns worried when an agent action fails or the app throws a page error.
+- Migration: none; `shipvoLumi.set(state)` still works and now takes an optional reason.
