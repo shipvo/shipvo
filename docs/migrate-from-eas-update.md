@@ -47,7 +47,7 @@ No files were changed. Details: docs/migrate-from-eas-update.md
 | EAS Update | Shipvo | Notes |
 | --- | --- | --- |
 | `eas update` | `shipvo publish` | Builds the bundle, signs it, publishes it. |
-| Channels and branches | Cohort bands: `--bands b0,b1,b2` | A release goes to bands, in order. `shipvo promote --to b1,b2` widens it. Bands are not named channels. |
+| Channels and branches | Cohort bands: `--bands b0,b1,b2` | A release goes to bands, in order: b0 is 1% of devices, b1 is 10%, b2 is 100%. You cannot pick another percent. `shipvo promote --to b1,b2` widens it. Bands are not named channels. |
 | `runtimeVersion` | The shell: `shellMajor` in the `@shipvo/runtime` plugin props, the Hermes bytecode version, and the native modules the build contains | A release is only offered to a shell it fits. See below. |
 | Code signing certificate | Ed25519 key made by `shipvo init` | Signing is always on. The public key is pinned in the shell. |
 | `eas update:rollback` | `shipvo rollback --to <release>` | Republishes an earlier release as a new release number. |
@@ -59,7 +59,7 @@ No files were changed. Details: docs/migrate-from-eas-update.md
 ## 3. From `init` to first publish
 
 1. Commit your work. Keep publishing to EAS Update for now.
-2. Remove `expo-updates` with your package manager, remove its plugin entry and the `updates` and `runtimeVersion` keys from the app config, and remove calls to its API. **(run** on the scratch app by editing the files; `migrate --plan` then reported "Nothing to migrate".**)**
+2. Remove `expo-updates` with your package manager, remove its plugin entry and the `updates` and `runtimeVersion` keys from the app config, and remove calls to its API. **(run)** On the scratch app, after editing the files, `migrate --plan` reported "Nothing to migrate".
 3. Preview what `init` will do. **(run)**
 
    ```bash
@@ -92,7 +92,7 @@ No files were changed. Details: docs/migrate-from-eas-update.md
    npx shipvo publish --dry-run --out .shipvo/dry-run
    ```
 
-   Output on the scratch app, before the failure: `native modules this release requires: @shipvo/runtime@^0.1.4, expo@~54.0.0, react-native@0.81.0`. It exported the Android Hermes bundle (`.hbc`, 1.72 MB) and said `patches: none`. A dry run builds no patches. The run after the `platforms` change was not repeated, so this guide does not show a passing dry run.
+   Output on the scratch app, before the failure: `native modules this release requires: @shipvo/runtime@^0.1.4, expo@~54.0.0, react-native@0.81.0`. It exported the Android Hermes bundle (`.hbc`) and said `patches: none`. A dry run builds no patches. The run after the `platforms` change was not repeated, so this guide does not show a passing dry run.
 
 7. Sign in and create the app on the hosted control plane. **(not run)**
 
@@ -121,7 +121,7 @@ This guide did not apply an update on a device. Steps 7 to 9 and this section ar
 
 ## 5. What does not map yet
 
-- **Percentage rollouts.** Shipvo releases to three bands, not to "20% of users". There is no per-percent flag.
+- **Percentage rollouts.** Shipvo releases to three bands: b0 reaches 1% of devices, b1 reaches 10% and b2 reaches 100%. You cannot pick an arbitrary percent such as 20%. Policy rules (`maxCohortForAgents`, `requireStageBeforeFull`) can take a percent as a limit, but a release itself still goes to a band.
 - **Named channels.** There is no channel or branch you point builds at. Bands are cohorts of installs, set by `--bands`.
 - **A dashboard.** Shipvo has `shipvo status` and a per-app admin page, but nothing that matches the EAS Update dashboard feature for feature.
 - **Automatic edits.** `shipvo migrate` only plans. It does not remove `expo-updates` or edit your config.

@@ -1,1 +1,1 @@
-- docs: new guide, Migrate from EAS Update to Shipvo, from `shipvo migrate --plan` to first publish. Migration: none.
+- docs: new guide, Migrate from EAS Update to Shipvo, from `shipvo migrate --plan` to a dry-run publish. Covers the first slice of #720; the real publish and first applied OTA are marked not run and are not covered yet. Migration: none.
