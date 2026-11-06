@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
 import { adminPage, loginPage } from "./admin";
-import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand, holdRelease, HOLD_COMMAND } from "./owner";
+import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand, holdRelease, HOLD_COMMAND, holdDismissedKey } from "./owner";
 import { auth } from "./auth";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
@@ -155,14 +155,13 @@ app.get("/b/:app/:file", async (c) => {
   return new Response(buf, { headers });
 });
 
-/** Failure reports in the last 10 minutes, and the app's normal count per 10 minutes over the 24 hours before that. */
+/** Failure reports for one release in the last 10 minutes, and that release's normal count per 10 minutes over the 24 hours before that. */
 async function failureRates(env: Env, appId: string, release: number): Promise<{ recentReports: number; normalRate: number }> {
   const failedList = FAILED_EVENTS.map((e) => `'${e}'`).join(",");
   const now = Date.now(), iso = (ms: number) => new Date(ms).toISOString();
   const r = (await env.DB.prepare(
-    `SELECT SUM(received_at >= ?) AS recent, SUM(received_at < ?) AS earlier FROM telemetry WHERE app_id = ? AND verified = 1 AND event IN (${failedList}) AND received_at >= ?`
-  ).bind(iso(now - 600_000), iso(now - 600_000), appId, iso(now - 600_000 - 86_400_000)).all<{ recent: number | null; earlier: number | null }>()).results?.[0];
-  void release;
+    `SELECT SUM(received_at >= ?) AS recent, SUM(received_at < ?) AS earlier FROM telemetry WHERE app_id = ? AND release = ? AND verified = 1 AND event IN (${failedList}) AND received_at >= ?`
+  ).bind(iso(now - 600_000), iso(now - 600_000), appId, release, iso(now - 600_000 - 86_400_000)).all<{ recent: number | null; earlier: number | null }>()).results?.[0];
   return { recentReports: Number(r?.recent ?? 0), normalRate: Number(r?.earlier ?? 0) / 144 };
 }
 
@@ -203,7 +202,7 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
   if (attack.suspicious) {
     const cur = await env.POINTERS.get(key);
     if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* fall through */ } }
-    await holdRelease({ kv: env.POINTERS, appId, actor: "halt-rule" }, release, attack.reason!, { reports: verdict.reports, failed: counts.failed, threshold });
+    await holdRelease({ kv: env.POINTERS, appId, actor: "halt-rule" }, release, attack.reason!, { reports: verdict.reports, failed: counts.failed });
     return;
   }
   // KV has no compare-and-set: two concurrent failures may both write, and the later halted_at wins.
@@ -219,6 +218,8 @@ async function maybeHalt(env: Env, appId: string, release: number): Promise<void
 async function applyHold(env: Env, appId: string, ch: { release?: number; id: string }, actor: string): Promise<void> {
   const release = ch.release;
   if (!Number.isInteger(release)) return;
+  const cur = await env.POINTERS.get(`halt/${appId}`);
+  if (cur) { try { if (JSON.parse(cur).release === release) return; } catch { /* overwrite bad value */ } }
   const halted = { release, halted_at: new Date().toISOString(), confirmed_by: actor, approval_id: ch.id };
   await env.POINTERS.put(`halt/${appId}`, JSON.stringify(halted));
   await recordAudit(env.DB, { app_id: appId, actor, actor_kind: "person", action: "halt", release: release!, before: null, after: JSON.stringify(halted) });
@@ -493,6 +494,7 @@ for (const verb of ["approve", "deny"] as const) app.post(`/app/:id/api/approval
   if (actor === AGENT_ACTOR) return c.json({ ok: false, error: { code: "agent_cannot_approve", message: "Only the owner signed in to the admin can decide an approval. A token cannot." } }, 403);
   const r = await resolveChallenge({ db: c.env.DB, kv: c.env.POINTERS, appId, actor }, c.req.param("cid"), verb, actor, "admin session");
   if (r.ok && r.challenge.command === HOLD_COMMAND && verb === "approve") await applyHold(c.env, appId, r.challenge, actor);
+  if (r.ok && r.challenge.command === HOLD_COMMAND && verb === "deny" && Number.isInteger(r.challenge.release)) await c.env.POINTERS.put(holdDismissedKey(appId, r.challenge.release!), r.challenge.resolved_at ?? "1", { expirationTtl: 30 * 86400 });
   return c.json(r, r.ok ? 200 : r.error.code === "approval_not_found" ? 404 : 409);
 });
 

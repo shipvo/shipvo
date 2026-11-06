@@ -78,12 +78,18 @@ export async function listChallenges(env: { kv: KVNamespace; appId: string }): P
   return out.sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 export const HOLD_COMMAND = "halt_release";
+/** KV key remembering that the owner dismissed the hold for a release, so later failures do not ask again. */
+export const holdDismissedKey = (appId: string, release: number) => `hold-dismissed/${appId}/${release}`;
 /**
  * The telemetry looks attacked: instead of halting, keep the release at its band and add an owner approval entry.
- * Confirm halts it, dismiss clears the hold. One pending hold per release.
+ * Confirm halts it, dismiss clears the hold and is remembered (see `holdDismissedKey`), so the owner is not asked again.
+ * One pending hold per release. An unanswered hold expires after CHALLENGE_TTL_MS; the next failure then asks again.
+ * KV has no compare-and-set, so two simultaneous failures can both pass the check below and create two pending entries.
+ * Either one can be answered; the owner sees at most a duplicate row.
  */
-export async function holdRelease(env: { kv: KVNamespace; appId: string; actor: string }, release: number, reason: "fresh_installs" | "burst", seen: { reports: number; failed: number; threshold?: number }): Promise<void> {
+export async function holdRelease(env: { kv: KVNamespace; appId: string; actor: string }, release: number, reason: "fresh_installs" | "burst", seen: { reports: number; failed: number }): Promise<void> {
   const prefix = `Release ${release}:`;
+  if (await env.kv.get(holdDismissedKey(env.appId, release))) return;
   if ((await listChallenges(env)).some((c) => c.command === HOLD_COMMAND && c.release === release)) return;
   const why = reason === "fresh_installs" ? "most failing installs registered in the last hour" : "failures are far above the normal rate";
   const now = Date.now();
