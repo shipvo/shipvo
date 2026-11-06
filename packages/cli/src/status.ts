@@ -36,7 +36,12 @@ export async function fetchBands(base: string, appId: string, major: number, fet
     out[b] = "?";
     try {
       const r = await fetchFn(`${base}/p/${encodeURIComponent(appId)}/${major}/${b}`);
-      if (r.status === 404) { out[b] = null; return; }
+      if (r.status === 404) {
+        // Only "no_release" means none. release_halted and mismatch errors also answer 404.
+        const e = (await r.json().catch(() => null)) as { error?: string } | null;
+        if (e?.error === "no_release") out[b] = null;
+        return;
+      }
       if (!r.ok) return;
       const env = (await r.json()) as { body?: string };
       const rel = JSON.parse(String(env.body)).release;
@@ -163,13 +168,14 @@ export async function status(argv: string[], fetchFn: typeof fetch = fetch): Pro
   const releases = data.releases ?? [];
   // An older control plane has no auto_halt field: say nothing rather than a wrong "off".
   if ("auto_halt" in data) console.log(describeAutoHalt(data.auto_halt));
-  if (!releases.length) { console.log(`No telemetry yet for "${appId}".`); return 0; }
+  const printBands = async () => { for (const l of describeBands(await fetchBands(base, appId, cfg.shellMajor, fetchFn))) console.log(l); };
+  if (!releases.length) { console.log(`No telemetry yet for "${appId}".`); await printBands(); return 0; }
   const h = data.halted;
   if (h && typeof h === "object") {
     const pct = Math.round(h.threshold * 1000) / 10;
     console.log(`Release ${h.release} is halted: ${h.failed} of ${h.reports} devices failed (limit ${pct}%). Publish a new release or run shipvo rollback to clear.`);
   }
   console.log(formatStatus(releases));
-  for (const l of describeBands(await fetchBands(base, appId, cfg.shellMajor, fetchFn))) console.log(l);
+  await printBands();
   return 0;
 }
