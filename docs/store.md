@@ -110,7 +110,9 @@ Files are PNG with no alpha channel, at the exact sizes from the table above, an
 { "store": { "captions": { "start": "Plan your day on the water", "tide://cart": "Pay in one tap" } } }
 ```
 
-With no entry, the caption is the screen title (the app name for the start screen). A long caption wraps at spaces; if it is still too long it is shortened at a word boundary and ends in "...". Words are never cut in the middle: the text shrinks first, and a caption that cannot fit is shown as "...".   `--json` prints one envelope: `{ ok, mode, out, files: [{ set, file, ok, problems }], notes }`.
+With no entry, the caption is the screen title (the app name for the start screen). A long caption wraps at spaces; if it is still too long it is shortened at a word boundary and ends in "...". Words are never cut in the middle: the text shrinks first, and a caption that cannot fit is shown as "...".
+
+With `--json`, stdout carries one envelope. Its `data` is `{ ok, mode, out, files: [{ set, file, ok, problems }], notes }`, and the progress lines go to stderr.
 
 See the package: [`packages/store`](../packages/store/README.md).
 

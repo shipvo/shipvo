@@ -17,7 +17,7 @@ export async function store(argv: string[]): Promise<void> {
 
 const STORE_NEXT: Next[] = [{ command: "shipvo store setup --json", why: "Write your store plan." }, { command: "shipvo doctor --json", why: "Check your setup." }];
 const STORE_RULES: [RegExp, string][] = [
-  [/^No store-plan\.json/, "no_plan"], [/^Unknown step/, "unknown_step"], [/must be yes or no|--as must be|--play-key needs|only fast mode/, "usage"],
+  [/^No store-plan\.json/, "no_plan"], [/^Unknown step/, "unknown_step"], [/must be yes or no|--as must be|--play-key needs|--mode must be/, "usage"],
   [/upload is not available/, "usage"], [/^Usage:/, "usage"], [/No shipvo\.json/, "no_config"],
 ];
 
@@ -49,7 +49,7 @@ async function storeJson(argv: string[]): Promise<void> {
     }
     if (sub === "screenshots") {
       if (process.exitCode) throw new CliFailure("Some store screenshots failed the size or format checks.", "screenshots_failed", 1, [{ command: "shipvo store screenshots --json", why: "Run it again after fixing the app screens." }]);
-      return { code: "screenshots_ready", summary: "Screenshots written and checked.", data: { out: argv.includes("--out") ? argv[argv.indexOf("--out") + 1] : "store-assets/raw" }, next: [{ command: "shipvo store status --json", why: "See the next store step." }] };
+      return { code: "screenshots_ready", summary: "Screenshots written and checked.", data: lastReport ?? { out: argv.includes("--out") ? argv[argv.indexOf("--out") + 1] : "store-assets/raw" }, next: [{ command: "shipvo store status --json", why: "See the next store step." }] };
     }
     const cfg = loadConfig(), d = deriveStoreDetails(cfg);
     return { code: "details_written", summary: `Wrote data safety answers for ${d.appName}.`, data: { app: d.appName, rows: d.rows.length, unknown: d.unknown.map((u) => u.question), filled: d.fill.filled, total: d.fill.total }, next: [{ command: "shipvo store setup --json", why: "Plan the store steps." }] };
@@ -179,7 +179,14 @@ export interface FrameOptions {
   caption?: (route: string | undefined, slug: string) => string;
   /** Print one JSON envelope instead of lines. */
   json?: boolean;
+  /** Called with the full report before `renderScreenshots` returns. */
+  onReport?: (r: ScreenshotReport) => void;
 }
+
+export interface ScreenshotReport { ok: boolean; mode: "fast" | "frames"; out: string; files: { set: string; file: string; ok: boolean; problems: string[] }[]; notes: string[] }
+
+/** The report of the last `screenshots` run, so the `--json` envelope can carry it. */
+let lastReport: ScreenshotReport | undefined;
 
 /** The screen title used when `store.captions` has no entry: the app name for the start screen, else the route words. */
 export function screenTitle(slug: string, appName: string): string {
@@ -234,7 +241,9 @@ export async function renderScreenshots(routes: string[] | undefined, render: Re
     for (const p of c.problems.filter((p) => /file\(s\)/.test(p))) { failed++; report.push({ set, file: dir, ok: false, problems: [p] }); log(`${spec.label}: ${p}`); }
     for (const n of c.notes ?? []) { notes.push(`${spec.label}: ${n}`); log(`${spec.label}: note: ${n}`); }
   }
-  if (json) console.log(JSON.stringify({ ok: failed === 0, mode: frames ? "frames" : "fast", out: outDir, files: report, notes }, null, 2));
+  const full: ScreenshotReport = { ok: failed === 0, mode: frames ? "frames" : "fast", out: outDir, files: report, notes };
+  opts?.onReport?.(full);
+  if (json) console.log(JSON.stringify(full, null, 2));
   else console.log(`\nFiles are in ${outDir}. Check the sizes against the store pages before you submit.`);
   return failed ? 1 : 0;
 }
@@ -246,7 +255,7 @@ async function screenshots(argv: string[]): Promise<void> {
   const framed = a.mode === "frames";
   const cfg = loadConfig() as ReturnType<typeof loadConfig> & { store?: { captions?: Record<string, string> } };
   const out = a.out && a.out !== "true" ? a.out : framed ? "store-assets/frames" : "store-assets/raw";
-  const json = a.json !== undefined && a.json !== "false";
+  lastReport = undefined;
   const sim = await startSim(a, cfg);
   let code = 1;
   try {
@@ -266,7 +275,7 @@ async function screenshots(argv: string[]): Promise<void> {
       const shot = await post("/act", { session, action: "screenshot", format, inline: true });
       if (!shot.ok || !shot.data) throw new Error(`screenshot failed: ${shot.error ?? "no data"}`);
       return new Uint8Array(Buffer.from(shot.data, "base64"));
-    }, out, { caption: framed ? captionFor(cfg) : undefined, json });
+    }, out, { caption: framed ? captionFor(cfg) : undefined, onReport: (r) => { lastReport = r; } });
   } finally { sim.stop(); }
   process.exitCode = code;
 }
