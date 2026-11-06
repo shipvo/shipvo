@@ -101,4 +101,4 @@ The run's log also prints: "patch 83999 bytes, full bundle 1996082 bytes, embedd
 
 ## First applied OTA of a scaffolded app (Android emulator)
 
-Not measured yet. `node scripts/first-run/applied-ota.mjs --control-url <url>` prints init, install, build apk, adb install, publish and publish-to-healthy times. The first value will be recorded here with the CI run link, runner and emulator image once the workflow step below exists.
+Not measured yet. `node scripts/first-run/applied-ota.mjs --control-url <url>` prints init, install, build apk, adb install, publish and publish-to-healthy times. The first value will be recorded here with the CI run link, runner and emulator image once it runs in CI. The script exists but has not been run in CI or on an emulator yet.

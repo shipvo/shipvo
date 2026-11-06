@@ -3,7 +3,8 @@
 // Steps: init, install (pnpm), build apk (expo prebuild + gradle, pinned to the control plane at 10.0.2.2), adb install,
 // publish release 1 and open the app, then edit src/release.ts, `shipvo publish` again and time the second publish
 // ("publish") and the wait until the app's prefs show that release as current ("publish to healthy").
-// "Healthy" = the runtime promoted the release to current_release (it does that after markHealthy), read with `adb run-as`.
+// "Healthy" = the runtime promoted the release to current_release (after the app boots into it and marks it healthy), read with `adb run-as`.
+// If a release stays pending for 8 s the script force-stops and starts the app, then keeps timing until current_release moves.
 // Needs: built CLI, a control plane at --control-url (SHIPVO_LOCAL_DEV_KEY, default sv_test_localdev), one booted emulator.
 // --dry-run prints the plan and exits 0 without touching anything (no emulator needed).
 // Reuses runStep, table, pickAppId and logTail from measure.mjs.
@@ -15,16 +16,6 @@ import { fileURLToPath } from "node:url";
 import { runStep, table, pickAppId } from "./measure.mjs";
 
 export const STEPS = ["init", "install", "build apk", "adb install", "first publish", "first open", "publish", "publish to healthy"];
-
-/** `key=value` timing marks from a log: lines like `[first-run] publish 1234ms`. Returns { step: ms } for positive whole numbers; later lines win. */
-export function parseTimings(text) {
-  const out = {};
-  for (const m of String(text).matchAll(/^\[first-run\] (.+?) (\d+)ms\s*$/gm)) {
-    const ms = Number(m[2]);
-    if (ms > 0) out[m[1]] = ms;
-  }
-  return out;
-}
 
 /** The release number the CLI reports on its last JSON line (`{"release":N,...}`), or undefined. */
 export function releaseFrom(output) {
@@ -40,8 +31,18 @@ export function parsePrefs(xml) {
   return Object.fromEntries([...String(xml).matchAll(/<(?:int|long) name="(\w+)" value="(-?\d+)"/g)].map((m) => [m[1], Number(m[2])]));
 }
 
-/** "current" when the release is promoted, "pending" when staged, else null. */
-export const reached = (prefs, release) => (prefs.current_release === release ? "current" : prefs.pending_release === release ? "pending" : null);
+/**
+ * What to do next while waiting for a release to be healthy. `release` must be an integer: an undefined
+ * release never matches, so a failed `run-as` ({}) cannot pass the wait.
+ * "done" = promoted to current_release; "relaunch" = staged (pending) and not yet running, restart the app to promote it; "wait" otherwise.
+ * The runtime can stage, reload and promote on its own, so relaunch only after `pendingSinceMs` >= `graceMs`.
+ */
+export function nextAction(prefs, release, pendingSinceMs = 0, graceMs = 8000) {
+  if (!Number.isInteger(release)) return "wait";
+  if (prefs.current_release === release) return "done";
+  if (prefs.pending_release === release && pendingSinceMs >= graceMs) return "relaunch";
+  return "wait";
+}
 
 /** Step results from timings, in the fixed step order. A step with no timing is left out, never shown as 0 s. */
 export function stepResults(timings) {
@@ -110,7 +111,7 @@ export async function main(argv) {
     writeFileSync(cfgPath, JSON.stringify({ ...cfg, controlPlane: controlUrl }, null, 2) + "\n");
     const publish = (label) => new Promise((done) => {
       const t0 = performance.now(), buf = [];
-      const c = spawn(process.execPath, [cli, "publish", "--skip-web", "true", "--platform", "android", "--bands", "b0"], { cwd: app, env: { ...process.env, ...env } });
+      const c = spawn(process.execPath, [cli, "publish", "--skip-web", "true", "--platform", "android", "--bands", "b0,b1,b2"], { cwd: app, env: { ...process.env, ...env } });
       c.stdout.on("data", (d) => buf.push(String(d))); c.stderr.on("data", (d) => buf.push(String(d)));
       c.on("close", (code) => done({ label, code: code ?? 1, ms: Math.max(1, Math.round(performance.now() - t0)), out: buf.join("") }));
     });
@@ -118,11 +119,25 @@ export async function main(argv) {
     timings["first publish"] = p1.ms;
     if (p1.code !== 0) throw new Error(`first publish failed:\n${p1.out}`);
     const prefs = () => { try { return parsePrefs(adb("shell", `run-as ${pkg} cat shared_prefs/shipvo.runtime.xml`)); } catch { return {}; } };
-    const waitFor = async (fn, ms) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) return null; await sleep(250); } };
-    await timed(timings, "first open", async () => {
-      adb("shell", "input keyevent KEYCODE_WAKEUP"); adb("shell", `am start -W -n ${pkg}/.MainActivity`);
-      if (!(await waitFor(() => prefs().current_release === releaseFrom(p1.out), 180_000))) throw new Error(`the app did not report release ${releaseFrom(p1.out)} healthy within 180 s`);
-    });
+    const launch = () => { adb("shell", "input keyevent KEYCODE_WAKEUP"); adb("shell", `am start -W -n ${pkg}/.MainActivity`); };
+    // Wait until `release` is current. If it only stays pending, force-stop and start the app so the runtime promotes it. Returns the number of relaunches.
+    const untilHealthy = async (release, ms) => {
+      const end = Date.now() + ms; let pendingAt = null, relaunches = 0, last = {};
+      while (Date.now() < end) {
+        last = prefs();
+        if (last.pending_release === release) pendingAt ??= Date.now(); else pendingAt = null;
+        const act = nextAction(last, release, pendingAt ? Date.now() - pendingAt : 0);
+        if (act === "done") return relaunches;
+        if (act === "relaunch") { adb("shell", `am force-stop ${pkg}`); await sleep(500); launch(); relaunches++; pendingAt = null; }
+        await sleep(250);
+      }
+      throw new Error(`release ${release} was not healthy on the device within ${ms / 1000} s (prefs: ${JSON.stringify(last)})`);
+    };
+    const r1 = releaseFrom(p1.out);
+    if (r1 === undefined) throw new Error(`first publish printed no release number:\n${p1.out}`);
+    await timed(timings, "first open", async () => { launch(); await untilHealthy(r1, 180_000); });
+    const cohort = prefs().cohort;
+    console.error(`device cohort ${cohort} (band ${cohort < 10 ? "b0" : cohort < 100 ? "b1" : "b2"}); releases are published to b0, b1 and b2`);
     const rel = join(app, "src/release.ts");
     writeFileSync(rel, readFileSync(rel, "utf8").replace(/headline: "[^"]*"/, 'headline: "Second release"'));
     const p2 = await publish("publish");
@@ -131,8 +146,9 @@ export async function main(argv) {
     const r2 = releaseFrom(p2.out);
     if (r2 === undefined) throw new Error(`publish printed no release number:\n${p2.out}`);
     const t0 = performance.now();
-    if (!(await waitFor(() => reached(prefs(), r2) === "current", 180_000))) throw new Error(`release ${r2} was not healthy on the device within 180 s (prefs: ${JSON.stringify(prefs())})`);
+    const relaunches = await untilHealthy(r2, 180_000);
     timings["publish to healthy"] = Math.max(1, Math.round(performance.now() - t0));
+    console.error(`second release became healthy after ${relaunches} explicit relaunch(es)`);
     const total = Math.round(performance.now() - start);
     writeFileSync(out, JSON.stringify({ steps: stepResults(timings), totalMs: total, device: { api: adb("shell", "getprop ro.build.version.sdk").trim(), abi: adb("shell", "getprop ro.product.cpu.abi").trim(), fingerprint: adb("shell", "getprop ro.build.fingerprint").trim() } }, null, 2) + "\n");
     console.log(report(timings, total));
