@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync
 import { tmpdir } from "node:os";
 import path, { dirname, join, relative, resolve } from "node:path";
 import { sha256Hex, signBytes } from "./index.js";
-import { checkBundle, parseDeclared } from "./hermes.js";
+import { checkBundle, checkEngine, installedHermesEngine, parseDeclared, parseEngine } from "./hermes.js";
 import { requiredNativeModules } from "./native.js";
 import { checkPublishPolicy } from "./policy.js";
 import { args as parse, kv as kvFor, loadConfig, seed } from "./config.js";
@@ -114,6 +114,7 @@ export async function publish(argv: string[]) {
   const MIN_SHELL = a["min-shell"] || JSON.parse(readFileSync("app.json", "utf8")).expo.version; // a bundle needs the shell it was built against
   if (a["hermes-bytecode-version"] === "true") throw new Error("--hermes-bytecode-version needs a value: pass a value like 96 (or 96,98)");
   const declaredHermes = parseDeclared(a["hermes-bytecode-version"] ?? cfg.hermesBytecodeVersion);
+  const hermesEngine = checkEngine(installedHermesEngine(process.cwd()), parseEngine(cfg.hermesEngine)); // fails before anything is uploaded
   const skippedNative: string[] = [];
   const nativeModules = requiredNativeModules(".", skippedNative);
   if (skippedNative.length) console.error(`native modules not recorded (the range is not a plain numeric semver range, so the control plane cannot check it): ${skippedNative.join(", ")}`);
@@ -185,10 +186,10 @@ export async function publish(argv: string[]) {
     for (const band of bands) {
       const body = JSON.stringify({ schema_version: "1.0", app_id: APP, shell_major: MAJOR, band, ...(pf === "ios" ? { platform: "ios" } : {}), release, issued_at,
         core: { version: `1.0.${release}`, sha256: newSha, size: bytes.length, url: `b/${APP}/${name}`, patches },
-        addons: [], screens: [], min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), ...(web ? { web } : {}) });
+        addons: [], screens: [], min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(hermesVersion && hermesEngine ? { hermes_engine: hermesEngine } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), ...(web ? { web } : {}) });
       await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
-    await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), web }), "application/json");
+    await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(hermesVersion && hermesEngine ? { hermes_engine: hermesEngine } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), web }), "application/json");
     totalBytes += bytes.length;
     summary[pf] = { bytes: bytes.length, patches: patches.map((p) => ({ from: p.from_sha256.slice(0, 12), kb: +(p.size / 1024).toFixed(1) })) };
     if (web) summary.web = web;
