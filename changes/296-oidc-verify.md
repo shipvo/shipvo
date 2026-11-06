@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: new OIDC ID token verifier (`verifyIdToken`) and claim-to-role mapping (`mapClaimsToRole`). Not wired to any route yet.
+- Migration: none; new module.

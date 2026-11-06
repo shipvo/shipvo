@@ -165,7 +165,7 @@ use(server, tools.list_apps, async ({ query }) => {
   return text(lines.join("\n") || `no apps match "${query}"`);
 });
 
-use(server, tools.open_app, async ({ app, session, seed_cart, dark, attach }) => {
+const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always" }) => {
   const id = app.split("@")[0];
   const live = attach === "never" ? undefined : findLiveRun(id);
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
@@ -200,6 +200,13 @@ use(server, tools.open_app, async ({ app, session, seed_cart, dark, attach }) =>
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
+};
+use(server, tools.open_app, openApp);
+// Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.
+use(server, tools.attach_session, async ({ app, session }) => {
+  const live = findLiveRun(app);
+  if (!live) return result("", { ok: false, code: "no_live_run", error: "no live shipvo run found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start `shipvo run android` or `shipvo run ios` first." });
+  return openApp({ app: live.app, session, attach: "always" });
 });
 
 use(server, tools.list_sessions, async () => {
@@ -479,6 +486,42 @@ use(server, tools.audit_log,
     const out = rows.slice(0, want);
     return { ...text(JSON.stringify(out, null, 2)), structuredContent: { app, rows: out } };
   });
+
+// The vault: the assistant asks for a one-time link and later reads only { saved, valid, access }. No value passes through here.
+const SECRET_NOTICE = "Open this link to add your key. Shipvo does not show it to the assistant.";
+const vaultFail = (code: string, error: string) => ({ ...text(`Error [${code}]: ${error}`), isError: true as const, structuredContent: { ok: false, code, error } });
+async function vaultCall(app: string, path: string, init: { method: string; body?: string }, retryHint = ""): Promise<{ fail: ReturnType<typeof vaultFail> } | { body: Record<string, unknown> }> {
+  if (ctx.scope && ctx.scope !== "owner") return { fail: vaultFail("unauthorized", `this key has scope "${ctx.scope}": the vault needs an owner key`) };
+  if (keyApps && !keyApps.includes(app)) return { fail: vaultFail("unauthorized", `this key is for: ${keyApps.join(", ")}`) };
+  const token = ctx.ownerToken || OWNER_TOKEN;
+  if (!token) return { fail: vaultFail("unauthorized", "the vault is not enabled on this server (no owner token).") };
+  let r: Response;
+  try { r = await fetch(`${CONTROL}/vault${path}`, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, signal: AbortSignal.timeout(simTimeoutMs()) }); }
+  catch { return { fail: vaultFail("unreachable", "could not reach the control plane. Try again in a minute.") }; }
+  if (r.status === 401 || r.status === 403) return { fail: vaultFail("unauthorized", "the token was not accepted for this app.") };
+  if (r.status === 400) {
+    const j = (await r.json().catch(() => null)) as { error?: unknown; message?: unknown } | null;
+    // The route's own plain message for a bad service, so the assistant can fix the call. Nothing else is passed on.
+    if (j?.error === "bad_service" && typeof j.message === "string") return { fail: vaultFail("bad_service", j.message.slice(0, 200)) };
+    return { fail: vaultFail("bad_request", "the app id, key name or service is not valid. Use letters, digits and underscores for the key name.") };
+  }
+  if (!r.ok) return { fail: vaultFail("vault_failed", `the vault could not do that (HTTP ${r.status}).${retryHint}`) };
+  return { body: (await r.json().catch(() => ({}))) as Record<string, unknown> };
+}
+use(server, tools.request_secret, async ({ app, name, purpose, service, access }) => {
+  const b = await vaultCall(app, "/tickets", { method: "POST", body: JSON.stringify({ app, name, purpose, service, access }) }, " Call request_secret again to get a new link.");
+  if ("fail" in b) return b.fail;
+  // Only the link and the notice go back. The link is the ticket; it holds no key.
+  if (typeof b.body.url !== "string" || typeof b.body.expires_in !== "number") return vaultFail("vault_failed", "the vault did not return a link. Call request_secret again.");
+  const out = { ok: true, app, name, url: b.body.url, expires_in: b.body.expires_in, notice: SECRET_NOTICE, if_expired: "If the link expired or was used, call request_secret again for a new one." };
+  return { ...text(JSON.stringify(out, null, 2)), structuredContent: out };
+});
+use(server, tools.secret_status, async ({ app, name }) => {
+  const b = await vaultCall(app, `/status/${encodeURIComponent(app)}/${encodeURIComponent(name)}`, { method: "GET" });
+  if ("fail" in b) return b.fail;
+  const out = { saved: b.body.saved === true, valid: typeof b.body.valid === "boolean" ? b.body.valid : null, access: b.body.access === "read" || b.body.access === "write" ? b.body.access : null };
+  return { ...text(JSON.stringify(out)), structuredContent: out };
+});
 
 return server;
 }

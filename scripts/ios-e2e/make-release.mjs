@@ -2,7 +2,7 @@
 // Signs an iOS release pointer for the e2e server, the same wire format `shipvo publish --platform ios` writes.
 //   node make-release.mjs <root> <appId> <seed> <release> <bundle.hbc> [minShell]
 // With PATCH_FROM=<file>[,<file>...] (for example the app's embedded main.jsbundle, and release 1's bundle when
-// building release 2) it also lists a bsdiff patch from each file, built with the Python bsdiff4 module, like
+// building release 2) it also lists a bsdiff patch from each file, built with the CLI's own bsdiff (packages/cli/dist/bsdiff.js), like
 // `shipvo publish` does.
 // With MISMATCH_HERMES=1 the bundle's Hermes bytecode version is changed to a different one before signing, so the
 // release is one the app must refuse (the file given is not modified).
@@ -16,6 +16,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { hermesVersionOf, otherHermesVersion, withHermesVersion } from "./hermes.mjs";
 import { signBytes, sha256Hex } from "../../packages/cli/dist/index.js";
+import { bsdiff } from "../../packages/cli/dist/bsdiff.js";
 
 const [root, app, seed, releaseS, file, min = "1.0.0"] = process.argv.slice(2);
 const release = Number(releaseS);
@@ -41,7 +42,7 @@ for (const from of (process.env.PATCH_FROM || "").split(",").filter(Boolean)) {
   if (seen.has(fromSha)) continue;
   seen.add(fromSha);
   const url = `b/${app}/ios-d-${fromSha.slice(0, 16)}-r${release}.bsdiff`;
-  execFileSync("python3", ["-c", "import sys, bsdiff4; bsdiff4.file_diff(sys.argv[1], sys.argv[2], sys.argv[3])", from, file, join(root, url)]);
+  writeFileSync(join(root, url), bsdiff(new Uint8Array(readFileSync(from)), new Uint8Array(readFileSync(file))));
   const patch = new Uint8Array(readFileSync(join(root, url)));
   patches.push({ from_sha256: fromSha, url, size: patch.length, sha256: sha256Hex(patch) });
   console.log(`patch from ${fromSha.slice(0, 12)}: ${patch.length} bytes`);

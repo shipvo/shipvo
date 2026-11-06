@@ -175,7 +175,7 @@ describe("shipvo keys rotate sign (process)", () => {
     const go = (f: string) => spawnSync(process.execPath, [join(out, "cli.js"), "keys", "rotate", "sign", "--root-seed-file", f, "--new-key", V.keys.K2.publicKey, "--sequence", "1", "--json"], { cwd: d, encoding: "utf8" });
     const ok = go(join(d, "good.txt")), bad = go(join(d, "bad.txt"));
     expect(ok.status).toBe(0);
-    expect(verifyStatement(JSON.parse(ok.stdout), V.root.publicKey, { appId: "tide", effectiveSequence: 0, now: new Date() }).ok).toBe(true);
+    expect(verifyStatement(JSON.parse(ok.stdout).data.envelope, V.root.publicKey, { appId: "tide", effectiveSequence: 0, now: new Date() }).ok).toBe(true);
     expect(bad.status).not.toBe(0);
     expect(bad.stderr).toMatch(/root seed is not valid/);
     const big = spawnSync(process.execPath, [join(out, "cli.js"), "keys", "rotate", "sign", "--root-seed-file", join(d, "good.txt"), "--new-key", V.keys.K2.publicKey, "--sequence", "100000000000000000000", "--json"], { cwd: d, encoding: "utf8" });

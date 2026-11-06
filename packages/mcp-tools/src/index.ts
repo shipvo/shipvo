@@ -47,6 +47,10 @@ export const tools = {
   dark: z.boolean().optional().describe("Dark mode"),
   attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
 }, WR, ["attach_failed","no_live_run","unknown_app"]),
+  attach_session: def("attach_session", "Attach to the phone of a live `shipvo run` in this project (read from .shipvo/run.json) and return its screen. The person sees every action in their browser. Same as open_app with attach: 'always', without needing the app id.", {
+  app: z.string().optional().describe("App id; default: the app of the live run"),
+  session: z.string().optional().describe("Session name (default: generated)"),
+}, WR, ["attach_failed","no_live_run"]),
   list_sessions: def("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, RO, []),
   screen: def("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, []),
   tap: def("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, []),
@@ -129,6 +133,8 @@ export const tools = {
   approvals_list: def("approvals_list", "List what waits for an owner. approvals: promotes held above the app's policy band (hold id, release, band, proposer, age). challenges: owner commands waiting for the owner to approve in the admin (id, command, plan, expiry, approval_url). Agents cannot approve either. Needs an owner token.", { app: z.string() }, RO, []),
   approval_approve: def("approval_approve", "Approve a held promote so it goes live. The proposer cannot approve it, and an agent cannot approve an agent's proposal: that is refused with rule self_approval. Ask the owner to approve in that case. Both outcomes are audited.", { app: z.string(), id: z.string().describe("Hold id from approvals_list") }, DEST, ["self_approval"]),
   audit_log: def("audit_log", "Read the app's release audit log, newest first: who (actor) did what (action) to which release (subject) and when (at). Read-only. Needs an owner token.", { app: z.string(), limit: z.number().int().optional().describe("Rows to return (default 50, max 200; values outside are clamped)"), action: z.string().optional().describe("Only rows with this action, for example rollback") }, RO, ["audit_failed","not_found","unauthorized","unreachable"]),
+  request_secret: def("request_secret", "Ask the person for an API key without it passing through this chat. Returns a one-time link to the Shipvo vault page (valid 10 minutes, works once) and a notice to show the person. The key goes straight into the vault: you never see it. Tell the person to open the link, then call secret_status to learn whether it was saved. Needs an owner token.", { app: z.string(), name: z.string().describe("Name for the key, e.g. STRIPE_KEY (letters, digits and underscores)"), purpose: z.string().max(200).describe("Why the app needs it, in plain English; shown to the person on the vault page"), service: z.string().min(1).describe("Service name (stripe) or its domain (api.example.com)"), access: z.enum(["read", "write"]).optional().describe("Access the key should have (default read)") }, WR, ["bad_request","bad_service","unauthorized","unreachable","vault_failed"]),
+  secret_status: def("secret_status", "Whether a key is saved in the vault, as { saved, valid, access }. Never returns the key. valid is null when it was not checked. Needs an owner token.", { app: z.string(), name: z.string() }, RO, ["bad_request","unauthorized","unreachable","vault_failed"]),
 } as const;
 
 /** Every tool, in registration order. */
