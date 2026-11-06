@@ -25,13 +25,12 @@ export async function hit(kv: KVNamespace, route: string, limits: Limits, scope:
   } catch (e) { console.error("rate limit check failed (request allowed)", e); return 0; }
 }
 
-/** Check every scope that is known; returns the longest wait, or 0. */
+/** Check scopes in order (ip, install, app) and stop at the first one over its limit, so a flooder does not burn other budgets. Returns that wait, or 0. */
+// Without cf-connecting-ip callers use a shared "unknown" bucket. That only happens outside Cloudflare.
 export async function check(kv: KVNamespace | undefined, route: "telemetry" | "register", limits: Limits, s: Source): Promise<number> {
   if (!kv) return 0;
-  const waits = [0];
-  if (s.ip) waits.push(await hit(kv, route, limits, "ip", s.ip));
-  if (s.installId) waits.push(await hit(kv, route, limits, "install", `${s.appId ?? ""}/${s.installId}`));
-  if (s.appId) waits.push(await hit(kv, route, limits, "app", s.appId));
-  return Math.max(...waits);
+  if (s.ip) { const w = await hit(kv, route, limits, "ip", s.ip); if (w) return w; }
+  if (s.installId) { const w = await hit(kv, route, limits, "install", `${s.appId ?? ""}/${s.installId}`); if (w) return w; }
+  if (s.appId) { const w = await hit(kv, route, limits, "app", s.appId); if (w) return w; }
+  return 0;
 }
-

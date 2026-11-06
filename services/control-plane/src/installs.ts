@@ -59,7 +59,7 @@ installs.post("/t/register", async (c) => {
   const secret = c.env.TELEMETRY_SECRET;
   if (!secret) return c.json({ error: "register_unavailable" }, 503);
   const ip = c.req.header("cf-connecting-ip") ?? "unknown";
-  const ipWait = await check(c.env.POINTERS, "register", REGISTER_LIMITS, { ip }).catch(() => 0);
+  const ipWait = await check(c.env.POINTERS, "register", REGISTER_LIMITS, { ip });
   if (ipWait) return c.json({ error: "rate_limited" }, 429, { "retry-after": String(ipWait) });
 
   let body: any;
@@ -67,7 +67,7 @@ installs.post("/t/register", async (c) => {
   const appId = body?.app_id, installId = body?.install_id, shell = body?.shell_version;
   if (typeof appId !== "string" || !ID.test(appId) || typeof installId !== "string" || !INSTALL_ID.test(installId) || typeof shell !== "string" || shell.length === 0 || shell.length > 40) return c.json({ error: "bad_register" }, 400);
 
-  const wait = await check(c.env.POINTERS, "register", REGISTER_LIMITS, { appId, installId }).catch(() => 0);
+  const wait = await check(c.env.POINTERS, "register", REGISTER_LIMITS, { appId, installId });
   if (wait) return c.json({ error: "rate_limited" }, 429, { "retry-after": String(wait) });
 
   const existing = await c.env.DB.prepare("SELECT key_hash FROM installs WHERE app_id = ? AND install_id = ?").bind(appId, installId).first<{ key_hash: string }>();

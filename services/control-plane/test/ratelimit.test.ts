@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import app from "../src/index";
 import { TELEMETRY_LIMITS as T, REGISTER_LIMITS as R } from "../src/ratelimit";
 
@@ -69,5 +69,36 @@ describe("POST /t/register rate limits", () => {
     const appRes = await reg(c.e, body("late"), "8.99.99.99");
     expect(appRes.status).toBe(429);
     expect(appRes.headers.get("retry-after")).toBeTruthy();
+  });
+});
+
+describe("rate limit edge cases", () => {
+  afterEach(() => vi.useRealTimers());
+  it("Retry-After is the seconds left in the window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(1_700_000_000_000 + 17_000));
+    const { e } = env();
+    const win = T.windowSeconds * 1000, now = Date.now();
+    const left = Math.ceil((Math.floor(now / win) * win + win - now) / 1000);
+    for (let i = 0; i < T.perIp; i++) await post(e, ev(), "2.2.2.2");
+    const r = await post(e, ev(), "2.2.2.2");
+    expect(r.status).toBe(429);
+    expect(Number(r.headers.get("retry-after"))).toBe(left);
+    expect(left).toBeLessThanOrEqual(T.windowSeconds);
+    vi.setSystemTime(Math.floor(now / win) * win + win - 3_000); // 3s left
+    for (let i = 0; i < T.perIp; i++) await post(e, ev(), "2.2.2.3");
+    expect(Number((await post(e, ev(), "2.2.2.3")).headers.get("retry-after"))).toBe(3);
+  });
+  it("fails open when KV throws", async () => {
+    const { e } = env();
+    const stored: unknown[] = [];
+    e.POINTERS = { get: async () => { throw new Error("kv down"); }, put: async () => { throw new Error("kv down"); } };
+    e.DB = { prepare: (q: string) => ({ bind: (...a: unknown[]) => ({ run: async () => { stored.push(a); return {}; }, all: async () => ({ results: [] }), first: async () => null }) }) };
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await post(e, ev(), "1.2.3.4");
+    expect(r.status).toBe(202);
+    expect(stored.length).toBeGreaterThan(0);
+    expect((await reg(e, { app_id: "tide", install_id: "install-kv-reg", shell_version: "1.0.0" }, "1.2.3.4")).status).not.toBe(429);
+    err.mockRestore();
   });
 });
