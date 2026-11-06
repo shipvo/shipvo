@@ -41,7 +41,10 @@ export const FRAMES = {
   ios: { width: 393, height: 852, radius: 55, label: "iOS", sheet: { title: "Would Like to Access", allow: "Allow While Using App", deny: "Don't Allow" } },
 } as const;
 
-export type RenderFrame = (o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string };
+export type RenderFrame = ((o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string }) & {
+  /** Script that keeps the status bar live from the app's `pn:status` events. Absent in older @shipvo/sim. */
+  statusScript?: (iframeId?: string, skin?: string) => string;
+};
 
 /** Loads the frame renderer from @shipvo/sim: the app's install first, then the one next to this CLI. */
 export async function loadFrameRenderer(bases: string[] = [process.cwd() + "/package.json", import.meta.url]): Promise<RenderFrame> {
@@ -50,7 +53,10 @@ export async function loadFrameRenderer(bases: string[] = [process.cwd() + "/pac
     try { file = createRequire(base).resolve("@shipvo/sim/frame.mjs"); break; } catch {}
   }
   if (!file) throw new Error("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager).");
-  return (await import(pathToFileURL(file).href)).renderFrame;
+  const mod = await import(pathToFileURL(file).href);
+  const render: RenderFrame = (o) => mod.renderFrame(o);
+  if (typeof mod.statusClientScript === "function") render.statusScript = mod.statusClientScript;
+  return render;
 }
 
 /** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. The phone body comes from @shipvo/sim's renderFrame. */
@@ -84,7 +90,7 @@ sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
 function fit(){var s=Math.min(1,(innerWidth-24)/${frame.outerWidth},(innerHeight-60)/${frame.outerHeight});var e=document.getElementById("fit");e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
-</script></body></html>`;
+</script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}</body></html>`;
 }
 
 const TYPES: Record<string, string> = {

@@ -51,7 +51,7 @@ export function statusParts(status) {
 }
 
 /**
- * Browser script for the page that holds the frame. It watches the app's "pn:status" events (sent by @shipvo/device when network,
+ * Browser script for the page (online is shown as 4 bars; the simulated device has no signal strength) that holds the frame. It watches the app's "pn:status" events (sent by @shipvo/device when network,
  * airplane or battery change), redraws the status bar, ticks the clock each minute and flips the text colour from the app's top background.
  * `iframeId` is the app iframe. It expects the markup from renderFrame and the functions below inlined by this script.
  */
@@ -64,15 +64,16 @@ function root(){return document.querySelector('[data-part="phone-body"]')}
 function draw(){var r=root();if(!r)return;var p=statusParts(statusFromDevice(dev,new Date()));
 r.querySelector('[data-part="time"]').textContent=p.time;r.querySelector(".sf-icons").innerHTML=p.icons}
 function topColor(w){try{var d=w.document,e=d.elementFromPoint(Math.floor(w.innerWidth/2),1);
-while(e){var c=w.getComputedStyle(e).backgroundColor;if(c&&c!=="transparent"&&!/rgba\(.*,\s*0\)$/.test(c))return c;e=e.parentElement}}catch(x){}return"#fff"}
-function theme(w){var r=root();if(!r)return;var dark=isDarkBackground(topColor(w));
-r.setAttribute("data-theme",dark?"dark":"light");r.style.setProperty("--sf-fg",dark?"#fff":"#111");r.style.setProperty("--sf-bg",dark?"#000":"#fff")}
+while(e){var c=w.getComputedStyle(e).backgroundColor;if(c&&c!=="transparent"&&!/rgba\\(.*,\\s*0\\)$/.test(c))return c;e=e.parentElement}var b=d.body&&w.getComputedStyle(d.body).backgroundColor;if(b&&!/rgba\\(.*,\\s*0\\)$/.test(b)&&b!=="transparent")return b}catch(x){}return"#fff"}
+function theme(w){var r=root();if(!r)return;var c=topColor(w),dark=isDarkBackground(c);
+r.setAttribute("data-theme",dark?"dark":"light");r.style.setProperty("--sf-status-fg",dark?"#fff":"#111");r.style.setProperty("--sf-status-bg",c)}
 function hook(){var f=document.getElementById(${JSON.stringify(iframeId)});var w=f&&f.contentWindow;if(!w)return;
 if(w.__pnDevice&&w.__pnDevice.status)dev=w.__pnDevice.status();draw();theme(w);
 if(!w.__shipvoStatusHooked){w.__shipvoStatusHooked=true;w.addEventListener("pn:status",function(e){dev=e.detail;draw();theme(w)})}}
-var f=document.getElementById(${JSON.stringify(iframeId)});if(f)f.addEventListener("load",hook);
+var f=document.getElementById(${JSON.stringify(iframeId)});if(f){f.addEventListener("load",hook);hook()}
 (function tick(){draw();var n=new Date();setTimeout(tick,(60-n.getSeconds())*1000-n.getMilliseconds()+50)})();
-setInterval(function(){var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)theme(f.contentWindow)},2000);
+// The app can change its top colour (a theme switch) without any event we can hear, so look again every 2 seconds. Skipped while the page is hidden.
+setInterval(function(){if(document.hidden)return;var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)theme(f.contentWindow)},2000);
 })();`;
 }
 
@@ -122,7 +123,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-body{--sf-bg:${dark ? "#000" : "#fff"};--sf-fg:${dark ? "#fff" : "#111"};position:relative;box-sizing:border-box;width:${outerWidth}px;height:${outerHeight}px;padding:${k.bezel}px ${k.bezel}px ${k.bezel + FOOT}px;`
       + `border-radius:${k.radius + k.bezel}px;background:linear-gradient(145deg,#3a3d42,#15171a);box-shadow:0 0 0 1px #000,0 10px 34px #0007;touch-action:manipulation;user-select:none;-webkit-user-select:none}`,
     `.sf-screen{width:${k.width}px;height:${k.height}px;border-radius:${k.radius}px;background:var(--sf-bg);color:var(--sf-fg);overflow:hidden;display:flex;flex-direction:column;position:relative}`,
-    `.sf-status{flex:none;height:${k.status}px;display:flex;justify-content:space-between;align-items:center;padding:0 ${k.pad}px;font:600 14px system-ui,sans-serif;position:relative;z-index:2}`,
+    `.sf-status{flex:none;height:${k.status}px;display:flex;justify-content:space-between;align-items:center;padding:0 ${k.pad}px;font:600 14px system-ui,sans-serif;position:relative;z-index:2;color:var(--sf-status-fg,var(--sf-fg));background:var(--sf-status-bg,transparent)}`,
     `.sf-icons{display:flex;align-items:center;gap:5px}.sf-ico{display:block}`,
     `.sf-cut{position:absolute;left:50%;background:#000}`,
     `.sf-hole{top:10px;width:14px;height:14px;margin-left:-7px;border-radius:50%;box-shadow:0 0 0 2px #1c1e21}`,

@@ -81,3 +81,47 @@ test("statusParts and the client script are usable", () => {
   assert.equal(p.time, "2:07"); assert.match(p.icons, /data-level="0"/);
   assert.doesNotThrow(() => new Function(statusClientScript("app")));
 });
+
+// Runs the real script against a minimal document and iframe window, then fires pn:status the way @shipvo/device does.
+function runClient(appColor = "rgb(255, 255, 255)") {
+  const node = (extra = {}) => ({ textContent: "", innerHTML: "", ...extra });
+  const time = node(), icons = node();
+  const props = {}, attrs = {};
+  const body = { setAttribute: (k, v) => { attrs[k] = v; }, style: { setProperty: (k, v) => { props[k] = v; } },
+    querySelector: (q) => (q === '[data-part="time"]' ? time : q === ".sf-icons" ? icons : null) };
+  const listeners = {}, frameListeners = {};
+  const win = { innerWidth: 412, __pnDevice: { status: () => ({ online: true, airplane: false, battery: { level: 100, charging: false } }) },
+    document: { elementFromPoint: () => ({ parentElement: null, bg: appColor }) },
+    getComputedStyle: (e) => ({ backgroundColor: e.bg }),
+    addEventListener: (t, f) => { listeners[t] = f; } };
+  const iframe = { contentWindow: win, addEventListener: (t, f) => { frameListeners[t] = f; } };
+  const document = { hidden: false, querySelector: (q) => (q === '[data-part="phone-body"]' ? body : null), getElementById: (id) => (id === "app" ? iframe : null) };
+  const timers = [];
+  new Function("document", "setTimeout", "setInterval", statusClientScript("app"))(document, () => 0, (f) => timers.push(f));
+  return { time, icons, props, attrs, win, listeners, timers, setColor: (c) => { win.document.elementFromPoint = () => ({ parentElement: null, bg: c }); } };
+}
+test("the client script redraws the bar on pn:status and flips only the status text colour", () => {
+  const c = runClient();
+  assert.match(c.icons.innerHTML, /data-part="wifi"/);
+  assert.match(c.time.textContent, /^\d{1,2}:\d{2}$/);
+  c.listeners["pn:status"]({ detail: { online: false, airplane: false, battery: { level: 15, charging: false } } });
+  assert.match(c.icons.innerHTML, /data-part="signal" data-level="0"/);
+  assert.doesNotMatch(c.icons.innerHTML, /data-part="wifi"/);
+  assert.match(c.icons.innerHTML, /data-level="15"/);
+  c.listeners["pn:status"]({ detail: { online: true, airplane: true, battery: { level: 80, charging: true } } });
+  assert.match(c.icons.innerHTML, /data-part="airplane"/);
+  assert.equal(c.attrs["data-theme"], "light"); assert.equal(c.props["--sf-status-fg"], "#111");
+  assert.equal("--sf-bg" in c.props, false); assert.equal("--sf-fg" in c.props, false);
+});
+test("the client script falls back to the body colour when the sampled element is transparent", () => {
+  const c = runClient("rgba(0, 0, 0, 0)");
+  c.win.document.body = { bg: "rgb(10, 14, 30)" };
+  c.timers[0]();
+  assert.equal(c.attrs["data-theme"], "dark");
+});
+test("the client script picks light status text for a dark app background", () => {
+  const c = runClient("rgb(10, 14, 30)");
+  assert.equal(c.attrs["data-theme"], "dark"); assert.equal(c.props["--sf-status-fg"], "#fff"); assert.equal(c.props["--sf-status-bg"], "rgb(10, 14, 30)");
+  c.setColor("rgb(255, 255, 255)"); c.timers[0]();
+  assert.equal(c.attrs["data-theme"], "light");
+});
