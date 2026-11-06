@@ -1,0 +1,16 @@
+<!-- Excerpt of the Appium page source of "Order placed C", iOS run 2026-11-05 (parity-ios run 42015379557, artifact parity-ios-local, source-ios-local-Order_placed_C.xml). Only the label-bearing elements are kept. -->
+<XCUIElementTypeButton type="XCUIElementTypeButton" name="btn-back" label="Back" />
+<XCUIElementTypeButton type="XCUIElementTypeButton" name="btn-scan-a-product-barcode" label="Scan a product barcode" />
+<XCUIElementTypeButton type="XCUIElementTypeButton" name="btn-open-search" label="Open search" />
+<XCUIElementTypeButton type="XCUIElementTypeButton" name="btn-open-cart-0-items" label="Open cart, 0 items" />
+<XCUIElementTypeOther type="XCUIElementTypeOther" name="Order placed" label="Order placed" />
+<XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Order TT-1003 placed" name="Order TT-1003 placed" label="Order TT-1003 placed" />
+<XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Order TT-1003 placed" name="Order TT-1003 placed" label="Order TT-1003 placed" />
+<XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="1 × Surface Popper 9 cm" name="1 × Surface Popper 9 cm" label="1 × Surface Popper 9 cm" />
+<XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="1 × Surface Popper 9 cm" name="1 × Surface Popper 9 cm" label="1 × Surface Popper 9 cm" />
+<XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Total 4 200 FCFA" name="Total 4 200 FCFA" label="Total 4 200 FCFA" />
+<XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Total 4 200 FCFA" name="Total 4 200 FCFA" label="Total 4 200 FCFA" />
+<XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Shop pickup, Bonanjo · Mobile money 677000111, paid (SANDBOX-MW3GNY07)" name="Shop pickup, Bonanjo · Mobile money 677000111, paid (SANDBOX-MW3GNY07)" label="Shop pickup, Bonanjo · Mobile money 677000111, paid (SANDBOX-MW3GNY07)" />
+<XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Shop pickup, Bonanjo · Mobile money 677000111, paid (SANDBOX-MW3GNY07)" name="Shop pickup, Bonanjo · Mobile money 677000111, paid (SANDBOX-MW3GNY07)" label="Shop pickup, Bonanjo · Mobile money 677000111, paid (SANDBOX-MW3GNY07)" />
+<XCUIElementTypeButton type="XCUIElementTypeButton" name="btn-share-order" label="Share order" />
+<XCUIElementTypeButton type="XCUIElementTypeButton" name="btn-back-to-shop" label="Back to shop" />

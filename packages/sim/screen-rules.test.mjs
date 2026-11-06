@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 
 test("filterTree drops empty generic lines", () => {
@@ -41,19 +42,32 @@ test("DOM rules hide off-screen rail items and content behind a modal, and clear
   } finally { await browser.close(); }
 });
 
-// Issue #589. iOS reads the "Order placed" screen's banner as one element, the label of the button. The snapshot
-// YAML-quotes that line (its label holds ": "), and the inner lines used to stay as extra text.
-test("filterTree groups a YAML-quoted control line into its label, as iOS does", () => {
+// Issue #589. A control whose label holds ": " is YAML-quoted in the snapshot, and its inner lines used to stay as extra text.
+const bannerHidden = (line, inner) => {
+  const out = filterTree([line, `  - generic [ref=e9]: ${inner}`, '- button "After" [ref=e10]'].join("\n")).split("\n");
+  return out.length === 2 && out[1] === '- button "After" [ref=e10]';
+};
+
+test("filterTree groups a YAML-quoted control line into its label (single-quoted, apostrophe, double-quoted)", () => {
+  assert.ok(bannerHidden(`- 'button "Notification: Order TT-1001 confirmed." [ref=e8]':`, "Order TT-1001 confirmed"));
+  assert.ok(bannerHidden(`- 'button "Notification: Don''t panic." [ref=e8]':`, "Don't panic"));
+  assert.ok(bannerHidden(`- "button \\"Notice: say \\"hi\\"\\" [ref=e8]":`, "say hi"));
+  assert.ok(bannerHidden(`- button "Plain" [ref=e8]:`, "inner"));
+});
+
+// The iOS side is a real recording: an excerpt of the Appium page source from parity-ios run 42015379557 (see the fixture header).
+// That recording was taken after the banner had gone, so it has no banner; it pins the row labels the simulator must match.
+test("filterTree keeps the Order placed rows as separate labels, as the recorded iOS tree has them", () => {
+  const xml = readFileSync(new URL("./fixtures/ios-order-placed.xml", import.meta.url), "utf8");
+  const ios = [...new Set([...xml.matchAll(/<XCUIElementTypeStaticText [^>]*label="([^"]*)"/g)].map((m) => m[1]))];
+  assert.equal(ios.length, 4);
   const sim = [
     '- generic "Order placed" [ref=e178]:',
-    '    - heading "Order TT-1001 placed" [level=1] [ref=e180]',
-    '    - generic [ref=e181]: 2 × Chrome Spoon 30 g',
-    `- 'button "Notification: Order TT-1001 confirmed. Total 7 100 FCFA." [ref=e188]':`,
-    '  - generic [ref=e189]: Order TT-1001 confirmed',
-    '  - generic [ref=e190]: Total 7 100 FCFA.',
+    '  - heading "Order TT-1003 placed" [level=1] [ref=e180]',
+    '  - generic [ref=e181]: 1 × Surface Popper 9 cm',
+    '  - generic [ref=e182]: Total 4 200 FCFA',
+    '  - generic [ref=e183]: Shop pickup, Bonanjo · Mobile money 677000111, paid (SANDBOX-MW3GNY07)',
   ].join("\n");
-  // Labels of the recorded iOS tree for the same screen (Appium source from a parity-ios run): one element per row, banner is one button.
-  const ios = ["Order TT-1001 placed", "2 × Chrome Spoon 30 g", "Notification: Order TT-1001 confirmed. Total 7 100 FCFA."];
-  const labels = filterTree(sim).split("\n").map((l) => /"([^"]+)"/.exec(l)?.[1] ?? /\]: (.+)$/.exec(l)?.[1]).filter((x) => x && x !== "Order placed");
+  const labels = filterTree(sim).split("\n").map((l) => /heading "([^"]+)"/.exec(l)?.[1] ?? /\]: (.+)$/.exec(l)?.[1]).filter(Boolean);
   assert.deepEqual(labels, ios);
 });
