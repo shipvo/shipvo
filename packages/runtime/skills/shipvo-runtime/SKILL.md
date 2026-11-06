@@ -17,10 +17,9 @@ import { Runtime } from "@shipvo/runtime";
 const state = Runtime.getState();        // running, pending and previous release, baseUrl, appId
 await Runtime.checkForUpdate(true);      // verify, download, stage, apply
 Runtime.markHealthy();                   // once the first screen rendered
-const events = Runtime.consumeEvents();  // strings like "verify_failed:<release>"
 ```
 
-Forward `crash_loop_revert`, `rolled_back` and `verify_failed` events to telemetry, once each.
+The runtime reports its own events (`crash_loop_revert`, `rolled_back`, `verify_failed`) to telemetry. Use `onRuntimeEvents` to log them. `reportEvents: false` turns reporting off. Do not call `Runtime.consumeEvents()` unless you forward events yourself: it drains the queue before the runtime reports it.
 
 ## Config plugin
 

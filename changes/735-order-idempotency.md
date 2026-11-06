@@ -1,0 +1,2 @@
+- `control-plane`: `POST /o/:app` is idempotent per install, order id and body (an identical retry returns the first result), rate limited per IP (`cf-connecting-ip`) and per install (429), and stores every order as `unverified` (`simulated` when the body says `simulated: true`). New migration `0018_order_status.sql`.
+- Migration: apply `0018_order_status.sql`; it only adds columns and an index. Apps may send `install_id` in the order body; without it all callers share one install bucket.
