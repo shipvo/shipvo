@@ -1,0 +1,2 @@
+- `@shipvo/cli`: new `shipvo keys root` (make an offline root key) and `shipvo keys rotate` (root-signed key-rotation statement with a sequence number). `shipvo.json` accepts an optional `rootKey`. Design: `docs/design/key-rotation.md`. Phones, control plane and audit entries are not wired yet.
+- Migration: none; new commands.

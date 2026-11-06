@@ -15,6 +15,7 @@ import { run } from "./run.js";
 import { keys, login, mcp } from "./login.js";
 import { verifyPointer } from "./verify.js";
 import { signingKey } from "./signing.js";
+import { rotationCmd } from "./rotation.js";
 import { appCmd } from "./app.js";
 import { status } from "./status.js";
 import { agentsCmd } from "./agents.js";
@@ -54,7 +55,7 @@ switch (cmd) {
   case "ci": process.exitCode = await ci(rest); break;
   case "eas": process.exitCode = await easCmd(rest); break;
   case "app": await appCmd(rest); break;
-  case "keys": if (rest[0] === "export" || rest[0] === "import") await signingKey(rest); else await keys(); break;
+  case "keys": if (rest[0] === "export" || rest[0] === "import") await signingKey(rest); else if (rest[0] === "root" || rest[0] === "rotate") process.exitCode = await rotationCmd(rest[0], rest.slice(1)); else await keys(); break;
   case "mcp": mcp(); break;
   case "keygen": {
     const s = b64(randomBytes(32)); const out = rest[rest.indexOf("--out") + 1];

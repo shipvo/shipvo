@@ -10,6 +10,8 @@ export type ShipvoConfig = {
   controlPlane: string;
   /** Base64 Ed25519 public key built into the shell. */
   publicKey: string;
+  /** Base64 Ed25519 root public key pinned in the shell. Only it can sign key-rotation statements. */
+  rootKey?: string;
   /** Hermes bytecode version(s) the app's shells run. If set, `shipvo publish` refuses bundles that differ. */
   hermesBytecodeVersion?: number | number[];
   /** Hermes engine build the app's shells run, such as "250829098.0.10". If set, `shipvo publish` refuses to run with another hermes-compiler. */
