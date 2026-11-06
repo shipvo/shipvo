@@ -53,10 +53,11 @@ export const PARITY_LIMITS = [
 
 const ACTIONABLE = new Set(["button", "link", "tab", "checkbox", "switch", "radio", "menuitem"]);
 const FIELDS = new Set(["textbox", "searchbox"]);
-/** Labels that end a session or destroy data. The walker taps them last. */
+/** Labels that end a session or destroy data. The walker taps them last. `cancel` is here too; being last, it is still tapped, so a modal is not skipped. */
 const RISKY = /\b(log ?out|sign ?out|delete|remove|cancel|erase|deactivate|clear all|unsubscribe)\b/i;
 const NETWORK = /network request failed|network error|networkerror|failed to fetch|no internet|you(?:'| a)re offline|(?:can't|cannot|couldn't|unable to) connect|connection (?:failed|lost|error)|ERR_(?:INTERNET|CONNECTION|NAME_NOT)\w*/i;
-const loading = (tree: string) => /progressbar|\bloading\b|\bspinner\b|activity indicator/i.test(tree);
+/** Only loading indicators count. Text such as a heading "Loading history" does not. */
+const loading = (tree: string) => /^\s*- (?:progressbar|spinner|activity ?indicator)\b/im.test(tree);
 /** Nothing drawn: no names and no text anywhere in the tree. */
 const blank = (tree: string) => !/"|: \S/.test(tree);
 /** Small seeded random numbers (mulberry32), so a seed repeats a run exactly. */

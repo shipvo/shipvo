@@ -76,8 +76,16 @@ describe("autotest walk", () => {
     expect(r.findings.some((f) => f.kind === "network_failed" && f.message.includes("Failed to fetch"))).toBe(true);
   });
   it("does not call a loading screen stuck when it settles", async () => {
-    const d = shop().driver; let n = 0;
-    d.snapshot = async () => ({ ok: true, screen: ++n > 0 ? SCREENS.profile : SCREENS.orders });
+    const d = shop().driver;
+    d.snapshot = async () => ({ ok: true, screen: SCREENS.profile });
+    const r = await walk(d, opts);
+    expect(r.findings.some((f) => f.kind === "stuck_loading")).toBe(false);
+  });
+  it("does not call a settled screen with 'Loading history' text stuck", async () => {
+    const d = shop().driver;
+    const screen = `- heading "Loading history" [ref=e1]\n- text: Your past orders`;
+    d.open = async () => ({ ok: true, screen });
+    d.snapshot = async () => ({ ok: true, screen });
     const r = await walk(d, opts);
     expect(r.findings.some((f) => f.kind === "stuck_loading")).toBe(false);
   });
@@ -88,7 +96,7 @@ describe("autotest walk", () => {
   it("keeps the report format and the step limit", async () => {
     const { driver, taps } = shop();
     const r = await walk(driver, { ...opts, maxSteps: 3 });
-    expect(taps.length + 0).toBeLessThanOrEqual(3 + 0);
+    expect(taps.length).toBeLessThanOrEqual(3);
     expect(r.steps).toBe(3);
     expect(r.stoppedEarly).toMatch(/max-steps \(3\)/);
     expect(Object.keys(r).sort()).toEqual(["app", "error", "findings", "generatedAt", "maxDepth", "maxSteps", "parityLimits", "screens", "steps", "stoppedEarly"]);
