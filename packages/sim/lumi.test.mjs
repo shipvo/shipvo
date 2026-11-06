@@ -114,7 +114,8 @@ test("Lumi on or off: app screenshot, recorded frames and labelled screen tree a
         // antialias a rounded clip differently once an animated layer exists, so those rows are frame edge, not app pixels.
         const full = await p.locator("#app").boundingBox();
         const box = { ...full, height: full.height - 12 };
-        const snap = () => p.screenshot({ clip: box });
+        // Chromium sometimes answers "Unable to capture screenshot" on a busy runner. Retry the capture; the bytes are still compared.
+        const snap = async () => { for (let t = 0; ; t++) { try { return await p.screenshot({ clip: box }); } catch (e) { if (t >= 4 || !/Unable to capture screenshot/.test(String(e))) throw e; await p.waitForTimeout(100); } } };
         // Wait until the app area stops changing, so a slow first paint cannot look like a Lumi difference.
         let shot = await snap();
         for (let i = 0; i < 40; i++) { await p.waitForTimeout(50); const again = await snap(); if (Buffer.compare(shot, again) === 0) break; shot = again; }
