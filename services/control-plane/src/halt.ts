@@ -70,6 +70,7 @@ export function looksLikeAttack(input: AttackInput): { suspicious: boolean; reas
   const now = input.now ?? Date.now();
   const list = input.failingInstalls;
   if (list.length > 0) {
+    // A registered_at in the future gives a negative age and counts as fresh.
     const fresh = list.filter((i) => now - i.registered_at <= FRESH_INSTALL_WINDOW_MS).length;
     if (fresh / list.length > FRESH_INSTALL_SHARE) return { suspicious: true, reason: "fresh_installs" };
   }
