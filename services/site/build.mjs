@@ -38,6 +38,7 @@ const NAV = [
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },
     { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real React Native app flows in a headless simulator on every pull request, with typed Vitest tests. No emulator, no device farm." },
+    { slug: "ci-check", src: "docs/ci-check.md", title: "Check every pull request", desc: "Add one workflow so every pull request builds your app, runs your Shipvo flows and explores every button. Fails on regressions and crashes only." },
   ]},
   { group: "Agents", pages: [
     { slug: "agents", src: "docs/agents.md", title: "Agents and Shipvo apps", desc: "How an AI agent sees and operates a Shipvo app over MCP: the accessibility tree, every tool, hosted access and public listings." },

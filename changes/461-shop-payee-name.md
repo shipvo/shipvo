@@ -1,1 +1,0 @@
-- cli: `shipvo init --template shop` now sends the payment to the shop name from `--name`. The name is stored as `name` in `src/data/shop.json`. Existing shops: add `"name"` to `src/data/shop.json` and use it in `Cart.tsx`.

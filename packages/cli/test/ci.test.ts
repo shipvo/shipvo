@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ci, WORKFLOW_PATH } from "../src/ci";
+import { ci, check, CHECK_WORKFLOW, CHECK_WORKFLOW_PATH, WORKFLOW_PATH } from "../src/ci";
 
 const yaml = createRequire(import.meta.url)("js-yaml") as { load: (s: string) => any };
 const TEMPLATE = join(__dirname, "..", "..", "..", "templates", "capacitor", "github-actions", "build.yml");
@@ -68,5 +68,44 @@ describe("capacitor build template", () => {
 
   it("has no inline secret values", () => {
     expect(text).not.toMatch(/(PASSWORD|KEY_ALIAS|BASE64)\s*:\s*(?!\$\{\{)\S/);
+  });
+});
+
+describe("shipvo ci init --check", () => {
+  const CHECK = join(__dirname, "..", "..", "..", "templates", "github-action", "shipvo-check.yml");
+
+  it("embedded workflow equals templates/github-action/shipvo-check.yml", () => {
+    expect(CHECK_WORKFLOW).toBe(readFileSync(CHECK, "utf8"));
+    const doc = yaml.load(CHECK_WORKFLOW);
+    expect(doc.on).toHaveProperty("pull_request");
+  });
+
+  it("writes the workflow into a dir with no templates folder", async () => {
+    quiet();
+    const cwd = mkdtempSync(join(tmpdir(), "shipvo-ci-"));
+    expect(existsSync(join(cwd, "templates"))).toBe(false);
+    expect(await ci(["init", "--check"], cwd)).toBe(0);
+    expect(readFileSync(join(cwd, CHECK_WORKFLOW_PATH), "utf8")).toBe(CHECK_WORKFLOW);
+    expect(await ci(["init", "--check"], cwd)).toBe(1);
+  });
+});
+
+describe("shipvo ci check exit code", () => {
+  const run = (t: number, e: number | Error) => check(async () => t, async () => { if (e instanceof Error) throw e; return e; });
+
+  it("passes when tests pass and exploration has only notes", async () => {
+    quiet();
+    expect(await run(0, 0)).toBe(0);
+  });
+  it("fails on a flow failure, and still explores", async () => {
+    quiet();
+    const explored = vi.fn(async () => 0);
+    expect(await check(async () => 1, explored)).toBe(1);
+    expect(explored).toHaveBeenCalled();
+  });
+  it("fails when exploration crashes", async () => {
+    quiet();
+    expect(await run(0, 1)).toBe(1);
+    expect(await run(0, new Error("boom"))).toBe(1);
   });
 });

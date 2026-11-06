@@ -1,2 +1,0 @@
-- `site`: tutorials and docs can embed a live phone with one line (`<div data-shipvo-phone ...>`). Both tutorials now have two "Try it" phones that load the sample shop, with the screenshot as fallback.
-- Migration: none; site only.

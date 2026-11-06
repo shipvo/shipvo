@@ -1,1 +1,0 @@
-- cli: the `shop` template now posts each paid order to the backend (`/o/<appId>`), so the simulator records it and `end_session` lists it. A declined payment posts nothing.

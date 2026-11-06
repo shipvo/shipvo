@@ -1,3 +1,0 @@
-- `@shipvo/cli`: `shipvo store screenshots` (fast mode) renders the start screen and each route in `shipvo.json` at store sizes, writes `store-assets/raw/<set>/`, and prints the checker result per file. It is a simulator render, not the native UI.
-- `@shipvo/store`: `checkScreenshot` also returns the detected `format`. `@shipvo/sim`: `/session` takes optional `width`, `height`, `scale`; the `screenshot` action takes `format: "jpeg"` and `inline: true`.
-- Migration: none; all additions.
