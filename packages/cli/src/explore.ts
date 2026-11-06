@@ -53,13 +53,14 @@ export const PARITY_LIMITS = [
   "See docs/parity-results.md for what was measured against Android emulators and the iOS Simulator.",
 ];
 
-const ACTIONABLE = new Set(["button", "link", "tab", "checkbox", "switch", "radio", "menuitem"]);
+export const ACTIONABLE = new Set(["button", "link", "tab", "checkbox", "switch", "radio", "menuitem"]);
 const FIELDS = new Set(["textbox", "searchbox"]);
 /** Labels that end a session or destroy data. The walker taps them last. `cancel` is here too; being last, it is still tapped, so a modal is not skipped. */
 const RISKY = /\b(log ?out|sign ?out|delete|remove|cancel|erase|deactivate|clear all|unsubscribe)\b/i;
 const NETWORK = /network request failed|network error|networkerror|failed to fetch|no internet|you(?:'| a)re offline|(?:can't|cannot|couldn't|unable to) connect|connection (?:failed|lost|error)|ERR_(?:INTERNET|CONNECTION|NAME_NOT)\w*/i;
 /** Only loading indicators count. Text such as a heading "Loading history" does not. */
-const loading = (tree: string) => /^\s*- (?:progressbar|spinner|activity ?indicator)\b/im.test(tree);
+export const LOADING_RE = /^\s*- (?:progressbar|spinner|activity ?indicator)\b/im;
+export const loading = (tree: string) => LOADING_RE.test(tree);
 /** Nothing drawn: no names and no text anywhere in the tree. */
 const blank = (tree: string) => !/"|: \S/.test(tree);
 /** Small seeded random numbers (mulberry32), so a seed repeats a run exactly. */
@@ -431,7 +432,8 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
       if (a["save-tests"] === "true") throw new Error("--save-tests needs a directory");
       const { files, skipped } = writeTests(report.findings, a["save-tests"]);
       issueInfo = { ...issueInfo, test_files: files };
-      const m = files.length ? `Wrote ${files.length} test file${files.length === 1 ? "" : "s"} to ${a["save-tests"]}. Run them with npx vitest run ${a["save-tests"]}${skipped.length ? `. ${skipped.length} finding${skipped.length === 1 ? "" : "s"} cannot be a test (size checks)` : ""}` : "No findings, so no test files written.";
+      const why = skipped.map((x) => `\n  not a test: ${x.message} (${x.reason})`).join("");
+      const m = files.length ? `Wrote ${files.length} test file${files.length === 1 ? "" : "s"} to ${a["save-tests"]}. Run them with npx vitest run ${a["save-tests"]}${why}` : `No test files written.${why}`;
       if (json) console.error(m); else console.log(m);
     }
     const failOn = a["fail-on-findings"] === "true";

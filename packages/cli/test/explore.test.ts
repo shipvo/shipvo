@@ -200,6 +200,35 @@ describe("explore --json", () => {
   });
 });
 
+describe("explore --save-tests", () => {
+  const setup = () => {
+    const dir = mkdtempSync(join(tmpdir(), "explore-save-"));
+    writeFileSync(join(dir, "shipvo.json"), JSON.stringify({ appId: "a", name: "A", controlPlane: "https://example.com", publicKey: "k" }));
+    vi.spyOn(process, "cwd").mockReturnValue(dir);
+    vi.spyOn(globalThis, "fetch").mockImplementation((async () => Response.json({ ok: true, screen: '- heading "Home" [ref=e1]', errors: [] })) as never);
+    return dir;
+  };
+  it("puts the written test files in the --json envelope", async () => {
+    const dir = setup(); const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const code = await explore(["--json", "--sim", "http://sim.test", "--out", join(dir, "r"), "--save-tests", join(dir, "t")]);
+    vi.restoreAllMocks();
+    expect(code).toBe(0);
+    const doc = JSON.parse(logs[0]!);
+    expect(doc.data.test_files).toHaveLength(1);
+    expect(doc.data.test_files[0]).toBe(join(dir, "t", "1-dead_end-home.test.ts"));
+  });
+  it("fails with a clear message when --save-tests has no directory", async () => {
+    const dir = setup(); const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    const code = await explore(["--json", "--sim", "http://sim.test", "--out", join(dir, "r"), "--save-tests"]);
+    vi.restoreAllMocks();
+    expect(code).toBe(2);
+    expect(JSON.parse(logs[0]!).summary).toMatch(/--save-tests needs a directory/);
+  });
+});
+
 describe("routesFromChange", () => {
   it("walks only changed routable screens, at most four", async () => {
     changed.fail = false;

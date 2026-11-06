@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Server } from "node:http";
 import { Lumi, lumiPage, parseCommand, routeName, startLumiServer, type State } from "../src/lumi.js";
 import type { Driver, Reply } from "../src/explore.js";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
 
 const SCREENS: Record<string, string> = {
   home: `- heading "Home" [ref=e1]\n- button "Sign up" [ref=e2]\n- button "Cart" [ref=e3]`,
@@ -50,6 +53,32 @@ describe("parseCommand", () => {
     expect(parseCommand("").kind).toBe("unknown");
   });
   it("names a route from its url", () => { expect(routeName("shop://cart")).toBe("cart"); expect(routeName("shop://")).toBe(""); });
+});
+
+describe("Lumi save bug", () => {
+  it("says so when there are no bugs yet, or the number is unknown", async () => {
+    const l = new Lumi(shop().driver, opts);
+    expect(await l.command("save bug 1")).toMatch(/no bugs to save yet/);
+    await l.command("test my app"); await l.idle();
+    expect(await l.command("save bug 99")).toMatch(/There is no bug 99\. Bugs so far: 1 to \d+/);
+  });
+  it("writes the test into testsDir and replies with its absolute path", async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "lumi-save-")), "tests");
+    const l = new Lumi(shop().driver, { ...opts, testsDir: dir });
+    await l.command("test my app"); await l.idle();
+    const n = l.state().findings.find((f) => f.kind === "network_failed")!.n;
+    const reply = await l.command(`save bug ${n}`);
+    const file = /as (\S+\.test\.ts)\./.exec(reply)?.[1]!;
+    expect(isAbsolute(file)).toBe(true); expect(file.startsWith(dir)).toBe(true); expect(existsSync(file)).toBe(true);
+  });
+  it("gives the reason when a bug cannot be a test", async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "lumi-save-")), "tests");
+    const d = shop().driver; const l = new Lumi({ ...d, errors: async () => ["boom"] }, { ...opts, testsDir: dir });
+    await l.command("test my app"); await l.idle();
+    const n = l.state().findings.find((f) => /Uncaught error/.test(f.message))!.n;
+    expect(await l.command(`save bug ${n}`)).toMatch(/cannot be a test: an uncaught page error is not on the screen/);
+    expect(existsSync(dir)).toBe(false);
+  });
 });
 
 describe("Lumi", () => {

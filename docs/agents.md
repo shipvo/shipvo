@@ -144,6 +144,8 @@ shipvo explore --issues-dir issues           # one ready-to-file issue per findi
 
 With `--issues-dir <dir>`, it also writes one Markdown file per distinct finding, `<n>-<kind>.md`. The first line is the title (`explore: <kind> on <screen>`), then the message, the numbered steps, the platform skin and the simulator limits. It does not call GitHub. It prints one `gh issue create --title ... --body-file ...` line per file for you or your agent to run. With no findings it writes nothing and says so.
 
+With `--save-tests <dir>`, it writes one `@shipvo/test` file per distinct finding, `<n>-<kind>-<screen>.test.ts`. Each file replays the steps, then checks the bug is gone, so it fails while the bug exists. Run them with `npx vitest run <dir>`. Dead ends, unnamed controls, duplicate names, blank screens, stuck loading and red screens or network messages shown on screen become tests. Findings a test cannot see (small targets, uncaught page errors, failed network calls, taps the app did not receive) are listed with the reason. In `shipvo lumi`, press "Save as test" on a finding, or type `save bug <n>`. Files go to `lumi-tests/`, or `--tests-dir`, and the reply gives the full path.
+
 It writes `explore-report.md` and `explore-report.json`. The report has nine kinds of finding, each with the steps to reach it as typed steps (`open`, `open_url`, `tap` by role and name, `type`, `back`):
 
 - an uncaught error or a red screen;

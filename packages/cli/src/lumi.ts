@@ -90,8 +90,8 @@ export class Lumi {
       const k = this.known[c.n - 1];
       if (!k) return this.known.length ? `There is no bug ${c.n}. Bugs so far: 1 to ${this.known.length}.` : "There are no bugs to save yet. Say \"test my app\" first.";
       const dir = this.o.testsDir ?? "lumi-tests";
-      const { files } = writeTests([k.finding], dir);
-      if (!files.length) return `Bug ${c.n} is a size check, which a test cannot see. It is in the report.`;
+      const { files, skipped } = writeTests([k.finding], dir);
+      if (!files.length) return `Bug ${c.n} cannot be a test: ${skipped[0]?.reason ?? "no check for it"}. It is in the report.`;
       this.say(`Saved bug ${c.n} as a test: ${files[0]}`);
       return `Saved bug ${c.n} as ${files[0]}. Run it with npx vitest run ${files[0]}. It fails while the bug is there.`;
     }
