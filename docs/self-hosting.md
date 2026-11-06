@@ -96,4 +96,6 @@ Limits. The recorded range is the one in `package.json`, not the installed versi
 
 ## Trust model, in one paragraph
 
+The full threat table, with the code and test behind each row and a list of gaps, is in [docs/threat-model.md](threat-model.md).
+
 The shell carries the Ed25519 public key and the control plane URL as native manifest meta-data. Pointers are signed with the matching seed, which lives only in your CI secrets; the control plane never has it, so a compromised control plane can serve stale or no releases but cannot forge one. Bundles are verified by SHA-256 and size before staging; patches are verified by the hash of the *result*. A release can never add a permission the shell did not declare, because it is JavaScript running on the shell's native modules.
