@@ -1,11 +1,12 @@
 import { PhoneError } from "./phone.js";
-import { redact, resolveSecrets } from "./secrets.js";
+import { account, redact, resolveSecrets } from "./secrets.js";
 import type { Phone } from "./phone.js";
 
 /** One parsed line. `target` is the quoted text: an accessibility name or visible text, as in the typed API. `role` is optional and narrows which elements a repair may pick. `line` is the 1-based line number in the source text. */
 export type Step =
   | { kind: "tap"; target: string; role?: string; line: number }
   | { kind: "type"; target: string; text: string; enter: boolean; role?: string; line: number }
+  | { kind: "login"; account: string; line: number }
   | { kind: "scroll"; direction: "down"; line: number }
   | { kind: "back"; line: number }
   | { kind: "see"; text: string; line: number }
@@ -16,6 +17,7 @@ const Q = '"([^"]*)"';
 const rules: [RegExp, (m: RegExpMatchArray, line: number) => Step][] = [
   [new RegExp(`^tap ${Q}$`, "i"), (m, line) => ({ kind: "tap", target: m[1]!, line })],
   [new RegExp(`^type ${Q} into ${Q}( and press enter)?$`, "i"), (m, line) => ({ kind: "type", text: m[1]!, target: m[2]!, enter: !!m[3], line })],
+  [new RegExp(`^log ?in as ${Q}$`, "i"), (m, line) => ({ kind: "login", account: m[1]!, line })],
   [/^scroll down$/i, (_m, line) => ({ kind: "scroll", direction: "down", line })],
   [/^go back$/i, (_m, line) => ({ kind: "back", line })],
   [new RegExp(`^do not see ${Q}$`, "i"), (m, line) => ({ kind: "not_see", text: m[1]!, line })],
@@ -45,6 +47,20 @@ export async function runSteps(phone: Phone, steps: Step[]): Promise<void> {
       switch (s.kind) {
         case "tap": await phone.tap(s.target); break;
         case "type": await phone.type(s.target, resolveSecrets(s.text), s.enter ? { enter: true } : {}); break;
+        case "login": {
+          // The account is read by name from SHIPVO_TEST_ACCOUNT_<NAME>_USER and _PASSWORD. Values never enter the step.
+          const a = account(s.account);
+          const fields = phone.nodes().filter((n) => ["textbox", "searchbox"].includes(n.role));
+          const pw = fields.find((n) => /password/i.test(n.name) || n.attrs.some((x) => /password/i.test(x)));
+          const user = fields.find((n) => n !== pw && /e-?mail|user|login|phone/i.test(n.name)) ?? fields.find((n) => n !== pw);
+          if (!user || !pw) throw new PhoneError(`cannot log in as "${s.account}": the screen needs a username field and a password field`, "login_fields_missing");
+          await phone.type({ ref: user.ref }, a.user);
+          await phone.type({ ref: pw.ref }, a.password);
+          const btn = phone.nodes().find((n) => n.role === "button" && /^(log ?in|sign ?in)$/i.test(n.name.trim()));
+          if (!btn) throw new PhoneError(`cannot log in as "${s.account}": no Log in or Sign in button on the screen`, "login_button_missing");
+          await phone.tap({ ref: btn.ref });
+          break;
+        }
         case "scroll": await phone.scroll(s.direction); break;
         case "back": await phone.back(); break;
         case "wait_for": await phone.waitFor(s.text); break;

@@ -61,3 +61,18 @@ Errors: schema violations; HTTP to domains not in `permissions.network` (or `per
 Warnings: touch targets under 44 px, more than three type sizes on a screen, many different spacing values on a screen, lists without an empty state, charts without a label, actions without a description.
 
 HTTP URLs must be absolute `https://` with a fixed host; `{{ }}` is allowed only in the path and query.
+
+## Render a screen
+
+```ts
+import { renderScreen, describeTree } from "@shipvo/spec";
+
+const r = renderScreen(spec, { style: "ios", data: { catches: [{ species: "Bass", spot: "Mole", weight: 3 }] } });
+if (!r.ok) console.log(r.errors); // the validator's errors, with paths and fixes
+else {
+  console.log(describeTree(r.tree)); // role "name" per line
+  // r.html is the screen as HTML, with a role and aria-label on each node
+}
+```
+
+`style` is `"android"` or `"ios"`; the same spec gives the same tree in both. Blocks: `stack` (`direction: "horizontal"` for a row), `grid`, `scroll`, `text`, `image`, `icon`, `badge` and `list`. Options: `screen`, `data` (values for `http` and `collection` sources), `state`, `params`, `locale`, `timeZone`, `now`. `toSnapshot(r.tree)` writes the tree in the simulator's screen format (`- role "name" [ref=e1]`), which `@shipvo/test` parses. Font names keep only letters, digits, spaces, `-` and `_`. `theme.mode` `"system"` renders the light palette. Theme tokens (`palette`, `radius`, `density`, `elevation`, `font`) set colours, corners, spacing and type.

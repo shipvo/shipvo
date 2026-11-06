@@ -1,1 +1,0 @@
-- Design doc for signing key rotation (root key, rotation statement, replay protection). No behaviour change.

@@ -24,6 +24,19 @@ export function findingToIssue(f: Finding, skin: Skin): { title: string; body: s
   return { title, body };
 }
 
+/** Mask the value of every `SHIPVO_TEST_*` variable (test accounts and secrets) with `***`. Values under 4 characters are left alone. */
+export function redactTestSecrets(text: string, env: NodeJS.ProcessEnv = process.env): string {
+  const values = Object.entries(env).filter(([k, v]) => k.startsWith("SHIPVO_TEST_") && v && v.length >= 4).map(([, v]) => v!).sort((a, b) => b.length - a.length);
+  let out = text;
+  for (const v of values) {
+    out = out.split(v).join("***");
+    // JSON output escapes quotes, backslashes and control characters, so mask that form too.
+    const esc = JSON.stringify(v).slice(1, -1);
+    if (esc !== v) out = out.split(esc).join("***");
+  }
+  return out;
+}
+
 const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
 /** Writes `<n>-<kind>.md` per distinct finding. Returns the files and the `gh issue create` lines. */
@@ -35,7 +48,7 @@ export function writeIssues(findings: Finding[], skin: Skin, dir: string): { fil
   unique.forEach((f, i) => {
     const { title, body } = findingToIssue(f, skin);
     const file = join(dir, `${i + 1}-${f.kind}.md`);
-    writeFileSync(file, `${title}\n\n${body}`);
+    writeFileSync(file, redactTestSecrets(`${title}\n\n${body}`));
     files.push(file); commands.push(`gh issue create --title ${quote(title)} --body-file ${quote(file)}`);
   });
   return { files, commands };

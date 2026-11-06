@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo sim`, `shipvo run --native` and `shipvo preview` start `npx` through the new spawn helper, so Windows runs `npx.cmd`. No change on Linux.
-- Migration: none.

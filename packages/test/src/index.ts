@@ -6,4 +6,4 @@ export { parseSteps, runSteps } from "./steps.js";
 export type { Step } from "./steps.js";
 export { proposeRepair } from "./repair.js";
 export type { Repair } from "./repair.js";
-export { secret, redact } from "./secrets.js";
+export { secret, account, redact } from "./secrets.js";

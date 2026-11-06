@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/capacitor",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "license": "Apache-2.0",
   "description": "Signed over-the-air updates for Capacitor web bundles: the same release decisions and trust model as the Shipvo React Native runtime.",
@@ -19,14 +19,27 @@
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
   },
-  "keywords": ["shipvo", "capacitor", "ota", "over-the-air", "ed25519", "web", "live-update"],
+  "keywords": [
+    "shipvo",
+    "capacitor",
+    "ota",
+    "over-the-air",
+    "ed25519",
+    "web",
+    "live-update"
+  ],
   "homepage": "https://github.com/shipvo/shipvo#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shipvo/shipvo.git",
     "directory": "packages/capacitor"
   },
-  "files": ["dist", "android/build.gradle", "android/src/main", "README.md"],
+  "files": [
+    "dist",
+    "android/build.gradle",
+    "android/src/main",
+    "README.md"
+  ],
   "publishConfig": {
     "access": "public",
     "provenance": true

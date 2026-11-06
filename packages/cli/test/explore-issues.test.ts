@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findingToIssue, writeIssues } from "../src/explore-issues.js";
+import { findingToIssue, redactTestSecrets, writeIssues } from "../src/explore-issues.js";
 import { PARITY_LIMITS, type Finding, type Kind } from "../src/explore.js";
 
 const kinds: Kind[] = ["error", "not_delivered", "action_failed", "dead_end", "unnamed", "small_target", "duplicate_name"];
@@ -38,5 +38,31 @@ describe("writeIssues", () => {
     const dir = join(mkdtempSync(join(tmpdir(), "iss-")), "out");
     expect(writeIssues([], "android", dir).files).toEqual([]);
     expect(() => readdirSync(dir)).toThrow();
+  });
+});
+
+describe("test account secrets", () => {
+  it("writes no account value into issue files", () => {
+    process.env.SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD = "pw-Zx81-secret";
+    try {
+      const dir = mkdtempSync(join(tmpdir(), "issues-"));
+      const f = mk("error", "Uncaught error: login rejected pw-Zx81-secret");
+      f.steps = [{ action: "open" }, { action: "type", role: "textbox", name: "Password", text: "pw-Zx81-secret" }];
+      f.screen += '\n- textbox "Password": pw-Zx81-secret';
+      const { files } = writeIssues([f], "android", dir);
+      const text = readFileSync(files[0]!, "utf8");
+      expect(text).not.toContain("pw-Zx81-secret");
+      expect(text).toContain("***");
+    } finally { delete process.env.SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD; }
+  });
+  it("masks a password with a quote or backslash in JSON output", () => {
+    const pw = 'pw"Zx\\81-secret';
+    const env = { SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD: pw };
+    const json = JSON.stringify({ message: `rejected ${pw}` });
+    expect(json).not.toContain(pw);
+    const out = redactTestSecrets(json, env);
+    expect(out).not.toContain("Zx");
+    expect(out).toContain("***");
+    expect(redactTestSecrets(`plain ${pw}`, env)).toBe("plain ***");
   });
 });

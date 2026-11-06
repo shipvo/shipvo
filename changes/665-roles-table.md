@@ -1,1 +1,0 @@
-- `@shipvo/control-plane`: new internal `roles.ts` with the viewer, developer, release manager and admin permission table and `can(role, action)`. It is not wired into auth yet, so nothing is enforced. Migration: none.

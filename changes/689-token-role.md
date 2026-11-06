@@ -1,2 +1,0 @@
-- `@shipvo/control-plane`: publish tokens have a nullable `role` column (migration 0017) and `publisher()` returns it. Nothing enforces it yet.
-- Migration: none; NULL means admin.
