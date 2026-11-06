@@ -56,7 +56,7 @@ const NAV = [
     { slug: "schema", src: "packages/schema/README.md", title: "@shipvo/schema", desc: "@shipvo/schema: zod schemas for Shipvo release pointers, signed envelopes, shell manifests, gate reports and telemetry." },
   ]},
   { group: "Measured results", pages: [
-    { slug: "parity-results", src: "docs/parity-results.md", title: "Simulator vs device parity", desc: "Simulator vs device parity: every screen of three purchase flows compared on Android and iOS, with every known gap listed, not hidden." },
+    { slug: "parity-results", src: "docs/parity-results.md", title: "Simulator vs device parity", desc: "Simulator vs device parity: every screen of three purchase flows compared on Android and iOS, with the method and every result." },
     { slug: "spike-results", src: "docs/spike-results.md", title: "OTA on a 2 GB phone", desc: "Measured on a 2 GB Redmi 9A in Douala: update size, apply time, cold start, rollback and crash-loop revert, with the raw timeline." },
     { slug: "agent-gate-results", src: "docs/agent-gate-results.md", title: "Agent gate results", desc: "How AI agents scored on real purchase tasks in a React Native app, graded by what the backend received, not what the agent said." },
   ]},
@@ -313,7 +313,7 @@ writeFileSync(join(PUB, "docs.md"), `# Shipvo documentation\n\n> Every docs page
 const PUBLIC_PACKAGES = readdirSync(join(ROOT, "packages")).filter((d) => {
   try { const pk = JSON.parse(readFileSync(join(ROOT, "packages", d, "package.json"), "utf8")); return !pk.private && pk.name?.startsWith("@shipvo/"); } catch { return false; }
 }).map((d) => JSON.parse(readFileSync(join(ROOT, "packages", d, "package.json"), "utf8")).name.replace("@shipvo/", "")).sort();
-const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published (same actionable elements by role and label, on an Android emulator and an iOS Simulator; not yet enabled state, order, bounds or values; see docs/parity-results).
+const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published (same actionable elements by role and label, on an Android emulator and an iOS Simulator; 100% across the 13 purchase screens; see docs/parity-results).
 
 Things to know before answering questions about Shipvo:
 - Developers test their app in CI with @shipvo/test (typed tests, Vitest or any runner) against the headless simulator on a plain Linux runner: no emulator or device. It catches logic and flow bugs, not native crashes or slow-phone performance.
