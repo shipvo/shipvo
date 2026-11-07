@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
-import { parseListening, firstTapRef, timings, table, measureRun } from "./run-time.mjs";
+import { parseListening, firstTapRef, timings, table, tableBoth, measureRun } from "./run-time.mjs";
 
 test("parseListening finds the phone URL", () => {
   assert.equal(parseListening("Building…\nSimulated Android phone at http://127.0.0.1:4123/  (Ctrl+C to stop)\n"), "http://127.0.0.1:4123/");
@@ -76,4 +76,21 @@ test("an empty first tree is not ready; ready is stamped once a ref shows up", a
   const rows = await measureRun({ ...f, timeoutMs: 20000, open: async () => () => {}, drive, poll: 20, now });
   assert.ok(calls >= 2);
   assert.ok(rows[2].ms >= Math.floor(secondAt - start), `ready at ${rows[2].ms} ms, second reply at ${secondAt - start}`);
+});
+
+test("tableBoth puts Android and iOS side by side, one row per step", () => {
+  const a = timings({ start: 0, listening: 6860, ready: 7880, tapped: 8190 });
+  const i = timings({ start: 0, listening: 5000, ready: 6000, tapped: 6500 });
+  const lines = tableBoth({ android: a, ios: i }).split("\n");
+  assert.equal(lines.length, 6);
+  assert.match(lines[0], /Android.*iOS/);
+  assert.match(lines[5], /first tap done \| 8\.19 \| 6\.50/);
+});
+
+test("measureRun starts the platform it is asked for", async () => {
+  const f = fakeCli(0);
+  const src = (await import("node:fs")).readFileSync(f.cli, "utf8");
+  writeFileSync(f.cli, `import {writeFileSync as w0} from "node:fs"; w0(${JSON.stringify(join(f.app, "argv.json"))}, JSON.stringify(process.argv.slice(2)));\n` + src);
+  await measureRun({ ...f, platform: "ios", timeoutMs: 20000, open: async () => () => {}, drive: fakeDriver, poll: 20 });
+  assert.deepEqual(JSON.parse((await import("node:fs")).readFileSync(join(f.app, "argv.json"), "utf8")), ["run", "ios", "--no-open"]);
 });

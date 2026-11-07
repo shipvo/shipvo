@@ -1,4 +1,4 @@
-// Times `shipvo run android` on a scaffolded app: process start, server listening, phone page ready, first tap done.
+// Times `shipvo run android` and `shipvo run ios` on a scaffolded app (one after the other): process start, server listening, phone page ready, first tap done.
 // Usage: node scripts/first-run/run-time.mjs [--cli path/to/cli.js] [--template blank] [--out run-time.json] [--timeout 120] [--with-install]
 // "Phone page ready" means the page answers and the frame reports the app loaded (a `tree` request on the agent channel succeeds).
 // The tap goes through the same agent channel `shipvo run` serves (.shipvo/run.json gives the port and token).
@@ -44,6 +44,13 @@ export function table(rows) {
   return ["| step | seconds since start |", "| --- | ---: |", ...rows.map((r) => `| ${r.step} | ${secs(r.ms)} |`)].join("\n");
 }
 
+/** One table with an Android and an iOS column. `byPlatform` is { android: rows, ios: rows } from `timings`. */
+export function tableBoth(byPlatform) {
+  const { android, ios } = byPlatform;
+  return ["| step | Android (seconds since start) | iOS (seconds since start) |", "| --- | ---: | ---: |",
+    ...android.map((r, i) => `| ${r.step} | ${secs(r.ms)} | ${secs(ios[i].ms)} |`)].join("\n");
+}
+
 /** Minimal request/reply client for the driver side of the agent channel. */
 function driverClient(port, token, WS = globalThis.WebSocket) {
   const ws = new WS(`ws://127.0.0.1:${port}/__shipvo/agent?role=driver&token=${encodeURIComponent(token)}`);
@@ -74,14 +81,14 @@ async function openPage(url) {
 }
 
 /**
- * Starts `shipvo run android --no-open` in `app` and times it. Throws a plain message if a stage does not finish in `timeoutMs`
+ * Starts `shipvo run <platform> --no-open` in `app` and times it. Throws a plain message if a stage does not finish in `timeoutMs`
  * (the whole run, from start). `open(url)` opens the page and `drive(port, token)` returns {request, close}; both can be faked in tests.
  */
-export async function measureRun({ cli, app, timeoutMs = 120000, now = () => performance.now(), open = openPage, drive = (p, t) => driverClient(p, t), poll = 200 }) {
+export async function measureRun({ cli, app, platform = "android", timeoutMs = 120000, now = () => performance.now(), open = openPage, drive = (p, t) => driverClient(p, t), poll = 200 }) {
   const t = { start: now() };
   const out = [];
   // spawn directly (not the CLI helper): we need the live child and its streams to stamp the ready line and stop the process group.
-  const child = spawn(process.execPath, [cli, "run", "android", "--no-open"], { cwd: app, env: cleanEnv(), detached: process.platform !== "win32" });
+  const child = spawn(process.execPath, [cli, "run", platform, "--no-open"], { cwd: app, env: cleanEnv(), detached: process.platform !== "win32" });
   let exited = null;
   const sink = (d) => { out.push(String(d)); if (t.listening === undefined && parseListening(out.join(""))) t.listening = now(); };
   child.stdout.on("data", sink);
@@ -149,11 +156,13 @@ export async function main(argv) {
       const inst = runInstallStep(app);
       if (inst.exit !== 0) { console.error(`install failed with exit ${inst.exit}:\n${inst.stderr}`); return 1; }
     }
-    let rows;
-    try { rows = await measureRun({ cli, app, timeoutMs }); }
-    catch (e) { console.error(`shipvo run android: ${e.message}`); return 1; }
-    writeFileSync(outFile, JSON.stringify(rows, null, 2) + "\n");
-    console.log(table(rows));
+    const result = {};
+    for (const platform of ["android", "ios"]) {
+      try { result[platform] = await measureRun({ cli, app, platform, timeoutMs }); }
+      catch (e) { console.error(`shipvo run ${platform}: ${e.message}`); return 1; }
+    }
+    writeFileSync(outFile, JSON.stringify(result, null, 2) + "\n");
+    console.log(tableBoth(result));
     return 0;
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
