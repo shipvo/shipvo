@@ -106,7 +106,7 @@ If the app calls `openUrl` and the Browser refuses the page, the call returns `f
 ## Try it
 
 1. Run `npx shipvo run android` or `npx shipvo run ios` in your app folder. The [run guide](/docs/run/) has the details.
-2. Ask your assistant to open every link in your app and report where each one lands. The [assistant tutorial](/docs/tutorials/test-with-an-assistant/) shows how to connect it.
+2. Ask your assistant to open every link in your app and report where each one lands. The [assistant tutorial](/docs/test-with-an-assistant/) shows how to connect it.
 3. Turn the checks that matter into typed tests with `export_test`.
 
 Related reading: [Test dark mode, large text and right-to-left](/blog/test-dark-mode-large-text-and-rtl-in-react-native/) covers the Settings app on the same phone, and [The permission you never test](/blog/the-permission-you-never-test/) covers camera, location and payment.
