@@ -980,7 +980,7 @@
             "android",
             "ios"
           ],
-          "description": "Phone to open: 'android' or 'ios'. Returns a platform_mismatch error if the phone that opens is not the one asked for."
+          "description": "Phone to open: 'android' or 'ios'. Returns a platform_mismatch error if the simulator reports a different phone than the one asked for."
         },
         "attach": {
           "type": "string",

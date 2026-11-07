@@ -29,7 +29,7 @@ beforeAll(async () => {
     let raw = ""; for await (const c of req) raw += c;
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu" }] }));
-    if (req.url === "/session") { const b = JSON.parse(raw || "{}"); sessionBodies.push(b); return res.end(JSON.stringify({ ok: true, release: "local", platform: String(b.session).startsWith("stuck") ? "android" : b.platform, screen: "heading Headless" })); }
+    if (req.url === "/session") { const b = JSON.parse(raw || "{}"); sessionBodies.push(b); return res.end(JSON.stringify({ ok: true, release: "local", ...(String(b.session).startsWith("quiet") ? {} : { platform: String(b.session).startsWith("stuck") ? "android" : b.device?.platform }), screen: "heading Headless" })); }
     if (JSON.parse(raw || "{}").action === "screenshot") return res.end(JSON.stringify({ ok: true, path: join(work, "headless.png"), screen: "heading Headless" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Headless" }));
   });
@@ -77,8 +77,13 @@ describe("open_app attach", { timeout: 30_000 }, () => {
   it("sends platform to the simulator and reports the phone it opened", async () => {
     const { c, text } = await open({ attach: "never", platform: "ios", session: "p-ios" });
     expect(text).toContain("platform: ios");
-    expect(sessionBodies.find((b) => b.session === "p-ios")?.platform).toBe("ios");
+    expect(sessionBodies.find((b) => b.session === "p-ios")?.device?.platform).toBe("ios");
+    expect(sessionBodies.find((b) => b.session === "p-ios")?.platform).toBeUndefined();
     await c.close();
+  });
+  it("does not error when the simulator reports no platform", async () => {
+    const { c, text, isError } = await open({ attach: "never", platform: "ios", session: "quiet-1" });
+    expect(isError).toBeFalsy(); expect(text).not.toContain("platform:"); expect(text).toContain("mode: headless session"); await c.close();
   });
   it("errors when the simulator opens a different platform than asked", async () => {
     const { c, text, isError } = await open({ attach: "never", platform: "ios", session: "stuck-1" });

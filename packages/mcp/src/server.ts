@@ -205,10 +205,10 @@ const openApp = async ({ app, session, seed_cart, dark, platform, attach }: { ap
       attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark, platform }) as Act & { release?: string | number; platform?: string };
+  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark, ...(platform ? { device: { platform } } : {}) }) as Act & { release?: string | number; platform?: string };
   if (r.code === "sim_timeout") return result(sid, r);
   // The simulator says which phone it opened. If that is not the one asked for, say so instead of handing back another phone.
-  if (r.ok !== false && platform && r.platform !== platform) return result(sid, { ok: false, code: "platform_mismatch", error: `asked for ${platform}, but the simulator opened ${r.platform ?? "a phone that did not report its platform"}` });
+  if (r.ok !== false && platform && r.platform && r.platform !== platform) return result(sid, { ok: false, code: "platform_mismatch", error: `asked for ${platform}, but the simulator opened ${r.platform}` });
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
