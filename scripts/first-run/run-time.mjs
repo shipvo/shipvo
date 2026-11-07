@@ -4,6 +4,7 @@
 // The tap goes through the same agent channel `shipvo run` serves (.shipvo/run.json gives the port and token).
 // Install time is not part of the numbers; --with-install installs the scaffold first (network). The page is opened with
 // playwright's chromium, resolved from packages/sim. The CLI must be built. No login, no secrets.
+// Android runs first, then iOS, in the same app directory, so a warm cache from the first run can help the second. Compare numbers with that order in mind.
 import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";

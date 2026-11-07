@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
-import { parseListening, firstTapRef, timings, table, combinedTable, measureRun } from "./run-time.mjs";
+import { parseListening, firstTapRef, timings, table, combinedTable, measureRun, main } from "./run-time.mjs";
 
 test("parseListening finds the phone URL", () => {
   assert.equal(parseListening("Building…\nSimulated Android phone at http://127.0.0.1:4123/  (Ctrl+C to stop)\n"), "http://127.0.0.1:4123/");
@@ -91,4 +91,8 @@ test("measureRun passes the platform to the CLI", async () => {
   const f = fakeCli(0);
   writeFileSync(f.cli, `console.log(JSON.stringify(process.argv.slice(2))); process.exit(0);`);
   await assert.rejects(measureRun({ ...f, platform: "ios", timeoutMs: 2000, open: async () => () => {}, drive: fakeDriver, poll: 20 }), /\["run","ios","--no-open"\]/);
+});
+
+test("main rejects a bad --platform value with exit 2", async () => {
+  assert.equal(await main(["--platform", "windows"]), 2);
 });
