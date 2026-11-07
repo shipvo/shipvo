@@ -73,3 +73,5 @@ Use the assistant for exploration, the questions you would not think to write do
 New to terminals? Read [how to build a mobile app without coding, and what to plan for after version one](https://shipvo.dev/blog/build-a-mobile-app-without-coding/).
 
 If you want to see your own app on a simulated phone first, [one command does it in your browser](https://shipvo.dev/blog/see-your-react-native-app-on-a-phone-in-your-browser/).
+
+Related: [test dark mode, large text and right-to-left](https://shipvo.dev/blog/test-dark-mode-large-text-and-rtl-in-react-native/) shows the settings your assistant can change on the simulated phone.
