@@ -61,7 +61,7 @@ Who this is for: you build the app on your computer and want a hosted assistant 
 
 1. Set your API key: `export SHIPVO_API_KEY=<your key>` (`shipvo login` gives you one).
 2. Build and upload. Either run `shipvo sim --hosted` in the app folder, or ask a local assistant (the `npx @shipvo/mcp` server) to call `upload_build`.
-3. Read the build id. The terminal prints `Uploaded. It expires <time>. On the hosted phone: open_app("tide@build:<id>")`. The tool prints the same line.
+3. Read the build id. The terminal prints `Uploaded. It expires <time>. On the hosted phone: open_app("tide@build:<id>")`. The `upload_build` tool returns the build id, the expiry and the `open_app("<app>@build:<id>")` call to use.
 4. In the hosted assistant, call `open_app("tide@build:<id>")`. The result shows `release: build:<id>`.
 
 Add `--skip-build` (or `skip_build: true`) to upload the existing `sim-dist` folder without building again.
@@ -76,7 +76,7 @@ A build is private to your account. Another account that asks for your id gets `
 | `stdio_only` | You called `upload_build` on the hosted server. | Add the local server (`npx @shipvo/mcp`) next to it and call it there. |
 | `build_not_found` | The id is wrong, belongs to another account, or was uploaded for another app. | Use the id and app from the upload line. |
 | `build_expired` | The build was deleted. | Upload again. |
-| `build_not_supported` | The simulator did not load that build, so no session opened. | Open the app without `@build` to use the published one. |
+| `build_not_supported` | The simulator did not load that build, so no session opened. | Open the app without `@build` to use the published one. The published app must exist. |
 
 Next steps: [Test with an assistant](test-with-an-assistant.md) to connect a hosted assistant, and [Run on a phone in your browser](run.md) to watch the phone yourself.
 
