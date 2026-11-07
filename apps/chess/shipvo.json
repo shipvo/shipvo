@@ -1,0 +1,7 @@
+{
+  "appId": "chess",
+  "name": "Chess",
+  "shellMajor": 1,
+  "controlPlane": "https://purenative-control.purenative.workers.dev",
+  "publicKey": "oERUkFs2xdjaEm9xAPZDULoDLV9gjksjyDvSJ9lSYZE="
+}
