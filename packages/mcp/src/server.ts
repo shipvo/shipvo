@@ -113,7 +113,7 @@ function scrollTrail(dir: string, el?: { x: number; y: number; w?: number; h?: n
   const [dx, dy] = dir === "down" ? [0, -h] : dir === "up" ? [0, h] : dir === "right" ? [-w, 0] : [w, 0];
   return [{ x: k(c.x - dx), y: k(c.y - dy) }, { x: k(c.x + dx), y: k(c.y + dy) }];
 }
-const sessions = new Map<string, { app: string; steps: number; startedAt: number }>();
+const sessions = new Map<string, { app: string; steps: number; startedAt: number; room?: string; client?: string; platform?: string }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
 const trees = new Map<string, string>();
 // Recorded steps per session, for export_test. Dropped when the session ends.
@@ -180,7 +180,7 @@ use(server, tools.list_apps, async ({ query }) => {
   return text((lines.join("\n") || `no apps match "${query}"`) + phone);
 });
 
-const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
+const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, room }: { app: string; room?: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
   let id = app.split("@")[0];
   const buildId = /^[^@]+@build:([A-Za-z0-9_-]+)$/.exec(app)?.[1];
   const headlessOnly = attach === "never" || show === false;
@@ -233,7 +233,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
       const r = await act({ session: sid, action: "screen" });
       if (!r.ok) { attached.delete(sid); attachedRun.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote += ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
       else {
-        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() }); steps.set(sid, [{ action: "open" }]);
+        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: live.platform }); steps.set(sid, [{ action: "open" }]);
         if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
         // Lumi shows the step in the phone frame. tap, type, scroll and back are captioned by the page itself, from the element it acts on.
         void d.request("lumi", { caption: `Opened ${id}`, state: "working", hold: 1800 }, 1000).catch(() => {});
@@ -244,13 +244,14 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
       attachNote += ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
+  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
   if (r.code === "sim_timeout") return result(sid, r);
   // Only report a build as open when the simulator says it loaded that build. Otherwise the phone shows another app version.
   if (buildId && r.ok !== false && r.build !== buildId) {
     return result("", { ok: false, code: "build_not_supported", error: `the simulator did not load build ${buildId}, so no session was opened. Open ${id} without @build to use the published app.` });
   }
-  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
+  if (r.ok === false) return result(sid, r);
+  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: "headless" });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${buildId ? `build:${buildId}` : r.release ?? "local"}\nmode: headless session${attachNote}\nvisible: no\n\n${r.screen ?? ""}`);
@@ -274,11 +275,24 @@ use(server, tools.attach_session, async ({ app, session }) => {
   return openApp({ app: live.app, session, attach: "always" });
 });
 
+// First heading of a tree, as the screen title of an attached phone.
+const titleOf = (tree?: string | null) => /^\s*- heading "([^"]*)"/m.exec(tree ?? "")?.[1] ?? "";
 use(server, tools.list_sessions, async () => {
-  const r = await sim("/sessions", {}) as Act & { sessions?: { session: string; app: string; release: string | number; started_at: string | null }[] };
+  const r = await sim("/sessions", {}) as Act & { sessions?: { session: string; app: string; release: string | number; started_at: string | null; room?: string | null; title?: string }[] };
   if (r.code === "sim_timeout") return result("", r);
-  const rows = (r.sessions ?? []).filter((s) => !keyApps || keyApps.includes(s.app));
-  return text(rows.length ? rows.map((s) => `${s.session}: ${s.app} release ${s.release}${s.started_at ? ` since ${s.started_at}` : ""}`).join("\n") : "no open sessions");
+  const rows: { session: string; app: string; platform: string; room: string | null; opened_by: string | null; started_at: string | null; screen_title: string; release?: string | number }[] = [];
+  for (const s of r.sessions ?? []) {
+    if (keyApps && !keyApps.includes(s.app)) continue;
+    const m = sessions.get(s.session);
+    rows.push({ session: s.session, app: s.app, platform: m?.platform ?? "headless", room: s.room ?? m?.room ?? null, opened_by: m?.client ?? null, started_at: s.started_at ?? (m ? new Date(m.startedAt).toISOString() : null), screen_title: s.title ?? "", release: s.release });
+  }
+  for (const [id, d] of attached) {
+    const m = sessions.get(id); if (!m || (keyApps && !keyApps.includes(m.app))) continue;
+    const t = await d.request("screen", {}, 2000).catch(() => undefined);
+    rows.push({ session: id, app: m.app, platform: m.platform ?? "attached", room: m.room ?? null, opened_by: m.client ?? null, started_at: new Date(m.startedAt).toISOString(), screen_title: titleOf(t?.screen) });
+  }
+  const line = (s: (typeof rows)[number]) => `${s.session}: ${s.app} on ${s.platform}${s.release !== undefined ? ` release ${s.release}` : ""}${s.room ? `, room ${s.room}` : ""}${s.opened_by ? `, opened by ${s.opened_by}` : ""}${s.started_at ? `, since ${s.started_at}` : ""}${s.screen_title ? `, screen "${s.screen_title}"` : ""}`;
+  return { ...text(rows.length ? rows.map(line).join("\n") : "no open sessions"), structuredContent: { sessions: rows } };
 });
 type Wait = { wait_for?: WaitFor; timeout_ms?: number; settle?: boolean };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -442,13 +456,16 @@ use(server, tools.end_session, async ({ session }) => {
     return text(JSON.stringify({ session, app: s?.app, mode: "attached", visible: true, url: run ? runUrl(run) : undefined, steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000) }, null, 2));
   }
   // The simulator is the source of truth: end a session it lists even if this server did not open it; otherwise no_session.
-  const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string }[] };
+  const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string; room?: string | null }[] };
   if (!listed.ok) return result(session, listed);
   if (!(listed.sessions ?? []).some((x) => x.session === session)) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
-  const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() }; sessions.delete(session); trees.delete(session); steps.delete(session);
+  const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() } as NonNullable<ReturnType<typeof sessions.get>>; sessions.delete(session); trees.delete(session); steps.delete(session);
+  const room = s.room ?? (listed.sessions as { session: string; room?: string | null }[]).find((x) => x.session === session)?.room ?? undefined;
+  // A room shares one store, so the report lists the room's orders. The room's files go when its last session ends.
   let orders: unknown[] = [];
-  try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
-  return text(JSON.stringify({ session, app: s.app, steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
+  try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/${room ? "~" + room : session}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
+  await sim("/end", { session }).catch(() => undefined);
+  return text(JSON.stringify({ session, app: s.app, ...(room ? { room } : {}), steps: s.steps, seconds: Math.round((Date.now() - s.startedAt) / 1000), orders }, null, 2));
 });
 
 // Record the phone frame page to an MP4 (one recording per server). Page: SHIPVO_FRAME_URL, default the simulator's root.
