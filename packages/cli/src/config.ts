@@ -41,7 +41,7 @@ export function loadConfig(dir = process.cwd()): ShipvoConfig {
 }
 
 /** Flags that never take a value, so the word after one stays a positional. Add new boolean flags here. */
-export const BOOLEAN_FLAGS: ReadonlySet<string> = new Set(["json", "skip-build", "hosted", "fail-on-findings", "no-open", "all", "global"]);
+export const BOOLEAN_FLAGS: ReadonlySet<string> = new Set(["json", "skip-build", "hosted", "fail-on-findings", "no-open", "all", "global", "npx"]);
 const argPairs = (argv: string[]) => Object.fromEntries(argv.reduce<string[][]>((a, x, i, all) => (x.startsWith("--") ? [...a, [x.slice(2), BOOLEAN_FLAGS.has(x.slice(2)) || all[i + 1] === undefined || all[i + 1].startsWith("--") ? "true" : all[i + 1]]] : a), []));
 export const args = (argv: string[]) => argPairs(argv) as Record<string, string | undefined>;
 
