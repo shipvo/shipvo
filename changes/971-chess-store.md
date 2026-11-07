@@ -1,1 +1,0 @@
-- chess: one shared game store with labelled squares, a move list, and typed actions `get_board`, `legal_moves` and `move(from, to)`. Illegal moves are rejected with a reason.

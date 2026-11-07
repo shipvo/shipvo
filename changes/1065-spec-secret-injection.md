@@ -1,3 +1,0 @@
-- spec: a data source's `auth.secret` is now read from the vault for the request's host only. The key is never in the data, errors or logs, and a key saved for one service is refused for any other (redirects are not followed). Missing or revoked keys say to add the key through the secret form.
-- spec: **Migration:** `RunContext.secrets` now receives the request host as a second argument and may answer `{ refused: "missing" | "revoked" | "domain" | "unavailable" }`. A plain string or `undefined` still works.
-- control-plane: `useSecret`, `runnerSecrets` and `listUses` (`vault-use.ts`) open a key for the person, app and host it is bound to, and record each use. Migration `0024_vault_use.sql` adds `vault_uses` and `vault_revoked`.

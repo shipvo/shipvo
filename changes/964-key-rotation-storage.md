@@ -1,3 +1,0 @@
-- `@shipvo/control-plane`: migration `0023_key_rotation.sql` adds storage for signing key rotation (root keys, statements, and a rotation log) and a typed accessor module. No routes use it yet. `audit_log` is not changed.
-- Deploy procedure: apply the migration first, then deploy the Worker. The migration only adds tables; the old Worker ignores them and keeps writing `audit_log`, so both Worker versions can run during the deploy and no row is lost.
-- Migration: none for users; new tables only.

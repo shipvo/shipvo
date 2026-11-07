@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo --version` and `shipvo -v` print the installed version; with `--json` they print the usual envelope with `version`. Listed in `--help`.
-- Migration: none; new flag.

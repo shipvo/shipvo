@@ -6,6 +6,8 @@ import { validate } from "./validate.js";
 import { evaluate, evaluateTemplate } from "./eval.js";
 import type { EvalOptions } from "./eval.js";
 import type { Issue } from "./types.js";
+import { aggregatePoints, chartSvg, chartText } from "./chart.js";
+import type { Aggregate, ChartKind, ChartPoint } from "./chart.js";
 
 export type PhoneStyle = "android" | "ios";
 
@@ -129,6 +131,8 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
       }
       case "list":
         return buildList(b, scope, label);
+      case "chart":
+        return buildChart(b, scope, label);
       case "button": {
         const key = String(b.id ?? b.label);
         registry.set(`button:${key}`, { kind: "button", block: b, scope });
@@ -139,6 +143,27 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
       default:
         return undefined; // other blocks arrive in later slices
     }
+  };
+
+  const buildChart = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
+    let items: unknown = [];
+    if (typeof b.from === "string") items = b.from.includes("{{") ? tpl(b.from, scope) : scope[b.from];
+    // x, y and series are templates or bare expressions, evaluated per item.
+    const each = (src: unknown, sc: Record<string, unknown>): unknown => {
+      if (typeof src !== "string") return "";
+      if (src.includes("{{")) return tpl(src, sc);
+      try { return evaluate(src, sc, options); } catch { return src; }
+    };
+    let points: ChartPoint[] = (Array.isArray(items) ? items : []).map((item) => {
+      const sc = { ...scope, item };
+      const y = Number(each(b.y, sc));
+      const x = each(b.x, sc);
+      const sr = b.series === undefined ? "" : each(b.series, sc);
+      return { x: x === null || x === undefined ? "" : String(x), y: Number.isFinite(y) ? y : 0, series: sr === null || sr === undefined ? "" : String(sr) };
+    });
+    if (typeof b.aggregate === "string") points = aggregatePoints(points, b.aggregate as Aggregate);
+    const name = chartText(label || "Chart", points);
+    return { role: "img", name, block: "chart", children: [], props: { kind: b.kind as ChartKind, points } };
   };
 
   const buildList = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
@@ -312,6 +337,8 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
         const color = pr.tone === "danger" ? t.p.danger : pr.tone === "success" ? t.p.success : t.p.primary;
         return `<span ${a} style="display:inline-block;padding:2px 10px;border-radius:999px;background:${t.p.surface};color:${color};border:1px solid ${color};font:600 12px ${t.font}">${esc(pr.text)}</span>`;
       }
+      case "chart":
+        return `<figure style="margin:0;padding:12px;background:${t.p.surface};border-radius:${t.radius}px">${chartSvg(pr.kind as ChartKind, pr.points as ChartPoint[], t.p, n.name, esc, t.font)}</figure>`;
       case "list": {
         const ios = style === "ios";
         const wrap = ios ? `background:${t.p.surface};border-radius:${t.radius}px;overflow:hidden` : "";

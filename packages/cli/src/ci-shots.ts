@@ -1,4 +1,4 @@
-// `shipvo ci shots`: one simulator screenshot per changed screen, written to shipvo-shots/ for the check comment.
+// `shipvo ci shots`: one simulator screenshot per changed screen and skin, written to shipvo-shots/<skin>/ for the check comment.
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { changedFiles, changedScreens } from "./ci-comment.js";
@@ -33,6 +33,13 @@ export async function captureScreens(screens: string[], shoot: Shoot, outDir: st
     } catch (e) { log(`screenshot of ${name} skipped: ${e instanceof Error ? e.message : e}`); }
   }
   return written;
+}
+
+/** `android,ios` (the default), `android` or `ios`. Null when a name is unknown. */
+export function parseSkins(v: string | undefined): Skin[] | null {
+  if (v === undefined) return [...SKINS];
+  const l = v.split(",").map((s) => s.trim()).filter(Boolean);
+  return l.length && l.every((s): s is Skin => (SKINS as readonly string[]).includes(s)) ? [...new Set(l)] : null;
 }
 
 export const SKINS = ["android", "ios"] as const;
@@ -92,14 +99,17 @@ async function pairsCmd(argv: string[]): Promise<number> {
   catch (e) { console.error(e instanceof Error ? e.message : e); return 2; }
 }
 
-/** `shipvo ci shots --changed-from <sha> [--sim url] [--out dir]`. Never fails the check. */
+/** `shipvo ci shots (--changed-from <sha> | --screens a,b) [--skins android,ios] [--sim url] [--out dir]`. Writes `<out>/<skin>/<screen>.png`. Never fails the check. */
 export async function shotsCmd(argv: string[]): Promise<number> {
   if (argv.includes("--before") || argv.includes("--after")) return pairsCmd(argv);
   const val = (n: string) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
   const base = val("--changed-from"), sim = (val("--sim") ?? "http://localhost:4545").replace(/\/$/, ""), out = val("--out") ?? "shipvo-shots";
-  if (!base) { console.error("shipvo ci shots: --changed-from <sha> is required"); return 2; }
+  const list = val("--screens");
+  if (!base && list === undefined) { console.error("shipvo ci shots: --changed-from <sha> or --screens <a,b> is required"); return 2; }
+  const skins = parseSkins(val("--skins"));
+  if (!skins) { console.error("shipvo ci shots: --skins takes android, ios or android,ios"); return 2; }
   let screens: string[] = [];
-  try { screens = changedScreens(changedFiles(base)); } catch (e) { console.error(`could not read the diff: ${e instanceof Error ? e.message : e}`); return 0; }
+  try { screens = list !== undefined ? list.split(",").map((s) => s.trim()).filter(Boolean) : changedScreens(changedFiles(base!)); } catch (e) { console.error(`could not read the diff: ${e instanceof Error ? e.message : e}`); return 0; }
   const post = async (path: string, body: Record<string, unknown>) => {
     const r = await fetch(sim + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(60000) });
     if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}`);
@@ -108,16 +118,22 @@ export async function shotsCmd(argv: string[]): Promise<number> {
   const { loadConfig } = await import("./config.js");
   let appId: string;
   try { appId = loadConfig().appId; } catch (e) { console.error(`could not read shipvo.json: ${e instanceof Error ? e.message : e}`); return 0; }
-  const session = `ci-shots-${Date.now().toString(36)}`;
-  const files = await captureScreens(screens, async (route) => {
-    const open = await post("/session", { session, app: appId, width: 390, height: 844 });
-    if (open.ok === false) throw new Error(`could not open the app: ${open.error ?? "unknown error"}`);
-    const nav = await post("/act", { session, action: "open_url", url: route });
-    if (!nav.ok) throw new Error(`could not open ${route}: ${nav.error ?? "unknown error"}`);
-    const shot = await post("/act", { session, action: "screenshot", format: "png", inline: true });
-    if (!shot.ok || !shot.data) throw new Error(`screenshot failed: ${shot.error ?? "no data"}`);
-    return new Uint8Array(Buffer.from(shot.data, "base64"));
-  }, out, (s) => console.error(s));
-  console.log(`Captured ${files.length} screenshot${files.length === 1 ? "" : "s"} in ${out}/.`);
+  let total = 0;
+  for (const skin of skins) {
+    const files = await captureScreens(screens, async (route) => {
+      const session = `ci-shots-${skin}-${Date.now().toString(36)}`;
+      const open = await post("/session", { session, app: appId, width: 390, height: 844, device: { platform: skin } });
+      if (open.ok === false) throw new Error(`could not open the app: ${open.error ?? "unknown error"}`);
+      const nav = await post("/act", { session, action: "open_url", url: route });
+      if (!nav.ok) throw new Error(`could not open ${route}: ${nav.error ?? "unknown error"}`);
+      const shot = await post("/act", { session, action: "screenshot", format: "png", inline: true });
+      if (!shot.ok || !shot.data) throw new Error(`screenshot failed: ${shot.error ?? "no data"}`);
+      return new Uint8Array(Buffer.from(shot.data, "base64"));
+    }, join(out, skin), (s) => console.error(`${skin}: ${s}`));
+    total += files.length;
+  }
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "screens.txt"), routableScreens(screens).map(([n]) => n).join(","));
+  console.log(`Captured ${total} screenshot${total === 1 ? "" : "s"} in ${out}/ (${skins.join(", ")}).`);
   return 0;
 }

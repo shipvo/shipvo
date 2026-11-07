@@ -41,6 +41,18 @@ importers:
       '@types/node':
         specifier: ^22.8.0
         version: 22.20.5
+      '@types/react':
+        specifier: ~19.3.0
+        version: 19.3.0
+      '@types/react-test-renderer':
+        specifier: ^19.3.1
+        version: 19.3.1
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-test-renderer:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -2341,6 +2353,9 @@ packages:
   '@types/plist@3.0.5':
     resolution: {integrity: sha512-E6OCaRmAe4WDmWNsL/9RMqdkkzDCY1etutkflWk4c+AcjDU07Pcz1fQwTX0TQz+Pxqn9i4L1TU3UFpjnrcDgxA==}
 
+  '@types/react-test-renderer@19.3.1':
+    resolution: {integrity: sha512-9AwMfeBOcXsN5kC4oAauNTOKEwqLHtc69tkJC2CihQ5fCELDwzfQvookvtyaxm6i+vc5LLD0V5OLB8arzY8Smw==}
+
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
 
@@ -3987,6 +4002,9 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
+  react-is@19.3.1:
+    resolution: {integrity: sha512-RRieF6IyxQBkcK6pP8xOHprLTPW6QjRkbGdImtqNme+/hYVwCZkLQLdlZGOhUqXwkS9IEynaGvPJtv6XB/cz0Q==}
+
   react-native-web@0.21.4:
     resolution: {integrity: sha512-77B6KlalB4osNIck91TNFixPkYPsTbuNEvw8P7IV+4v4/5wZSBRKZnw0Zhx6YjuauDTz71gc8IW+fVhcBMjr5A==}
     peerDependencies:
@@ -4007,6 +4025,11 @@ packages:
   react-refresh@0.14.2:
     resolution: {integrity: sha512-jCvmsr+1IUSMUyzOkRcvnVbX3ZYC6g9TDrDbFuFmRDq7PD4yaGbLKNQL6k2jnArV8hjYxh7hVhAZB6s9HDGpZA==}
     engines: {node: '>=0.10.0'}
+
+  react-test-renderer@19.3.0:
+    resolution: {integrity: sha512-AUxgv+hRbqjRgx4xVwiWL6cvDDKPAva1VWLXQIMoevqQn9us//C5TX9LEnBGH47D0zvJpjwjxb1umzgOMvE8Wg==}
+    peerDependencies:
+      react: ^19.3.0
 
   react@19.3.0:
     resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
@@ -7009,6 +7032,10 @@ snapshots:
       '@types/node': 22.20.5
       xmlbuilder: 15.1.1
 
+  '@types/react-test-renderer@19.3.1':
+    dependencies:
+      '@types/react': 19.3.0
+
   '@types/react@19.3.0':
     dependencies:
       csstype: 3.2.3
@@ -9119,6 +9146,8 @@ snapshots:
 
   react-is@18.3.1: {}
 
+  react-is@19.3.1: {}
+
   react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       '@babel/runtime': 7.29.10
@@ -9177,6 +9206,12 @@ snapshots:
       - utf-8-validate
 
   react-refresh@0.14.2: {}
+
+  react-test-renderer@19.3.0(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-is: 19.3.1
+      scheduler: 0.28.0
 
   react@19.3.0: {}
 

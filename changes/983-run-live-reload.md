@@ -1,1 +1,0 @@
-- cli: `shipvo run android|ios` now rebuilds when you save a file and reloads the phone. A failed rebuild keeps the last good page and shows the error in the terminal and in a bar outside the phone.
