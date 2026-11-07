@@ -7,7 +7,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,6 +69,15 @@ class HeadlessLoadTest {
     } finally {
       inst.runOnMainSync { activity.finish() }
     }
-    assertNotNull(s.pendingPath)
+    assertEquals(1, s.pendingRelease)
+  }
+
+  @Test
+  fun loadWithAScreenCountsTheBootAtOnce() {
+    ShipvoHostHandler.processVisibleOverride = true
+    val s = Store(ctx)
+    assertEquals(bundle.path, ShipvoHostHandler(ctx).getJSBundleFile(false))
+    assertEquals(1, s.trialBoots)
+    assertEquals(0, Store.gate.deferredRelease)
   }
 }
