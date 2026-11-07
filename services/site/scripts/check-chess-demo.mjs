@@ -61,7 +61,7 @@ try {
   // One autoplay move updates the move list, and shows on the other phone.
   await page.locator("#cd-moves li").first().waitFor({ timeout: SLOW });
   assert.match(await page.locator("#cd-moves li").first().textContent(), /^1\. e2e4/);
-  await ios.getByLabel("white pawn on e4").waitFor({ timeout: 10_000 });
+  await ios.getByLabel("white pawn on e4").waitFor({ timeout: SLOW });
   // "Play against it": the visitor taps white, the code answers for black.
   await page.locator("#cd-mode").click();
   await android.getByTestId("board").waitFor({ timeout: SLOW });
