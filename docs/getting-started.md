@@ -170,3 +170,25 @@ The simulator also runs hosted: one Worker spins up a sandbox per API key and ex
 ## Where things are measured
 
 Everything above is claimed from measurements on real hardware, published in this repo: OTA sizes and timings on a 2 GB Redmi 9A ([spike-results.md](spike-results.md)), and simulator-vs-device parity on an Android emulator and an iPhone simulator ([parity-results.md](parity-results.md)).
+
+## Troubleshooting
+
+These come from the App Builder reports in `docs/product/dogfood/`.
+
+| What you see | What to do |
+| --- | --- |
+| `node --version` prints less than `v22` | Run `nvm use 22`, or install Node 22 from nodejs.org. |
+| A step fails and you do not know why | Run `npx shipvo doctor` in the app folder. Each FAIL line ends with the exact fix. |
+| `npm test` fails on buttons that no longer exist | You replaced `App.tsx`. Replace or delete `tests/app.test.ts` too. |
+| `Port 4545 is in use. Stop the other \`shipvo sim\` or pass --port <n>.` | Another simulator is still running. Stop it, or run `npx shipvo sim --port 4546`. |
+| The first publish fails | Run `shipvo doctor`, then `shipvo publish --dry-run` to see the failing step without sending anything. |
+| Installed phones never accept an update after you changed machines | The signing key differs. Restore it from your backup: [new machine](new-machine.md). |
+
+## Next steps
+
+- [Run the app on a phone in your browser](run.md)
+- [Have an AI assistant test it](test-with-an-assistant.md)
+- [Check every pull request](ci-check.md)
+- [Take it to the stores](store.md)
+- [Words explained](glossary.md)
+
