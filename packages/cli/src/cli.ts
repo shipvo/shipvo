@@ -29,6 +29,7 @@ import { store } from "./store.js";
 import { ci } from "./ci.js";
 import { easCmd } from "./eas.js";
 import { testCmd } from "./test.js";
+import { evalCmd } from "./eval.js";
 import { emit, envelope, EXIT } from "./json-out.js";
 import { failure, help, unknownCommand } from "./help.js";
 
@@ -56,6 +57,7 @@ switch (cmd) {
   case "migrate": process.exitCode = await migrate(rest); break;
   case "approvals": process.exitCode = await approvals(rest); break;
   case "test": process.exitCode = await testCmd(rest); break;
+  case "eval": process.exitCode = await evalCmd(rest); break;
   case "store": await store(rest); break;
   case "ci": process.exitCode = await ci(rest); break;
   case "eas": process.exitCode = await easCmd(rest); break;
