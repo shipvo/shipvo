@@ -56,6 +56,8 @@ const PHONE = {
   apps: [{ id: "a", name: "A", schemes: ["appa"] }, { id: "b", name: "B", schemes: ["appb"] }, { id: "c", name: "C", schemes: ["appc"] }, { id: "d", name: "D" }],
 };
 
+// Both skins run the same server path; the loop shows the behaviour holds for
+// each skin label, not that any skin-specific code exists.
 for (const skin of ["android", "iphone"]) {
   test(`${skin}: open_url switches to the owning app and it gets the initial URL`, async () => {
     const s = `sw-${skin}`;
@@ -75,7 +77,7 @@ for (const skin of ["android", "iphone"]) {
     assert.equal(await initial(s), null);
   });
 
-  test(`${skin}: open_url leaves no init script, so a reload sees no link`, async () => {
+  test(`${skin}: open_url link is one-shot: after kill and resume the app sees no link`, async () => {
     const s = `init-${skin}`;
     assert.ok((await call("/session", { session: s, phone: PHONE })).ok);
     assert.equal((await act(s, { action: "open_url", url: "appb://x" })).ok, true);

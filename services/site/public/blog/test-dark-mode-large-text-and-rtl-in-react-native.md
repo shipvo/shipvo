@@ -121,5 +121,3 @@ Settings reach your app through the same React Native APIs, but the useful quest
 1. Run `npx shipvo run android` or `npx shipvo run ios` and watch the phone in your browser ([see how](https://shipvo.dev/blog/see-your-react-native-app-on-a-phone-in-your-browser/)).
 2. Ask your assistant to set `dark_mode`, `font_size` and `language` and report what changed.
 3. Read [the phone apps guide](https://shipvo.dev/docs/phone-apps/) for the Browser, Store and system controls.
-
-Same phone, another app: [Test the links that leave your app](https://shipvo.dev/blog/test-links-that-leave-your-app/) uses the Browser to check web pages and deep links.
