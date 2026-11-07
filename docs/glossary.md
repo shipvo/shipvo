@@ -72,7 +72,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Promote.** Widening a staged release to more phones. `shipvo promote` sends the release you already checked to the next bands.
 
-
 **Lumi.** The small glowing orb beside the Shipvo Phone camera. It shows each step as a caption, looks worried when something fails, and powers `shipvo lumi`, which tests your app while you watch. See [Lumi](lumi.md).
 
 **Network profile.** A named connection speed and reliability for the simulated phone, such as `2g` or `spotty`, so you can see how your app behaves on a poor connection. See [Device API](device-api.md#network-profiles).

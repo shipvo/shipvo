@@ -1,1 +1,0 @@
-- docs: new Score an agent on your app page for `shipvo eval run` and `shipvo eval report`; in the sidebar, search and llms.txt.
