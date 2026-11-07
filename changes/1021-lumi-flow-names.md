@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo lumi` understands everyday flow names. "checkout" finds Cart then Pay, "login" and "sign up" match their usual wordings, and Lumi says which path it picked. `try <flow> with bad input` on a flow with no text fields says so and tests it with taps.
+- Migration: none.

@@ -9,7 +9,7 @@ const SCREENS: Record<string, string> = {
   signup: `- heading "Sign up" [ref=e1]\n- textbox "Email" [ref=e2]\n- button "Continue" [ref=e3]\n- button "Back" [ref=e4]`,
   bad: `- heading "Sign up" [ref=e1]\n- text: Enter a valid email\n- textbox "Email" [ref=e2]\n- button "Continue" [ref=e3]\n- button "Back" [ref=e4]`,
   welcome: `- heading "Welcome" [ref=e1]\n- button "Back" [ref=e2]`,
-  cart: `- heading "Cart" [ref=e1]\n- text: Network request failed\n- button "Back" [ref=e2]`,
+  cart: `- heading "Cart" [ref=e1]\n- text: Network request failed\n- button "Back" [ref=e2]\n- button "Pay" [ref=e3]`,
 };
 function shop() {
   let at = "home"; let email = ""; const stack: string[] = []; const typed: string[] = [];
@@ -87,6 +87,19 @@ describe("Lumi", () => {
     const r = await l.command("test zebra");
     expect(r).toMatch(/do not know a flow called "zebra"/); expect(r).toMatch(/cart/); expect(r).toMatch(/Sign up/);
     expect(l.state().running).toBe(false);
+  });
+  it("checkout resolves to the Cart then Pay path and says so", async () => {
+    const l = new Lumi(shop().driver, { ...opts, routes: [] });
+    const r = await l.command("test checkout");
+    expect(r).toBe("Checkout: I'll go Cart → Pay. Testing Pay.");
+    await l.idle();
+    const taps = l.state().feed.filter((f) => f.kind === "step").map((f) => f.text);
+    expect(taps.some((t) => /"Pay"/.test(t))).toBe(true);
+  });
+  it("try checkout with bad input says it has no fields and still runs", async () => {
+    const l = new Lumi(shop().driver, { ...opts, routes: [] });
+    expect(await l.command("try checkout with bad input")).toBe("Checkout: I'll go Cart → Pay. Checkout has no fields to fill; I'll test it with taps.");
+    expect(l.state().running).toBe(true); await l.idle();
   });
   it("try <flow> with bad input types only invalid values", async () => {
     const { driver, typed } = shop(); const l = new Lumi(driver, opts);
