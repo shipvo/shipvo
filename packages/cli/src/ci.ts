@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 import { args } from "./config.js";
 import { explore } from "./explore.js";
 import { testCmd } from "./test.js";
-import { commentCmd } from "./ci-comment.js";
+import { commentCmd, renderComment, upsertComment } from "./ci-comment.js";
+import type { TestReport } from "./report-md.js";
+import { loadConfig } from "./config.js";
+import { checkPublishPolicy } from "./policy.js";
+import { spawnSync } from "node:child_process";
 import { shotsCmd } from "./ci-shots.js";
 
 export const WORKFLOW_PATH = join(".github", "workflows", "shipvo-build.yml");
@@ -44,6 +48,59 @@ export async function check(runTest: Run = testCmd, runExplore: Run = explore, c
 }
 
 
+export type FixDeps = {
+  runTest?: Run;
+  /** Publishes to the given band and returns the release id. */
+  publishBand?: (band: string) => Promise<number>;
+  policy?: unknown;
+  readReport?: () => TestReport | null;
+  post?: (body: string) => Promise<void>;
+};
+
+const FIRST_BAND = "b0";
+
+function defaultPublish(band: string): Promise<number> {
+  const r = spawnSync(process.execPath, [process.argv[1]!, "publish", "--bands", band, "--json"], { encoding: "utf8" });
+  let doc: { data?: { release?: number }; summary?: string } = {};
+  try { doc = JSON.parse(r.stdout); } catch { /* handled below */ }
+  if (r.status !== 0 || typeof doc.data?.release !== "number") return Promise.reject(new Error(doc.summary ?? `shipvo publish exited ${r.status}`));
+  return Promise.resolve(doc.data.release);
+}
+
+/** `shipvo ci fix`: run the flows; if all pass, publish to the first band only (never wider) and post the release id.
+ * Widening stays with release health and the release policy. Returns the exit code. */
+export async function fixToFirstBand(d: FixDeps = {}): Promise<number> {
+  const runTest = d.runTest ?? testCmd;
+  const code = await runTest(["--report", "shipvo-report.json"]);
+  let report: TestReport | null = null;
+  try { report = (d.readReport ?? (() => JSON.parse(readFileSync("shipvo-report.json", "utf8")) as TestReport))(); } catch { /* no report */ }
+  const failed = (report?.flows ?? []).filter((f) => f.status === "failed").map((f) => f.name ?? "unnamed flow");
+  let skipped: string | undefined;
+  if (failed.length) skipped = `${failed.length === 1 ? "This flow is" : "These flows are"} still failing: ${failed.join(", ")}.`;
+  else if (code !== 0 || !report) skipped = "`shipvo test` did not pass.";
+  let fix: { release: number; band: string } | { skipped: string } | undefined;
+  let exit = 0;
+  if (skipped) { fix = { skipped }; exit = 1; }
+  else {
+    const policy = "policy" in d ? d.policy : loadConfig().policy;
+    const verdict = checkPublishPolicy(policy, [FIRST_BAND]);
+    if (!verdict.ok) { fix = { skipped: `Policy rule ${verdict.rule} refused the first band: ${verdict.reason}` }; exit = 1; }
+    else {
+      try { fix = { release: await (d.publishBand ?? defaultPublish)(FIRST_BAND), band: FIRST_BAND }; }
+      catch (e) { fix = { skipped: `Publish failed: ${e instanceof Error ? e.message : String(e)}` }; exit = 1; }
+    }
+  }
+  const body = renderComment({ test: report, fix });
+  const post = d.post ?? (async (b: string) => {
+    const env = process.env, pr = Number(env.SHIPVO_PR);
+    if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY || !pr) { console.log(b); return; }
+    await upsertComment({ repo: env.GITHUB_REPOSITORY, pr, token: env.GITHUB_TOKEN, body: b });
+  });
+  try { await post(body); } catch (e) { console.error(`Not posted: ${e instanceof Error ? e.message : e}`); }
+  console.log("release" in fix ? `Published release ${fix.release} to ${fix.band}.` : fix.skipped);
+  return exit;
+}
+
 /** Find the template: next to the built CLI (npm), or in the repo's `templates/` (development). */
 function templatePath(framework: string): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -61,9 +118,10 @@ export async function ci(argv: string[], cwd = process.cwd()): Promise<number> {
     if (i >= 0 && (v === undefined || v.startsWith("-"))) { console.error("shipvo ci check: --changed-from needs a commit sha"); return 2; }
     return check(testCmd, explore, v);
   }
+  if (sub === "fix") return fixToFirstBand();
   if (sub === "shots") return shotsCmd(rest);
   if (sub === "comment") return commentCmd(rest);
-  if (sub !== "init") { console.error("Usage: shipvo ci init --check | --framework capacitor [--dry-run] [--force]\n       shipvo ci check"); return 2; }
+  if (sub !== "init") { console.error("Usage: shipvo ci init --check | --framework capacitor [--dry-run] [--force]\n       shipvo ci check\n       shipvo ci fix"); return 2; }
   const a = args(rest);
   const isCheck = a.check !== undefined && a.check !== "false";
   if (!isCheck && a.framework !== "capacitor") { console.error("shipvo ci init: --framework capacitor is the only framework with a template so far"); return 2; }
