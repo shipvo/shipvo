@@ -32,6 +32,8 @@ A row appears when test results reach your control plane.
    Expected output ends with `uploaded report for release 42 (android)`.
 2. For pull requests, send the report to `POST /r/<app>/pr/<number>/tests` with a publish token. Each run adds a row named `p<number>`.
 
+`shipvo test --report` writes the flows. `findings` and `screens` appear only when the report you send contains them: add them to the report JSON before you upload or post it (limits and format are in the Reference). Without them, a row shows its flows only.
+
 A release row is named `r<number>` and a pull request row `p<number>`. When Android and iOS both report for the same point, they share one row.
 
 ## Reference

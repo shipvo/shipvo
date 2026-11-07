@@ -1,1 +1,2 @@
 - docs: new page "Behaviour timeline" covering the Timeline tab, its routes, report fields and troubleshooting.
+- docs: `docs/testing.md` has a new section on `--device agent-device`.
