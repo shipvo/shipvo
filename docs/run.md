@@ -44,6 +44,19 @@ If a rebuild fails (a typo in your code, say), the phone keeps your last good ve
 
 The tests in `packages/cli/test/run-live-reload.test.ts` edit a fixture app and check the Android and iOS frames in Chromium, and they print the save-to-visible time for each.
 
+## The device panel
+
+Next to the phone, on both the Android and iOS frames, the page has a collapsible **Device panel**. Each control sets the simulated device state your app reads, and writes a line to the event log on the page, marked "(simulated)".
+
+- **Location**: pick Douala, Paris, New York or Nairobi, or type a latitude and longitude.
+- **Camera**: pick a test image. The app's file and photo picker offers it.
+- **Biometrics**: succeed, fail or not enrolled.
+- **Payment**: succeed, cancel or decline.
+- **Network**: online, offline, 2G or slow 4G, using the profiles from `@shipvo/sim`.
+- **Push**: send a test notification with a title and message.
+
+`packages/cli/test/run-panel.test.ts` clicks every control on the Android and iOS frames and checks what the app reads.
+
 ## Your app reaches its backend, with no CORS errors
 
 On Android and iOS, an app calls its backend directly and there is no CORS. In the simulated phone the app runs in a browser tab, so Shipvo sends every request to another origin (`fetch` and `XMLHttpRequest`) through the `shipvo run` server at `/__shipvo/net`. The server makes the real request from Node and returns the status, headers and body unchanged. Requests to the app's own origin go straight through.

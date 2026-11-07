@@ -1,0 +1,2 @@
+- cli: `shipvo run android|ios` shows a collapsible device panel beside the phone frame: location, camera test image, biometrics, payment, network and push. Each change is logged on the page as "(simulated)". No migration needed.
+- device: simulated payments accept `payment.nextResult: "cancel"`, which returns `{ ok: false, reason: "cancelled" }`. Existing values are unchanged.
