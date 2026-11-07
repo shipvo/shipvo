@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chess on Android</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:transparent}
+#fit{position:absolute;left:50%;top:50%;transform-origin:center;touch-action:manipulation}
+.sf-body{--sf-bg:#fff;--sf-fg:#111;position:relative;box-sizing:border-box;width:432px;height:949px;padding:10px 10px 24px;border-radius:46px;background:linear-gradient(145deg,#3a3d42,#15171a);box-shadow:0 0 0 1px #000,0 10px 34px #0007;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.sf-screen{width:412px;height:915px;border-radius:36px;background:var(--sf-bg);color:var(--sf-fg);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.sf-status{flex:none;height:36px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font:600 14px system-ui,sans-serif;position:relative;z-index:2;color:var(--sf-status-fg,var(--sf-fg));background:var(--sf-status-bg,transparent)}
+.sf-icons{display:flex;align-items:center;gap:5px}.sf-ico{display:block}
+.sf-cut{position:absolute;left:50%;background:#000}
+.sf-hole{top:10px;width:14px;height:14px;margin-left:-7px;border-radius:50%;box-shadow:0 0 0 2px #1c1e21}
+.sf-island{top:11px;width:122px;height:34px;margin-left:-61px;border-radius:20px}
+.sf-content{flex:1;min-height:0;position:relative;background:#fff}
+.sf-content iframe{border:0;background:#fff;width:100%;height:100%;display:block}
+.sf-bar{flex:none;height:24px;display:flex;justify-content:center;align-items:center;background:var(--sf-bg)}
+.sf-bar i{display:block;width:108px;height:5px;border-radius:3px;background:var(--sf-fg);opacity:.85}
+.sf-btn{position:absolute;right:-5px;width:5px;padding:0;border:0;border-radius:0 2px 2px 0;background:#5b6068;box-shadow:0 0 0 1px #000;cursor:pointer}.sf-btn::before{content:"";position:absolute;top:-6px;bottom:-6px;left:-4px;right:-10px}.sf-btn:focus-visible,.sf-lock button:focus-visible,.sf-menu button:focus-visible{outline:3px solid #4da3ff;outline-offset:2px}.sf-power{top:200px;height:80px}.sf-volup{top:310px;height:56px}.sf-voldown{top:376px;height:56px}
+.sf-lock,.sf-boot,.sf-off,.sf-menu,.sf-vol{position:absolute;z-index:5}.sf-lock[hidden],.sf-boot[hidden],.sf-off[hidden],.sf-menu[hidden],.sf-vol[hidden]{display:none}.sf-off{inset:0;z-index:7;background:#000;cursor:pointer}
+.sf-lock{inset:0;background:#10151c;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif}.sf-lock-time{font-size:64px;font-weight:300}.sf-lock-hint{font-size:14px;opacity:.7}.sf-lock button{margin-top:8px;padding:10px 28px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer}
+.sf-boot{inset:0;z-index:6;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font:700 34px system-ui,sans-serif;letter-spacing:.04em}
+.sf-vbar{display:block;width:90px;height:4px;margin-top:6px;border-radius:2px;background:#fff4}.sf-vbar b{display:block;height:100%;border-radius:2px;background:#fff}.sf-vol{top:80px;right:12px;padding:8px 14px;border-radius:14px;background:#222d;color:#fff;font:600 14px system-ui,sans-serif}
+.sf-menu{left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:16px;background:#222;box-shadow:0 8px 30px #0008}.sf-menu button{padding:10px 24px;border:0;border-radius:10px;background:#3a3d42;color:#fff;font:600 15px system-ui,sans-serif}
+.sf-grab{position:absolute;left:0;right:0;top:0;height:18px;z-index:7}
+.sf-panel{position:absolute;inset:0;z-index:6;overflow:auto;padding:48px 14px 14px;background:#1b1e23f2;color:#fff;font:14px system-ui,sans-serif}.sf-panel[hidden]{display:none}
+.sf-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.sf-tile{padding:10px 4px;border:0;border-radius:14px;background:#3a3d42;color:#fff;font:600 11px system-ui,sans-serif}.sf-tile[aria-pressed="true"]{background:#4da3ff;color:#001}
+.sf-row{position:relative}.sf-icon{flex:none;width:28px;height:28px;margin-right:10px;border-radius:8px;background:#4da3ff;color:#001;font:700 14px/28px system-ui,sans-serif;text-align:center}.sf-text{flex:1;min-width:0}.sf-dismiss{position:absolute;right:8px;top:8px;padding:2px 8px;border:1px solid #fff6;border-radius:999px;background:#1b1e23;color:#fff;font:11px system-ui,sans-serif;opacity:0;pointer-events:none}.sf-dismiss:focus{opacity:1;pointer-events:auto}.sf-note{display:flex;align-items:flex-start;width:100%;margin:6px 0;padding:10px 12px;border:0;border-radius:14px;background:#2c3036;color:#fff;text-align:left;font:13px system-ui,sans-serif}.sf-text b{display:block}.sf-note small{opacity:.7}.sf-group{margin:10px 0 0;font-weight:700;opacity:.8}
+.sf-clear,.sf-close{margin-top:8px;padding:8px 16px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff}
+.sf-settings{position:absolute;inset:0;z-index:8;overflow:auto;padding:48px 14px 14px;background:#10151c;color:#fff;font:15px system-ui,sans-serif}.sf-settings[hidden]{display:none}.sf-sh{margin:0 0 12px;font-size:22px}
+.sf-srow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;box-sizing:border-box;margin:6px 0;padding:12px;border:0;border-radius:14px;background:#2c3036;color:#fff;font:inherit;text-align:start}.sf-srow[role=switch]::after{content:"Off";opacity:.7}.sf-srow[aria-checked=true]::after{content:"On";color:#4da3ff;font-weight:700}
+.sf-group2{margin:6px 0;padding:8px 12px;border-radius:14px;background:#2c3036}.sf-group2 b{display:block;margin-bottom:6px}.sf-opts{display:flex;flex-wrap:wrap;gap:6px}.sf-opt{padding:8px 12px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:inherit}.sf-opt[aria-checked=true]{background:#4da3ff;color:#001;border-color:#4da3ff}
+.sf-gear{margin:0 8px 8px 0;padding:8px 16px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff}
+.sf-settings :focus-visible,.sf-gear:focus-visible{outline:3px solid #4da3ff;outline-offset:2px}
+.sf-store{position:absolute;inset:0;z-index:8;overflow:auto;padding:70px 20px 40px;box-sizing:border-box;background:#0b1320;color:#fff;font-family:system-ui,sans-serif}[data-theme="light"] .sf-store{background:#f4f7fb;color:#111}.sf-store[hidden]{display:none}.sf-store-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #8883;font:600 15px system-ui,sans-serif}.sf-store-row small{opacity:.6;font-weight:400}.sf-store-row button,.sf-store .sf-close{border:0;border-radius:999px;padding:12px 18px;min-height:44px;background:#f4a261;color:#102030;font:600 14px system-ui,sans-serif;cursor:pointer}.sf-store-have{color:#8a94a6;font-size:13px}[data-theme="light"] .sf-store-have{color:#4a5568}.sf-store .sf-close{margin-top:18px;background:#8883;color:inherit}.sf-apps{position:absolute;left:28px;right:28px;top:180px;display:flex;flex-wrap:wrap;gap:20px 24px}.sf-apps .sf-icon{position:static}
+.sf-update{position:absolute;left:10px;right:10px;top:48px;z-index:4;padding:8px 12px;border-radius:12px;background:#1d2733;color:#fff;font:600 13px system-ui,sans-serif;box-shadow:0 4px 16px #0006}.sf-update[hidden]{display:none}
+.sf-edge{position:absolute;left:0;top:36px;bottom:24px;width:14px;z-index:3}.sf-home[hidden],.sf-recents[hidden],.sf-navbtns[hidden]{display:none}
+.sf-home,.sf-recents{position:absolute;inset:0;z-index:4;background:linear-gradient(160deg,#1d3557,#0b1320);color:#fff;font-family:system-ui,sans-serif}[data-theme="light"] .sf-home{background:linear-gradient(160deg,#dbe7f5,#f4f7fb);color:#111}.sf-icon{position:absolute;left:28px;top:70px;width:76px;padding:0;border:0;background:none;color:inherit;display:flex;flex-direction:column;align-items:center;gap:6px;font:600 12px system-ui,sans-serif;cursor:pointer}.sf-icon b{display:flex;width:60px;height:60px;border-radius:16px;background:#f4a261;color:#102030;align-items:center;justify-content:center;font-size:28px}.sf-recents{display:flex;align-items:center;justify-content:center;background:#10151cee;color:#fff}[data-theme="light"] .sf-recents{background:#eef1f5ee;color:#111}.sf-card{width:230px;height:420px;border-radius:20px;background:#fff;color:#111;border:1px solid #8884;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:14px;box-sizing:border-box;transition:transform .2s}[data-theme="dark"] .sf-card{background:#1c232d;color:#fff}.sf-card button{border:0;border-radius:10px;padding:8px 18px;background:#8883;color:inherit;font:600 14px system-ui,sans-serif;cursor:pointer}
+.sf-bar{position:relative}.sf-navbtns{position:absolute;inset:0;display:flex;justify-content:space-around;align-items:center;background:var(--sf-bg)}.sf-navbtns button{border:0;background:none;color:var(--sf-fg);font-size:16px;padding:2px 24px;cursor:pointer}.sf-body[data-nav="buttons"] .sf-bar i{display:none}
+.sf-label{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:600 9px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa0a6}
+</style></head><body>
+<div id="fit"><div id="phone" data-platform="android"><div class="sf-body" data-skin="android" data-theme="light" data-part="phone-body"><div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">9:41</span><span class="sf-cut sf-hole" data-part="punch-hole"></span><span class="sf-icons"><svg class="sf-ico" data-part="signal" data-level="4" width="15" height="12" viewBox="0 0 15 12" aria-hidden="true"><rect x="0" y="10" width="3" height="3" rx="1" fill="currentColor"/><rect x="4" y="7" width="3" height="6" rx="1" fill="currentColor"/><rect x="8" y="4" width="3" height="9" rx="1" fill="currentColor"/><rect x="12" y="1" width="3" height="12" rx="1" fill="currentColor"/></svg><svg class="sf-ico" data-part="wifi" width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 4.5a10 10 0 0 1 14 0M3.5 7.2a6.4 6.4 0 0 1 9 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="10" r="1.4" fill="currentColor"/></svg><svg class="sf-ico" data-part="battery" data-level="100" width="25" height="12" viewBox="0 0 25 12" aria-hidden="true"><rect x=".75" y=".75" width="21.5" height="10.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"/><rect x="3.5" y="3.5" width="15" height="5" rx="1.5" fill="currentColor"/><rect x="23" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".6"/></svg></span></div><div class="sf-content"><iframe id="app" src="./app/" title="Chess, Android"></iframe></div><div class="sf-update" data-part="update-banner" role="status" aria-live="polite" aria-label="Simulated update status" hidden><span data-part="update-banner-text"></span></div><div class="sf-grab" data-part="top-edge" aria-hidden="true"></div><div class="sf-panel" data-part="notification-shade" role="dialog" aria-label="Notification shade" tabindex="-1" hidden><div class="sf-tiles" data-part="tiles"></div><div class="sf-notes" data-part="notification-list"></div><button type="button" class="sf-clear" data-part="clear-all">Clear all</button><button type="button" class="sf-gear" data-part="settings-gear" aria-label="Settings">⚙ Settings</button><button type="button" class="sf-close" data-part="close">Close</button></div><span class="sf-edge" data-part="edge-swipe"></span><div class="sf-home" data-part="home-screen" role="region" aria-label="Home screen" hidden><button type="button" class="sf-icon" data-part="app-icon" aria-label="App"><b>A</b><span>App</span></button><button type="button" class="sf-icon" data-part="settings-icon" aria-label="Settings" style="left:124px"><b>⚙</b><span>Settings</span></button><button type="button" class="sf-icon" data-part="store-icon" aria-label="Store" style="left:220px"><b>▤</b><span>Store</span></button></div><div class="sf-settings" data-part="settings-screen" role="dialog" aria-label="Settings" tabindex="-1" hidden><h2 class="sf-sh">Settings</h2><div data-part="settings-rows" role="group" aria-label="Settings"></div><button type="button" class="sf-close" data-part="settings-close">Close</button></div><div class="sf-settings sf-store" data-part="store-screen" role="dialog" aria-label="Store" tabindex="-1" hidden><h2 class="sf-sh">Store</h2><div data-part="store-rows" role="list" aria-label="Apps"></div><button type="button" class="sf-close" data-part="store-close">Close</button></div><div class="sf-recents" data-part="recents" role="region" aria-label="Recent apps" hidden><div class="sf-card" data-part="recents-card"><button type="button" data-part="recents-open" aria-label="Open App">App</button><button type="button" data-part="recents-close" aria-label="Close App">Close</button></div></div><div class="sf-lock" data-part="lock-screen" role="dialog" aria-label="Lock screen" tabindex="-1" hidden><div class="sf-lock-time" data-part="lock-time">9:41</div><div class="sf-lock-hint">Swipe up to unlock</div><button type="button" data-part="unlock-button">Unlock</button></div><div class="sf-boot" data-part="boot-screen" hidden><div class="sf-boot-logo">Shipvo</div></div><div class="sf-off" data-part="off-screen" role="button" tabindex="0" aria-label="Phone is off. Press to power on" hidden></div><div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button><button role="menuitem" data-act="navstyle" data-part="nav-style-toggle">3-button navigation</button><button role="menuitem" data-act="cancel">Cancel</button></div><div class="sf-bar" data-part="gesture-bar"><i></i><div class="sf-navbtns" data-part="nav-buttons" hidden><button type="button" data-part="nav-back" aria-label="Back">◀</button><button type="button" data-part="nav-home" aria-label="Home">●</button><button type="button" data-part="nav-recents" aria-label="Recents">■</button></div></div></div><button class="sf-btn sf-power" data-part="power-button" aria-label="Power"></button><button class="sf-btn sf-volup" data-part="volume-up-button" aria-label="Volume up"></button><button class="sf-btn sf-voldown" data-part="volume-down-button" aria-label="Volume down"></button><span class="sf-label" data-part="simulated-label">Simulated</span></div></div></div>
+<script>
+function fit(){var s=Math.min(1,innerWidth/432,innerHeight/949),e=document.getElementById("fit");e.style.width="432px";e.style.height="949px";e.style.transform="translate(-50%,-50%) scale("+s+")"}
+addEventListener("resize",fit);fit();
+</script><script>(function(){
+var statusParts=function statusParts(status) {
+  const st = normalizeStatus(status);
+  return { time: st.time, icons: icons(st) };
+},normalizeStatus=function normalizeStatus(status = {}) {
+  const s = status && typeof status === "object" ? status : {};
+  const bat = typeof s.battery === "number" ? { level: s.battery } : (s.battery && typeof s.battery === "object" ? s.battery : {});
+  const num = (v, d) => (Number.isFinite(Number(v)) && v !== null && v !== "" ? Number(v) : d);
+  return {
+    time: s.time == null ? "9:41" : clean(s.time),
+    signal: Math.round(clamp(num(s.signal, 4), 0, 4)),
+    wifi: s.wifi !== false,
+    airplane: s.airplane === true,
+    battery: { level: Math.round(clamp(num(bat.level, 100), 0, 100)), charging: bat.charging === true },
+  };
+},icons=function icons(st) {
+  if (st.airplane) {
+    return svg(16, 16, `<path d="M8 1.5 9.4 6.5 15 9.5v1.4l-5.6-1.5-.4 3 1.6 1.2v1L8 14.7 5.4 15.6v-1L7 13.4l-.4-3L1 10.9V9.5l5.6-3z" fill="currentColor"/>`, 'data-part="airplane"');
+  }
+  let bars = "";
+  for (let i = 0; i < 4; i++) bars += `<rect x="${i * 4}" y="${10 - i * 3}" width="3" height="${3 + i * 3}" rx="1" fill="currentColor"${i < st.signal ? "" : ' opacity=".3"'}/>`;
+  const signal = svg(15, 12, bars, `data-part="signal" data-level="${st.signal}"`);
+  const wifi = st.wifi
+    ? svg(16, 12, `<path d="M1 4.5a10 10 0 0 1 14 0M3.5 7.2a6.4 6.4 0 0 1 9 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="10" r="1.4" fill="currentColor"/>`, 'data-part="wifi"')
+    : "";
+  return signal + wifi + battery(st.battery);
+},battery=function battery(b) {
+  const w = Math.round((b.level / 100) * 15);
+  const bolt = b.charging ? `<path d="M12 2 7.5 7.5h3L9 11l4.5-5.5h-3z" fill="#000" opacity=".75"/>` : "";
+  return svg(25, 12, `<rect x=".75" y=".75" width="21.5" height="10.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"/><rect x="3.5" y="3.5" width="${w}" height="5" rx="1.5" fill="currentColor"/><rect x="23" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".6"/>${bolt}`, `data-part="battery" data-level="${b.level}"${b.charging ? ' data-charging="true"' : ""}`);
+},svg=(w, h, body, extra = "") => `<svg class="sf-ico" ${extra} width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${body}</svg>`,isDarkBackground=function isDarkBackground(color) {
+  const c = String(color ?? "").trim().toLowerCase();
+  let r, g, b, a = 1, m;
+  if ((m = /^#([0-9a-f]{3})$/.exec(c))) [r, g, b] = [...m[1]].map((x) => parseInt(x + x, 16));
+  else if ((m = /^#([0-9a-f]{6})/.exec(c))) [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+  else if ((m = /^rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?/.exec(c))) { [r, g, b] = [+m[1], +m[2], +m[3]]; if (m[4] != null) a = m[4].endsWith("%") ? parseFloat(m[4]) / 100 : +m[4]; }
+  else return false;
+  return a >= 0.5 && 0.2126 * r + 0.7152 * g + 0.0722 * b < 128;
+},statusFromDevice=function statusFromDevice(device = {}, now = new Date()) {
+  const d = device && typeof device === "object" ? device : {};
+  const online = d.online !== false && d.airplane !== true && (d.wifi !== false || d.mobileData !== false);
+  const h = now.getHours() % 12 || 12, m = String(now.getMinutes()).padStart(2, "0");
+  return { time: `${h}:${m}`, signal: online && d.mobileData !== false ? 4 : 0, wifi: online && d.wifi !== false, airplane: d.airplane === true, battery: d.battery };
+};
+var clean=(s) => String(s).replace(/[<>&"'\\]/g, "").slice(0, 12),clamp=(n, lo, hi) => Math.min(hi, Math.max(lo, n));
+var dev={online:true,airplane:false,battery:{level:100,charging:false}};
+function root(){return document.querySelector('[data-part="phone-body"]')}
+function draw(){var r=root();if(!r)return;var p=statusParts(statusFromDevice(dev,new Date()));
+r.querySelector('[data-part="time"]').textContent=p.time;var lt=r.querySelector('[data-part="lock-time"]');if(lt)lt.textContent=p.time;r.querySelector(".sf-icons").innerHTML=p.icons}
+function topColor(w){try{var d=w.document,e=d.elementFromPoint(Math.floor(w.innerWidth/2),1);
+while(e){var c=w.getComputedStyle(e).backgroundColor;if(c&&c!=="transparent"&&!/rgba\(.*,\s*0\)$/.test(c))return c;e=e.parentElement}var b=d.body&&w.getComputedStyle(d.body).backgroundColor;if(b&&!/rgba\(.*,\s*0\)$/.test(b)&&b!=="transparent")return b}catch(x){}return"#fff"}
+function theme(w){var r=root();if(!r)return;var c=topColor(w),dark=isDarkBackground(c);
+r.setAttribute("data-theme",dark?"dark":"light");r.style.setProperty("--sf-status-fg",dark?"#fff":"#111");r.style.setProperty("--sf-status-bg",c)}
+function hook(){var f=document.getElementById("app");var w=f&&f.contentWindow;if(!w)return;
+if(w.__pnDevice&&w.__pnDevice.status)dev=Object.assign({},w.__pnDevice.status(),w.__pnDevice.settings?w.__pnDevice.settings():{});draw();theme(w);
+if(!w.__shipvoStatusHooked){w.__shipvoStatusHooked=true;w.addEventListener("pn:status",function(e){dev=Object.assign({},dev,e.detail);draw();theme(w)});w.addEventListener("pn:settings",function(e){dev=Object.assign({},dev,e.detail);draw()})}}
+var f=document.getElementById("app");if(f){f.addEventListener("load",hook);hook()}
+(function buttons(){var r=root();if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')},vol=50,hold,volT,bootT;
+if(!q("power-button")||!q("lock-screen")||!q("power-menu"))return;
+function show(el,on){if(el)el.hidden=!on}
+function shown(p){var e=q(p);return !!e&&!e.hidden}
+function lockNow(){show(q("power-menu"),false);show(q("lock-screen"),true);var u=q("unlock-button");if(u)u.focus()}
+function unlockNow(){show(q("lock-screen"),false);var p=q("power-button");if(p)p.focus()}
+function closeMenu(){if(shown("power-menu")){show(q("power-menu"),false);q("power-button").focus()}}
+function powerOn(){show(q("off-screen"),false);show(q("boot-screen"),true);clearTimeout(bootT);bootT=setTimeout(function(){show(q("boot-screen"),false)},1200)}
+function openMenu(){show(q("power-menu"),true);var b=q("power-menu").querySelector("button");if(b)b.focus()}
+var sy=null,ls=q("lock-screen");
+ls.addEventListener("pointerdown",function(e){sy=e.clientY});
+ls.addEventListener("pointerup",function(e){if(sy!=null&&sy-e.clientY>60)unlockNow();sy=null});
+ls.addEventListener("keydown",function(e){if(e.key==="ArrowUp"||e.key==="Enter"){e.preventDefault();unlockNow()}});
+if(q("unlock-button"))q("unlock-button").addEventListener("click",unlockNow);
+var pw=q("power-button");
+function stopHold(){if(hold){clearTimeout(hold);hold=null}}
+pw.addEventListener("pointerdown",function(){stopHold();hold=setTimeout(function(){hold=null;if(shown("off-screen"))return;openMenu();pw.setAttribute("data-held","1")},700)});
+pw.addEventListener("pointerleave",stopHold);pw.addEventListener("pointercancel",stopHold);
+pw.addEventListener("pointerup",stopHold);
+pw.addEventListener("click",function(e){
+if(pw.getAttribute("data-held")){pw.removeAttribute("data-held");return}
+if(shown("off-screen")){powerOn();return}
+if(e.detail===0&&e.shiftKey){shown("power-menu")?closeMenu():openMenu();return}
+if(shown("power-menu")){closeMenu();return}
+if(shown("lock-screen")){return}
+lockNow()});
+function bump(d){vol=Math.max(0,Math.min(100,vol+d));q("volume-level").textContent=vol;q("volume-bar").firstChild.style.width=vol+"%";show(q("volume-overlay"),true);clearTimeout(volT);volT=setTimeout(function(){show(q("volume-overlay"),false)},1500)}
+q("volume-up-button").addEventListener("click",function(){bump(10)});q("volume-down-button").addEventListener("click",function(){bump(-10)});
+q("off-screen").addEventListener("click",powerOn);q("off-screen").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();powerOn()}});
+r.addEventListener("keydown",function(e){if(e.key==="Escape")closeMenu()});
+document.addEventListener("pointerdown",function(e){if(shown("power-menu")&&!q("power-menu").contains(e.target)&&e.target!==pw)closeMenu()});
+q("power-menu").addEventListener("click",function(e){var a=e.target.getAttribute&&e.target.getAttribute("data-act");if(!a)return;show(q("power-menu"),false);
+if(a==="cancel"){pw.focus();return}
+if(a==="navstyle")return;
+if(a==="restart"){show(q("boot-screen"),true);var f=document.getElementById("app");if(f&&f.contentWindow)f.contentWindow.location.reload();clearTimeout(bootT);bootT=setTimeout(function(){show(q("boot-screen"),false)},1200)}
+else{show(q("lock-screen"),false);show(q("off-screen"),true);pw.focus()}})})();
+(function(){
+var TILES={"wifi":{"label":"Wi-Fi","field":"wifi","on":["android","ios"]},"mobile_data":{"label":"Mobile data","field":"mobileData","on":["android","ios"]},"airplane":{"label":"Airplane mode","field":"airplane","on":["android","ios"]},"location":{"label":"Location","field":"locationServices","on":["android"]},"dark_mode":{"label":"Dark mode","field":"darkMode","on":["android","ios"]},"dnd":{"label":"Do Not Disturb","field":"dnd","on":["android"]},"focus":{"label":"Focus","field":"dnd","on":["ios"]},"auto_rotate":{"label":"Auto-rotate","field":"autoRotate","on":["android"]},"orientation_lock":{"label":"Orientation lock","field":"orientationLock","on":["ios"]},"flashlight":{"label":"Flashlight","field":"flashlight","on":["android"]},"brightness":{"label":"Brightness","field":"brightness","on":["ios"],"slider":true}},tileStates=function tileStates(platform, device = {}, expanded = true) {
+  const ids = order[platform] ?? order.android;
+  const list = platform === "android" && !expanded ? ids.slice(0, ANDROID_FIRST_PULL) : ids;
+  return list.map((id) => { const t = TILES[id], v = device[t.field]; return t.slider ? { id, label: t.label, on: true, value: Number(v ?? 70) } : { id, label: t.label, on: id === "wifi" || id === "mobile_data" ? v !== false : v === true }; });
+},tilePatch=function tilePatch(platform, tile, device = {}, value) {
+  const t = TILES[tile];
+  if (!t) throw new ShadeError("unknown_tile", `unknown tile '${tile}'. Tiles: ${(order[platform] ?? order.android).join(", ")}`);
+  if (!t.on.includes(platform)) throw new ShadeError("unknown_tile", `'${tile}' is not on ${platform === "ios" ? "an iPhone" : "an Android phone"}. Tiles: ${order[platform].join(", ")}`);
+  const cur = device[t.field];
+  if (t.slider) {
+    const v = value === undefined ? (Number(cur ?? 70) > 50 ? 20 : 100) : Number(value);
+    if (!Number.isFinite(v) || v < 0 || v > 100) throw new ShadeError("bad_value", "brightness needs a value from 0 to 100");
+    return { [t.field]: Math.round(v) };
+  }
+  if (value !== undefined && typeof value !== "boolean") throw new ShadeError("bad_value", `'${tile}' takes true or false`);
+  const on = tile === "wifi" || tile === "mobile_data" ? cur !== false : cur === true;
+  return { [t.field]: value === undefined ? !on : value };
+},groupByApp=function groupByApp(list = []) {
+  const groups = new Map();
+  for (const n of [...list].sort((a, b) => (b.at ?? 0) - (a.at ?? 0))) { const k = n.app || "App"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(n); }
+  return [...groups].map(([app, items]) => ({ app, items }));
+},ago=function ago(at, now = Date.now()) {
+  const m = Math.floor(Math.max(0, now - (at ?? now)) / 60000);
+  return m < 1 ? "now" : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ago`;
+},panelFor=function panelFor(platform, x, width, open = "none") {
+  if (platform === "ios") return x > width * 2 / 3 ? "control" : "notifications";
+  return open === "shade" || open === "shade-expanded" ? "shade-expanded" : "shade";
+},order={"android":["wifi","mobile_data","airplane","location","dark_mode","dnd","auto_rotate","flashlight"],"ios":["airplane","wifi","mobile_data","focus","orientation_lock","brightness","dark_mode"]},ANDROID_FIRST_PULL=4;
+function ShadeError(c,m){var e=new Error(m);e.code=c;return e}
+var P="android",r=document.querySelector('[data-part="phone-body"]');if(!r)return;
+var q=function(p){return r.querySelector('[data-part="'+p+'"]')},open="none",edge=q("top-edge");if(!edge)return;
+function dev(){var f=document.getElementById("app");var w=f&&f.contentWindow;return w&&w.__pnDevice?w.__pnDevice:null}
+function partOf(o){return o==="control"?"control-center":o==="notifications"?"notification-center":"notification-shade"}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function draw(){var d=dev(),el=open==="none"?null:q(partOf(open));if(!el||!d)return;
+var t=q("tiles");if(t&&el.contains(t)){t.innerHTML=tileStates(P,d.settings(),open!=="shade").map(function(x){return '<button type="button" class="sf-tile" data-tile="'+x.id+'" aria-pressed="'+x.on+'">'+esc(x.label)+(x.slider?' '+x.value+'%':'')+'</button>'}).join("")}
+var l=q("notification-list");if(l&&el.contains(l)){var ns=d.notifications(),h="";(P==="ios"?groupByApp(ns):[{app:null,items:ns.slice().reverse()}]).forEach(function(g){if(g.app)h+='<p class="sf-group">'+esc(g.app)+'</p>';g.items.forEach(function(n){h+='<div class="sf-row"><button type="button" class="sf-note" data-note="'+esc(n.id)+'"><span class="sf-icon" aria-hidden="true">'+esc(String(n.app||"App").charAt(0).toUpperCase())+'</span><span class="sf-text"><b>'+esc(n.title)+'</b>'+esc(n.body)+' <small>'+ago(n.at)+'</small></span></button><button type="button" class="sf-dismiss" data-dismiss="'+esc(n.id)+'" aria-label="Dismiss '+esc(n.title)+'">Dismiss</button></div>'})});l.innerHTML=h||'<p>No notifications</p>'}}
+var back=null;
+function show(o){var was=open;if(was==="none"&&o!=="none")back=document.activeElement;open=o;["notification-shade","notification-center","control-center"].forEach(function(p){var e=q(p);if(e)e.hidden=true});if(o!=="none"){var e=q(partOf(o));if(e){e.hidden=false;draw();e.focus&&e.focus({preventScroll:true})}}else if(was!=="none"&&back){var b=back;back=null;b.focus&&b.focus({preventScroll:true})}}
+function pull(x){var e=r.getBoundingClientRect();show(panelFor(P,x,e.width,open))}
+var sy=null,sx=0;edge.addEventListener("mousedown",function(e){e.preventDefault()});edge.addEventListener("pointerdown",function(e){try{edge.setPointerCapture(e.pointerId)}catch(x){}sy=e.clientY;sx=e.clientX-r.getBoundingClientRect().left});
+document.addEventListener("pointerup",function(e){if(sy!=null&&e.clientY-sy>40)pull(sx);sy=null});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&open!=="none")show("none")});
+var closeY=null;r.addEventListener("pointerdown",function(e){if(open!=="none"&&!e.target.closest(".sf-tile,.sf-note,.sf-dismiss,.sf-clear,.sf-close,.sf-gear"))closeY=e.clientY});
+document.addEventListener("pointerup",function(e){if(closeY!=null&&closeY-e.clientY>60)show("none");closeY=null});
+r.addEventListener("click",function(e){if(swiped){swiped=false;return}if(e.target.closest(".sf-close,.sf-gear")){show("none");return}var d=dev();if(!d)return;var tl=e.target.closest(".sf-tile");
+if(tl){var id=tl.getAttribute("data-tile");try{d.set(tilePatch(P,id,d.settings(),undefined))}catch(x){}draw();return}
+if(e.target.closest(".sf-clear")){d.clearAll();draw();return}
+var dm=e.target.closest(".sf-dismiss");if(dm){var did=dm.getAttribute("data-dismiss"),rows=[].slice.call(r.querySelectorAll(".sf-dismiss")),at=rows.indexOf(dm);d.dismiss(did);draw();var nx=r.querySelectorAll(".sf-dismiss")[at]||r.querySelectorAll(".sf-dismiss")[at-1],pn=r.querySelector('[data-part="'+partOf(open)+'"]');(nx||pn).focus({preventScroll:true});return}
+var nb=e.target.closest(".sf-note");if(nb){var nid=nb.getAttribute("data-note");show("none");d.openNotification(nid)}});
+var sw=null,swiped=false;r.addEventListener("pointerdown",function(e){var n=e.target.closest&&e.target.closest(".sf-note");sw=n?{n:n,x:e.clientX}:null});
+document.addEventListener("pointerup",function(e){if(sw&&Math.abs(e.clientX-sw.x)>80){var d=dev();if(d){d.dismiss(sw.n.getAttribute("data-note"));draw();swiped=true;setTimeout(function(){swiped=false},100)}}sw=null});
+var f=document.getElementById("app");function wire(){var w=f&&f.contentWindow;if(w&&!w.__shipvoShadeHooked){w.__shipvoShadeHooked=true;w.addEventListener("pn:settings",draw);w.addEventListener("pn:status",draw)}}
+if(f){f.addEventListener("load",wire);wire()}
+setInterval(function(){if(open!=="none"&&!document.hidden)draw()},1000);
+})();
+(function(){
+var SETTINGS={"dark_mode":{"label":"Dark mode","field":"darkMode","kind":"boolean"},"font_size":{"label":"Font size","field":"fontSize","kind":"choice","values":["small","default","large","largest"]},"bold_text":{"label":"Bold text","field":"boldText","kind":"boolean"},"reduce_motion":{"label":"Reduce motion","field":"reduceMotion","kind":"boolean"},"language":{"label":"Language","field":"language","kind":"choice","values":["en","fr","ar"]},"rtl":{"label":"Right-to-left layout","field":"rtl","kind":"boolean"}},SETTING_KEYS=["dark_mode","font_size","bold_text","reduce_motion","language","rtl"],LANGS={"en":"English","fr":"Français","ar":"العربية"},FONT=["small","default","large","largest"],settingPatch=function settingPatch(key, value) {
+  const s = Object.prototype.hasOwnProperty.call(SETTINGS, key) ? SETTINGS[key] : null;
+  if (!s) throw new SettingsError("unknown_setting", `unknown setting '${key}'. Settings: ${SETTING_KEYS.join(", ")}`);
+  if (s.kind === "boolean") {
+    if (typeof value !== "boolean") throw new SettingsError("bad_value", `'${key}' takes true or false`);
+    return { [s.field]: value };
+  }
+  if (typeof value !== "string" || !s.values.includes(value)) throw new SettingsError("bad_value", `'${key}' takes one of: ${s.values.join(", ")}`);
+  return key === "language" ? { language: value, rtl: value === "ar" } : { [s.field]: value };
+},readSettings=function readSettings(device = {}) {
+  const defaults = { dark_mode: false, font_size: "default", bold_text: false, reduce_motion: false, language: "en", rtl: false };
+  return Object.fromEntries(SETTING_KEYS.map((k) => [k, device[SETTINGS[k].field] ?? defaults[k]]));
+};
+function SettingsError(c,m){var e=new Error(m);e.code=c;return e}
+var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
+var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("settings-screen");if(!sc)return;
+function dev(){var f=document.getElementById("app");var w=f&&f.contentWindow;return w&&w.__pnDevice&&w.__pnDevice.system?w.__pnDevice:null}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+var SIZE={small:"Small",default:"Default",large:"Large",largest:"Largest"};
+function draw(){var d=dev(),rows=q("settings-rows");if(!d||!rows||sc.hidden)return;var v=readSettings(d.system()),h="";
+SETTING_KEYS.forEach(function(k){var s=SETTINGS[k];
+if(s.kind==="boolean")h+='<button type="button" class="sf-srow" role="switch" data-setting="'+k+'" aria-checked="'+(!!v[k])+'">'+esc(s.label)+'</button>';
+else{h+='<div class="sf-group2" role="radiogroup" aria-label="'+esc(s.label)+'"><b>'+esc(s.label)+'</b><div class="sf-opts">'+s.values.map(function(o){return '<button type="button" class="sf-opt" role="radio" data-setting="'+k+'" data-value="'+o+'" aria-checked="'+(v[k]===o)+'">'+esc(k==="language"?LANGS[o]:SIZE[o])+'</button>'}).join("")+'</div></div>'}});
+var keep=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-setting"),kv=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-value");
+rows.innerHTML=h;if(keep){var again=rows.querySelector('[data-setting="'+keep+'"]'+(kv?'[data-value="'+kv+'"]':''));if(again)again.focus({preventScroll:true})}}
+var back=null;
+function show(on){if(on){back=document.activeElement;sc.hidden=false;draw();sc.focus({preventScroll:true});try{window.parent.postMessage({type:"pn:settings-open",open:true},"*")}catch(x){}}else{sc.hidden=true;if(back&&back.focus)back.focus({preventScroll:true});back=null}}
+r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
+if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){show(true);return}
+if(t.closest('[data-part="settings-close"]')){show(false);return}
+var row=t.closest("[data-setting]");if(row){var d=dev();if(!d)return;var k=row.getAttribute("data-setting"),s=SETTINGS[k],val=s.kind==="boolean"?row.getAttribute("aria-checked")!=="true":row.getAttribute("data-value");
+try{d.set(settingPatch(k,val))}catch(x){}draw()}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)show(false)});
+var f=document.getElementById("app");function wire(){var w=f&&f.contentWindow;if(w&&!w.__shipvoSettingsHooked){w.__shipvoSettingsHooked=true;w.addEventListener("pn:system",draw)}}
+if(f){f.addEventListener("load",wire);wire()}
+})();
+(function(){
+var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=[{"id":"tide","name":"Tide & Tackle","url":"fixture://tide","version":"1.0.0"},{"id":"notes","name":"Pocket Notes","url":"fixture://notes","version":"0.3.1"},{"id":"weather","name":"Harbour Weather","url":"fixture://weather","version":"2.1.0"}];
+var entry=(a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}) }),text=(v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n),esc=(s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]),note=(st, name, id) => { st.log.push({ at: Date.now(), name, app: id, source: "simulated" }); },installApp=function installApp(st, id, catalog = st.store) {
+  const found = (catalog ?? []).find((a) => a.id === id);
+  if (!found) throw new AppsError("unknown_app", `no app '${id}' in the Store. Apps: ${(catalog ?? []).map((a) => a.id).join(", ") || "none"}`);
+  if (st.installed_apps.some((a) => a.id === id)) throw new AppsError("already_installed", `'${id}' is already installed`);
+  st.installed_apps.push(entry(found)); note(st, "install_app", id); return st;
+},switchApp=function switchApp(st, id, nav) {
+  if (!st.installed_apps.some((a) => a.id === id)) throw new AppsError("not_installed", `'${id}' is not installed`);
+  st.current_app = id; if (nav) nav.where = "app"; note(st, "switch_app", id); return st;
+},installedIconsHtml=function installedIconsHtml(st) {
+  return st.installed_apps.map((a) => `<button type="button" class="sf-icon sf-appicon" data-part="installed-app" data-app="${esc(a.id)}" aria-label="${esc(a.name)}"><b>${esc(a.name.slice(0, 1).toUpperCase())}</b><span>${esc(a.name)}</span></button>`).join("");
+},storeRowsHtml=function storeRowsHtml(st) {
+  return st.store.map((a) => {
+    const have = st.installed_apps.some((i) => i.id === a.id);
+    return `<div class="sf-store-row" data-app="${esc(a.id)}"><span class="sf-store-name">${esc(a.name)} <small>${esc(a.version)}</small></span>${have ? `<span class="sf-store-have">Installed</span>` : `<button type="button" data-part="store-install" data-app="${esc(a.id)}" aria-label="Install ${esc(a.name)}">Install</button>`}</div>`;
+  }).join("");
+},createApps=function createApps(profile = {}) {
+  return { installed_apps: [], current_app: null, store: STORE_FIXTURE.map(entry), settings: {}, log: [], ...profile };
+};
+var loadProfile=function loadProfile(json) {
+  let p = json;
+  if (typeof json === "string") { try { p = JSON.parse(json); } catch { throw new AppsError("bad_profile", "phone.json is not valid JSON"); } }
+  if (!p || typeof p !== "object" || Array.isArray(p)) throw new AppsError("bad_profile", "phone.json must be an object");
+  const apps = p.apps ?? [];
+  if (!Array.isArray(apps)) throw new AppsError("bad_profile", "'apps' must be a list");
+  const st = createApps();
+  if (p.store !== undefined) { if (!Array.isArray(p.store)) throw new AppsError("bad_profile", "'store' must be a list"); st.store = p.store.map((a) => entry(a)); }
+  const seen = new Set();
+  for (const a of apps) {
+    if (!a || typeof a.id !== "string" || !/^[a-z0-9-]+$/.test(a.id)) throw new AppsError("bad_profile", "every app needs an id of lowercase letters, digits and dashes");
+    if (seen.has(a.id)) throw new AppsError("bad_profile", `app '${a.id}' is listed twice`);
+    seen.add(a.id); st.installed_apps.push(entry(a));
+  }
+  if (p.current_app != null) { if (!seen.has(p.current_app)) throw new AppsError("bad_profile", `current_app '${p.current_app}' is not in 'apps'`); st.current_app = p.current_app; }
+  if (p.settings !== undefined) {
+    if (!p.settings || typeof p.settings !== "object") throw new AppsError("bad_profile", "'settings' must be an object");
+    for (const [k, v] of Object.entries(p.settings)) { try { settingPatch(k, v); } catch (e) { throw new AppsError("bad_profile", `settings: ${e.message}`); } st.settings[k] = v; }
+  }
+  return st;
+},settingPatch=function(){};
+var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
+var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;
+var st;try{st=loadProfile({})}catch(x){st=createApps()}
+st.settings={};
+var box=document.createElement("div");box.className="sf-apps";box.setAttribute("data-part","installed-apps");home.appendChild(box);
+function drawHome(){box.innerHTML=installedIconsHtml(st)}
+function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)}
+function open(on){sc.hidden=!on;if(on){drawStore();sc.focus({preventScroll:true})}}
+drawHome();
+r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
+if(t.closest('[data-part="store-icon"]'))return open(true);
+if(t.closest('[data-part="store-close"]'))return open(false);
+var i=t.closest('[data-part="store-install"]');if(i){try{installApp(st,i.getAttribute("data-app"))}catch(x){}drawStore();drawHome();return}
+var a=t.closest('[data-part="installed-app"]');if(a){try{switchApp(st,a.getAttribute("data-app"))}catch(x){}window.postMessage({type:"pn:nav",where:"app"},"*")}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)open(false)});
+})();
+(function(){var b=document.querySelector('[data-part="update-banner"]');if(!b)return;var t=b.querySelector('[data-part="update-banner-text"]');
+window.addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pn:update")return;if(typeof d.text==="string"&&d.text.indexOf("Simulated")===0){t.textContent=d.text.slice(0,120);b.hidden=false}else b.hidden=true})})();
+(function(){var S=["idle","working","happy","worried"],T=0;var lumiReaction=function lumiReaction(event) {
+  if (!event || typeof event !== "object") return null;
+  const one = (v) => {
+    const t = String(v && v.message ? v.message : v == null ? "" : v).split(/\r?\n/).map((x) => x.replace(/\s+/g, " ").trim()).find(Boolean) || "";
+    return t.length > 90 ? t.slice(0, 89) + "…" : t;
+  };
+  const name = one(event.name), err = one(event.error), detail = one(event.detail);
+  const why = (fallback) => err || detail || fallback;
+  switch (event.kind) {
+    case "check-passed": return { state: "happy", reason: name ? "Check passed: " + name : "Check passed" };
+    case "flow-done": return { state: "happy", reason: name ? "Flow finished: " + name : "Flow finished" };
+    case "page-error": return { state: "worried", reason: "Page error: " + why("the page threw an error") };
+    case "crash": return { state: "worried", reason: "Crash: " + why("the app stopped") };
+    case "action-failed": return { state: "worried", reason: (name ? "Action failed (" + name + "): " : "Action failed: ") + why("no reason given") };
+    case "check-failed": return { state: "worried", reason: (name ? "Check failed (" + name + "): " : "Check failed: ") + why("no reason given") };
+    default: return null;
+  }
+};
+function set(state,reason){if(S.indexOf(state)<0)return false;var l=document.querySelector('[data-part="lumi"]');if(!l)return false;l.setAttribute("data-state",state);
+if(typeof reason==="string"&&reason){l.setAttribute("data-reason",reason);l.setAttribute("title",reason)}else{l.removeAttribute("data-reason");l.removeAttribute("title")}
+var g=l.querySelectorAll("[data-face]");for(var i=0;i<g.length;i++)g[i].hidden=g[i].getAttribute("data-face")!==state;return true}
+function react(ev){var r=lumiReaction(ev);if(!r)return null;return set(r.state,r.reason)?r:null}
+function say(text,state,hold){clearTimeout(T);var c=document.querySelector('[data-part="lumi-caption"]');var ok=set(state||"working");
+if(c){var t=String(text==null?"":text).replace(/\s+/g," ").trim().slice(0,80);c.textContent=t;c.hidden=!t}
+if(hold>0)T=setTimeout(function(){if(c){c.hidden=true;c.textContent=""}set("idle")},hold);return ok}
+if(typeof window==="undefined")return;window.shipvoLumi={set:set,react:react,say:say,states:S};
+window.addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pn:lumi")return;if(d.event)react(d.event);else if(typeof d.caption==="string")say(d.caption,d.state,Number(d.hold)||0);else set(d.state,d.reason)})})();
+(function(){var K="shipvo.lumi.guide",g=document.querySelector('[data-part="lumi-guide"]');if(!g)return;
+function seen(){try{return localStorage.getItem(K)==="done"}catch(x){return false}}
+function save(){try{localStorage.setItem(K,"done")}catch(x){}}
+var s=g.querySelectorAll(".sf-guide-step"),i=0,c=g.querySelector('[data-part="guide-count"]'),n=g.querySelector('[data-part="guide-next"]');
+function lumi(st){if(window.shipvoLumi)window.shipvoLumi.set(st)}
+function draw(){for(var j=0;j<s.length;j++)s[j].hidden=j!==i;c.textContent=(i+1)+" of "+s.length;n.textContent=i===s.length-1?"Done":"Next"}
+function close(happy){save();g.hidden=true;lumi(happy?"happy":"idle")}
+g.querySelector('[data-part="guide-skip"]').addEventListener("click",function(){close(false)});
+n.addEventListener("click",function(){if(i>=s.length-1)return close(true);i++;draw()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!g.hidden)close(false)});
+if(seen())return;draw();g.hidden=false})();
+(function nav(){var r=root();if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')};
+if(!q("home-screen")||!q("recents"))return;
+var classifySwipe=function classifySwipe({ skin = "android", fromEdge = null, dx = 0, dy = 0, ms = 0 } = {}) {
+  if (fromEdge === "left" && dx > 60 && Math.abs(dy) < 80) return "back";
+  if (fromEdge !== "bottom") return null;
+  if (dy < -60 && Math.abs(dx) < Math.abs(dy)) return ms >= 400 ? "recents" : "home";
+  if (skin === "ios" && Math.abs(dx) > 60 && Math.abs(dy) < 40) return dx > 0 ? "switch-right" : "switch-left";
+  return null;
+},setVisibilityInPage=function setVisibilityInPage(state) {
+  const hidden = state === "background";
+  try {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (hidden ? "hidden" : "visible") });
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+  } catch {}
+  document.dispatchEvent(new Event("visibilitychange"));
+};
+var where="app",style="gesture",skin="android";
+function show(el,on){if(el)el.hidden=!on}
+function appWin(){var f=document.getElementById("app");return f&&f.contentWindow}
+function fire(state){var w=appWin();if(!w)return;try{w.eval("("+setVisibilityInPage.toString()+")("+JSON.stringify(state)+")")}catch(x){}}
+function go(next){var was=where;where=next;show(q("home-screen"),next==="home");show(q("recents"),next==="recents");r.setAttribute("data-where",next);
+if(was==="app"&&next!=="app")fire("background");if(was!=="app"&&next==="app")fire("active");
+if(was!==next){try{window.parent.postMessage({type:"pn:nav-state",where:next},"*")}catch(x){}}}
+window.addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pn:nav"&&(d.where==="app"||d.where==="home"||d.where==="recents"))go(d.where)});
+var af=document.getElementById("app");if(af)af.addEventListener("load",function(){if(where!=="app")fire("background")});
+function home(){go("home")}function recents(){go("recents")}
+function back(){if(where!=="app")return go("app");var w=appWin();if(!w)return;var b=w.document.querySelector('[aria-label="Back"],[role=button][aria-label="Back"]');if(b)b.click()}
+function kill(){var w=appWin();go("home");if(w)w.location.reload()}
+function setStyle(st){style=st;r.setAttribute("data-nav",st);show(q("nav-buttons"),st==="buttons");var t=q("nav-style-toggle");if(t)t.textContent=st==="buttons"?"Gesture navigation":"3-button navigation"}
+q("app-icon").addEventListener("click",function(){go("app")});
+q("recents-open").addEventListener("click",function(){go("app")});
+q("recents-close").addEventListener("click",kill);
+var cd=q("recents-card"),cy=null;cd.addEventListener("pointerdown",function(e){cy=e.clientY});cd.addEventListener("pointerup",function(e){if(cy!=null&&cy-e.clientY>80)kill();cy=null});
+if(q("nav-back")){q("nav-back").addEventListener("click",back);q("nav-home").addEventListener("click",home);q("nav-recents").addEventListener("click",recents)}
+var tg=q("nav-style-toggle");if(tg)tg.addEventListener("click",function(){setStyle(style==="buttons"?"gesture":"buttons")});
+function swipe(el,edge){var x0=null,y0,t0;
+el.addEventListener("pointerdown",function(e){if(e.target.closest&&e.target.closest("button"))return;x0=e.clientX;y0=e.clientY;t0=Date.now();try{el.setPointerCapture(e.pointerId)}catch(x){}});
+el.addEventListener("pointercancel",function(){x0=null});
+el.addEventListener("pointerup",function(e){if(x0==null)return;var a=classifySwipe({skin:skin,fromEdge:edge,dx:e.clientX-x0,dy:e.clientY-y0,ms:Date.now()-t0});x0=null;
+if(a==="home")home();else if(a==="recents")recents();else if(a==="back")back()})}
+swipe(q("edge-swipe"),"left");
+var bar=r.querySelector(".sf-bar");if(bar&&!(skin==="android"&&style==="buttons"))swipe(bar,"bottom");
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&where!=="app")go("app")});
+})();
+(function tick(){draw();var n=new Date();setTimeout(tick,(60-n.getSeconds())*1000-n.getMilliseconds()+50)})();
+// The app can change its top colour (a theme switch) without any event we can hear, so look again every 2 seconds. Skipped while the page is hidden.
+setInterval(function(){if(document.hidden)return;var f=document.getElementById("app");if(f&&f.contentWindow)theme(f.contentWindow)},2000);
+})();</script></body></html>
