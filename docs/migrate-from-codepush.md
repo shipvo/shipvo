@@ -130,7 +130,15 @@ This signs the code of release 3 as the next release number and publishes it to 
 - It does not update apps that do not contain `@shipvo/runtime`.
 - It is not a drop-in for bare React Native projects without Expo. The publish command calls `expo export`.
 
-## Next
+## Troubleshooting
+
+- **The native build fails after `shipvo migrate --apply`**: a native file still calls CodePush (`MainApplication`, `AppDelegate`, `settings.gradle`, `app/build.gradle` or the `Podfile`). `--apply` lists each file and line under its manual steps. Remove those calls and build again.
+- **`migrate --apply` refuses to run**: your git tree has uncommitted changes. Commit them, or pass `--force`.
+- **`shipvo init` refuses the folder**: it only creates new folders. Run it in a scratch folder and copy the files, as in Step 1.
+- **`shipvo doctor` prints a FAIL line**: the line ends with the fix. Run it again after applying the fix.
+- **The dry run builds no patches**: that is expected offline. Patches are built when you publish to a control plane.
+
+## Next steps
 
 - [Build your first app](getting-started.md)
 - [Self-hosting the control plane](self-hosting.md)

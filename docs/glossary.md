@@ -79,3 +79,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Build.** Turning your app's files into one copy that can run, here a web copy shown on a simulated phone. The first build is the slowest.
 
 **pnpm.** A tool that downloads the parts a project needs. You turn it on with `corepack enable`, which comes with Node.
+
+**Eval.** A scored test of an AI agent. You write a task (what to do, and what must be true at the end), the agent does it on a Shipvo phone, and Shipvo checks the result itself. See [Score an agent](eval.md).
