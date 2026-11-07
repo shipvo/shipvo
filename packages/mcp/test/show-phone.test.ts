@@ -124,6 +124,22 @@ describe("open_app shows the phone", { timeout: 30_000 }, () => {
       expect(existsSync(join(project, "started-android"))).toBe(false);
     } finally { proc.kill(); }
   });
+  it("a live run for another app does not block a plain headless open_app", async () => {
+    const { c, text, project } = await open({}, (p) => { mkdirSync(join(p, ".shipvo")); writeFileSync(join(p, ".shipvo", "run.json"), JSON.stringify({ port: hostPort, platform: "android", app: "shop", token: "tok", pid: process.pid })); });
+    expect(text).toContain("mode: headless session");
+    expect(text).not.toContain("unknown_app");
+    expect(existsSync(join(project, "started-android"))).toBe(false);
+    await c.close();
+  });
+  it("platform is reported as ignored when show is false", async () => {
+    const { c, text } = await open({ platform: "ios", show: false });
+    expect(text).toContain("platform ios ignored");
+    await c.close();
+  });
+  it("a bad SHIPVO_RUN_COMMAND names the variable", async () => {
+    const old = process.env.SHIPVO_RUN_COMMAND; process.env.SHIPVO_RUN_COMMAND = "not json";
+    try { await expect(startRun("android", work, 200)).rejects.toThrow(/SHIPVO_RUN_COMMAND/); } finally { if (old === undefined) delete process.env.SHIPVO_RUN_COMMAND; else process.env.SHIPVO_RUN_COMMAND = old; }
+  });
   it("show false stays headless and starts nothing", async () => {
     const { c, text, project } = await open({ platform: "ios", show: false });
     expect(text).toContain("mode: headless session");

@@ -35,12 +35,17 @@ function readRun(dir: string): RunInfo | undefined {
   try { return JSON.parse(readFileSync(join(dir, ".shipvo", "run.json"), "utf8")) as RunInfo; } catch { return undefined; }
 }
 
+function parseRunCommand(v: string): string[] {
+  try { const a = JSON.parse(v); if (Array.isArray(a) && a.length && a.every((x) => typeof x === "string")) return a; } catch { /* fall through */ }
+  throw new Error("SHIPVO_RUN_COMMAND must be a JSON array of strings, for example [\"node\",\"run.js\"]");
+}
+
 /**
  * Starts `shipvo run <platform>` in `dir` (it opens the browser itself) and waits until its run.json names a live
  * process on that platform. SHIPVO_RUN_COMMAND replaces the command (a JSON array, for tests and custom installs).
  */
 export async function startRun(platform: "android" | "ios", dir: string, timeoutMs = Number(process.env.SHIPVO_RUN_TIMEOUT_MS) || 120_000): Promise<RunInfo> {
-  const override = process.env.SHIPVO_RUN_COMMAND ? (JSON.parse(process.env.SHIPVO_RUN_COMMAND) as string[]) : undefined;
+  const override = process.env.SHIPVO_RUN_COMMAND ? parseRunCommand(process.env.SHIPVO_RUN_COMMAND) : undefined;
   const [cmd, ...args] = override ?? (localShipvo(dir) ? [localShipvo(dir)!] : ["npx", "-y", "shipvo"]);
   const before = readRun(dir)?.pid;
   const child = spawn(cmd, [...args, "run", platform], { cwd: dir, stdio: "ignore", detached: true });
@@ -48,6 +53,7 @@ export async function startRun(platform: "android" | "ios", dir: string, timeout
   child.on("error", (e) => { exited = e.message; });
   child.on("exit", (code) => { exited = `exited with code ${code}`; });
   child.unref();
+  const stop = () => { try { if (child.pid) process.kill(-child.pid); } catch { /* already gone */ } };
   const end = Date.now() + timeoutMs;
   while (Date.now() < end) {
     const r = findLiveRun(undefined, dir);
@@ -55,5 +61,6 @@ export async function startRun(platform: "android" | "ios", dir: string, timeout
     if (exited) throw new Error(`shipvo run ${platform} stopped before the phone was ready (${exited}). Run it in a terminal to see why.`);
     await new Promise((res) => setTimeout(res, 100));
   }
+  if (exited === undefined) stop();
   throw new Error(`shipvo run ${platform} did not write .shipvo/run.json within ${Math.round(timeoutMs / 1000)} s. Run it in a terminal to see why.`);
 }

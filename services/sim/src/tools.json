@@ -980,7 +980,7 @@
             "android",
             "ios"
           ],
-          "description": "Which phone to show: 'android' or 'ios' (default: the live run's, else android)"
+          "description": "Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)"
         },
         "show": {
           "type": "boolean",
