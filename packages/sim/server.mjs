@@ -137,6 +137,16 @@ async function enterApp(s, page, id) {
   await page.evaluate(() => { delete globalThis.__pnInitialUrl; });
 }
 
+// Hand a deep link to the app that owns it, once: switch to it if it is another installed app, then set the launch URL and fire the `url` event.
+// No init script stays behind. The launch URL is set after the switch, because the switch clears the previous one.
+async function deliverLink(s, page, app, url) {
+  const installed = s.apps.installed_apps.some((a) => a.id === app);
+  if (!installed && app !== CFG.appId) throw new SimError("no_handler", `the app '${app}' that handles ${url} is not installed`);
+  if (installed && s.apps.current_app !== app) await enterApp(s, page, app);
+  await page.evaluate((u) => { globalThis.__pnInitialUrl = u; return globalThis.__pnDevice?.openUrl(u); }, url);
+  s.apps.log.push({ at: Date.now(), name: "open_url", app, url, source: "simulated" });
+}
+
 async function newSession(id, opts = {}) {
   if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close(); }
   const target = await resolveApp(opts.app);
@@ -147,6 +157,15 @@ async function newSession(id, opts = {}) {
   const ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
+  // The app's Linking.openURL for another app's scheme lands here: the simulator switches to the owning app and delivers the link.
+  // Answers { ok: true } when an installed app owns the scheme, { ok: false } otherwise (the page then keeps its own listeners). The switch runs after the answer.
+  await ctx.exposeFunction("__pnOpenLink", (url) => {
+    const s = sessions.get(id); if (!s) return { ok: false };
+    let r; try { r = resolveUrl(s.apps, String(url), Array.isArray(CFG.schemes) && typeof CFG.appId === "string" ? [{ id: CFG.appId, schemes: CFG.schemes }] : []); } catch { return { ok: false }; }
+    if (!r.app) return { ok: false };
+    s.linkP = (s.linkP ?? Promise.resolve()).then(async () => { await deliverLink(s, s.page, r.app, String(url)); }).catch(() => {});
+    return { ok: true };
+  });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
   const errors = [];
@@ -380,10 +399,7 @@ async function act(id, body) {
       if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
       let r; try { r = resolveUrl(s.apps, body.url, Array.isArray(CFG.schemes) && typeof CFG.appId === "string" ? [{ id: CFG.appId, schemes: CFG.schemes }] : []); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       if (r.app) {
-        // Switch to the owning app, then hand over the link once: as the initial URL of this launch and as a `url` event. No init script stays behind.
-        if (s.apps.current_app !== r.app && s.apps.installed_apps.some((a) => a.id === r.app)) await enterApp(s, page, r.app);
-        await page.evaluate((u) => { globalThis.__pnInitialUrl = u; return globalThis.__pnDevice?.openUrl(u); }, body.url);
-        s.apps.log.push({ at: Date.now(), name: "open_url", app: r.app, url: body.url, source: "simulated" });
+        await deliverLink(s, page, r.app, body.url);
         await page.waitForTimeout(400); return { app: r.app, screen: await screen(page) };
       }
       const handled = await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url);

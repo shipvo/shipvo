@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
-register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { if (s === "react-native") return { url: "data:text/javascript,export const Appearance={},PixelRatio={},AccessibilityInfo={},I18nManager={},Dimensions={}", shortCircuit: true }; try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
+register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { if (s === "react-native") return { url: "data:text/javascript,export const Appearance={},PixelRatio={},AccessibilityInfo={},I18nManager={},Dimensions={},Linking={}", shortCircuit: true }; try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
 
 const listeners = {};
 const win = { dispatchEvent: (e) => { (listeners[e.type] ?? []).forEach((f) => f(e)); return true; }, addEventListener: (t, f) => { (listeners[t] ??= []).push(f); } };

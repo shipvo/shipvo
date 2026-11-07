@@ -1,6 +1,7 @@
 // Simulated device: the same API, backed by a device state the Shipvo simulator controls, with system sheets
 // (permission dialog, camera viewfinder, fingerprint prompt, payment prompt, notification banner, share sheet)
 // drawn as real dialogs so an agent sees and operates them exactly as it would a phone's.
+import { Linking } from "react-native";
 import { mayUseReal, openStream, levelMeter, stopStream, realPosition, barcodeDetector, type Source } from "./real";
 import type { ConnectionType, NetworkProfileName, Device, PermissionStatus, Coords, ScanResult, AuthResult, PaymentResult, Notification, Contact, CalendarEvent, PermissionName, PickedFile } from "./types";
 export * from "./types";
@@ -336,6 +337,17 @@ export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });
 export const onUrl = (cb: (url: string) => void) => { urlSubs.add(cb); return () => { urlSubs.delete(cb); }; };
 /** The URL that launched the app, or null. The simulator sets it once for the launch a link opened; a switch or reload clears it. */
 export const getInitialUrl = async (): Promise<string | null> => (g as { __pnInitialUrl?: string }).__pnInitialUrl ?? null;
+// In the simulator the app calls `Linking.getInitialURL()` and `Linking.openURL()` from react-native-web. Route both to the simulator:
+// the launch URL comes from `__pnInitialUrl`, and a link for another installed app's scheme goes to the simulator, which switches to that app.
+const L = Linking as unknown as { getInitialURL?: () => Promise<string | null>; openURL?: (u: string) => Promise<unknown> };
+L.getInitialURL = () => getInitialUrl();
+L.openURL = async (url: string) => {
+  const link = (g as { __pnOpenLink?: (u: string) => unknown }).__pnOpenLink;
+  if (link && !/^https?:\/\//i.test(url)) {
+    try { const r = (await link(url)) as { ok?: boolean } | undefined; if (r && r.ok) return; } catch { /* fall back to this page's listeners */ }
+  }
+  await deliverUrl(url);
+};
 /** Deliver a URL to the app. Returns true if an `onUrl` listener received it. */
 function deliverUrl(url: string): boolean | Promise<boolean> {
   // A web page opens in the phone's Browser app, not in the app. Only when the simulator provides one.

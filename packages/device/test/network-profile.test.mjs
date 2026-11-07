@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
-register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
+register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { if (s === "react-native") return { url: "data:text/javascript,export const Linking={}", shortCircuit: true }; try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
 globalThis.window = { dispatchEvent: () => true };
 globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
 globalThis.document = { querySelectorAll: () => [] };

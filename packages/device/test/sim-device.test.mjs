@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
-register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
+register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { if (s === "react-native") return { url: "data:text/javascript,export const Linking={}", shortCircuit: true }; try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
 
 // A tiny DOM: enough for notification banners, which are the only drawing these tests reach.
 const el = () => ({ style: {}, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, remove() { removed.push(this); }, appendChild() {}, set innerHTML(_v) {} });
@@ -167,4 +167,25 @@ test("openUrl: a page the Browser app refuses is logged as refused and openUrl a
   const entries = JSON.stringify(dev.log().slice(before));
   assert.match(entries, /browser_open_refused[^}]*host_not_allowed/); assert.match(entries, /bad_url/);
   assert.equal((entries.match(/browser_opened/g) ?? []).length, 1);   // only the accepted page
+});
+
+test("Linking.getInitialURL returns the launch URL the simulator set, or null", async () => {
+  const { Linking } = await import("react-native");
+  delete globalThis.__pnInitialUrl;
+  assert.equal(await Linking.getInitialURL(), null);
+  globalThis.__pnInitialUrl = "appb://item/42";
+  assert.equal(await Linking.getInitialURL(), "appb://item/42");
+  delete globalThis.__pnInitialUrl;
+});
+
+test("Linking.openURL hands another app's scheme to the simulator; otherwise this page's listeners get it", async () => {
+  const { Linking } = await import("react-native");
+  const sent = []; const got = [];
+  const off = mod.onUrl((u) => got.push(u));
+  globalThis.__pnOpenLink = (u) => { sent.push(u); return { ok: u.startsWith("appb:") }; };
+  await Linking.openURL("appb://item/1");
+  assert.deepEqual(sent, ["appb://item/1"]); assert.deepEqual(got, []);
+  await Linking.openURL("appz://x");
+  assert.deepEqual(got, ["appz://x"]);
+  delete globalThis.__pnOpenLink; off();
 });

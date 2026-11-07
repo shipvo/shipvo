@@ -19,7 +19,7 @@ const PAGE = `<!doctype html><html><head><title>fx</title></head><body><h1 id="h
 <script>
 window.__seen = [];
 window.__pnDevice = { log() { return []; }, capabilities() { return null; }, openUrl(u) { window.__seen.push(u); document.getElementById("h").textContent = "Opened " + u; return true; } };
-</script><button onclick="document.getElementById('i').textContent = 'initial=' + (window.__pnInitialUrl ?? null)">Read initial</button><p id="i">unread</p></body></html>`;
+</script><button onclick="window.__pnOpenLink('appb://from-app/9')">Open B link</button><button onclick="document.getElementById('i').textContent = 'initial=' + (window.__pnInitialUrl ?? null)">Read initial</button><p id="i">unread</p></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
 
@@ -89,4 +89,23 @@ test("two links in a row, then switch_app: the next app sees no stale initial UR
   assert.equal((await act("w", { action: "open_url", url: "appc://item/2" })).ok, true);
   assert.equal((await act("w", { action: "switch_app", id: "appd" })).ok, true);
   assert.equal(await readInitial("w"), "null");
+});
+
+test("a link opened from inside app A (Linking.openURL bridge) switches to B and delivers it", async () => {
+  assert.ok((await call("/session", { session: "v", phone: PHONE })).ok);
+  const first = await act("v", { action: "screen" });
+  const m = /Open B link[^\n]*\[ref=(\w+)\]/.exec(first.screen); assert.ok(m, first.screen);
+  assert.equal((await act("v", { action: "tap", ref: m[1] })).ok, true);
+  let cur; for (let i = 0; i < 30 && cur !== "appb"; i++) { await new Promise((r) => setTimeout(r, 200)); cur = (await act("v", { action: "device_log" })).log.find((l) => l.name === "open_url")?.app; }
+  assert.equal(cur, "appb");
+  assert.equal(await readInitial("v"), "appb://from-app/9");
+});
+
+test("a link for an app that is not installed is refused: no initial URL, no log entry", async () => {
+  assert.ok((await call("/session", { session: "u", phone: PHONE })).ok);
+  assert.equal((await act("u", { action: "uninstall_app", id: "appd" })).ok, true);
+  const r = await act("u", { action: "open_url", url: "appd://item/1" });
+  assert.equal(r.ok, false);
+  assert.equal(await readInitial("u"), "null");
+  assert.ok(!(await act("u", { action: "device_log" })).log.some((l) => l.name === "open_url"));
 });

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { register } from "node:module";
 // The source imports "./real" and "./types" without extensions; let node find the .ts files.
-register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
+register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { if (s === "react-native") return { url: "data:text/javascript,export const Linking={}", shortCircuit: true }; try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
 
 const events = [];
 globalThis.window = { dispatchEvent: (e) => { events.push(e); return true; } };
