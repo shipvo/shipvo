@@ -1,1 +1,1 @@
-- Docs: new page "Score an agent on app tasks" for `shipvo eval run` and `shipvo eval report`: task files, checks, what is measured, options and troubleshooting.
+- Docs: troubleshooting and next steps in "Move to a new machine" and "Migrate from CodePush", and a `shipvo eval` entry in the CLI reference.

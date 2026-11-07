@@ -136,7 +136,6 @@ This signs the code of release 3 as the next release number and publishes it to 
 - **`migrate --apply` refuses to run**: your git tree has uncommitted changes. Commit them, or pass `--force`.
 - **`shipvo init` refuses the folder**: it only creates new folders. Run it in a scratch folder and copy the files, as in Step 1.
 - **`shipvo doctor` prints a FAIL line**: the line ends with the fix. Run it again after applying the fix.
-- **Patches in a dry run**: the dry run checks your setup. Patches are built when you publish to a control plane.
 
 ## Next steps
 

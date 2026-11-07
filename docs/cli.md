@@ -154,7 +154,7 @@ shipvo auto-halt --threshold 0.2 --dry-run         # print the change, write not
 
 ## `shipvo eval`
 
-`shipvo eval run <task> --agent <name>` scores an agent on a task file in `tasks/`; `shipvo eval report` compares runs. See [Score an agent on app tasks](eval.md).
+`shipvo eval run <task> --agent <name>` scores an agent on a task file in `tasks/`; `shipvo eval report` compares runs. See [Score an agent on an app task](eval.md).
 
 ## `shipvo agents setup`
 
