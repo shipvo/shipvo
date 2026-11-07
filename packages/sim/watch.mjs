@@ -86,7 +86,7 @@ export function createWatch(sessions, accept, doInput = async () => {}) {
     const s = sessions.get(id); if (!s) return;
     s.watch ??= { peers: new Set(), cdp: null, starting: false, steps: [] };
     s.watch.peers.add(v.peer); startCast(s);
-    if (s.watch.steps.length) v.peer.send(JSON.stringify({ type: "history", steps: s.watch.steps }));
+    v.peer.send(JSON.stringify({ type: "history", steps: s.watch.steps }));   // always, even empty: the page clears its list on it
   }
   function detach(v) {
     const s = sessions.get(v.current); v.current = null;
@@ -139,6 +139,7 @@ body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px
 .w-steps{width:300px;max-width:100%;background:#fff;border-radius:10px;padding:10px 12px;box-sizing:border-box;max-height:80vh;overflow:auto}
 .w-steps h2{font-size:14px;margin:0 0 6px}.w-steps ol{list-style:none;margin:0;padding:0}.w-steps li{padding:6px 0;border-top:1px solid #0001}
 .w-steps small{display:block;color:#555}.w-steps .you{font-weight:600}.w-take{display:flex;gap:6px;align-items:center}
+.w-view:focus-visible{outline:3px solid #1a73e8;outline-offset:-3px}.w-err{margin:0;color:#b3261e}
 .w-view img{width:100%;height:100%;object-fit:contain;display:block}
 @media (prefers-color-scheme:dark){html,body{background:#15171a;color:#eee}.w-steps{background:#23262b}.w-steps small{color:#bbb}.w-steps li{border-color:#fff2}.w-empty{color:#bbb}}`;
 
@@ -148,11 +149,12 @@ function label(s){return s.app+" \\u00b7 "+(s.skin==="ios"?"iPhone":"Android")+"
 function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/watch/ws"+(pinned?"?session="+encodeURIComponent(pinned):""));
 function addStep(s){var li=document.createElement("li");if(s.by==="you")li.className="you";li.textContent=s.text;
 if(s.change){var c=document.createElement("small");c.textContent=s.change;li.append(c)}$("step-list").prepend(li);$("steps-empty").hidden=true}
-ws.onopen=function(){$("step-list").innerHTML="";$("steps-empty").hidden=false;if(take.checked)ws.send(JSON.stringify({type:"control",on:true}))};
+function clearSteps(){$("step-list").innerHTML="";$("steps-empty").hidden=false}
+ws.onopen=function(){clearSteps();if(take.checked)ws.send(JSON.stringify({type:"control",on:true}))};
 ws.onmessage=function(e){var m=JSON.parse(e.data);
-if(m.type==="history"){m.steps.forEach(addStep)}
+if(m.type==="history"){clearSteps();m.steps.forEach(addStep)}
 else if(m.type==="step"){addStep(m.step)}
-else if(m.type==="error"){$("steps-empty").hidden=false;$("steps-empty").textContent=m.message}
+else if(m.type==="error"){var er=$("input-error");er.textContent=m.message;er.hidden=false}
 else if(m.type==="frame"){vw=m.width||vw;vh=m.height||vh;img.src="data:image/jpeg;base64,"+m.data;$("empty").hidden=true}
 else if(m.type==="sessions"){
 pick.innerHTML="";var f=document.createElement("option");f.value="";f.textContent="Newest session";pick.append(f);
@@ -186,7 +188,8 @@ export function watchPage(skin = "android", pinned = "") {
   const title = `Watch the agent's phone (simulated ${skin === "ios" ? "iPhone" : "Android"})`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
 <style>${CSS}\n${frame.css}</style></head><body><div class="w-bar"><label>Session <select data-part="session-picker" aria-label="Session"><option value="">Newest session</option></select></label>
-<label class="w-take"><input type="checkbox" data-part="take-over"> Take over</label>
+<label class="w-take"><input type="checkbox" data-part="take-over" aria-describedby="take-over-help"> Take over</label><span id="take-over-help" class="w-empty">Your taps, swipes and typing go to the phone</span>
+<p class="w-err" role="status" data-part="input-error" hidden></p>
 <p class="w-empty" data-part="empty">No live session yet. It appears here when your agent starts one.</p></div>
 <div class="w-main">${frame.html}<aside class="w-steps" aria-label="Agent steps"><h2>Agent steps</h2><p class="w-empty" data-part="steps-empty">No steps yet.</p><ol data-part="step-list"></ol></aside></div><script>${SCRIPT(skin, pinned).replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
 }

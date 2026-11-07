@@ -165,3 +165,11 @@ describe("shouldOpenWatch", () => {
     expect(shouldOpenWatch({ json: true })).toBe(false);
   });
 });
+
+describe("--no-open", () => {
+  it("parses to \"true\" through args", async () => {
+    const { args } = await import("../src/config");
+    expect(args(["--no-open"])["no-open"]).toBe("true");
+    expect(args(["--port", "4545"])["no-open"]).toBeUndefined();
+  });
+});

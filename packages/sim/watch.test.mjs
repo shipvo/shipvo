@@ -104,3 +104,39 @@ test("a tap through /act is a step on /watch; input is ignored until Take over i
   assert.match(mine.step.text, /typed/);
   v.ws.close();
 });
+
+test("switching to another session sends that session's history, without the old session's steps", async () => {
+  await call("/session", { session: "ha", skin: "android" });
+  const v = connect(); await v.opened;
+  await until(() => v.msgs.find((m) => m.type === "history"));
+  await call("/act", { session: "ha", action: "set_device", device: { network: "offline" } });
+  await until(() => v.msgs.find((m) => m.type === "step" && m.step.text.startsWith("set_device")));
+  const before = v.msgs.length;
+  await call("/session", { session: "hb", skin: "android" });
+  const h = await until(() => v.msgs.slice(before).find((m) => m.type === "history"));
+  assert.deepEqual(h.steps, []);
+  v.ws.close();
+});
+
+test("Take over: swipe and key are acted on, bad coordinates give an error", async () => {
+  await call("/session", { session: "ti", skin: "android" });
+  const v = connect("?session=ti"); await v.opened;
+  await until(() => v.msgs.find((m) => m.type === "frame"));
+  v.ws.send(JSON.stringify({ type: "control", on: true }));
+  v.ws.send(JSON.stringify({ type: "swipe", x1: 5, y1: 50, x2: 5, y2: 5 }));
+  v.ws.send(JSON.stringify({ type: "key", key: "Enter" }));
+  v.ws.send(JSON.stringify({ type: "tap", x: "a", y: 1 }));
+  await until(() => v.msgs.filter((m) => m.type === "step" && m.step.by === "you").length >= 2);
+  const mine = v.msgs.filter((m) => m.type === "step" && m.step.by === "you").map((m) => m.step.text);
+  assert.ok(mine.includes("You scrolled") && mine.includes("You pressed Enter"));
+  const err = await until(() => v.msgs.find((m) => m.type === "error"));
+  assert.match(err.message, /numbers/);
+  v.ws.close();
+});
+
+test("the page has a separate status line for input errors and describes Take over", () => {
+  const html = watchPage("android");
+  assert.match(html, /role="status" data-part="input-error"/);
+  assert.match(html, /aria-describedby="take-over-help"/);
+  assert.match(html, /\.w-view:focus-visible/);
+});
