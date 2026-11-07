@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "smoke", "run", "explore", "lumi", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "migrate", "approvals", "test", "keys", "mcp",
+  "init", "sim", "smoke", "run", "explore", "lumi", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "migrate", "approvals", "test", "eval", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -52,6 +52,7 @@ Ship
   approvals list|approve <id> [--app id] [--json]  List promotes held for a second owner, or approve one
   audit <app> [--format json|csv] [--limit n] [--json]  Export the audit log to stdout
   test [files] [--repair [--write]] [--report <file> [--release <id>] [--platform android|ios] [--upload]] [--json]  Run tests/*.steps; --repair shows a diff for broken steps, --write saves it; --report writes JSON results keyed by commit and release
+  eval run <task> --agent <name> [--model <name>] [--mcp <url>]  Score an agent on tasks/<task>.task.json: records every step, checks the result; eval report [--json] compares runs
   doctor [--port <n>] [--json]  Check setup before first publish
   migrate --plan [--json]     Read-only plan to switch from Expo EAS Update (expo-updates) to Shipvo
   migrate --apply [--force] [--json]  Make the safe edits (EAS Update or CodePush) (backups in .shipvo/migrate-backup/)
