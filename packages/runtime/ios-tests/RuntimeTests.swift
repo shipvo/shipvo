@@ -323,6 +323,18 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(load(s)?.path, path); XCTAssertEqual(s.trialBoots, 2)
   }
 
+  /// UIScene lifecycle: React starts from the scene delegate, so the first scene activation and `didBecomeActive` can both
+  /// fire for one load. Together they must count one trial boot, and a background wake with no scene counts none.
+  func testSceneActivationAndAppActivationCountOneTrialBoot() async throws {
+    let s = store("good"); _ = try await Updater.check(s)
+    ShipvoBundleSelector.invalidate()
+    _ = ShipvoBundleSelector.select(s, visible: false)
+    XCTAssertEqual(s.trialBoots, 0, "no scene connected: nothing counted")
+    ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false) // scene activates
+    ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false) // app becomes active
+    XCTAssertEqual(s.trialBoots, 1)
+  }
+
   func testUiSeenStaysTrueAfterTheAppGoesToBackground() async throws {
     let s = store("good"); _ = try await Updater.check(s)
     ShipvoBundleSelector.resetUiSeen()
