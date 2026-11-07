@@ -5,6 +5,7 @@
 //   - Cloudflare Containers backend (wrangler.containers.jsonc): one container per app.
 import { Container, getContainer } from "@cloudflare/containers";
 import TOOLS from "./tools.json";
+import { handleOAuth, wwwAuthenticate } from "./oauth";
 
 type Env = {
   SIM?: DurableObjectNamespace<SimContainer>; DB: D1Database; CONTROL: string; OWNER_TOKEN?: string;
@@ -73,6 +74,7 @@ export default {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response("", { status: 204, headers: CORS });
     if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, service: "shipvo-sim", backend: env.E2B_API_KEY ? "e2b" : env.SIM ? "containers" : "none", mcp: "/mcp", docs: "https://github.com/shipvo/shipvo/tree/main/packages/mcp" });
+    const oauth = await handleOAuth(req, env); if (oauth) return oauth;
     // /mcp with Authorization: Bearer <key>, or, for clients that cannot send headers (ChatGPT's custom MCP
     // connectors offer only OAuth or none), /mcp/<key> or /mcp?key=<key>.
     const pathKey = url.pathname.match(/^\/mcp\/([A-Za-z0-9_-]{8,})$/)?.[1];
@@ -92,10 +94,12 @@ export default {
         if (msg.method === "tools/list") return rpc({ tools: TOOLS });
       }
     }
-    if (!key) return json({ error: "missing_api_key", hint: "Authorization: Bearer <key> (create one with the owner command create_api_key)" }, 401);
+    const challenge = { "www-authenticate": wwwAuthenticate(url.origin) };
+    const unauthorized = (o: unknown) => new Response(JSON.stringify(o), { status: 401, headers: { "content-type": "application/json", ...CORS, ...challenge } });
+    if (!key) return unauthorized({ error: "missing_api_key", hint: "Authorization: Bearer <key> (create one with the owner command create_api_key)" });
     const row = await env.DB.prepare("SELECT id, app_id, scope, expires_at, account_id FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").bind(await sha256(key)).first<{ id: number; app_id: string; scope: string; expires_at: string | null; account_id: number | null }>();
-    if (!row) return json({ error: "invalid_api_key" }, 401);
-    if (row.expires_at && row.expires_at < new Date().toISOString()) return json({ error: "expired_api_key", expires_at: row.expires_at, hint: "Run `shipvo login` to get a new key." }, 401);
+    if (!row) return unauthorized({ error: "invalid_api_key" });
+    if (row.expires_at && row.expires_at < new Date().toISOString()) return unauthorized({ error: "expired_api_key", expires_at: row.expires_at, hint: "Run `shipvo login` to get a new key." });
     env.DB.prepare("UPDATE api_keys SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").bind(row.id).run().catch(() => {});
 
     // A signed-in developer's key opens the beta app plus the apps they registered.

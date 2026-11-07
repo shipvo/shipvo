@@ -50,6 +50,7 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Pull request check:** `shipvo ci init --check` runs your tests and an explore pass on every pull request, with before and after screens of Android and iOS in the comment ([PR check](docs/ci-check.md)).
 - **Behaviour timeline:** the app admin compares how each release and pull request behaves on Android and iOS ([timeline](docs/timeline.md)).
 - **Real devices too:** `shipvo test --device agent-device` runs the same tests on an Android emulator or iOS Simulator through Callstack's agent-device ([testing](docs/testing.md)).
+- **Score an agent:** `shipvo eval run` runs any agent or model on a task and measures pass rate, steps, time, errors and retries on Android and iOS ([eval](docs/eval.md)).
 - **Move over in one command:** `shipvo migrate --plan` and `--apply` switch an app from Expo EAS Update or CodePush ([EAS Update](docs/migrate-from-eas-update.md), [CodePush](docs/migrate-from-codepush.md)).
 - **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/shipvo-design`.
 
