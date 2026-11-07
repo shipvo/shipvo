@@ -1,0 +1,141 @@
+{
+  "date": "2026-11-07T12:12:48.059Z",
+  "app": "apps/chess",
+  "machine": {
+    "platform": "linux",
+    "cpus": 2,
+    "cpuModel": "Intel(R) Xeon(R) Processor @ 2.30GHz",
+    "ramGb": 7.8
+  },
+  "node": "v22.23.4",
+  "requested": 120,
+  "step": 10,
+  "idleRssMb": 604,
+  "idleAvailableMb": 7234,
+  "steps": [
+    {
+      "open": 10,
+      "batchSeconds": 3.5,
+      "medianStartMs": 3478,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 3542,
+      "processes": 28,
+      "availableMb": 6581
+    },
+    {
+      "open": 20,
+      "batchSeconds": 3.7,
+      "medianStartMs": 3661,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 6380,
+      "processes": 48,
+      "availableMb": 5941
+    },
+    {
+      "open": 30,
+      "batchSeconds": 3.6,
+      "medianStartMs": 3536,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 9184,
+      "processes": 68,
+      "availableMb": 5321
+    },
+    {
+      "open": 40,
+      "batchSeconds": 3.4,
+      "medianStartMs": 3359,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 11999,
+      "processes": 88,
+      "availableMb": 4714
+    },
+    {
+      "open": 50,
+      "batchSeconds": 3.6,
+      "medianStartMs": 3339,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 14816,
+      "processes": 108,
+      "availableMb": 4098
+    },
+    {
+      "open": 60,
+      "batchSeconds": 3.6,
+      "medianStartMs": 3544,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 17628,
+      "processes": 128,
+      "availableMb": 3485
+    },
+    {
+      "open": 70,
+      "batchSeconds": 3.9,
+      "medianStartMs": 3872,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 20397,
+      "processes": 148,
+      "availableMb": 2954
+    },
+    {
+      "open": 80,
+      "batchSeconds": 3.7,
+      "medianStartMs": 3716,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 23154,
+      "processes": 168,
+      "availableMb": 2434
+    },
+    {
+      "open": 90,
+      "batchSeconds": 4.1,
+      "medianStartMs": 4025,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 25889,
+      "processes": 188,
+      "availableMb": 2018
+    },
+    {
+      "open": 100,
+      "batchSeconds": 5.1,
+      "medianStartMs": 4642,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 17926,
+      "processes": 208,
+      "availableMb": 1521
+    },
+    {
+      "open": 110,
+      "batchSeconds": 27.6,
+      "medianStartMs": 27558,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 10385,
+      "processes": 228,
+      "availableMb": 1531
+    },
+    {
+      "open": 110,
+      "batchSeconds": 54.1,
+      "medianStartMs": 53515,
+      "failed": 10,
+      "answering": "3/3",
+      "rssMb": 9648,
+      "processes": 248,
+      "availableMb": 1443
+    }
+  ],
+  "stopped": "10 sessions did not start at 120",
+  "perSimulatorMb": 57.1,
+  "note": "rssMb sums the sim process and its descendants and counts shared pages once per process, so it over-counts. perSimulatorMb uses the fall in MemAvailable.",
+  "perSimulatorAtOpen": 100
+}

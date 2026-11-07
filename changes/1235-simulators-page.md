@@ -1,0 +1,3 @@
+- site: new product page at `/products/simulators/`: Android and iOS simulators on your own machine or CI runner, with the measured numbers, a drag-to-explore chart and animated demos. It is linked from the Product menu and the footer.
+- sim: `scripts/sim-bench/scale.mjs` opens simulators in batches and records memory and start time. The first published run opened 110 at once on a 2-CPU, 7.8 GB machine, at 57.1 MB each (`docs/product/sim-bench/`).
+- Migration: none.

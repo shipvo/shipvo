@@ -31,6 +31,7 @@
     "guide.mjs",
     "phone-browser.mjs",
     "browser-app.mjs",
+    "watch.mjs",
     "ws-lite.mjs",
     "lifecycle.mjs",
     "shade.mjs",
