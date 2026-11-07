@@ -1,3 +1,4 @@
+import { createServer } from "node:net";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,6 +6,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { lumi } from "../src/lumi.js";
 
 const cwd = process.cwd();
+
+/** A port the OS just gave away, so a fixed number cannot collide with another test or process. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const s = createServer();
+    s.once("error", reject);
+    s.listen(0, "127.0.0.1", () => { const p = (s.address() as { port: number }).port; s.close(() => resolve(p)); });
+  });
+}
 afterEach(() => { process.chdir(cwd); vi.restoreAllMocks(); });
 
 function app(kit: string | null): string {
@@ -24,17 +34,17 @@ function app(kit: string | null): string {
 describe("shipvo lumi --device", () => {
   it("rejects an unknown device", async () => {
     app(null);
-    await expect(lumi(["--device", "toaster", "--ui-port", "47611"])).rejects.toThrow('--device must be "agent-device" or "phone"');
+    await expect(lumi(["--device", "toaster", "--ui-port", String(await freePort())])).rejects.toThrow('--device must be "agent-device" or "phone"');
   });
 
   it("says to install @shipvo/test when it is missing", async () => {
     app(null);
-    await expect(lumi(["--device", "agent-device", "--ui-port", "47612"])).rejects.toThrow("Install @shipvo/test");
+    await expect(lumi(["--device", "agent-device", "--ui-port", String(await freePort())])).rejects.toThrow("Install @shipvo/test");
   });
 
   it("asks for a newer @shipvo/test when it has no agent-device driver", async () => {
     app("export {};\n");
-    await expect(lumi(["--device", "agent-device", "--ui-port", "47613"])).rejects.toThrow("too old for --device agent-device");
+    await expect(lumi(["--device", "agent-device", "--ui-port", String(await freePort())])).rejects.toThrow("too old for --device agent-device");
   });
 
   it("with agent-device it starts no simulator and serves the screenshot from the driver", async () => {
@@ -44,7 +54,7 @@ describe("shipvo lumi --device", () => {
     snapshot: async () => ok, errors: async () => [], sizes: async () => ({}), screenshot: async () => new Uint8Array([1, 2, 3]) };
 }\n`);
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const port = 47614;
+    const port = await freePort();
     const done = lumi(["--device", "agent-device", "--no-open", "--ui-port", String(port)]);
     let body: Buffer | undefined;
     for (let i = 0; i < 100 && !body; i++) {
