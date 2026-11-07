@@ -324,15 +324,22 @@ final class RuntimeTests: XCTestCase {
   }
 
   /// UIScene lifecycle: React starts from the scene delegate, so the first scene activation and `didBecomeActive` can both
-  /// fire for one load. Together they must count one trial boot, and a background wake with no scene counts none.
+  /// fire for one load. Together they must count one trial boot, and a load with no activation counts none.
   func testSceneActivationAndAppActivationCountOneTrialBoot() async throws {
     let s = store("good"); _ = try await Updater.check(s)
+    ShipvoReactDelegateHandler.makeStore = { s }
+    defer { ShipvoReactDelegateHandler.makeStore = { Store() } }
+    ShipvoReactDelegateHandler.watchForeground()
     ShipvoBundleSelector.invalidate()
     _ = ShipvoBundleSelector.select(s, visible: false)
+    await MainActor.run {}
     XCTAssertEqual(s.trialBoots, 0, "no scene connected: nothing counted")
-    ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false) // scene activates
-    ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false) // app becomes active
-    XCTAssertEqual(s.trialBoots, 1)
+    NotificationCenter.default.post(name: UIScene.didActivateNotification, object: nil)
+    await MainActor.run {} // observers run on the main queue
+    XCTAssertEqual(s.trialBoots, 1, "scene activation counts the trial boot")
+    NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
+    await MainActor.run {}
+    XCTAssertEqual(s.trialBoots, 1, "app activation for the same load does not count again")
   }
 
   func testUiSeenStaysTrueAfterTheAppGoesToBackground() async throws {
