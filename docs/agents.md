@@ -188,7 +188,15 @@ Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_pol
 - The `shipvo.json` read by `@shipvo/mcp` (from `PN_APP_DIR` or the current folder) can only make the rules stricter than the control plane's.
 - The signed-in admin at `/app/<id>/admin` is not gated: the confirm step is for agents holding the owner token.
 
+## Share one backend between phones with `room`
+
+Give `open_app` a `room` name and every session opened with that room on the same simulator shares one mock backend: orders, content and telemetry. Use it when two phones, for example an Android and an iOS phone, or a shopper and a shop owner, must see the same data. Without `room`, each session has its own backend.
+
+`list_sessions` shows each session's app, platform, room, who opened it (the MCP client name), when it started and its current screen title. `end_session` ends one session; a room closes with its last session, and its report includes the room and the room's orders.
+
 ## Grading an agent
+
+To score an agent with numbers and compare agents, use [`shipvo eval`](eval.md).
 
 `end_session` returns what the app actually sent to its backend, not what the agent says it did. The Tide & Tackle repo has an agent-eval harness that scores tasks that way ([agent-gate-results.md](agent-gate-results.md)).
 
