@@ -1,1 +1,0 @@
-- hq: buttons, tabs and the brand link are at least 44 px tall at phone and tablet width; the tab row scrolls inside itself.

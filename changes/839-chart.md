@@ -1,1 +1,0 @@
-- spec: a `chart` block (line, area, bar, donut) validates, renders as SVG in theme colours, and lists its label and data points as text in the screen tree. A chart without a label, or with an unknown kind or aggregate, is now an error (it was a warning for the missing label). No migration needed for the exported API.

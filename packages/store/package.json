@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/store",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "license": "Apache-2.0",
   "description": "Know what Google Play and the App Store will ask before you are stuck on a form: derive Data safety answers and a draft privacy policy from shipvo.json.",

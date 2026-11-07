@@ -1,1 +1,0 @@
-- capacitor: new Swift package `packages/capacitor/ios` (`ShipvoBundle`). It verifies a signed web bundle (Ed25519 signature, size and SHA-256), stores it in a versioned directory, counts crash-loop boots and rolls back to the previous bundle. Tests run the shared vectors in `packages/capacitor/test-vectors/bundle.json`, which the TypeScript tests also check.

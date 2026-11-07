@@ -1,2 +1,0 @@
-- apps: Notes and Tasks, a first-party spec app and forkable template in `templates/notes-tasks/app.json`, with tools `add_task`, `complete_task`, `add_note` and `search`. Each task shows its id and a "Complete task form" moves it to Done tasks. Search ignores letter case.
-- spec: `App.call(action, input)` runs an action by name, like a generated tool. Actions now see the latest data. New method only; no migration needed.
