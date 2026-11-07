@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo agents setup` writes the Shipvo MCP server into the config of Claude Code, Cursor, VS Code / Copilot, Gemini CLI, Qwen Code, Roo Code, Kiro and opencode (merged, other servers kept). `--global` also writes Codex CLI and Windsurf; Claude Desktop, Cline, Zed, Goose, Continue and Amp get a block to paste. New flags: `--for`, `--all`, `--global`; `--json` now has an `agents` list.
+- Migration: none; `.mcp.json` is still written, `.cursor/mcp.json` when Cursor is found.
