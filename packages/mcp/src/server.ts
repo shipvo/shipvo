@@ -93,7 +93,9 @@ async function act1(body: Record<string, unknown>): Promise<Act> {
   if (!d) return sim("/act", body);
   const { session: _s, action, ...args } = body;
   if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone. Open a headless session with show: false for it.` };
-  const m = await d.request(String(action), args);
+  // The request's own `id` is the message id, so a notification id travels as `nid`.
+  const { id: nid, ...rest } = args as Record<string, unknown>;
+  const m = await d.request(String(action), nid !== undefined ? { ...rest, nid } : rest);
   return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code, ...(m.log !== undefined ? { log: m.log as unknown[] } : {}), ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}), ...(m.notifications !== undefined ? { notifications: m.notifications } : {}), ...(m.settings !== undefined ? { settings: m.settings } : {}), ...(m.delivered !== undefined ? { delivered: m.delivered as boolean } : {}), ...(typeof m.image === "string" ? { image: m.image } : {}), ...(typeof m.mime === "string" ? { mime: m.mime } : {}), ...(typeof m.source === "string" ? { source: m.source } : {}), ...(Array.isArray(m.unsupported) ? { unsupported: m.unsupported as string[] } : {}) };
 }
 // While recording with show_taps, ask the simulator where an element is (0..1 of the viewport). Unknown element or attached phone: undefined, so no dot.
@@ -187,6 +189,8 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
   if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
   if (!keyApps && !live && !project && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
+  // show: true was asked for, but there is nothing to show: say so instead of opening a headless session without a note.
+  if (show === true && wantShow && !live && !project) return result("", { ok: false, code: "no_project", error: `show: true needs a shipvo run phone, but no live run for "${id}" and no shipvo.json were found in this directory or its parents. Run from the app's folder, start \`shipvo run android\` or \`shipvo run ios\`, or use show: false for a headless session.` });
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const mode = attach ?? "auto";
   let attachNote = "";

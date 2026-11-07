@@ -57,11 +57,11 @@ setTimeout(() => {}, 5000);
 });
 afterAll(() => { sim?.close(); host?.close(); if (out) rmSync(out, { recursive: true, force: true }); if (work) rmSync(work, { recursive: true, force: true }); });
 
-async function open(args: Record<string, unknown>) {
+async function open(args: Record<string, unknown>, cwd = join(work, "proj", "src")) {
   const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${simPort}`, PN_CONTROL: "http://127.0.0.1:1", SHIPVO_BIN: join(work, "fake-shipvo.mjs"), SHIPVO_BROWSER: join(work, "fake-browser.mjs"), FAKE_PORT: String(hostPort), FAKE_PID: String(process.pid) };
   delete env.PN_APPS; delete env.CI;
   const c = new Client({ name: "t", version: "0" });
-  await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env, cwd: join(work, "proj", "src") }));
+  await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env, cwd }));
   const call = async (name: string, a: Record<string, unknown>) => (await c.callTool({ name, arguments: a }) as { content: { text: string }[]; isError?: boolean }).content[0].text;
   return { c, call, text: await call("open_app", { app: "menu", ...args }) };
 }
@@ -98,6 +98,8 @@ describe("open_app platform and show", { timeout: 40_000 }, () => {
     expect(log.capabilities).toEqual({ camera: "simulated" });
     await call("push_notification", { session, title: "Hi", body: "there" });
     expect(seen.some((m) => m.type === "push_notification" && m.title === "Hi")).toBe(true);
+    await call("dismiss_notification", { session, id: "n1" });
+    expect(seen.some((m) => m.type === "dismiss_notification" && m.nid === "n1")).toBe(true); // `id` is the message id, so the notification id goes as `nid`
     const report = JSON.parse(await call("end_session", { session }));
     expect(report.mode).toBe("attached");
     expect(report.network).toEqual([{ url: "https://x/orders", method: "POST" }]);
@@ -108,6 +110,15 @@ describe("open_app platform and show", { timeout: 40_000 }, () => {
     const { c, text } = await open({ platform: "ios", show: false });
     expect(text).toContain("mode: headless session");
     expect(text).toContain("phone: not visible");
+    expect(existsSync(join(work, "spawned.txt"))).toBe(false);
+    await c.close();
+  });
+  it("show true with no live run and no shipvo.json returns a clear error", async () => {
+    reset();
+    const bare = join(work, "bare"); mkdirSync(bare, { recursive: true });
+    const { c, text } = await open({ show: true }, bare);
+    expect(text).toContain("no_project");
+    expect(text).toContain("no shipvo.json");
     expect(existsSync(join(work, "spawned.txt"))).toBe(false);
     await c.close();
   });

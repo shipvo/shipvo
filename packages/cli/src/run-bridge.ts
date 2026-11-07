@@ -16,6 +16,15 @@ export function screenRulesSource(): string {
   return src.replace(/^export /gm, "");
 }
 
+/**
+ * The simulator's settings rules (`@shipvo/sim/settings.mjs`), as source that the page can run: same key names, validation,
+ * error codes and the `language ar` -> `rtl` rule as the simulator's get_settings and set_setting.
+ */
+export function settingsRulesSource(): string {
+  const src = readFileSync(createRequire(import.meta.url).resolve("@shipvo/sim/settings.mjs"), "utf8");
+  return src.replace(/^export /gm, "");
+}
+
 /** Runs in the page. Everything it needs is nested inside, because it is serialised with `String(fn)`. */
 function bridgeMain(win: any, token: string) {
   const doc = win.document;
@@ -342,6 +351,12 @@ function bridgeMain(win: any, token: string) {
 
   // Device actions go to the same simulated @shipvo/device state the device panel uses (`__pnDevice` in the app iframe).
   const DEVICE_TYPES = /^(set_device|device_log|device_reset|push_notification|notifications|open_notification|open_url|dismiss_notification|get_settings|set_setting)$/;
+  const rules = win.__shipvoSettings;
+  const sysOf = (d: any) => {
+    const sys = typeof d.system === "function" ? d.system() : null;
+    if (!sys) throw new rules.SettingsError("no_device", "the app has no simulated device in this session");
+    return sys;
+  };
   async function deviceAct(m: any) {
     let d: any; try { d = frameEl.contentWindow.__pnDevice; } catch {}
     if (!d) { const e: any = new Error("the app is still loading: try again in a moment"); e.code = "not_ready"; throw e; }
@@ -351,11 +366,18 @@ function bridgeMain(win: any, token: string) {
       case "device_log": return { log: d.log().slice(), capabilities: d.capabilities() };
       case "push_notification": { const id = d.push({ title: String(m.title ?? ""), body: String(m.body ?? ""), data: m.data, at: Date.now() }); return { delivered: id != null, id }; }
       case "notifications": return { notifications: d.notifications() };
-      case "open_notification": if (!d.openNotification(m.id)) throw new Error("no such notification"); return {};
-      case "dismiss_notification": if (m.all) d.clearAll(); else if (!d.dismiss(String(m.id))) throw new Error("no such notification"); return {};
+      case "open_notification": if (!d.openNotification(m.nid)) throw new Error("no such notification"); return {};
+      case "dismiss_notification": if (m.all) d.clearAll(); else if (!d.dismiss(String(m.nid))) throw new Error("no such notification"); return {};
       case "open_url": if (!(await d.openUrl(String(m.url)))) throw new Error("the app has no handler for that link"); return {};
-      case "get_settings": return { settings: typeof d.settings === "function" ? d.settings() : {} };
-      case "set_setting": { d.set({ [m.key]: m.value }); return {}; }
+      case "get_settings": { const settings = rules.readSettings(sysOf(d)); return { settings, screen: rules.describeSettings(settings) }; }
+      case "set_setting": {
+        if (typeof m.key !== "string" || !m.key) throw new rules.SettingsError("unknown_setting", "set_setting needs a key, such as dark_mode or font_size");
+        const patch = rules.settingPatch(m.key, m.value); // unknown key and bad value fail before anything changes
+        sysOf(d);
+        d.set(patch);
+        const settings = rules.readSettings(sysOf(d));
+        return { settings, screen: rules.describeSettings(settings) };
+      }
     }
     return {};
   }
@@ -480,7 +502,7 @@ function bridgeMain(win: any, token: string) {
     if (DEVICE_TYPES.test(m.type)) {
       step("Device: " + m.type.replace(/_/g, " "), true);
       Promise.resolve().then(() => deviceAct(m)).then(async (r) => { await sleep(100); ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r, screen: screenOrUndefined() })); },
-        (err: any) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: String(err && err.message || err), screen: screenOrUndefined() })));
+        (err: any) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: String(err && err.message || err), ...(err && err.code ? { code: String(err.code) } : {}), screen: screenOrUndefined() })));
       return;
     }
     if (m.type === "lumi") {
@@ -503,8 +525,10 @@ function bridgeMain(win: any, token: string) {
 }
 
 /** The script text served at `/__shipvo/bridge.js`. It reads the session token from its own `data-token` attribute and then removes the attribute. */
-export function bridgeScript(rules: string = screenRulesSource()): string {
+export function bridgeScript(rules: string = screenRulesSource(), settings: string = settingsRulesSource()): string {
   return `(function(){
+globalThis.__shipvoSettings=(function(){${settings}
+return {SettingsError:SettingsError,settingPatch:settingPatch,readSettings:readSettings,describeSettings:describeSettings};})();
 var __rules=(function(){${rules}
 return {clearScreenRules:clearScreenRules,applyScreenRules:applyScreenRules,filterTree:filterTree};})();
 globalThis.__shipvoRules=__rules;

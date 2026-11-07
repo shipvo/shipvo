@@ -2,3 +2,4 @@
 - `@shipvo/mcp`: on an attached phone, `set_device`, `device_log`, `device_reset`, `push_notification`, `notifications`, `open_notification`, `dismiss_notification`, `open_url`, `get_settings` and `set_setting` work, and `end_session` lists the app's network calls.
 - `@shipvo/cli`: the `shipvo run` page switches skin with `/?skin=ios|android`, and `.shipvo/run.json` follows.
 - Migration: none; new optional input fields. `open_app` now shows the phone by default on a machine with a desktop (not in CI); pass `show: false` for a headless session.
+- `@shipvo/mcp`: `open_app` with `show: true` returns `no_project` when no live run and no `shipvo.json` is found, instead of opening a headless session silently.
