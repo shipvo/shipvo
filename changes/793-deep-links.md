@@ -1,0 +1,2 @@
+- `@shipvo/sim`: `open_url` switches to the app that owns the link and hands it the URL once, as its initial URL, then sends the `url` event. A later switch or reload does not see the link.
+- Migration: none.
