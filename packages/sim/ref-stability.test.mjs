@@ -1,4 +1,5 @@
 // Refs from an old snapshot must keep working on the same element, or fail with `stale_ref`. They must never act on another element.
+import { pickPort } from "./test-port.mjs";
 import test, { before, after } from "node:test";
 import { pickPort } from "./test-port.mjs";
 import assert from "node:assert/strict";

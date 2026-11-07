@@ -1,4 +1,5 @@
 // set_network_mocks against a real sim server and a tiny local HTTP backend the page calls with fetch.
+import { pickPort } from "./test-port.mjs";
 import test, { before, after } from "node:test";
 import { pickPort } from "./test-port.mjs";
 import assert from "node:assert/strict";

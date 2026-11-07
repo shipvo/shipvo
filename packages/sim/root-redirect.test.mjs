@@ -1,4 +1,5 @@
 // GET / on the sim redirects to the app page at /app/.
+import { pickPort } from "./test-port.mjs";
 import test, { before, after } from "node:test";
 import { pickPort } from "./test-port.mjs";
 import assert from "node:assert/strict";

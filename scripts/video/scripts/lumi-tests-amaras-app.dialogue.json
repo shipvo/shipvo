@@ -1,0 +1,12 @@
+{"cast": {"amara": {"voice": "af_heart", "speed": 1.0, "fx": "warm"},
+          "lumi": {"voice": "af_jessica", "speed": 1.1, "fx": "energetic"}},
+ "cues": [
+  [1.5, "amara", "I finished my app. Does every button work?"],
+  [5.5, "lumi", "Let me check!"],
+  [11.0, "amara", "Wait, it is tapping by itself."],
+  [17.0, "lumi", "Found one. This button does nothing."],
+  [22.5, "amara", "Show me again."],
+  [26.0, "lumi", "Replaying. There."],
+  [32.0, "amara", "Okay. I know what to fix."],
+  [40.0, "lumi", "Next on Shipvo."]
+ ]}

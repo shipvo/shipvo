@@ -1,4 +1,5 @@
 // tap, type and scroll say delivered or not_delivered, with a reason when nothing reached the app.
+import { pickPort } from "./test-port.mjs";
 import test, { before, after } from "node:test";
 import { pickPort } from "./test-port.mjs";
 import assert from "node:assert/strict";

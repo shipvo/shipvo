@@ -91,6 +91,7 @@ In CI, `shipvo explore --save-tests <dir>` writes one file per finding. Names ar
 
 ## Next steps
 
+- [Tutorial: have Lumi test your app while you watch](tutorials/test-your-app-with-lumi.md)
 - [Run on a phone in your browser](run.md)
 - [`shipvo explore` and flows](cli.md)
 - [Test with an assistant](test-with-an-assistant.md)
