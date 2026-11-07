@@ -179,6 +179,17 @@ shipvo agents setup --json       # machine-readable result
 - It prints the skill install line.
 - Running it again changes nothing.
 
+## `shipvo sim --hosted`
+
+Test your local build on the hosted phone. Run it in the app folder.
+
+```bash
+export SHIPVO_API_KEY=<your key>
+shipvo sim --hosted [--skip-build]
+```
+
+It builds the app the way `shipvo sim` does, uploads it for your key and prints `Uploaded. It expires <time>. On the hosted phone: open_app("<app>@build:<id>")`. With `--json` the data has `id`, `app`, `expires_at` and `open`. `--skip-build` uploads the existing `sim-dist` folder. Errors: `no_api_key`, `build_failed`, `build_too_large`, `upload_failed`. Full steps and the codes table: [Agents](agents.md#test-the-build-on-your-machine-on-the-hosted-phone).
+
 ## `shipvo smoke`
 
 Does the app load? Run it after a change, with no test to write.
