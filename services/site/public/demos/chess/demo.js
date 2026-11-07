@@ -57,6 +57,8 @@ addEventListener("message", (e) => {
   if (!d || d.type !== "chess:moves" || !Array.isArray(d.moves)) return;
   const from = appWin("white") === e.source ? "white" : appWin("black") === e.source ? "black" : null;
   if (!from) return;
+  // A reloaded phone first says it has no moves. Any other message before both are ready comes from the page it replaced.
+  if (!started && !ready[from] && d.moves.length > 0) return;
   ready[from] = true;
   if (d.moves.length > moves.length) {
     moves = d.moves; over = !!d.over;
