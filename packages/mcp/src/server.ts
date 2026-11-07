@@ -149,7 +149,8 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
 };
 type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
-const SERVER_VERSION = "0.0.4";
+/** The package version, read from package.json next to dist/ so it never drifts from the published one. */
+const SERVER_VERSION: string = (() => { try { return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version ?? "0.0.0"; } catch { return "0.0.0"; } })();
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
 const TOOLS_LIST_TTL_MS = 60_000;
 const SUPPORTED_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];

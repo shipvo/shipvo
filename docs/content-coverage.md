@@ -6,19 +6,21 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-1. ~~Shipvo Testers and `shipvo store testers`~~ (done)
-2. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
-3. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
-4. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
-5. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
-6. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
-7. Record demo videos (`record_*`) (tutorial, video, blog; docs done)
-8. The `shipvo` skill for coding agents (tutorial, blog; docs done)
-9. Check every pull request (`shipvo ci init --check`): launch kit written 6 Nov; tutorial, video and blog needed
-10. Capacitor support (all columns, as slices land)
+1. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog, tutorial and video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md).
+2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
+3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
+4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
+5. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
+6. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
+7. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
+8. Record demo videos (`record_*`) (tutorial, video, blog; docs done)
+9. The `shipvo` skill for coding agents (tutorial, blog; docs done)
+10. Check every pull request (`shipvo ci init --check`): launch kit written 6 Nov; tutorial, video and blog needed
+11. Capacitor support (all columns, as slices land)
 
 | Feature | Docs | Tutorial | Video | Blog |
 | --- | --- | --- | --- | --- |
+| Chess on Shipvo Phone: live demo and two agents playing through MCP | [demos/chess](demos/chess.md) | | | |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | Signed over-the-air updates | [getting-started](getting-started.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |

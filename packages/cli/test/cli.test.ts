@@ -62,7 +62,10 @@ describe("cli", () => {
     try {
       const r = spawnSync(process.execPath, [join(out, "cli.js"), "mcp"], { encoding: "utf8", env: { ...process.env, SHIPVO_HOME: home } });
       expect(r.status).toBe(0);
-      expect(r.stdout).toContain('"args": [\n        "-y",\n        "@shipvo/mcp"');
+      expect(r.stdout).toContain('"command": "node"');
+      expect(r.stdout).toContain("node_modules/@shipvo/mcp/dist/server.js");
+      expect(r.stdout).toContain('"PN_SIM"');
+      expect(r.stdout).not.toContain("npx");
       expect(r.stderr).not.toContain("Not signed in");
     } finally { rmSync(home, { recursive: true, force: true }); }
   });

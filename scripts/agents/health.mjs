@@ -123,16 +123,35 @@ if (!ready.length && !working.length && !live.some((r) => r.name === "agent-plan
   fixed.push("The issue queue was empty; asked the Head of Product to plan the next slices.");
 }
 
-// 3c. Daily content roles: GitHub sometimes drops scheduled runs. Start any that has not run for 14 hours.
-for (const wf of ["agent-blog.yml", "agent-tutorial.yml", "agent-video.yml"]) {
+// 3c. Content roles: GitHub often drops scheduled runs. Start any that has missed one and a half of its intervals.
+const CONTENT = { "agent-docs.yml": 6, "agent-blog.yml": 4, "agent-tutorial.yml": 4, "agent-video.yml": 3, "agent-launch.yml": 12 };
+for (const [wf, every] of Object.entries(CONTENT)) {
   try {
     const last = api(`repos/${REPO}/actions/workflows/${wf}/runs?per_page=1`).workflow_runs[0];
-    if (!last || (last.status === "completed" && mins(last.created_at) > 14 * 60)) {
+    if (!last || (last.status === "completed" && mins(last.created_at) > every * 90)) {
       dispatch(wf);
-      fixed.push(`${wf} had not run for 14 hours (missed schedule); started it.`);
+      fixed.push(`${wf} had not run for ${Math.round(mins(last?.created_at ?? 0) / 60)} hours (missed schedule, runs every ${every} h); started it.`);
     }
   } catch (e) { console.log(`skip ${wf}:`, e.message); }
 }
+
+// 3c2. Shipped but not announced: a merged PR with a changes/ entry must reach the roadmap's Shipped list within
+// 3 hours (the docs agent then adds its content-coverage row, and blog, tutorial, video and launch follow).
+try {
+  const roadmap = Buffer.from(api(`repos/${REPO}/contents/docs/ROADMAP.md`).content, "base64").toString("utf8");
+  const merged = api(`repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=40`)
+    .filter((p) => p.merged_at && mins(p.merged_at) > 180 && mins(p.merged_at) < 48 * 60);
+  const missing = [];
+  for (const p of merged) {
+    if (new RegExp(`#${p.number}\\b`).test(roadmap)) continue;
+    const files = api(`repos/${REPO}/pulls/${p.number}/files?per_page=100`).map((f) => f.filename);
+    if (files.some((f) => /^changes\/(?!README)/.test(f))) missing.push(p.number);
+  }
+  if (missing.length) {
+    if (!live.some((r) => r.name === "agent-docs")) dispatch("agent-docs.yml");
+    fixed.push(`Shipped but not on the roadmap yet: ${missing.map(link).join(", ")}; started the docs agent to add them to Shipped and to the content ledger.`);
+  }
+} catch (e) { console.log("skip shipped check:", e.message); }
 
 // 3d. Content coverage (information only): features still missing a tutorial or a video.
 try {

@@ -27,9 +27,9 @@ describe.each(JSON_FORMATS)("%s", (id, file, _p, servers) => {
     quiet(); const d = tmp();
     expect(await run(["setup", "--for", id], d)).toBe(0);
     const s = servers(rd(d, file)).shipvo;
-    if (id === "opencode") expect(s).toEqual({ type: "local", command: ["npx", "-y", "@shipvo/mcp"], environment: {} });
-    else if (id === "vscode") expect(s).toEqual({ type: "stdio", command: "npx", args: ["-y", "@shipvo/mcp"] });
-    else expect(s).toEqual({ command: "npx", args: ["-y", "@shipvo/mcp"] });
+    if (id === "opencode") expect(s).toEqual({ type: "local", command: ["node", "node_modules/@shipvo/mcp/dist/server.js"], environment: { PN_SIM: "http://localhost:4545" } });
+    else if (id === "vscode") expect(s).toEqual({ type: "stdio", command: "node", args: ["node_modules/@shipvo/mcp/dist/server.js"], env: { PN_SIM: "http://localhost:4545" } });
+    else expect(s).toEqual({ command: "node", args: ["node_modules/@shipvo/mcp/dist/server.js"], env: { PN_SIM: "http://localhost:4545" } });
   });
   it("keeps another server and other keys", async () => {
     quiet(); const d = tmp();

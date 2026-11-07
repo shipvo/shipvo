@@ -16,11 +16,16 @@ const PROMOTIONS: { value: Promotion; name: string; glyph: string }[] = [
 ];
 
 export function statusText(board: BoardSnapshot): string {
-  const s = board.status;
+  if (board.result) return board.result;
   const side = board.turn === "white" ? "White" : "Black";
-  if (s.state === "checkmate") return `Checkmate, ${s.winner === "w" ? "white" : "black"} wins`;
-  if (s.state === "draw") return s.reason === "stalemate" ? "Stalemate, draw" : `Draw (${s.reason})`;
-  return s.check ? `${side} to move, check` : `${side} to move`;
+  return board.status.state === "playing" && board.status.check ? `${side} to move, check` : `${side} to move`;
+}
+
+/** Says whose turn it is and the last move, for the people and agents who read the screen. */
+export function turnText(board: BoardSnapshot): string {
+  const last = board.lastMove ? `Last move: ${board.lastMove}.` : "No moves yet.";
+  const turn = board.over ? "The game is over." : `Turn: ${board.turn}.`;
+  return `${turn} ${last}${board.seat ? ` You play ${board.seat}.` : ""}`;
 }
 
 const PAD = 12;
@@ -32,7 +37,7 @@ export function App({ store }: { store: ChessStore }) {
   // The store is the only source of truth: re-read it on every change.
   const fen = useSyncExternalStore(
     (fn) => store.subscribe(fn),
-    () => store.get_board().fen,
+    () => { const b = store.get_board(); return `${b.fen}|${b.lastMove}|${b.result}|${b.seat}|${store.lastNotice()}`; },
   );
   void fen;
   const board = store.get_board();
@@ -45,10 +50,12 @@ export function App({ store }: { store: ChessStore }) {
 
   const targets = selected ? store.legal_moves(selected) : [];
   const targetSquares = new Set(targets.map((m) => m.to));
-  const playing = board.status.state === "playing";
+  const playing = !board.over;
 
   const onSquare = (square: string) => {
     if (!playing || pending) return;
+    const wait = store.outOfTurn();
+    if (wait) { setSelected(null); store.refuse(wait); return; }
     if (selected && targetSquares.has(square)) {
       const options = targets.filter((m) => m.to === square);
       if (options.some((m) => m.promotion)) {
@@ -75,6 +82,8 @@ export function App({ store }: { store: ChessStore }) {
       <Text style={styles.status} testID="status" accessibilityRole="header">
         {statusText(board)}
       </Text>
+      <Text style={styles.info} testID="turn-info">{turnText(board)}</Text>
+      {store.lastNotice() ? <Text style={styles.notice} testID="notice" accessibilityRole="alert">{store.lastNotice()}</Text> : null}
       <View style={[styles.board, { width: size * 8 }]} testID="board">
         {board.squares.map((sq) => {
           const isSel = sq.square === selected;
@@ -131,6 +140,8 @@ export function App({ store }: { store: ChessStore }) {
 const styles = StyleSheet.create({
   root: { flex: 1, padding: 12, backgroundColor: "#fff" },
   status: { color: "#111", fontSize: 18, fontWeight: "600", marginBottom: 8 },
+  info: { color: "#111", fontSize: 14, marginBottom: 6 },
+  notice: { color: "#a00", fontSize: 14, marginBottom: 6 },
   board: { flexDirection: "row", flexWrap: "wrap" },
   square: { alignItems: "center", justifyContent: "center" },
   light: { backgroundColor: "#f0d9b5" },
