@@ -53,6 +53,14 @@ async function loginRun(argv: string[], json: boolean): Promise<Done> {
   return fail("Timed out waiting for GitHub.", "login_timeout");
 }
 
+/** Sign in for `shipvo agents setup --hosted`. Prints the device code, never the key. With `quiet`, prints go to stderr so JSON output stays clean. */
+export async function loginForKey(quiet = false): Promise<{ key: string; mcp_url: string } | null> {
+  const log = console.log;
+  if (quiet) console.log = (...x: unknown[]) => console.error(...x);
+  try { await loginRun([], true); } catch (e) { console.error(e instanceof Error ? e.message : String(e)); return null; } finally { console.log = log; }
+  return savedCreds();
+}
+
 export async function keys() {
   const c = savedCreds(); if (!c) { console.error("Not signed in. Run `shipvo login`."); process.exit(1); }
   const r = await fetch(`${c.control}/auth/me`, { headers: { authorization: `Bearer ${c.key}` } });

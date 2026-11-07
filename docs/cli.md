@@ -168,6 +168,7 @@ shipvo agents setup --json       # machine-readable result
 - It detects the project: Shipvo app (`shipvo.json`), Capacitor, Expo, bare React Native.
 - It writes a section to `AGENTS.md` between `<!-- shipvo:begin -->` and `<!-- shipvo:end -->`. A missing file is created. Text outside the markers is never changed.
 - It adds `@shipvo/mcp` to devDependencies with your package manager (npm, pnpm, yarn or bun) if it is missing, then adds the `shipvo` server (`node node_modules/@shipvo/mcp/dist/server.js`, with `PN_SIM` set to your sim port) to the MCP config of each coding agent it detects in the project (a folder, a file or the CLI on `PATH`). `.mcp.json` for Claude Code is always written. Other servers and keys stay. A file that is not valid JSON is left alone and the command exits 2.
+- `--hosted` writes the hosted Shipvo phone instead: the remote URL plus an `Authorization` header for each agent, and the key-in-path URL for Claude Desktop and ChatGPT. It runs `shipvo login` first if there is no key. Project files that git tracks or does not ignore are not written; the block is printed with the reason. Printed output shows `<your Shipvo key>`, never the key.
 - `--npx` writes a pinned `npx -y @shipvo/mcp@<installed version>` entry instead and installs nothing.
 - Agents it does not detect are listed with their `--for` name. `--for <names>` takes a comma-separated list of ids and writes those agents; `--all` treats every agent as present.
 - Agent ids: `claude`, `cursor`, `vscode`, `gemini`, `qwen`, `roo`, `kiro`, `opencode`, `codex`, `windsurf`, `claude-desktop`, `cline`, `zed`, `goose`, `continue`, `amp`.
@@ -270,6 +271,10 @@ Writes one JSON line per action with screen features, action features and the ou
 | 1 | the check or test failed (`explore` exits 1 on findings or a failed `--flows` flow only with `--fail-on-findings`, and always when the walk fails) |
 | 2 | usage or setup error |
 
+## `shipvo sim --hosted`
+
+Builds the app the way `shipvo sim` does, uploads it for your `SHIPVO_API_KEY` and prints the id. Open it on the hosted phone as `open_app("<app>@build:<id>")`. `--skip-build` uploads the existing `sim-dist`. Errors and the assistant tool `upload_build` are in [Test your build](test-your-build.md).
+
 ## `shipvo audit`
 
 Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.
@@ -337,6 +342,8 @@ These come from fixed issues in this repository.
 **`shipvo publish` says `Refused by policy rule ...` (also on `--dry-run`).** Your `policy` section in `shipvo.json` forbids this publish. Change the cohort bands you publish to, or change the rule. Use `--dry-run-policy` to test the rule without building.
 
 **`shipvo audit` exits 1 with a status code.** The token is missing or wrong. Set `SHIPVO_OWNER_TOKEN`, or use the publish token from `shipvo app create`.
+
+**`shipvo sim --hosted` says `no_api_key`.** Set `SHIPVO_API_KEY` to your key (run `shipvo login` to get one, then `shipvo mcp` prints your config with the key in it). Then see [Test your build](test-your-build.md).
 
 **`shipvo sim --watch` prints one line about a broken JSON file.** Fix the comma or quote it names and save. Add `--verbose` for the full build error.
 

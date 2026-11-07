@@ -8,6 +8,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Deep link.** A web-style address, such as `myapp://item/42`, that opens a particular screen in an app. In Shipvo Phone it opens the app that owns the address and takes you to that screen once.
 
+**App spec.** A JSON file that describes an app's screens, buttons and data in plain terms. Shipvo checks it, shows it the same on Android and iOS, and lets an assistant use it. See [App spec](spec-blocks.md).
+
 **App id.** A short name for your app with no spaces, such as `tideshop`. Shipvo uses it to find your app.
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
@@ -81,3 +83,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Save as test.** A button in Lumi, and the `--save-tests` flag of `shipvo explore`, that turns a bug the walker found into a test file that fails until the bug is fixed. See [Lumi](lumi.md).
 
 **App spec.** A short JSON description of an app (screens, charts, lists, toggles) that Shipvo turns into a native-feeling app. See [App spec](design/app-spec.md).
+**Build.** Turning your app's files into one copy that can run, here a web copy shown on a simulated phone. The first build is the slowest.
+
+**pnpm.** A tool that downloads the parts a project needs. You turn it on with `corepack enable`, which comes with Node.
+
+**Build id.** The short name Shipvo gives a copy of your app you uploaded for the hosted phone. You open it as `myapp@build:<id>`. It is private to you and deleted when it expires. See [Test your build on the hosted phone](test-your-build.md).
