@@ -22,6 +22,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | --- | --- | --- | --- | --- |
 | Test your local build on the hosted phone (`upload_build`, `shipvo sim --hosted`, `app@build:<id>`) | [agents](agents.md#test-the-build-on-your-machine-on-the-hosted-phone), [cli](cli.md) | | | |
 | Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | | | |
+| Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | [chess-on-two-phones](tutorials/chess-on-two-phones.md) | | |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | Signed over-the-air updates | [getting-started](getting-started.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
