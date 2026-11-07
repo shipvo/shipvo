@@ -33,7 +33,9 @@ export function changedFiles(base: string): string[] {
 
 export type CommentInput = { test?: TestReport | null; explore?: ExploreReport | null; changed?: string[]; screenshots?: string[]; runUrl?: string; compare?: Comparison | null;
   /** Before and after pairs from `pairShots`. `images` maps `before/<path>` and `after/<path>` to a URL; without it the file names are listed. */
-  pairs?: ShotPair[]; moreCount?: number; images?: Record<string, string> | null };
+  pairs?: ShotPair[]; moreCount?: number; images?: Record<string, string> | null;
+  /** Result of `shipvo ci fix`: the release published to the first band, or why nothing was published. */
+  fix?: { release: number; band: string } | { skipped: string } | null };
 
 const cell = (s: string) => s.replace(/\s+/g, " ").replace(/\|/g, "\\|").trim();
 
@@ -93,6 +95,7 @@ export function renderComment(i: CommentInput): string {
     for (const f of flows) L.push(`| ${cell(f.name ?? "unnamed flow")} | ${f.status === "failed" ? `❌ failed${f.message ? `: ${cell(f.message).slice(0, 160)}` : ""}` : "✅ passed"} |`);
     L.push("");
   }
+  if (i.fix) L.push("### Fix release", "", "release" in i.fix ? `Published release ${i.fix.release} to the first band (1% of users, ${i.fix.band}). Release health and the release policy decide any widening.` : `Nothing was published. ${i.fix.skipped}`, "");
   if (i.compare) L.push(...compareSection(i.compare));
   if (i.explore) {
     L.push("### Explore", "");
