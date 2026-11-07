@@ -245,7 +245,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px sy
 .lm{flex:none;width:360px;display:flex;flex-direction:column;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-sizing:border-box;overflow:auto}
 .lm h1{margin:0;font-size:18px}.lm h2{margin:0 0 4px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.lm p{margin:0}.lm-now{color:var(--muted)}
 .lm ol{margin:0;padding:0;list-style:none}.lm-feed{max-height:190px;overflow:auto;font-family:ui-monospace,monospace;font-size:12px}.lm-feed li{padding:2px 0;border-bottom:1px solid var(--line)}.lm-feed .bug,.lm-bugs{color:var(--bad)}
-.lm-bugs{max-height:170px;overflow:auto}.lm-bugs li{display:flex;gap:6px;align-items:flex-start;padding:3px 0}.lm-bugs span{flex:1}.lm-bugs button{flex:none;font:inherit;font-size:12px;padding:2px 8px}
+.lm-bugs{max-height:170px;overflow:auto}.lm-bugs li{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:3px 0}.lm-bugs span{flex:1 1 100%}.lm-bugs button{flex:1 1 auto;min-height:44px;min-width:44px;font:inherit;font-size:13px;padding:6px 12px}
 .lm-cov{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0}.lm-cov dt{color:var(--muted)}.lm-cov dd{margin:0;font-weight:600}
 .lm-cmd label{display:block;margin-bottom:4px;font-weight:600}.lm-cmd div{display:flex;gap:6px}.lm-cmd input{flex:1;min-width:0;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
 .lm-cmd button{font:inherit;padding:8px 14px;border:0;border-radius:8px;background:var(--accent);color:var(--bg);font-weight:600;cursor:pointer}.lm-reply{margin-top:6px;color:var(--muted);min-height:1.2em}
