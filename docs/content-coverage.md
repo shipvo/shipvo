@@ -7,7 +7,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
 1. ~~Shipvo Testers and `shipvo store testers`~~ (done)
-2. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog needed) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
+2. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog needed) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial done 7 Nov, video needs the new section)
 3. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
 4. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
 5. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
@@ -48,6 +48,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | |
 | MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | [run-your-app-on-a-phone](tutorials/run-your-app-on-a-phone.md) | [See your app on a phone in your browser](videos.md#see-your-app-on-a-phone-in-your-browser-with-shipvo-run) | [see-your-react-native-app-on-a-phone-in-your-browser](../blog/see-your-react-native-app-on-a-phone-in-your-browser.md) |
+| Live reload in `shipvo run` (save a file, the phone updates; red bar on a failed build) | [run](run.md#edit-and-save-the-phone-updates) | [run-your-app-on-a-phone](tutorials/run-your-app-on-a-phone.md#5-change-a-word-and-watch-the-phone-update) | | |
 | Assistant attaches to the live `shipvo run` phone (`open_app`) | [run](run.md), [agents](agents.md) | | | |
 | Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md), [worked example](record-a-demo-video.md) | | | |
 | Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | [Get your 12 Google Play testers](videos.md) | [google-play-12-testers-14-days](../blog/google-play-12-testers-14-days.md) |

@@ -76,7 +76,29 @@ Click **Show Android system sheet** at the top right of the page. You should see
 
 ![The cart screen dimmed behind a white sheet at the bottom of the phone. The sheet asks Allow access? and has two buttons, While using the app and Don't allow.](/tutorials/run-your-app-on-a-phone/04-system-sheet.png)
 
-## 5. Try the iPhone style and dark frame
+## 5. Change a word and watch the phone update
+
+Leave the phone running. While it runs, Shipvo watches your app's files. When you save a change, it rebuilds your app by itself and reloads the phone. You do not stop and start anything.
+
+1. Open your app's folder in a text editor (Notepad, TextEdit or any code editor). Open the file `src/data/products.json`. It is a plain list of your products.
+2. Find `"name": "Wool beanie"` and change the words inside the quotes to `Merino beanie`. Keep the quote marks. Save the file.
+3. Look at the terminal. After a few seconds it prints one line, like `rebuilt in 6.6 s`.
+4. Look at the phone. The product in the list now says **Merino beanie**. The page did not change address and you did not click anything.
+
+![The Android phone showing the Tidepool Shop list. The fourth product now reads Merino beanie, $24.00.](/tutorials/run-your-app-on-a-phone/08-after-edit.png)
+
+Now make a mistake on purpose, to see what Shipvo does. In the same file, delete the comma straight after `"name": "Merino beanie"`, so the line ends with a quote mark, and save. The phone keeps showing your last good version. A small red bar appears at the bottom of the phone and the terminal prints the same message, for example `Your file src/data/products.json has a mistake at line 23, column 26: check for a missing or extra comma.`
+
+![The same phone with a red message bar at the bottom. It says the file src/data/products.json has a mistake at line 23, column 26, and that the page still shows your last good version.](/tutorials/run-your-app-on-a-phone/09-error-bar.png)
+
+Put the comma back and save. The red bar goes away and the phone reloads.
+
+> **If something goes wrong.**
+> - Nothing changes after you save: check that the terminal still shows the `Watching for changes` line and that you saved the file (most editors show a dot on an unsaved tab).
+> - The red bar is there: read the message. It names the file and the line. Fix that line and save again.
+> - The rebuild takes a while: a bigger app takes longer. The phone stays usable while it works.
+
+## 6. Try the iPhone style and dark frame
 
 Go back to the terminal and press **Ctrl+C** to stop the phone. The terminal gives your prompt back. Now type:
 
@@ -94,7 +116,7 @@ To see the dark frame, add `?dark=1` to the end of the address in your browser, 
 
 Want a different size? The page scales the phone to fit your browser window, so make the window smaller or larger.
 
-## 6. Stop the phone
+## 7. Stop the phone
 
 Go to the terminal and press **Ctrl+C**. The page stops answering. Your files are not changed. Nothing was sent to anyone.
 
@@ -104,11 +126,13 @@ While the phone is on, Shipvo writes a small file called `.shipvo/run.json` in y
 
 ## Recap
 
-You ran your app on a simulated phone in your browser with one command, tapped through the shop, saw the system sheet, switched to the iPhone style and stopped it. You used no real phone and no account.
+You ran your app on a simulated phone in your browser with one command, tapped through the shop, saw the system sheet, changed a product name and watched the phone update, switched to the iPhone style and stopped it. You used no real phone and no account.
 
-If you change a screen in your app, stop the phone with Ctrl+C and run `npx shipvo run android` again to see the change.
+Every time you save a change while the phone is on, it updates by itself.
 
 ## What we measured
+
+On 2026-11-07, on a GitHub Actions Linux runner, we saved a name change in `src/data/products.json` while `shipvo run android` was open. The terminal printed `rebuilt in 6.6 s` and the phone showed the new name. A file with a missing comma printed the error and showed the red bar, and the fixed file reloaded the phone (`rebuilt in 6.9 s`). The screenshots in step 5 come from that run. The browser test `packages/cli/test/run-live-reload.test.ts` checks the same behaviour on the Android and iOS frames.
 
 On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a first start of `shipvo run android` for a new shop app, with an empty cache, bundled 204 modules in 6.0 s and was serving the phone within the 60 seconds we waited. We did not time it more closely than that. A start-to-tappable timing on a clean machine is tracked in issue #676. We took every screenshot in this tutorial from that run.
 

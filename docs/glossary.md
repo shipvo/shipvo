@@ -16,6 +16,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **JSON.** A plain way to write a list of things in a text file, with curly brackets, quote marks and commas. Shop products live in a JSON file. A missing comma is the usual mistake.
 
+**Live reload.** The phone updating by itself when you save a file in your app, so you do not stop and start anything.
+
 **MCP.** The way an assistant connects to tools such as the Shipvo simulator. You will see the word in settings; you do not need to understand it to use it.
 
 **Node.** A free program that runs the tools behind Shipvo. You install it once. Shipvo needs version 22 or newer.
