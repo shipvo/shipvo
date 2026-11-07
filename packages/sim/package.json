@@ -27,6 +27,7 @@
     "browser-resolver.mjs",
     "app-name.mjs",
     "frame.mjs",
+    "secrets.mjs",
     "lumi.mjs",
     "guide.mjs",
     "phone-browser.mjs",

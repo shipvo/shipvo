@@ -2,6 +2,7 @@
 // A value enters only through POST /vault/t/<ticket>. No endpoint returns a value, and nothing here logs one.
 import { Hono } from "hono";
 import { encryptSecret } from "./vault-crypto";
+import { listUses } from "./vault-use";
 
 type Env = { DB: D1Database; VAULT_MASTER_KEY?: string };
 type Who = (c: any, appId: string) => Promise<string | null>;
@@ -76,13 +77,57 @@ export function vaultRoutes(who: Who, deps: { fetch?: typeof fetch } = {}) {
     if (!known && !HOST.test(domain)) return c.json({ error: "bad_service", message: "Use a known service name or the service's domain." }, 400);
     const actor = await who(c, appId);
     if (!actor) return c.json({ error: "unauthorized" }, 401);
+    return c.json(await issueTicket(c, { appId, name, service, domain, access, purpose, actor }), 201, { "cache-control": "no-store" });
+  });
+
+  async function issueTicket(c: any, t: { appId: string; name: string; service: string; domain: string; access: string; purpose: string; actor: string }) {
     const now = Date.now();
     const id = newTicketId();
     await c.env.DB.prepare("DELETE FROM vault_tickets WHERE expires_at < ?").bind(new Date(now - 86400_000).toISOString()).run();
     await c.env.DB.prepare("INSERT INTO vault_tickets (id_hash, app_id, name, service, domain, access, purpose, requested_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
-      .bind(await sha256(id), appId, name, service, domain, access, purpose, actor, new Date(now).toISOString(), new Date(now + TICKET_TTL_MS).toISOString()).run();
-    const url = `${new URL(c.req.url).origin}/vault/t/${id}`;
-    return c.json({ ticket: id, url, expires_in: TICKET_TTL_MS / 1000 }, 201, { "cache-control": "no-store" });
+      .bind(await sha256(id), t.appId, t.name, t.service, t.domain, t.access, t.purpose, t.actor, new Date(now).toISOString(), new Date(now + TICKET_TTL_MS).toISOString()).run();
+    return { ticket: id, url: `${new URL(c.req.url).origin}/vault/t/${id}`, expires_in: TICKET_TTL_MS / 1000 };
+  }
+
+  /** Settings, Secrets. Metadata only: no route below returns a value, a ciphertext or a wrapped key. */
+  const secretsAuth = async (c: any) => {
+    const appId = c.req.param("app"), name = c.req.param("name");
+    if (!ID.test(appId) || (name !== undefined && !NAME.test(name))) return { err: c.json({ error: "bad_request" }, 400) };
+    const actor = await who(c, appId);
+    if (!actor) return { err: c.json({ error: "unauthorized" }, 401) };
+    return { appId, name, actor };
+  };
+  const NS = { "cache-control": "no-store" };
+
+  v.get("/secrets/:app", async (c) => {
+    const a = await secretsAuth(c); if ("err" in a) return a.err;
+    const r: any = await c.env.DB.prepare("SELECT s.name, s.domain, s.access, s.warning, s.valid, s.created_at, s.last_used_at, s.use_count FROM vault_secrets s LEFT JOIN vault_revoked r ON r.app_id = s.app_id AND r.name = s.name WHERE s.app_id = ? AND s.owner = ? AND r.name IS NULL ORDER BY s.name").bind(a.appId, a.actor).all();
+    const secrets = (r.results as any[]).map((x) => ({ app: a.appId, name: x.name, domain: x.domain, access: x.access, warning: x.warning ?? null, valid: x.valid === null ? null : x.valid === 1, saved_at: x.created_at, last_used_at: x.last_used_at ?? null, use_count: x.use_count }));
+    return c.json({ secrets }, 200, NS);
+  });
+
+  /** A new one-time ticket for the same app, name and domain. The old key stays until the new one is saved. */
+  v.post("/secrets/:app/:name/rotate", async (c) => {
+    const a = await secretsAuth(c); if ("err" in a) return a.err;
+    const row: any = await c.env.DB.prepare("SELECT domain, access FROM vault_secrets WHERE app_id = ? AND name = ? AND owner = ?").bind(a.appId, a.name, a.actor).first();
+    if (!row) return c.json({ error: "not_found", message: "No saved key with that name." }, 404, NS);
+    const service = Object.keys(SERVICES).find((k) => SERVICES[k].domain === row.domain) ?? row.domain;
+    return c.json(await issueTicket(c, { appId: a.appId, name: a.name, service, domain: row.domain, access: row.access, purpose: "Replace the saved key", actor: a.actor }), 201, NS);
+  });
+
+  /** Destroys the stored value and marks the key revoked. The next use is refused with "revoked". */
+  v.delete("/secrets/:app/:name", async (c) => {
+    const a = await secretsAuth(c); if ("err" in a) return a.err;
+    const gone = await c.env.DB.prepare("UPDATE vault_secrets SET wrapped_key = '', ciphertext = '' WHERE app_id = ? AND name = ? AND owner = ?").bind(a.appId, a.name, a.actor).run();
+    if ((gone as any)?.meta?.changes !== 1) return c.json({ error: "not_found", message: "No saved key with that name." }, 404, NS);
+    await c.env.DB.prepare("INSERT INTO vault_revoked (app_id, name, revoked_at) VALUES (?,?,?) ON CONFLICT(app_id, name) DO UPDATE SET revoked_at = excluded.revoked_at").bind(a.appId, a.name, new Date().toISOString()).run();
+    return c.json({ revoked: true, app: a.appId, name: a.name }, 200, NS);
+  });
+
+  v.get("/secrets/:app/:name/uses", async (c) => {
+    const a = await secretsAuth(c); if ("err" in a) return a.err;
+    const uses = (await listUses(c.env, { person: a.actor, app: a.appId, name: a.name })).map((u) => ({ at: u.at, app: a.appId, host: u.domain, outcome: u.outcome }));
+    return c.json({ uses }, 200, NS);
   });
 
   /** Whether a key is saved, never the key. Same owner check as tickets. */

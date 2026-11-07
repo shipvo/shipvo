@@ -112,6 +112,18 @@ At call time the spec runner asks the vault for a data source's `auth.secret`, a
 
 Not covered here: a screen for the use log (a later slice), revoking and rotating keys (the check exists; the way to revoke does not), and a service that puts the key in its own response in a form other than the exact value (for example encoded).
 
+## Secret vault, Settings Secrets (slice 4 of #841)
+
+The person can list, rotate and revoke saved keys and read each key's use log. Code: `services/control-plane/src/vault.ts` (`/vault/secrets/*`), `packages/sim/secrets.mjs`, the `/vault-ui/*` forward in `packages/sim/server.mjs`. Tests: `services/control-plane/test/vault.test.ts`, `packages/sim/secrets.test.mjs`.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| A value leaves through the new routes | The list, rotate, revoke and use-log routes select only metadata columns. Rotate returns a ticket link, never a key. | "lists metadata only" |
+| Revoked key still works | Revoke wipes the stored value and writes a revocation. The next use is refused as revoked and the error asks for a new key. | "revoke destroys the value" |
+| Rotate points at another app or host | The ticket copies app, name, domain and access from the stored key. | "rotate issues a ticket bound to the same app, name and domain" |
+| Another person reads the log | Every route requires the app owner and matches the key's saver. | "the use log shows calls for that person only" |
+| The sim forward is used to reach other vault routes | It forwards only the four shapes above and adds the owner token on the server. | "only the four metadata routes are forwarded" |
+
 ## Person phone and sign-in (slice 2 of #843)
 
 A person signs in with an email magic link and gets one phone: an installed-apps list and a per-app key-value data area. Code: `services/control-plane/src/people.ts`, `phone.ts`, migration `0022_people_phone.sql`. Tests: `services/control-plane/test/phone.test.ts`. Developer auth is unchanged.

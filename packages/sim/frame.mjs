@@ -4,6 +4,7 @@
 
 import { lockScreenHtml, bootScreenHtml, offScreenHtml } from "./lifecycle.mjs";
 import { shadeHtml, shadeCss, shadeClientScript } from "./shade.mjs";
+import { secretsCss, secretsClientScript } from "./secrets.mjs";
 import { settingsHtml, settingsIconHtml, settingsCss, settingsClientScript } from "./settings.mjs";
 import { storeIconHtml, storeScreenHtml, storeCss, appsClientScript } from "./apps.mjs";
 import { updateBannerHtml, updateCss, updateClientScript } from "./update.mjs";
@@ -118,6 +119,7 @@ if(a==="restart"){show(q("boot-screen"),true);var f=document.getElementById(${JS
 else{show(q("lock-screen"),false);show(q("off-screen"),true);pw.focus()}})})();
 ${shadeClientScript(iframeId, skin)}
 ${settingsClientScript(iframeId)}
+${secretsClientScript("/vault-ui")}
 ${appsClientScript(iframeId, phone)}
 ${updateClientScript()}
 ${lumiClientScript()}
@@ -229,6 +231,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     ...(lumi && guide ? [guideCss] : []),
     shadeCss,
     settingsCss,
+    secretsCss,
     storeCss,
     updateCss,
     `.sf-edge{position:absolute;left:0;top:${k.status}px;bottom:${k.bar}px;width:14px;z-index:3}.sf-home[hidden],.sf-recents[hidden],.sf-navbtns[hidden]{display:none}`,
