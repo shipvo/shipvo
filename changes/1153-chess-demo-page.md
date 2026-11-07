@@ -1,0 +1,1 @@
+- site: shipvo.dev/demos/chess/ shows an Android phone and an iPhone playing chess in the browser, with a clock per side and a move list. Press "Play against it" to take white. It is static files only. Migration: none.
