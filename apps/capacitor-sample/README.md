@@ -57,11 +57,6 @@ npx cap run ios          # pick a simulator
 
 `www/` and the copied web assets inside `android/` and `ios/` are ignored. `pnpm sync` rebuilds them and runs `cap sync`.
 
-## Not covered here
-
-
-No CI job builds `android/` or `ios/` yet. That needs a workflow under `.github/`, which is proposed in the PR.
-
 ## Check apply, rollback and a refused bundle on the iOS Simulator
 
 ```bash
@@ -72,7 +67,11 @@ scripts/ios-sim-check.sh          # env: DEVICE_NAME (default "iPhone 16"), PORT
 Needs macOS, Xcode and an iPhone Simulator. The script makes a fresh signing key, builds `App.app` with that public key and a local server URL, and runs three cases on a clean install each:
 
 1. **apply**: the server offers a signed bundle v2. The page shows `v2`.
-2. **rollback**: the server offers a bundle whose page throws at load and never reports healthy. The script relaunches three times (the trial boots), then once more. The page shows `v1`.
+2. **rollback**: the server offers a bundle whose page throws at load and never reports healthy. Launches 1 to 3 are the trial boots (`MAX_BOOTS` in `packages/capacitor/src/engine.ts`); launch 4 reverts. The page shows `v1`.
 3. **refused bad signature**: the server signs the pointer with a different key. The bundle is not downloaded and the page shows `v1`.
 
 It prints one line per case and exits non-zero with a message on any mismatch. The launch hook (`src/launch.ts`) calls the plugin `status`, writes `v<release>` into `#version`, logs it, and in this build also reports it to the local server. Helpers for keys, zip, signing and the server are in `scripts/ios-sim-lib.mjs`; their tests run with `pnpm --filter capacitor-sample test` on Linux.
+
+## Not covered here
+
+No CI job builds `android/` or `ios/` yet. That needs a workflow under `.github/`, which is proposed in the PR.

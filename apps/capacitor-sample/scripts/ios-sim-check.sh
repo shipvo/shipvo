@@ -62,6 +62,7 @@ for _ in $(seq 1 60); do grep -q '^bundle 2' "$EVENTS" && break; sleep 1; done
 grep -q '^bundle 2' "$EVENTS" || fail "rollback: the app never downloaded the failing bundle"
 sleep "$SETTLE"
 for _ in 2 3; do launch; sleep "$SETTLE"; done
+# Launch 4 reverts. It then runs checkForUpdate, so a later "bundle" line in the events is not a failure.
 before="$(versions)"; launch; wait_report "$before"
 expect "rollback" "$(last_version)" v1
 
