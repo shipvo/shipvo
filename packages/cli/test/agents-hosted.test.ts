@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, statSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentsCmd } from "../src/agents";
@@ -45,6 +45,16 @@ describe("agents setup --hosted", () => {
     // a second run changes nothing
     expect(await run(d, home)).toBe(0);
     expect(out.join("\n")).toContain(".mcp.json already up to date");
+  });
+
+  it("tightens an existing 0644 file to 0600 when it adds the key", async () => {
+    const d = repo(), home = tmp();
+    mkdirSync(join(home, ".cursor"));
+    const f = join(home, ".cursor/mcp.json");
+    writeFileSync(f, JSON.stringify({ mcpServers: { other: { command: "x" } } })); chmodSync(f, 0o644);
+    expect(await run(d, home)).toBe(0);
+    expect(JSON.parse(readFileSync(f, "utf8")).mcpServers.shipvo.url).toBe(URL_);
+    expect(statSync(f).mode & 0o777).toBe(0o600);
   });
 
   it("prints the block instead of writing when the project file is tracked by git", async () => {

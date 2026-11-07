@@ -2,7 +2,7 @@
 // signed-in key. A key goes only into a user-level file, or into a project file that git ignores.
 // Anything else is printed, with the reason.
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -83,7 +83,7 @@ export function setupHosted(o: HostedOpts): HostedResult[] {
     }
     const old = existsSync(path) ? readFileSync(path, "utf8") : null;
     if (old === next) { out.push({ agent: t.agent, file: shown, action: "unchanged" }); continue; }
-    if (!o.dry) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, next, { mode: 0o600 }); }
+    if (!o.dry) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, next, { mode: 0o600 }); chmodSync(path, 0o600); }
     out.push({ agent: t.agent, file: shown, action: old === null ? "create" : "update" });
   }
   return out;
