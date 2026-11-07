@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { hasDesktop, startRun } from "../src/launch.js";
 import { acceptWebSocket } from "../../cli/src/run-ws.js";
 
 const root = resolve(__dirname, "..");
@@ -63,30 +64,42 @@ async function open(args: Record<string, unknown>, setup: (project: string) => v
 const runJson = (platform: string) => (p: string) => { mkdirSync(join(p, ".shipvo")); writeFileSync(join(p, ".shipvo", "run.json"), JSON.stringify({ port: hostPort, platform, app: "menu", token: "tok", pid: process.pid })); };
 
 describe("open_app shows the phone", { timeout: 30_000 }, () => {
-  it("platform ios with no run starts one and attaches", async () => {
-    const { c, text, project } = await open({ platform: "ios" });
+  it("platform ios with show true and no run starts one and attaches", async () => {
+    const { c, text, project } = await open({ platform: "ios", show: true });
     expect(existsSync(join(project, "started-ios"))).toBe(true);
     expect(text).toContain("attached to the live shipvo run phone");
     expect(text).toContain(`visible: yes, ios phone at http://127.0.0.1:${hostPort}/`);
     await c.close();
   });
-  it("a live android run is switched to ios, not duplicated", async () => {
+  it("show unset on a desktop starts nothing when the project has no local shipvo", async () => {
+    const { c, text, project } = await open({});
+    expect(existsSync(join(project, "started-android"))).toBe(false);
+    expect(text).toContain("mode: headless session");
+    await c.close();
+  });
+  it("a live android run is attached as it is when ios is asked, and nothing is duplicated", async () => {
     seen.length = 0;
     const { c, text, project } = await open({ platform: "ios" }, runJson("android"));
     expect(existsSync(join(project, "started-ios"))).toBe(false);
-    expect(seen.some((m) => m.type === "skin" && m.platform === "ios")).toBe(true);
-    expect(text).toContain("visible: yes, ios phone");
+    expect(seen.some((m) => m.type === "skin")).toBe(false);
+    expect(text).toContain("the live phone is android; to see ios");
+    expect(text).toContain("visible: yes, android phone");
     await c.close();
   });
-  it("set_device and device_log work on the attached phone", async () => {
+  it("tools the run does not answer say not_supported_attached", async () => {
     seen.length = 0;
     const { c, text } = await open({}, runJson("android"));
     const session = /session: (\S+)/.exec(text)![1];
-    const sd = await c.callTool({ name: "set_device", arguments: { session, network: "offline" } }) as { content: { text: string }[]; isError?: boolean };
-    expect(sd.isError).toBeFalsy();
-    expect(seen.some((m) => m.type === "set_device")).toBe(true);
-    const dl = await c.callTool({ name: "device_log", arguments: { session } }) as { content: { text: string }[] };
-    expect(dl.content[0].text).toContain('"source": "simulated"');
+    const sd = await c.callTool({ name: "set_device", arguments: { session, network: "offline" } }) as { content: { text: string }[] };
+    expect(sd.content[0].text).toContain("not_supported_attached");
+    expect(seen.some((m) => m.type === "set_device")).toBe(false);
+    await c.close();
+  });
+  it("refuses when the project's run is for another app", async () => {
+    const { c, text, project } = await open({ app: "other", show: true });
+    expect(existsSync(join(project, "started-android"))).toBe(true);
+    expect(text).toContain("unknown_app");
+    expect(text).toContain('project runs "menu", not "other"');
     await c.close();
   });
   it("show false stays headless and starts nothing", async () => {
@@ -95,5 +108,20 @@ describe("open_app shows the phone", { timeout: 30_000 }, () => {
     expect(text).toContain("visible: no");
     expect(existsSync(join(project, "started-ios"))).toBe(false);
     await c.close();
+  });
+});
+
+describe("launch helpers", () => {
+  it("hasDesktop is false in CI and on Linux without a display", () => {
+    expect(hasDesktop({ CI: "true", DISPLAY: ":0" }, "linux")).toBe(false);
+    expect(hasDesktop({ DISPLAY: ":0" }, "linux")).toBe(true);
+    expect(hasDesktop({}, "linux")).toBe(false);
+    expect(hasDesktop({ CI: "false" }, "darwin")).toBe(true);
+  });
+  it("startRun reports a command that exits early", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "early-"));
+    process.env.SHIPVO_RUN_COMMAND = JSON.stringify([process.execPath, "-e", "process.exit(3)"]);
+    try { await expect(startRun("ios", dir, 5000)).rejects.toThrow(/stopped before the phone was ready/); }
+    finally { delete process.env.SHIPVO_RUN_COMMAND; rmSync(dir, { recursive: true, force: true }); }
   });
 });

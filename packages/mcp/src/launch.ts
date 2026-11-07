@@ -21,6 +21,13 @@ export function findProjectDir(cwd = process.cwd()): string | undefined {
   }
 }
 
+/** The `shipvo` binary installed in the project, if any. open_app starts a run on its own only with this, so it never fetches a package unasked. */
+export function localShipvo(dir: string | undefined): string | undefined {
+  if (!dir) return undefined;
+  const bin = join(dir, "node_modules", ".bin", process.platform === "win32" ? "shipvo.cmd" : "shipvo");
+  return existsSync(bin) ? bin : undefined;
+}
+
 /** The URL of a run's phone page. */
 export const runUrl = (r: Pick<RunInfo, "port">) => `http://127.0.0.1:${r.port}/`;
 
@@ -34,7 +41,7 @@ function readRun(dir: string): RunInfo | undefined {
  */
 export async function startRun(platform: "android" | "ios", dir: string, timeoutMs = Number(process.env.SHIPVO_RUN_TIMEOUT_MS) || 120_000): Promise<RunInfo> {
   const override = process.env.SHIPVO_RUN_COMMAND ? (JSON.parse(process.env.SHIPVO_RUN_COMMAND) as string[]) : undefined;
-  const [cmd, ...args] = override ?? ["npx", "-y", "shipvo"];
+  const [cmd, ...args] = override ?? (localShipvo(dir) ? [localShipvo(dir)!] : ["npx", "-y", "shipvo"]);
   const before = readRun(dir)?.pid;
   const child = spawn(cmd, [...args, "run", platform], { cwd: dir, stdio: "ignore", detached: true });
   let exited: string | undefined;
