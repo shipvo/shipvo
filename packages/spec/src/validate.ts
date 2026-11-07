@@ -150,6 +150,7 @@ class Run {
     for (const d of dataNames) names[d] = undefined;
     if (/^\$\.data\.[^.[]+\.paginate/.test(path) || /^\$\.data\["[^"]+"\]\.paginate/.test(path)) return { names, loose: true };
     if (path.startsWith("$.screens")) names.item = undefined;
+    if (path.includes(".onMove.")) names.column = undefined;
     const action = /^\$\.actions(?:\.([A-Za-z_][A-Za-z0-9_]*)|\["([^"]+)"\])/.exec(path);
     if (action && isObject(this.spec.actions)) {
       const a = this.spec.actions[action[1] ?? action[2]!];
@@ -295,6 +296,8 @@ class Run {
       this.warn(path, "List has no empty state.", "Add \"empty\": { \"message\": \"...\" } so an empty list explains itself.");
     }
     if (type === "chart") this.chart(b, path);
+    if (type === "kanban") this.kanban(b, path);
+    if (type === "timeline") this.timeline(b, path);
     if (type === "text" && typeof b.variant === "string") screen.sizes.add(`variant:${b.variant}`);
     if (isObject(b.style)) {
       const st = b.style;
@@ -342,6 +345,72 @@ class Run {
     this.checkBare(b.series, childPath(path, "series"));
     if (b.aggregate !== undefined && (typeof b.aggregate !== "string" || !AGGREGATES.includes(b.aggregate))) {
       this.error(childPath(path, "aggregate"), `Aggregate ${JSON.stringify(b.aggregate)} is not supported.`, `Use one of: ${AGGREGATES.join(", ")}.`);
+    }
+  }
+
+  /** The seed rows of the collection a block reads, when `from` names one. */
+  seedOf(b: Record<string, unknown>): unknown[] | undefined {
+    const src = isObject(this.spec.data) && typeof b.from === "string" ? this.spec.data[b.from] : undefined;
+    return isObject(src) && Array.isArray(src.seed) ? src.seed : undefined;
+  }
+
+  /** The field a bare or templated expression reads from the item, such as `item.status`. */
+  itemField(expr: unknown): string | undefined {
+    const m = typeof expr === "string" ? /^\s*(?:\{\{\s*)?item\.([A-Za-z_][A-Za-z0-9_]*)\s*(?:\}\})?\s*$/.exec(expr) : null;
+    return m?.[1];
+  }
+
+  /** Fields every board and timeline needs: a data source and an expression per item. */
+  itemBlock(b: Record<string, unknown>, path: string, name: string, keys: string[]) {
+    if (typeof b.label !== "string" || b.label.trim() === "") {
+      this.error(childPath(path, "label"), `${name} has no label.`, `Add "label": a short name that people and agents see, for example "${name === "Board" ? "Task board" : "History"}".`);
+    }
+    if (typeof b.from !== "string" || b.from === "") {
+      this.error(childPath(path, "from"), `${name} has no data source.`, "Add \"from\": the name of a source in \"data\", for example \"tasks\".");
+    }
+    for (const k of keys) {
+      if (typeof b[k] !== "string" || b[k] === "") this.error(childPath(path, k), `${name} has no ${k}.`, `Add "${k}": an expression per item, for example "{{ item.${k} }}".`);
+      else this.checkBare(b[k], childPath(path, k));
+    }
+  }
+
+  kanban(b: Record<string, unknown>, path: string) {
+    this.itemBlock(b, path, "Board", ["column", "title"]);
+    const cols = b.columns;
+    const ok = Array.isArray(cols) && cols.length > 0 && cols.every((c) => typeof c === "string" && c !== "") && new Set(cols).size === cols.length;
+    if (!ok) {
+      this.error(childPath(path, "columns"), "Board has no valid columns.", "Add \"columns\": a list of unique column names, for example [\"todo\", \"doing\", \"done\"].");
+    }
+    const field = this.itemField(b.column);
+    const seed = this.seedOf(b);
+    if (ok && field && seed) {
+      seed.forEach((row, i) => {
+        const v = isObject(row) ? row[field] : undefined;
+        if (!(cols as string[]).includes(String(v))) {
+          this.error(childPath(childPath(childPath(childPath("$.data", String(b.from)), "seed"), i), field), `Card column ${JSON.stringify(v ?? null)} is not a board column.`, `Use one of: ${(cols as string[]).join(", ")}.`);
+        }
+      });
+    }
+    if (b.onMove !== undefined) {
+      const a = isObject(b.onMove) ? b.onMove.action : undefined;
+      if (typeof a !== "string" || !(isObject(this.spec.actions) && a in this.spec.actions)) {
+        this.error(childPath(childPath(path, "onMove"), "action"), `Move action ${JSON.stringify(a ?? null)} is not declared.`, "Name an action from \"actions\", for example \"move_task\"; it receives the column in {{ column }}.");
+      }
+    }
+  }
+
+  timeline(b: Record<string, unknown>, path: string) {
+    this.itemBlock(b, path, "Timeline", ["date", "title"]);
+    const field = this.itemField(b.date);
+    const seed = this.seedOf(b);
+    if (field && seed) {
+      seed.forEach((row, i) => {
+        const v = isObject(row) ? row[field] : undefined;
+        const d = typeof v === "string" ? v.slice(0, 10) : "";
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) !== d) {
+          this.error(childPath(childPath(childPath(childPath("$.data", String(b.from)), "seed"), i), field), `Entry date ${JSON.stringify(v ?? null)} is not a date.`, "Use a date like 2026-11-07, or a date and time like 2026-11-07T09:30.");
+        }
+      });
     }
   }
 

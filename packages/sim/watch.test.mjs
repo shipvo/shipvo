@@ -1,0 +1,84 @@
+// /watch against a real sim server: frames for a session, no screencast without a viewer, view only, Origin check.
+import test, { before, after } from "node:test";
+import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { pickPort } from "./test-port.mjs";
+import { watchPage } from "./watch.mjs";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const PORT = pickPort(10300, 100);
+const root = mkdtempSync(join(tmpdir(), "sim-watch-")); const dist = join(root, "dist");
+let proc;
+const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
+const until = async (f, ms = 15000) => { const t = Date.now(); for (;;) { const v = await f(); if (v) return v; if (Date.now() - t > ms) throw new Error("timed out"); await new Promise((r) => setTimeout(r, 100)); } };
+const list = async () => (await call("/sessions", {})).sessions;
+function connect(query = "", headers) {
+  const ws = new WebSocket(`ws://localhost:${PORT}/watch/ws${query}`, headers ? { headers } : undefined);
+  const msgs = []; ws.onmessage = (e) => msgs.push(JSON.parse(e.data));
+  const opened = new Promise((r, j) => { ws.onopen = r; ws.onerror = () => j(new Error("refused")); });
+  return { ws, msgs, opened };
+}
+
+before(async () => {
+  const require = createRequire(import.meta.url); const pw = require("playwright");
+  if (!existsSync(pw.chromium.executablePath())) spawnSync(process.execPath, [join(dirname(require.resolve("playwright/package.json")), "cli.js"), "install", "chromium"], { stdio: "inherit" });
+  mkdirSync(dist, { recursive: true }); writeFileSync(join(dist, "index.html"), `<!doctype html><title>app</title><h1>Home</h1><script>setInterval(()=>{document.title=String(Date.now())},50)</script>`);
+  proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", join(root, "state"), "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
+  let err = ""; proc.stderr.on("data", (d) => { err += d; });
+  let up = false;
+  for (let i = 0; i < 450 && !up; i++) { try { await fetch(`http://localhost:${PORT}/`); up = true; } catch { if (proc.exitCode !== null) throw new Error(`sim exited: ${err}`); await new Promise((r) => setTimeout(r, 200)); } }
+  if (!up) throw new Error("sim did not start");
+});
+after(async () => {
+  if (proc && proc.exitCode === null) { const done = new Promise((r) => proc.once("exit", r)); proc.kill("SIGKILL"); await done; }
+  proc?.stderr.destroy(); rmSync(root, { recursive: true, force: true });
+});
+
+test("the page is drawn in the Android and the iOS frame", () => {
+  assert.match(watchPage("android"), /data-skin="android"/);
+  assert.match(watchPage("ios"), /data-skin="ios"/);
+});
+
+test("GET /watch serves the page", async () => {
+  const r = await fetch(`http://localhost:${PORT}/watch?skin=ios`);
+  assert.equal(r.status, 200); assert.match(await r.text(), /data-skin="ios"/);
+});
+
+test("no viewer, no screencast; a viewer gets frames and follows the newest session, then it stops", async () => {
+  await call("/session", { session: "a", skin: "android" });
+  assert.equal((await list())[0].streaming, false);
+  const v = connect(); await v.opened;
+  const first = await until(() => v.msgs.find((m) => m.type === "frame"));
+  assert.equal(Buffer.from(first.data, "base64")[0], 0xff); assert.ok(first.width > 0);
+  assert.equal((await list()).find((s) => s.session === "a").streaming, true);
+  // a new session: the viewer follows it
+  await call("/session", { session: "b", skin: "ios" });
+  const sw = await until(() => v.msgs.find((m) => m.type === "sessions" && m.current === "b"));
+  assert.equal(sw.sessions.find((s) => s.session === "b").skin, "ios");
+  await until(() => v.msgs.slice(v.msgs.indexOf(sw)).some((m) => m.type === "frame"));
+  const ss = await list();
+  assert.equal(ss.find((s) => s.session === "b").streaming, true);
+  assert.equal(ss.find((s) => s.session === "a").streaming, false);
+  v.ws.send(JSON.stringify({ type: "tap", x: 5, y: 5 }));   // input is ignored
+  v.ws.close();
+  await until(async () => (await list()).every((s) => s.streaming === false));
+});
+
+test("a viewer that picked a session stays on it", async () => {
+  const v = connect("?session=a"); await v.opened;
+  await until(() => v.msgs.find((m) => m.type === "frame"));
+  await call("/session", { session: "c" });
+  const m = await until(() => v.msgs.filter((x) => x.type === "sessions").find((x) => x.sessions.some((s) => s.session === "c")));
+  assert.equal(m.current, "a"); assert.equal(m.following, false);
+  v.ws.close();
+});
+
+test("a wrong Origin is refused, the same origin is accepted", async () => {
+  await assert.rejects(connect("", { origin: "http://evil.example" }).opened, /refused/);
+  const ok = connect("", { origin: `http://localhost:${PORT}` }); await ok.opened; ok.ws.close();
+});
