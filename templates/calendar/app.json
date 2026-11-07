@@ -3,7 +3,7 @@
   "app": { "id": "calendar", "name": "Calendar", "icon": "calendar", "description": "Put events on your calendar and see them by day or month." },
   "theme": { "mode": "light", "palette": { "primary": "#0B5FFF", "text": "#111827", "background": "#FFFFFF", "surface": "#F3F4F6", "muted": "#4B5563" }, "radius": "lg", "density": "comfortable", "elevation": "soft" },
   "data": {
-    "events": { "source": "collection", "fields": { "id": "text", "title": "text", "start": "text", "place": "text" }, "seed": [] },
+    "events": { "source": "collection", "fields": { "id": "text", "seq": "number", "title": "text", "start": "text", "place": "text" }, "seed": [] },
     "today": { "source": "computed", "value": "{{ events.filter(e, startOf('day', e.start) == today()) }}" }
   },
   "navigation": { "type": "tabs", "items": [{ "screen": "day", "label": "Day", "icon": "calendar" }, { "screen": "month", "label": "Month", "icon": "list" }] },
@@ -13,15 +13,15 @@
       { "type": "list", "label": "Today's events", "from": "{{ sortBy(today, 'start') }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ formatDate(item.start, 'time') }}, Id {{ item.id }}" }, "empty": { "message": "Nothing today" } },
       { "type": "form", "label": "New event form", "submit": { "label": "Add event", "action": "create_event" }, "fields": [
         { "name": "title", "type": "text", "label": "Event", "required": true, "maxLength": 200 },
-        { "name": "start", "type": "text", "label": "Starts at (date and time with offset, like 2026-11-10T15:00:00+01:00)", "required": true, "maxLength": 40 },
+        { "name": "start", "type": "text", "label": "Starts at (like 2026-11-10T15:00:00+01:00)", "required": true, "maxLength": 40 },
         { "name": "place", "type": "text", "label": "Place", "maxLength": 200 }
       ] },
       { "type": "form", "label": "Delete event form", "submit": { "label": "Delete event", "action": "delete_event" }, "fields": [
-        { "name": "id", "type": "text", "label": "Event id", "required": true, "maxLength": 20 }
+        { "name": "id", "type": "text", "label": "Event id (shown under each event)", "required": true, "maxLength": 20 }
       ] }
     ] },
-    { "id": "month", "title": "This month", "body": [
-      { "type": "timeline", "label": "Events this month", "from": "events", "date": "{{ item.start }}", "title": "{{ item.title }}", "detail": "{{ item.place }}" }
+    { "id": "month", "title": "All events", "body": [
+      { "type": "timeline", "label": "All events", "from": "events", "date": "{{ item.start }}", "title": "{{ item.title }}", "detail": "{{ item.place }}" }
     ] }
   ],
   "actions": {
@@ -30,7 +30,7 @@
       "input": { "title": { "type": "text" }, "start": { "type": "text" }, "place": { "type": "text", "default": "" } },
       "returns": { "id": "text" },
       "do": [
-        { "insert": "events", "value": { "id": "{{ 'e' + string(unix(input.start)) + string(count(events) + 1) }}", "title": "{{ input.title }}", "start": "{{ formatDate(input.start, 'iso') }}", "place": "{{ input.place }}" } },
+        { "insert": "events", "value": { "id": "{{ 'e' + string(count(events) == 0 ? 1 : last(sortBy(events, 'seq')).seq + 1) }}", "seq": "{{ count(events) == 0 ? 1 : last(sortBy(events, 'seq')).seq + 1 }}", "title": "{{ input.title }}", "start": "{{ formatDate(input.start, 'iso') }}", "place": "{{ input.place }}" } },
         { "toast": "Event added" },
         { "return": { "id": "{{ last(events).id }}" } }
       ]

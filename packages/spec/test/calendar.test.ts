@@ -55,6 +55,21 @@ describe("Calendar spec app", () => {
     expect(c.value.id).not.toBe(b.value.id);
   });
 
+  it("keeps ids distinct when events with the same start are deleted and added", () => {
+    const store = phoneStorage();
+    const start = "2026-11-10T15:00:00Z";
+    const a = callTool(store, "create_event", { title: "A", start }).out as any;
+    const b = callTool(store, "create_event", { title: "B", start }).out as any;
+    expect(callTool(store, "delete_event", { id: a.value.id }).out.ok).toBe(true);
+    const c = callTool(store, "create_event", { title: "C", start }).out as any;
+    const ids = (store.get("calendar", "data").events as any[]).map((e) => e.id);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+    expect(c.value.id).not.toBe(b.value.id);
+    callTool(store, "delete_event", { id: c.value.id });
+    expect((store.get("calendar", "data").events as any[]).map((e) => e.title)).toEqual(["B"]);
+  });
+
   it("uses the phone's time zone at a day boundary", () => {
     const store = phoneStorage();
     // 23:30 UTC on Nov 10 is already Nov 11 in Auckland and still Nov 10 in New York.
