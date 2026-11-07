@@ -20,7 +20,8 @@ import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
 import { Recorder, RecorderError } from "./recorder.js";
-import { connectDriver, findLiveRun, type Driver } from "./attach.js";
+import { connectDriver, findLiveRun, type Driver, type RunInfo } from "./attach.js";
+import { findProjectDir, hasDesktop, localShipvo, runUrl, startRun } from "./launch.js";
 import { satisfied, sameTree, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -80,7 +81,10 @@ async function storeApps(): Promise<{ ok: true; apps: StoreApp[]; fixture: boole
 const recorder = new Recorder();
 // Sessions attached to a live `shipvo run` phone. Module level: HTTP mode builds a server per request.
 const attached = new Map<string, Driver>();
+// What the run's page answers today. Every other tool needs a headless session and says so.
 const ATTACH_TYPES = new Set(["screen", "screenshot", "tap", "type", "scroll", "back"]);
+// The run each attached session is on, for list_apps and open_app results.
+const attachedRun = new Map<string, RunInfo>();
 // One action on a session: through the driver connection when attached, else the simulator.
 async function act(body: Record<string, unknown>): Promise<Act> {
   const end = recorder.actionSpan();
@@ -146,7 +150,7 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
   const guarded = (args: unknown, extra: unknown) => inputHasKey(args) ? keyRefusal() : (cb as (a: unknown, e: unknown) => unknown)(args, extra);
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
 };
-type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
+type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
 /** The package version, read from package.json next to dist/ so it never drifts from the published one. */
 const SERVER_VERSION: string = (() => { try { return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version ?? "0.0.0"; } catch { return "0.0.0"; } })();
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
@@ -170,15 +174,38 @@ use(server, tools.list_apps, async ({ query }) => {
     const d = dir[id] ?? APPS[id]; const desc = d ? `${d.name}. ${d.description}${"category" in d ? ` [${(d as any).category}]` : ""}` : `published with shipvo`;
     return q && !`${id} ${desc}`.toLowerCase().includes(q) ? null : `${id}: ${desc} (open_app("${id}@latest"))`;
   }).filter(Boolean);
-  return text(lines.join("\n") || `no apps match "${query}"`);
+  const run = findLiveRun(undefined);
+  const phone = run ? `\n\nPhone: ${run.platform} phone of ${run.app} is visible at ${runUrl(run)} (open_app attaches to it).` : `\n\nPhone: none visible yet. open_app starts one in the user's browser (platform: "android" or "ios") when run from a Shipvo project.`;
+  return text((lines.join("\n") || `no apps match "${query}"`) + phone);
 });
 
-const openApp = async ({ app, session, seed_cart, dark, platform, attach }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; platform?: "android" | "ios"; attach?: "auto" | "never" | "always" }) => {
-  const id = app.split("@")[0];
-  let live = attach === "never" ? undefined : findLiveRun(id);
-  const mismatch = live && platform && live.platform !== platform ? live.platform : undefined;
-  if (mismatch && attach === "always") return result("", { ok: false, code: "platform_mismatch", error: `the live shipvo run is ${mismatch}, not ${platform}. Start \`shipvo run ${platform}\`, or use attach: "auto" for a headless ${platform} session.` });
-  if (mismatch) live = undefined; // auto: the live phone is the wrong platform, so open a headless session instead
+const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
+  let id = app.split("@")[0];
+  const headlessOnly = attach === "never" || show === false;
+  let live = headlessOnly ? undefined : findLiveRun(id);
+  let launchNote = "";
+  // Show the person a phone: switch a live run to the asked platform, or start one from the project.
+  // Only a local (stdio) server starts processes. Over HTTP a caller never makes the server host run a command.
+  if (!headlessOnly && ctx.scope !== "read" && ctx.local) {
+    const autoStart = show === undefined && attach !== "always" && hasDesktop() && localShipvo(findProjectDir());
+    // Refuse a different app's run only when we are about to start or attach a phone, never for a plain headless call.
+    const wantsPhone = show === true || attach === "always" || Boolean(autoStart);
+    const other = live || !wantsPhone ? undefined : findLiveRun(undefined);
+    if (other && other.app !== id) return result("", { ok: false, code: "unknown_app", error: `this project runs "${other.app}", not "${id}". The phone for "${other.app}" is up at ${runUrl(other)}; call open_app("${other.app}") to use it.` });
+    if (live && platform && live.platform !== platform) {
+      // The run's page does not switch skins over the driver connection yet, so this attaches to the phone that is up and says so.
+      launchNote = ` (the live phone is ${live.platform}; to see ${platform}, stop it and run \`shipvo run ${platform}\`)`;
+    } else if (!live && (show === true || autoStart)) {
+      const dir = findProjectDir();
+      if (dir) {
+        try {
+          live = await startRun(platform ?? "android", dir);
+          if (live.app !== id) return result("", { ok: false, code: "unknown_app", error: `this project runs "${live.app}", not "${id}". The phone for "${live.app}" is up at ${runUrl(live)}; call open_app("${live.app}") to use it.` });
+          launchNote = ` (started shipvo run ${live.platform})`; }
+        catch (e) { if (attach === "always" || show === true) return result("", { ok: false, code: "run_failed", error: (e as Error).message }); launchNote = ` (could not start the phone: ${(e as Error).message})`; }
+      }
+    }
+  }
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
   if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
   if (!keyApps && !live && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
@@ -186,23 +213,25 @@ const openApp = async ({ app, session, seed_cart, dark, platform, attach }: { ap
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const mode = attach ?? "auto";
   if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
-  let attachNote = "";
+  let attachNote = launchNote;
+  if (platform && !launchNote && (!live || live.platform !== platform) ) attachNote += ` (platform ${platform} ignored: no phone was started${live ? `; the live phone is ${live.platform}` : ""})`;
+  if (live && app.includes("@")) attachNote += ` (${app.split("@")[1]} ignored: the phone runs the local build)`;
   if (live) {
     try {
       const d = await connectDriver(live);
-      attached.get(sid)?.close(); attached.set(sid, d);
+      attached.get(sid)?.close(); attached.set(sid, d); attachedRun.set(sid, live);
       const r = await act({ session: sid, action: "screen" });
-      if (!r.ok) { attached.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote = ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
+      if (!r.ok) { attached.delete(sid); attachedRun.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote += ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
       else {
         sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() }); steps.set(sid, [{ action: "open" }]);
         if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
         // Lumi shows the step in the phone frame. tap, type, scroll and back are captioned by the page itself, from the element it acts on.
         void d.request("lumi", { caption: `Opened ${id}`, state: "working", hold: 1800 }, 1000).catch(() => {});
-        return text(`session: ${sid}\napp: ${id} release: local\nmode: attached to the live shipvo run phone\n\n${r.screen ?? ""}`);
+        return text(`session: ${sid}\napp: ${id} release: local\nmode: attached to the live shipvo run phone${attachNote}\nvisible: yes, ${live.platform} phone at ${runUrl(live)}\n\n${r.screen ?? ""}`);
       }
     } catch (e) {
       if (mode === "always") return result("", { ok: false, code: "attach_failed", error: (e as Error).message });
-      attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
+      attachNote += ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark, ...(platform ? { device: { platform } } : {}) }) as Act & { release?: string | number; platform?: string };
@@ -212,7 +241,7 @@ const openApp = async ({ app, session, seed_cart, dark, platform, attach }: { ap
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
-  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}${r.platform ? ` platform: ${r.platform}` : ""}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
+  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}${r.platform ? ` platform: ${r.platform}` : ""}\nmode: headless session${attachNote}\nvisible: no\n\n${r.screen ?? ""}`);
 };
 use(server, tools.open_app, openApp);
 // Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.
@@ -384,7 +413,11 @@ use(server, tools.export_test, async ({ session }) => {
 use(server, tools.end_session, async ({ session }) => {
   need(session);
   const live = attached.get(session);
-  if (live) { const s = sessions.get(session); live.close(); attached.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session); return text(JSON.stringify({ session, app: s?.app, mode: "attached", steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000) }, null, 2)); }
+  if (live) {
+    const s = sessions.get(session); const run = attachedRun.get(session);
+    live.close(); attached.delete(session); attachedRun.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session);
+    return text(JSON.stringify({ session, app: s?.app, mode: "attached", visible: true, url: run ? runUrl(run) : undefined, steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000) }, null, 2));
+  }
   // The simulator is the source of truth: end a session it lists even if this server did not open it; otherwise no_session.
   const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string }[] };
   if (!listed.ok) return result(session, listed);
@@ -398,7 +431,9 @@ use(server, tools.end_session, async ({ session }) => {
 // Record the phone frame page to an MP4 (one recording per server). Page: SHIPVO_FRAME_URL, default the simulator's root.
 const recFail = (e: unknown) => { if (e instanceof RecorderError) return result("", { ok: false, code: e.code, error: e.message }); throw e; };
 use(server, tools.record_start, async ({ format, fps, title, show_taps, background, lumi, lumi_voice }) => {
-  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background, lumi, lumiVoice: lumi_voice }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
+  const urls = [...new Set([...attachedRun.values()].map(runUrl))];
+  if (!process.env.SHIPVO_FRAME_URL && urls.length > 1) return result("", { ok: false, code: "ambiguous_phone", error: `sessions are attached to ${urls.length} phones (${urls.join(", ")}). End the others, or set SHIPVO_FRAME_URL to the one to record.` });
+  try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? urls[0] ?? SIM + "/", format, fps, title, showTaps: show_taps, background, lumi, lumiVoice: lumi_voice }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 use(server, tools.record_marker, async ({ caption }) => {
   try { const c = recorder.marker(caption); return { ...text(`marker at ${c.t}s: ${c.caption}`), structuredContent: c }; } catch (e) { return recFail(e); }
@@ -573,7 +608,7 @@ return server;
 // ---- transport: stdio (local) or Streamable HTTP (remote) ----
 const argi = process.argv.indexOf("--http");
 if (argi < 0) {
-  await makeServer().connect(new StdioServerTransport());
+  await makeServer({ local: true }).connect(new StdioServerTransport());
 } else {
   const port = Number(process.argv[argi + 1] || 8787);
   const keys = new Set((process.env.PN_API_KEYS ?? "").split(",").map((k) => k.trim()).filter(Boolean));
