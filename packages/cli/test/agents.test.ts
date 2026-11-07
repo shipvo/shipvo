@@ -84,7 +84,7 @@ describe(".mcp.json", () => {
 describe("flags", () => {
   it("--dry-run writes nothing; --json prints changes and the skill line", async () => {
     const log = quiet(); const d = tmp();
-    expect(await agentsCmd(["setup", "--dry-run", "--json"], d)).toBe(0);
+    expect(await agentsCmd(["setup", "--dry-run", "--json"], d, d, "")).toBe(0);
     expect(existsSync(join(d, "AGENTS.md"))).toBe(false);
     const j = JSON.parse(String(log.mock.calls[0][0]));
     expect(j.dry_run).toBe(true); expect(j.changes.map((c: any) => c.action)).toEqual(["create", "create"]);
@@ -177,19 +177,19 @@ describe("local server entry", () => {
   it.each([["pnpm-lock.yaml", "pnpm", ["add", "-D", "@shipvo/mcp"]], ["yarn.lock", "yarn", ["add", "-D", "@shipvo/mcp"]], ["bun.lock", "bun", ["add", "-d", "@shipvo/mcp"]], [undefined, "npm", ["install", "--save-dev", "@shipvo/mcp"]]] as const)(
     "adds @shipvo/mcp with %s -> %s when missing", async (lock, cmd, cargs) => {
       quiet(); const d = app(lock); const run = vi.fn();
-      expect(await agentsCmd(["setup"], d, { run })).toBe(0);
+      expect(await agentsCmd(["setup"], d, d, "", { run })).toBe(0);
       expect(run).toHaveBeenCalledWith(cmd, [...cargs], d);
     });
   it("writes the relative node entry with PN_SIM and skips the install when present", async () => {
     quiet(); const d = app(undefined, true); const run = vi.fn();
     writeFileSync(join(d, "shipvo.json"), JSON.stringify({ simPort: 4600 }));
-    await agentsCmd(["setup"], d, { run });
+    await agentsCmd(["setup"], d, d, "", { run });
     expect(run).not.toHaveBeenCalled();
     expect(JSON.parse(readFileSync(join(d, ".mcp.json"), "utf8")).mcpServers.shipvo).toEqual({ command: "node", args: ["node_modules/@shipvo/mcp/dist/server.js"], env: { PN_SIM: "http://localhost:4600" } });
   });
   it("--npx pins the installed version and never installs", async () => {
     quiet(); const d = app(undefined, true); const run = vi.fn();
-    await agentsCmd(["setup", "--npx"], d, { run });
+    await agentsCmd(["setup", "--npx"], d, d, "", { run });
     expect(run).not.toHaveBeenCalled();
     const e = JSON.parse(readFileSync(join(d, ".mcp.json"), "utf8")).mcpServers.shipvo;
     expect(e).toEqual({ command: "npx", args: ["-y", "@shipvo/mcp@1.2.3"], env: { PN_SIM: "http://localhost:4545" } });
@@ -197,7 +197,7 @@ describe("local server entry", () => {
   });
   it("--npx fails clearly when no version is installed", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {}); const d = app(); const run = vi.fn();
-    expect(await agentsCmd(["setup", "--npx"], d, { run })).toBe(2);
+    expect(await agentsCmd(["setup", "--npx"], d, d, "", { run })).toBe(2);
     expect(err.mock.calls.join(" ")).toContain("none is installed");
     expect(existsSync(join(d, ".mcp.json"))).toBe(false);
   });
@@ -208,7 +208,7 @@ describe("local server entry", () => {
     writeFileSync(join(real, "dist/server.js"), "");
     mkdirSync(join(d, "node_modules/@shipvo"), { recursive: true });
     symlinkSync(real, join(d, "node_modules/@shipvo/mcp"), "dir");
-    await agentsCmd(["setup"], d, { run: vi.fn() });
+    await agentsCmd(["setup"], d, d, "", { run: vi.fn() });
     expect(JSON.parse(readFileSync(join(d, ".mcp.json"), "utf8")).mcpServers.shipvo.args).toEqual(["node_modules/@shipvo/mcp/dist/server.js"]);
   });
 });

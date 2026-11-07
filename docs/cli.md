@@ -158,14 +158,23 @@ Sets a project up for AI coding agents.
 
 ```bash
 shipvo agents setup              # write the files
+shipvo agents setup --for cursor,codex   # also write these agents, detected or not
+shipvo agents setup --all        # treat every agent as present
+shipvo agents setup --global     # also write user-level files (Codex CLI, Windsurf)
 shipvo agents setup --dry-run    # show what would change, write nothing
 shipvo agents setup --json       # machine-readable result
 ```
 
 - It detects the project: Shipvo app (`shipvo.json`), Capacitor, Expo, bare React Native.
 - It writes a section to `AGENTS.md` between `<!-- shipvo:begin -->` and `<!-- shipvo:end -->`. A missing file is created. Text outside the markers is never changed.
-- It adds `@shipvo/mcp` to devDependencies with your package manager (npm, pnpm, yarn or bun) if it is missing, then adds the `shipvo` server (`node node_modules/@shipvo/mcp/dist/server.js`, with `PN_SIM` set to your sim port) to `.mcp.json`, and to `.cursor/mcp.json` if `.cursor/` exists. Other servers stay. A file that is not valid JSON is left alone and the command exits 2.
+- It adds `@shipvo/mcp` to devDependencies with your package manager (npm, pnpm, yarn or bun) if it is missing, then adds the `shipvo` server (`node node_modules/@shipvo/mcp/dist/server.js`, with `PN_SIM` set to your sim port) to the MCP config of each coding agent it detects in the project (a folder, a file or the CLI on `PATH`). `.mcp.json` for Claude Code is always written. Other servers and keys stay. A file that is not valid JSON is left alone and the command exits 2.
 - `--npx` writes a pinned `npx -y @shipvo/mcp@<installed version>` entry instead and installs nothing.
+- Agents it does not detect are listed with their `--for` name. `--for <names>` takes a comma-separated list of ids and writes those agents; `--all` treats every agent as present.
+- Agent ids: `claude`, `cursor`, `vscode`, `gemini`, `qwen`, `roo`, `kiro`, `opencode`, `codex`, `windsurf`, `claude-desktop`, `cline`, `zed`, `goose`, `continue`, `amp`.
+- Project files: `.mcp.json` (Claude Code), `.cursor/mcp.json`, `.vscode/mcp.json` (VS Code and GitHub Copilot), `.gemini/settings.json`, `.qwen/settings.json`, `.roo/mcp.json`, `.kiro/settings/mcp.json`, `opencode.json`.
+- Codex CLI (`~/.codex/config.toml`, other tables are kept) and Windsurf (`~/.codeium/windsurf/mcp_config.json`) are user-level files. They are written only with `--global`; without it the block is printed.
+- Claude Desktop, Cline, Zed, Goose, Continue and Amp print a block to paste, with the file it goes in.
+- `--json` adds `agents`: one entry per agent with its `agent` id, `name`, `file`, `action` and, for printed blocks, the `block`.
 - It prints the skill install line.
 - Running it again changes nothing.
 

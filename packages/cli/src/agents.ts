@@ -1,9 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { args } from "./config.js";
 import { detectPackageManager, type PackageManager } from "./ensure-playwright.js";
+import { TARGETS, blockFor, detected, mergeJson, mergeToml } from "./agent-targets.js";
 
 export type ProjectKind = "shipvo" | "expo" | "react-native" | "capacitor" | "unknown";
 
@@ -103,16 +105,9 @@ export function mcpInstallCommand(pm: PackageManager): { cmd: string; args: stri
   }
 }
 
-/** Add the `shipvo` server and keep every other server and key. Returns null if the file is not valid JSON. */
+/** Add the `shipvo` server to a `.mcp.json` style file and keep every other server and key. Returns null if the file is not valid JSON. */
 export function mergeMcp(text: string | null, entry: McpServerEntry = serverEntry(process.cwd())): string | null {
-  let doc: Record<string, unknown> = {};
-  if (text !== null && text.trim()) {
-    try { doc = JSON.parse(text); } catch { return null; }
-    if (!doc || typeof doc !== "object" || Array.isArray(doc)) return null;
-  }
-  const servers = (doc.mcpServers && typeof doc.mcpServers === "object" ? doc.mcpServers : {}) as Record<string, unknown>;
-  servers.shipvo = entry;
-  return JSON.stringify({ ...doc, mcpServers: servers }, null, 2) + "\n";
+  return mergeJson(text, ["mcpServers"], entry);
 }
 
 /** Where synced skills are copied to, relative to the project. */
@@ -164,10 +159,9 @@ export function skillStatus(dir: string): { package: string; name: string; synce
 type Change = { file: string; action: "create" | "update" | "unchanged" | "skip"; note?: string };
 
 /** `shipvo agents setup [--dry-run] [--json]`. Exit 0 done, 2 error. */
-export async function agentsCmd(argv: string[], dir = process.cwd(), deps: { run?: (cmd: string, args: string[], cwd: string) => void } = {}): Promise<number> {
+export async function agentsCmd(argv: string[], dir = process.cwd(), home = homedir(), pathVar = process.env.PATH, deps: { run?: (cmd: string, args: string[], cwd: string) => void } = {}): Promise<number> {
   const [sub, ...rest] = argv;
-  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--dry-run] [--json] [--npx]"); return 2; }
-  const only = sub === "skills-sync";
+  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--for <names>] [--all] [--global] [--npx] [--dry-run] [--json]"); return 2; }  const only = sub === "skills-sync";
   const a = args(rest);
   const dry = a["dry-run"] !== undefined, json = a.json !== undefined;
   const kind = detectProject(dir);
@@ -175,14 +169,21 @@ export async function agentsCmd(argv: string[], dir = process.cwd(), deps: { run
   const writes: { path: string; text: string }[] = [];
   let installed: string | undefined;
   const plan = (file: string, next: string | null, note?: string) => {
-    const path = join(dir, file);
+    const path = resolve(dir, file);
     const old = existsSync(path) ? readFileSync(path, "utf8") : null;
     if (next === null) { changes.push({ file, action: "skip", note }); return; }
     if (old === next) { changes.push({ file, action: "unchanged" }); return; }
     changes.push({ file, action: old === null ? "create" : "update" });
     writes.push({ path, text: next });
   };
-  const read = (f: string) => existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : null;
+  const read = (f: string) => existsSync(resolve(dir, f)) ? readFileSync(resolve(dir, f), "utf8") : null;
+  const forced = new Set((a.for ?? "").split(",").map((x) => x.trim()).filter(Boolean));
+  const unknown = [...forced].filter((n) => !TARGETS.some((t) => t.id === n));
+  if (unknown.length) { console.error(`Unknown agent: ${unknown.join(", ")}. Known: ${TARGETS.map((t) => t.id).join(", ")}.`); return 2; }
+  const all = a.all !== undefined, global = a.global !== undefined;
+  type AgentResult = { agent: string; name: string; action: "written" | "up-to-date" | "printed" | "not-found" | "skipped"; file?: string; note?: string; block?: string };
+  const agentResults: AgentResult[] = [];
+  const homeFile = (f: string) => f.startsWith("~/") ? join(home, f.slice(2)) : f;
 
   if (!only) {
     plan("AGENTS.md", upsertSection(read("AGENTS.md") ?? "", agentsSection(kind)), "AGENTS.md has a broken shipvo marker; fix it and run again.");
@@ -205,22 +206,44 @@ export async function agentsCmd(argv: string[], dir = process.cwd(), deps: { run
       }
       entry = serverEntry(dir, { path: localServerPath(dir) });
     }
-    const targets = [".mcp.json", ...(existsSync(join(dir, ".cursor")) ? [".cursor/mcp.json"] : [])];
-    for (const f of targets) {
-      const merged = mergeMcp(read(f), entry);
-      plan(f, merged, `${f} is not valid JSON; I left it alone. Fix it and run again.`);
-    }
+    for (const t of TARGETS) {
+      const on = all || forced.has(t.id) || detected(t, dir, pathVar);
+      const base = { agent: t.id, name: t.label };
+      if (t.level === "project") {
+        if (!on) { agentResults.push({ ...base, action: "not-found", note: `not found; add it with --for ${t.id}` }); continue; }
+        const merged = mergeJson(read(t.file), t.jsonPath!, t.entry!(entry));
+        const before = changes.length;
+        plan(t.file, merged, `${t.file} is not valid JSON (or has an unexpected shape); I left it alone. Fix it and run again.`);
+        const c = changes[before];
+        agentResults.push({ ...base, file: t.file, action: c.action === "skip" ? "skipped" : c.action === "unchanged" ? "up-to-date" : "written", note: c.note });
+        continue;
+      }
+      // User-level config: written only with --global, otherwise printed to paste.
+      const file = homeFile(t.file), block = blockFor(t, entry);
+      if (t.level === "user-write" && global && on) {
+        const old = read(file);
+        const next = t.block ? mergeToml(old, block) : mergeJson(old, t.jsonPath!, t.entry!(entry));
+        const before = changes.length;
+        plan(file, next, `${file} could not be parsed; I left it alone. Fix it and run again.`);
+        const c = changes[before];
+        agentResults.push({ ...base, file, action: c.action === "skip" ? "skipped" : c.action === "unchanged" ? "up-to-date" : "written", note: c.note, block });
+      } else agentResults.push({ ...base, file, action: "printed", block, note: t.level === "user-write" ? (on ? "run with --global to write it" : `not found; add it with --for ${t.id} --global`) : undefined });    }
   }
   const skills = projectSkills(dir);
   for (const e of skills) for (const t of skillTargets(dir, e)) plan(t.file, t.text);
   const bad = changes.some((c) => c.action === "skip");
   if (!dry && !bad) for (const w of writes) { mkdirSync(dirname(w.path), { recursive: true }); writeFileSync(w.path, w.text); }
   const wrote = !dry && !bad;
-  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, mcp_install: installed ?? null, changes, skill_install: SKILL_LINE, skills: skills.map((e) => ({ package: e.package, name: e.name })) }));
-  else {
+  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, changes, mcp_install: installed ?? null, agents: agentResults, skill_install: SKILL_LINE, skills: skills.map((e) => ({ package: e.package, name: e.name })) }));  else {
     console.log(`Project: ${LABEL[kind]}.`);
     if (installed) console.log(`  @shipvo/mcp: ${dry ? installed : `added with ${installed}`}`);
     for (const c of changes) console.log(`  ${c.file}: ${c.action === "skip" ? c.note : c.action === "unchanged" ? "already up to date" : `${dry ? "would " : ""}${c.action}${dry ? "" : "d"}`}`);
+    if (!only) {
+      console.log("Agents:");
+      for (const r of agentResults) console.log(`  ${r.name} (${r.agent}): ${r.action === "written" ? (dry ? "would write" : "written") : r.action === "up-to-date" ? "already up to date" : r.action === "skipped" ? r.note : r.action === "not-found" ? r.note : "printed (user-level)"}${r.file && r.action !== "not-found" ? ` [${r.file}]` : ""}`);
+      for (const r of agentResults.filter((x) => x.action === "printed" || (x.block && x.action === "written"))) console.log(`\n${r.name}: add this to ${r.file}${r.note ? ` (${r.note})` : ""}\n${r.block}`);
+      console.log("");
+    }
     if (dry) console.log("Dry run: nothing was written.");
     else if (wrote && !changes.some((c) => c.action !== "unchanged")) console.log("Nothing to change.");
     if (only && !skills.length) console.log("No installed @shipvo/* dependency ships a skill.");
