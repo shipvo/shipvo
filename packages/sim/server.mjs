@@ -119,6 +119,24 @@ async function openInBrowserApp(id, url) {
   }
 }
 
+// Open an installed app: load its page if it has one, and drop any link the previous launch received (a link belongs to one launch).
+async function enterApp(s, page, id) {
+  const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
+  // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
+  // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
+  let dest = null;
+  const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
+  if (am) dest = (await resolveApp(am[1])).url;
+  else if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^fixture:/i.test(url)) {
+    try { dest = (await checkUrl(url, { allowPrivate: false, allowHosts: [] })).href; }
+    catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
+  }
+  switchApp(s.apps, id, s.nav);
+  if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  await page.evaluate(setVisibilityInPage, "active");
+  await page.evaluate(() => { delete globalThis.__pnInitialUrl; });
+}
+
 async function newSession(id, opts = {}) {
   if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close(); }
   const target = await resolveApp(opts.app);
@@ -281,19 +299,7 @@ async function act(id, body) {
         if (body.action === "install_app") installApp(s.apps, id, Array.isArray(body.catalog) ? body.catalog : s.apps.store);
         else if (body.action === "uninstall_app") uninstallApp(s.apps, id, s.nav);
         else {
-          const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
-          // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
-          // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
-          let dest = null;
-          const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
-          if (am) dest = (await resolveApp(am[1])).url;
-          else if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^fixture:/i.test(url)) {
-            try { dest = (await checkUrl(url, { allowPrivate: false, allowHosts: [] })).href; }
-            catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
-          }
-          switchApp(s.apps, id, s.nav);
-          if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
-          await page.evaluate(setVisibilityInPage, "active");
+          await enterApp(s, page, id);
         }
       } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       if (body.action === "uninstall_app" && s.nav.where === "home") await page.evaluate(setVisibilityInPage, "background");
@@ -373,7 +379,13 @@ async function act(id, body) {
     case "open_url": {
       if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
       let r; try { r = resolveUrl(s.apps, body.url, Array.isArray(CFG.schemes) && typeof CFG.appId === "string" ? [{ id: CFG.appId, schemes: CFG.schemes }] : []); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
-      if (r.app) { await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url); await page.waitForTimeout(400); return { app: r.app, screen: await screen(page) }; }   // a listener, if the app has one, still gets the URL
+      if (r.app) {
+        // Switch to the owning app, then hand over the link once: as the initial URL of this launch and as a `url` event. No init script stays behind.
+        if (s.apps.current_app !== r.app && s.apps.installed_apps.some((a) => a.id === r.app)) await enterApp(s, page, r.app);
+        s.apps.log.push({ at: Date.now(), name: "open_url", app: r.app, url: body.url, source: "simulated" });
+        await page.evaluate((u) => { globalThis.__pnInitialUrl = u; return globalThis.__pnDevice?.openUrl(u); }, body.url);
+        await page.waitForTimeout(400); return { app: r.app, screen: await screen(page) };
+      }
       const handled = await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url);
       if (!handled) throw new SimError("no_url_listener", `the app has no URL listener, so it did not handle ${body.url}. Register one with onUrl from @shipvo/device.`);
       await page.waitForTimeout(400); break;

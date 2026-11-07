@@ -311,6 +311,8 @@ g.__pnDevice = {
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
+  /** Register a deep-link listener (the same as `onUrl`). Returns an unsubscribe function. */
+  onUrl: (cb: (url: string) => void) => onUrl(cb),
   capabilities: () => device.capabilities(),
   /** What the status bar shows: network, airplane and battery. */
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
@@ -332,6 +334,8 @@ export const simLog = log;
 export const setOnline = (o: boolean) => g.__pnDevice.set({ online: o });
 /** Call `cb` with each URL opened in the app (deep links). Returns an unsubscribe function. */
 export const onUrl = (cb: (url: string) => void) => { urlSubs.add(cb); return () => { urlSubs.delete(cb); }; };
+/** The URL that launched the app, or null. The simulator sets it once for the launch a link opened; a switch or reload clears it. */
+export const getInitialUrl = async (): Promise<string | null> => (g as { __pnInitialUrl?: string }).__pnInitialUrl ?? null;
 /** Deliver a URL to the app. Returns true if an `onUrl` listener received it. */
 function deliverUrl(url: string): boolean | Promise<boolean> {
   // A web page opens in the phone's Browser app, not in the app. Only when the simulator provides one.

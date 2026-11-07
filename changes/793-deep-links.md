@@ -1,0 +1,3 @@
+- `@shipvo/sim`: `open_url` and `Linking.openURL` switch to the app that owns the link's scheme and deliver the URL once, as the launch URL and as a `url` event. Switching to another app or reloading clears the launch URL. Device-log entries for the link are marked `simulated`.
+- `@shipvo/device`: new `getInitialUrl()` and `__pnDevice.onUrl` on the simulated device.
+- Migration: none; new APIs.

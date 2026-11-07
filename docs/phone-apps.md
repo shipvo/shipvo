@@ -121,3 +121,7 @@ switch_app { session, id: "notes" }    -> current_app is notes
 uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app, switch_app, uninstall_app, all source "simulated"
 ```
+
+### Open a deep link in the app that owns it
+
+`open_url myapp://item/42` finds the installed app that declares the `myapp` scheme in its `schemes` list, switches to it, and hands it the URL once. On Android and iPhone skins the app gets the URL two ways: `Linking.getInitialURL()` (or `getInitialUrl()` from `@shipvo/device`) returns it, and the `url` event (or `onUrl`) fires. The URL belongs to that one launch. If you then `switch_app` to another app or reload, its `getInitialURL()` is `null`. The `device_log` entry for the link has `source: "simulated"`.
