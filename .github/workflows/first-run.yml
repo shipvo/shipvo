@@ -142,10 +142,10 @@ jobs:
             ${{ runner.temp }}/applied-ota.md
           if-no-files-found: ignore
 
-  # Time `shipvo run android` to a tappable phone page (escalation #712; script from PR #679).
+  # Time `shipvo run` (Android and iOS) to a tappable phone page (escalation #712; script from PR #679).
   # Skips cleanly until scripts/first-run/run-time.mjs is on main.
   run-time:
-    name: shipvo run android (time to first tap)
+    name: shipvo run, Android and iOS (time to first tap)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -164,12 +164,12 @@ jobs:
         name: Install Chromium
         run: bash scripts/agents/install-chromium.sh
       - if: steps.has.outputs.script == '1'
-        name: Time shipvo run android
+        name: Time shipvo run (Android and iOS)
         run: |
           set -o pipefail
           rc=0
           node scripts/first-run/run-time.mjs --with-install --out "$RUNNER_TEMP/run-time.json" | tee "$RUNNER_TEMP/run-time.md" || rc=$?
-          { echo "### shipvo run android on ubuntu-latest (clean runner, no secrets)"; echo; cat "$RUNNER_TEMP/run-time.md"; echo; \
+          { echo "### shipvo run, Android and iOS, on ubuntu-latest (clean runner, no secrets)"; echo; cat "$RUNNER_TEMP/run-time.md"; echo; \
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } >> "$GITHUB_STEP_SUMMARY"
           exit $rc
       - uses: actions/upload-artifact@v4
