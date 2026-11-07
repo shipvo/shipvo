@@ -1,0 +1,1 @@
+- runtime: background and headless wake-ups (silent push, background task) no longer use up a release's trial boots or add to the unhealthy-boot count on Android and iOS. A load counts when the app can show a screen; an uncaught JS error still counts at once. No API change, no migration needed.

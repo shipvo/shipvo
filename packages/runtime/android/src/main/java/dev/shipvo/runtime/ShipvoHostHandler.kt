@@ -1,6 +1,9 @@
 package dev.shipvo.runtime
 
+import android.app.Activity
+import android.app.Application
 import android.content.Context
+import android.os.Bundle
 import expo.modules.core.interfaces.ReactNativeHostHandler
 import java.io.File
 
@@ -13,7 +16,10 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
   override fun getJSBundleFile(useDeveloperSupport: Boolean): String? {
     if (useDeveloperSupport) return null
     synchronized(LOCK) {
+      watchActivities()
       val s = Store(ctx)
+      val visible = Store.uiStarted
+      Store.deferredRelease = 0
       Store.bundleSelectedAt = s.now()
       Store.loadsInProcess = Store.loadsInProcess + 1
 
@@ -32,7 +38,8 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
           File(pending).delete()
           s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
         } else {
-          s.trialBoots = s.trialBoots + 1
+          if (BootRules.countsAtSelection(visible)) s.trialBoots = s.trialBoots + 1
+          else { Store.deferredRelease = s.pendingRelease; Store.deferredIsTrial = true }
           Store.runningRelease = s.pendingRelease
           return pending
         }
@@ -40,7 +47,9 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
       val current = s.currentPath
       if (current != null && File(current).exists()) {
-        if (BootRules.countBoot(s, s.now(), MAX_BOOTS, WINDOW_MS)) {
+        if (!BootRules.countsAtSelection(visible)) {
+          Store.deferredRelease = s.currentRelease; Store.deferredIsTrial = false
+        } else if (BootRules.countBoot(s, s.now(), MAX_BOOTS, WINDOW_MS)) {
           s.addEvent("crash_loop_revert:${s.currentRelease}")
           s.block(s.currentRelease)
           revertToPrevious(s)
@@ -54,6 +63,26 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
     }
   }
 
+  private var watching = false
+
+  /** Counts a deferred load as soon as the first activity starts. */
+  private fun watchActivities() {
+    if (watching) return
+    val app = ctx.applicationContext as? Application ?: return
+    watching = true
+    app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+      override fun onActivityStarted(activity: Activity) {
+        synchronized(LOCK) { Store.uiStarted = true; settleDeferred(Store(ctx), crashed = false) }
+      }
+      override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+      override fun onActivityResumed(activity: Activity) {}
+      override fun onActivityPaused(activity: Activity) {}
+      override fun onActivityStopped(activity: Activity) {}
+      override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+      override fun onActivityDestroyed(activity: Activity) {}
+    })
+  }
+
   private fun selectCurrentOrEmbedded(s: Store): String? {
     val c = s.currentPath
     return if (c != null && File(c).exists()) { Store.runningRelease = s.currentRelease; c } else { Store.runningRelease = 0; null }
@@ -65,6 +94,19 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
     /** A release is stable once its process stayed in the foreground this long after markHealthy. iOS uses the same value. */
     const val STABILITY_MS = 30_000L
     val LOCK = Any()
+
+    /** Counts the load that was chosen without UI, if one is waiting. Call inside [LOCK]. The release keeps running
+     *  the same bundle; a trial release that now reaches its limit is reverted at the next selection. */
+    internal fun settleDeferred(s: Store, crashed: Boolean) {
+      val release = Store.deferredRelease
+      if (release == 0 || !BootRules.countsLater(true, Store.uiStarted, crashed)) return
+      Store.deferredRelease = 0
+      if (Store.deferredIsTrial) {
+        if (s.pendingRelease == release) s.trialBoots = s.trialBoots + 1
+      } else if (s.currentRelease == release) {
+        BootRules.countBoot(s, s.now(), MAX_BOOTS, WINDOW_MS)
+      }
+    }
 
     internal fun revertToPrevious(s: Store) {
       s.currentPath?.let { if (it != s.previousPath) File(it).delete() }

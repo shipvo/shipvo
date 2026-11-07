@@ -7,11 +7,39 @@ enum ShipvoBundleSelector {
   /// A release is stable once its process has stayed in the foreground this long after `markHealthy`. Android uses the same value.
   static let stabilitySeconds: TimeInterval = 30
 
+  /// Whether a load counts as a boot the moment its bundle is chosen. Only a load that can show a screen does. A silent push
+  /// or background task can start the process with no UI; counting those would use up a release's trial boots.
+  static func countsAtSelection(visible: Bool) -> Bool { visible }
+
+  /// Whether a load that was not counted at selection counts now: once the app becomes active, or after an uncaught JS
+  /// error in that load (a crashing background load must still count against the release). Counts at most once.
+  static func countsLater(deferred: Bool, visible: Bool, crashed: Bool) -> Bool { deferred && (visible || crashed) }
+
+  /// The release whose load was chosen without UI and is not counted yet (0 = none), and whether it was a trial.
+  private static var deferredRelease = 0
+  private static var deferredIsTrial = false
+
+  /// Counts the deferred load, if one is waiting. Call on `didBecomeActive` (`crashed: false`) and on an uncaught JS error
+  /// (`crashed: true`). The release keeps running the same bundle; a trial release that now reaches its limit is reverted
+  /// at the next selection.
+  static func settleDeferred(_ s: Store, visible: Bool, crashed: Bool) {
+    Store.lock.lock(); defer { Store.lock.unlock() }
+    let release = deferredRelease
+    guard release != 0, countsLater(deferred: true, visible: visible, crashed: crashed) else { return }
+    deferredRelease = 0
+    if deferredIsTrial {
+      if s.pendingRelease == release { s.trialBoots += 1 }
+    } else if s.currentRelease == release {
+      countCurrentBoot(s)
+    }
+  }
+
   /// Idempotent per load: React Native asks for the URL more than once, and only the first ask counts as a boot.
-  static func select(_ s: Store) -> URL? {
+  /// `visible` is false when the app is in the background at load time (a silent push or background task).
+  static func select(_ s: Store, visible: Bool = true) -> URL? {
     Store.lock.lock(); defer { Store.lock.unlock() }
     if Store.selection.set { return Store.selection.url }
-    let url = choose(s)
+    let url = choose(s, visible: visible)
     Store.selection = (url, true)
     return url
   }
@@ -57,7 +85,17 @@ enum ShipvoBundleSelector {
   private static func exists(_ path: String?) -> Bool { path != nil && FileManager.default.fileExists(atPath: path!) }
   private static func remove(_ path: String?) { if let p = path { try? FileManager.default.removeItem(atPath: p) } }
 
-  private static func choose(_ s: Store) -> URL? {
+  /// Counts one boot of the current release. Returns true when the release must be reverted.
+  @discardableResult
+  private static func countCurrentBoot(_ s: Store) -> Bool {
+    let now = Store.now()
+    if now - s.firstUnhealthyAt > windowSeconds { s.firstUnhealthyAt = now; s.unhealthyBoots = 0 }
+    s.unhealthyBoots += 1
+    return s.unhealthyBoots > maxBoots
+  }
+
+  private static func choose(_ s: Store, visible: Bool) -> URL? {
+    deferredRelease = 0
     Store.bundleSelectedAt = Store.now()
     Store.loadsInProcess += 1
 
@@ -75,17 +113,17 @@ enum ShipvoBundleSelector {
         remove(pending)
         s.pendingPath = nil; s.pendingRelease = 0; s.trialBoots = 0
       } else {
-        s.trialBoots += 1
+        if countsAtSelection(visible: visible) { s.trialBoots += 1 }
+        else { deferredRelease = s.pendingRelease; deferredIsTrial = true }
         Store.runningRelease = s.pendingRelease
         return URL(fileURLWithPath: pending)
       }
     }
 
     if exists(s.currentPath) {
-      let now = Store.now()
-      if now - s.firstUnhealthyAt > windowSeconds { s.firstUnhealthyAt = now; s.unhealthyBoots = 0 }
-      s.unhealthyBoots += 1
-      if s.unhealthyBoots > maxBoots {
+      if !countsAtSelection(visible: visible) {
+        deferredRelease = s.currentRelease; deferredIsTrial = false
+      } else if countCurrentBoot(s) {
         s.addEvent("crash_loop_revert:\(s.currentRelease)")
         s.block(s.currentRelease)
         revertToPrevious(s)

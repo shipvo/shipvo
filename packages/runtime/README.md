@@ -61,6 +61,12 @@ await enableSignedTelemetry({
 
 The sent body is the unsigned JSON with its closing `}` replaced by `,"sig":"<hex>"}`. The HMAC-SHA256 covers the unsigned JSON, closing `}` included. A second call replaces the first identity.
 
+## Background loads
+
+A silent push or a background task can start the app process with no screen. Shipvo runs the same bundle for that load, so background code uses the staged release. It does not count the load as a boot until the app can show a screen: on Android when the first activity starts, on iOS when the app becomes active. Any number of background loads leave a release's trial boots at 0 and the release pending. The first load that shows a screen counts as boot 1.
+
+An uncaught JS error in a background load counts as one failed boot at once, so a release that crashes there is still rolled back. Three loads with a screen and no `markHealthy` still revert the release.
+
 ## Crash after `markHealthy`
 
 `markHealthy` means the first screen rendered. It promotes a staged release, but it does not clear the unhealthy-boot count. The count is cleared when the app has stayed in the foreground for 30 seconds, or when it goes to background. If the process dies before that, the next launch counts as an unhealthy boot for that release. After 3 unhealthy boots inside 60 seconds the runtime blocks the release, goes back to the previous one and records `crash_loop_revert`.

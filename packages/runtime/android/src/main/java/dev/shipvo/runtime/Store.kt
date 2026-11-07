@@ -123,6 +123,11 @@ internal class Store(private val ctx: Context) : BootCounts, RotationState {
     @Volatile var bundleSelectedAt: Long = 0
     /** How many times a bundle was selected in this process: 1 = cold start, more = in-process reload. */
     @Volatile var loadsInProcess: Int = 0
+    /** True once an activity of this process has started: from then on a load can show a screen. */
+    @Volatile var uiStarted: Boolean = false
+    /** The load that was chosen without UI and is not counted yet: 0 = none, else the release it runs. */
+    @Volatile var deferredRelease: Int = 0
+    @Volatile var deferredIsTrial: Boolean = false
   }
 
   fun now() = SystemClock.elapsedRealtime()

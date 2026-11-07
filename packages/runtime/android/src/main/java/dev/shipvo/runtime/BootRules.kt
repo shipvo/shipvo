@@ -23,6 +23,14 @@ internal object BootRules {
    *  more than MAX_BOOTS runs. Call this inside the handler lock, right before staging. */
   fun mayStage(release: Int, current: Int, pending: Int, blocked: Int): Boolean = release > maxOf(current, pending, blocked)
 
+  /** Whether a load counts as a boot the moment its bundle is chosen. Only a load that can show a screen does. A silent push
+   *  or background task can start the process with no UI; counting those would use up a release's trial boots. */
+  fun countsAtSelection(visible: Boolean): Boolean = visible
+
+  /** Whether a load that was not counted at selection counts now: once the process can show UI, or after an uncaught JS
+   *  error in that load (a crashing headless load must still count against the release). Counts at most once. */
+  fun countsLater(deferred: Boolean, visible: Boolean, crashed: Boolean): Boolean = deferred && (visible || crashed)
+
   fun clear(c: BootCounts) { c.unhealthyBoots = 0; c.firstUnhealthyAt = 0 }
 
   /** The load that last reported healthy (0 = none). */

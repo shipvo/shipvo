@@ -308,6 +308,29 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(s.trialBoots, 2)
   }
 
+  func testBackgroundLoadsDoNotUseUpTrialBoots() async throws {
+    let s = store("good"); _ = try await Updater.check(s)
+    let path = s.pendingPath!
+    for _ in 0..<3 {
+      ShipvoBundleSelector.invalidate()
+      XCTAssertEqual(ShipvoBundleSelector.select(s, visible: false)?.path, path, "a background load runs the staged code")
+    }
+    XCTAssertEqual(s.trialBoots, 0); XCTAssertEqual(s.pendingRelease, 5)
+    ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false)
+    XCTAssertEqual(s.trialBoots, 1, "the app becoming active counts the load once")
+    ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false)
+    XCTAssertEqual(s.trialBoots, 1)
+    XCTAssertEqual(load(s)?.path, path); XCTAssertEqual(s.trialBoots, 2)
+  }
+
+  func testBackgroundLoadThatThrowsStillCountsOneFailedBoot() async throws {
+    let s = store("good"); _ = try await Updater.check(s)
+    ShipvoBundleSelector.invalidate()
+    _ = ShipvoBundleSelector.select(s, visible: false)
+    ShipvoBundleSelector.settleDeferred(s, visible: false, crashed: true)
+    XCTAssertEqual(s.trialBoots, 1)
+  }
+
   func testHealthyStartPromotesAndStopsFurtherUpdates() async throws {
     let s = store("good"); _ = try await Updater.check(s)
     _ = load(s)

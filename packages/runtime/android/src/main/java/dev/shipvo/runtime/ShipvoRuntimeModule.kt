@@ -44,6 +44,7 @@ class ShipvoRuntimeModule : Module() {
       val sinceLoad = if (Store.bundleSelectedAt > 0) now - Store.bundleSelectedAt else -1
       var promoted = false
       synchronized(ShipvoHostHandler.LOCK) {
+        ShipvoHostHandler.settleDeferred(s, crashed = true) // a first screen means the load is visible: count it first
         if (s.pendingRelease != 0 && Store.runningRelease == s.pendingRelease) {
           s.previousPath?.let { old -> if (old != s.currentPath) File(old).delete() }
           s.previousRelease = s.currentRelease; s.previousPath = s.currentPath
@@ -62,7 +63,12 @@ class ShipvoRuntimeModule : Module() {
     }
 
     // Called by the JS error handler before React destroys the host, so the pause that follows is not read as "stable".
-    Function("noteCrash") { synchronized(ShipvoHostHandler.LOCK) { BootRules.noteCrash(Store.loadsInProcess) } }
+    Function("noteCrash") {
+      synchronized(ShipvoHostHandler.LOCK) {
+        BootRules.noteCrash(Store.loadsInProcess)
+        ShipvoHostHandler.settleDeferred(Store(ctx), crashed = true) // a headless load that throws still counts
+      }
+    }
 
     OnActivityEntersBackground { stableNow() }
 
