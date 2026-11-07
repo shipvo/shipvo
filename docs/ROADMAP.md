@@ -82,6 +82,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-07: Test the build on your computer on the hosted phone with `upload_build` or `shipvo sim --hosted`, then `open_app("<app>@build:<id>")` ([Hosted build](hosted-build.md), #1171)
 - 2026-11-07: Two assistants play a full chess game through `@shipvo/mcp` with `--agents`, and `--record` saves the video and the moves ([Chess on two phones](demos/chess.md), #1166)
 - 2026-11-07: With the network off, the app's `fetch` and `XMLHttpRequest` calls fail like on a phone, in sim, MCP and test sessions on Android and iOS ([Device API](device-api.md#network), #1161)
 - 2026-11-07: Payment cancel comes back as `cancelled` ([Device API](device-api.md#payments), #1158)

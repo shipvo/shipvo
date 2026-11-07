@@ -1,0 +1,2 @@
+- Docs: new page "Test your build on the hosted phone" for `upload_build` and `shipvo sim --hosted`, with every option and error code.
+- Migration: none.
