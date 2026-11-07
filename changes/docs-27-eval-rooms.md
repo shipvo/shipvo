@@ -1,1 +1,0 @@
-- docs: new section on `room` in the agents page, with `list_sessions` fields and the room report in `end_session`, and a link to the eval page.
