@@ -71,9 +71,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
 | Network off blocks the app's network calls (`TypeError: Network request failed`) | [device-api](device-api.md#network) | | | |
 | Payment cancel returns `cancelled` (`@shipvo/device` 0.1.5) | [device-api](device-api.md#payments) | | | |
-| Deep links: `open_url` and `Linking.openURL` switch to the owning app | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
-| `shipvo agents setup` writes the MCP config for every coding agent | [cli](cli.md), [agents](agents.md) | | | |
-| Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec](../packages/spec/README.md) | | | |
 | Deep links: `open_url` and `Linking.openURL` switch to the owning app; one-shot initial URL | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
 | `shipvo agents setup` writes the MCP config for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md), [agents](agents.md) | | | |
 | Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec-blocks](spec-blocks.md), [spec](../packages/spec/README.md) | | | |

@@ -78,11 +78,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Agents setup.** `shipvo agents setup` gets your coding agent ready in one command: it writes the Shipvo MCP config for each coding agent it finds and copies the Shipvo skills into your project. See [Agents](agents.md).
 
-**Deep link.** A web-style address that opens a specific screen in an app. `open_url` in the simulator sends one to the app that owns it, once. See [Phone apps](phone-apps.md).
-
 **Save as test.** A button in Lumi, and the `--save-tests` flag of `shipvo explore`, that turns a bug the walker found into a test file that fails until the bug is fixed. See [Lumi](lumi.md).
 
-**App spec.** A short JSON description of an app (screens, charts, lists, toggles) that Shipvo turns into a native-feeling app. See [App spec](design/app-spec.md).
 **Build.** Turning your app's files into one copy that can run, here a web copy shown on a simulated phone. The first build is the slowest.
 
 **pnpm.** A tool that downloads the parts a project needs. You turn it on with `corepack enable`, which comes with Node.
