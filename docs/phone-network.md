@@ -2,17 +2,17 @@
 
 The hosted phone sends an app's HTTP calls through a request proxy on the control plane, so the browser applies no CORS rules. It works the same on the Android and iOS skins.
 
-## Declare your hosts
+## Allowed hosts
 
-List the hosts your app calls in `shipvo.json`:
+The proxy only reaches the hosts on the app's allow-list. The owner stores the list with the `set_network_allow` command (owner sign-in only), for example:
 
 ```json
-{ "network": { "allow": ["api.example.com", "*.cdn.example.com"] } }
+["api.example.com", "*.cdn.example.com"]
 ```
 
 - A name matches that host only. `*.example.com` matches any subdomain, not `example.com` itself.
-- No scheme, port, path or IP address. `@shipvo/schema` validates the field (`parseNetwork`).
-- Owners store the list for the hosted phone with the `set_network_allow` command (owner sign-in only).
+- No scheme, port, path or IP address. A bad entry is refused with `bad_param` and nothing is stored.
+- `@shipvo/schema` exports the same validation (`parseNetwork`).
 
 ## What the proxy checks
 

@@ -136,10 +136,11 @@ export function phoneNetRoutes(opts: { resolve?: Resolver; fetch?: typeof fetch 
     let desc: { url?: unknown; method?: unknown; headers?: unknown } = {};
     try { desc = JSON.parse(decodeURIComponent(c.req.header("x-shipvo-req") ?? "")); } catch { /* handled below */ }
     let method = typeof desc.method === "string" ? desc.method.toUpperCase() : "GET";
+    const origMethod = method;   // method is rewritten on a 303 redirect; the log keeps what the app sent
     let url: URL | null = null; try { url = new URL(String(desc.url)); } catch { /* handled below */ }
     const log = async (status: number, refusal: string | null, bytesOut: number, bytesIn: number) => {
       try { await c.env.DB.prepare("INSERT INTO device_log (at, person_id, app_id, kind, method, host, path, status, refusal, ms, bytes_out, bytes_in) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-        .bind(new Date().toISOString(), me, app.slice(0, 64), "network", method.slice(0, 16), url?.hostname.slice(0, 253) ?? null, url?.pathname.slice(0, 200) ?? null, status, refusal, Date.now() - started, bytesOut, bytesIn).run(); } catch (e) { console.error("device_log write failed", e); }
+        .bind(new Date().toISOString(), me, app.slice(0, 64), "network", origMethod.slice(0, 16), url?.hostname.slice(0, 253) ?? null, url?.pathname.slice(0, 200) ?? null, status, refusal, Date.now() - started, bytesOut, bytesIn).run(); } catch (e) { console.error("device_log write failed", e); }
     };
     const refuse = async (status: number, code: string, bytesOut = 0, extra: Record<string, string> = {}) => {
       await log(status, code, bytesOut, 0);
@@ -152,7 +153,9 @@ export function phoneNetRoutes(opts: { resolve?: Resolver; fetch?: typeof fetch 
     // Rate limit per session. Counted before any work, refusals included, so probing the allow-list costs budget too.
     const sess = await sha256((c.req.header("authorization") ?? "").replace(/^Bearer\s+/i, ""));
     if (!c.env.POINTERS) return refuse(503, "rate_limit_unavailable");   // no limiter means no proxy
-    const wait = await hit(c.env.POINTERS, "phonenet", { perIp: 0, perInstall: lim.perMinute, perApp: 0, windowSeconds: 60 }, "install", sess);
+    let wait: number;
+    try { wait = await hit(c.env.POINTERS, "phonenet", { perIp: 0, perInstall: lim.perMinute, perApp: 0, windowSeconds: 60 }, "install", sess, true); }
+    catch (e) { console.error("phone net rate limit unavailable", e); return refuse(503, "rate_limit_unavailable"); }   // KV outage: fail closed
     if (wait) return refuse(429, "rate_limited", 0, { "retry-after": String(wait) });
 
     const declared = Number(c.req.header("content-length"));

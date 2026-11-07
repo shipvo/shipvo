@@ -37,8 +37,8 @@ function setup(upstream: (u: string, init: RequestInit) => Response | Promise<Re
 const ok = () => new Response('{"hello":1}', { status: 200, headers: { "content-type": "application/json", "set-cookie": "a=b", connection: "close" } });
 
 describe("phone request proxy", () => {
-  // The same proxy serves the Android and iOS skins: the skin is the page around the app, the request is identical.
-  for (const skin of ["Android", "iOS"]) it(`${skin}: a declared host succeeds and is logged`, async () => {
+  // The proxy does not read the skin: the Android and iOS phones send the identical request and get the identical result.
+  for (const skin of ["Android", "iOS"]) it(`request sent from the ${skin} phone is skin-independent: a declared host succeeds and is logged`, async () => {
     const { net, signIn, log } = setup(ok);
     const s = await signIn();
     const r = await net(s, "https://api.shop.dev/v1/items?q=1", { headers: { accept: "application/json", "x-shipvo-skin": skin.toLowerCase() } });
@@ -152,6 +152,21 @@ describe("phone proxy hardening", () => {
     const r = await net(s, "https://api.shop.dev/");
     expect(r.status).toBe(503); expect(r.headers.get("x-shipvo-net-error")).toBe("rate_limit_unavailable");
     expect(upstreamCalls).toEqual([]);
+  });
+  it("fails closed with 503 rate_limit_unavailable when the KV limiter errors", async () => {
+    const { net, signIn, upstreamCalls, e } = setup(ok);
+    const s = await signIn();
+    const get = e.POINTERS.get;
+    e.POINTERS.get = async (k: string) => { if (k.startsWith("phonenet_rl/")) throw new Error("kv down"); return get(k); };
+    const r = await net(s, "https://api.shop.dev/");
+    expect(r.status).toBe(503); expect(r.headers.get("x-shipvo-net-error")).toBe("rate_limit_unavailable");
+    expect(upstreamCalls).toEqual([]);
+  });
+  it("logs the method the app sent, also after a 303 turns the hop into a GET", async () => {
+    let n = 0;
+    const { net, signIn, log } = setup(() => (n++ === 0 ? new Response(null, { status: 303, headers: { location: "https://api.shop.dev/done" } }) : ok()));
+    expect((await net(await signIn(), "https://api.shop.dev/submit", { method: "POST", body: "x=1" })).status).toBe(200);
+    expect(log()[0]).toMatchObject({ method: "POST", status: 200 });
   });
   it("blocks Teredo and 6to4 anycast", () => {
     for (const ip of ["2001:0:4136:e378:8000:63bf:3fff:fdd2", "192.88.99.1"]) expect(isBlockedAddress(ip), ip).toBe(true);

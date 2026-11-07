@@ -16,3 +16,4 @@ CREATE TABLE IF NOT EXISTS device_log (
   bytes_in INTEGER
 );
 CREATE INDEX IF NOT EXISTS device_log_person ON device_log(person_id, id);
+CREATE INDEX IF NOT EXISTS device_log_at ON device_log(at);
