@@ -24,6 +24,7 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
+import { vaultUi } from "./secrets.mjs";
 import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
@@ -514,6 +515,12 @@ const server = http.createServer(async (req, res) => {
   // CORS plus Chromium's private-network preflight: the app page comes from the public control plane (https) and
   // posts orders and telemetry to this loopback backend.
   const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-private-network": "true" };
+  // Settings, Secrets: same-origin only, no CORS headers. Handled before CORS so a foreign page gets 403 and nothing is forwarded.
+  if (url.pathname.startsWith("/vault-ui/")) {
+    const sid = url.searchParams.get("session") ?? [...sessions.keys()].at(-1) ?? "";
+    const r = await vaultUi({ method: req.method, rest: url.pathname.slice(10), headers: req.headers, token: process.env.PN_OWNER_TOKEN ?? "", control: CONTROL, app: () => { const x = sessions.get(sid)?.apps; return x?.current_app ?? sessions.get(sid)?.app; } });
+    res.writeHead(r.status, { "content-type": "application/json" }); return res.end(r.status === 204 ? "" : JSON.stringify(r.body));
+  }
   const send = (code, obj, type = "application/json") => { res.writeHead(code, { "content-type": type, ...CORS }); res.end(type === "application/json" ? JSON.stringify(obj) : obj); };
   try {
     if (req.method === "OPTIONS") return send(204, "", "text/plain");

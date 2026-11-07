@@ -1,0 +1,3 @@
+- `@shipvo/control-plane`: new owner routes `GET /vault/secrets/:app`, `POST /vault/secrets/:app/:name/rotate`, `DELETE /vault/secrets/:app/:name` and `GET /vault/secrets/:app/:name/uses` list, rotate, revoke and show the use log of saved keys. They return metadata only, never a value.
+- `@shipvo/sim`: the Settings app has a Secrets screen on the Android and iOS skins with one row per key, Rotate, Revoke and a use log.
+- Migration: none; new routes and screen.

@@ -264,3 +264,53 @@ describe("vault status and plain errors", () => {
     expect(((await r.json()) as any).message).toContain("Ask the assistant for a new one");
   });
 });
+
+describe("vault, Settings Secrets", () => {
+  const auth = (as = "tide") => ({ headers: { authorization: `Bearer owner-${as}` } });
+  async function saved() {
+    const s = setup();
+    const t = await s.ticket();
+    await s.store(t.j.ticket);
+    return s;
+  }
+  it("lists metadata only: no value, ciphertext or wrapped key in any response", async () => {
+    const { req, sql } = await saved();
+    const r = await req("/vault/secrets/tide", auth());
+    const text = await r.text();
+    const row = sql.prepare("SELECT wrapped_key, ciphertext FROM vault_secrets").get();
+    for (const bad of [SECRET, row.wrapped_key, row.ciphertext]) expect(text).not.toContain(bad);
+    expect(JSON.parse(text).secrets).toEqual([expect.objectContaining({ app: "tide", name: "STRIPE_KEY", domain: "api.stripe.com", access: "read", last_used_at: null })]);
+    expect((await req("/vault/secrets/tide")).status).toBe(401);
+  });
+  it("rotate issues a ticket bound to the same app, name and domain", async () => {
+    const { req, sql, store } = await saved();
+    const r = await req("/vault/secrets/tide/STRIPE_KEY/rotate", { method: "POST", ...auth() });
+    expect(r.status).toBe(201);
+    const j: any = await r.json();
+    expect(JSON.stringify(j)).not.toContain(SECRET);
+    const t = sql.prepare("SELECT app_id, name, domain, service FROM vault_tickets WHERE used_at IS NULL").get();
+    expect(t).toMatchObject({ app_id: "tide", name: "STRIPE_KEY", domain: "api.stripe.com", service: "stripe" });
+    expect((await store(j.ticket, "rk_live_NEWVALUE1234567890")).status).toBe(201);
+    expect((await req("/vault/secrets/tide/NOPE/rotate", { method: "POST", ...auth() })).status).toBe(404);
+  });
+  it("revoke destroys the value, hides the key, and the next use fails with revoked", async () => {
+    const { req, sql, env } = await saved();
+    const r = await req("/vault/secrets/tide/STRIPE_KEY", { method: "DELETE", ...auth() });
+    expect(await r.json()).toMatchObject({ revoked: true });
+    expect(sql.prepare("SELECT ciphertext, wrapped_key FROM vault_secrets").get()).toEqual({ ciphertext: "", wrapped_key: "" });
+    expect(((await (await req("/vault/secrets/tide", auth())).json()) as any).secrets).toEqual([]);
+    expect(await useSecret(env, { person: "owner (admin)", app: "tide", name: "STRIPE_KEY", host: "api.stripe.com" })).toEqual({ ok: false, reason: "revoked" });
+  });
+  it("the use log shows calls for that person only", async () => {
+    const { req, env, sql } = await saved();
+    const me = { person: "owner (admin)", app: "tide", name: "STRIPE_KEY" };
+    await useSecret(env, { ...me, host: "api.stripe.com" });
+    await useSecret(env, { ...me, host: "evil.test" });
+    await useSecret(env, { ...me, person: "bob", host: "api.stripe.com" });
+    const j: any = await (await req("/vault/secrets/tide/STRIPE_KEY/uses", auth())).json();
+    expect(j.uses.map((u: any) => [u.host, u.outcome]).sort()).toEqual([["api.stripe.com", "used"], ["evil.test", "domain_mismatch"]]);
+    expect(JSON.stringify(j)).not.toContain(SECRET);
+    sql.prepare("UPDATE vault_secrets SET owner = 'bob'").run();
+    expect(((await (await req("/vault/secrets/tide/STRIPE_KEY/uses", auth())).json()) as any).uses).toEqual([]);
+  });
+});
