@@ -34,6 +34,11 @@ export default function App() {
 
   const press = (name: string) => {
     if (promoting) setPromoting(null);
+    if (selected && selected !== name && !targets.has(name) && chessActions.legal_moves({ from: name }).length > 0) {
+      setSelected(name);
+      setMessage("");
+      return;
+    }
     if (selected && selected !== name) {
       const options = chessActions.legal_moves({ from: selected }).filter((m) => m.to === name && m.promotion);
       if (options.length > 1) {
@@ -61,7 +66,7 @@ export default function App() {
             onPress={() => press(q.name)}
             style={[s.square, { width: size, height: size, backgroundColor: q.dark ? "#b58863" : "#f0d9b5" }, targets.has(q.name) && s.target, selected === q.name && s.selected]}
           >
-            <Text style={s.glyph}>{GLYPH[q.piece] ?? ""}</Text>
+            <Text style={s.glyph}>{GLYPH[q.piece] ?? (targets.has(q.name) ? "●" : "")}</Text>
           </Pressable>
         ))}
       </View>

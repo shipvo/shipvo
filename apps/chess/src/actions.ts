@@ -39,18 +39,18 @@ export interface MoveInput {
 
 export function createActions(store: ChessStore = chessStore) {
   const getBoard = (): BoardState => {
-      const g = store.game;
-      const s = g.status();
-      const status =
-        s.state === "playing" ? (s.check ? "check" : "playing") : s.state === "checkmate" ? `checkmate, ${s.winner === "w" ? "white" : "black"} wins` : `draw by ${s.reason}`;
-      return {
-        fen: toFen(g.position),
-        turn: g.position.turn === "w" ? "white" : "black",
-        status,
-        squares: boardView(g).map((q) => ({ square: q.name, label: q.label })),
-        moves: moveList(g),
-      };
-  };
+    const g = store.game;
+    const s = g.status();
+    const status =
+      s.state === "playing" ? (s.check ? "check" : "playing") : s.state === "checkmate" ? `checkmate, ${s.winner === "w" ? "white" : "black"} wins` : `draw by ${s.reason}`;
+    return {
+      fen: toFen(g.position),
+      turn: g.position.turn === "w" ? "white" : "black",
+      status,
+      squares: boardView(g).map((q) => ({ square: q.name, label: q.label })),
+      moves: moveList(g),
+    };
+};
 
   return {
     get_board: getBoard,
