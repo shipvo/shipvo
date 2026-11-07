@@ -12,7 +12,7 @@ import { pickPort } from "./test-port.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const sample = join(here, "..", "..", "apps", "capacitor-sample");
 const www = join(sample, "www");
-const PORT = pickPort(8200, 300);
+const PORT = pickPort(10400, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-capacitor-"));
 let proc;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
