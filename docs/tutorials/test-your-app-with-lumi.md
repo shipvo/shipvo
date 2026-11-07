@@ -40,11 +40,11 @@ To test one path, type its everyday name: `test checkout`, `test login` or `test
 
 ## 3. Read the findings
 
-Look at **Findings** in the sidebar. Each finding is a problem Lumi found, such as a button that does nothing, a screen that stays blank or a network call that fails. Each problem is listed once. **Coverage** shows how many screens and controls Lumi tried.
+Look at **Findings** in the sidebar. Each finding is something Lumi reported, such as a button that does nothing, a screen that stays blank or a network call that fails. Each problem is listed once. **Coverage** shows how many screens and controls Lumi tried.
 
 ![The Lumi sidebar with 26 findings, the first three visible, each with a Replay button, and Coverage showing 13 screens and 22 of 42 controls tried so far in a run that is still going.](/tutorials/test-your-app-with-lumi/findings.png)
 
-This screenshot is a run on the sample app, taken while Lumi was still testing, so the coverage numbers are mid-run. The numbers under "What we measured" come from the benchmark apps ([Lumi benchmark](../lumi-bench.md)).
+This screenshot is a run on the sample app, taken while Lumi was still testing, so the coverage numbers are mid-run. We did not check each of its findings by hand, so read them as things to look at, not as confirmed bugs. The numbers under "What we measured" come from the benchmark apps ([Lumi benchmark](../lumi-bench.md#results)).
 
 On a phone-width window the sidebar sits below the phone:
 
@@ -70,7 +70,7 @@ The same seed gives the same walk, so you can check that a fix worked.
 
 ## What we measured
 
-On the benchmark apps in this repository, with seed 1 and a budget of 200 steps, Lumi found 3 of 3 planted bugs in each app and reached 5 screens in `shop` and 8 in `account`. The commands, the apps and the rules are in [Lumi benchmark](../lumi-bench.md).
+On the benchmark apps in this repository, with seed 1 and a budget of 200 steps, Lumi found 3 of 3 planted bugs in each app and reached 5 screens in `shop` and 8 in `account`. The command, the date and the full table are in [Lumi benchmark results](../lumi-bench.md#results).
 
 ## Next steps
 

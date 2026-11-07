@@ -36,7 +36,7 @@ Shared look: soft outlines in warm near-black (`#2b1d24`), large glossy eyes wit
 
 ## Amara, the app maker (episode voice only)
 - Used in `scripts/video/story/lumi-episode.md` with the voice `af_heart` (warm). Lumi, the host, uses `af_jessica`.
-- Her drawn design is not part of the rig yet; the cast decision is tracked in the issue for the episode (#884).
+- She has a voice only. She has no drawn design in the rig.
 
 ## Rig API (`rig.mjs`)
 

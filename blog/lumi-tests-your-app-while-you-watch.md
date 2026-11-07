@@ -20,7 +20,7 @@ Shipvo builds a web copy of your app and opens it on a phone in your browser. Us
 
 ![Lumi running on Tide & Tackle: the phone on the left, the sidebar on the right with a list of taps, a list of findings with Replay buttons, and mid-run coverage of 13 screens and 22 of 42 controls.](/tutorials/test-your-app-with-lumi/findings.png)
 
-This screenshot is a run on the sample app, taken while Lumi was still testing, so the coverage numbers are mid-run. The numbers under "What we measured" come from the benchmark apps ([Lumi benchmark](https://shipvo.dev/docs/lumi-bench/)).
+This screenshot is a run on the sample app, taken while Lumi was still testing, so the coverage numbers are mid-run. We did not check each finding in it by hand, so read them as things to look at, not as confirmed bugs. The numbers under "What we measured" come from the benchmark apps ([Lumi benchmark](https://shipvo.dev/docs/lumi-bench/#results)).
 
 ![The same Lumi view on a 390 pixel wide window, with the sidebar below the phone.](/tutorials/test-your-app-with-lumi/findings-phone.png)
 
@@ -37,7 +37,7 @@ A caption names every step, such as "Tapping Checkout". Press **Replay** on a fi
 
 ## What we measured
 
-We keep two apps in the repository with bugs planted on purpose, and a script that counts how many Lumi finds. With seed 1 and a budget of 200 steps, Lumi found 3 of 3 planted bugs in `shop` and 3 of 3 in `account`. It reached 5 screens in `shop` and 8 in `account`. The apps, the rules and the command to repeat the run are in the [Lumi benchmark](https://shipvo.dev/docs/lumi-bench/).
+We keep two apps in the repository with bugs planted on purpose, and a script that counts how many Lumi finds. With seed 1 and a budget of 200 steps, Lumi found 3 of 3 planted bugs in `shop` and 3 of 3 in `account`. It reached 5 screens in `shop` and 8 in `account`. The apps, the rules and the command to repeat the run are in the [Lumi benchmark](https://shipvo.dev/docs/lumi-bench/#results).
 
 ## Ask in plain words
 
@@ -52,7 +52,7 @@ Commands are plain text and need no AI account:
 
 A run repeats when you pass the same `--seed`, so you can check that your fix worked.
 
-Lumi runs on your computer and answers only requests from its own page.
+Lumi runs on your computer and answers only requests from its own page ([Lumi on Shipvo Phone](https://shipvo.dev/docs/lumi/)).
 
 ## Try it
 
