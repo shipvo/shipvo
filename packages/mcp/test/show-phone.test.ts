@@ -13,6 +13,7 @@ import { acceptWebSocket } from "../../cli/src/run-ws.js";
 const root = resolve(__dirname, "..");
 let out = "", work = "", host: http.Server, hostPort = 0, sim: http.Server, simPort = 0, fake = "";
 const seen: { type: string; [k: string]: unknown }[] = [];
+let skinFile = "", failLog = false;
 const TREE = '- button "Buy" [ref=e1]';
 
 beforeAll(async () => {
@@ -40,6 +41,10 @@ setTimeout(() => {}, 30000);`);
     if (url.searchParams.get("token") !== "tok") return void socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
     const peer = acceptWebSocket(req, socket, (t) => {
       const m = JSON.parse(t); seen.push(m);
+      if (m.type === "skin") { peer?.send(JSON.stringify({ id: m.id, type: "skin", ok: true })); if (skinFile) writeFileSync(skinFile, JSON.stringify({ port: hostPort, platform: m.platform, app: "menu", token: "tok", pid: process.pid })); return; }
+      if (m.type === "device_log" && failLog) return;
+      if (m.type === "notifications") return void peer?.send(JSON.stringify({ id: m.id, ok: true, notifications: [{ id: "n1", title: "Hi" }], screen: TREE }));
+      if (m.type === "get_settings") return void peer?.send(JSON.stringify({ id: m.id, ok: true, settings: { dark_mode: false, language: "en" }, screen: TREE }));
       if (m.type === "device_log") return void peer?.send(JSON.stringify({ id: m.id, ok: true, log: [{ kind: "permission", source: "simulated" }], capabilities: {}, screen: TREE }));
       peer?.send(JSON.stringify({ id: m.id, ok: true, screen: TREE }));
     }, () => {});
@@ -77,15 +82,50 @@ describe("open_app shows the phone", { timeout: 30_000 }, () => {
     expect(text).toContain("mode: headless session");
     await c.close();
   });
-  it("a live android run is attached as it is when ios is asked, and nothing is duplicated", async () => {
+  it("a live android run switches to ios when ios is asked", async () => {
     seen.length = 0;
-    const { c, text, project } = await open({ platform: "ios" }, runJson("android"));
+    const { c, text, project } = await open({ platform: "ios" }, (p) => { runJson("android")(p); skinFile = join(p, ".shipvo", "run.json"); });
     expect(existsSync(join(project, "started-ios"))).toBe(false);
-    expect(seen.some((m) => m.type === "skin")).toBe(false);
-    expect(text).toContain("the live phone is android; to see ios");
-    expect(text).toContain("visible: yes, android phone");
+    expect(seen.find((m) => m.type === "skin")?.platform).toBe("ios");
+    expect(text).toContain("switched the phone from android to ios");
+    expect(text).toContain("visible: yes, ios phone");
+    skinFile = "";
     await c.close();
   });
+  it("show true with no live run and no shipvo.json returns no_project", async () => {
+    const project = join(work, `p${n++}`); mkdirSync(join(project, ".git"), { recursive: true });
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${simPort}`, PN_CONTROL: "http://127.0.0.1:1", DISPLAY: ":0" };
+    delete env.CI;
+    const c = new Client({ name: "t", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env, cwd: project }));
+    const r = await c.callTool({ name: "open_app", arguments: { app: "menu", show: true } }) as { content: { text: string }[] };
+    expect(r.content[0].text).toContain("no_project");
+    await c.close();
+  });
+  it("device actions on an attached phone go to the bridge, with the notification id as nid", async () => {
+    seen.length = 0;
+    const { c, text } = await open({}, runJson("android"));
+    const session = /session: (\S+)/.exec(text)![1];
+    const call = async (name: string, args: Record<string, unknown>) => (await c.callTool({ name, arguments: { session, ...args } }) as { content: { text: string }[] }).content[0].text;
+    expect(await call("set_device", { network: "offline" })).not.toContain("not_supported_attached");
+    expect(seen.some((m) => m.type === "set_device")).toBe(true);
+    expect(await call("notifications", {})).toContain("Hi");
+    expect(await call("get_settings", {})).not.toContain("not_supported_attached");
+    expect(seen.some((m) => m.type === "get_settings")).toBe(true);
+    await call("dismiss_notification", { id: "n1" });
+    const d = seen.find((m) => m.type === "dismiss_notification")!;
+    expect(d.nid).toBe("n1");
+    await c.close();
+  });
+  it("end_session lists network calls and still closes when the page does not answer device_log", async () => {
+    const { c, text } = await open({}, runJson("android"));
+    const session = /session: (\S+)/.exec(text)![1];
+    failLog = true;
+    const e = await c.callTool({ name: "end_session", arguments: { session } }) as { content: { text: string }[] };
+    failLog = false;
+    expect(JSON.parse(e.content[0].text).network).toEqual([]);
+    await c.close();
+  }, 30_000);
   it("tools the run does not answer say not_supported_attached", async () => {
     seen.length = 0;
     const { c, text } = await open({}, runJson("android"));

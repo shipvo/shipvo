@@ -195,8 +195,17 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
     const other = live || !wantsPhone ? undefined : findLiveRun(undefined);
     if (other && other.app !== id) return result("", { ok: false, code: "unknown_app", error: `this project runs "${other.app}", not "${id}". The phone for "${other.app}" is up at ${runUrl(other)}; call open_app("${other.app}") to use it.` });
     if (live && platform && live.platform !== platform) {
-      // The run's page does not switch skins over the driver connection yet, so this attaches to the phone that is up and says so.
-      launchNote = ` (the live phone is ${live.platform}; to see ${platform}, stop it and run \`shipvo run ${platform}\`)`;
+      // Ask the run's page to switch skin. It reloads on the new skin and the run rewrites run.json, so wait for that and use the new run info.
+      const from = live.platform;
+      try {
+        const d0 = await connectDriver(live);
+        const sw = await d0.request("skin", { platform }, 3000); d0.close();
+        if (!sw.ok) throw new Error(sw.error ?? sw.code ?? "the page refused");
+        let now: RunInfo | undefined;
+        for (let i = 0; i < 100 && !now; i++) { const r = findLiveRun(id); if (r && r.platform === platform) now = r; else await new Promise((r2) => setTimeout(r2, 100)); }
+        if (!now) throw new Error("the phone did not come back on the new skin");
+        live = now; launchNote = ` (switched the phone from ${from} to ${platform})`;
+      } catch (e) { launchNote = ` (could not switch the phone to ${platform}: ${(e as Error).message}; it stays ${from})`; }
     } else if (!live && (show === true || autoStart)) {
       const dir = findProjectDir();
       if (dir) {
@@ -205,7 +214,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
           if (live.app !== id) return result("", { ok: false, code: "unknown_app", error: `this project runs "${live.app}", not "${id}". The phone for "${live.app}" is up at ${runUrl(live)}; call open_app("${live.app}") to use it.` });
           launchNote = ` (started shipvo run ${live.platform})`; }
         catch (e) { if (attach === "always" || show === true) return result("", { ok: false, code: "run_failed", error: (e as Error).message }); launchNote = ` (could not start the phone: ${(e as Error).message})`; }
-      }
+      } else if (show === true) return result("", { ok: false, code: "no_project", error: "show: true needs a Shipvo project: no shipvo.json was found in this directory or its parents, and no `shipvo run` is live. Run from the project folder, or use show: false for a headless session." });
     }
   }
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
@@ -236,6 +245,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
       attachNote += ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
+  // The check above skips apps with a live run. If that attach failed we are headless now, so the app must be one the simulator knows.
   if (!keyApps && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
   if (r.code === "sim_timeout") return result(sid, r);
@@ -416,8 +426,9 @@ use(server, tools.end_session, async ({ session }) => {
   const live = attached.get(session);
   if (live) {
     // The report: steps, and the calls the app made to its backend, read from the phone's event log before it closes.
-    const logged = await act({ session, action: "device_log" }) as Act & { log?: { kind?: string; detail?: unknown }[] };
-    const network = (logged.log ?? []).filter((e) => e.kind === "net").map((e) => e.detail);
+    // A closed or silent page must not keep the session open: an empty list then.
+    let network: unknown[] = [];
+    try { const logged = await act({ session, action: "device_log" }) as Act & { log?: { kind?: string; detail?: unknown }[] }; network = (logged.log ?? []).filter((e) => e.kind === "net").map((e) => e.detail); } catch {}
     const s = sessions.get(session); const run = attachedRun.get(session);
     live.close(); attached.delete(session); attachedRun.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session);
     return text(JSON.stringify({ session, app: s?.app, mode: "attached", visible: true, url: run ? runUrl(run) : undefined, steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000), network }, null, 2));

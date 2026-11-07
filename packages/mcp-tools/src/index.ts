@@ -49,7 +49,7 @@ export const tools = {
   platform: z.enum(["android", "ios"]).optional().describe("Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)"),
   show: z.boolean().optional().describe("true: open the phone in the user's browser so they can watch (default on a computer with a desktop, when the project has `shipvo` installed; a server over HTTP never starts a run). false: headless, nobody sees it (default in CI)."),
   attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
-}, WR, ["attach_failed","no_live_run","unknown_app","run_failed"]),
+}, WR, ["attach_failed","no_live_run","unknown_app","run_failed","no_project"]),
   attach_session: def("attach_session", "Attach to the phone of a live `shipvo run` in this project (read from .shipvo/run.json) and return its screen. The person sees every action in their browser. Same as open_app with attach: 'always', without needing the app id.", {
   app: z.string().optional().describe("App id; default: the app of the live run"),
   session: z.string().optional().describe("Session name (default: generated)"),

@@ -87,7 +87,7 @@ On Android and iOS, an app calls its backend directly and there is no CORS. In t
 
 While `shipvo run` is up, it writes `.shipvo/run.json` in your project (port, platform, app, a secret session token and the process id) and adds `.shipvo/` to `.gitignore`. The token only works from your own computer.
 
-When an assistant calls the Shipvo MCP tool `open_app` for the same app, it finds that file and drives your live phone. The result says `attached to the live shipvo run phone`. If no live phone is found, it says `headless session` and uses its own hidden phone. Attached sessions support `screen`, `tap`, `type`, `scroll` and `back`; other tools return `not_supported_attached`. Attaching needs Node 22 or newer. Full tool list: [Agents](agents.md).
+When an assistant calls the Shipvo MCP tool `open_app` for the same app, it finds that file and drives your live phone. The result says `attached to the live shipvo run phone`. If no live phone is found, it says `headless session` and uses its own hidden phone. Attached sessions support `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, the device tools (`set_device`, `device_log`, `device_reset`, notifications, `open_url`) and the settings tools (`get_settings`, `set_setting`); other tools, such as `record_start`, return `not_supported_attached`. Attaching needs Node 22 or newer. Full tool list: [Agents](agents.md).
 
 The assistant sees the same list of buttons and text as in the simulator, with `[ref=eN]` numbers it can tap. Refs are numbered differently from the simulator's, and a ref from an earlier page returns `stale_ref` so it never taps the wrong thing.
 

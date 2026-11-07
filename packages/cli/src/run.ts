@@ -207,6 +207,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     if (path === "/" || path === "/index.html") {
       const q = new URL(req.url ?? "/", "http://x").searchParams;
       const dark = q.get("dark") === "1";
+      // Changes state on a GET. With --lan this route is behind the LAN token; otherwise it is bound to 127.0.0.1.
       const want = q.get("skin");
       if ((want === "android" || want === "ios") && want !== skin) { skin = want; writeInfo(); }
       const bare = isMobileUserAgent(req.headers["user-agent"]);
