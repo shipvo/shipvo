@@ -72,6 +72,12 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-07: Two coding agents play a full chess game through `@shipvo/mcp` with `--agents`, and `--record` saves it ([Chess on two phones](demos/chess.md), #1166)
+- 2026-11-07: `open_app` starts or switches the phone (`platform`, `show`) and every session tool works on it ([Agents](agents.md), #1163)
+- 2026-11-07: With the network off, the app's `fetch` and `XMLHttpRequest` calls fail like on a phone, on Android and iOS ([Device API](device-api.md#network-profiles), #1161)
+- 2026-11-07: `shipvo agents setup` writes the Shipvo MCP config for every coding agent ([CLI guide](cli.md), #1156, #1155)
+- 2026-11-07: Deep links: `open_url` and `Linking.openURL` switch to the owning app and deliver the link once on Android and iOS ([Phone apps](phone-apps.md), #1132, #1140)
+- 2026-11-07: `@shipvo/spec` blocks `stat`, `progress`, `card`, `section`, `toggle`, `segmented`, `chart` and sheet navigation ([@shipvo/spec](../packages/spec/README.md), #1134, #1129)
 - 2026-11-07: Live chess demo at [shipvo.dev/demos/chess](https://shipvo.dev/demos/chess/): an Android phone and an iPhone play in your browser, and you can take white ([Chess on two phones](demos/chess.md), #1168)
 - 2026-11-07: Behaviour timeline in the app admin compares releases and pull requests on Android and iOS ([Behaviour timeline](timeline.md), #1084)
 - 2026-11-07: `shipvo test --device agent-device` runs flows on a real emulator or simulator ([Test your app in CI](testing.md), #1041)

@@ -77,6 +77,26 @@ else {
 
 `style` is `"android"` or `"ios"`; the same spec gives the same tree in both. Blocks: `stack` (`direction: "horizontal"` for a row), `grid`, `scroll`, `text`, `image`, `icon`, `badge`, `list` and `chart`. Options: `screen`, `data` (values for `http` and `collection` sources), `state`, `params`, `locale`, `timeZone`, `now`. `toSnapshot(r.tree)` writes the tree in the simulator's screen format (`- role "name" [ref=e1]`), which `@shipvo/test` parses. Font names keep only letters, digits, spaces, `-` and `_`. `theme.mode` `"system"` renders the light palette. Theme tokens (`palette`, `radius`, `density`, `elevation`, `font`) set colours, corners, spacing and type.
 
+### More blocks
+
+All of these render in Android and iOS styles and show their value in the screen tree, so an agent or a typed test can read them.
+
+| Block | Fields | Screen tree node |
+| --- | --- | --- |
+| `stat` | `label`, `value`, optional `delta`, `trend`, `variant` | `status "Revenue: €120, +4%"` |
+| `progress` | `label`, `value`, optional `max` (default 100), `variant: "ring"` for a ring | `progressbar "Goal: 60%"` |
+| `card` | `label`, `variant`, child blocks | `group` |
+| `section` | `title`, child blocks | `region` |
+| `divider` | none | `separator` |
+| `toggle` | `label`, `bind: "state.<name>"` | `switch "Alerts: on"` |
+| `segmented` | `label`, `bind: "state.<name>"`, `options` (strings) | `radiogroup "Period: week"` with one `radio` per option |
+
+`toggle` and `segmented` need a `label` and a `bind` to a state value the spec declares; `segmented` also needs at least one option. The validator names the path of each missing field.
+
+Open a screen as a bottom sheet with `{ "navigate": "<screen>", "presentation": "sheet" }`. `back` closes it.
+
+In `createApp`, `app.toggle("Alerts")` flips a toggle (or `app.toggle("Alerts", true)` sets it) and `app.select("Period", "week")` picks a segment. `app.state` starts with the defaults the spec declares. Code that read `app.state` before any change used to see `{}` and now sees those defaults.
+
 ### Charts
 
 `{ "type": "chart", "kind": "line" | "area" | "bar" | "donut", "from": "charges", "x": "{{ formatDate(item.created, 'day') }}", "y": "{{ item.amount / 100 }}", "label": "Revenue by day" }`. `x`, `y` and the optional `series` are evaluated per item. With `aggregate` (`sum`, `avg`, `count`, `min`, `max`) points are grouped by `x` (and `series`). The HTML is plain SVG in theme colours (`primary`, `accent`, `success`, `danger`, `muted`), so dark palettes work; it has no animation. The screen tree node is `img "Revenue by day: Mon 120, Tue 90"`, so agents can read the data points.

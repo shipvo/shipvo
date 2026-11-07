@@ -67,3 +67,9 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
+| `shipvo agents setup` for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md#shipvo-agents-setup), [agents](agents.md) | | | |
+| `open_app` with `platform` and `show` (start the phone and watch) | [agents](agents.md) | | | |
+| Deep links on Shipvo Phone (`open_url`, `Linking.openURL`, one-shot initial URL) | [phone-apps](phone-apps.md), [testing](testing.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
+| Network off blocks the app's requests | [device-api](device-api.md#network-profiles) | | | |
+| App spec blocks (`stat`, `progress`, `card`, `toggle`, `segmented`, `chart`, sheets) | [@shipvo/spec](../packages/spec/README.md), [app-spec](design/app-spec.md) | | | |
+| Self-hosted control plane `backup` and `restore` | [self-hosting](self-hosting.md) | | | |
