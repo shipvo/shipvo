@@ -42,7 +42,8 @@ const server = createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}`;
-// Other packages test in parallel on the CI runner; give each wait room so a busy machine does not fail the check.
+// In CI `pnpm -r test` runs the sim and test packages on the same CPUs, so the phones load slowly.
+// 30 s timed out once (#1211); a passing run is unchanged, only a slow one waits longer.
 const SLOW = 90_000;
 const browser = await chromium.launch();
 try {
