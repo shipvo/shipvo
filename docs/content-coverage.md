@@ -6,7 +6,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-1. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog, tutorial and video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md).
+1. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog, tutorial and video now for the live page; two assistants playing through MCP (#1166, merged): launch kit written 7 Nov; the agent-vs-agent video is next. Docs: [demos/chess](demos/chess.md).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
 4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
@@ -15,8 +15,9 @@ Content agents take their next item from this list first (top to bottom, skippin
 7. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
 8. Record demo videos (`record_*`) (tutorial, video, blog; docs done)
 9. The `shipvo` skill for coding agents (tutorial, blog; docs done)
-10. Check every pull request (`shipvo ci init --check`): launch kit written 6 Nov; tutorial, video and blog needed
-11. Capacitor support (all columns, as slices land)
+10. Behaviour timeline (launch kit written 7 Nov; tutorial, video and blog needed)
+11. Check every pull request (`shipvo ci init --check`): launch kit written 6 Nov; tutorial, video and blog needed
+12. Capacitor support (all columns, as slices land)
 
 | Feature | Docs | Tutorial | Video | Blog |
 | --- | --- | --- | --- | --- |
