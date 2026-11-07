@@ -1,4 +1,5 @@
-import { dispatchSchedules, runScheduleStub } from "./dispatcher";
+import { dispatchSchedules } from "./dispatcher";
+import { scheduleRunner } from "./runner";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
@@ -633,6 +634,6 @@ export default Object.assign(app, {
   scheduled(_e: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(exportTelemetry(env).catch((e) => console.error("telemetry export failed", e)));
     ctx.waitUntil(pruneDeviceLog(env.DB).catch((e) => console.error("device_log prune failed", e)));
-    ctx.waitUntil(dispatchSchedules(env.DB, runScheduleStub).catch((e) => console.error("schedule dispatch failed", e)));
+    ctx.waitUntil(dispatchSchedules(env.DB, scheduleRunner(env)).catch((e) => console.error("schedule dispatch failed", e)));
   },
 });
