@@ -88,4 +88,37 @@ describe("Notes and Tasks spec app", () => {
     expect(app.submit("New note form").ok).toBe(true);
     expect(app.data.notes).toHaveLength(1);
   });
+
+  it("gives each call fresh ids when it runs twice on one app", () => {
+    const r = createApp(spec);
+    if (!r.ok) throw new Error("x");
+    const app = r.app;
+    expect(app.call("add_task", { title: "A" })).toEqual({ ok: true, value: { id: "t1" } });
+    expect(app.call("add_task", { title: "B" })).toEqual({ ok: true, value: { id: "t2" } });
+    expect(app.call("add_note", { title: "A" })).toEqual({ ok: true, value: { id: "n1" } });
+    expect(app.call("add_note", { title: "B" })).toEqual({ ok: true, value: { id: "n2" } });
+  });
+
+  it("moves a task to Done tasks from the Tasks tab", () => {
+    const r = createApp(spec);
+    if (!r.ok) throw new Error("x");
+    const app = r.app;
+    app.call("add_task", { title: "Buy bait" });
+    const list = (name: string) => tree(app).tree.children.find((c) => c.name === name)!.children.map((c) => c.name);
+    expect(list("Open tasks")).toEqual(["Buy bait, Id t1"]);
+    expect(list("Done tasks")).toEqual(["Nothing done yet"]);
+    app.setField("Complete task form", "id", "t1");
+    expect(app.submit("Complete task form").ok).toBe(true);
+    expect(list("Open tasks")).toEqual(["No open tasks"]);
+    expect(list("Done tasks")).toEqual(["Buy bait"]);
+    expect(unlabelled(tree(app).tree)).toEqual([]);
+  });
+
+  it("finds items whatever the letter case", () => {
+    const store = phoneStorage();
+    callTool(store, "add_task", { title: "Mend net" });
+    callTool(store, "add_note", { title: "Tides", body: "High at 6" });
+    expect((callTool(store, "search", { query: "mend" }).out as any).value.tasks).toHaveLength(1);
+    expect((callTool(store, "search", { query: "HIGH" }).out as any).value.notes).toHaveLength(1);
+  });
 });

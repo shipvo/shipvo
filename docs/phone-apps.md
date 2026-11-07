@@ -128,4 +128,4 @@ device_log { session }                 -> install_app, switch_app, uninstall_app
 | --- | --- | --- | --- |
 | Notes and Tasks | Keeps tasks and notes on the phone, across chats and assistants. Android and iOS. | `add_task`, `complete_task`, `add_note`, `search` | [`templates/notes-tasks/app.json`](../templates/notes-tasks/app.json) |
 
-The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
+The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.

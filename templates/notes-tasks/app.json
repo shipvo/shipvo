@@ -11,8 +11,11 @@
   "screens": [
     { "id": "tasks", "title": "Tasks", "body": [
       { "type": "badge", "value": "{{ open }} open" },
-      { "type": "list", "label": "Open tasks", "from": "{{ tasks.filter(t, !t.done) }}", "item": { "title": "{{ item.title }}" }, "empty": { "message": "No open tasks" } },
+      { "type": "list", "label": "Open tasks", "from": "{{ tasks.filter(t, !t.done) }}", "item": { "title": "{{ item.title }}", "subtitle": "Id {{ item.id }}" }, "empty": { "message": "No open tasks" } },
       { "type": "list", "label": "Done tasks", "from": "{{ tasks.filter(t, t.done) }}", "item": { "title": "{{ item.title }}" }, "empty": { "message": "Nothing done yet" } },
+      { "type": "form", "label": "Complete task form", "submit": { "label": "Mark done", "action": "complete_task" }, "fields": [
+        { "name": "id", "type": "text", "label": "Task id", "required": true, "maxLength": 20 }
+      ] },
       { "type": "form", "label": "New task form", "submit": { "label": "Add task", "action": "add_task" }, "fields": [
         { "name": "title", "type": "text", "label": "Task", "required": true, "maxLength": 200 }
       ] }
@@ -59,7 +62,7 @@
       "input": { "query": { "type": "text" } },
       "returns": { "tasks": "list", "notes": "list" },
       "do": [
-        { "return": { "tasks": "{{ tasks.filter(t, t.title.contains(input.query)) }}", "notes": "{{ notes.filter(n, n.title.contains(input.query) || n.body.contains(input.query)) }}" } }
+        { "return": { "tasks": "{{ tasks.filter(t, lower(t.title).contains(lower(input.query))) }}", "notes": "{{ notes.filter(n, lower(n.title).contains(lower(input.query)) || lower(n.body).contains(lower(input.query))) }}" } }
       ]
     }
   }
