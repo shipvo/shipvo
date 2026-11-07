@@ -204,3 +204,69 @@ describe("runAction", () => {
     expect(e.code).toBe("unsupported_step");
   });
 });
+
+describe("secret injection", () => {
+  const KEY = "wk_live_ABCDEF123456";
+  const s = {
+    permissions: { network: ["api.weather.test"] },
+    data: {
+      w: { source: "http", get: "https://api.weather.test/v1", auth: { secret: "WEATHER_KEY", type: "bearer" } },
+      q: { source: "http", get: "https://api.weather.test/v1", auth: { secret: "WEATHER_KEY", type: "query", name: "key" } }
+    },
+    screens: [{ body: [{ type: "text", value: "{{ w.echo }}" }] }]
+  };
+  const mk = (answer: any, text = JSON.stringify({ echo: "hi" })) => {
+    const secrets = vi.fn(async (_n: string, _h: string) => answer);
+    const log = vi.fn();
+    const fetch = vi.fn(async () => ({ ok: true, status: 200, text: async () => text }));
+    return { secrets, log, fetch, ctx: { fetch, secrets, log } };
+  };
+
+  it("asks the vault for the key with the request host", async () => {
+    const { ctx, secrets } = mk(KEY);
+    await runSource(s, "w", ctx);
+    expect(secrets).toHaveBeenCalledWith("WEATHER_KEY", "api.weather.test");
+  });
+  it("never returns the key when the upstream echoes it", async () => {
+    const { ctx } = mk(KEY, JSON.stringify({ echo: `Bearer ${KEY}` }));
+    const out = await runSource(s, "w", ctx);
+    expect(JSON.stringify(out)).not.toContain(KEY);
+  });
+  it("keeps the key out of errors and logs", async () => {
+    for (const name of ["w", "q"]) {
+      const m = mk(KEY);
+      m.fetch.mockRejectedValueOnce(new Error(`connect failed https://api.weather.test/v1?key=${KEY}`));
+      const e = await runSource(s, name, m.ctx).catch((x) => x);
+      expect(e.code).toBe("request_failed");
+      expect(e.message).not.toContain(KEY);
+      const ok = mk(KEY);
+      await runSource(s, name, ok.ctx);
+      expect(JSON.stringify(ok.log.mock.calls)).not.toContain(KEY);
+    }
+    const st = mk(KEY); st.fetch.mockResolvedValueOnce({ ok: false, status: 500, text: async () => KEY });
+    const e = await runSource(s, "w", st.ctx).catch((x) => x);
+    expect(e.message).not.toContain(KEY);
+  });
+  it("does not follow a redirect, so the key cannot reach another host", async () => {
+    const m = mk(KEY);
+    m.fetch.mockResolvedValueOnce({ ok: false, status: 302, text: async () => "" });
+    await expect(runSource(s, "w", m.ctx)).rejects.toMatchObject({ code: "upstream_error" });
+    expect(m.fetch).toHaveBeenCalledTimes(1);
+    expect((m.fetch.mock.calls[0] as any)[1].redirect).toBe("manual");
+  });
+  it("refuses with plain errors when the vault refuses", async () => {
+    const cases: [any, string, RegExp][] = [
+      [{ refused: "domain" }, "secret_domain", /different service/],
+      [{ refused: "revoked" }, "secret_revoked", /secret form/],
+      [{ refused: "missing" }, "secret_missing", /secret form/],
+      [undefined, "secret_missing", /secret form/]
+    ];
+    for (const [a, code, re] of cases) {
+      const m = mk(a);
+      const e = await runSource(s, "w", m.ctx).catch((x) => x);
+      expect(e.code).toBe(code);
+      expect(e.message).toMatch(re);
+      expect(m.fetch).not.toHaveBeenCalled();
+    }
+  });
+});

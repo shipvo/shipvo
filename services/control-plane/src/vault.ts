@@ -149,6 +149,8 @@ export function vaultRoutes(who: Who, deps: { fetch?: typeof fetch } = {}) {
     try {
       await c.env.DB.prepare("INSERT INTO vault_secrets (owner, app_id, name, domain, access, warning, valid, wrapped_key, ciphertext, created_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(app_id, name) DO UPDATE SET owner = excluded.owner, domain = excluded.domain, access = excluded.access, warning = excluded.warning, valid = excluded.valid, wrapped_key = excluded.wrapped_key, ciphertext = excluded.ciphertext, created_at = excluded.created_at, last_used_at = NULL, use_count = 0")
         .bind(t.requested_by, t.app_id, t.name, t.domain, check.access, check.warning ?? null, check.valid === null ? null : check.valid ? 1 : 0, sealed.wrapped_key, sealed.ciphertext, nowIso).run();
+      // A key saved again is a new key: clear an earlier revocation. If this fails the save fails too (500, ticket given back), so a key is never reported saved while still revoked.
+      await c.env.DB.prepare("DELETE FROM vault_revoked WHERE app_id = ? AND name = ?").bind(t.app_id, t.name).run();
     } catch { await release(); return fail(500, "save_failed"); }
     const out = { saved: true, app: t.app_id, name: t.name, valid: check.valid, access: check.access, ...(check.warning ? { warning: check.warning, warning_text: WARNINGS[check.warning] } : {}) };
     if (asJson) return c.json(out, 201, { "cache-control": "no-store" });

@@ -25,7 +25,7 @@ export type DeviceState = {
   /** What the camera "sees": a barcode in view, or nothing. */
   camera: { barcode?: { type: string; data: string } | null; delayMs?: number };
   biometrics: { enrolled: boolean; nextResult: "success" | "fail" | "cancel" };
-  payment: { nextResult: "approve" | "decline" | "timeout" | "insufficient_funds"; pin?: string };
+  payment: { nextResult: "approve" | "decline" | "cancel" | "timeout" | "insufficient_funds"; pin?: string };
   online: boolean;
   /** The network profile the simulator runs under. `online` (the default) leaves connectivity as the switches say. */
   networkProfile: NetworkProfileName;
@@ -209,7 +209,7 @@ export const device: Device = {
       await new Promise((r) => setTimeout(r, 300));
       const n = state.payment.nextResult;
       const r: PaymentResult = state.payment.pin && pin !== state.payment.pin ? { ok: false, reason: "declined" }
-        : n === "approve" ? { ok: true, receipt: `SIMULATED-${Date.now().toString(36).toUpperCase()}` } : n === "decline" ? { ok: false, reason: "declined" } : n === "timeout" ? { ok: false, reason: "timeout" } : { ok: false, reason: "insufficient_funds" };
+        : n === "approve" ? { ok: true, receipt: `SIMULATED-${Date.now().toString(36).toUpperCase()}` } : n === "decline" ? { ok: false, reason: "declined" } : n === "cancel" ? { ok: false, reason: "cancelled" } : n === "timeout" ? { ok: false, reason: "timeout" } : { ok: false, reason: "insufficient_funds" };
       log("payment", { req, r }); return r;
     },
   },

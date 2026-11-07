@@ -6,6 +6,8 @@ import type { TestReport } from "./report-md.js";
 import type { Report as ExploreReport } from "./explore.js";
 import { diffReports, type Comparison, type FlowResult } from "./ci-compare.js";
 import { stepText } from "./report-md.js";
+import { pairShots, type ShotPair } from "./ci-shots.js";
+import { join } from "node:path";
 
 /** Hidden marker used to find our comment again. */
 export const MARKER = "<!-- shipvo-check -->";
@@ -29,7 +31,9 @@ export function changedFiles(base: string): string[] {
   return execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" }).split("\n").filter(Boolean);
 }
 
-export type CommentInput = { test?: TestReport | null; explore?: ExploreReport | null; changed?: string[]; screenshots?: string[]; runUrl?: string; compare?: Comparison | null };
+export type CommentInput = { test?: TestReport | null; explore?: ExploreReport | null; changed?: string[]; screenshots?: string[]; runUrl?: string; compare?: Comparison | null;
+  /** Before and after pairs from `pairShots`. `images` maps `before/<path>` and `after/<path>` to a URL; without it the file names are listed. */
+  pairs?: ShotPair[]; moreCount?: number; images?: Record<string, string> | null };
 
 const cell = (s: string) => s.replace(/\s+/g, " ").replace(/\|/g, "\\|").trim();
 
@@ -48,6 +52,28 @@ function compareSection(c: Comparison): string[] {
   part("Fixed", c.fixed);
   part("Still failing", c.stillFailing);
   part("New flows (not on base)", c.newFlows.filter((f) => f.status === "failed"));
+  return L;
+}
+
+const SKIN_NAME = { android: "Android", ios: "iOS" } as const;
+
+function pairsSection(pairs: ShotPair[], more: number, images: Record<string, string> | null, runUrl?: string): string[] {
+  const L = ["### Before and after", ""];
+  const screens = [...new Set(pairs.map((p) => p.screen))];
+  for (const screen of screens) {
+    const rows = pairs.filter((p) => p.screen === screen);
+    L.push(`**${cell(screen)}**`, "");
+    if (images) {
+      const img = (side: "before" | "after", p: ShotPair) => { const path = p[side]; return path && images[`${side}/${path}`] ? `<img src="${images[`${side}/${path}`]}" width="180" alt="${cell(screen)} ${SKIN_NAME[p.skin]}, ${side}">` : "none"; };
+      L.push("| | Before | After |", "| --- | --- | --- |");
+      for (const p of rows) L.push(`| ${SKIN_NAME[p.skin]} | ${img("before", p)} | ${img("after", p)} |`);
+    } else {
+      for (const p of rows) L.push(`- ${SKIN_NAME[p.skin]}: before ${p.before ? `\`${cell(p.before)}\`` : "none"}, after ${p.after ? `\`${cell(p.after)}\`` : "none"}`);
+    }
+    L.push("");
+  }
+  if (!images) L.push("The images are in the before and after folders of this run.", "");
+  if (more > 0) L.push(`${more} more in those folders.`, "");
   return L;
 }
 
@@ -87,11 +113,56 @@ export function renderComment(i: CommentInput): string {
     if (shots.length) L.push(`${shots.length} screenshot${shots.length === 1 ? "" : "s"} saved. Open ${where} and download the zip to see them.`, "");
     else L.push("No screenshots were captured for these screens.", "");
   }
+  if (i.pairs?.length) L.push(...pairsSection(i.pairs, i.moreCount ?? 0, i.images ?? null, i.runUrl));
   L.push("<sub>Built in your workflow. Nothing was sent to Shipvo.</sub>");
   return L.join("\n");
 }
 
 type Fetch = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; json(): Promise<any> }>;
+
+const MEDIA_BRANCH = "shipvo-media";
+
+/**
+ * Upload the images of `pairs` to the repo's media branch and return `before/<path>` and `after/<path>` URLs.
+ * Returns null, having uploaded nothing, when the repo is private or cannot be read. Needs a `contents: write` token.
+ * An existing file counts as success only when that side and path already hold the same bytes.
+ */
+export async function uploadShots(o: { repo: string; token: string; key: string; pairs: ShotPair[]; beforeDir: string; afterDir: string; fetch?: Fetch }): Promise<Record<string, string> | null> {
+  const f: Fetch = o.fetch ?? (fetch as unknown as Fetch);
+  const base = `https://api.github.com/repos/${o.repo}`;
+  const headers = { authorization: `Bearer ${o.token}`, accept: "application/vnd.github+json", "content-type": "application/json" };
+  const req = (url: string, method = "GET", body?: unknown) => f(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const info = await req(base).catch(() => null);
+  const meta = info?.ok ? await info.json() : null;
+  if (!meta || meta.private !== false) return null;
+  const have = await req(`${base}/git/ref/heads/${MEDIA_BRANCH}`);
+  if (!have.ok && have.status !== 404) throw new Error(`could not read the ${MEDIA_BRANCH} branch (${have.status})`);
+  if (have.status === 404) {
+    const def = meta.default_branch ?? "main";
+    const headRes = await req(`${base}/git/ref/heads/${def}`);
+    const sha = headRes.ok ? (await headRes.json())?.object?.sha : undefined;
+    if (typeof sha !== "string" || !sha) throw new Error(`could not read the ${def} branch to create ${MEDIA_BRANCH} from (${headRes.status})`);
+    const made = await req(`${base}/git/refs`, "POST", { ref: `refs/heads/${MEDIA_BRANCH}`, sha });
+    if (!made.ok) throw new Error(`could not create the ${MEDIA_BRANCH} branch (${made.status}). The token needs contents: write`);
+  }
+  const urls: Record<string, string> = {};
+  for (const p of o.pairs) for (const side of ["before", "after"] as const) {
+    const rel = p[side];
+    if (!rel) continue;
+    const bytes = readFileSync(join(side === "before" ? o.beforeDir : o.afterDir, ...rel.split("/")));
+    const path = `${o.key}/${side}/${rel}`;
+    const api = `${base}/contents/${path.split("/").map(encodeURIComponent).join("/")}`;
+    const put = await req(api, "PUT", { message: `shipvo check: ${side} ${rel}`, content: bytes.toString("base64"), branch: MEDIA_BRANCH });
+    if (!put.ok) {
+      if (put.status !== 422) throw new Error(`upload of ${side}/${rel} answered ${put.status}${put.status === 403 || put.status === 404 ? ". The token needs contents: write" : ""}`);
+      const cur = await req(`${api}?ref=${MEDIA_BRANCH}`);
+      const body = cur.ok ? await cur.json() : null;
+      if (!body || typeof body.content !== "string" || !Buffer.from(body.content, "base64").equals(bytes)) throw new Error(`${side}/${rel} already exists with different content`);
+    }
+    urls[`${side}/${rel}`] = `https://raw.githubusercontent.com/${o.repo}/${MEDIA_BRANCH}/${path.split("/").map(encodeURIComponent).join("/")}`;
+  }
+  return urls;
+}
 
 /** Create the comment, or update the one that already has the marker. Returns "created" or "updated". */
 export async function upsertComment(o: { repo: string; pr: number; token: string; body: string; fetch?: Fetch }): Promise<"created" | "updated"> {
@@ -132,7 +203,16 @@ export async function commentCmd(argv: string[]): Promise<number> {
     if (!baseReport) console.error(`No comparison with base: could not read ${baseFile}.`);
     else compare = diffReports(baseReport, test);
   }
-  const body = renderComment({ compare, test, explore: readJson("explore-report.json"), changed, screenshots: shots,
+  let pairs: ShotPair[] = [], moreCount = 0, images: Record<string, string> | null = null;
+  const bd = val("--before-shots"), ad = val("--after-shots");
+  if (bd && ad && existsSync(bd) && existsSync(ad)) {
+    ({ pairs, moreCount } = pairShots(bd, ad));
+    if (env.GITHUB_TOKEN && env.GITHUB_REPOSITORY && pairs.length) {
+      try { images = await uploadShots({ repo: env.GITHUB_REPOSITORY, token: env.GITHUB_TOKEN, key: `pr-${val("--pr") ?? /refs\/pull\/(\d+)\//.exec(env.GITHUB_REF ?? "")?.[1] ?? "x"}/${(env.GITHUB_SHA ?? "run").slice(0, 12)}`, pairs, beforeDir: bd, afterDir: ad }); }
+      catch (e) { console.error(`Images not uploaded: ${e instanceof Error ? e.message : e}`); }
+    }
+  }
+  const body = renderComment({ pairs, moreCount, images, compare, test, explore: readJson("explore-report.json"), changed, screenshots: shots,
     runUrl: env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : undefined });
   const fail = argv.includes("--fail-on-regression") && !!compare?.regressions.length ? 1 : 0;
   const pr = Number(val("--pr") ?? /refs\/pull\/(\d+)\//.exec(env.GITHUB_REF ?? "")?.[1]);

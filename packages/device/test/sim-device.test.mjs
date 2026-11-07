@@ -189,3 +189,10 @@ test("Linking.openURL hands another app's scheme to the simulator; otherwise thi
   assert.deepEqual(got, ["appz://x"]);
   delete globalThis.__pnOpenLink; off();
 });
+
+test("payment: a cancel result comes back as cancelled", async () => {
+  dev.reset({ payment: { nextResult: "cancel", pin: "" } });
+  dev.set({ payment: { nextResult: "cancel", pin: "" } });
+  assert.deepEqual(await device.pay.charge({ amount: 100 }), { ok: false, reason: "cancelled" });
+  dev.reset();
+});
