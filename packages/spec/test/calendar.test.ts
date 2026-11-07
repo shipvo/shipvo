@@ -33,7 +33,7 @@ describe("Calendar spec app", () => {
   });
 
   it("generates the typed tools", () => {
-    expect(toolsFromSpec(spec).map((t) => t.name)).toEqual(["create_event", "delete_event", "list_events"]);
+    expect(toolsFromSpec(spec).map((t) => t.name)).toEqual(["create_event", "delete_event", "list_events", "show_day"]);
   });
 
   it("creates, lists and deletes events kept in phone storage", () => {
@@ -80,6 +80,61 @@ describe("Calendar spec app", () => {
     expect(titles("Pacific/Auckland", "2026-11-10T08:00:00Z")).toEqual([]); // Nov 10, 21:00 in Auckland
     expect(titles("Pacific/Auckland", "2026-11-10T12:00:00Z")).toEqual(["Late call"]); // Nov 11, 01:00 in Auckland
     expect(titles("America/New_York", "2026-11-10T12:00:00Z")).toEqual(["Late call"]);
+  });
+
+  it("shows the month the person picks, grouped in the phone's time zone", () => {
+    const store = phoneStorage();
+    callTool(store, "create_event", { title: "Dentist", start: "2026-11-10T15:00:00Z", place: "Main St" });
+    callTool(store, "create_event", { title: "Old", start: "2026-10-20T09:00:00Z" });
+    callTool(store, "create_event", { title: "Ski", start: "2026-12-05T09:00:00Z" });
+    // 23:30 UTC on Nov 30 is already Dec 1 in Auckland.
+    callTool(store, "create_event", { title: "Edge", start: "2026-11-30T23:30:00Z" });
+    const month = (pick: string | null, tz = "UTC") => {
+      const r = createApp(spec, { data: store.get("calendar", "data"), timeZone: tz, now: NOW, screen: "month" });
+      if (!r.ok) throw new Error(JSON.stringify(r.errors));
+      if (pick) r.app.select("Month", pick);
+      return describeTree(r.app.render().tree);
+    };
+    const t = month(null);
+    expect(t).toContain("November 2026");
+    expect(t).toContain("Dentist");
+    expect(t).toContain("Main St");
+    expect(t).toContain("Edge");
+    for (const other of ["Old", "Ski"]) expect(t).not.toContain(other);
+    expect(month("Last month")).toContain("Old");
+    expect(month("Last month")).toContain("October 2026");
+    expect(month("Next month")).toContain("Ski");
+    expect(month("Next month")).not.toContain("Dentist");
+    const nz = month(null, "Pacific/Auckland");
+    expect(nz).not.toContain("Edge");
+    expect(month("Next month", "Pacific/Auckland")).toContain("Edge");
+  });
+
+  it("shows another day through the Pick a day form", () => {
+    const store = phoneStorage();
+    callTool(store, "create_event", { title: "Dentist", start: "2026-11-10T15:00:00Z" });
+    callTool(store, "create_event", { title: "Ski", start: "2026-11-12T09:00:00Z" });
+    const r = createApp(spec, { data: store.get("calendar", "data"), now: NOW });
+    if (!r.ok) throw new Error("x");
+    const app = r.app;
+    expect(describeTree(app.render().tree)).toContain("Dentist");
+    app.setField("Pick a day form", "day", "2026-11-12");
+    expect(app.submit("Pick a day form").ok).toBe(true);
+    const t = describeTree(app.render().tree);
+    expect(t).toContain("Ski");
+    expect(t).not.toContain("Dentist");
+    app.setField("Pick a day form", "day", "");
+    app.submit("Pick a day form");
+    expect(describeTree(app.render().tree)).toContain("Dentist");
+    app.setField("Pick a day form", "day", "soon");
+    expect(app.submit("Pick a day form").ok).toBe(false);
+  });
+
+  it("reads a start without an offset as UTC", () => {
+    const store = phoneStorage();
+    const r = callTool(store, "create_event", { title: "Dentist", start: "2026-11-10T15:00:00" }).out as any;
+    expect(r.ok).toBe(true);
+    expect(store.get("calendar", "data").events[0].start).toBe("2026-11-10T15:00:00.000Z");
   });
 
   it("refuses missing input", () => {

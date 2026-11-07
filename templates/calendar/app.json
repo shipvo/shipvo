@@ -4,13 +4,23 @@
   "theme": { "mode": "light", "palette": { "primary": "#0B5FFF", "text": "#111827", "background": "#FFFFFF", "surface": "#F3F4F6", "muted": "#4B5563" }, "radius": "lg", "density": "comfortable", "elevation": "soft" },
   "data": {
     "events": { "source": "collection", "fields": { "id": "text", "seq": "number", "title": "text", "start": "text", "place": "text" }, "seed": [] },
-    "today": { "source": "computed", "value": "{{ events.filter(e, startOf('day', e.start) == today()) }}" }
+    "today": { "source": "computed", "value": "{{ events.filter(e, startOf('day', e.start) == startOf('day', state.day == '' ? today() : state.day + 'T12:00:00Z')) }}" },
+    "monthRef": { "source": "computed", "value": "{{ state.month == 'Last month' ? addDays(startOf('month', today()), -1) : state.month == 'Next month' ? addDays(endOf('month', today()), 1) : today() }}" },
+    "inMonth": { "source": "computed", "value": "{{ events.filter(e, startOf('month', e.start) == startOf('month', monthRef)) }}" }
+  },
+  "state": {
+    "day": { "type": "text", "default": "" },
+    "month": { "type": "enum", "options": ["Last month", "This month", "Next month"], "default": "This month" }
   },
   "navigation": { "type": "tabs", "items": [{ "screen": "day", "label": "Day", "icon": "calendar" }, { "screen": "month", "label": "Month", "icon": "list" }] },
   "screens": [
-    { "id": "day", "title": "Today", "body": [
-      { "type": "badge", "value": "{{ count(today) }} today" },
-      { "type": "list", "label": "Today's events", "from": "{{ sortBy(today, 'start') }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ formatDate(item.start, 'time') }}, Id {{ item.id }}" }, "empty": { "message": "Nothing today" } },
+    { "id": "day", "title": "Day", "body": [
+      { "type": "text", "variant": "title", "value": "{{ formatDate(state.day == '' ? today() : state.day + 'T12:00:00Z', 'day') }}" },
+      { "type": "badge", "value": "{{ count(today) }} on this day" },
+      { "type": "form", "label": "Pick a day form", "submit": { "label": "Show day", "action": "show_day" }, "fields": [
+        { "name": "day", "type": "date", "label": "Day (like 2026-11-10); leave empty for today" }
+      ] },
+      { "type": "list", "label": "Events on this day", "from": "{{ sortBy(today, 'start') }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ formatDate(item.start, 'time') }}, Id {{ item.id }}" }, "empty": { "message": "Nothing on this day" } },
       { "type": "form", "label": "New event form", "submit": { "label": "Add event", "action": "create_event" }, "fields": [
         { "name": "title", "type": "text", "label": "Event", "required": true, "maxLength": 200 },
         { "name": "start", "type": "text", "label": "Starts at (like 2026-11-10T15:00:00+01:00)", "required": true, "maxLength": 40 },
@@ -20,8 +30,10 @@
         { "name": "id", "type": "text", "label": "Event id (shown under each event)", "required": true, "maxLength": 20 }
       ] }
     ] },
-    { "id": "month", "title": "All events", "body": [
-      { "type": "timeline", "label": "All events", "from": "events", "date": "{{ item.start }}", "title": "{{ item.title }}", "detail": "{{ item.place }}" }
+    { "id": "month", "title": "Month", "body": [
+      { "type": "segmented", "label": "Month", "bind": "state.month", "options": ["Last month", "This month", "Next month"] },
+      { "type": "text", "variant": "title", "value": "{{ formatDate(monthRef, 'month') }}" },
+      { "type": "list", "label": "Events this month", "from": "{{ sortBy(inMonth, 'start') }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ formatDate(item.start, 'datetime') }}{{ item.place == '' ? '' : ', ' + item.place }}" }, "empty": { "message": "Nothing this month" } }
     ] }
   ],
   "actions": {
@@ -42,6 +54,11 @@
       "do": [
         { "return": { "events": "{{ sortBy(events.filter(e, startOf('day', e.start) == startOf('day', input.day == '' ? today() : input.day)), 'start') }}" } }
       ]
+    },
+    "show_day": {
+      "description": "Show one day on the Day screen. Day is a date like 2026-11-10; leave it empty for today.",
+      "input": { "day": { "type": "date", "default": "" } },
+      "do": [ { "set": "state.day", "value": "{{ input.day }}" } ]
     },
     "delete_event": {
       "description": "Remove an event, by its id.",
