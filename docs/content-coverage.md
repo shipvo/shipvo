@@ -20,7 +20,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 
 | Feature | Docs | Tutorial | Video | Blog |
 | --- | --- | --- | --- | --- |
-| Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | | | |
+| Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | [chess-on-two-phones](tutorials/chess-on-two-phones.md) | | |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | Signed over-the-air updates | [getting-started](getting-started.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
@@ -78,3 +78,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Self-host upgrade check, backup and restore | [self-hosting](self-hosting.md#back-up-and-upgrade) | | | |
 | iOS apps on the UIScene lifecycle (`SceneDelegate`) | [cli](cli.md) | | | |
 | Test your local build on the hosted phone (`upload_build`, `shipvo sim --hosted`, `app@build:<id>`) | [agents](agents.md#test-your-local-build-on-the-hosted-phone) | | | |
+| Test your own build on the hosted phone (`upload_build`, `shipvo sim --hosted`, `app@build:<id>`) | [test-your-build](test-your-build.md) | | | |
