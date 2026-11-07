@@ -1,5 +1,9 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pairShots } from "../src/ci-shots";
 import { describe, it, expect } from "vitest";
-import { MARKER, changedScreens, commentCmd, renderComment, upsertComment } from "../src/ci-comment";
+import { MARKER, changedScreens, commentCmd, renderComment, upsertComment, uploadShots } from "../src/ci-comment";
 
 const ok = { name: "login.steps", status: "passed" };
 const bad = { name: "checkout.steps", status: "failed", message: "could not find \"Pay\"" };
@@ -106,5 +110,69 @@ describe("changedScreens", () => {
   it("picks screens from a sample diff", () => {
     const diff = ["app/index.tsx", "app/cart/index.tsx", "app/profile.tsx", "app/_layout.tsx", "app/profile.test.tsx", "src/screens/Settings.tsx", "README.md", "package.json", "app/cart/index.tsx"];
     expect(changedScreens(diff)).toEqual(["home", "cart", "profile", "Settings"]);
+  });
+});
+
+describe("before and after screens", () => {
+  const dirs = () => {
+    const root = mkdtempSync(join(tmpdir(), "pairs-"));
+    for (const side of ["before", "after"]) for (const skin of ["android", "ios"]) {
+      mkdirSync(join(root, side, skin), { recursive: true });
+      for (const s of ["home", "cart", "a", "b", "c"]) writeFileSync(join(root, side, skin, `${s}.png`), s === "cart" ? `${side}${skin}` : s + skin);
+    }
+    return { before: join(root, "before"), after: join(root, "after") };
+  };
+  const server = (priv: boolean, store: Map<string, string> = new Map()) => {
+    const calls: string[] = [];
+    const fetch = async (url: string, init: any = {}) => {
+      const m = init.method ?? "GET"; calls.push(`${m} ${url}`);
+      const ok = (j: any, status = 200) => ({ ok: true, status, json: async () => j });
+      if (url.endsWith("/repos/o/r")) return ok({ private: priv, default_branch: "main" });
+      if (url.includes("/git/ref/heads/shipvo-media")) return ok({});
+      if (m === "PUT") {
+        if (store.has(url)) return { ok: false, status: 422, json: async () => ({}) };
+        store.set(url, JSON.parse(init.body).content); return ok({}, 201);
+      }
+      return ok({ content: store.get(url.split("?")[0]) });
+    };
+    return { fetch, calls };
+  };
+
+  it("shows one changed screen of five with both skins and different image URLs", async () => {
+    const d = dirs();
+    const { pairs, moreCount } = pairShots(d.before, d.after);
+    const s = server(false);
+    const images = await uploadShots({ repo: "o/r", token: "t", key: "pr-3/abc", pairs, beforeDir: d.before, afterDir: d.after, fetch: s.fetch });
+    const c = renderComment({ pairs, moreCount, images });
+    expect(c).toContain("**cart**");
+    expect(c).toContain("| Android |");
+    expect(c).toContain("| iOS |");
+    const imgs = [...c.matchAll(/<img src="([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(imgs).size).toBe(imgs.length);
+    expect(images!["before/android/cart.png"]).not.toBe(images!["after/android/cart.png"]);
+    expect(images!["before/android/cart.png"]).toContain("/before/");
+  });
+  it("a private repo uploads nothing and lists the files", async () => {
+    const d = dirs();
+    const { pairs, moreCount } = pairShots(d.before, d.after);
+    const s = server(true);
+    const images = await uploadShots({ repo: "o/r", token: "t", key: "k", pairs, beforeDir: d.before, afterDir: d.after, fetch: s.fetch });
+    expect(images).toBeNull();
+    expect(s.calls.some((x) => x.startsWith("PUT"))).toBe(false);
+    const c = renderComment({ pairs, moreCount, images });
+    expect(c).not.toContain("<img");
+    expect(c).toContain("- Android: before `android/cart.png`, after `android/cart.png`");
+  });
+  it("an existing file with the same bytes is success; different bytes is not", async () => {
+    const d = dirs();
+    const { pairs } = pairShots(d.before, d.after);
+    const store = new Map<string, string>();
+    const s = server(false, store);
+    const o = { repo: "o/r", token: "t", key: "k", pairs, beforeDir: d.before, afterDir: d.after, fetch: s.fetch };
+    await uploadShots(o);
+    expect(await uploadShots(o)).not.toBeNull();
+    const first = [...store.keys()].find((k) => k.includes("/before/android/cart.png"))!;
+    store.set(first, Buffer.from("other").toString("base64"));
+    await expect(uploadShots(o)).rejects.toThrow(/different content/);
   });
 });
