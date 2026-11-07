@@ -114,6 +114,7 @@ const btn = (text: string, onClick: () => void, primary = false) => {
   Object.assign(b.style, { minHeight: "44px", borderRadius: "10px", border: primary ? "0" : "1px solid #ccc", background: primary ? "#1366D6" : "#fff", color: primary ? "#fff" : "#111", fontSize: "16px", fontWeight: "600", padding: "0 16px" });
   return b;
 };
+const unknownNextResult = (n: unknown): never => { throw new Error(`unknown payment.nextResult "${n}"`); };
 const p = (text: string) => { const e = document.createElement("p"); e.textContent = text; Object.assign(e.style, { margin: "0", fontSize: "15px", lineHeight: "20px" }); return e; };
 
 async function askPermission(name: PermissionName): Promise<PermissionStatus> {
@@ -208,7 +209,7 @@ export const device: Device = {
       await new Promise((r) => setTimeout(r, 300));
       const n = state.payment.nextResult;
       const r: PaymentResult = state.payment.pin && pin !== state.payment.pin ? { ok: false, reason: "declined" }
-        : n === "approve" ? { ok: true, receipt: `SIMULATED-${Date.now().toString(36).toUpperCase()}` } : n === "decline" ? { ok: false, reason: "declined" } : n === "cancel" ? { ok: false, reason: "cancelled" } : n === "timeout" ? { ok: false, reason: "timeout" } : n === "insufficient_funds" ? { ok: false, reason: "insufficient_funds" } : (() => { throw new Error(`unknown payment.nextResult "${n}"`); })();
+        : n === "approve" ? { ok: true, receipt: `SIMULATED-${Date.now().toString(36).toUpperCase()}` } : n === "decline" ? { ok: false, reason: "declined" } : n === "cancel" ? { ok: false, reason: "cancelled" } : n === "timeout" ? { ok: false, reason: "timeout" } : n === "insufficient_funds" ? { ok: false, reason: "insufficient_funds" } : unknownNextResult(n);
       log("payment", { req, r }); return r;
     },
   },
