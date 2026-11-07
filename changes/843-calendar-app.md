@@ -1,0 +1,2 @@
+- `templates/calendar`: Calendar, the second first-party spec app, with day and month views, an event form and the actions `create_event`, `list_events` and `delete_event`. Events live in phone storage and use the phone's time zone.
+- Migration: none; new template.
