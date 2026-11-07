@@ -1,0 +1,1 @@
+- docs: the agents page covers rooms (several phones sharing one backend), the `room` option of `open_app` and the `list_sessions` columns; the glossary defines Room; `shipvo agents setup --hosted` is listed in the coverage ledger.
