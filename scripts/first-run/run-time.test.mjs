@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
-import { parseListening, firstTapRef, timings, table, measureRun } from "./run-time.mjs";
+import { parseListening, firstTapRef, timings, table, combinedTable, measureRun } from "./run-time.mjs";
 
 test("parseListening finds the phone URL", () => {
   assert.equal(parseListening("Building…\nSimulated Android phone at http://127.0.0.1:4123/  (Ctrl+C to stop)\n"), "http://127.0.0.1:4123/");
@@ -76,4 +76,19 @@ test("an empty first tree is not ready; ready is stamped once a ref shows up", a
   const rows = await measureRun({ ...f, timeoutMs: 20000, open: async () => () => {}, drive, poll: 20, now });
   assert.ok(calls >= 2);
   assert.ok(rows[2].ms >= Math.floor(secondAt - start), `ready at ${rows[2].ms} ms, second reply at ${secondAt - start}`);
+});
+
+test("combinedTable has an Android and an iOS column with the same steps", () => {
+  const a = timings({ start: 0, listening: 6860, ready: 7880, tapped: 8190 });
+  const i = timings({ start: 0, listening: 7000, ready: 8000, tapped: 8500 });
+  const lines = combinedTable({ android: a, ios: i }).split("\n");
+  assert.equal(lines.length, 6);
+  assert.equal(lines[0], "| step | Android (seconds since start) | iOS (seconds since start) |");
+  assert.equal(lines[5], "| first tap done | 8.19 | 8.50 |");
+});
+
+test("measureRun passes the platform to the CLI", async () => {
+  const f = fakeCli(0);
+  writeFileSync(f.cli, `console.log(JSON.stringify(process.argv.slice(2))); process.exit(0);`);
+  await assert.rejects(measureRun({ ...f, platform: "ios", timeoutMs: 2000, open: async () => () => {}, drive: fakeDriver, poll: 20 }), /\["run","ios","--no-open"\]/);
 });
