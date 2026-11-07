@@ -53,12 +53,13 @@ export function friendlyBuildError(message: string, verbose = false): string {
  * `build` rejects with the build error; it is printed and the caller keeps serving the last good build.
  * Returns a function that stops watching.
  */
-export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>; debounceMs?: number; log?: (line: string) => void; verbose?: boolean; onResult?: (r: { ok: true; seconds: number } | { ok: false; message: string }) => void }): () => void {
-  const { dir, build, debounceMs = 300, log = (l) => console.error(l), verbose = false, onResult } = opts;
+export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>; debounceMs?: number; log?: (line: string) => void; verbose?: boolean; onStart?: () => void; onResult?: (r: { ok: true; seconds: number } | { ok: false; message: string }) => void }): () => void {
+  const { dir, build, debounceMs = 300, log = (l) => console.error(l), verbose = false, onStart, onResult } = opts;
+  let announced = false;
   let timer: NodeJS.Timeout | undefined; let running = false; let again = false; let closed = false;
   const run = async () => {
     if (running) { again = true; return; }
-    running = true;
+    running = true; announced = false;
     const t0 = Date.now();
     try { await build(); const seconds = (Date.now() - t0) / 1000; log(`rebuilt in ${seconds.toFixed(1)} s`); onResult?.({ ok: true, seconds }); }
     catch (e) { const message = friendlyBuildError((e as Error).message, verbose); log(message); onResult?.({ ok: false, message }); }
@@ -67,6 +68,8 @@ export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>;
   };
   const w = watch(dir, { recursive: true }, (_ev, file) => {
     if (closed || (file && ignoredPath(String(file)))) return;
+    // Say right away that the save was seen, once per rebuild.
+    if (!announced) { announced = true; log("Rebuilding..."); onStart?.(); }
     clearTimeout(timer);
     timer = setTimeout(() => void run(), debounceMs);
   });
