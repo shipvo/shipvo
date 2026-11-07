@@ -52,9 +52,16 @@ const SOLUTIONS = [
   ["Test with the assistant you use", "/#how", "Claude, ChatGPT or Cursor drives your app end to end, no emulator"],
   ["Ship updates without the store", "/docs/getting-started/", "One command; phones have it in seconds"],
   ["Make your app agent-ready", "/docs/agents/#listing-your-app-for-every-agent", "List it so any agent can open it"],
-  ["Shipvo vs Expo", "/compare/", "Side by side, including where Expo is the better choice"],
+  ["Shipvo vs Expo", "/compare/", "Side by side, feature by feature"],
   ["Self-host everything", "/docs/self-hosting/", "Your Cloudflare account, your keys, ten minutes"],
 ];
+const RESOURCES = [
+  ["Blog", "/blog/", "Guides and stories, with what we measured"],
+  ["Changelog", "/changelog/", "Every release, newest first"],
+  ["Roadmap", "/roadmap/", "What is in progress and what shipped"],
+  ["Apps", "/apps", "The marketplace of apps any agent can open"],
+];
+const RES_KEYS = ["blog", "changelog", "roadmap", "apps"];
 const menu = (items) => `<div class="menu"><div class="menu-grid">${items.map(([t, h, d]) => `<a href="${h}"><b>${t}</b><span>${d}</span></a>`).join("")}</div></div>`;
 
 export const nav = (active = "") => `<a class="skip" href="#main">Skip to content</a><header class="nav"><div class="wrap">
@@ -65,10 +72,7 @@ export const nav = (active = "") => `<a class="skip" href="#main">Skip to conten
     <div class="has-menu"><button type="button" aria-expanded="false" aria-haspopup="true">Product<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>${menu(PRODUCT)}</div>
     <div class="has-menu"><button type="button" aria-expanded="false" aria-haspopup="true">Solutions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>${menu(SOLUTIONS)}</div>
     <a href="/pricing/" class="${active === "pricing" ? "on" : ""}">Pricing</a>
-    <a href="/blog/" class="${active === "blog" ? "on" : ""}">Blog</a>
-    <a href="/apps" class="${active === "apps" ? "on" : ""}">Apps</a>
-    <a href="/changelog/" class="${active === "changelog" ? "on" : ""}">Changelog</a>
-    <a href="/roadmap/" class="${active === "roadmap" ? "on" : ""}">Roadmap</a>
+    <div class="has-menu"><button type="button" aria-expanded="false" aria-haspopup="true" class="${RES_KEYS.includes(active) ? "on" : ""}">Resources<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>${menu(RESOURCES)}</div>
   </nav>
   <div class="nav-right">
     <button class="theme-btn" type="button" data-theme-toggle data-mode="auto" aria-label="Colour theme: automatic. Click to change." title="Theme: automatic"><svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
@@ -79,9 +83,10 @@ export const nav = (active = "") => `<a class="skip" href="#main">Skip to conten
 </div>
 <div class="mobile-menu" id="mobile-menu" role="dialog" aria-modal="true" aria-label="Main menu" hidden>
   <div class="mm-theme"><span>Theme</span><button class="theme-btn" type="button" data-theme-toggle data-mode="auto" aria-label="Colour theme: automatic. Click to change." title="Theme: automatic"><svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button></div>
-  <a href="/docs/">Docs</a><a href="/learn/">Learn</a><a href="/pricing/">Pricing</a><a href="/blog/">Blog</a><a href="/apps">Apps</a><a href="/changelog/">Changelog</a><a href="/roadmap/">Roadmap</a>
+  <a href="/docs/">Docs</a><a href="/learn/">Learn</a><a href="/pricing/">Pricing</a>
   <div class="mm-title">Product</div>${PRODUCT.map(([t, h]) => `<a href="${h}">${t}</a>`).join("")}
   <div class="mm-title">Solutions</div>${SOLUTIONS.map(([t, h]) => `<a href="${h}">${t}</a>`).join("")}
+  <div class="mm-title">Resources</div>${RESOURCES.map(([t, h]) => `<a href="${h}">${t}</a>`).join("")}
   <a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a>
 </div></header>`;
 
