@@ -96,4 +96,4 @@ Want the native build too? `--native` runs your app on an emulator or simulator 
 - Record a demo of the phone: [record a demo video](/docs/record/).
 - New here? Start with [build your first app](/docs/getting-started/).
 
-See also: [two phones playing chess in your browser](https://shipvo.dev/blog/chess-on-two-phones-android-and-ios/).
+See also: [two phones playing chess in your browser](/blog/chess-on-two-phones-android-and-ios/).

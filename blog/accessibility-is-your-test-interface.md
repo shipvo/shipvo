@@ -45,4 +45,4 @@ A test taps `"Place order"`, not a coordinate and not an id. If the label is mis
 
 Related: [test dark mode, large text and right-to-left in a React Native app](/blog/test-dark-mode-large-text-and-rtl-in-react-native/) uses the Settings screen, which is part of this same tree.
 
-See also: [Android and iOS phones playing chess in your browser](https://shipvo.dev/blog/chess-on-two-phones-android-and-ios/).
+See also: [Android and iOS phones playing chess in your browser](/blog/chess-on-two-phones-android-and-ios/).
