@@ -50,6 +50,8 @@ In a bare app, `shipvo init` uses the same plan, `--dry-run` and confirmation. T
 
 The values are the same ones the config plugin writes. Other keys keep their order, and a second run changes nothing. It does not add a config plugin, because a bare app has no prebuild. If it cannot find the manifest or the Info.plist, it stops and changes nothing. Then it prints the next steps: `cd ios && pod install`, rebuild both apps, `shipvo publish --dry-run`.
 
+On iOS, `shipvo init` accepts the Expo setup in either `AppDelegate` or `SceneDelegate`, so apps on the UIScene lifecycle are recognised.
+
 Other options: `--control-plane <url>`. `--public-key <key>` must be base64 that decodes to 32 bytes, or it exits 2 before changing anything. If `shipvo.json` has a `publicKey` that does not match `.shipvo/seed.txt`, it stops and changes nothing. If `app.json` is not valid JSON, it stops with a one-line message. If a step fails, it lists the steps already applied.
 
 ## `shipvo preview`
