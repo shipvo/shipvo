@@ -301,6 +301,12 @@ describe("vault, Settings Secrets", () => {
     expect(((await (await req("/vault/secrets/tide", auth())).json()) as any).secrets).toEqual([]);
     expect(await useSecret(env, { person: "owner (admin)", app: "tide", name: "STRIPE_KEY", host: "api.stripe.com" })).toEqual({ ok: false, reason: "revoked" });
   });
+  it("rotate refuses a revoked key", async () => {
+    const { req } = await saved();
+    await req("/vault/secrets/tide/STRIPE_KEY", { method: "DELETE", ...auth() });
+    const r = await req("/vault/secrets/tide/STRIPE_KEY/rotate", { method: "POST", ...auth() });
+    expect(r.status).toBe(404);
+  });
   it("the use log shows calls for that person only", async () => {
     const { req, env, sql } = await saved();
     const me = { person: "owner (admin)", app: "tide", name: "STRIPE_KEY" };

@@ -110,7 +110,7 @@ At call time the spec runner asks the vault for a data source's `auth.secret`, a
 | Use goes unseen | Every use and every refused domain or revoked attempt is written to `vault_uses` (app, name, person, host, outcome, time) and counted on the key. The log never holds a value. `listUses` returns it to the key's owner only. | "returns the value to the owner ... and records the use" |
 | A cached answer is shared between people | An authed source is cached only when the host sets `cacheScope`; the cache key holds the key's name, never its value. | "does not read or write the cache for an authed source without cacheScope" |
 
-Not covered here: a screen for the use log (a later slice), revoking and rotating keys (the check exists; the way to revoke does not), and a service that puts the key in its own response in a form other than the exact value (for example encoded).
+Not covered here: a service that puts the key in its own response in a form other than the exact value (for example encoded).
 
 ## Secret vault, Settings Secrets (slice 4 of #841)
 

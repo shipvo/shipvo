@@ -40,6 +40,15 @@ test("foreign origins get 403 and never reach the control plane; preflights are 
   assert.equal((await vaultUi({ method: "GET", rest: "secrets/tide", headers: HDR, token: "", control: "x", fetchImpl, app: () => "tide" })).status, 401);
 });
 
+test("a rebound hostname with a matching Origin gets 403 and no fetch", async () => {
+  let calls = 0; const fetchImpl = async () => { calls++; return { status: 200, json: async () => ({}) }; };
+  const run = (host, origin) => vaultUi({ method: "GET", rest: "secrets/tide", headers: { host, ...(origin ? { origin } : {}) }, token: "t", control: "https://cp.test", fetchImpl, app: () => "tide" });
+  assert.equal((await run("attacker.example:7000", "http://attacker.example:7000")).status, 403);
+  assert.equal((await run("attacker.example:7000")).status, 403);
+  assert.equal(calls, 0);
+  for (const h of ["localhost:7000", "127.0.0.1:7000", "[::1]:7000"]) assert.equal((await run(h, `http://${h}`)).status, 200, h);
+});
+
 async function setup(b, page, skin, state) {
   const p = await b.newPage({ viewport: { width: 460, height: 960 } });
   const calls = [];
@@ -71,7 +80,7 @@ for (const [name, make] of [["frame page", pageFor]]) {
         await p.click('[data-part="secrets-open"]');
         await p.waitForSelector("[data-secret]");
         const text = await p.innerText('[data-part="secrets"]');
-        assert.match(text, /STRIPE_KEY/); assert.match(text, /api\.stripe\.com/);
+        assert.match(text, /Secrets for tide/); assert.match(text, /STRIPE_KEY/); assert.match(text, /api\.stripe\.com/);
         await p.click('[data-secret-act="uses"]'); await p.waitForSelector(".sf-uses");
         await p.click('[data-secret-act="rotate"]'); await p.waitForSelector(".sf-slink a");
         assert.equal(await p.getAttribute(".sf-slink a", "href"), "https://cp.test/vault/t/vt_x");

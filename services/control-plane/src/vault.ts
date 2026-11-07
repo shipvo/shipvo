@@ -109,7 +109,7 @@ export function vaultRoutes(who: Who, deps: { fetch?: typeof fetch } = {}) {
   /** A new one-time ticket for the same app, name and domain. The old key stays until the new one is saved. */
   v.post("/secrets/:app/:name/rotate", async (c) => {
     const a = await secretsAuth(c); if ("err" in a) return a.err;
-    const row: any = await c.env.DB.prepare("SELECT domain, access FROM vault_secrets WHERE app_id = ? AND name = ? AND owner = ?").bind(a.appId, a.name, a.actor).first();
+    const row: any = await c.env.DB.prepare("SELECT s.domain, s.access FROM vault_secrets s LEFT JOIN vault_revoked r ON r.app_id = s.app_id AND r.name = s.name WHERE s.app_id = ? AND s.name = ? AND s.owner = ? AND r.name IS NULL").bind(a.appId, a.name, a.actor).first();
     if (!row) return c.json({ error: "not_found", message: "No saved key with that name." }, 404, NS);
     const service = Object.keys(SERVICES).find((k) => SERVICES[k].domain === row.domain) ?? row.domain;
     return c.json(await issueTicket(c, { appId: a.appId, name: a.name, service, domain: row.domain, access: row.access, purpose: "Replace the saved key", actor: a.actor }), 201, NS);
