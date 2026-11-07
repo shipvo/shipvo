@@ -23,8 +23,9 @@ window.__pnDevice = {
   setInitialUrl(u) { initial = u ?? null; document.getElementById("i").textContent = "initial: " + initial; },
   getInitialURL() { return initial; },
   openUrl(u) { document.getElementById("h").textContent = "Opened " + u; return true; },
-  // What @shipvo/device does for Linking.openURL: ask the simulator whether another app owns the link.
-  };
+};
+// A hand-written stand-in for Linking.openURL: ask the simulator whether another app owns the link.
+// The @shipvo/device side of this call is covered by packages/device/test/sim-device.test.mjs.
 window.linkOut = async (u) => { if (!(await window.__pnOpenLink(u))) document.getElementById("h").textContent = "Local " + u; };
 </script></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
