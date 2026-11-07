@@ -1,19 +1,33 @@
 #!/usr/bin/env node
-// Renders the story ad frames built so far (scenes 1 to 3, 0 to 22 s) to an mp4 or to PNG stills.
+// Renders the story ad frames built so far (scenes 1 to 6, 0 to 60 s) to an mp4 or to PNG stills.
 //   node scripts/video/render-story.mjs --out /tmp/agent/story-a.mp4 [--from 0] [--to 22]
+//   --rec-order <mp4>  real recording from story/record-screens.mjs order (phone area is cropped and cut into frames)
 //   node scripts/video/render-story.mjs --still 2,8,16 --out /tmp/agent/stills
 // Needs Chromium (CHROME_PATH or /usr/bin/chromium), playwright-core resolvable from the repo, and ffmpeg.
 import { createRequire } from "node:module";
-import { mkdirSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { spawn, execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { frameAt, FPS, SHOTS } from "./story/scenes.mjs";
+import { frameAt, FPS, SHOTS, setScreen } from "./story/scenes.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i < 0 ? d : process.argv[i + 1]; };
 const end = SHOTS[SHOTS.length - 1].t1;
 const from = Number(arg("from", 0)), to = Number(arg("to", end)), out = arg("out", "/tmp/agent/story-a.mp4"), stills = arg("still");
 if (!(from >= 0 && to > from && to <= end)) { console.error(`--from/--to must satisfy 0 <= from < to <= ${end}`); process.exit(2); }
+
+// Real recording -> one JPEG per frame of the phone area (412x910 at x 197, y 512 in the 1080x1920 frame), read on demand.
+const rec = arg("rec-order");
+if (rec) {
+  const dir = join(process.env.TMPDIR || "/tmp", "story-order-frames"); mkdirSync(dir, { recursive: true });
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", rec, "-vf", `fps=${FPS},crop=412:910:197:512`, "-q:v", "4", join(dir, "%04d.jpg")]);
+  const n = readdirSync(dir).length, cache = new Map();
+  setScreen("order", (sec) => {
+    const k = Math.min(n, Math.floor(sec * FPS) + 1);
+    if (!cache.has(k)) cache.set(k, "data:image/jpeg;base64," + readFileSync(join(dir, String(k).padStart(4, "0") + ".jpg")).toString("base64"));
+    return cache.get(k);
+  });
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { chromium } = createRequire(join(here, "../../package.json"))("playwright-core");
