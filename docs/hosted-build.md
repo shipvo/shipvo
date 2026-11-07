@@ -1,6 +1,6 @@
 # Test your own build on the hosted phone
 
-For anyone who wants their AI assistant to test the app on their machine, on the hosted Shipvo phone, without publishing a release first. You will upload a build, get a build id, and open it on the phone. It works the same for Android and iOS phone frames.
+Upload the app from your machine and let your assistant test it on the hosted Shipvo phone, without publishing a release first. You will upload a build, get a build id, and open it on the phone. It works the same for Android and iOS phone frames.
 
 Founders: ask your assistant "upload my app and test it on the hosted phone". It runs the steps below for you.
 
@@ -60,7 +60,7 @@ Builds are private to your account. A key from another account gets `build_not_f
 | `build_not_supported` | The simulator did not load that build, so no session was opened. | Open the app without `@build` to use the published release. |
 | `unknown_app` | Your key does not open that app. | Use an app from `list_apps`. |
 
-A read-only key cannot upload builds.
+If you see "this key is read-only: it cannot upload builds", use a key with write access.
 
 ## Next steps
 
