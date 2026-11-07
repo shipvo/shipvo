@@ -111,7 +111,7 @@ export function renderComment(i: CommentInput): string {
     if (changed.length) L.push(`From this diff: ${changed.map((c) => `\`${c}\``).join(", ")}`, "");
     const where = i.runUrl ? `the \`shipvo-check\` artifact of [this run](${i.runUrl})` : "the `shipvo-check` artifact of this run";
     if (shots.length) L.push(`${shots.length} screenshot${shots.length === 1 ? "" : "s"} saved. Open ${where} and download the zip to see them.`, "");
-    else L.push("No screenshots were captured for these screens.", "");
+    else if (!i.pairs?.length) L.push("No screenshots were captured for these screens.", "");
   }
   if (i.pairs?.length) L.push(...pairsSection(i.pairs, i.moreCount ?? 0, i.images ?? null, i.runUrl));
   L.push("<sub>Built in your workflow. Nothing was sent to Shipvo.</sub>");
