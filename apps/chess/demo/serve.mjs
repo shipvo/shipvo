@@ -92,13 +92,18 @@ export function agentSetup(side, dir) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
+  const moveSeconds = opt("--move-time") === undefined ? undefined : Number(opt("--move-time"));
+  if (moveSeconds !== undefined && !(Number.isFinite(moveSeconds) && moveSeconds > 0)) {
+    console.error(`--move-time needs a positive number of seconds, got "${opt("--move-time")}".`);
+    process.exit(1);
+  }
   const agents = args.includes("--agents");
   const record = args.includes("--record");
   const demo = await startDemo({
     port: opt("--port") ? Number(opt("--port")) : 0,
     agents,
     record,
-    moveTime: opt("--move-time") ? Number(opt("--move-time")) * 1000 : MOVE_TIME_DEFAULT,
+    moveTime: moveSeconds !== undefined ? moveSeconds * 1000 : MOVE_TIME_DEFAULT,
     names: { white: opt("--white-name"), black: opt("--black-name") },
   });
   const url = args.includes("--autoplay") ? `${demo.url}?autoplay=1` : demo.url;

@@ -84,9 +84,11 @@ describe("seats, time and notation", () => {
     s.setSeat("black");
     const r = s.move("e2", "e4");
     expect(r.ok).toBe(false);
+    expect(s.lastNotice()).toContain("Wait for your turn");
     expect(s.outOfTurn()).toContain("It is white's turn. You play black.");
     expect(s.move("e2", "e4", undefined, { relay: true }).ok).toBe(true);
     expect(s.outOfTurn()).toBeNull();
+    expect(s.lastNotice()).toBe("");
     expect(s.get_board()).toMatchObject({ lastMove: "e2e4", seat: "black", over: false });
   });
   it("ends the game on a lost clock", () => {
