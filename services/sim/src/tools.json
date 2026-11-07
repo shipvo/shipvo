@@ -934,7 +934,7 @@
   },
   {
     "name": "open_app",
-    "description": "Opens the phone in the user's browser so they can watch. Opens an app in a phone-sized session and returns its first screen. With no live `shipvo run` for the project, it starts one (pick platform: 'android' or 'ios') when the project has `shipvo` installed, or when show is true. A live run on the other platform is attached as it is and the result says so. screen, tap, type, scroll, back and screenshot work on that phone. The result says whether the phone is visible and its URL.",
+    "description": "Opens the phone in the user's browser so they can watch. Opens an app in a phone-sized session and returns its first screen. With no live `shipvo run` for the project, it starts one (pick platform: 'android' or 'ios') when the project has `shipvo` installed, or when show is true, and only from a local (stdio) server. A live run on the other platform is attached as it is and the result says so. screen, tap, type, scroll, back and screenshot work on that phone. The result says whether the phone is visible and its URL.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -984,7 +984,7 @@
         },
         "show": {
           "type": "boolean",
-          "description": "true: open the phone in the user's browser so they can watch (default on a computer with a desktop). false: headless, nobody sees it (default in CI)."
+          "description": "true: open the phone in the user's browser so they can watch (default on a computer with a desktop, when the project has `shipvo` installed; a server over HTTP never starts a run). false: headless, nobody sees it (default in CI)."
         },
         "attach": {
           "type": "string",

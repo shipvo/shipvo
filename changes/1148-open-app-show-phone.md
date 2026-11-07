@@ -1,3 +1,5 @@
 - `open_app` takes `platform: "android" | "ios"` and `show: true | false`. It opens the phone in the user's browser so they can watch: it starts `shipvo run <platform>` from the nearest folder with `shipvo.json` when none is live. With `show` unset it does this only on a computer with a desktop whose project has `shipvo` installed; `show: true` also works through `npx`. A live run on the other platform is attached as it is and the result says so.
 - `open_app` results carry `visible:` and the phone's URL; `list_apps` shows the visible phone; `record_start` records the attached phone. `open_app` refuses with `unknown_app` when the project's run is for another app.
 - Migration: none. `SHIPVO_RUN_COMMAND` (JSON array) replaces the command that starts the run.
+- `open_app` starts a run only from a local (stdio) server. A server over HTTP never starts a process, whatever `show` is.
+- `list_apps` now ends with a `Phone:` line saying which phone is visible (or that none is). Clients that parse the list should ignore that line.

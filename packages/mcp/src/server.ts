@@ -150,7 +150,7 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
   const guarded = (args: unknown, extra: unknown) => inputHasKey(args) ? keyRefusal() : (cb as (a: unknown, e: unknown) => unknown)(args, extra);
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
 };
-type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
+type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
 const SERVER_VERSION = "0.0.4";
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
 const TOOLS_LIST_TTL_MS = 60_000;
@@ -184,7 +184,10 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
   let live = headlessOnly ? undefined : findLiveRun(id);
   let launchNote = "";
   // Show the person a phone: switch a live run to the asked platform, or start one from the project.
-  if (!headlessOnly && ctx.scope !== "read") {
+  // Only a local (stdio) server starts processes. Over HTTP a caller never makes the server host run a command.
+  if (!headlessOnly && ctx.scope !== "read" && ctx.local) {
+    const other = live ? undefined : findLiveRun(undefined);
+    if (other && other.app !== id) return result("", { ok: false, code: "unknown_app", error: `this project runs "${other.app}", not "${id}". The phone for "${other.app}" is up at ${runUrl(other)}; call open_app("${other.app}") to use it.` });
     if (live && platform && live.platform !== platform) {
       // The run's page does not switch skins over the driver connection yet, so this attaches to the phone that is up and says so.
       launchNote = ` (the live phone is ${live.platform}; to see ${platform}, stop it and run \`shipvo run ${platform}\`)`;
@@ -598,7 +601,7 @@ return server;
 // ---- transport: stdio (local) or Streamable HTTP (remote) ----
 const argi = process.argv.indexOf("--http");
 if (argi < 0) {
-  await makeServer().connect(new StdioServerTransport());
+  await makeServer({ local: true }).connect(new StdioServerTransport());
 } else {
   const port = Number(process.argv[argi + 1] || 8787);
   const keys = new Set((process.env.PN_API_KEYS ?? "").split(",").map((k) => k.trim()).filter(Boolean));
