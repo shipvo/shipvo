@@ -42,12 +42,17 @@ const def = <S extends ZodRawShape>(name: string, description: string, input: S,
 export const tools = {
   list_apps: def("list_apps", "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').", { query: z.string().optional() }, RO, []),
   open_app: def("open_app", "Open an app in a fresh phone-sized session and return its first screen.", {
-  app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"),
+  app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run), or 'tide@build:<id>' (a build from upload_build, on the hosted phone)"),
   session: z.string().optional().describe("Session name (default: generated). One session is one phone."),
   seed_cart: z.array(z.object({ product_id: z.string().optional(), id: z.string().optional(), quantity: z.number().int().positive().optional(), qty: z.number().int().positive().optional() }).refine((l) => (l.product_id ?? l.id) && (l.quantity ?? l.qty), "each line needs product_id (or id) and quantity (or qty)")).optional().describe("Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."),
   dark: z.boolean().optional().describe("Dark mode"),
   attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
-}, WR, ["attach_failed","no_live_run","unknown_app"]),
+}, WR, ["attach_failed","no_live_run","unknown_app","build_not_found","build_expired"]),
+  upload_build: def("upload_build", "Build the app in this project with the simulated device (the same build `shipvo sim` makes), upload it to the hosted phone for this key, and return a build id. Then call open_app(\"<app>@build:<id>\") on the hosted server. The build is private to your account and is deleted when it expires. Runs only on the local (stdio) server, because it reads your project.", {
+  dir: z.string().optional().describe("Project folder (default: the server's working directory)"),
+  app: z.string().optional().describe("App id (default: read from the project's shipvo config)"),
+  skip_build: z.boolean().optional().describe("Upload the existing sim-dist folder without building again"),
+}, { readOnlyHint: false, destructiveHint: false, openWorldHint: true }, ["stdio_only","no_api_key","build_failed","build_too_large","upload_failed"]),
   attach_session: def("attach_session", "Attach to the phone of a live `shipvo run` in this project (read from .shipvo/run.json) and return its screen. The person sees every action in their browser. Same as open_app with attach: 'always', without needing the app id.", {
   app: z.string().optional().describe("App id; default: the app of the live run"),
   session: z.string().optional().describe("Session name (default: generated)"),

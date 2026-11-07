@@ -1,0 +1,3 @@
+- `@shipvo/mcp`: new tool `upload_build` builds your project with the simulated device and uploads it for your key; `open_app("<app>@build:<id>")` opens it on the hosted phone. Builds are private to your account and deleted when they expire.
+- `@shipvo/cli`: `shipvo sim --hosted` does the same from the terminal.
+- Migration: none; new tool and flag.
