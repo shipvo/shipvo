@@ -177,7 +177,7 @@ footer.old{display:none}
 .nav .wrap{gap:18px}
 .nav .primary{display:flex;align-items:center;gap:4px;margin-left:10px;font-size:15px;color:var(--mute)}
 .nav .primary>a,.nav .primary button{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;background:transparent;border:0;color:var(--mute);font:inherit;font-size:15px;cursor:pointer;min-height:38px}
-.nav .primary>a:hover,.nav .primary button:hover,.nav .primary>a.on{color:var(--paper);background:var(--ink-2)}
+.nav .primary>a:hover,.nav .primary button:hover,.nav .primary>a.on,.nav .primary button.on{color:var(--paper);background:var(--ink-2)}
 .nav .primary button svg{width:14px;height:14px;transition:transform .2s}
 .has-menu{position:relative}
 .has-menu.open button{color:var(--paper);background:var(--ink-2)}
@@ -456,3 +456,16 @@ pre.term .term-copy.done{color:#0B0F0E;background:#FF9A2E;border-color:#FF9A2E}
 .ep-btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
 .ep-skip{border-color:var(--accent,#7CFFB2)}
 @media (max-width:480px){.ep-bar{padding:8px}.ep-btn{font-size:13px;padding:0 12px}}
+/* in-page search (filter.js) */
+.f-out{display:none!important}
+.fsearch{position:relative;display:flex;align-items:center;max-width:520px;width:100%}
+.fsearch svg{position:absolute;left:14px;width:18px;height:18px;color:var(--dim);pointer-events:none}
+.fsearch input{width:100%;min-height:48px;padding:0 78px 0 42px;border-radius:12px;border:1px solid var(--line-2);background:var(--ink-2);color:var(--paper);font:inherit;font-size:16px}
+.fsearch input::placeholder{color:var(--dim)}
+.fsearch input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,154,46,.18)}
+.fsearch input::-webkit-search-cancel-button{display:none}
+.fsearch kbd{position:absolute;right:12px;font-size:12px;color:var(--dim);border:1px solid var(--line-2);border-radius:6px;padding:1px 7px}
+.fsearch input:not(:placeholder-shown)~kbd{display:none}
+.fcount{position:absolute;right:14px;font-family:var(--mono);font-size:12px;color:var(--dim);pointer-events:none}
+.fsearch input:placeholder-shown~.fcount{display:none}
+.fempty{color:var(--mute);padding:24px 0;list-style:none}

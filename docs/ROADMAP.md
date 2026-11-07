@@ -120,7 +120,9 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-05: Hourly telemetry export to your R2 bucket as Parquet ([Telemetry export](telemetry-export.md), #324)
 - 2026-11-05: `shipvo auto-halt` turns on automatic halting ([CLI guide](cli.md), #302)
 
-## Not doing (for now)
+## Promises
 
-- Shipping compiled native code over the air. Updates stay interpreted JavaScript on capabilities the shell declares.
-- Anything that weakens signing or lets an update replace its own trust root.
+Lines we hold, whatever else changes.
+
+- Updates stay interpreted JavaScript running on the capabilities the shell declares; compiled native code always ships through the stores.
+- Update signing is never weakened, and an update can never replace its own trust root.

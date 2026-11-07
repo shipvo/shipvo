@@ -9,6 +9,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 
 import { corona } from "./corona.mjs";
 import { buildBlog } from "./blog.mjs";
 import { parseRoadmap, renderRoadmap, fetchProgress } from "./roadmap.mjs";
+import { parseChangelog, renderChangelog } from "./changelog.mjs";
 import { mark, symbol, animated } from "./brand.mjs";
 import { copyFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -263,18 +264,15 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
   mkdirSync(join(PUB, "img"), { recursive: true });
   writeFileSync(join(PUB, "img", "shipvo-corona.svg"), corona({ logoHref: `data:image/png;base64,${logo}`, id: "cor", standalone: true }));
 }
-// Changelog from CHANGELOG.md
+// Changelog: CHANGELOG.md (released) + changes/*.md (on main), with the roadmap's Shipped lines as each day's highlights.
 {
-  // Entries merged since the last release (changes/*.md) show at the top as "On main, coming in the next release",
-  // so the page is current on every deploy, not only after the daily release train.
   const pending = readdirSync(join(ROOT, "changes")).filter((f) => f.endsWith(".md") && f !== "README.md").sort()
-    .flatMap((f) => readFileSync(join(ROOT, "changes", f), "utf8").split("\n").filter((l) => /^- /.test(l) && !/^- Migration: none/i.test(l)));
-  const unreleased = pending.length ? `## On main, coming in the next release\n\nMerged and live on the hosted services where it applies; packages reach npm with the next daily release.\n\n${pending.join("\n")}\n\n` : "";
-  const md = readFileSync(join(ROOT, "CHANGELOG.md"), "utf8").replace(/^# .*\n/, "").replace(/^\s*Dated, newest first\.[^\n]*\n/, (m) => m + "\n" + unreleased);
-  marked.use({ renderer: new marked.Renderer(), gfm: true });
-  const body = marked.parse(md);
+    .flatMap((f) => readFileSync(join(ROOT, "changes", f), "utf8").split("\n").filter((l) => /^- /.test(l) && !/^- Migration: none/i.test(l)).map((l) => l.slice(2)));
+  const releases = parseChangelog(readFileSync(join(ROOT, "CHANGELOG.md"), "utf8"));
+  const highlights = parseRoadmap(readFileSync(join(ROOT, "docs/ROADMAP.md"), "utf8")).shipped;
+  const body = renderChangelog({ releases, pending, highlights, resolveHref: (h) => rewriteHref(h, "docs/ROADMAP.md") });
   mkdirSync(join(PUB, "changelog"), { recursive: true });
-  writeFileSync(join(PUB, "changelog", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Changelog — Shipvo", desc: "What shipped in Shipvo, dated, newest first: releases of the React Native OTA runtime, simulator, MCP server, CLI and typed test package.", path: "/changelog/", image: "/og/changelog.png", ld: crumbs([["Home", "/"], ["Changelog", "/changelog/"]]) })}</head><body>${navTag("changelog")}<main id="main"><section style="border-top:0;padding-top:clamp(40px,6vw,72px)"><div class="wrap"><div class="eyebrow">Changelog</div><h1 style="margin-top:12px">What shipped.</h1><p class="lede" style="margin-top:14px">Dated, newest first. Package versions are on npm under <code>@shipvo</code>; what comes next is on the <a class="link" href="/roadmap/">roadmap</a>; the full history is the <a class="link" href="https://github.com/shipvo/shipvo/commits/main" rel="noopener">commit log</a>.</p><article class="log">${body}</article></div></section></main>${footTag()}</body></html>`);
+  writeFileSync(join(PUB, "changelog", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Changelog — Shipvo", desc: "Every Shipvo release, newest first: highlights in plain words, the packages on npm, and every change for the OTA runtime, Shipvo Phone, MCP server, CLI and test package.", path: "/changelog/", image: "/og/changelog.png", extraCss: '<link rel="stylesheet" href="/changelog.css">', ld: crumbs([["Home", "/"], ["Changelog", "/changelog/"]]) })}</head><body>${navTag("changelog")}<main id="main">${body}</main>${footTag()}<script src="/filter.js" defer></script></body></html>`);
 }
 
 // Roadmap from docs/ROADMAP.md (single source). Slice progress comes from each epic's task list when GitHub is reachable.
@@ -283,7 +281,7 @@ for (const f of readdirSync(join(here, "pages")).filter((f) => f.endsWith(".html
   const progress = process.env.SHIPVO_OFFLINE ? {} : await fetchProgress(data.now.flatMap((g) => g.items.map((i) => i.issue)).filter(Boolean), { token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "" });
   const body = renderRoadmap(data, { resolveHref: (h) => rewriteHref(h, "docs/ROADMAP.md"), progress });
   mkdirSync(join(PUB, "roadmap"), { recursive: true });
-  writeFileSync(join(PUB, "roadmap", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Roadmap — Shipvo", desc: "The public Shipvo roadmap: what is in flight now, what shipped and when, and what we are not doing for now. Built from docs/ROADMAP.md in the repository.", path: "/roadmap/", extraCss: '<link rel="stylesheet" href="/roadmap.css">', ld: crumbs([["Home", "/"], ["Roadmap", "/roadmap/"]]) })}</head><body>${navTag("roadmap")}<main id="main">${body}</main>${footTag()}</body></html>`);
+  writeFileSync(join(PUB, "roadmap", "index.html"), `<!doctype html><html lang="en"><head>${headTag({ title: "Roadmap — Shipvo", desc: "The public Shipvo roadmap: what is in flight now, what shipped and when, and what we are not doing for now. Built from docs/ROADMAP.md in the repository.", path: "/roadmap/", extraCss: '<link rel="stylesheet" href="/roadmap.css">', ld: crumbs([["Home", "/"], ["Roadmap", "/roadmap/"]]) })}</head><body>${navTag("roadmap")}<main id="main">${body}</main>${footTag()}<script src="/filter.js" defer></script></body></html>`);
 }
 
 // ---------- Legal pages ----------
@@ -333,7 +331,7 @@ const FACTS = `Shipvo is an open-source React Native framework: build once, publ
 Things to know before answering questions about Shipvo:
 - Developers test their app in CI with @shipvo/test (typed tests, Vitest or any runner) against the headless simulator on a plain Linux runner: no emulator or device. It catches logic and flow bugs, not native crashes or slow-phone performance.
 - The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
-- AI agents do not yet buy things for real people through Shipvo apps. That needs consent, spend limits and a checkout contract, and is on the roadmap.
+- Real orders go through the app's own checkout to the control plane, start as unverified, and the owner settles them after checking the payment (docs: taking-real-orders).
 - Over-the-air updates run on Android and iOS. The iOS runtime is verified on an iPhone simulator in CI on every change.
 - CLI commands include init, sim, preview, publish (with --dry-run and --dry-run-policy), rollback, auto-halt, audit, run (android or ios, a phone frame in your browser), promote (with --report), test (with --repair, --report and --report-md), explore, store (details, setup, screenshots, testers), doctor, eas setup and ci init (Expo and Capacitor).
 - MCP tools include open_app (attaches to a live shipvo run phone), screen, tap, type, scroll, back, screenshot, wait_for, and record_start, record_marker, record_stop for MP4 demo videos.
