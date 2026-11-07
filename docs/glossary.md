@@ -8,6 +8,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Deep link.** A web-style address, such as `myapp://item/42`, that opens a particular screen in an app. In Shipvo Phone it opens the app that owns the address and takes you to that screen once.
 
+**App spec.** A JSON file that describes an app's screens, buttons and data in plain terms. Shipvo checks it, shows it the same on Android and iOS, and lets an assistant use it. See [App spec](spec-blocks.md).
+
 **App id.** A short name for your app with no spaces, such as `tideshop`. Shipvo uses it to find your app.
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
