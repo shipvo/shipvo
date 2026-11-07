@@ -338,6 +338,8 @@ These come from fixed issues in this repository.
 
 **`shipvo audit` exits 1 with a status code.** The token is missing or wrong. Set `SHIPVO_OWNER_TOKEN`, or use the publish token from `shipvo app create`.
 
+**`shipvo sim --hosted` says `no_api_key`.** Set `SHIPVO_API_KEY` to your key (`shipvo login` prints one). Then see [Test your local build on the hosted phone](agents.md#test-your-local-build-on-the-hosted-phone).
+
 **`shipvo sim --watch` prints one line about a broken JSON file.** Fix the comma or quote it names and save. Add `--verbose` for the full build error.
 
 ## Next steps

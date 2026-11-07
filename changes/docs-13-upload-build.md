@@ -1,0 +1,1 @@
+- Docs: new section "Test your local build on the hosted phone" in the agents guide covers `upload_build`, `shipvo sim --hosted`, `open_app("<app>@build:<id>")` and every error code.

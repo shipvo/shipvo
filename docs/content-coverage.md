@@ -77,3 +77,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Lumi findings saved as tests (`shipvo explore --save-tests`) | [lumi](lumi.md) | | | |
 | Self-host upgrade check, backup and restore | [self-hosting](self-hosting.md#back-up-and-upgrade) | | | |
 | iOS apps on the UIScene lifecycle (`SceneDelegate`) | [cli](cli.md) | | | |
+| Test your local build on the hosted phone (`upload_build`, `shipvo sim --hosted`, `app@build:<id>`) | [agents](agents.md#test-your-local-build-on-the-hosted-phone) | | | |
