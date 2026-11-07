@@ -18,6 +18,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Control plane.** The Shipvo service that keeps your releases and decides who gets them. You can use the hosted one or run your own.
 
+**Eval (agent evaluation).** A scored try-out for an assistant. You give it a task, such as buying one tote bag, and Shipvo records every step and checks the result. See [Score an agent](eval.md).
+
 **Dry run.** A practice run. Shipvo does all the work of a release but sends nothing to anyone.
 
 **JSON.** A plain way to write a list of things in a text file, with curly brackets, quote marks and commas. Shop products live in a JSON file. A missing comma is the usual mistake.

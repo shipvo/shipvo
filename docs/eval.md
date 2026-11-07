@@ -1,55 +1,77 @@
-# Score an agent on your app (`shipvo eval`)
+# Score an agent on an app task (`shipvo eval`)
 
-This page is for developers who want to know how well a coding agent or model uses their app. You will run one agent on one task, get a pass or fail that Shipvo measures, and compare runs in a report. Every task runs on Android or iOS.
+This page is for developers and teams who want to know how well a coding agent or model can use their app, on Android and iOS. You give the agent a task, such as "buy one Canvas tote". Shipvo records every step the agent takes and scores the result with checks you write. You get pass rate, steps, time, errors and retries that Shipvo measured, not the agent's own report.
 
-Your agent calls the model. `shipvo eval run` opens a phone session and a recording MCP address; your agent connects to it like any MCP server. When the run ends, Shipvo checks the result itself, so the score does not depend on what the agent says it did.
+Shipvo never calls a model. It opens a phone session and puts a recording proxy in front of the MCP server. Your agent connects to the proxy the usual way. Any agent that speaks MCP works.
+
+## Before you start
+
+- The Shipvo MCP server is running (`shipvo mcp`, or a hosted URL). Default: `http://localhost:8787/mcp`.
+- An agent that can connect to an MCP URL. See [agents](agents.md).
 
 ## Run a task
 
-1. Start the Shipvo MCP server, then pass one of its keys with `--key` (or `SHIPVO_EVAL_KEY`). The default address is `http://localhost:8787/mcp`; set `--mcp` or `SHIPVO_EVAL_MCP` to use another.
+1. Pick a task. Two samples for the shop template are in `tasks/`:
+   - `buy-canvas-tote` (Android): buy one tote and pay.
+   - `declined-card-then-pay` (iOS): the first payment is declined; the agent must recover and place one order.
+2. Start the run:
 
-```bash
-PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
-```
-2. Pick a task file. Two sample tasks for the shop template are in `tasks/`: `buy-canvas-tote` (Android) and `declined-card-then-pay` (iOS).
-3. Run it:
+   ```bash
+   shipvo eval run buy-canvas-tote --agent claude --model <model-name>
+   ```
 
-```bash
-npx shipvo eval run buy-canvas-tote --agent claude --model claude-sonnet-5-5 --key key1
-```
+3. Shipvo prints the proxy URL, the session name and the instruction:
 
-4. Shipvo prints an MCP URL, a session name and the task instruction. Point your agent at that URL, give it the instruction, and tell it to use that session in every tool call.
-5. The run ends when the agent calls `end_session`, after the task's step limit, or after its time limit.
+   ```text
+   Eval run ready.
+   MCP URL for the agent: http://127.0.0.1:<port>/mcp
+   Session: eval-buy-canvas-tote-claude-<timestamp>
 
-Expected output:
+   Give the agent this instruction:
+   Open the shop. Buy one Canvas tote and pay for it. Call end_session when the order is placed.
+   ```
 
-```text
-PASS buy-canvas-tote (claude) ended by agent: <n> steps, <n>s, <n> errors, <n> retries
-  ok   order: 1 matching order(s)
-  ok   confirmation: "Order placed" on the final screen
-  ok   no-crash: no crash
-Steps: .shipvo/eval/buy-canvas-tote-claude-<timestamp>/steps.jsonl
-```
+4. Point your agent at that URL, give it the instruction, and tell it to use the session name in every tool call.
+5. The run ends when the agent calls `end_session`, or at the step limit or time limit. Shipvo then scores the checks and prints the result:
 
-Your run prints its own numbers in place of `<n>`. The exit code is 0 on pass and 1 on fail.
+   ```text
+   PASS buy-canvas-tote (claude) ended by agent: <steps> steps, <seconds>s, 0 errors, 0 retries
+     ok   order: 1 matching order(s)
+     ok   confirmation: "Order placed" on the final screen
+     ok   no-crash: no crash
+   Steps: .shipvo/eval/<run>/steps.jsonl
+   ```
 
-## Options
+The command exits `0` when every check passes and `1` when any fails, so you can use it in CI.
 
-| Option | What it does |
+### Options
+
+| Option | Meaning |
 | --- | --- |
-| `--agent <name>` | Required. A label for the agent, such as `claude` or `cursor`. |
-| `--model <name>` | Optional label for the model. Runs are grouped by agent, model and task. |
-| `--mcp <url>` | The Shipvo MCP server to score against. Default `http://localhost:8787/mcp`, or `SHIPVO_EVAL_MCP`. |
-| `--key <key>` | Bearer key for the MCP server, or `SHIPVO_EVAL_KEY`. |
-| `--port <n>` | Port for the recording address. Default: a free port. |
+| `<task>` | Task name (reads `tasks/<name>.task.json`) or a path to a `.json` file. |
+| `--agent <name>` | Required. A label for who is being scored. |
+| `--model <name>` | Optional. Shown in the report. |
+| `--mcp <url>` | MCP server to use. Also `SHIPVO_EVAL_MCP`. Default `http://localhost:8787/mcp`. |
+| `--key <key>` | Bearer key for the MCP server. Also `SHIPVO_EVAL_KEY`. |
+| `--port <n>` | Port for the proxy. Default: a free port. |
 | `--dir <path>` | Where runs are saved. Default `.shipvo/eval`. |
-| `--json` | Print the result as a JSON envelope. |
+| `--json` | Print the result as JSON. |
 
-`<task>` is a path to a `.json` file, or a name that resolves to `tasks/<name>.task.json`.
+Each run writes `run.json` and `steps.jsonl` under `.shipvo/eval/<run>/`. If the agent used `record_start` and `record_stop`, the report links the recording too ([record](record.md)).
 
-## Write a task
+## Compare runs
 
-A task is a JSON file:
+```bash
+shipvo eval report
+shipvo eval report --json
+shipvo eval report --out eval.md
+```
+
+The report has one row per agent, model and task: runs, pass rate, median steps, median seconds, and a link to each run's steps (and recording). `--out eval.md` also writes `eval.json` next to it.
+
+## Write your own task
+
+A task is `tasks/<name>.task.json`:
 
 ```json
 {
@@ -71,48 +93,36 @@ A task is a JSON file:
 }
 ```
 
-Required: `name`, `app`, `platform` (`android` or `ios`), `instruction`, `limits.seconds`, `limits.steps` (both above 0) and at least one check. `start.seed_cart` fills the cart; `start.device` and `start.network` are passed to `set_device` before the agent starts.
+- `name`, `app`, `instruction`, `platform` (`android` or `ios`), `limits.seconds`, `limits.steps` and at least one check are required.
+- `start` sets the state before the agent begins: `seed_cart`, `device` settings (for example the next payment result) and `network`.
 
-### Checks
+### Check types
 
 | Type | Passes when |
 | --- | --- |
-| `order_exists` | An order contains every item in `items` (match by `id` or `name`, optionally `quantity`). With `count`, the total number of orders must equal it. |
-| `screen_shown` or `text_present` | `text` is on the final screen (not case sensitive). |
-| `text_absent` | `text` is not on the final screen. |
-| `text_seen` | `text` appeared in any step's output, for messages that come and go, such as a declined payment. |
+| `order_exists` | An order in the session has every listed item (by `id` or `name`, with `quantity`). Add `count` to require an exact number of orders. |
+| `screen_shown` / `text_present` | The text is on the final screen. |
+| `text_absent` | The text is not on the final screen. |
+| `text_seen` | The text appeared at some step, even if the screen changed later. |
 | `no_crash` | No step reported a crash. |
 
-The run passes only when every check passes.
+## How it is scored
 
-## What is measured
-
-Each run saves `run.json` and `steps.jsonl` in `.shipvo/eval/<run id>/`:
-
-- pass or fail for each check, with a detail line;
-- steps, seconds, errors and retries (the same failing call repeated with the same arguments);
-- findings: each failing tool call grouped by tool and error code, with counts;
-- how the run ended: `agent`, `step_limit` or `time_limit`;
-- the recording path, if the agent used `record_start` and `record_stop` (see [Record a demo video](record.md)).
-
-## Compare runs
-
-```bash
-npx shipvo eval report --out eval.md
-```
-
-The report groups runs by agent, model and task and shows the pass rate, the median steps and the median seconds, with a link to each run's steps and recording. `--out eval.md` writes the Markdown and a matching `eval.json`; `--json` prints the rows.
+- **Steps**: tool calls the agent made, not counting `end_session`.
+- **Errors**: steps that returned an error. **Retries**: the same call repeated right after it failed.
+- **Findings**: each error code, with the tool and how many times it happened.
+- **Ended by**: `agent`, `step_limit` or `time_limit`. At a limit, Shipvo reads the final screen and the orders itself.
 
 ## Troubleshooting
 
-- **`no task "x": expected tasks/x.task.json`**: pass a path to the file, or put it in `tasks/` with the `.task.json` ending.
-- **`open_app failed at the start of the run`**: the MCP server is not running at `--mcp`, or the key is wrong. Start it, or pass `--key`.
-- **`unknown check type`**: use one of the types in the table above.
-- **The agent gets `the eval run is over`**: the step or time limit ended the run. Raise `limits` in the task.
-- **Calls in other sessions are not scored**: use the session name Shipvo printed in every tool call.
+- **`no task "x": expected tasks/x.task.json`**: run the command from the folder that has `tasks/`, or pass the file path.
+- **`open_app failed at the start of the run`**: the MCP server is not reachable or the app name is wrong. Check `--mcp` and `--key`.
+- **The run ends with `step_limit` right away**: raise `limits.steps`, or check that the agent is not repeating a failing call (see Retries).
+- **The agent's calls are not counted**: use the session name Shipvo printed in every tool call. Calls for another session are not scored.
+- **HTTP 410 from the proxy**: the run is over. Start a new run.
 
 ## Next steps
 
-- [Agents and Shipvo apps](agents.md): the tools your agent can call.
-- [Test your app in CI](testing.md): turn what an agent did into a typed test with `export_test`.
-- [Record a demo video](record.md): attach a recording to a run.
+- [Test with an assistant](test-with-an-assistant.md) and [agents](agents.md): how an agent drives the phone.
+- [Typed tests](testing.md): keep what an agent finds as a test you run in CI.
+- [Record demo videos](record.md): record an eval run.
