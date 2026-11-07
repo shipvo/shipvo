@@ -8,3 +8,5 @@ export { routeStore, TESTER_RULE, SHIPVO_TESTERS_GROUP, SHIPVO_TESTERS_JOIN_URL,
 export type { RouteAnswers, RouteStep, StoreRoute, StoreRoutes, AccountType } from "./route.js";
 export { renderFrame, fitCaption, frameStyleFor, decodePng, encodePng } from "./frames.js";
 export type { FrameOptions, FrameStyle, RawImage } from "./frames.js";
+export { renderPolicyText } from "./policy-text.js";
+export type { PolicyContact, PolicyDoc } from "./policy-text.js";

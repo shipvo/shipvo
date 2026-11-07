@@ -35,6 +35,8 @@ Ship
   eas build [args]            Link the iOS scheme, then run eas build
   login [--json]              Sign in with GitHub and get a key for the hosted simulator
   store details --dry-run     Draft Play Data safety answers and a privacy policy from shipvo.json
+  store policy [--out dir] [--strict]
+                              Write privacy-policy.md and .html from what the app declares (never uploads)
   store setup [--company yes|no] [--android-now] [--play-account-before-2023-11-13]
                               Pick the store accounts to open and write store-plan.json
   store screenshots [--out dir] [--sim url]

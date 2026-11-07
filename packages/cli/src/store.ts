@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { join } from "node:path";
 import { createSign } from "node:crypto";
-import { checkScreenshot, checkSet, renderFrame, SCREENSHOT_SETS, deriveStoreDetails, renderDataSafetyCsv, renderPrivacyPolicy, routeStore, SHIPVO_TESTERS_GROUP, SHIPVO_TESTERS_JOIN_URL } from "@shipvo/store";
+import { checkScreenshot, checkSet, renderFrame, SCREENSHOT_SETS, deriveStoreDetails, renderDataSafetyCsv, renderPrivacyPolicy, renderPolicyText, routeStore, SHIPVO_TESTERS_GROUP, SHIPVO_TESTERS_JOIN_URL } from "@shipvo/store";
 import type { RouteAnswers, ScreenshotSetId, StoreRoute } from "@shipvo/store";
 import { args, loadConfig } from "./config.js";
 import { startSim } from "./explore.js";
@@ -65,7 +65,8 @@ async function storeRun(argv: string[]): Promise<void> {
   if (sub === "status") return status(rest);
   if (sub === "testers") return testers(rest);
   if (sub === "screenshots") return screenshots(rest);
-  if (sub !== "details") { console.error("Usage: shipvo store details --dry-run [--out dir] | store setup | store status | store screenshots | store testers"); process.exit(2); }
+  if (sub === "policy") return policy(rest);
+  if (sub !== "details") { console.error("Usage: shipvo store details --dry-run [--out dir] | store setup | store status | store policy | store screenshots | store testers"); process.exit(2); }
   const a = args(rest);
   if (a["dry-run"] === undefined || a["dry-run"] === "false") { console.error("shipvo store details: upload is not available yet; use --dry-run"); process.exit(2); }
   const cfg = loadConfig();
@@ -81,6 +82,25 @@ async function storeRun(argv: string[]): Promise<void> {
   console.log(`\nYou still need to answer (${d.unknown.length}):`);
   for (const u of d.unknown) console.log(`  - ${u.question}`);
   console.log(`\nWrote ${join(out, "data-safety.csv")} and ${join(out, "privacy-policy.md")}. Nothing was uploaded.`);
+}
+
+/** `shipvo store policy [--out dir] [--strict]`: write privacy-policy.md and privacy-policy.html. Never uploads. */
+async function policy(argv: string[]): Promise<void> {
+  const a = args(argv);
+  const cfg = loadConfig();
+  const d = deriveStoreDetails(cfg);
+  const doc = renderPolicyText(d, cfg.listing?.privacy);
+  const out = a.out && a.out !== "true" ? a.out : ".shipvo/store";
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "privacy-policy.md"), doc.markdown);
+  writeFileSync(join(out, "privacy-policy.html"), doc.html);
+  console.log(`Privacy policy for ${d.appName}: ${d.rows.length === 0 ? "no data uses declared" : d.rows.map((r) => r.dataType).join(", ")}.`);
+  if (doc.missing.length) {
+    console.log("\nSet these in shipvo.json before you publish:");
+    for (const m of doc.missing) console.log(`  - ${m}`);
+  }
+  console.log(`\nWrote ${join(out, "privacy-policy.md")} and ${join(out, "privacy-policy.html")}. Review them, then host the page yourself. Nothing was uploaded.`);
+  if (doc.missing.length && a.strict !== undefined && a.strict !== "false") process.exitCode = 1;
 }
 
 const PLAN_FILE = "store-plan.json";
