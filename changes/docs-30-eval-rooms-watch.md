@@ -1,0 +1,1 @@
+- docs: new page "Score an agent on an app task" for `shipvo eval run` and `eval report`; the agents page now covers rooms, `list_sessions` details and the `/watch` page; the CLI guide lists `shipvo eval`. No migration.
