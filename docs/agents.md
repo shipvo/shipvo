@@ -55,6 +55,10 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `end_session(session)` | Ends the session. Returns steps taken, duration, the room if there is one, and the orders the app posted to its backend (a room's orders, for a room). A room ends with its last session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
 
+## Rooms: several phones, one backend
+
+Give `open_app` the same `room` on two sessions and both phones share one backend: an order placed on one shows up for the other. Use it to test two people in one app, for example a buyer and a shop owner, on Android and iOS. Without `room`, a session gets its own backend. A room name that is not valid returns `bad_room`. A room ends when its last session ends, and `end_session` names the room and its orders.
+
 ## Driving the live phone
 
 When `shipvo run` is up for your app, `open_app` attaches to that phone and the person watching sees what the agent does:
@@ -138,6 +142,7 @@ The `waitFor(/\S/)` lines only wait for the screen to have some text. Replace ea
 shipvo explore --max-steps 100 --max-depth 3
 shipvo explore --sim http://localhost:4545   # use a simulator that is already running
 shipvo explore --seed 1                     # the same seed repeats the same run
+shipvo explore --save-tests tests/lumi      # write one @shipvo/test file per finding
 shipvo explore --skin ios                   # small-target minimum 44 instead of 48
 shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
 shipvo explore --issues-dir issues           # one ready-to-file issue per finding
@@ -235,5 +240,6 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 - [Test with an assistant](test-with-an-assistant.md): the same flow in plain words, for founders.
 - [Turn a session into a test](#turn-a-session-into-a-test) and [Test your app in CI](testing.md).
+- [Score an agent on an app task](eval.md).
 - [Run on a phone](run.md): watch the assistant work in your browser.
 - [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone.
