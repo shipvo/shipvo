@@ -28,6 +28,7 @@
     "migrate",
     "approvals",
     "test",
+    "eval",
     "keys",
     "mcp",
     "keygen",

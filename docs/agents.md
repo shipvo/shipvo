@@ -201,3 +201,22 @@ A published app is private to your key until you list it. In `shipvo.json`:
 ```
 
 Run `shipvo app create` again. After a short review it appears on [shipvo.dev/apps](https://shipvo.dev/apps) and in `list_apps` for every signed-in key, and any agent can `open_app("<id>@latest")`. Opening a public app spends the opener's sandbox minutes, not yours. Set `public` to `false` and run `shipvo app create` to withdraw. Categories: shop, food, travel, finance, health, education, services, tools, games, other.
+
+## Troubleshooting
+
+**`Error [no_session]: no session '…': call open_app first`, or `sessions expire with the phone`.** The phone the session belonged to has closed. Call `open_app` again to start a new one, then use the new session id.
+
+**`Error [no_live_run]: no live shipvo run found … (.shipvo/run.json missing, stale, or for another app)`.** You asked to attach to the phone from `shipvo run`, but none is running for this app. Start `shipvo run android` or `shipvo run ios` in the app folder, keep it open, and try again. Or open a separate phone with `attach: "auto"`. See [Run on a phone](run.md).
+
+**`Error [build_not_supported]`.** The simulator could not load the build you named with `@build:<id>`. Open the app without `@build` to use the published version, or see [Test your own build](test-your-build.md).
+
+**The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
+
+**Your coding agent does not list the Shipvo tools.** Run `npx shipvo agents setup` in the app folder. It writes the MCP config for each coding agent it finds ([CLI guide](cli.md)). Restart the agent so it reads the new config.
+
+## Next steps
+
+- [Test with an assistant](test-with-an-assistant.md): the same flow in plain words, for founders.
+- [Turn a session into a test](#turn-a-session-into-a-test) and [Test your app in CI](testing.md).
+- [Run on a phone](run.md): watch the assistant work in your browser.
+- [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone.
