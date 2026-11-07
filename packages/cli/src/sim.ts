@@ -64,7 +64,7 @@ export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>;
     try { await build(); const seconds = (Date.now() - t0) / 1000; log(`rebuilt in ${seconds.toFixed(1)} s`); onResult?.({ ok: true, seconds }); }
     catch (e) { const message = friendlyBuildError((e as Error).message, verbose); log(message); onResult?.({ ok: false, message }); }
     running = false;
-    if (again && !closed) { again = false; void run(); }
+    if (again && !closed) { again = false; onStart?.(); void run(); }
   };
   const w = watch(dir, { recursive: true }, (_ev, file) => {
     if (closed || (file && ignoredPath(String(file)))) return;

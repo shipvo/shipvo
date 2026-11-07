@@ -85,7 +85,7 @@ export const RELOAD_PATH = "/__shipvo/reload";
 const RELOAD_CLIENT = `(function(){if(!window.EventSource)return;var b=document.getElementById("banner"),u=document.getElementById("updating"),f=document.getElementById("app");
 var es=new EventSource("${RELOAD_PATH}");
 es.onmessage=function(m){var d;try{d=JSON.parse(m.data)}catch(e){return}
-if(d.type==="building"){if(u)u.hidden=false}
+if(d.type==="building"){if(b&&!b.hidden){b.hidden=true;window.fit&&fit()}if(u)u.hidden=false}
 else if(d.type==="error"){if(u)u.hidden=true;if(b){b.textContent=d.message;b.hidden=false;window.fit&&fit()}}
 else if(d.type==="reload"){if(u)u.hidden=true;if(b){b.hidden=true;window.fit&&fit()}try{f.contentWindow.location.reload()}catch(e){f.src=f.src}}}})()`;
 
