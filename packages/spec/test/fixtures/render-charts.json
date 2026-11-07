@@ -1,0 +1,18 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "chart-demo", "name": "Charts" },
+  "theme": { "palette": { "primary": "#0B5FFF", "accent": "#C2410C", "background": "#FFFFFF", "surface": "#F3F4F6", "text": "#111827", "muted": "#4B5563", "danger": "#B91C1C", "success": "#047857" } },
+  "data": { "sales": { "source": "collection", "fields": { "day": "text", "amount": "number", "team": "text" }, "seed": [
+    { "day": "Mon", "amount": 100, "team": "A" },
+    { "day": "Mon", "amount": 20, "team": "B" },
+    { "day": "Tue", "amount": 90, "team": "A" },
+    { "day": "Wed", "amount": 140, "team": "A" },
+    { "day": "Wed", "amount": 10, "team": "B" }
+  ] } },
+  "screens": [{ "id": "home", "title": "Dashboard", "body": [
+    { "type": "chart", "kind": "line", "from": "sales", "x": "{{ item.day }}", "y": "{{ item.amount }}", "aggregate": "sum", "label": "Line revenue" },
+    { "type": "chart", "kind": "area", "from": "sales", "x": "{{ item.day }}", "y": "{{ item.amount }}", "aggregate": "sum", "label": "Area revenue" },
+    { "type": "chart", "kind": "bar", "from": "sales", "x": "{{ item.day }}", "y": "{{ item.amount }}", "series": "{{ item.team }}", "aggregate": "sum", "label": "Bar revenue by team" },
+    { "type": "chart", "kind": "donut", "from": "sales", "x": "{{ item.team }}", "y": "{{ item.amount }}", "aggregate": "sum", "label": "Donut share" }
+  ] }]
+}

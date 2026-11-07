@@ -56,9 +56,9 @@ Functions: `sum avg min max count unique sortBy groupBy first last take`; `today
 
 ## What it checks
 
-Errors: schema violations; HTTP to domains not in `permissions.network` (or `permissions.write` for action steps); strings that look like keys or tokens; interactive blocks without `label`; palette text contrast under 4.5:1; invalid CEL syntax; unknown names, fields (of `data`, `state`, `input`, `person`) and functions, with a "did you mean" suggestion; wrong argument counts for library functions; an expression over 2,000 characters, 400 tokens or the cost limit; more than 40 screens or 2,000 blocks.
+Errors: schema violations; HTTP to domains not in `permissions.network` (or `permissions.write` for action steps); strings that look like keys or tokens; interactive blocks without `label`; charts without `label`, with an unknown `kind` or `aggregate`, or without `from`, `x` or `y`; palette text contrast under 4.5:1; invalid CEL syntax; unknown names, fields (of `data`, `state`, `input`, `person`) and functions, with a "did you mean" suggestion; wrong argument counts for library functions; an expression over 2,000 characters, 400 tokens or the cost limit; more than 40 screens or 2,000 blocks.
 
-Warnings: touch targets under 44 px, more than three type sizes on a screen, many different spacing values on a screen, lists without an empty state, charts without a label, actions without a description.
+Warnings: touch targets under 44 px, more than three type sizes on a screen, many different spacing values on a screen, lists without an empty state, actions without a description.
 
 HTTP URLs must be absolute `https://` with a fixed host; `{{ }}` is allowed only in the path and query.
 
@@ -75,4 +75,8 @@ else {
 }
 ```
 
-`style` is `"android"` or `"ios"`; the same spec gives the same tree in both. Blocks: `stack` (`direction: "horizontal"` for a row), `grid`, `scroll`, `text`, `image`, `icon`, `badge` and `list`. Options: `screen`, `data` (values for `http` and `collection` sources), `state`, `params`, `locale`, `timeZone`, `now`. `toSnapshot(r.tree)` writes the tree in the simulator's screen format (`- role "name" [ref=e1]`), which `@shipvo/test` parses. Font names keep only letters, digits, spaces, `-` and `_`. `theme.mode` `"system"` renders the light palette. Theme tokens (`palette`, `radius`, `density`, `elevation`, `font`) set colours, corners, spacing and type.
+`style` is `"android"` or `"ios"`; the same spec gives the same tree in both. Blocks: `stack` (`direction: "horizontal"` for a row), `grid`, `scroll`, `text`, `image`, `icon`, `badge`, `list` and `chart`. Options: `screen`, `data` (values for `http` and `collection` sources), `state`, `params`, `locale`, `timeZone`, `now`. `toSnapshot(r.tree)` writes the tree in the simulator's screen format (`- role "name" [ref=e1]`), which `@shipvo/test` parses. Font names keep only letters, digits, spaces, `-` and `_`. `theme.mode` `"system"` renders the light palette. Theme tokens (`palette`, `radius`, `density`, `elevation`, `font`) set colours, corners, spacing and type.
+
+### Charts
+
+`{ "type": "chart", "kind": "line" | "area" | "bar" | "donut", "from": "charges", "x": "{{ formatDate(item.created, 'day') }}", "y": "{{ item.amount / 100 }}", "label": "Revenue by day" }`. `x`, `y` and the optional `series` are evaluated per item. With `aggregate` (`sum`, `avg`, `count`, `min`, `max`) points are grouped by `x` (and `series`). The HTML is plain SVG in theme colours (`primary`, `accent`, `success`, `danger`, `muted`), so dark palettes work; it has no animation. The screen tree node is `img "Revenue by day: Mon 120, Tue 90"`, so agents can read the data points.
