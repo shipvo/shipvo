@@ -64,8 +64,6 @@ const NAV = [
     { slug: "test", src: "packages/test/README.md", title: "@shipvo/test", desc: "@shipvo/test: typed end-to-end tests for React Native apps in Vitest or any runner, running against the headless Shipvo simulator in CI." },
     { slug: "sim", src: "packages/sim/README.md", title: "@shipvo/sim", desc: "@shipvo/sim: the headless simulator that runs your app in Playwright and exposes accessibility trees and a simulated phone to agents and tests." },
     { slug: "schema", src: "packages/schema/README.md", title: "@shipvo/schema", desc: "@shipvo/schema: zod schemas for Shipvo release pointers, signed envelopes, shell manifests, gate reports and telemetry." },
-    { slug: "threat-model", src: "docs/threat-model.md", title: "Threat model for signed updates", desc: "What a stolen token or a bad server can and cannot do to phones running a Shipvo-updated app, with the file and test behind each claim." },
-    { slug: "crash-loop-paths", src: "docs/android-crash-loop-paths.md", title: "Crash-loop revert paths", desc: "How a release that crashes on start is reverted by trial boots or promoted boots, and how each path is counted." },
     { slug: "lumi-ranker", src: "docs/lumi-ranker.md", title: "Lumi action ranker", desc: "The optional model that scores Lumi's next action, what it does with no model, and the benchmark behind it." },
   ]},
   { group: "Measured results", pages: [
