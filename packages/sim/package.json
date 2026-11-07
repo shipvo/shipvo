@@ -22,6 +22,7 @@
   },
   "files": [
     "server.mjs",
+    "net-gate.mjs",
     "chromium-hint.mjs",
     "browser-resolver.mjs",
     "app-name.mjs",

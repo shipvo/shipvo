@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--HEAD title="Chess on an Android phone and an iPhone, playing in your browser" desc="Two simulated phones play chess side by side, with a clock for each side. Watch a full game, or play white against it. Every square and piece is labelled for AI agents." path="/demos/chess/"-->
+<style>
+.chess-demo{margin-top:28px}
+.cd-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-bottom:16px}
+.cd-status{font-weight:600;margin:0;flex:1 1 220px}
+.cd-btn{min-height:44px;padding:0 20px;border-radius:999px;border:0;background:var(--accent,#7cf);color:#04101a;font:inherit;font-weight:700;cursor:pointer}
+.cd-phones{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.cd-side{min-width:0}
+.cd-side h2{font-size:18px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.cd-clock{font:600 22px ui-monospace,monospace;padding:2px 10px;border-radius:8px;background:var(--ink-2);border:1px solid var(--line)}
+.cd-clock.running{background:var(--text,#fff);color:var(--ink,#000)}
+.cd-side iframe{width:100%;height:min(760px,170vw);border:0;background:transparent;display:block}
+.cd-moves{margin:20px 0 0;padding:14px 18px;border:1px solid var(--line);border-radius:16px;background:var(--ink-2)}
+.cd-moves h2{font-size:16px;margin:0 0 8px}
+.cd-moves ol{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px 18px;font-family:ui-monospace,monospace;font-size:15px;min-height:24px}
+.cd-note{margin-top:20px;color:var(--mute);font-size:16px;max-width:70ch}
+.cd-note a{display:inline-flex;align-items:center;min-height:44px}
+@media (max-width:700px){.cd-phones{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<!--NAV-->
+<main>
+<section style="border-top:0">
+  <div class="wrap">
+    <div class="eyebrow">Live demo</div>
+    <h1>Chess on an Android phone and an iPhone</h1>
+    <p class="lede">Two simulated phones, one game. Android plays white and iOS plays black, each with its own clock. The game starts by itself. Press "Play against it" to take white.</p>
+    <div class="chess-demo" id="chess-demo">
+      <div class="cd-bar">
+        <p class="cd-status" id="cd-status" role="status" data-part="game-status">Loading the phones</p>
+        <button class="cd-btn" id="cd-mode" type="button">Play against it</button>
+      </div>
+      <div class="cd-phones">
+        <section class="cd-side" data-side="white"><h2><span>Android plays white</span><span class="cd-clock" id="cd-clock-white" role="timer" aria-label="White clock">0:00</span></h2><iframe id="cd-phone-white" title="Android phone playing white" data-src="/demos/chess/phone-android.html"></iframe></section>
+        <section class="cd-side" data-side="black"><h2><span>iOS plays black</span><span class="cd-clock" id="cd-clock-black" role="timer" aria-label="Black clock">0:00</span></h2><iframe id="cd-phone-black" title="iOS phone playing black" data-src="/demos/chess/phone-ios.html"></iframe></section>
+      </div>
+      <div class="cd-moves"><h2>Moves</h2><ol id="cd-moves" aria-label="Move list" data-part="move-list"></ol></div>
+      <noscript><p>This demo needs JavaScript.</p></noscript>
+    </div>
+    <p class="cd-note">Every square and every piece on these phones has a label, such as "white knight on d5". An assistant reads the board with the typed actions <code>get_board</code> and <code>legal_moves</code>, and plays with <code>move</code>, through <code>@shipvo/mcp</code>. <a class="link" href="https://github.com/shipvo/shipvo/blob/main/docs/demos/chess.md" rel="noopener">Run it with your own agents</a>.</p>
+  </div>
+</section>
+</main>
+<!--FOOTER-->
+<script type="module" src="/demos/chess/demo.js"></script>
+</body>
+</html>
