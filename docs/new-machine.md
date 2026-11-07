@@ -59,6 +59,6 @@ Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`
 
 ## Next steps
 
-- [Release and roll back](cli.md): publish, promote and roll back from the new machine.
+- [CLI guide](cli.md): publish, promote and roll back from the new machine.
 - [Self-hosting](self-hosting.md): keep the control plane under your own account.
 - [Glossary](glossary.md): what a seed, a shell and a band are.

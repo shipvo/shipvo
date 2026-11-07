@@ -70,7 +70,7 @@ Each line starts with PASS or FAIL. A FAIL line ends with the fix.
 npx shipvo publish --dry-run --out .shipvo/dry-run
 ```
 
-This builds and signs a release and writes files locally. It sends nothing. `--out` defaults to `.shipvo/dry-run`. A dry run builds no patches. Unknown flags are errors, so a typo like `--dryrun` cannot start a real publish.
+This builds and signs a release and writes files locally. It sends nothing. `--out` defaults to `.shipvo/dry-run`. A dry run checks your setup; patches are built when you publish. Unknown flags are errors, so a typo like `--dryrun` cannot start a real publish.
 
 Output from the sample app (`apps/tide-and-tackle`, with a throwaway key; the Metro progress lines are left out):
 
@@ -136,7 +136,7 @@ This signs the code of release 3 as the next release number and publishes it to 
 - **`migrate --apply` refuses to run**: your git tree has uncommitted changes. Commit them, or pass `--force`.
 - **`shipvo init` refuses the folder**: it only creates new folders. Run it in a scratch folder and copy the files, as in Step 1.
 - **`shipvo doctor` prints a FAIL line**: the line ends with the fix. Run it again after applying the fix.
-- **The dry run builds no patches**: that is expected offline. Patches are built when you publish to a control plane.
+- **Patches in a dry run**: the dry run checks your setup. Patches are built when you publish to a control plane.
 
 ## Next steps
 

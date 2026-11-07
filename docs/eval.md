@@ -135,7 +135,7 @@ When a limit ends the run, Shipvo reads the final screen and the orders itself a
 ## Troubleshooting
 
 - **`no task "x": expected tasks/x.task.json`**: run the command from the folder that has `tasks/`, or pass the path to the file.
-- **`open_app failed at the start of the run`**: Shipvo could not reach the MCP server. Start it with `npx @shipvo/mcp --http 8787`, or set `--mcp` and `--key`.
+- **`open_app failed at the start of the run`**: Shipvo could not open the app, for example because it could not reach the MCP server. Start it with `npx @shipvo/mcp --http 8787`, or set `--mcp` and `--key`.
 - **The agent gets `the eval run is over`**: the run already ended (a limit, or `end_session`). Start a new run.
 - **Steps from the agent are not counted**: the agent used a different session name. Calls with another `session` are ignored. Tell the agent to use the printed session in every call.
 - **The run ended by `time_limit` or `step_limit`**: raise the limits in the task file, or check the steps file for a loop.
