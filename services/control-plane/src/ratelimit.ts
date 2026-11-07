@@ -12,9 +12,9 @@ async function sha256Hex(s: string) {
 /**
  * Count one request against a limit. Returns the seconds to wait when over the limit, otherwise 0.
  * KV read-then-put is not atomic: concurrent calls can undercount a little. Fine for abuse control.
- * A KV failure lets the request through, so telemetry is never lost to the limiter.
+ * A KV failure lets the request through, so telemetry is never lost to the limiter, unless `failClosed` is set: then the error is thrown.
  */
-export async function hit(kv: KVNamespace, route: string, limits: Limits, scope: "ip" | "install" | "app", id: string): Promise<number> {
+export async function hit(kv: KVNamespace, route: string, limits: Limits, scope: "ip" | "install" | "app", id: string, failClosed = false): Promise<number> {
   try {
     const win = limits.windowSeconds * 1000, now = Date.now(), bucket = Math.floor(now / win);
     const max = scope === "ip" ? limits.perIp : scope === "install" ? limits.perInstall : limits.perApp;
@@ -22,7 +22,7 @@ export async function hit(kv: KVNamespace, route: string, limits: Limits, scope:
     const n = (Number(await kv.get(key)) || 0) + 1;
     await kv.put(key, String(n), { expirationTtl: limits.windowSeconds + 60 });
     return n > max ? Math.max(1, Math.ceil(((bucket + 1) * win - now) / 1000)) : 0;
-  } catch (e) { console.error("rate limit check failed (request allowed)", e); return 0; }
+  } catch (e) { if (failClosed) throw e; console.error("rate limit check failed (request allowed)", e); return 0; }
 }
 
 /** Check scopes in order (ip, install, app) and stop at the first one over its limit, so a flooder does not burn other budgets. Returns that wait, or 0. */

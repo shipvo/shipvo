@@ -66,9 +66,16 @@ The sidebar has a live feed, findings (each with a Replay button), coverage (scr
 | `try <flow> with bad input` | Same flow with invalid values in text fields. |
 | `stop` | Stops the current run. |
 | `replay bug <n>` | Replays finding number `n`. |
+| `save bug <n> as test` | Same as the Save as test button. Writes `tests/lumi/lumi-<kind>-<n>.test.ts`. |
 | `help` | Lists the commands. |
 
 Other text gets the short list of commands.
+
+### Save a finding as a test
+
+Each finding has a Save as test button. It writes a `@shipvo/test` file to `tests/lumi/` that replays the steps and fails while the bug is there. Run it with `shipvo test`.
+
+In CI, `shipvo explore --save-tests <dir>` writes one file per finding. Names are `lumi-<kind>-<n>.test.ts`, built from the finding kind and its position, never from text in the app.
 
 ### In the page and in code
 
