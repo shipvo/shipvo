@@ -48,7 +48,10 @@ async function storeJson(argv: string[]): Promise<void> {
       return { code: done === steps.length ? "live" : "in_progress", summary: `${done} of ${steps.length} store steps done.`, data: { done, total: steps.length, marks: plan.marks, steps: steps.map((x) => ({ id: x.id, title: x.title, state: plan.marks[x.id] ?? "todo" })) }, next: stepNext(plan) };
     }
     if (sub === "screenshots") {
-      if (process.exitCode) throw new CliFailure("Some store screenshots failed the size or format checks.", "screenshots_failed", 1, [{ command: "shipvo store screenshots --json", why: "Run it again after fixing the app screens." }]);
+      if (process.exitCode) {
+        const why = (lastReport?.files ?? []).filter((f) => !f.ok).map((f) => `${f.file}: ${f.problems.join("; ")}`);
+        throw new CliFailure(`Some store screenshots failed the size or format checks.${why.length ? ` ${why.join(" | ")}` : ""}`, "screenshots_failed", 1, [{ command: "shipvo store screenshots --json", why: "Run it again after fixing the app screens." }]);
+      }
       return { code: "screenshots_ready", summary: "Screenshots written and checked.", data: lastReport ?? { out: argv.includes("--out") ? argv[argv.indexOf("--out") + 1] : "store-assets/raw" }, next: [{ command: "shipvo store status --json", why: "See the next store step." }] };
     }
     const cfg = loadConfig(), d = deriveStoreDetails(cfg);
