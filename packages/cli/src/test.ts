@@ -103,9 +103,9 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string
   const upload = argv.includes("--upload");
   const deviceFlag = flagValue(argv, "--device");
   if (argv.includes("--device") && deviceFlag !== "agent-device" && deviceFlag !== "phone") { return fail('--device must be "agent-device" or "phone"', [{ command: "shipvo test --device agent-device", why: "Pass agent-device, or drop --device to use Shipvo Phone." }]); }
+  if (platform !== "android" && platform !== "ios") { return fail('--platform must be "android" or "ios"', [{ command: "shipvo test --platform ios", why: "Pass android or ios." }]); }
   if (deviceFlag) process.env.SHIPVO_DEVICE_DRIVER = deviceFlag;
   if (deviceFlag === "agent-device") process.env.SHIPVO_PLATFORM = platform;
-  if (platform !== "android" && platform !== "ios") { return fail('--platform must be "android" or "ios"', [{ command: "shipvo test --platform ios", why: "Pass android or ios." }]); }
   if (upload && !reportPath) { return fail("--upload needs --report <file>", [{ command: "shipvo test --report report.json --release 12 --upload", why: "Upload sends the report file." }]); }
   if (upload && !release) { return fail("--upload needs --release <number>", [{ command: "shipvo test --report report.json --release 12 --upload", why: "Results are stored per release." }]); }
   if (argv.includes("--report") && !reportPath) { return fail("--report needs a file name", [{ command: "shipvo test --report report.json", why: "Pass a file name." }]); }

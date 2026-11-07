@@ -347,7 +347,7 @@ importers:
   packages/test:
     dependencies:
       agent-device:
-        specifier: '*'
+        specifier: '>=0.21'
         version: 0.21.36
     devDependencies:
       '@types/node':

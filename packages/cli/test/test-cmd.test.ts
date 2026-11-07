@@ -266,4 +266,12 @@ describe("shipvo test --device", () => {
     expect(err.mock.calls.join("\n")).toContain('--device must be "agent-device" or "phone"');
     err.mockRestore();
   });
+  it("does not set the driver or platform env when the command fails validation", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    delete process.env.SHIPVO_DEVICE_DRIVER; delete process.env.SHIPVO_PLATFORM;
+    expect(await testCmd(["--device", "agent-device", "--platform", "windows"])).toBe(2);
+    expect(process.env.SHIPVO_DEVICE_DRIVER).toBeUndefined();
+    expect(process.env.SHIPVO_PLATFORM).toBeUndefined();
+    err.mockRestore();
+  });
 });

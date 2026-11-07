@@ -28,7 +28,7 @@
   },
   "peerDependencies": {
     "vitest": ">=2",
-    "agent-device": "*"
+    "agent-device": ">=0.21"
   },
   "peerDependenciesMeta": {
     "vitest": {

@@ -109,7 +109,7 @@ export class AgentDevicePhone extends Phone {
     switch (action) {
       case "tap": await this.ad.tap(ref!); break;
       case "type":
-        if (extra.enter) throw new PhoneError("type with enter is not supported through agent-device yet; tap the keyboard's action button instead", "unsupported");
+        if (extra.enter) throw new PhoneError("type with enter is not available through agent-device; tap the keyboard's action button", "unsupported");
         await this.ad.fill(ref!, String(extra.text ?? "")); break;
       case "scroll": await this.ad.scroll(String(extra.direction ?? "down")); break;
       case "back": await this.ad.back(); break;
@@ -146,7 +146,7 @@ export function agentDeviceDriver(app: string, o: AgentDeviceOptions = {}) {
     openUrl: (url: string) => step(() => ad.open(url))(),
     tap: (ref: string) => step(() => ad.tap(ref))(),
     back: step(() => ad.back()),
-    type: (ref: string, text: string, enter?: boolean) => enter ? Promise.resolve<R>({ ok: false, error: "type with enter is not supported through agent-device yet", code: "unsupported" }) : step(() => ad.fill(ref, text))(),
+    type: (ref: string, text: string, enter?: boolean) => enter ? Promise.resolve<R>({ ok: false, error: "type with enter is not available through agent-device; tap the keyboard's action button", code: "unsupported" }) : step(() => ad.fill(ref, text))(),
     snapshot: look,
     errors: async () => [] as string[],
     sizes: async () => sizesOf(nodes),

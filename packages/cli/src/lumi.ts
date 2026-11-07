@@ -1,12 +1,12 @@
 // `shipvo lumi`: the app on Shipvo Phone in your browser, with a sidebar for Lumi (live feed, findings, coverage, command box).
 // Commands are plain text matched by rules. There is no AI call. `Lumi` is the engine and only needs a `Driver`, so tests run it
 // against a fake app. `lumi()` wires it to the simulator and a small local web server.
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { args as parse, loadConfig } from "./config.js";
 import { elements, fieldElements, signature, describeStep, walk, startSim, simDriver, type Driver, type Finding, type Skin, type Step, type WalkOptions } from "./explore.js";
 import { portFree } from "./sim.js";
-import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
 import { loadFrameRenderer, openBrowser } from "./run.js";
 
 export type Mood = "idle" | "working" | "happy" | "worried";

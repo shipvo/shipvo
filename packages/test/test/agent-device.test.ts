@@ -86,3 +86,28 @@ describe("agent-device driver", () => {
     expect(r.error).toContain("npm i -D agent-device");
   });
 });
+
+describe("openApp driver selection", () => {
+  const inDir = (json?: object) => {
+    const d = mkdtempSync(join(tmpdir(), "ad-app-"));
+    if (json) writeFileSync(join(d, "shipvo.json"), JSON.stringify(json));
+    const prev = process.cwd(); process.chdir(d);
+    return () => process.chdir(prev);
+  };
+  it("uses agent-device when opts.driver says so", async () => {
+    const back = inDir();
+    try { await openApp({ app: "dev.tide", driver: "agent-device" }); expect(calls()[0]![0]).toBe("open"); } finally { back(); }
+  });
+  it("uses agent-device when SHIPVO_DEVICE_DRIVER says so", async () => {
+    const back = inDir(); process.env.SHIPVO_DEVICE_DRIVER = "agent-device";
+    try { await openApp({ app: "dev.tide" }); expect(calls()[0]![0]).toBe("open"); } finally { back(); }
+  });
+  it("uses agent-device when shipvo.json has device: agent-device", async () => {
+    const back = inDir({ appId: "dev.tide", device: "agent-device" });
+    try { await openApp({}); expect(calls()[0]).toEqual(["open", "dev.tide", "--platform", "android"]); } finally { back(); }
+  });
+  it("lets opts.driver phone win over the env var", async () => {
+    const back = inDir(); process.env.SHIPVO_DEVICE_DRIVER = "agent-device";
+    try { await openApp({ app: "dev.tide", driver: "phone", sim: "http://127.0.0.1:1" }).catch(() => {}); expect(calls()).toEqual([]); } finally { back(); }
+  });
+});
