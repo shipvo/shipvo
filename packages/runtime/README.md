@@ -63,7 +63,7 @@ The sent body is the unsigned JSON with its closing `}` replaced by `,"sig":"<he
 
 ## Background loads
 
-A silent push or a background task can start the app process with no screen. Shipvo runs the same bundle for that load, so background code uses the staged release. It does not count the load as a boot until the app can show a screen: on Android when the first activity starts, on iOS when the app becomes active. Any number of background loads leave a release's trial boots at 0 and the release pending. The first load that shows a screen counts as boot 1.
+A silent push or a background task can start the app process with no screen. Shipvo runs the same bundle for that load, so background code uses the staged release. It does not count the load as a boot until the app can show a screen: on Android, a load counts at once when the process is in the foreground or visible while the bundle is chosen, and otherwise when the first activity is created or started; on iOS, a load counts at once unless the app is in the background, and otherwise when the app becomes active. Any number of background loads leave a release's trial boots at 0 and the release pending. The first load that shows a screen counts as boot 1.
 
 An uncaught JS error in a background load counts as one failed boot at once, so a release that crashes there is still rolled back. Three loads with a screen and no `markHealthy` still revert the release.
 

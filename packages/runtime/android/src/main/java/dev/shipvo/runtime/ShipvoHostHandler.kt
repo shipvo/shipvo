@@ -1,6 +1,7 @@
 package dev.shipvo.runtime
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
@@ -18,8 +19,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
     synchronized(LOCK) {
       watchActivities()
       val s = Store(ctx)
-      val visible = Store.uiStarted
-      Store.deferredRelease = 0
+      val visible = Store.gate.uiStarted || processCanShowUi()
       Store.bundleSelectedAt = s.now()
       Store.loadsInProcess = Store.loadsInProcess + 1
 
@@ -38,8 +38,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
           File(pending).delete()
           s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
         } else {
-          if (BootRules.countsAtSelection(visible)) s.trialBoots = s.trialBoots + 1
-          else { Store.deferredRelease = s.pendingRelease; Store.deferredIsTrial = true }
+          Store.gate.selectTrial(s, visible)
           Store.runningRelease = s.pendingRelease
           return pending
         }
@@ -47,9 +46,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
       val current = s.currentPath
       if (current != null && File(current).exists()) {
-        if (!BootRules.countsAtSelection(visible)) {
-          Store.deferredRelease = s.currentRelease; Store.deferredIsTrial = false
-        } else if (BootRules.countBoot(s, s.now(), MAX_BOOTS, WINDOW_MS)) {
+        if (Store.gate.selectCurrent(s, visible, s.now(), MAX_BOOTS, WINDOW_MS)) {
           s.addEvent("crash_loop_revert:${s.currentRelease}")
           s.block(s.currentRelease)
           revertToPrevious(s)
@@ -65,16 +62,24 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
   private var watching = false
 
-  /** Counts a deferred load as soon as the first activity starts. */
+  /** True when the process is in the foreground or visible now. Reads the process state, which is already right while the
+   *  first activity is in `onCreate`, before `onActivityStarted`. */
+  private fun processCanShowUi(): Boolean {
+    val info = ActivityManager.RunningAppProcessInfo()
+    ActivityManager.getMyMemoryState(info)
+    return BootRules.visibleImportance(info.importance)
+  }
+
+  /** Counts a deferred load as soon as the first activity starts (the settle trigger for true headless loads). */
   private fun watchActivities() {
     if (watching) return
     val app = ctx.applicationContext as? Application ?: return
     watching = true
     app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
       override fun onActivityStarted(activity: Activity) {
-        synchronized(LOCK) { Store.uiStarted = true; settleDeferred(Store(ctx), crashed = false) }
+        synchronized(LOCK) { Store.gate.uiStarted = true; settleDeferred(Store(ctx), visible = true, crashed = false) }
       }
-      override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+      override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) { Store.gate.uiStarted = true }
       override fun onActivityResumed(activity: Activity) {}
       override fun onActivityPaused(activity: Activity) {}
       override fun onActivityStopped(activity: Activity) {}
@@ -97,16 +102,8 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
     /** Counts the load that was chosen without UI, if one is waiting. Call inside [LOCK]. The release keeps running
      *  the same bundle; a trial release that now reaches its limit is reverted at the next selection. */
-    internal fun settleDeferred(s: Store, crashed: Boolean) {
-      val release = Store.deferredRelease
-      if (release == 0 || !BootRules.countsLater(true, Store.uiStarted, crashed)) return
-      Store.deferredRelease = 0
-      if (Store.deferredIsTrial) {
-        if (s.pendingRelease == release) s.trialBoots = s.trialBoots + 1
-      } else if (s.currentRelease == release) {
-        BootRules.countBoot(s, s.now(), MAX_BOOTS, WINDOW_MS)
-      }
-    }
+    internal fun settleDeferred(s: Store, visible: Boolean, crashed: Boolean) =
+      Store.gate.settle(s, visible, crashed, s.now(), MAX_BOOTS, WINDOW_MS)
 
     internal fun revertToPrevious(s: Store) {
       s.currentPath?.let { if (it != s.previousPath) File(it).delete() }
