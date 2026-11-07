@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--HEAD title="Playground: try Shipvo in your browser, no install" desc="Run a sample app on an Android or iOS phone in your browser. Switch dark mode, large text and right-to-left, and open every Shipvo feature from one sidebar. No install, no account." path="/playground/"-->
+<style>
+.pg{margin-top:28px;display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px;align-items:start}
+.pg-nav{display:flex;flex-direction:column;gap:4px}
+.pg-nav a{display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid transparent;color:inherit;text-decoration:none;font-weight:600}
+.pg-nav a[aria-current="page"]{background:var(--ink-2);border-color:var(--line)}
+.pg-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:24px;align-items:start}
+.pg-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.pg-bar button{min-height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--line);background:var(--ink-2);color:inherit;font:inherit;font-weight:600;cursor:pointer}
+.pg-bar button[aria-pressed="true"]{background:var(--accent,#7cf);color:#04101a;border-color:transparent}
+.pg-group{display:flex;gap:8px;margin-inline-end:12px}
+.pg-phone iframe{width:100%;height:min(760px,170vw);border:0;background:transparent;display:block}
+.pg-panel{padding:18px 20px;border:1px solid var(--line);border-radius:16px;background:var(--ink-2)}
+.pg-panel h2{font-size:20px;margin:0 0 8px}
+.pg-panel p{margin:0 0 12px;max-width:60ch}
+.pg-panel a{display:inline-flex;align-items:center;min-height:44px}
+@media (max-width:900px){.pg,.pg-main{grid-template-columns:1fr}.pg-nav{flex-direction:row;flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<!--NAV-->
+<main>
+<section style="border-top:0">
+  <div class="wrap">
+    <div class="eyebrow">Playground</div>
+    <h1>Try Shipvo in your browser</h1>
+    <p class="lede">A sample app runs on an Android phone or an iPhone, right here. No install and no account. Pick a feature on the left to open it.</p>
+    <div class="pg" id="playground">
+      <nav class="pg-nav" aria-label="Features">
+        <a href="#app" data-feature="app">Sample app</a>
+        <a href="#device" data-feature="device">Device API</a>
+        <a href="#ota" data-feature="ota">Over-the-air updates</a>
+        <a href="#agent" data-feature="agent">Agent tools</a>
+        <a href="#phones" data-feature="phones">Many phones</a>
+      </nav>
+      <div class="pg-main">
+        <div>
+          <div class="pg-bar" role="group" aria-label="Phone settings">
+            <span class="pg-group" role="group" aria-label="Platform">
+              <button type="button" data-platform="android" aria-pressed="true">Android</button>
+              <button type="button" data-platform="ios" aria-pressed="false">iOS</button>
+            </span>
+            <button type="button" id="pg-dark" aria-pressed="false">Dark mode</button>
+            <button type="button" id="pg-large" aria-pressed="false">Large text</button>
+            <button type="button" id="pg-rtl" aria-pressed="false">Right to left</button>
+          </div>
+          <section class="pg-panel" id="pg-panel-app"><h2>Sample app</h2><p>A chess app running on an Android or iOS phone. Tap it, or switch the phone, theme, text size and direction above.</p><a class="link" href="/docs/agents/">How agents drive it</a></section>
+          <section class="pg-panel" id="pg-panel-device" hidden><h2>Device API</h2><p>Camera, location, biometrics, payments, notifications and airplane mode, set live on the phone.</p><a class="link" href="/docs/device-api/">Device API docs</a></section>
+          <section class="pg-panel" id="pg-panel-ota" hidden><h2>Over-the-air updates</h2><p>Signed updates, staged rollouts and crash-loop rollback.</p><a class="link" href="/docs/getting-started/#5-publish-over-the-air">Publish an update</a></section>
+          <section class="pg-panel" id="pg-panel-agent" hidden><h2>Agent tools</h2><p>Drive the phone with tap, type, screen and device_log, the same tools an assistant gets over MCP.</p><a class="link" href="/docs/mcp/">MCP docs</a></section>
+          <section class="pg-panel" id="pg-panel-phones" hidden><h2>Many phones</h2><p>Run several phones side by side and share the setup as a link.</p><a class="link" href="/products/simulators/">Simulators</a></section>
+        </div>
+        <div class="pg-phone"><iframe id="pg-phone" title="Android phone running the sample app"></iframe></div>
+      </div>
+      <noscript><p>The playground needs JavaScript.</p></noscript>
+    </div>
+  </div>
+</section>
+</main>
+<!--FOOTER-->
+<script type="module" src="/playground/playground.js"></script>
+</body>
+</html>
