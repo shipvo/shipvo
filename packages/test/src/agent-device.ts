@@ -18,7 +18,7 @@ const ROLES: Record<string, string> = {
 };
 const quote = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
-/** Parse `agent-device snapshot` output: the `--json` form (an array, or an object holding `nodes`), or the text form (`@e4 [button] "Lists"`). */
+/** Parse `agent-device snapshot` output: the `--json` form (`{ success, data: { nodes: [{ ref, role, type, label, rect }] } }`), or the text form (`@e4 [button] "Lists"`). */
 export function parseSnapshot(raw: string): AdNode[] {
   const text = raw.trim();
   if (text.startsWith("{") || text.startsWith("[")) {
@@ -36,7 +36,7 @@ export function parseSnapshot(raw: string): AdNode[] {
       if (!n || typeof n.ref !== "string") continue;
       const r = n.rect as Record<string, unknown> | undefined;
       const rect = r && [r.x, r.y, r.width, r.height].every((v) => typeof v === "number") ? { x: r.x as number, y: r.y as number, width: r.width as number, height: r.height as number } : undefined;
-      out.push({ ref: n.ref.replace(/^@/, ""), kind: String(n.kind ?? n.role ?? "other"), label: String(n.label ?? n.name ?? ""), rect });
+      out.push({ ref: n.ref.replace(/^@/, ""), kind: String(n.role ?? n.type ?? n.kind ?? "other"), label: String(n.label ?? n.name ?? n.contentDescription ?? ""), rect });
     }
     return out;
   }
@@ -52,7 +52,7 @@ export function parseSnapshot(raw: string): AdNode[] {
 export function toScreen(nodes: AdNode[]): string {
   return nodes.map((n) => {
     const k = n.kind.toLowerCase();
-    const role = ROLES[k] ?? k.replace(/[^\w-]/g, "") ?? "generic";
+    const role = ROLES[k] ?? (k.replace(/[^\w-]/g, "") || "generic");
     const b = n.rect ? ` [bounds=${[n.rect.x, n.rect.y, n.rect.width, n.rect.height].map((v) => Math.round(v)).join(",")}]` : "";
     const head = role === "text" || role === "generic" || role === "img" ? `- ${role} [ref=${n.ref}]${b}${n.label ? `: ${n.label.replace(/\n/g, " ")}` : ""}` : `- ${role}${n.label ? " " + quote(n.label.replace(/\n/g, " ")) : ""} [ref=${n.ref}]${b}`;
     return head;
@@ -74,19 +74,28 @@ export class AgentDevice {
     this.bin = o.bin ?? process.env.SHIPVO_AGENT_DEVICE_BIN ?? (existsSync(local) ? local : "agent-device");
   }
   get platform(): "android" | "ios" { return this.o.platform ?? (process.env.SHIPVO_PLATFORM === "ios" ? "ios" : "android"); }
-  run(args: string[]): Promise<string> {
+  run(args: string[], input?: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      execFile(this.bin, [...args, "--platform", this.platform], { timeout: this.o.timeoutMs ?? 60000, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+      const child = execFile(this.bin, [...args, "--platform", this.platform], { timeout: this.o.timeoutMs ?? 60000, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
         if (!err) return resolve(stdout);
         if ((err as NodeJS.ErrnoException).code === "ENOENT") return reject(new PhoneError(NOT_INSTALLED, "agent_device_missing"));
         reject(new PhoneError(`agent-device ${args[0]} failed: ${(stderr || stdout || err.message).trim().split("\n").slice(0, 5).join("\n")}`, "agent_device_failed"));
       });
+      if (input !== undefined) { child.stdin?.on("error", () => {}); child.stdin?.end(input); }
     });
   }
   async snapshot(): Promise<AdNode[]> { return parseSnapshot(await this.run(["snapshot", "--json"])); }
-  async open(target: string): Promise<void> { await this.run(["open", target]); }
+  async open(target: string): Promise<void> {
+    if (target.startsWith("-")) throw new PhoneError(`cannot open "${target}": an app id or URL cannot start with "-"`, "agent_device_args");
+    await this.run(["open", target]);
+  }
   async tap(ref: string): Promise<void> { await this.run(["click", "@" + ref.replace(/^@/, "")]); }
-  async fill(ref: string, text: string): Promise<void> { await this.run(["fill", "@" + ref.replace(/^@/, ""), text]); }
+  /** Text goes in on stdin (`--text-stdin`), so text that starts with `-` is never read as a flag. agent-device drops one trailing newline, so one is added. An empty text clears the field. */
+  async fill(ref: string, text: string): Promise<void> {
+    const target = "@" + ref.replace(/^@/, "");
+    if (text === "") await this.run(["fill", target, ""]);
+    else await this.run(["fill", target, "--text-stdin"], text + "\n");
+  }
   async scroll(direction: string): Promise<void> { await this.run(["scroll", direction]); }
   async back(): Promise<void> { await this.run(["back"]); }
   async screenshot(): Promise<Uint8Array> {

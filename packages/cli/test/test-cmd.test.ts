@@ -260,6 +260,7 @@ describe("shipvo test secrets", () => {
 });
 
 describe("shipvo test --device", () => {
+  afterEach(() => { delete process.env.SHIPVO_DEVICE_DRIVER; delete process.env.SHIPVO_PLATFORM; });
   it("rejects an unknown device", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await testCmd(["--device", "toaster"])).toBe(2);

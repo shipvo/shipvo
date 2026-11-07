@@ -5,13 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { agentDeviceDriver, openApp, parseSnapshot, toScreen, sizesOf, NOT_INSTALLED } from "../src/index.js";
 
 // A fake `agent-device` that logs its arguments and answers `snapshot --json` with recorded output.
-const SNAPSHOT = JSON.stringify({ nodes: [
-  { ref: "e1", kind: "application", label: "Tide" },
-  { ref: "e2", kind: "text", label: "Welcome back", rect: { x: 0, y: 40, width: 200, height: 20 } },
-  { ref: "e3", kind: "button", label: "Sign in", rect: { x: 10, y: 100, width: 120, height: 52 } },
-  { ref: "e4", kind: "text-field", label: "Email", rect: { x: 10, y: 160, width: 300, height: 52 } },
-  { ref: "e5", kind: "button", label: "Close", rect: { x: 340, y: 20, width: 24, height: 24 } },
-] });
+// Shape of `agent-device snapshot --json` as typed in agent-device 0.21.36 (`{ success, data: { nodes } }`, each node with `role`, `type`, `label`, `ref`, `rect`).
+const SNAPSHOT = readFileSync(join(import.meta.dirname, "fixtures", "agent-device-snapshot.json"), "utf8");
 let dir: string, log: string;
 const calls = () => readFileSync(log, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as string[]);
 
@@ -23,7 +18,8 @@ beforeEach(() => {
   writeFileSync(bin, `#!${process.execPath}
 const fs = require("node:fs");
 const a = process.argv.slice(2);
-fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(a) + "\\n");
+const stdin = a.includes("--text-stdin") ? fs.readFileSync(0, "utf8") : undefined;
+fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(stdin === undefined ? a : [...a, "stdin:" + stdin]) + "\\n");
 if (a[0] === "snapshot") process.stdout.write(${JSON.stringify(SNAPSHOT)});
 else if (a[0] === "screenshot") fs.writeFileSync(a[1], Buffer.from([137, 80, 78, 71]));
 else if (a[0] === "click" && a[1] === "@e99") { process.stderr.write("no such ref"); process.exit(1); }
@@ -63,8 +59,22 @@ describe("agent-device driver", () => {
     await phone.type("Email", "a@b.co");
     await phone.scroll("down");
     await phone.back();
-    expect(calls()).toEqual(expect.arrayContaining([["fill", "@e4", "a@b.co", "--platform", "android"], ["scroll", "down", "--platform", "android"], ["back", "--platform", "android"]]));
+    expect(calls()).toEqual(expect.arrayContaining([["fill", "@e4", "--text-stdin", "--platform", "android", "stdin:a@b.co\n"], ["scroll", "down", "--platform", "android"], ["back", "--platform", "android"]]));
     expect(Array.from(await phone.screenshot())).toEqual([137, 80, 78, 71]);
+  });
+  it("passes text that starts with a dash as data, not a flag", async () => {
+    const phone = await openApp({ app: "dev.tide", driver: "agent-device" });
+    await phone.type("Email", "--help");
+    await phone.type("Email", "-5");
+    const fills = calls().filter((c) => c[0] === "fill");
+    expect(fills.map((c) => c.slice(-1)[0])).toEqual(["stdin:--help\n", "stdin:-5\n"]);
+    expect(fills.every((c) => !c.includes("--help") && !c.includes("-5"))).toBe(true);
+    const ad = (phone as unknown as { ad: { open(t: string): Promise<void> } }).ad;
+    await expect(ad.open("--help")).rejects.toThrow(/cannot start with "-"/);
+    expect(calls().some((c) => c[1] === "--help")).toBe(false);
+  });
+  it("gives a symbols-only kind the generic role", () => {
+    expect(toScreen([{ ref: "e1", kind: "***", label: "" }])).toBe("- generic [ref=e1]");
   });
   it("says what failed when the CLI fails", async () => {
     const phone = await openApp({ app: "dev.tide", driver: "agent-device" });
