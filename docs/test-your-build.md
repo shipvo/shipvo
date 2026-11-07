@@ -5,7 +5,7 @@ This page is for you if your app runs on your computer and you want your AI assi
 ## What you need
 
 - A Shipvo project (a folder with `shipvo.json`).
-- A Shipvo API key. Run `shipvo login` to sign in with GitHub and get one.
+- A Shipvo API key. Run `shipvo login` to sign in with GitHub, then `shipvo mcp` prints your config with the key in it.
 - `SHIPVO_API_KEY` set to that key in the terminal where you run the command, or in the environment of your coding agent's `@shipvo/mcp` server.
 
 ## Upload from the terminal
@@ -55,7 +55,7 @@ A build is private to your account. A key from another account gets `build_not_f
 
 | Code | Meaning | What to do |
 | --- | --- | --- |
-| `no_api_key` | `SHIPVO_API_KEY` is not set. | Run `shipvo login`, then set the variable. |
+| `no_api_key` | `SHIPVO_API_KEY` is not set. The key is read from the environment, not from the saved login. | Run `shipvo login`, then `shipvo mcp` to see your key, and set the variable. |
 | `stdio_only` | You called `upload_build` on the hosted server. | Add the local server: `npx @shipvo/mcp`. |
 | `build_failed` | The web build failed, or there is no app id. | Run `shipvo sim` and fix the first error it shows. Or pass `app`. |
 | `build_too_large` | The upload is over the size limit. | Remove unused images, fonts and large assets, drop unused dependencies, upload again. |
