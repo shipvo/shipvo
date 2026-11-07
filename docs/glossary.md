@@ -82,6 +82,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **pnpm.** A tool that downloads the parts a project needs. You turn it on with `corepack enable`, which comes with Node.
 
-**Eval.** A scored test of an AI agent. You write a task (what to do, and what must be true at the end), the agent does it on a Shipvo phone, and Shipvo checks the result itself. See [Score an agent](eval.md).
 
 **Build id.** The short name Shipvo gives a copy of your app you uploaded for the hosted phone. You open it as `myapp@build:<id>`. It is private to you and deleted when it expires. See [Test your build on the hosted phone](test-your-build.md).
