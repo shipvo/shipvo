@@ -29,7 +29,7 @@ export type ShipvoConfig = {
   /** Deep links `shipvo explore` opens after the start screen (for example "tide://cart"). Needs an onUrl listener in the app. */
   routes?: string[];
   /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */
-  listing?: { public?: boolean; description?: string; category?: string; tagline?: string; icon?: string; screenshots?: string[]; website?: string; capabilities?: string[] };
+  listing?: { public?: boolean; description?: string; category?: string; tagline?: string; icon?: string; screenshots?: string[]; website?: string; capabilities?: string[]; privacy?: { company?: string; contactEmail?: string } };
 };
 
 export function loadConfig(dir = process.cwd()): ShipvoConfig {
@@ -41,7 +41,7 @@ export function loadConfig(dir = process.cwd()): ShipvoConfig {
 }
 
 /** Flags that never take a value, so the word after one stays a positional. Add new boolean flags here. */
-export const BOOLEAN_FLAGS: ReadonlySet<string> = new Set(["json", "skip-build", "fail-on-findings", "no-open", "all", "global", "npx", "hosted"]);
+export const BOOLEAN_FLAGS: ReadonlySet<string> = new Set(["json", "skip-build", "fail-on-findings", "no-open", "all", "global", "npx", "hosted", "strict"]);
 const argPairs = (argv: string[]) => Object.fromEntries(argv.reduce<string[][]>((a, x, i, all) => (x.startsWith("--") ? [...a, [x.slice(2), BOOLEAN_FLAGS.has(x.slice(2)) || all[i + 1] === undefined || all[i + 1].startsWith("--") ? "true" : all[i + 1]]] : a), []));
 export const args = (argv: string[]) => argPairs(argv) as Record<string, string | undefined>;
 
