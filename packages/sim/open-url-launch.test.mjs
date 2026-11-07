@@ -16,14 +16,16 @@ const PORT = pickPort(9400, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-url-launch-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc;
-const PAGE = `<!doctype html><html><head><title>fx</title></head><body><h1 id="h">Home</h1><p id="i">initial: null</p>
+const PAGE = `<!doctype html><html><head><title>fx</title></head><body><h1 id="h">Home</h1><p id="i">initial: null</p><button id="go" onclick="linkOut('appb://item/9')">Open B</button>
 <script>
 let initial = null;
 window.__pnDevice = {
   setInitialUrl(u) { initial = u ?? null; document.getElementById("i").textContent = "initial: " + initial; },
   getInitialURL() { return initial; },
   openUrl(u) { document.getElementById("h").textContent = "Opened " + u; return true; },
-};
+  // What @shipvo/device does for Linking.openURL: ask the simulator whether another app owns the link.
+  };
+window.linkOut = async (u) => { if (!(await window.__pnOpenLink(u))) document.getElementById("h").textContent = "Local " + u; };
 </script></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
@@ -87,6 +89,25 @@ for (const skin of ["android", "iphone"]) {
     const k = await act(s, { action: "kill_app" }); assert.equal(k.ok, true, JSON.stringify(k));
     assert.equal((await act(s, { action: "resume_app" })).ok, true);
     assert.equal(k.reloads >= 1, true, "the page reloaded");
+    assert.equal(await initial(s), null);
+  });
+}
+
+for (const skin of ["android", "iphone"]) {
+  test(`${skin}: app A opens app B's scheme through the link bridge: B is current and gets the URL`, async () => {
+    const s = `link-${skin}`;
+    assert.ok((await call("/session", { session: s, phone: PHONE })).ok);
+    const snap = (await act(s, { action: "screen" })).screen;
+    const ref = /button "Open B" \[ref=(e\d+)\]/.exec(snap)?.[1];
+    assert.ok(ref, snap);
+    const r = await act(s, { action: "tap", ref });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    await new Promise((x) => setTimeout(x, 800));
+    const sc = await act(s, { action: "screen" });
+    assert.match(sc.screen, /Opened appb:\/\/item\/9/);
+    assert.equal(await initial(s), "appb://item/9");
+    const apps = await act(s, { action: "switch_app", id: "d" });
+    assert.equal(apps.current_app, "d");
     assert.equal(await initial(s), null);
   });
 }

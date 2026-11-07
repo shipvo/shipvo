@@ -129,6 +129,18 @@ async function newSession(id, opts = {}) {
   const ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
+  // The app's Linking.openURL for another installed app's scheme lands here: the phone switches to that app and hands it the link once.
+  // Returns true when another app took the link; false means deliver it inside the current app as before.
+  await ctx.exposeFunction("__pnOpenLink", async (url) => {
+    const s = sessions.get(id); if (!s) return false;
+    try {
+      const r = resolveUrl(s.apps, String(url), []);
+      if (!r.app || r.app === s.apps.current_app || !s.apps.installed_apps.some((a) => a.id === r.app)) return false;
+      await switchToApp(s, s.page, r.app);
+      await s.page.evaluate((u) => { globalThis.__pnDevice?.setInitialUrl?.(u); return globalThis.__pnDevice?.openUrl(u); }, String(url));
+      return true;
+    } catch { return false; }
+  });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
   const errors = [];
