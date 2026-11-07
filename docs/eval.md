@@ -2,16 +2,20 @@
 
 This page is for developers who want to know how well a coding agent or model uses their app. You will run one agent on one task, get a pass or fail that Shipvo measures, and compare runs in a report. Every task runs on Android or iOS.
 
-Shipvo does not call any model. `shipvo eval run` opens a phone session, then starts a recording MCP address. Your agent connects to that address like any other MCP server. When the run ends, Shipvo checks the result itself, so the score does not depend on what the agent says it did.
+Your agent calls the model. `shipvo eval run` opens a phone session and a recording MCP address; your agent connects to it like any MCP server. When the run ends, Shipvo checks the result itself, so the score does not depend on what the agent says it did.
 
 ## Run a task
 
-1. Start the Shipvo MCP server (the default address is `http://localhost:8787/mcp`; set `--mcp` or `SHIPVO_EVAL_MCP` to use another).
+1. Start the Shipvo MCP server, then pass one of its keys with `--key` (or `SHIPVO_EVAL_KEY`). The default address is `http://localhost:8787/mcp`; set `--mcp` or `SHIPVO_EVAL_MCP` to use another.
+
+```bash
+PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
+```
 2. Pick a task file. Two sample tasks for the shop template are in `tasks/`: `buy-canvas-tote` (Android) and `declined-card-then-pay` (iOS).
 3. Run it:
 
 ```bash
-npx shipvo eval run buy-canvas-tote --agent claude --model claude-sonnet-5-5
+npx shipvo eval run buy-canvas-tote --agent claude --model claude-sonnet-5-5 --key key1
 ```
 
 4. Shipvo prints an MCP URL, a session name and the task instruction. Point your agent at that URL, give it the instruction, and tell it to use that session in every tool call.
@@ -20,14 +24,14 @@ npx shipvo eval run buy-canvas-tote --agent claude --model claude-sonnet-5-5
 Expected output:
 
 ```text
-PASS buy-canvas-tote (claude) ended by agent: 12 steps, 41s, 0 errors, 0 retries
+PASS buy-canvas-tote (claude) ended by agent: <n> steps, <n>s, <n> errors, <n> retries
   ok   order: 1 matching order(s)
   ok   confirmation: "Order placed" on the final screen
   ok   no-crash: no crash
-Steps: .shipvo/eval/buy-canvas-tote-claude-20261107120000/steps.jsonl
+Steps: .shipvo/eval/buy-canvas-tote-claude-<timestamp>/steps.jsonl
 ```
 
-The numbers above show the format. Your run prints its own. The exit code is 0 on pass and 1 on fail.
+Your run prints its own numbers in place of `<n>`. The exit code is 0 on pass and 1 on fail.
 
 ## Options
 
