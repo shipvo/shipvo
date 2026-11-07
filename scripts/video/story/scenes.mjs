@@ -1,4 +1,4 @@
-// Story ad scenes 1 to 3 (0 to 22 s of the storyboard): street, empty counter, customer walks away.
+// Story ad scenes 1 to 6 (0 to 60 s of the storyboard): street, empty counter, customer walks away, chat, the app appears, Dana's assistant orders.
 // Each scene is a pure function t -> SVG string (1280x720), t in seconds from the start of the film.
 import { createCharacter, CAST } from "../cast/rig.mjs";
 import { cameraAt, parallax, sky, glow, lightRays, particles, grain, vignette, motionBlur, whipPan, progress, EASE, f } from "../camera.mjs";
@@ -9,12 +9,20 @@ export const SHOTS = [
   { id: "street", t0: 0, t1: 5 },
   { id: "counter", t0: 5, t1: 14 },
   { id: "walkaway", t0: 14, t1: 22 },
+  { id: "chat", t0: 22, t1: 32 },
+  { id: "app", t0: 32, t1: 44 },
+  { id: "order", t0: 44, t1: 60 },
 ];
+
+/** Real screen recordings, supplied by the renderer: name -> (seconds into the recording) => image URL, or null when not loaded. */
+export const SCREEN_LENGTH = { order: 9.1 };
+const screens = {};
+export const setScreen = (name, fn) => { screens[name] = fn; };
 export const shotAt = (t) => SHOTS.find((s) => t >= s.t0 && t < s.t1) || SHOTS[SHOTS.length - 1];
 
 const BROWN = "#2b1d24";
 const wrap = (id, t, body, blur = 0) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">${motionBlur(id + "mb", blur, body)}${vignette(id + "v")}${grain(id + "g", t, { fps: FPS })}</svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><rect width="1280" height="720" fill="#2a2140"/>${motionBlur(id + "mb", blur, body)}${vignette(id + "v")}${grain(id + "g", t, { fps: FPS })}</svg>`;
 
 /** A walker: simple silhouette with a phone in hand, bobbing as it walks. */
 function walker(x, y, t, { color, hair, scale = 1, flip = false }) {
@@ -86,6 +94,83 @@ export function walkaway(t) {
   return wrap("wa", t, scene, wp.blur);
 }
 
-const BY_ID = { street, counter, walkaway };
+/** A phone showing a real recording (412x910 source) at film position (x, y), scaled. Falls back to a plain screen when none is loaded. */
+function phone(x, y, scale, name, sec) {
+  const w = 412 * scale, h = 910 * scale, src = screens[name]?.(Math.max(0, Math.min(sec, SCREEN_LENGTH[name] - 0.05)));
+  return `<g transform="translate(${f(x)} ${f(y)})"><rect x="-10" y="-10" width="${f(w + 20)}" height="${f(h + 20)}" rx="${f(34 * scale + 8)}" fill="#10202f" stroke="${BROWN}" stroke-width="4"/>
+    ${src ? `<image href="${src}" width="${f(w)}" height="${f(h)}" preserveAspectRatio="xMidYMid slice"/>` : `<rect width="${f(w)}" height="${f(h)}" rx="${f(26 * scale)}" fill="#eaf4ff"/>`}</g>`;
+}
+
+/** One bold feature caption, mask-revealed, on screen for 1.5 s. */
+function caption(text, t, t0) {
+  if (t < t0 || t > t0 + 1.5) return "";
+  const k = progress(t, t0, t0 + .3, EASE.outCubic), out = progress(t, t0 + 1.2, t0 + 1.5, EASE.inCubic);
+  return `<g opacity="${f(1 - out)}"><clipPath id="cap${f(t0)}"><rect x="${f(640 - 420 * k)}" y="560" width="${f(840 * k)}" height="90"/></clipPath>
+    <g clip-path="url(#cap${f(t0)})"><rect x="220" y="560" width="840" height="90" rx="20" fill="#0b1f3a" opacity=".88"/>
+    <text x="640" y="622" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="46" fill="#ff8a3d">${text}</text></g></g>`;
+}
+
+const jun = createCharacter(CAST.jun, { seed: 2 });
+jun.pose("lean", { at: 22 }).expression("worried", { at: 22 }).lookAt(.6, .1, { at: 22 }).say("Wait, I can fix that.", { at: 22.4 });
+jun.expression("determined", { at: 24.2 }).pose("talk", { at: 24.2 }).gesture("point", { at: 25, dur: 1.2 }).lookAt(.9, .2, { at: 26 });
+jun.expression("happy", { at: 29.5 });
+mara.pose("idle", { at: 32 }).expression("surprised", { at: 38 }).lookAt(-.4, .3, { at: 36 }).expression("relieved", { at: 41 });
+const dana = createCharacter(CAST.dana, { seed: 3 });
+const pip = createCharacter(CAST.pip, { seed: 4 });
+pip.expression("happy", { at: 44 }).say("Found it. Ordering now.", { at: 44.4 });
+dana.pose("idle", { at: 44 }).expression("neutral", { at: 44 }).lookAt(.7, .1, { at: 44 }).expression("surprised", { at: 53 }).pose("cheer", { at: 53.2 }).say("Whoa, that was quick.", { at: 53.4 });
+
+const TYPED = "Make my shop an app every assistant can use.";
+const bubble = (x, y, w, text, fill, ink, op = 1) => `<g opacity="${f(op)}"><rect x="${x}" y="${y}" width="${w}" height="64" rx="22" fill="${fill}"/><text x="${x + 22}" y="${y + 40}" font-family="system-ui,sans-serif" font-size="22" fill="${ink}">${text}</text></g>`;
+
+/** 22 to 32 s: Jun types the ask on a laptop chat, Pip answers. Over-the-shoulder push-in. */
+export function chat(t) {
+  const camera = cameraAt([ // hard cuts at 25 and 27.5: Jun, the chat, Pip
+    { type: "pushIn", t0: 22, t1: 25, from: 1, to: 1.12, x: 420, y: 340 }, { type: "pushIn", t0: 25, t1: 27.5, from: 1.6, to: 1.75, x: 860, y: 300 },
+    { type: "pushIn", t0: 27.5, t1: 32, from: 1.8, to: 1.95, x: 1120, y: 120 }], t);
+  const typed = TYPED.slice(0, Math.round(TYPED.length * progress(t, 23.2, 27, (k) => k)));
+  const sent = t > 27.2, reply = progress(t, 28.4, 28.9, EASE.outCubic), done = t > 30;
+  const bg = sky("kysky", "golden") + `<rect y="470" width="1280" height="250" fill="#4a2e20"/><rect width="1280" height="720" fill="#c98a4b" opacity=".25"/>`;
+  const screen = `<rect x="540" y="110" width="660" height="400" rx="18" fill="#0b1f3a" stroke="${BROWN}" stroke-width="6"/>
+    <text x="570" y="152" font-family="system-ui,sans-serif" font-weight="700" font-size="22" fill="#7fb2ff">Your assistant</text>
+    ${sent ? bubble(570, 190, 600, TYPED, "#ff8a3d", "#0b1f3a") : ""}
+    ${reply > 0 ? bubble(570, 280, 470, done ? "Done. Your app is live." : "Building your app...", "#1d3b66", "#ffffff", reply) : ""}
+    <rect x="570" y="420" width="600" height="56" rx="18" fill="#10294d"/><text x="590" y="456" font-family="system-ui,sans-serif" font-size="24" fill="#fff">${sent ? "" : typed + (Math.floor(t * 2) % 2 ? "|" : "")}</text>
+    <rect x="500" y="510" width="740" height="26" rx="10" fill="#2b1d24"/>`;
+  const bell = t < 22.9 ? `<text x="1000" y="70" font-family="system-ui,sans-serif" font-size="30" fill="#ffe2a8">ding-dong</text>` : "";
+  const fg = jun.render(t, { x: 40, y: 150, scale: .85 }) + pip.render(t, { x: 1080, y: 20, scale: .45 }) + bell;
+  const near = lightRays("kray", { x: 1000, y: -40, t, angle: 110, spread: 50 }) + particles({ seed: 5, t, count: 30 });
+  return wrap("ch", t, parallax([{ depth: .15, svg: bg }, { depth: .6, svg: screen }, { depth: 1, svg: fg }, { depth: 1.4, svg: near }], camera));
+}
+
+/** 32 to 44 s: close-up on the phone as the shop's app appears; the zoom lands on the tap. Mara watches. */
+export function app(t) {
+  const camera = cameraAt([ // hard cuts at 35 (Mara reacts), 37.5 (tap close-up) and 40 (Mara beside the phone)
+    { type: "pushIn", t0: 32, t1: 35, from: 1, to: 1.3, x: 640, y: 380 }, { type: "pushIn", t0: 35, t1: 37.5, from: 1.7, to: 1.85, x: 900, y: 280 },
+    { type: "pushIn", t0: 37.5, t1: 40, from: 1.9, to: 2.1, x: 640, y: 330 },
+    { type: "pushIn", t0: 40, t1: 44, from: 1.1, to: 1.25, x: 800, y: 360 }], t);
+  const bg = sky("apsky", "golden") + `<rect y="470" width="1280" height="250" fill="#5a3a2a"/>` + glow("apg", 640, 360, 420, "#ffd37a", .35);
+  const tapAt = progress(t, 38.2, 38.8, EASE.outCubic), ring = tapAt > 0 && tapAt < 1 ? `<circle cx="640" cy="400" r="${f(20 + 50 * tapAt)}" fill="none" stroke="#ff8a3d" stroke-width="6" opacity="${f(1 - tapAt)}"/>` : "";
+  const ph = phone(496, 40, .66, "order", (t - 32) * .5);
+  const fg = mara.render(t, { x: 870, y: 160, scale: .8, flip: true });
+  const near = particles({ seed: 6, t, count: 30 });
+  return wrap("ap", t, parallax([{ depth: .2, svg: bg }, { depth: 1, svg: ph + ring }, { depth: 1.1, svg: fg }, { depth: 1.4, svg: near }], camera));
+}
+
+/** 44 to 60 s: split screen. Dana and her assistant on the left, the order on the phone on the right. Caption 2 at 46 s. */
+export function order(t) {
+  const camera = cameraAt([ // hard cuts at 48.5 (phone), 53 (Dana reacts), 56.5 (wide)
+    { type: "pushIn", t0: 44, t1: 48.5, from: 1, to: 1.1, x: 320, y: 360 }, { type: "pushIn", t0: 48.5, t1: 53, from: 1.5, to: 1.65, x: 960, y: 380 },
+    { type: "pushIn", t0: 53, t1: 56.5, from: 1.4, to: 1.5, x: 300, y: 300 }, { type: "pushIn", t0: 56.5, t1: 60, from: 1, to: 1.08, x: 640, y: 360 }], t);
+  const half = (id, body, x, w) => `<clipPath id="${id}"><rect x="${x}" y="0" width="${w}" height="720"/></clipPath><g clip-path="url(#${id})">${body}</g>`;
+  const left = sky("dasky", "dusk") + `<rect y="480" width="640" height="240" fill="#3a2a3e"/>` + glow("dag", 300, 260, 300, "#ffb36b", .4) + dana.render(t, { x: 110, y: 60, scale: .9 }) + pip.render(t, { x: 440, y: 40, scale: .5 });
+  const right = `<rect x="640" width="640" height="720" fill="#0b1f3a"/>` + glow("dpg", 960, 360, 360, "#7fb2ff", .3) + phone(790, 70, .62, "order", t - 46);
+  const split = half("dl", left, 0, 640) + half("dr", right, 640, 640) + `<rect x="636" width="8" height="720" fill="#ff8a3d"/>`;
+  const near = particles({ seed: 8, t, count: 24 });
+  return wrap("or", t, parallax([{ depth: 1, svg: split }, { depth: 1.4, svg: near }], camera)).replace(/<\/svg>$/, `${caption("Your assistant can order.", t, 46)}</svg>`);
+}
+
+const BY_ID = { street, counter, walkaway, chat, app, order };
+
 /** The frame at film time t. */
 export const frameAt = (t) => BY_ID[shotAt(t).id](t);
