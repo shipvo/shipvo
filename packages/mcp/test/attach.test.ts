@@ -90,12 +90,10 @@ describe("open_app attach", { timeout: 30_000 }, () => {
     expect(isError).toBe(true); expect(text).toContain("platform_mismatch"); expect(text).toContain("opened android");
     await c.close();
   });
-  it("does not attach to a live run of the other platform", async () => {
+  it("attaches to a live run of the other platform and says so", async () => {
     runJson(process.pid); // the live run is android
     const a = await open({ attach: "always", platform: "ios" });
-    expect(a.isError).toBe(true); expect(a.text).toContain("platform_mismatch"); await a.c.close();
-    const b = await open({ platform: "ios", session: "p-ios2" });
-    expect(b.text).toContain("mode: headless session"); expect(b.text).toContain("platform: ios"); await b.c.close();
+    expect(a.isError).toBeFalsy(); expect(a.text).toContain("attached to the live shipvo run phone"); expect(a.text).toContain("the live phone is android"); await a.c.close();
     const ok = await open({ platform: "android" });
     expect(ok.text).toContain("attached to the live shipvo run phone"); await ok.c.close();
   });
