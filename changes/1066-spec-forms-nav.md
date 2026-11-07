@@ -1,0 +1,2 @@
+- `@shipvo/spec`: specs can collect input and navigate. `button` and `form` blocks (text, number, date, choice and toggle fields with validation messages; submit runs a named action), tab navigation and screen push/back. New `createApp` runs a spec as a live app (`setField`, `submit`, `press`, `selectTab`, `push`, `back`); `renderScreen` shows the new blocks in the labelled screen tree on Android and iOS.
+- Migration: none; new exports `createApp`, `checkField`.

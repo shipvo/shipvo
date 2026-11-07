@@ -1,0 +1,329 @@
+{
+  "seed": 1,
+  "bugs": "on",
+  "ranker": "on",
+  "platform": null,
+  "rows": [
+    {
+      "app": "shop",
+      "budget": 40,
+      "seed": 1,
+      "stepsUsed": 38,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "shop:dead_button",
+        "shop:failing_network_call",
+        "shop:bad_validation"
+      ],
+      "findings": 2,
+      "heldOut": false
+    },
+    {
+      "app": "shop",
+      "budget": 50,
+      "seed": 1,
+      "stepsUsed": 43,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "shop:dead_button",
+        "shop:failing_network_call",
+        "shop:bad_validation"
+      ],
+      "findings": 2,
+      "heldOut": false
+    },
+    {
+      "app": "shop",
+      "budget": 60,
+      "seed": 1,
+      "stepsUsed": 44,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "shop:dead_button",
+        "shop:failing_network_call",
+        "shop:bad_validation"
+      ],
+      "findings": 2,
+      "heldOut": false
+    },
+    {
+      "app": "shop",
+      "budget": 80,
+      "seed": 1,
+      "stepsUsed": 44,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "shop:dead_button",
+        "shop:failing_network_call",
+        "shop:bad_validation"
+      ],
+      "findings": 2,
+      "heldOut": false
+    },
+    {
+      "app": "shop",
+      "budget": 100,
+      "seed": 1,
+      "stepsUsed": 44,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "shop:dead_button",
+        "shop:failing_network_call",
+        "shop:bad_validation"
+      ],
+      "findings": 2,
+      "heldOut": false
+    },
+    {
+      "app": "shop",
+      "budget": 150,
+      "seed": 1,
+      "stepsUsed": 44,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "shop:dead_button",
+        "shop:failing_network_call",
+        "shop:bad_validation"
+      ],
+      "findings": 2,
+      "heldOut": false
+    },
+    {
+      "app": "account",
+      "budget": 40,
+      "seed": 1,
+      "stepsUsed": 40,
+      "screens": 0,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 1,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "account:bad_validation"
+      ],
+      "findings": 0,
+      "heldOut": true
+    },
+    {
+      "app": "account",
+      "budget": 50,
+      "seed": 1,
+      "stepsUsed": 50,
+      "screens": 0,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 1,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "account:bad_validation"
+      ],
+      "findings": 0,
+      "heldOut": true
+    },
+    {
+      "app": "account",
+      "budget": 60,
+      "seed": 1,
+      "stepsUsed": 57,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 2,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "account:blank_screen",
+        "account:bad_validation"
+      ],
+      "findings": 2,
+      "heldOut": true
+    },
+    {
+      "app": "account",
+      "budget": 80,
+      "seed": 1,
+      "stepsUsed": 67,
+      "screens": 8,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "account:broken_route",
+        "account:blank_screen",
+        "account:bad_validation"
+      ],
+      "findings": 3,
+      "heldOut": true
+    },
+    {
+      "app": "account",
+      "budget": 100,
+      "seed": 1,
+      "stepsUsed": 71,
+      "screens": 8,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "account:broken_route",
+        "account:blank_screen",
+        "account:bad_validation"
+      ],
+      "findings": 3,
+      "heldOut": true
+    },
+    {
+      "app": "account",
+      "budget": 150,
+      "seed": 1,
+      "stepsUsed": 71,
+      "screens": 8,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3,
+      "bugIds": [
+        "account:broken_route",
+        "account:blank_screen",
+        "account:bad_validation"
+      ],
+      "findings": 3,
+      "heldOut": true
+    }
+  ],
+  "summary": [
+    {
+      "set": "tuning",
+      "budget": 40,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "tuning",
+      "budget": 50,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "tuning",
+      "budget": 60,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "tuning",
+      "budget": 80,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "tuning",
+      "budget": 100,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "tuning",
+      "budget": 150,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "held out",
+      "budget": 40,
+      "screens": 0,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 1,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "held out",
+      "budget": 50,
+      "screens": 0,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 1,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "held out",
+      "budget": 60,
+      "screens": 5,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 2,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "held out",
+      "budget": 80,
+      "screens": 8,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "held out",
+      "budget": 100,
+      "screens": 8,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    },
+    {
+      "set": "held out",
+      "budget": 150,
+      "screens": 8,
+      "flowsFinished": 2,
+      "flowsTotal": 5,
+      "bugsFound": 3,
+      "bugsPlanted": 3
+    }
+  ]
+}
