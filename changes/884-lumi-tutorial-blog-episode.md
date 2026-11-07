@@ -1,0 +1,2 @@
+- Docs: tutorial "Have Lumi test your app while you watch", a blog post on `shipvo lumi`, and a script and dialogue for the episode "Lumi tests Amara's app".
+- Migration: none.

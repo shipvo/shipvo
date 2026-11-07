@@ -34,6 +34,10 @@ Shared look: soft outlines in warm near-black (`#2b1d24`), large glossy eyes wit
 - **Outfit:** none.
 - **Voice:** bright, slightly high, clear; short phrases, a chime-like lift on good news.
 
+## Amara, the app maker (episode voice only)
+- Used in `scripts/video/story/lumi-episode.md` with the voice `af_heart` (warm). Lumi, the host, uses `af_jessica`.
+- She has a voice only. She has no drawn design in the rig.
+
 ## Rig API (`rig.mjs`)
 
 ```js

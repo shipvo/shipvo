@@ -35,3 +35,14 @@ A step is one tap, type, open-URL or back action. Opening a fresh phone is free.
 ## Planted bugs
 
 Each bug has a flag in `scripts/lumi/spec-app.mjs` and a check that says which finding shows it. `packages/cli/test/lumi-bench.test.ts` turns on one bug at a time and checks that the engine finds that bug, and only that bug, with a budget of 1000. It also checks that nothing is found when all flags are off.
+
+## Results
+
+Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed 1` (bugs on, ranker off). `tide-and-tackle` was not run in this measurement.
+
+| App | Budget | Steps used | Screens | Flows finished | Planted bugs found |
+| --- | --- | --- | --- | --- | --- |
+| `shop` | 50 | 43 | 5 | 2 of 5 | 3 of 3 |
+| `shop` | 200 | 44 | 5 | 2 of 5 | 3 of 3 |
+| `account` | 50 | 50 | 0 | 2 of 5 | 1 of 3 |
+| `account` | 200 | 71 | 8 | 2 of 5 | 3 of 3 |
