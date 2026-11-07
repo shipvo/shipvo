@@ -16,11 +16,11 @@ describe("startSim", () => {
     const prev = process.cwd(); process.chdir(dir);
     try {
       const cfg = { name: "demo", appId: "demo", controlPlane: "http://x" };
-      await expect(startSim({ "skip-build": "true", port: "45999" }, cfg)).rejects.toThrow("@shipvo/sim is not installed");
+      await expect(startSim({ "skip-build": "true", port }, cfg)).rejects.toThrow("@shipvo/sim is not installed");
       expect(ensure).toHaveBeenCalledTimes(1);
       expect(ensure).toHaveBeenCalledWith({ cwd: process.cwd(), quiet: false });
       ensure.mockImplementationOnce(() => { throw new Error("playwright install failed"); });
-      await expect(startSim({ "skip-build": "true", port: "45999" }, cfg)).rejects.toThrow("playwright install failed");
+      await expect(startSim({ "skip-build": "true", port }, cfg)).rejects.toThrow("playwright install failed");
     } finally { process.chdir(prev); }
   });
 });
