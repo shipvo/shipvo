@@ -26,7 +26,7 @@ Shipvo builds a web copy of your app. You will see `Building <your app> for the 
 ![Lumi on Tide & Tackle in a desktop browser: the phone on the left shows the app's home screen, the Lumi sidebar on the right says Idle, shows Findings 0 and has a box labelled Tell Lumi what to do.](/tutorials/test-your-app-with-lumi/start.png)
 
 > **If something goes wrong.**
-> - The terminal shows an error from `npx expo export --platform web` and names a file: that file uses something that only works on a real phone. Ask your assistant to fix it.
+> - The terminal shows an error from `npx expo export --platform web` and names a file: that file uses something that only works inside a phone's own system, such as a camera or Bluetooth module. Ask your assistant to fix it.
 > - It says `Port 4547 is in use. Pass --ui-port <n>.`: type `npx shipvo lumi --ui-port 4600`.
 > - It says `Port 4546 is in use.`: pass `--port <n>` the same way.
 
@@ -42,7 +42,9 @@ To test one path, type its everyday name: `test checkout`, `test login` or `test
 
 Look at **Findings** in the sidebar. Each finding is a problem Lumi found, such as a button that does nothing, a screen that stays blank or a network call that fails. Each problem is listed once. **Coverage** shows how many screens and controls Lumi tried.
 
-![The Lumi sidebar with Findings listing three bugs, each with a Replay button, and Coverage showing 13 screens and 22 of 42 controls tried.](/tutorials/test-your-app-with-lumi/findings.png)
+![The Lumi sidebar with 26 findings, the first three visible, each with a Replay button, and Coverage showing 13 screens and 22 of 42 controls tried so far in a run that is still going.](/tutorials/test-your-app-with-lumi/findings.png)
+
+This screenshot is a run on the sample app, taken while Lumi was still testing, so the coverage numbers are mid-run. The numbers under "What we measured" come from the benchmark apps ([Lumi benchmark](../lumi-bench.md)).
 
 On a phone-width window the sidebar sits below the phone:
 
