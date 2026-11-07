@@ -133,13 +133,15 @@ async function newSession(id, opts = {}) {
   // Returns true when another app took the link; false means deliver it inside the current app as before.
   await ctx.exposeFunction("__pnOpenLink", async (url) => {
     const s = sessions.get(id); if (!s) return false;
-    try {
-      const r = resolveUrl(s.apps, String(url), []);
-      if (!r.app || r.app === s.apps.current_app || !s.apps.installed_apps.some((a) => a.id === r.app)) return false;
-      await switchToApp(s, s.page, r.app);
-      await s.page.evaluate((u) => { globalThis.__pnDevice?.setInitialUrl?.(u); return globalThis.__pnDevice?.openUrl(u); }, String(url));
-      return true;
-    } catch { return false; }
+    // Same rules as open_url: a locked phone, the home screen or the app switcher takes no link. Do not switch.
+    try { assertUnlocked(s.life); assertForeground(s.nav); } catch { return false; }
+    let r;
+    try { r = resolveUrl(s.apps, String(url), []); } catch { return false; }
+    if (!r.app || r.app === s.apps.current_app || !s.apps.installed_apps.some((a) => a.id === r.app)) return false;
+    try { await switchToApp(s, s.page, r.app); } catch { return s.apps.current_app === r.app; }
+    // The phone has switched, so the link is not delivered inside the old app, whatever happens next.
+    try { await s.page.evaluate((u) => { globalThis.__pnDevice?.setInitialUrl?.(u); return globalThis.__pnDevice?.openUrl(u); }, String(url)); } catch {}
+    return true;
   });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   const page = await ctx.newPage();
