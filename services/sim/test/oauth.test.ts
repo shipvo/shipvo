@@ -14,7 +14,7 @@ function setup() {
   sql.exec("CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, github_id INTEGER UNIQUE, github_login, last_login_at)");
   sql.exec("CREATE TABLE apps (app_id, account_id, listed, approved, latest_release)");
   const DB = { prepare: (q: string) => { const st = sql.prepare(q); let b: any[] = []; const o: any = {
-    bind: (...a: any[]) => { b = a; return o; }, first: async () => st.get(...b) ?? null, all: async () => ({ results: st.all(...b) }), run: async () => ({ meta: { changes: st.run(...b).changes } }) }; return o; } } as any;
+    bind: (...a: any[]) => { b = a; return o; }, first: async () => st.get(...b) ?? null, all: async () => ({ results: st.all(...b) }), run: async () => ({ meta: { changes: st.run(...b).changes } }) }; return o; }, batch: async (l: any[]) => { const r = []; for (const x of l) r.push(await x.run()); return r; } } as any;
   return { sql, env: { DB, CONTROL: "x", GITHUB_CLIENT_ID: "gh-id", GITHUB_CLIENT_SECRET: "gh-secret" } as any };
 }
 const call = (env: any, path: string, init?: RequestInit) => worker.fetch(new Request(O + path, init), env);
@@ -203,6 +203,14 @@ describe("authorize and token", () => {
     const a = await startAuthorize(env, cid); const st = new URL(a.headers.get("location")!).searchParams.get("state");
     await call(env, `/authorize/callback?code=gh-ok&state=${st}`, { redirect: "manual" });
     expect((await call(env, `/authorize/callback?code=gh-ok&state=${st}`, { redirect: "manual" })).status).toBe(400);
+  });
+  it("a new sign-in replaces the account's earlier test key, even from another client", async () => {
+    stubGitHub(); const { env, sql } = setup(); const c1 = await register(env); const c2 = await register(env);
+    const t1: any = await (await tok(env, c1, (await signIn(env, c1)).loc.searchParams.get("code")!)).json();
+    const t2: any = await (await tok(env, c2, (await signIn(env, c2)).loc.searchParams.get("code")!)).json();
+    expect(sql.prepare("SELECT COUNT(*) n FROM api_keys WHERE revoked_at IS NULL").get().n).toBe(1);
+    expect((await rpc(env, "tools/call", { authorization: "Bearer " + t1.access_token })).status).toBe(401);
+    expect((await rpc(env, "tools/call", { authorization: "Bearer " + t2.access_token })).status).toBe(503);
   });
   it("expired and revoked OAuth tokens are refused", async () => {
     stubGitHub(); const { env, sql } = setup(); const cid = await register(env);

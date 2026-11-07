@@ -4,6 +4,7 @@ type Db = { DB: D1Database; GITHUB_CLIENT_ID?: string; GITHUB_CLIENT_SECRET?: st
 
 const PENDING_TTL_MS = 10 * 60_000;   // time to finish signing in at GitHub
 const CODE_TTL_MS = 5 * 60_000;       // life of an authorization code
+// KEY_TTL_DAYS, QUOTA_MIN and BETA_APP must change together with the same values in services/control-plane/src/auth.ts.
 const KEY_TTL_DAYS = 30;
 const QUOTA_MIN = 600;
 const BETA_APP = "tide";
@@ -155,15 +156,18 @@ async function token(req: Request, env: Db): Promise<Response> {
   if (f.get("client_id") !== row.client_id) return tokenError("invalid_grant", "Code was issued to a different client.");
   if (f.get("redirect_uri") !== row.redirect_uri) return tokenError("invalid_grant", "redirect_uri does not match the authorization request.");
   if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))) !== row.code_challenge) return tokenError("invalid_grant", "PKCE verification failed.");
-  // Same key as `shipvo login`: sv_test_…, hash stored, 30 days, same quota, revocable. A new sign-in from this client replaces its earlier key.
+  // Same key as `shipvo login`: sv_test_…, hash stored, 30 days, same quota, revocable. A new sign-in replaces every live test key of the account, as `shipvo login` does.
   const key = `sv_test_${rand(24).replace(/[-_]/g, "a")}`;
   const label = `shipvo oauth (${row.client_id})`;
-  await env.DB.prepare(`UPDATE api_keys SET revoked_at = ${NOW} WHERE account_id = ? AND label = ? AND revoked_at IS NULL`).bind(row.account_id, label).run();
+  const keyHash = await sha256(key);
   const expires = iso(Date.now() + KEY_TTL_DAYS * 86400_000);
-  await env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")
-    .bind(BETA_APP, await sha256(key), key.slice(0, 12), "test", label, row.account_id, QUOTA_MIN, expires).run();
-  const made = await env.DB.prepare("SELECT id FROM api_keys WHERE key_hash = ?").bind(await sha256(key)).first<{ id: number }>();
-  if (made) await env.DB.prepare("UPDATE oauth_codes SET key_id = ? WHERE hash = ?").bind(made.id, h).run();
+  // One batch, so a spent code always knows the key it made.
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE api_keys SET revoked_at = ${NOW} WHERE account_id = ? AND scope = 'test' AND revoked_at IS NULL`).bind(row.account_id),
+    env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")
+      .bind(BETA_APP, keyHash, key.slice(0, 12), "test", label, row.account_id, QUOTA_MIN, expires),
+    env.DB.prepare("UPDATE oauth_codes SET key_id = (SELECT id FROM api_keys WHERE key_hash = ?) WHERE hash = ?").bind(keyHash, h),
+  ]);
   return json({ access_token: key, token_type: "Bearer", expires_in: KEY_TTL_DAYS * 86400, scope: "test" });
 }
 
