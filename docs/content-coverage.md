@@ -82,6 +82,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Shared rooms, `list_sessions` details and `end_session` for rooms | [agents](agents.md#share-one-backend-between-phones) | | | |
 | `/watch` page: follow the agent's phone live, view only | [agents](agents.md#watch-the-agents-phone) | | | |
 | `shipvo agents setup --hosted` | [cli](cli.md#shipvo-agents-setup) | | | |
+| Score agents on app tasks (`shipvo eval run`, `shipvo eval report`) | [eval](eval.md) | | | |
 | Data sources that use a saved key (`auth.secret`, `secret_revoked`, `secret_domain`) | [spec-blocks](spec-blocks.md#data-sources-that-use-a-saved-key) | | | |
 | `open_app` with `platform` and `show` opens the phone in your browser | [agents](agents.md), [run](run.md) | | | |
 | Fuller shop template checkout (plain payment errors, offline message, Undo, confirmation screen) | [getting-started](getting-started.md#the-shop-checkout) | | | |
