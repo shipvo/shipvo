@@ -24,7 +24,7 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
-import { secretsRoute } from "./secrets.mjs";
+import { vaultUi } from "./secrets.mjs";
 import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
@@ -514,7 +514,13 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   // CORS plus Chromium's private-network preflight: the app page comes from the public control plane (https) and
   // posts orders and telemetry to this loopback backend.
-  const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS", "access-control-allow-private-network": "true" };
+  const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-private-network": "true" };
+  // Settings, Secrets: same-origin only, no CORS headers. Handled before CORS so a foreign page gets 403 and nothing is forwarded.
+  if (url.pathname.startsWith("/vault-ui/")) {
+    const sid = url.searchParams.get("session") ?? [...sessions.keys()].at(-1) ?? "";
+    const r = await vaultUi({ method: req.method, rest: url.pathname.slice(10), headers: req.headers, token: process.env.PN_OWNER_TOKEN ?? "", control: CONTROL, app: () => { const x = sessions.get(sid)?.apps; return x?.current_app ?? sessions.get(sid)?.app; } });
+    res.writeHead(r.status, { "content-type": "application/json" }); return res.end(r.status === 204 ? "" : JSON.stringify(r.body));
+  }
   const send = (code, obj, type = "application/json") => { res.writeHead(code, { "content-type": type, ...CORS }); res.end(type === "application/json" ? JSON.stringify(obj) : obj); };
   try {
     if (req.method === "OPTIONS") return send(204, "", "text/plain");
@@ -554,15 +560,6 @@ const server = http.createServer(async (req, res) => {
         return send(202, { ok: true });
       }
       return send(202, { ok: true }); // telemetry etc.
-    }
-    // Settings, Secrets: forward the four metadata routes to the control plane with the owner token. No value passes through here.
-    if (url.pathname.startsWith("/vault-ui/")) {
-      const target = secretsRoute(req.method, url.pathname.slice(10));
-      const token = process.env.PN_OWNER_TOKEN ?? "";
-      if (!target) return send(404, { error: "not found" });
-      if (!token) return send(401, { error: "unauthorized", message: "Set PN_OWNER_TOKEN to manage saved keys." });
-      const r = await fetch(CONTROL + target, { method: req.method, headers: { authorization: `Bearer ${token}` } }).catch(() => null);
-      return send(r ? r.status : 502, r ? await r.json().catch(() => ({})) : { error: "unreachable" });
     }
     // the Browser app, in a phone frame
     if (req.method === "GET" && url.pathname === "/browser") return send(200, browserAppPage(url.searchParams.get("skin") === "ios" ? "ios" : "android", url.searchParams.get("session") ?? ""), MIME[".html"]);
