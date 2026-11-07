@@ -2,6 +2,125 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## 2026-11-07 (release)
+
+- **@shipvo/capacitor 0.0.3**: capacitor: iOS plugin class and sample wiring (slice 2 of #985); capacitor: iOS Swift bundle verify, store and rollback with tests (slice 1 of #985)
+- **@shipvo/cli 0.1.7**: cli: ci shots captures Android and iOS on base and head; run: show a Rebuilding line and an Updating hint as soon as a save is seen; run: wrap the top label and keep the error bar below the phone frame; runtime: iOS trial boots under the UIScene lifecycle; cli recognises SceneDelegate; cli: lumi device tests take a free port instead of a fixed one
+- **@shipvo/device 0.1.5**: device: Linking shim with getInitialURL, url events and setInitialUrl; run: device panel beside the phone frame (slice 3 of #442); sim: a text size change reaches the open screen
+- **@shipvo/mcp 0.0.11**: mcp: parity test covers the hosted worker's tool list (slice 4 of #842); sim: open_url resolves URL schemes and returns typed errors (slice 1 of #930); mcp-tools: refuse key-shaped text in tool inputs (slice 5 of #841); phone: request_app_install with a consent card, and list_installed_apps (slice 3 of #843)
+- **@shipvo/runtime 0.1.6**: runtime: scene-based iOS Simulator host that tests trial boots under UIScene; runtime: iOS trial boots under the UIScene lifecycle; cli recognises SceneDelegate; runtime: emulator test that a headless load keeps trialBoots at 0 (Android); runtime: background and headless wake-ups no longer use up a release's trial boots
+- **@shipvo/schema 0.0.7**: phone: allow-listed, SSRF-safe network proxy on the hosted phone
+- **@shipvo/sim 0.1.7**: sim: give each live test its own port range; sim: open_url resolves URL schemes and returns typed errors (slice 1 of #930); sim: a text size change reaches the open screen; spec: renderer core with theme tokens, layout and content blocks, and list (slice 3a of #839)
+- **@shipvo/spec 0.0.3**: spec: chart block (line, area, bar, donut) with data in the screen tree; apps: Notes and Tasks first-party spec app (slice 4a of #843); spec: inject vault secrets into data sources server-side (slice 3 of #841); spec: renderer forms, buttons and tab/stack navigation; spec: run data sources and actions with trimmed responses and cost limits
+- **@shipvo/store 0.0.3**: store: marketing frames for store screenshots (slice 3c of #249)
+- **@shipvo/test 0.1.5**: run: device panel beside the phone frame (slice 3 of #442); test: run @shipvo/test and Lumi on a real simulator or device through agent-device (slice 1 of #1025); test: log in with test accounts from environment secrets
+
+### Changes
+
+- first-run: `scripts/first-run/cross-os.mjs --pack <dir>` packs the CLI, `shipvo`, `create-shipvo` and their `@shipvo/*` dependencies; the install steps use every tarball, so unpublished versions pass.
+- `@shipvo/cli`: `shipvo --version` and `shipvo -v` print the installed version; with `--json` they print the usual envelope with `version`. Listed in `--help`.
+- Migration: none; new flag.
+- init and doctor: `npm create shipvo` and `shipvo init` print one line when your Node is outside the Expo version's supported range, and `shipvo doctor` shows the same as a warning note. Neither fails.
+- `@shipvo/cli`: `shipvo init` writes `pnpm-workspace.yaml` with `minimumReleaseAgeExclude` for `@shipvo/*`, `shipvo` and `create-shipvo`, so pnpm 11 installs a Shipvo release the day it ships.
+- `@shipvo/cli`: `shipvo doctor` warns when a newer `@shipvo/cli` is on npm and prints the update command for your package manager. An unknown command that a newer CLI has now says which version has it.
+- Migration: none.
+- create-shipvo: Back, Cart and link buttons in the shop and content templates are at least 48 x 48, so a new app has no small-target findings.
+- lumi: a small target or duplicate name that repeats on several screens is now one finding ("on N screens"), with every screen kept in its replay paths.
+- lumi: the Done line reads "N actions over S screens (V visits), X new bugs, T in total", using the same screen count as Coverage.
+- `@shipvo/cli`: `shipvo lumi` understands everyday flow names. "checkout" finds Cart then Pay, "login" and "sign up" match their usual wordings, and Lumi says which path it picked. `try <flow> with bad input` on a flow with no text fields says so and tests it with taps.
+- Migration: none.
+- sim: changing the text size now fires the `Dimensions` change event with the new `fontScale`, so an open screen that listens (for example `useWindowDimensions`) redraws. The `set_setting` result for `font_size` adds a `note` saying when a screen reads the size.
+- `@shipvo/test`: `openApp({ driver: "agent-device" })` runs the same typed API (tap, type, scroll, back, screenshot) on a real Android emulator, iOS Simulator or device through the `agent-device` CLI. `agent-device` is an optional peer dependency. New exports: `AgentDevice`, `openAgentDevice`, `agentDeviceDriver`, `parseSnapshot`, `toScreen`.
+- `@shipvo/cli`: `shipvo test --device agent-device` and `shipvo lumi android --device agent-device` (or `"device": "agent-device"` in shipvo.json) use it.
+- Migration: none; Shipvo Phone stays the default.
+- `@shipvo/cli`: when `shipvo store screenshots --json` fails, the summary names each failed file and its problem.
+- Migration: none.
+- runtime: background and headless wake-ups (silent push, background task) no longer use up a release's trial boots or add to the unhealthy-boot count on Android and iOS. A load counts when the app can show a screen; an uncaught JS error still counts at once. No API change, no migration needed.
+- cli: `shipvo run android|ios` shows a collapsible device panel beside the phone frame: location, camera test image, biometrics, payment, network and push. Each change is logged on the page as "(simulated)". No migration needed.
+- device, mcp-tools, test: simulated payments accept `payment.nextResult: "cancel"` (also in the `set_device` MCP tool and the typed `@shipvo/test` phone API), which returns `{ ok: false, reason: "cancelled" }`. Existing values are unchanged.
+- spec: a data source's `auth.secret` is now read from the vault for the request's host only. The key is never in the data, errors or logs, and a key saved for one service is refused for any other (redirects are not followed). Missing or revoked keys say to add the key through the secret form.
+- spec: **Migration:** `RunContext.secrets` now receives the request host as a second argument and may answer `{ refused: "missing" | "revoked" | "domain" | "unavailable" }`. A plain string or `undefined` still works.
+- control-plane: `useSecret`, `runnerSecrets` and `listUses` (`vault-use.ts`) open a key for the person, app and host it is bound to, and record each use. Migration `0024_vault_use.sql` adds `vault_uses` and `vault_revoked`.
+- `@shipvo/spec`: specs can collect input and navigate. `button` and `form` blocks (text, number, date, choice and toggle fields with validation messages; submit runs a named action), tab navigation and screen push/back. New `createApp` runs a spec as a live app (`setField`, `submit`, `press`, `selectTab`, `push`, `back`); `renderScreen` shows the new blocks in the labelled screen tree on Android and iOS.
+- Migration: none; new exports `createApp`, `checkField`.
+- `@shipvo/mcp`: the hosted server's key-less `tools/list` now returns every tool with its hints, the same list the stdio server gives. A CI test fails on any difference.
+- Migration: none; no exported API changed.
+- `@shipvo/control-plane`: the Docker image has `backup` and `restore` commands, and a CI test checks that data written by the previous layout survives an upgrade and that migrations apply once.
+- Migration: none; new commands. Steps are in `docs/self-hosting.md`.
+- apps: Notes and Tasks, a first-party spec app and forkable template in `templates/notes-tasks/app.json`, with tools `add_task`, `complete_task`, `add_note` and `search`. Each task shows its id and a "Complete task form" moves it to Done tasks. Search ignores letter case.
+- spec: `App.call(action, input)` runs an action by name, like a generated tool. Actions now see the latest data. New method only; no migration needed.
+- docs: new page "Behaviour timeline" covering the Timeline tab, its routes, report fields and troubleshooting.
+- docs: `docs/testing.md` has a new section on `--device agent-device`.
+- `@shipvo/runtime` (iOS): a staged release's trial boot is also counted when a scene activates, so apps on the UIScene lifecycle (React Native 0.88, Xcode 27) count one trial boot per load.
+- `@shipvo/cli`: `shipvo init` recognises a project whose Expo setup is in `SceneDelegate`.
+- Migration: none.
+- run: the top label wraps instead of being cut off by the system sheet button, and the build error bar sits below the phone frame (Android and iOS).
+- `shipvo run` and `shipvo sim --watch` print `Rebuilding...` as soon as a save is seen, and the `shipvo run` page shows a small "Updating…" hint until the new build loads.
+- `@shipvo/runtime` (iOS): a scene-based test host (`packages/runtime/ios-scene-host`) runs on the iOS Simulator in CI (job `scene-host`) and checks that a staged release counts one trial boot per load, a background wake counts none, `markHealthy` clears the trial, and three unhealthy loads roll back.
+- Migration: none.
+- `@shipvo/store`: new `renderFrame`, `fitCaption`, `frameStyleFor`, `decodePng` and `encodePng`. They draw an Android or iPhone/iPad style frame with a caption on a solid background, as RGB PNG with no alpha.
+- `@shipvo/cli`: `shipvo store screenshots --mode frames` writes framed store screenshots to `store-assets/frames/<set>/`. Captions come from `store.captions` in `shipvo.json`, or the screen title. `--json` prints one envelope.
+- Migration: none; `--mode` now accepts `fast` or `frames`, and `renderScreenshots` takes an optional fourth argument.
+- `@shipvo/control-plane`: when failures come mostly from installs registered in the last hour, or arrive in a sudden burst, the release is held instead of halted and an owner approval is created. Confirm halts it; dismiss clears the hold.
+- Migration: none.
+- phone: `open_url` now resolves the URL first. Apps declare `schemes` in `phone.json` (and `shipvo.json`); a match returns the owning app id (`app`) and also delivers the URL to the app's URL listener when it has one. Text without a scheme fails with `invalid_url`, and a scheme no app declares fails with `no_handler`. Migration: if you declare no `schemes`, nothing changes. If you declare them, a URL with an undeclared scheme now fails with `no_handler` instead of reaching `onUrl`; add the scheme to `schemes`.
+- device: Linking shim for the simulated device (getInitialURL, url events, openURL) and `__pnDevice.setInitialUrl(url | null)`. The native build re-exports the real `Linking`. No migration needed.
+- hq: buttons, tabs and the brand link are at least 44 px tall at phone and tablet width; the tab row scrolls inside itself.
+- chess: a board screen (`App`) with 64 labelled squares, tap-to-move with highlighted targets, a promotion choice, a status line and a move list, rendered from `ChessStore` for Android and iOS.
+- spec: a `chart` block (line, area, bar, donut) validates, renders as SVG in theme colours, and lists its label and data points as text in the screen tree. A chart without a label, or with an unknown kind or aggregate, is now an error (it was a warning for the missing label). No migration needed for the exported API.
+- Docs: new page "Lumi on Shipvo Phone" (states, captions, `shipvo lumi` options and commands, off switch) and a "Network profiles" section in the Device API page with the profile table.
+- Migration: none.
+- cli: new `exportTest(finding)` in `explore-tests.ts` returns the source of a `@shipvo/test` file (or `null` for kinds a screen check cannot prove) that replays a finding's steps and fails while the bug exists. App text (names, typed text, URLs) is written only as JSON string literals, never in comments.
+- `@shipvo/cli`: `shipvo explore --save-tests <dir>` writes one `@shipvo/test` file per finding. `shipvo lumi` has a Save as test button per finding (and `save bug <n> as test`) that writes to `tests/lumi/`. File names are `lumi-<kind>-<n>.test.ts`.
+- Migration: none; new flag and command.
+- Docs: tutorial "Have Lumi test your app while you watch", a blog post on `shipvo lumi`, and a script and dialogue for the episode "Lumi tests Amara's app".
+- Migration: none.
+- `@shipvo/schema`: new `network.allow` field for `shipvo.json` with `parseNetwork` and `networkHostMatches`.
+- `control-plane`: `POST /phone/net`, an allow-listed, SSRF-safe request proxy for the hosted phone; `set_network_allow` owner command; `device_log` table (migration 0024).
+- Migration: run migration 0024 (additive, adds `device_log`) before deploying. Without it the audit trail is not written.
+- `@shipvo/control-plane`: migration `0023_key_rotation.sql` adds storage for signing key rotation (root keys, statements, and a rotation log) and a typed accessor module. No routes use it yet. `audit_log` is not changed.
+- Deploy procedure: apply the migration first, then deploy the Worker. The migration only adds tables; the old Worker ignores them and keeps writing `audit_log`, so both Worker versions can run during the deploy and no row is lost.
+- Migration: none for users; new tables only.
+- `@shipvo/control-plane`: new `PUT /rotation/<app>/root` and `POST /rotation/<app>` store a root public key and root-signed key rotation statements. Admin session only; publish tokens and the owner token get 403. Each upload writes a `key_rotation_log` row.
+- Migration: none; new routes.
+- `@shipvo/cli`: no API change. Adds `scripts/lumi/bench.mjs`, a step-budgeted benchmark for Lumi Autotest with planted bugs (see `docs/lumi-bench.md`).
+- `@shipvo/cli`: `shipvo explore --record-features <file>` writes one JSON line per action (roles, counts, types and hashes only) as training data for Lumi. Off by default.
+- Migration: none; new flag. `walk` gains an optional `onAction` option.
+- `@shipvo/cli`: `walk` accepts an optional `ranker` model that scores actions; `scripts/lumi/train.mjs` trains one from self-play and `bench.mjs --ranker on|off` compares it. No model ships, because it did not beat the algorithm on the held-out app (docs/lumi-ranker.md).
+- Migration: none; `ranker` is optional and off by default.
+- chess: one shared game store with labelled squares, a move list, and typed actions `get_board`, `legal_moves` and `move(from, to)`. Illegal moves are rejected with a reason.
+- `@shipvo/mcp`: new tools `request_app_install` and `list_installed_apps`. `request_app_install` returns a consent card (app name, publisher, permissions, approve and decline links). Nothing installs until the person approves with their own session. Set `PN_ASSISTANT_TOKEN` to use them. (`install_app` keeps its simulator meaning, so the phone tool has a new name.)
+- `services/control-plane`: `POST /phone/assistant-tokens`, `POST /phone/install-cards`, `GET /phone/install-cards/:id`, `POST /phone/install-cards/:id/approve|decline`, `GET /phone/assistant/apps`. Cards expire after 15 minutes. An assistant token cannot approve.
+- Migration: `0023_phone_install_cards.sql` (additive: two new tables).
+- `@shipvo/mcp` and `@shipvo/mcp-tools`: a tool call whose input contains an API key, private key or token is refused with advice to rotate it and use `request_secret`. The key is never echoed or logged.
+- Migration: none; new exports `containsKeyShapedText`, `inputHasKey` and `KEY_REFUSAL`.
+- Every tool now lists `key_in_input` in its `errorCodes`; new export `KEY_IN_INPUT`.
+- `@shipvo/spec`: new `runSource` and `runAction` run a spec's http data sources and actions with injected `fetch`, secrets and cache, trimmed responses and a CEL cost limit. Errors are typed `RunError`s.
+- Migration: none; new exports.
+- spec: new `renderScreen`, `describeTree`, `unlabelled` and `toSnapshot` render a validated app spec as a labelled screen tree and HTML in Android style or iPhone style (stack, grid, scroll, text, image, icon, badge, list). Additive; no migration needed.
+- `@shipvo/spec`: new `toolsFromSpec(spec, { reserved })` returns one typed tool definition (name, description, JSON input schema, error shapes) for each spec action, sorted and stable.
+- Migration: none; new export.
+- cli: `store`, `app` and `sim` take `--json` and print the shared `{ ok, code, summary, data, next }` envelope with documented exit codes.
+- cli: `store testers --json` now prints that envelope; the guide fields moved into `data`. Read `data.optInUrl`, `data.group` and so on instead of the top level.
+- cli: `--json` is matched as the bare flag only; `store testers --json=true` is no longer accepted. Use `--json`.
+- cli: `shipvo run android|ios` now rebuilds when you save a file and reloads the phone. A failed rebuild keeps the last good page and shows the error in the terminal and in a bar outside the phone.
+- `@shipvo/test`: the step `log in as "buyer"` signs in with the test account from `SHIPVO_TEST_ACCOUNT_BUYER_USER` and `SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD`. A missing variable fails with its name. New export `account(name)`.
+- `@shipvo/cli`: `shipvo explore` issue files and reports mask the values of `SHIPVO_TEST_*` variables.
+- Migration: none; new step and export.
+- capacitor: new Swift package `packages/capacitor/ios` (`ShipvoBundle`). It verifies a signed web bundle (Ed25519 signature, size and SHA-256), stores it in a versioned directory, counts crash-loop boots and rolls back to the previous bundle. Tests run the shared vectors in `packages/capacitor/test-vectors/bundle.json`, which the TypeScript tests also check.
+- capacitor: the iOS plugin (`Shipvo`) has the same methods and results as the Android plugin, serves a verified bundle from the app's private storage, and is linked into `apps/capacitor-sample` through Swift Package Manager.
+
+- Migration: none.
+- control-plane: single sign-on routes `GET /sso/<org>/start` and `GET /sso/<org>/callback` sign people in through an OIDC provider and create a session with the mapped role. See docs/sso.md. Existing routes are unchanged.
+- `@shipvo/cli`: `shipvo ci comment --before-shots <dir> --after-shots <dir>` adds Android and iOS before and after screens to the check comment. Public repos upload to the `shipvo-media` branch (needs `contents: write`); private repos list file names.
+- Migration: none; new options and new exports `uploadShots` and the `pairs`, `moreCount` and `images` fields of `renderComment`.
+- cli: `shipvo ci shots` takes `--skins android,ios` (default both) and `--screens a,b`, and writes `<out>/<skin>/<screen>.png`. The check action captures the PR head and the base commit and passes both to `ci comment`. Migration: `ci shots` no longer writes PNGs straight into `shipvo-shots/`.
+- cli: `shipvo ci shots --before <dir> --after <dir> --json` pairs before and after screenshots per screen and skin (Android and iOS), changed screens first, at most six pairs and a `moreCount`. Screenshots sit in `<dir>/android/` and `<dir>/ios/`. New export `pairShots` in the CLI; nothing changes for existing callers.
+- control-plane: new Timeline tab in the app admin lists every release and pull request check run with its flows, explore findings and screen thumbnails, and compares any two points for Android and iOS.
+- control-plane: test reports accept optional `findings` and `screens` (small image data URLs); new `POST /r/:app/pr/:n/tests` stores pull request runs.
+- Migration: none; the new fields are optional.
+- The default test report size limit is now 256 KB (was 64 KB) so a report with 20 screens fits. `MAX_TEST_REPORT_BYTES` still overrides it.
+
 ## 2026-11-06 (release)
 
 - **@shipvo/capacitor 0.0.2**: capacitor: Android native layer applies a signed web bundle with rollback

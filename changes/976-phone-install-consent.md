@@ -1,3 +1,0 @@
-- `@shipvo/mcp`: new tools `request_app_install` and `list_installed_apps`. `request_app_install` returns a consent card (app name, publisher, permissions, approve and decline links). Nothing installs until the person approves with their own session. Set `PN_ASSISTANT_TOKEN` to use them. (`install_app` keeps its simulator meaning, so the phone tool has a new name.)
-- `services/control-plane`: `POST /phone/assistant-tokens`, `POST /phone/install-cards`, `GET /phone/install-cards/:id`, `POST /phone/install-cards/:id/approve|decline`, `GET /phone/assistant/apps`. Cards expire after 15 minutes. An assistant token cannot approve.
-- Migration: `0023_phone_install_cards.sql` (additive: two new tables).

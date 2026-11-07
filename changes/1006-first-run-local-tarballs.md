@@ -1,1 +1,0 @@
-- first-run: `scripts/first-run/cross-os.mjs --pack <dir>` packs the CLI, `shipvo`, `create-shipvo` and their `@shipvo/*` dependencies; the install steps use every tarball, so unpublished versions pass.

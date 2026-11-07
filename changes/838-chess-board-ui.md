@@ -1,1 +1,0 @@
-- chess: a board screen (`App`) with 64 labelled squares, tap-to-move with highlighted targets, a promotion choice, a status line and a move list, rendered from `ChessStore` for Android and iOS.

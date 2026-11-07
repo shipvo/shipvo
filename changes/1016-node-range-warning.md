@@ -1,1 +1,0 @@
-- init and doctor: `npm create shipvo` and `shipvo init` print one line when your Node is outside the Expo version's supported range, and `shipvo doctor` shows the same as a warning note. Neither fails.

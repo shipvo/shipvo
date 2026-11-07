@@ -1,2 +1,0 @@
-- `@shipvo/mcp`: the hosted server's key-less `tools/list` now returns every tool with its hints, the same list the stdio server gives. A CI test fails on any difference.
-- Migration: none; no exported API changed.

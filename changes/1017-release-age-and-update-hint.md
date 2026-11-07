@@ -1,3 +1,0 @@
-- `@shipvo/cli`: `shipvo init` writes `pnpm-workspace.yaml` with `minimumReleaseAgeExclude` for `@shipvo/*`, `shipvo` and `create-shipvo`, so pnpm 11 installs a Shipvo release the day it ships.
-- `@shipvo/cli`: `shipvo doctor` warns when a newer `@shipvo/cli` is on npm and prints the update command for your package manager. An unknown command that a newer CLI has now says which version has it.
-- Migration: none.

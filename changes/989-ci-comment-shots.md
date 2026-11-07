@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo ci comment --before-shots <dir> --after-shots <dir>` adds Android and iOS before and after screens to the check comment. Public repos upload to the `shipvo-media` branch (needs `contents: write`); private repos list file names.
-- Migration: none; new options and new exports `uploadShots` and the `pairs`, `moreCount` and `images` fields of `renderComment`.
