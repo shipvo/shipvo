@@ -140,3 +140,13 @@ test("the page has a separate status line for input errors and describes Take ov
   assert.match(html, /aria-describedby="take-over-help"/);
   assert.match(html, /\.w-view:focus-visible/);
 });
+
+test("the page clears the input error on history, your next step, toggle and reconnect, and has a light error colour in dark mode", () => {
+  const html = watchPage("android");
+  assert.match(html, /function clearErr\(\)/);
+  assert.match(html, /ws\.onopen=function\(\)\{clearSteps\(\);clearErr\(\)/);
+  assert.match(html, /m\.type==="history"\)\{clearSteps\(\);clearErr\(\)/);
+  assert.match(html, /m\.step\.by==="you"\)clearErr\(\)/);
+  assert.match(html, /take\.onchange=function\(\)\{clearErr\(\)/);
+  assert.match(html, /prefers-color-scheme:dark[^`]*\.w-err\{color:#f2b8b5\}/);
+});
