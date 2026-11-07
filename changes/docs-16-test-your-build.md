@@ -1,0 +1,1 @@
+- docs: new page "Test your build on the hosted phone" covers `upload_build`, `shipvo sim --hosted`, `app@build:<id>`, errors and troubleshooting.

@@ -270,6 +270,10 @@ Writes one JSON line per action with screen features, action features and the ou
 | 1 | the check or test failed (`explore` exits 1 on findings or a failed `--flows` flow only with `--fail-on-findings`, and always when the walk fails) |
 | 2 | usage or setup error |
 
+## `shipvo sim --hosted`
+
+Builds the app the way `shipvo sim` does, uploads it for your `SHIPVO_API_KEY` and prints the id. Open it on the hosted phone as `open_app("<app>@build:<id>")`. `--skip-build` uploads the existing `sim-dist`. Errors and the assistant tool `upload_build` are in [Test your build](test-your-build.md).
+
 ## `shipvo audit`
 
 Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.
