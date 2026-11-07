@@ -38,8 +38,8 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | Tool | What it does |
 | --- | --- |
 | `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
-| `list_sessions` | Open sessions on this server, to resume after a reconnect |
-| `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
+| `list_sessions` | Open sessions on this server: id, app, platform, room, which client opened each, start time and current screen title. Use it to resume after a reconnect or to see who shares a room |
+| `open_app(app, session?, room?, seed_cart?, dark?, attach?, platform?, show?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
 | `attach_session(app?, session?)` | Attach to the live `shipvo run` phone (Android or iOS) from `.shipvo/run.json`, without an app id. Returns `no_live_run` when no run is up (or `app` does not match it) and `attach_failed` when the phone cannot be reached |
 | `screen(session)` | The accessibility tree with refs (`[ref=e12]`) |
@@ -188,9 +188,24 @@ Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_pol
 - The `shipvo.json` read by `@shipvo/mcp` (from `PN_APP_DIR` or the current folder) can only make the rules stricter than the control plane's.
 - The signed-in admin at `/app/<id>/admin` is not gated: the confirm step is for agents holding the owner token.
 
+## Several phones, one backend (rooms)
+
+Give `open_app` the same `room` and the sessions on one simulator share one backend: an order placed on one phone shows on the other, and content and telemetry go through the same store. Use it for two agents (or an Android phone and an iPhone) working in one shop.
+
+```text
+open_app(app: "shop", session: "buyer", room: "r1", platform: "android")
+open_app(app: "shop", session: "owner", room: "r1", platform: "ios")
+list_sessions
+```
+
+- A room name is 1 to 64 letters, digits, `_` or `-`. Anything else returns `bad_room`.
+- Without `room`, each session has its own backend, as before.
+- `end_session` ends the session in the simulator. A room ends with its last session, and the report names the room and its orders.
+- Phones attached to a live `shipvo run` already share that run's one backend. Their room name is recorded and shown in `list_sessions`.
+
 ## Grading an agent
 
-`end_session` returns what the app actually sent to its backend, not what the agent says it did. The Tide & Tackle repo has an agent-eval harness that scores tasks that way ([agent-gate-results.md](agent-gate-results.md)).
+`end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval` uses that to score any agent on a task you write and compare runs: see [Score an agent on your app](eval.md). Results from the Tide & Tackle harness are in [agent-gate-results.md](agent-gate-results.md).
 
 ## Listing your app for every agent
 

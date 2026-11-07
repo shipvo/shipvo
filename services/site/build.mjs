@@ -57,6 +57,7 @@ const NAV = [
     { slug: "record", src: "docs/record.md", title: "Record a demo video", desc: "Have your assistant record an MP4 of the phone with chapter markers using record_start, record_marker and record_stop, for store pages and bug reports." },
     { slug: "record-a-demo-video", src: "docs/record-a-demo-video.md", title: "Record a demo video: worked example", desc: "A worked example for founders: have your assistant record an MP4 of your app with chapters, music and a voice track." },
     { slug: "demo-chess", src: "docs/demos/chess.md", title: "Chess on two phones", desc: "Watch an Android phone and an iPhone play chess in your browser, or run it and let two assistants play a full game through MCP." },
+    { slug: "eval", src: "docs/eval.md", title: "Score an agent on your app", desc: "Run any agent on a task file with shipvo eval and get a score from what the app received: checks, steps, time, errors and a comparison report." },
     { slug: "mcp", src: "packages/mcp/README.md", title: "@shipvo/mcp", desc: "The @shipvo/mcp server for AI agents: run it locally over stdio, remotely over HTTP, or hosted with a key. Config for Claude, Cursor, ChatGPT." },
   ]},
   { group: "Reference", pages: [

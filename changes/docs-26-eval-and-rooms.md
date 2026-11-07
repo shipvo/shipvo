@@ -1,0 +1,2 @@
+- docs: new page "Score an agent on your app" for `shipvo eval run` and `shipvo eval report` (task file, checks, options, output, troubleshooting).
+- docs: the agents page explains shared rooms (`open_app` `room`, `list_sessions`) and lists the `room` argument.
