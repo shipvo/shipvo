@@ -472,10 +472,17 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
         else console.log(`Wrote ${files.length} issue file${files.length === 1 ? "" : "s"} to ${a["issues-dir"]}. To file them:\n${commands.join("\n")}`);
       } else issueInfo = { issue_files: files, file_commands: commands };
     }
+    let testInfo: Record<string, unknown> = {};
+    if (a["save-tests"] !== undefined) {
+      // Lazy import: explore-save imports types from this file, so a static import would be a cycle.
+      const r = (await import("./explore-save.js")).runSaveTests(report.findings, a["save-tests"]);
+      if (!json) console.log(r.message);
+      else testInfo = r.info;
+    }
     const failOn = a["fail-on-findings"] === "true";
     const { exit, code } = outcome(report, flowsFailed, failOn);
     if (json) {
-      const data = { ...issueInfo, ...flowInfo, report_files: [`${out}.md`, `${out}.json`, ...flowFiles], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
+      const data = { ...issueInfo, ...testInfo, ...flowInfo, report_files: [`${out}.md`, `${out}.json`, ...flowFiles], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
       const next = report.error ? [{ command: "shipvo doctor --json", why: "Check the simulator setup." }]
         : report.findings.length || flowsFailed ? [{ command: `open ${out}.md`, why: "Read the steps to reproduce each finding." }, { command: "shipvo explore --json", why: "Run again after fixing to confirm." }]
         : [{ command: "shipvo test --json", why: "Run your step files." }];
