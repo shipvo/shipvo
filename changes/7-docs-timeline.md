@@ -1,0 +1,1 @@
+- docs: new page "Behaviour timeline" covering the Timeline tab, its routes, report fields and troubleshooting.

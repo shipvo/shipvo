@@ -258,3 +258,13 @@ gh issue create --title "Shipvo flows failed on release 42" --body-file shipvo-r
 ```
 
 `--report-md` writes a Markdown file and nothing else; the CLI never calls GitHub. It can be used with `--report`. The file lists the release, the commit and the passed and failed counts. Each failing flow gets its steps, the failed step, the error and any screenshot file names, then the parity limits. A run where every flow passes gets a short "all flows passed" summary. Missing fields (no commit, no release, no screenshots) are shown as "unknown", "not set" or left out. Text is copied from the report as is, so values masked there stay masked.
+
+## Run on a real emulator or simulator with agent-device
+
+`shipvo test --device agent-device` runs the same flows on an Android emulator, the iOS Simulator or a device through the optional [agent-device](https://github.com/callstack/agent-device) CLI. Shipvo Phone stays the default.
+
+1. Install it: `npm i -D agent-device`.
+2. Run: `npx shipvo test --device agent-device --platform ios`. Lumi works the same way: `npx shipvo lumi android --device agent-device`.
+3. Or set `"device": "agent-device"` in `shipvo.json`.
+
+In code: `await openApp({ driver: "agent-device", platform: "android" })`. If the CLI is missing you see `agent-device is not installed; npm i -D agent-device, or drop --device to use Shipvo Phone`. Set `SHIPVO_AGENT_DEVICE_BIN` to use a binary in another place. See [`@shipvo/test`](../packages/test/README.md).
