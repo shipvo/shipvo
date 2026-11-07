@@ -56,7 +56,7 @@ it("ends with the seven next steps, in order, npm install first, using the direc
   const phones = out.split("\n").find((l) => l.startsWith("Phones:"))!;
   expect(phones).toContain("needs no Android Studio");
   expect(phones).toContain("expo run:android");
-  expect(out).toContain("AI agents: npx -y @shipvo/mcp");
+  expect(out).toContain("AI agents: node node_modules/@shipvo/mcp/dist/server.js");
 });
 
 it.each(["blank", "content", "shop"])("the %s template prints the preview step", async (tpl) => {
