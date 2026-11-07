@@ -119,6 +119,35 @@ In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a seg
 
 Add `"presentation": "sheet"` to a screen and to the `navigate` action that opens it. The screen appears as a bottom sheet (a `dialog` in the tree). `{ "back": true }` closes it.
 
+## Data sources that use a saved key
+
+A data source can call a service with a key you saved once in the secret form. The spec holds only the key's name. The key never reaches the assistant, the spec or the screen.
+
+```json
+"secrets": [{ "name": "STRIPE_KEY", "service": "stripe" }],
+"permissions": { "network": ["api.stripe.com"] },
+"data": {
+  "charges": {
+    "source": "http",
+    "get": "https://api.stripe.com/v1/charges",
+    "auth": { "secret": "STRIPE_KEY", "type": "bearer" }
+  }
+}
+```
+
+`type` is `bearer` (default), `basic`, `header` or `query`. For `header` and `query`, `name` sets the header or parameter. Rules the runner enforces:
+
+- The key opens only for the person who saved it, in this app, for the exact domain it was saved for. Subdomains do not match.
+- Redirects are not followed. Any redirect is an error, so the key cannot travel to another host.
+- If the service echoes the key back, it is replaced with `[hidden]` before the data is read.
+- Authed sources are cached only when the host sets a cache scope, so two people never share one entry.
+
+| Code | Meaning | Fix |
+| --- | --- | --- |
+| `secret_missing` | The key is not saved. | Add it through the secret form. |
+| `secret_revoked` | The key was revoked. | Save it again; saving clears the revocation. |
+| `secret_domain` | The key is saved for a different service than the URL's host. No request was sent. | Save the key for this domain, or fix the URL. |
+
 ## Errors you may see
 
 `validate` returns the JSON path and a fix for each error.
