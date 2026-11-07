@@ -1,2 +1,0 @@
-- `@shipvo/cli`: when `shipvo store screenshots --json` fails, the summary names each failed file and its problem.
-- Migration: none.

@@ -1,2 +1,0 @@
-- `@shipvo/runtime` (iOS): a scene-based test host (`packages/runtime/ios-scene-host`) runs on the iOS Simulator in CI (job `scene-host`) and checks that a staged release counts one trial boot per load, a background wake counts none, `markHealthy` clears the trial, and three unhealthy loads roll back.
-- Migration: none.

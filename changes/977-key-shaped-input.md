@@ -1,3 +1,0 @@
-- `@shipvo/mcp` and `@shipvo/mcp-tools`: a tool call whose input contains an API key, private key or token is refused with advice to rotate it and use `request_secret`. The key is never echoed or logged.
-- Migration: none; new exports `containsKeyShapedText`, `inputHasKey` and `KEY_REFUSAL`.
-- Every tool now lists `key_in_input` in its `errorCodes`; new export `KEY_IN_INPUT`.

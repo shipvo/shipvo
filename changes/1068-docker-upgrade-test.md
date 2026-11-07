@@ -1,2 +1,0 @@
-- `@shipvo/control-plane`: the Docker image has `backup` and `restore` commands, and a CI test checks that data written by the previous layout survives an upgrade and that migrations apply once.
-- Migration: none; new commands. Steps are in `docs/self-hosting.md`.

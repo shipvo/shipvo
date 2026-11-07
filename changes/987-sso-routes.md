@@ -1,1 +1,0 @@
-- control-plane: single sign-on routes `GET /sso/<org>/start` and `GET /sso/<org>/callback` sign people in through an OIDC provider and create a session with the mapped role. See docs/sso.md. Existing routes are unchanged.

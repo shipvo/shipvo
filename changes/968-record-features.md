@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo explore --record-features <file>` writes one JSON line per action (roles, counts, types and hashes only) as training data for Lumi. Off by default.
-- Migration: none; new flag. `walk` gains an optional `onAction` option.
