@@ -80,7 +80,7 @@ What it writes (existing files are kept; running it twice changes nothing):
 
 - `eas.json`: profiles `shipvo-android` (image `latest`) and `shipvo-ios` (image `macos-tahoe-26.5-xcode-26.6`, Node 22), plus matching `submit` profiles. Your own settings in `eas.json` are not changed, but the file is written back with 2-space indentation, so its formatting may change on the first run.
 - `.eas/build/android.yml`: JDK 21 install, web build, `npx cap sync android`, `eas/inject_android_credentials`, `eas/run_gradle :app:bundleRelease`.
-- `.eas/build/ios.yml`: web build, `npx cap sync ios`, EAS credential steps, `ExportOptions.plist` written in a YAML step (method `app-store`, team id from the EAS credential steps), then `xcodebuild archive` and export with distribution signing. The iOS signing step names (such as `eas/prebuild_credentials_ios`) are unproven: they were not checked against Expo's custom build functions (https://docs.expo.dev/custom-builds/schema/). `shipvo eas setup` says so when it finds iOS, and your first iOS build is the check.
+- `.eas/build/ios.yml`: web build, `npx cap sync ios`, the EAS credential steps (`eas/resolve_apple_team_id_from_credentials`, `eas/configure_ios_credentials`), `ExportOptions.plist` written in a YAML step (method `app-store`, team id from `eas/resolve_apple_team_id_from_credentials`), then `xcodebuild archive` and export with distribution signing. Every `eas/` step is one of [EAS's built-in functions](https://docs.expo.dev/custom-builds/schema/#built-in-eas-functions), and a test checks that.
 - `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme`, the shared scheme, if it is missing.
 - A `.gitignore` line for `ios/App.xcodeproj`.
 

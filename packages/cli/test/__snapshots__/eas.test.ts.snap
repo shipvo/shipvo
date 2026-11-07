@@ -83,9 +83,6 @@ build:
         command: cd ios/App && pod install
     - eas/resolve_apple_team_id_from_credentials:
         id: resolve_apple_team_id
-    - eas/prebuild_credentials_ios:
-        inputs:
-          project_dir: ios
     - eas/configure_ios_credentials
     - run:
         name: Write ExportOptions.plist
@@ -100,7 +97,7 @@ build:
           <plist version="1.0">
           <dict>
             <key>method</key><string>app-store</string>
-            <key>teamID</key><string>\${{ steps.resolve_apple_team_id.outputs.apple_team_id }}</string>
+            <key>teamID</key><string>\${ steps.resolve_apple_team_id.apple_team_id }</string>
             <key>signingStyle</key><string>manual</string>
             <key>provisioningProfiles</key>
             <dict><key>$BUNDLE_ID</key><string>$PROFILE</string></dict>
@@ -115,7 +112,7 @@ build:
             -scheme App \\
             -configuration Release \\
             -archivePath build/App.xcarchive \\
-            DEVELOPMENT_TEAM="\${{ steps.resolve_apple_team_id.outputs.apple_team_id }}" \\
+            DEVELOPMENT_TEAM="\${ steps.resolve_apple_team_id.apple_team_id }" \\
             CODE_SIGN_STYLE=Manual
           xcodebuild -exportArchive \\
             -archivePath build/App.xcarchive \\
