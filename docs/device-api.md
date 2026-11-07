@@ -155,6 +155,8 @@ device.net.onChange((online) => …);
 
 Simulator: `set_device(online: false)` takes the phone offline; the app's offline banner and queued actions can be tested without touching a radio.
 
+With the network off (`set_device` network off, airplane mode, Wi-Fi and mobile data both off, or the `offline` network profile), the app's `fetch` and `XMLHttpRequest` calls to other origins fail with `TypeError: Network request failed`, like on a phone. This applies to `shipvo sim`, `@shipvo/mcp` and `@shipvo/test` sessions on Android and iOS. Slow profiles add their delay once.
+
 `device.net.type()` returns `none`, `wifi`, `cellular`, or the cellular generation (`2g`, `3g`, `4g`). On web it follows the active network profile. `device.net.onChange` also runs when the profile changes.
 
 ### Network profiles
@@ -205,6 +207,8 @@ const mic = await device.microphone.open();   // web and simulator only; optiona
 
 ## Troubleshooting
 
+- **`TypeError: Network request failed` in the simulator**: the phone's network is off (airplane mode, Wi-Fi and mobile data off, or the `offline` profile). Turn it back on with `set_device`, or call `device_reset`.
+- **A cancelled payment shows as `insufficient_funds`**: your app has `@shipvo/device` older than 0.1.5 in its lockfile. Update it (`pnpm update @shipvo/device`, or the npm or yarn equivalent). From 0.1.5 `payment.nextResult: "cancel"` returns `cancelled`, and a result the simulator does not know throws.
 - **`Location permission denied`**: the permission is `denied` in the simulator (`set_device`) or the person refused the browser prompt. Reset with `device_reset`.
 - **`scan()` throws on a phone**: `expo-camera` is not installed, so `camera` is `unavailable`. Check `device.capabilities()`.
 - **A log entry says `source: "simulated"` when you expected real hardware**: the tab was hidden or headless, or the browser refused access.
