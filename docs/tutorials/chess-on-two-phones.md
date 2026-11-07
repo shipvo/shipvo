@@ -25,7 +25,7 @@ corepack enable
 pnpm install --frozen-lockfile
 ```
 
-`git clone` copies the project into a folder called `shipvo`. `cd shipvo` goes into that folder. `corepack enable` turns on **pnpm**, the tool that installs the project's parts. The last line downloads them. It can take a few minutes and prints a lot of text. You do not need to read it.
+`git clone` copies the project into a folder called `shipvo`. `cd shipvo` goes into that folder. `corepack enable` turns on **[pnpm](../glossary.md)**, the tool that installs the project's parts. The last line downloads them. It can take a few minutes and prints a lot of text. You do not need to read it.
 
 Then build the parts the demo uses:
 
@@ -47,14 +47,14 @@ Type:
 pnpm --filter chess demo
 ```
 
-The first time, Shipvo builds a web copy of the chess app. This is called a **build**. You will see lines about "Metro" and "Exported", which is the tool gathering the app's files. When it is ready you should see:
+The first time, Shipvo builds a web copy of the chess app. This is called a **[build](../glossary.md)**. You will see lines about "Metro" and "Exported", which is the tool gathering the app's files. When it is ready you should see:
 
 ```text
 Chess on Android and iOS: http://127.0.0.1:4810/
 Press Ctrl+C to stop.
 ```
 
-Your browser opens on that address by itself. The number after the last colon can be different on your computer. If no tab opens, copy the address into your browser.
+Your browser opens on that address by itself. The number after the last colon will almost always be different on your computer. If no tab opens, copy the address into your browser.
 
 > **If something goes wrong.**
 > - The port is in use: type `pnpm --filter chess demo -- --port 4810` (any free number works).
@@ -67,7 +67,7 @@ You should see two phones. The left one is an Android phone and the right one is
 
 ![A browser tab with two phone frames side by side. The left one is an Android phone titled Android plays white, the right one an iPhone-style phone titled iOS plays black. Each shows an eight by eight chess board in the starting position, and each has a clock above it showing 0:00.](/tutorials/chess-on-two-phones/01-start.png)
 
-Both phones show the same board. The line at the top of the page says whose turn it is.
+Both phones show the same board. The line at the top of the page says whose turn it is. Each phone is used for its own side: the Android phone for white, the iOS phone for black.
 
 ## 4. Make a move on the Android phone
 
@@ -78,11 +78,11 @@ White moves first, so use the left phone. Click works like a tap.
 
 ![The Android phone and the iOS phone side by side. On the Android phone the white pawn in front of the king is yellow and two green dots mark the squares it can move to.](/tutorials/chess-on-two-phones/02-picked.png)
 
-You should see the pawn jump forward on the **iOS phone too**. The line at the top changes to "Black to move, move 1". The white clock stops and the black clock starts counting up. Under each board a list shows the move: `1. e2e4`.
+You should see the pawn jump forward on the **iOS phone too**. The line at the top changes to "Black to move, move 1". The white clock stops and the black clock starts counting up. Under each board a list shows the move: `1. e2e4` means the white pawn went from e2 to e4.
 
 ![The two phones after the first move. Both boards show the white pawn two squares forward. The text above them says Black to move, move 1. The move list on each phone reads 1. e2e4.](/tutorials/chess-on-two-phones/03-moved.png)
 
-Now click a black pawn on the **right** phone and then the square ahead of it. The move shows on the Android phone, and the clocks swap again.
+Now, for black, click a black pawn on the **right** phone and then the square ahead of it. The move shows on the Android phone, and the clocks swap again.
 
 Want to play right now? The live page [shipvo.dev/demos/chess](/demos/chess/) has the same two phones: tap a white piece on the Android phone, then a square, and watch the move appear on the iPhone-style phone.
 
@@ -99,9 +99,9 @@ Stop the demo with **Ctrl+C** in the terminal. Start it again with one more word
 pnpm --filter chess demo -- --autoplay
 ```
 
-Both phones now play a famous short game, called Légal's mate, by themselves. When it finishes you should see "Checkmate, white wins" on both phones, "Game over after 13 moves" at the top of the page, and both clocks stopped.
+Both phones now play a famous short game, called Légal's mate, by themselves. When it finishes you should see "Checkmate, white wins" on both phones, "Game over after 13 moves" at the top of the page, and both clocks stopped. "13 moves" counts each side's move separately, so white made 7 and black made 6. The clocks only count the time each side spent thinking, so they stay near zero.
 
-![The two phones at the end of the game. Both boards show the final position. Each phone says Checkmate, white wins, and lists seven moves for each side. The top of the page says Game over after 13 moves.](/tutorials/chess-on-two-phones/04-checkmate.png)
+![The two phones at the end of the game. Both boards show the final position. Each phone says Checkmate, white wins, and lists the 13 moves, ending with 7. c3d5. The top of the page says Game over after 13 moves.](/tutorials/chess-on-two-phones/04-checkmate.png)
 
 Every move was sent from one phone to the other, the same way it was when you clicked.
 
@@ -109,7 +109,7 @@ Every move was sent from one phone to the other, the same way it was when you cl
 
 ## 6. Stop it
 
-Click the terminal and press **Ctrl+C**. Both phones stop. Nothing was installed on your computer outside the `shipvo` folder.
+Click the terminal and press **Ctrl+C**. Both phones stop.
 
 ## Recap
 
