@@ -59,6 +59,13 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 
 Give `open_app` the same `room` on two sessions and both phones share one backend: an order placed on one shows up for the other. Use it to test two people in one app, for example a buyer and a shop owner, on Android and iOS. Without `room`, a session gets its own backend. A room name that is not valid returns `bad_room`. A room ends when its last session ends, and `end_session` names the room and its orders.
 
+```text
+open_app("tide-and-tackle@latest", room: "demo")   // session s1, Android
+open_app("tide-and-tackle@latest", room: "demo", platform: "ios")   // session s2, iOS
+```
+
+`list_sessions` shows the room of every session.
+
 ## Driving the live phone
 
 When `shipvo run` is up for your app, `open_app` attaches to that phone and the person watching sees what the agent does:
@@ -68,20 +75,9 @@ When `shipvo run` is up for your app, `open_app` attaches to that phone and the 
 
 The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on. An action already in flight when the person takes over still finishes, and its step is logged after "You took over".
 
-## Two phones, one backend: rooms
-
-Give `open_app` the same `room` on the same simulator and the sessions share one mock backend: orders, content and telemetry. Use it when two phones must see each other's data, for example a buyer and a seller, or two players. Without `room`, each session has its own backend.
-
-```text
-open_app("tide-and-tackle@latest", room: "demo")   // session s1, Android
-open_app("tide-and-tackle@latest", room: "demo", platform: "ios")   // session s2, iOS
-```
-
-`list_sessions` shows the room of every session. `end_session` ends one session; the room ends with its last one. `room` is optional, so existing setups do not change.
-
 ## Watch the agent's phone
 
-The simulator serves a `/watch` page. Open it in a browser to see the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and is view only: you cannot tap it. The video stream runs only while someone is watching. `/sessions` reports `skin` and `streaming` for each session. For a phone you can also touch, use [`shipvo run`](run.md).
+The simulator serves a `/watch` page. Open it in a browser to see the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and is view only: you cannot tap it. To step in on a phone you can touch, see [Driving the live phone](#driving-the-live-phone). The video stream runs only while someone is watching. `/sessions` reports `skin` and `streaming` for each session. For a phone you can also touch, use [`shipvo run`](run.md).
 
 ## What the tree shows (and hides), on purpose
 
@@ -232,7 +228,7 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
 
-**Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator.
+**Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
 
 **Your coding agent does not list the Shipvo tools.** Run `npx shipvo agents setup` in the app folder. It writes the MCP config for each coding agent it finds ([CLI guide](cli.md)). Restart the agent so it reads the new config.
 

@@ -32,7 +32,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Over the air (OTA).** Sending an update to phones through the internet, so people do not have to go to the app store.
 
-**Room.** A name that puts several phones on one shared backend, so a buyer on one phone and a seller on another see the same orders. See [Agents](agents.md#two-phones-one-backend-rooms).
 
 **Release.** One numbered version of your app that phones can download.
 
