@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { act, create, type ReactTestInstance } from "react-test-renderer";
-import { App } from "../src/App.js";
+import { App, statusText, squareSize } from "../src/App.js";
 import { ChessStore } from "../src/store.js";
+import { setWindowWidth } from "./rn-stub.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -56,10 +57,48 @@ describe("chess App", () => {
     tap("a7");
     tap("b8");
     expect(r.root.findAll((n) => n.props.testID === "promotion")).not.toHaveLength(0);
-    expect(sq("b8").props.accessibilityLabel).toBe("black knight on b8");
+    expect(sq("b8").props.accessibilityLabel).toBe("black knight on b8, legal move");
     act(() => { r.root.find((n) => n.props.testID === "promote-n" && String(n.type) === "Pressable").props.onPress(); });
     expect(sq("b8").props.accessibilityLabel).toBe("white knight on b8");
     expect(r.root.findAll((n) => n.props.testID === "promotion")).toHaveLength(0);
     expect(text("status")).toMatch(/^Black to move/);
+  });
+
+  it("fits the board to a 360 wide screen", () => {
+    setWindowWidth(360);
+    try {
+      const { r } = mount(new ChessStore());
+      const board = r.root.find((n) => n.props.testID === "board" && String(n.type) === "View");
+      const w = board.props.style.find((x: object) => "width" in x).width;
+      expect(w).toBeLessThanOrEqual(360 - 24);
+      expect(squareSize(360)).toBeGreaterThanOrEqual(40);
+    } finally { setWindowWidth(390); }
+  });
+
+  it("ignores board taps while the promotion chooser is open", () => {
+    const store = new ChessStore();
+    for (const [f, t] of [["a2","a4"],["b7","b5"],["a4","b5"],["a7","a6"],["b5","a6"],["c7","c6"],["a6","a7"],["c6","c5"]]) store.move(f, t);
+    const { r, sq, tap } = mount(store);
+    tap("a7");
+    tap("b8");
+    tap("a1");
+    expect(sq("a7").props.accessibilityState.selected).toBe(true);
+    expect(sq("a1").props.accessibilityState.selected).toBe(false);
+    expect(r.root.findAll((n) => n.props.testID === "promotion")).not.toHaveLength(0);
+  });
+
+  it("marks legal targets in the label", () => {
+    const { sq, tap } = mount(new ChessStore());
+    tap("e2");
+    expect(sq("e4").props.accessibilityLabel).toBe("empty square e4, legal move");
+  });
+
+  it("describes check and checkmate", () => {
+    const store = new ChessStore();
+    for (const [f, t] of [["f2","f3"],["e7","e5"],["g2","g4"],["d8","h4"]]) store.move(f, t);
+    expect(statusText(store.get_board())).toBe("Checkmate, black wins");
+    const s2 = new ChessStore();
+    for (const [f, t] of [["e2","e4"],["f7","f6"],["d1","h5"]]) s2.move(f, t);
+    expect(statusText(s2.get_board())).toBe("Black to move, check");
   });
 });
