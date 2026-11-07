@@ -6,7 +6,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-1. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog, tutorial and video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md).
+1. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done; tutorial and video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
 4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
@@ -20,7 +20,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 
 | Feature | Docs | Tutorial | Video | Blog |
 | --- | --- | --- | --- | --- |
-| Chess on Shipvo Phone: live demo and two agents playing through MCP | [demos/chess](demos/chess.md) | | | |
+| Chess on Shipvo Phone: live demo and two agents playing through MCP | [demos/chess](demos/chess.md) | | | [chess-on-two-phones-android-and-ios](../blog/chess-on-two-phones-android-and-ios.md) |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | Signed over-the-air updates | [getting-started](getting-started.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
