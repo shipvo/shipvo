@@ -156,3 +156,20 @@ describe("rebuildInto", () => {
     expect(readFileSync(join(root, "sim-dist", "index.html"), "utf8")).toBe("big");
   });
 });
+
+describe("shouldOpenWatch", () => {
+  it("opens by default, not with --no-open or --json", async () => {
+    const { shouldOpenWatch } = await import("../src/sim");
+    expect(shouldOpenWatch({})).toBe(true);
+    expect(shouldOpenWatch({ noOpen: true })).toBe(false);
+    expect(shouldOpenWatch({ json: true })).toBe(false);
+  });
+});
+
+describe("--no-open", () => {
+  it("parses to \"true\" through args", async () => {
+    const { args } = await import("../src/config");
+    expect(args(["--no-open"])["no-open"]).toBe("true");
+    expect(args(["--port", "4545"])["no-open"]).toBeUndefined();
+  });
+});
