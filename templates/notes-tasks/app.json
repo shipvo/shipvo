@@ -1,0 +1,66 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "notes-tasks", "name": "Notes and Tasks", "icon": "check", "description": "Keep notes and tasks on your phone, across chats." },
+  "theme": { "mode": "light", "palette": { "primary": "#0B5FFF", "text": "#111827", "background": "#FFFFFF", "surface": "#F3F4F6", "muted": "#4B5563" }, "radius": "lg", "density": "comfortable", "elevation": "soft" },
+  "data": {
+    "tasks": { "source": "collection", "fields": { "id": "text", "title": "text", "done": "bool" }, "seed": [] },
+    "notes": { "source": "collection", "fields": { "id": "text", "title": "text", "body": "text" }, "seed": [] },
+    "open": { "source": "computed", "value": "{{ count(tasks.filter(t, !t.done)) }}" }
+  },
+  "navigation": { "type": "tabs", "items": [{ "screen": "tasks", "label": "Tasks", "icon": "check" }, { "screen": "notes", "label": "Notes", "icon": "note" }] },
+  "screens": [
+    { "id": "tasks", "title": "Tasks", "body": [
+      { "type": "badge", "value": "{{ open }} open" },
+      { "type": "list", "label": "Open tasks", "from": "{{ tasks.filter(t, !t.done) }}", "item": { "title": "{{ item.title }}" }, "empty": { "message": "No open tasks" } },
+      { "type": "list", "label": "Done tasks", "from": "{{ tasks.filter(t, t.done) }}", "item": { "title": "{{ item.title }}" }, "empty": { "message": "Nothing done yet" } },
+      { "type": "form", "label": "New task form", "submit": { "label": "Add task", "action": "add_task" }, "fields": [
+        { "name": "title", "type": "text", "label": "Task", "required": true, "maxLength": 200 }
+      ] }
+    ] },
+    { "id": "notes", "title": "Notes", "body": [
+      { "type": "list", "label": "Notes", "from": "{{ notes }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ item.body }}" }, "empty": { "message": "No notes yet" } },
+      { "type": "form", "label": "New note form", "submit": { "label": "Add note", "action": "add_note" }, "fields": [
+        { "name": "title", "type": "text", "label": "Title", "required": true, "maxLength": 200 },
+        { "name": "body", "type": "text", "label": "Body", "maxLength": 5000 }
+      ] }
+    ] }
+  ],
+  "actions": {
+    "add_task": {
+      "description": "Add a task to the list.",
+      "input": { "title": { "type": "text" } },
+      "returns": { "id": "text" },
+      "do": [
+        { "insert": "tasks", "value": { "id": "{{ 't' + string(count(tasks) + 1) }}", "title": "{{ input.title }}", "done": false } },
+        { "toast": "Task added" },
+        { "return": { "id": "{{ 't' + string(count(tasks)) }}" } }
+      ]
+    },
+    "complete_task": {
+      "description": "Mark a task as done, by its id.",
+      "input": { "id": { "type": "text" } },
+      "do": [
+        { "update": "tasks", "where": "item.id == input.id", "value": { "done": true } },
+        { "toast": "Task done" }
+      ]
+    },
+    "add_note": {
+      "description": "Add a note with a title and a body.",
+      "input": { "title": { "type": "text" }, "body": { "type": "text", "default": "" } },
+      "returns": { "id": "text" },
+      "do": [
+        { "insert": "notes", "value": { "id": "{{ 'n' + string(count(notes) + 1) }}", "title": "{{ input.title }}", "body": "{{ input.body }}" } },
+        { "toast": "Note added" },
+        { "return": { "id": "{{ 'n' + string(count(notes)) }}" } }
+      ]
+    },
+    "search": {
+      "description": "Find notes and tasks whose title contains the text.",
+      "input": { "query": { "type": "text" } },
+      "returns": { "tasks": "list", "notes": "list" },
+      "do": [
+        { "return": { "tasks": "{{ tasks.filter(t, t.title.contains(input.query)) }}", "notes": "{{ notes.filter(n, n.title.contains(input.query) || n.body.contains(input.query)) }}" } }
+      ]
+    }
+  }
+}
