@@ -6,7 +6,7 @@ Shipvo never calls a model for you. You run the agent. Shipvo sits between the a
 
 ## Before you start
 
-- A running MCP server for your app (local `shipvo mcp` or the hosted one). See [Agents and Shipvo apps](agents.md).
+- A running MCP server for your app (local, started with `npx @shipvo/mcp --http 8787`, or the hosted one). See [Agents and Shipvo apps](agents.md).
 - An agent that can connect to an MCP server by URL.
 - A task file in `tasks/<name>.task.json`. Two samples for the shop template are in the repository: `buy-canvas-tote` (Android) and `declined-card-then-pay` (iOS).
 
@@ -111,7 +111,7 @@ One row per agent, model and task. `run.json` also lists findings: each failing 
 
 **`open_app failed at the start of the run`.** The MCP server refused the session. Check `--mcp`, and `--key` for a hosted server. The message after the colon is the server's own error.
 
-**The run ends by `step_limit` or `time_limit`.** The agent did not call `end_session` in time. Shipvo reads the screen and orders itself and scores what is there. Raise `limits` if the task needs more steps.
+**The run ends by `step_limit` or `time_limit`.** The agent did not call `end_session` in time. Shipvo reads the screen and orders itself and scores what is there: every check in the task runs on the last screen and the orders at that point, so a check passes only if the app reached that state. Raise `limits` if the task needs more steps.
 
 **Steps are missing from `steps.jsonl`.** Calls with a different `session` than the one printed are not recorded. Make sure the agent uses the printed session in every call.
 
