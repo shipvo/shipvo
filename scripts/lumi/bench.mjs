@@ -2,7 +2,7 @@
 // Lumi benchmark: runs the current Lumi engine (flows, then the walker) on a fixed set of apps with a fixed step budget
 // and prints screens reached, flows finished and planted bugs found, as a table and as JSON.
 //   node scripts/lumi/bench.mjs [--budgets 50,200] [--seed 1] [--bugs on|off] [--json] [--out file.json]
-//                               [--sim <url> | --start-sim] [--platform android|ios]
+//                               [--ranker on|off] [--sim <url> | --start-sim] [--platform android|ios]
 // Needs the CLI built: pnpm --filter @shipvo/cli build.
 // Spec apps (shop, account) run in-process with planted bugs. `account` is held out: do not tune on it.
 // Tide and Tackle runs on a simulator: pass --sim <url> for one that is running, or --start-sim to build and start one.
@@ -18,13 +18,17 @@ const budgets = (arg("budgets", "50,200")).split(",").map(Number);
 const seed = Number(arg("seed", 1));
 const bugs = arg("bugs", "on");
 const platform = arg("platform", "android");
+const ranker = arg("ranker", "off");
+if (ranker !== "on" && ranker !== "off") { console.error("--ranker must be on or off"); process.exit(2); }
 if (budgets.some((n) => !Number.isInteger(n) || n < 1) || !Number.isInteger(seed) || seed < 0) { console.error("--budgets must be whole numbers of 1 or more and --seed a whole number of 0 or more"); process.exit(2); }
 if (bugs !== "on" && bugs !== "off") { console.error("--bugs must be on or off"); process.exit(2); }
 if (platform !== "android" && platform !== "ios") { console.error("--platform must be android or ios"); process.exit(2); }
 
 const cli = (f) => import(resolve(root, "packages/cli/dist", f));
-const [explore, flows] = await Promise.all([cli("explore.js"), cli("flows.js")]);
-const engine = { walk: explore.walk, runFlows: flows.runFlows };
+const [explore, flows, weights] = await Promise.all([cli("explore.js"), cli("flows.js"), cli("ranker-weights.js")]);
+const model = ranker === "on" ? weights.RANKER_MODEL : null;
+if (ranker === "on" && !model) { console.error("--ranker on: no trained model in this build. Run node scripts/lumi/train.mjs and build."); process.exit(2); }
+const engine = { walk: (d, o) => explore.walk(d, { ...o, ranker: model }), runFlows: flows.runFlows };
 
 const rows = await runSpecApps(engine, { budgets, seed, bugsOn: bugs === "on" });
 
@@ -45,7 +49,7 @@ try {
   } else console.error("tide-and-tackle skipped: pass --sim <url> or --start-sim to run it on a simulator.");
 } finally { stop(); }
 
-const result = { seed, bugs, platform: base ? platform : null, rows, summary: summarize(rows) };
+const result = { seed, bugs, ranker, platform: base ? platform : null, rows, summary: summarize(rows) };
 if (arg("out")) writeFileSync(arg("out"), JSON.stringify(result, null, 2) + "\n");
 if (flag("json")) console.log(JSON.stringify(result, null, 2));
 else { console.log(table(rows)); console.log(); console.log(JSON.stringify(result, null, 2)); }

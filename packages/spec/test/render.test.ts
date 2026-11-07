@@ -123,4 +123,20 @@ describe("renderScreen", () => {
     expect(lines.every((l) => /^ *- [\w-]+( "(?:[^"\\]|\\.)*")? \[ref=e\d+\]$/.test(l))).toBe(true);
     expect(snap).toContain('listitem "Mackerel, North pier, 1.3 kg"');
   });
+
+  it("renders buttons, forms and tabs in both styles with a name on every control", () => {
+    const forms = JSON.parse(readFileSync(new URL("./fixtures/render-forms.json", import.meta.url), "utf8"));
+    for (const style of ["android", "ios"] as const) {
+      for (const screen of ["today", "new"]) {
+        const r = renderScreen(forms, { style, screen });
+        if (!r.ok) throw new Error(JSON.stringify(r.errors));
+        expect(unlabelled(r.tree)).toEqual([]);
+        expect(r.html).toContain('role="tab"');
+      }
+    }
+    const r = renderScreen(forms, { screen: "new" });
+    if (!r.ok) throw new Error("render failed");
+    expect(r.html).toContain('<form role="form" aria-label="New task form"');
+    expect(r.html).toContain('aria-label="Save task"');
+  });
 });
