@@ -82,6 +82,11 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-07: `kanban` and `timeline` app spec blocks, with `App.move` and an `onMove` action, on Android and iOS skins ([Boards and timelines](spec-blocks.md#boards-and-timelines), #1245)
+- 2026-11-07: The hosted MCP serves OAuth discovery and dynamic client registration, so clients can sign in themselves ([Agents](agents.md), #1216)
+- 2026-11-07: `shipvo agents setup --hosted` writes the hosted phone config for each coding agent ([CLI guide](cli.md#shipvo-agents-setup), #1215)
+- 2026-11-07: `/watch` shows the agent's phone live, in its Android or iOS frame ([Agents](agents.md#watch-the-agents-phone), #1217)
+- 2026-11-07: `room` on `open_app`: phones in one room share one backend; `list_sessions` shows each session's room and owner ([Agents](agents.md#two-phones-one-backend-rooms), #1203)
 - 2026-11-07: `shipvo eval run` and `shipvo eval report` score any agent or model on an app task: pass rate, steps, time, errors and retries on Android and iOS ([Score an agent](eval.md), #1201)
 - 2026-11-07: Run Android and iOS simulators on your own machine or CI runner: 110 open at once on a 2-CPU, 7.8 GB machine ([Shipvo Simulators](https://shipvo.dev/products/simulators/), #1235)
 - 2026-11-07: Test your own build on the hosted phone with `upload_build` or `shipvo sim --hosted`, then `open_app("<app>@build:<id>")` ([Test your build](test-your-build.md), #1171)
