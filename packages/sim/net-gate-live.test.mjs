@@ -27,7 +27,15 @@ window.pay = async () => {
   try { const r = await fetch(window.BACKEND + "/orders", { method: "POST", body: "{}" }); document.getElementById("h").textContent = "Placed " + r.status; }
   catch (e) { document.getElementById("h").textContent = "Failed " + e.name + " " + e.message; }
 };
-</script><button onclick="pay()">Pay</button></body></html>`;
+window.timed = async (kind) => {
+  const t0 = performance.now();
+  try {
+    if (kind === "xhr") await new Promise((res, rej) => { const x = new XMLHttpRequest(); x.onloadend = () => (x.status ? res() : rej(new Error("xhr " + x.readyState + " " + x.status))); x.open("GET", window.BACKEND + "/slow"); x.send(); });
+    else await fetch(window.BACKEND + "/slow");
+    document.getElementById("h").textContent = "Took " + Math.round(performance.now() - t0);
+  } catch (e) { document.getElementById("h").textContent = "Failed " + e.message; }
+};
+</script><button onclick="pay()">Pay</button><button onclick="timed('fetch')">Fetch</button><button onclick="timed('xhr')">Xhr</button></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
 before(async () => {
@@ -36,7 +44,7 @@ before(async () => {
     const cli = join(dirname(require.resolve("playwright/package.json")), "cli.js");
     if (spawnSync(process.execPath, [cli, "install", "chromium"], { stdio: "inherit" }).status !== 0) throw new Error("could not install Chromium");
   }
-  backend = http.createServer((req, res) => { if (req.method === "POST") orders.push(req.url); res.writeHead(200, { "content-type": "text/plain", "access-control-allow-origin": "*", "access-control-allow-headers": "*" }); res.end("ok"); });
+  backend = http.createServer((req, res) => { if (req.method === "POST") orders.push(req.url); if (req.url === "/slow") { res.writeHead(200, { "access-control-allow-origin": "*" }); return res.end("ok"); } res.writeHead(200, { "content-type": "text/plain", "access-control-allow-origin": "*", "access-control-allow-headers": "*" }); res.end("ok"); });
   await new Promise((r) => backend.listen(0, "127.0.0.1", r));
   backendUrl = `http://127.0.0.1:${backend.address().port}`;
   mkdirSync(dist, { recursive: true }); writeFileSync(join(dist, "index.html"), PAGE.replace("</head>", `<script>window.BACKEND=${JSON.stringify(backendUrl)}</script></head>`));
@@ -79,3 +87,41 @@ for (const [name, off, on] of cases) {
     assert.equal(orders.length, 1);
   });
 }
+
+async function timed(session, label) {
+  const s = (await act(session, { action: "screen" })).screen;
+  await act(session, { action: "tap", ref: new RegExp(label + "[^\\n]*\\[ref=(\\w+)\\]").exec(s)[1] });
+  for (let i = 0; i < 80; i++) {
+    const r = await act(session, { action: "screen" });
+    const m = /(?:Took \d+|Failed [^\n"]*)/.exec(r.screen); if (m) return m[0];
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.fail("no result");
+}
+for (const kind of ["Fetch", "Xhr"]) {
+  test(`3g adds its latency once to ${kind}, not twice`, async () => {
+    const id = `lat-${kind}`;
+    assert.ok((await call("/session", { session: id })).ok);
+    await act(id, { action: "set_network_profile", profile: "3g" });
+    const ms = Number(/Took (\d+)/.exec(await timed(id, kind))?.[1]);
+    assert.ok(ms >= 280 && ms < 520, `3g latency is 300 ms, took ${ms} ms`);
+  });
+  test(`offline: ${kind} ends like a failed request, with status 0 and loadend`, async () => {
+    const id = `off-${kind}`;
+    assert.ok((await call("/session", { session: id })).ok);
+    await act(id, { action: "set_device", device: { airplane: true } });
+    const r = await timed(id, kind);
+    assert.match(r, kind === "Xhr" ? /Failed xhr 4 0/ : /Failed Network request failed/);
+  });
+}
+test("offline survives a cold start", async () => {
+  const id = "off-cold";
+  assert.ok((await call("/session", { session: id })).ok);
+  orders.length = 0;
+  await act(id, { action: "set_network_profile", profile: "offline" });
+  await act(id, { action: "open_recents" });
+  assert.equal((await act(id, { action: "kill_app" })).ok, true);
+  await act(id, { action: "resume_app" });
+  assert.match(await pay(id), /Failed TypeError Network request failed/);
+  assert.equal(orders.length, 0);
+});

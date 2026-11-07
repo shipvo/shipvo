@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
-import { installNetGate, netGateProfiles } from "./net-gate.mjs";
+import { installNetGate } from "./net-gate.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -145,7 +145,7 @@ async function newSession(id, opts = {}) {
     return true;
   });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
-  await ctx.addInitScript(installNetGate, netGateProfiles);
+  await ctx.addInitScript(installNetGate);
   const page = await ctx.newPage();
   const errors = [];
   // phone.json: the apps and settings this phone starts with. The same profile gives the same phone every run.
@@ -182,9 +182,14 @@ async function boot(s, url) {
   const before = s.pageErrors.n;
   if (url) await s.page.goto(url, { waitUntil: "networkidle" }); else await s.page.reload({ waitUntil: "networkidle" });
   await s.page.waitForTimeout(300);
+  await reapplyNetProfile(s, s.page);
   const r = bootDone(s.update, s.pageErrors.n > before);
   if (r.revert) { await s.page.goto(r.url, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); }
   await showBanner(s);
+}
+// A new page load starts with a fresh device state, so the session's network profile is set on it again.
+async function reapplyNetProfile(s, page) {
+  if (s.netProfile) await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
 }
 async function switchToApp(s, page, id) {
   const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
@@ -199,6 +204,7 @@ async function switchToApp(s, page, id) {
   }
   switchApp(s.apps, id, s.nav);
   if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
   await page.evaluate(() => globalThis.__pnDevice?.setInitialUrl?.(null));
