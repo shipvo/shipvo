@@ -188,8 +188,11 @@ const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string;
   let attachNote = "";
   let buildUrl: string | undefined;
   if (buildId) {
-    try { buildUrl = (await resolveBuild(buildId, ctx.key ?? hostedKey())).url; }
-    catch (e) { return result("", { ok: false, code: e instanceof BuildError ? e.code : "build_not_found", error: (e as Error).message }); }
+    try {
+      const b = await resolveBuild(buildId, ctx.key ?? hostedKey());
+      if (b.app !== id) return result("", { ok: false, code: "build_not_found", error: `build ${buildId} was uploaded for "${b.app}", not "${id}". Use open_app("${b.app}@build:${buildId}") or run upload_build for ${id}.` });
+      buildUrl = b.url;
+    } catch (e) { return result("", { ok: false, code: e instanceof BuildError ? e.code : "build_not_found", error: (e as Error).message }); }
   }
   if (live) {
     try {
@@ -209,8 +212,12 @@ const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string;
       attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
+  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
   if (r.code === "sim_timeout") return result(sid, r);
+  // Only report a build as open when the simulator says it loaded that build. Otherwise the phone shows another app version.
+  if (buildId && r.ok !== false && r.build !== buildId) {
+    return result("", { ok: false, code: "build_not_supported", error: `the simulator did not load build ${buildId}, so no session was opened. Opening an uploaded build on the hosted phone is not available on this simulator yet.` });
+  }
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
@@ -219,9 +226,12 @@ const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string;
 use(server, tools.open_app, openApp);
 // Build the project here and upload it for the hosted phone. Needs the project on disk, so stdio only.
 use(server, tools.upload_build, async ({ dir, app, skip_build }) => {
+  if (ctx.scope === "read") throw new Error("this key is read-only: it cannot upload builds");
   if (ctx.remote) return result("", { ok: false, code: "stdio_only", error: "upload_build reads your project, so it runs only in the local server: add the stdio server (npx @shipvo/mcp) next to this one" });
   try {
+    if (keyApps && app && !keyApps.includes(app)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
     const b = await uploadBuild({ dir, app, skipBuild: skip_build });
+    if (keyApps && !keyApps.includes(b.app)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
     return { ...text(`build: ${b.id}\napp: ${b.app}\nexpires: ${b.expires_at}\nsize: ${b.bytes} bytes\n\nOpen it on the hosted phone: open_app("${b.app}@build:${b.id}")`), structuredContent: { ...b } };
   } catch (e) { return result("", { ok: false, code: e instanceof BuildError ? e.code : "upload_failed", error: (e as Error).message }); }
 });

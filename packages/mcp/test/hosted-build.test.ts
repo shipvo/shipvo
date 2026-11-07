@@ -10,7 +10,7 @@ const server = resolve(__dirname, "..", "dist", "server.js");
 // Stand-in for the hosted service: keys map to accounts, builds belong to one account and expire.
 const accounts: Record<string, string> = { "key-a": "acct-a", "key-b": "acct-b" };
 const builds = new Map<string, { account: string; app: string; expires: number; bytes: number }>();
-let now = Date.now(); let limit = 1 << 20; let seq = 0;
+let simLoadsBuilds = true; let now = Date.now(); let limit = 1 << 20; let seq = 0;
 let hosted: http.Server; let sim: http.Server; let hostedPort = 0; let simPort = 0; let proj = "";
 const sessionBodies: any[] = [];
 
@@ -40,9 +40,12 @@ beforeAll(async () => {
   hostedPort = await listen(hosted);
   sim = http.createServer(async (req, res) => {
     let raw = ""; for await (const c of req) raw += c;
-    if (req.url === "/session") sessionBodies.push(JSON.parse(raw));
+    const body = req.url === "/session" ? JSON.parse(raw) : {};
+    if (req.url === "/session") sessionBodies.push(body);
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, screen: "heading Hello from my build", release: "local" }));
+    // A simulator that supports builds echoes the build it loaded; one that does not ignores build_url.
+    const build = simLoadsBuilds && body.build_url ? String(body.build_url).split("/files/")[1]?.replace(/\/$/, "") : undefined;
+    res.end(JSON.stringify({ ok: true, screen: "heading Hello from my build", release: "local", ...(build ? { build } : {}) }));
   });
   simPort = await listen(sim);
   proj = mkdtempSync(join(tmpdir(), "hosted-build-"));
@@ -54,7 +57,7 @@ afterAll(() => { hosted?.close(); sim?.close(); rmSync(proj, { recursive: true, 
 
 async function client(key: string) {
   const c = new Client({ name: "t", version: "1" });
-  await c.connect(new StdioClientTransport({ command: process.execPath, args: [server], env: { ...process.env, PN_SIM: `http://127.0.0.1:${simPort}`, PN_CONTROL: "http://127.0.0.1:1", PN_APPS: JSON.stringify({ myapp: { name: "My app", description: "x" } }), SHIPVO_HOSTED_URL: `http://127.0.0.1:${hostedPort}`, SHIPVO_API_KEY: key } as Record<string, string> }));
+  await c.connect(new StdioClientTransport({ command: process.execPath, args: [server], env: { ...process.env, PN_SIM: `http://127.0.0.1:${simPort}`, PN_CONTROL: "http://127.0.0.1:1", PN_APPS: JSON.stringify({ myapp: { name: "My app", description: "x" }, otherapp: { name: "Other", description: "x" } }), SHIPVO_HOSTED_URL: `http://127.0.0.1:${hostedPort}`, SHIPVO_API_KEY: key } as Record<string, string> }));
   return c;
 }
 const txt = (r: any) => r.content[0].text as string;
@@ -71,6 +74,27 @@ describe("test the build on your machine on the hosted phone", () => {
     expect(open.isError).toBeFalsy();
     expect(txt(open)).toContain(`build:${id}`);
     expect(sessionBodies.at(-1).build_url).toBe(`http://127.0.0.1:${hostedPort}/files/${id}/`);
+    await a.close();
+  }, 30000);
+
+  it("refuses a build uploaded for another app", async () => {
+    const a = await client("key-a");
+    const id = (await a.callTool({ name: "upload_build", arguments: { dir: proj, skip_build: true } }) as any).structuredContent.id;
+    const r: any = await a.callTool({ name: "open_app", arguments: { app: `otherapp@build:${id}` } });
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent.code).toBe("build_not_found");
+    await a.close();
+  }, 30000);
+
+  it("does not report a build as open when the simulator did not load it", async () => {
+    simLoadsBuilds = false;
+    const a = await client("key-a");
+    const id = (await a.callTool({ name: "upload_build", arguments: { dir: proj, skip_build: true } }) as any).structuredContent.id;
+    const r: any = await a.callTool({ name: "open_app", arguments: { app: `myapp@build:${id}` } });
+    simLoadsBuilds = true;
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent.code).toBe("build_not_supported");
+    expect(txt(r)).not.toContain(`release: build:${id}`);
     await a.close();
   }, 30000);
 
