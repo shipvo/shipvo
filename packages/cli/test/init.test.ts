@@ -140,7 +140,7 @@ it("--template shop writes list, detail, cart, five products and a test that rea
   expect(test).toContain("You're offline. Your cart is saved.");
   expect(cart).toContain("device.net.online()");
   expect(cart).toContain('"Plus " + p.name');
-  expect(cart).toContain('accessibilityLabel="Undo"');
+  expect(cart).not.toContain('accessibilityLabel="Undo"');
   expect(cart).toContain("Back to shop");
   const readme = readFileSync(join(dir, "README.md"), "utf8");
   expect(readme).toContain("src/data/products.json");

@@ -719,7 +719,8 @@ export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order
   const [undo, setUndo] = useState<{ line: Line; index: number; name: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  // Remove a line and offer Undo for a few seconds.
+  // Remove a line and offer Undo for a few seconds. Removing a second line while
+  // Undo shows replaces it, so only the latest removal can be undone.
   const removeLine = (id: string) => {
     const index = lines.findIndex((x) => x.id === id);
     if (index < 0) return;
@@ -781,7 +782,7 @@ export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order
           </View>
         );
       })}
-      {undo ? <Pressable accessibilityRole="alert" accessibilityLiveRegion="polite" accessibilityLabel="Undo" onPress={undoRemove} style={s.remove}><Text style={s.backText}>{"Undo (" + undo.name + " removed)"}</Text></Pressable> : null}
+      {undo ? <Pressable accessibilityRole="alert" accessibilityLiveRegion="polite" onPress={undoRemove} style={s.remove}><Text style={s.backText}>{"Undo (" + undo.name + " removed)"}</Text></Pressable> : null}
       <Text style={s.total}>{"Total: " + formatPrice(totalCents)}</Text>
       {lines.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Pay" accessibilityState={{ disabled: busy }} onPress={pay} style={s.pay}><Text style={s.payText}>Pay</Text></Pressable> : null}
       {status ? <Text style={s.body} accessibilityRole="alert">{status}</Text> : null}
