@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { readFileSync } from "node:fs";
 import { describeTools } from "@shipvo/mcp-tools";
 
 // The built server (pnpm build runs before pnpm test in CI). Stdio is the coding-agent server, --http the remote one.
@@ -96,4 +97,36 @@ describe("key-shaped input is refused on stdio and remote", () => {
       check(await call(c)); await c.close();
     } finally { p.kill(); }
   }, 30000);
+});
+
+// Readable diff of two tool lists, by name: missing, extra and changed (name, description, input schema, annotations).
+export function diffTools(a: Tool[], b: Tool[], labelA = "stdio", labelB = "remote"): string[] {
+  const by = (l: Tool[]) => new Map(l.map((t) => [t.name, t]));
+  const ma = by(a), mb = by(b), out: string[] = [];
+  for (const n of [...new Set([...ma.keys(), ...mb.keys()])].sort()) {
+    const x = ma.get(n), y = mb.get(n);
+    if (!x) out.push(`${n}: only on ${labelB}`);
+    else if (!y) out.push(`${n}: only on ${labelA}`);
+    else for (const k of ["description", "inputSchema", "annotations"] as const) {
+      if (JSON.stringify(x[k]) !== JSON.stringify(y[k])) out.push(`${n}.${k}: ${labelA}=${JSON.stringify(x[k])} ${labelB}=${JSON.stringify(y[k])}`);
+    }
+  }
+  return out;
+}
+
+describe("parity diff helper", () => {
+  const t = (name: string, extra: Partial<Tool> = {}): Tool => ({ name, description: "d", inputSchema: { type: "object" }, annotations: { readOnlyHint: true }, ...extra });
+  it("is empty for equal lists", () => expect(diffTools([t("a"), t("b")], [t("b"), t("a")])).toEqual([]));
+  it("names a tool added on one side only", () => expect(diffTools([t("a")], [t("a"), t("b")])).toEqual(["b: only on remote"]));
+  it("names a changed schema or annotation", () => {
+    const d = diffTools([t("a")], [t("a", { inputSchema: { type: "string" }, annotations: { readOnlyHint: false } })]);
+    expect(d.map((l) => l.split(":")[0])).toEqual(["a.inputSchema", "a.annotations"]);
+  });
+});
+
+describe("hosted worker handshake list", () => {
+  it("services/sim/src/tools.json matches the stdio list (regenerate it if this fails)", () => {
+    const file = JSON.parse(readFileSync(resolve(__dirname, "..", "..", "..", "services", "sim", "src", "tools.json"), "utf8")) as Tool[];
+    expect(diffTools(stdio, file, "stdio", "tools.json")).toEqual([]);
+  });
 });
