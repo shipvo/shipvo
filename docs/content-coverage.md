@@ -58,8 +58,10 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Policy enforced by the control plane (weekday, staged rollout, max band) | [cli](cli.md) | | | |
 | Hosted MCP `server/discover` support | [mcp](../packages/mcp/README.md) | | | |
 | Phone Settings screen (`get_settings`, `set_setting`) | [phone-apps](phone-apps.md) | | | [test-dark-mode-large-text-and-rtl-in-react-native](../blog/test-dark-mode-large-text-and-rtl-in-react-native.md) |
-| Phone Browser app (`browser_*` tools) | [phone-apps](phone-apps.md) | | | |
+| Phone Browser app (`browser_*` tools) | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
 | Phone home, recents, shade and power controls | [agents](agents.md), [phone-apps](phone-apps.md) | | | |
 | Lumi on Shipvo Phone (captions, reactions, first-run guide) | [lumi](lumi.md) | | | |
 | `shipvo lumi` (test your app while you watch) | [lumi](lumi.md), [cli](cli.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | [Have Lumi test your app while you watch](videos.md#have-lumi-test-your-app-while-you-watch) | |
+| Lumi on Shipvo Phone (captions, reactions, first-run guide) | [lumi](lumi.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
+| `shipvo lumi` (test your app while you watch) | [lumi](lumi.md), [cli](cli.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
 | Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles) | | | |
