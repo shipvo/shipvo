@@ -42,7 +42,6 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
 | `attach_session(app?, session?)` | Attach to the live `shipvo run` phone (Android or iOS) from `.shipvo/run.json`, without an app id. Returns `no_live_run` when no run is up (or `app` does not match it) and `attach_failed` when the phone cannot be reached |
-| `upload_build(dir?, app?, skip_build?)` | Build this project with the simulated device (the same build as `shipvo sim`), upload it to the hosted phone for your key and return a build id. Then call `open_app("<app>@build:<id>")` on the hosted server. Runs only on the local (stdio) server. See [Test your local build on the hosted phone](#test-your-local-build-on-the-hosted-phone) |
 | `screen(session)` | The accessibility tree with refs (`[ref=e12]`) |
 | `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb |
 | `screenshot(session)` | PNG of the phone |
@@ -55,38 +54,6 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
-
-## Test your local build on the hosted phone
-
-For anyone whose assistant talks to the hosted server (`https://sim.shipvo.dev/mcp`) but whose code is on their own machine. The hosted phone opens published releases by default. This puts the version you are working on on that phone, without publishing it.
-
-1. Set your key: `export SHIPVO_API_KEY=<your key>` (run `npx -y @shipvo/cli login`, then `shipvo mcp`, which prints your config with the key in it).
-2. Add the local server next to the hosted one (`npx @shipvo/mcp`). Run the assistant in your project folder.
-3. Ask the assistant to call `upload_build`, or run it yourself from the terminal:
-
-```bash
-shipvo sim --hosted
-```
-
-It builds the app the way `shipvo sim` does, uploads it and prints the build id and when it expires:
-
-```
-Uploaded. It expires <date>. On the hosted phone: open_app("tide@build:<id>")
-```
-
-4. On the hosted server, call `open_app("tide@build:<id>")`. The session works like any other: `screen`, `tap`, `type`, `export_test` and the rest.
-
-`upload_build` takes `dir` (project folder, default the working directory), `app` (default: `appId` from `shipvo.json`) and `skip_build` (upload the existing `sim-dist` folder without building again). `shipvo sim --hosted --skip-build` does the same. A build is private to your account and is deleted when it expires.
-
-| Code | What it means | What to do |
-| --- | --- | --- |
-| `no_api_key` | `SHIPVO_API_KEY` is not set. The key is read from the environment, not from the saved login. | Set it to your key and run again. |
-| `stdio_only` | You called `upload_build` on the hosted server. It needs your project files. | Call it on the local server (`npx @shipvo/mcp`). |
-| `build_failed` | The web build did not finish, or no app id was found. | Run `shipvo sim` and fix the first error it prints, or pass `app`. |
-| `build_too_large` | The build is too big to upload. | Remove unused images, fonts and large assets and unused dependencies, then upload again. |
-| `upload_failed` | The hosted service could not be reached or refused the upload. | Check your network and key, then try again. |
-| `build_not_found` | No build with that id for your key, or it was uploaded for another app. | Run `upload_build` and use the id it returns with the same app id. |
-| `build_expired` | The build has expired and was deleted. | Run `upload_build` again. |
 
 ## Driving the live phone
 
