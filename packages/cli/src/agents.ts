@@ -161,7 +161,8 @@ type Change = { file: string; action: "create" | "update" | "unchanged" | "skip"
 /** `shipvo agents setup [--dry-run] [--json]`. Exit 0 done, 2 error. */
 export async function agentsCmd(argv: string[], dir = process.cwd(), home = homedir(), pathVar = process.env.PATH, deps: { run?: (cmd: string, args: string[], cwd: string) => void } = {}): Promise<number> {
   const [sub, ...rest] = argv;
-  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--for <names>] [--all] [--global] [--npx] [--dry-run] [--json]"); return 2; }  const only = sub === "skills-sync";
+  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--for <names>] [--all] [--global] [--npx] [--dry-run] [--json]"); return 2; }
+  const only = sub === "skills-sync";
   const a = args(rest);
   const dry = a["dry-run"] !== undefined, json = a.json !== undefined;
   const kind = detectProject(dir);
@@ -227,14 +228,16 @@ export async function agentsCmd(argv: string[], dir = process.cwd(), home = home
         plan(file, next, `${file} could not be parsed; I left it alone. Fix it and run again.`);
         const c = changes[before];
         agentResults.push({ ...base, file, action: c.action === "skip" ? "skipped" : c.action === "unchanged" ? "up-to-date" : "written", note: c.note, block });
-      } else agentResults.push({ ...base, file, action: "printed", block, note: t.level === "user-write" ? (on ? "run with --global to write it" : `not found; add it with --for ${t.id} --global`) : undefined });    }
+      } else agentResults.push({ ...base, file, action: "printed", block, note: t.level === "user-write" ? (on ? "run with --global to write it" : `not found; add it with --for ${t.id} --global`) : undefined });
+    }
   }
   const skills = projectSkills(dir);
   for (const e of skills) for (const t of skillTargets(dir, e)) plan(t.file, t.text);
   const bad = changes.some((c) => c.action === "skip");
   if (!dry && !bad) for (const w of writes) { mkdirSync(dirname(w.path), { recursive: true }); writeFileSync(w.path, w.text); }
   const wrote = !dry && !bad;
-  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, changes, mcp_install: installed ?? null, agents: agentResults, skill_install: SKILL_LINE, skills: skills.map((e) => ({ package: e.package, name: e.name })) }));  else {
+  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, changes, mcp_install: installed ?? null, agents: agentResults, skill_install: SKILL_LINE, skills: skills.map((e) => ({ package: e.package, name: e.name })) }));
+  else {
     console.log(`Project: ${LABEL[kind]}.`);
     if (installed) console.log(`  @shipvo/mcp: ${dry ? installed : `added with ${installed}`}`);
     for (const c of changes) console.log(`  ${c.file}: ${c.action === "skip" ? c.note : c.action === "unchanged" ? "already up to date" : `${dry ? "would " : ""}${c.action}${dry ? "" : "d"}`}`);
