@@ -60,7 +60,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 
 For anyone whose assistant talks to the hosted server (`https://sim.shipvo.dev/mcp`) but whose code is on their own machine. The hosted phone opens published releases by default. This puts the version you are working on on that phone, without publishing it.
 
-1. Set your key: `export SHIPVO_API_KEY=<your key>` (`npx -y @shipvo/cli login` prints one).
+1. Set your key: `export SHIPVO_API_KEY=<your key>` (run `npx -y @shipvo/cli login`, then `shipvo mcp`, which prints your config with the key in it).
 2. Add the local server next to the hosted one (`npx @shipvo/mcp`). Run the assistant in your project folder.
 3. Ask the assistant to call `upload_build`, or run it yourself from the terminal:
 
@@ -80,7 +80,7 @@ Uploaded. It expires <date>. On the hosted phone: open_app("tide@build:<id>")
 
 | Code | What it means | What to do |
 | --- | --- | --- |
-| `no_api_key` | `SHIPVO_API_KEY` is not set. | Set it to your key and run again. |
+| `no_api_key` | `SHIPVO_API_KEY` is not set. The key is read from the environment, not from the saved login. | Set it to your key and run again. |
 | `stdio_only` | You called `upload_build` on the hosted server. It needs your project files. | Call it on the local server (`npx @shipvo/mcp`). |
 | `build_failed` | The web build did not finish, or no app id was found. | Run `shipvo sim` and fix the first error it prints, or pass `app`. |
 | `build_too_large` | The build is too big to upload. | Remove unused images, fonts and large assets and unused dependencies, then upload again. |
