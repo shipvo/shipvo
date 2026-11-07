@@ -26,7 +26,7 @@ The key opens the beta sample app and every app you register with `shipvo app cr
 
 **Connect any agent with one command.** `shipvo agents setup --hosted` signs you in if needed and writes the remote config for Claude Code, Cursor, VS Code and Windsurf. It prints the key-in-URL form for ChatGPT. A key is written only to a user-level file or a project file that git ignores; for a tracked file it prints the block and says why.
 
-**Or sign in instead of copying a key.** Run `claude mcp add --transport http shipvo https://sim.shipvo.dev/mcp`. It opens GitHub sign-in and gives Claude Code a key for your account ([tested here](../services/control-plane/test/oauth.test.ts)).
+**Or sign in instead of copying a key.** Run `claude mcp add --transport http shipvo https://sim.shipvo.dev/mcp`. It opens GitHub sign-in, then asks you to allow Claude Code (it shows the app name and where you are sent back to), and gives Claude Code a key for your account ([tested here](../services/control-plane/test/oauth.test.ts)).
 
 **2. Print the connection details.**
 

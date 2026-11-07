@@ -16,11 +16,11 @@ export function newKey(scope: string) {
 }
 const gh = (path: string, init: RequestInit) => fetch(`https://github.com${path}`, { ...init, headers: { accept: "application/json", "content-type": "application/json", "user-agent": "shipvo-control", ...(init.headers ?? {}) } });
 
-/** Sign-in result: a new per-account test key (only its hash is stored). A device login replaces the account's earlier test keys, as before. An OAuth sign-in replaces only the earlier key of the same connector. */
+/** Sign-in result: a new per-account test key (only its hash is stored). A device login replaces the account's earlier `shipvo login` keys and leaves OAuth connector keys alone. An OAuth sign-in replaces only the earlier key of the same connector. */
 export async function issueLoginKey(env: Env, accountId: number, login: string, via: "device" | "oauth" = "device", client = "") {
   const { key, prefix } = newKey("test");
   const label = via === "device" ? `shipvo login (${login})` : `shipvo oauth (${login}) ${client.slice(0, 16)}`;
-  const prior = via === "device" ? "" : " AND label = ?";   // device login: as before, replaces every earlier test key of the account
+  const prior = via === "device" ? " AND label LIKE 'shipvo login%'" : " AND label = ?";   // device login replaces only earlier device-login keys
   await env.DB.prepare(`UPDATE api_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE account_id = ? AND scope = 'test' AND revoked_at IS NULL${prior}`).bind(...(via === "device" ? [accountId] : [accountId, label])).run();
   const expires_at = new Date(Date.now() + KEY_TTL_DAYS * 86400_000).toISOString();
   await env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")

@@ -4,6 +4,8 @@
 // needs no second kind of credential. Pending state lives in KV with a TTL and codes are single use.
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { hit } from "./ratelimit";
 import { issueLoginKey, type AuthEnv } from "./auth";
 
 type Env = AuthEnv & { POINTERS: KVNamespace; GITHUB_CLIENT_SECRET?: string; PUBLIC_URL?: string };
@@ -11,6 +13,7 @@ export const oauth = new Hono<{ Bindings: Env }>();
 const open = cors({ origin: "*", allowHeaders: ["*"], exposeHeaders: ["www-authenticate"] });
 oauth.use("/oauth/*", open); oauth.use("/.well-known/oauth-authorization-server", open);
 
+const MAX_URI = 2048, REGISTER_LIMITS = { perIp: 20, perInstall: 0, perApp: 0, windowSeconds: 3600 };
 const CLIENT_TTL = 365 * 86400, PENDING_TTL = 600, CODE_TTL = 300;
 const rand = (n = 24) => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(n)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const b64url = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -29,10 +32,12 @@ oauth.get("/.well-known/oauth-authorization-server", (c) => c.json(metadata(issu
 
 /** Dynamic client registration (RFC 7591) for public clients. Redirect URIs must be https, or http on loopback. */
 oauth.post("/oauth/register", async (c) => {
+  const wait = await hit(c.env.POINTERS, "oauth_register", REGISTER_LIMITS, "ip", c.req.header("cf-connecting-ip") ?? "unknown");
+  if (wait) return c.json({ error: "rate_limited", error_description: "Too many registrations. Try again later." }, 429, { "retry-after": String(wait) });
   const b = (await c.req.json().catch(() => null)) as { redirect_uris?: unknown; client_name?: unknown } | null;
   const uris = Array.isArray(b?.redirect_uris) ? (b!.redirect_uris as unknown[]).filter((u): u is string => typeof u === "string") : [];
-  const ok = (u: string) => { try { const x = new URL(u); return !x.hash && (x.protocol === "https:" || (x.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(x.hostname)) || (/^[a-z][a-z0-9+.-]*:$/.test(x.protocol) && !["http:", "javascript:", "data:"].includes(x.protocol))); } catch { return false; } };
-  if (!uris.length || uris.length > 10 || !uris.every(ok)) return err(c, "invalid_redirect_uri", "redirect_uris must be 1 to 10 https, loopback or app-scheme URLs");
+  const ok = (u: string) => { if (u.length > MAX_URI) return false; try { const x = new URL(u); return !x.hash && (x.protocol === "https:" || (x.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(x.hostname)) || (/^[a-z][a-z0-9+.-]*:$/.test(x.protocol) && !["http:", "javascript:", "data:"].includes(x.protocol))); } catch { return false; } };
+  if (!uris.length || uris.length > 10 || !uris.every(ok)) return err(c, "invalid_redirect_uri", "redirect_uris must be 1 to 10 https, loopback or app-scheme URLs of at most 2048 characters");
   const client_id = `svc_${rand(18)}`;
   const name = typeof b?.client_name === "string" ? b.client_name.slice(0, 80) : "";
   await c.env.POINTERS.put(`oauth:client:${client_id}`, JSON.stringify({ redirect_uris: uris, name }), { expirationTtl: CLIENT_TTL });
@@ -50,8 +55,10 @@ oauth.get("/oauth/authorize", async (c) => {
   if (q.response_type !== "code") return back("unsupported_response_type", "response_type must be code");
   if (!q.code_challenge || q.code_challenge_method !== "S256") return back("invalid_request", "PKCE with code_challenge_method=S256 is required");
   if (!c.env.GITHUB_CLIENT_ID || !c.env.GITHUB_CLIENT_SECRET) return back("temporarily_unavailable", "sign-in is not configured on this server");
-  const gstate = rand();
-  await c.env.POINTERS.put(`oauth:pending:${gstate}`, JSON.stringify({ client_id: q.client_id, redirect_uri: q.redirect_uri, state: q.state ?? "", challenge: q.code_challenge }), { expirationTtl: PENDING_TTL });
+  const gstate = rand(), bind = rand();
+  // The cookie ties this sign-in to the browser that started it, so a victim cannot be handed someone else's flow.
+  setCookie(c, "shipvo_oauth", bind, { httpOnly: true, secure: true, sameSite: "Lax", path: "/oauth", maxAge: PENDING_TTL });
+  await c.env.POINTERS.put(`oauth:pending:${gstate}`, JSON.stringify({ bind, client_id: q.client_id, redirect_uri: q.redirect_uri, state: q.state ?? "", challenge: q.code_challenge }), { expirationTtl: PENDING_TTL });
   const g = new URL("https://github.com/login/oauth/authorize");
   g.searchParams.set("client_id", c.env.GITHUB_CLIENT_ID); g.searchParams.set("redirect_uri", `${issuer(c)}/oauth/callback`);
   g.searchParams.set("scope", "read:user"); g.searchParams.set("state", gstate);
@@ -62,6 +69,7 @@ oauth.get("/oauth/authorize", async (c) => {
 oauth.get("/oauth/callback", async (c) => {
   const pending = c.req.query("state") ? await take(c.env.POINTERS, `oauth:pending:${c.req.query("state")}`) : null;
   if (!pending) return err(c, "invalid_request", "unknown or expired sign-in; start again from your agent");
+  if (getCookie(c, "shipvo_oauth") !== pending.bind) return err(c, "invalid_request", "this sign-in was started in another browser; start again from your agent");
   const back = (error: string, d: string) => { const u = new URL(pending.redirect_uri); u.searchParams.set("error", error); u.searchParams.set("error_description", d); if (pending.state) u.searchParams.set("state", pending.state); return c.redirect(u.toString(), 302); };
   const code = c.req.query("code");
   if (!code) return back("access_denied", "GitHub sign-in was not completed");
@@ -72,9 +80,31 @@ oauth.get("/oauth/callback", async (c) => {
   await c.env.DB.prepare("INSERT INTO accounts (github_id, github_login, last_login_at) VALUES (?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(github_id) DO UPDATE SET github_login = excluded.github_login, last_login_at = excluded.last_login_at").bind(u.id, u.login).run();
   const acct = await c.env.DB.prepare("SELECT id FROM accounts WHERE github_id = ?").bind(u.id).first<{ id: number }>();
   if (!acct) return back("server_error", "could not create the account");
-  const ours = rand(32);
-  await c.env.POINTERS.put(`oauth:code:${ours}`, JSON.stringify({ account_id: acct.id, login: u.login, client_id: pending.client_id, redirect_uri: pending.redirect_uri, challenge: pending.challenge }), { expirationTtl: CODE_TTL });
-  const r = new URL(pending.redirect_uri); r.searchParams.set("code", ours); if (pending.state) r.searchParams.set("state", pending.state);
+  // No code yet: the person must approve this client first.
+  const consent = rand();
+  await c.env.POINTERS.put(`oauth:consent:${consent}`, JSON.stringify({ bind: pending.bind, account_id: acct.id, login: u.login, client_id: pending.client_id, redirect_uri: pending.redirect_uri, state: pending.state, challenge: pending.challenge }), { expirationTtl: PENDING_TTL });
+  const client = await c.env.POINTERS.get(`oauth:client:${pending.client_id}`).then((v) => (v ? JSON.parse(v) : { name: "" }));
+  const esc = (x: string) => x.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+  const host = new URL(pending.redirect_uri);
+  const who = client.name ? esc(client.name) : "An app";
+  c.header("cache-control", "no-store"); c.header("content-security-policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'");
+  return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Allow access to Shipvo</title><style>body{font:16px system-ui;max-width:28rem;margin:3rem auto;padding:0 1rem}button{font:inherit;padding:.5rem 1rem;margin-right:.5rem}</style><h1>Allow access?</h1><p><b>${who}</b> wants to open the Shipvo simulator as <b>${esc(u.login)}</b>.</p><p>It will send you back to <b>${esc(host.protocol === "https:" || host.protocol === "http:" ? host.host : host.protocol)}</b>. Only allow this if you started it.</p><form method="post" action="/oauth/consent"><input type="hidden" name="id" value="${esc(consent)}"><button name="decision" value="allow">Allow</button><button name="decision" value="deny">Deny</button></form>`);
+});
+
+/** The person's answer. The record is single use and only works in the browser that started the flow. */
+oauth.post("/oauth/consent", async (c) => {
+  const f = Object.fromEntries(new URLSearchParams(await c.req.text()));
+  const rec = f.id ? await take(c.env.POINTERS, `oauth:consent:${f.id}`) : null;
+  if (!rec || getCookie(c, "shipvo_oauth") !== rec.bind) return err(c, "invalid_request", "unknown, expired or foreign approval; start again from your agent");
+  deleteCookie(c, "shipvo_oauth", { path: "/oauth" });
+  const r = new URL(rec.redirect_uri);
+  if (f.decision !== "allow") { r.searchParams.set("error", "access_denied"); r.searchParams.set("error_description", "the person denied access"); }
+  else {
+    const ours = rand(32);
+    await c.env.POINTERS.put(`oauth:code:${ours}`, JSON.stringify({ account_id: rec.account_id, login: rec.login, client_id: rec.client_id, redirect_uri: rec.redirect_uri, challenge: rec.challenge }), { expirationTtl: CODE_TTL });
+    r.searchParams.set("code", ours);
+  }
+  if (rec.state) r.searchParams.set("state", rec.state);
   return c.redirect(r.toString(), 302);
 });
 

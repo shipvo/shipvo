@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: () => ({ fetch: async () => new Response("never") }) }));
 import app from "../src/index";
+import { issueLoginKey } from "../src/auth";
 import sim from "../../sim/src/index";
 
 // A tiny in-memory stand-in for KV and for the two D1 tables the sign-in touches.
@@ -14,7 +15,7 @@ function world() {
     const run = async () => {
       if (/INSERT INTO accounts/.test(sql)) { if (!accounts.find((x) => x.github_id === a[0])) accounts.push({ id: accounts.length + 1, github_id: a[0], login: a[1] }); }
       else if (/INSERT INTO api_keys/.test(sql)) keys.push({ id: keys.length + 1, app_id: a[0], key_hash: a[1], prefix: a[2], scope: a[3], label: a[4], account_id: a[5], expires_at: a[7], revoked_at: null });
-      else if (/UPDATE api_keys SET revoked_at/.test(sql)) keys.filter((k) => k.account_id === a[0] && k.scope === "test" && !k.revoked_at && (a.length < 2 || k.label === a[1])).forEach((k) => (k.revoked_at = "now"));
+      else if (/UPDATE api_keys SET revoked_at/.test(sql)) keys.filter((k) => k.account_id === a[0] && k.scope === "test" && !k.revoked_at && (/LIKE/.test(sql) ? k.label.startsWith("shipvo login") : (a.length < 2 || k.label === a[1]))).forEach((k) => (k.revoked_at = "now"));
       return {};
     };
     const first = async () => {
@@ -42,15 +43,25 @@ function stubGithub() {
     throw new Error("unexpected fetch " + u);
   }));
 }
-async function signIn(env: any, client_id: string) {
+// Starts the flow and returns the consent page; `approve` answers it.
+async function consentPage(env: any, client_id: string, over: { cookie?: string | null; redirect_uri?: string } = {}) {
   const a = await app.request(`/oauth/authorize?${new URLSearchParams({ client_id, redirect_uri: REDIRECT, response_type: "code", code_challenge: challenge, code_challenge_method: "S256", state: "st1" })}`, {}, env);
   expect(a.status).toBe(302);
+  const cookie = (a.headers.get("set-cookie") ?? "").split(";")[0];
   const g = new URL(a.headers.get("location")!);
   expect(g.origin + g.pathname).toBe("https://github.com/login/oauth/authorize");
   expect(g.searchParams.get("redirect_uri")).toBe("https://api.shipvo.dev/oauth/callback");
-  const cb = await app.request(`/oauth/callback?code=ghcode&state=${g.searchParams.get("state")}`, {}, env);
-  expect(cb.status).toBe(302);
-  const back = new URL(cb.headers.get("location")!);
+  const use = over.cookie === undefined ? cookie : over.cookie;
+  const cb = await app.request(`/oauth/callback?code=ghcode&state=${g.searchParams.get("state")}`, { headers: use ? { cookie: use } : {} }, env);
+  return { cb, cookie };
+}
+const answer = (env: any, cookie: string, html: string, decision: string) => app.request("/oauth/consent", { method: "POST", body: new URLSearchParams({ id: /name="id" value="([^"]+)"/.exec(html)![1], decision }), headers: { "content-type": "application/x-www-form-urlencoded", cookie } }, env);
+async function signIn(env: any, client_id: string) {
+  const { cb, cookie } = await consentPage(env, client_id);
+  expect(cb.status).toBe(200);
+  const r = await answer(env, cookie, await cb.text(), "allow");
+  expect(r.status).toBe(302);
+  const back = new URL(r.headers.get("location")!);
   expect(back.origin + back.pathname).toBe(REDIRECT); expect(back.searchParams.get("state")).toBe("st1");
   return back.searchParams.get("code")!;
 }
@@ -74,6 +85,14 @@ describe("OAuth metadata", () => {
 });
 
 describe("registration", () => {
+  it("caps URI length and the number of registrations per source", async () => {
+    const { env } = world();
+    const long = await app.request("/oauth/register", { method: "POST", body: JSON.stringify({ redirect_uris: ["https://a.example/" + "x".repeat(2100)] }) }, env);
+    expect(long.status).toBe(400);
+    let last = 0;
+    for (let i = 0; i < 25; i++) last = (await app.request("/oauth/register", { method: "POST", headers: { "cf-connecting-ip": "1.2.3.4" }, body: JSON.stringify({ redirect_uris: [REDIRECT] }) }, env)).status;
+    expect(last).toBe(429);
+  });
   it("registers a public client and rejects bad redirect URIs", async () => {
     const { env } = world();
     const { r, body } = await register(env);
@@ -93,7 +112,68 @@ describe("registration", () => {
   });
 });
 
+describe("consent", () => {
+  it("issues no code until the person allows, and shows the client and redirect host", async () => {
+    const w = world(); stubGithub();
+    const { body } = await register(w.env);
+    const { cb, cookie } = await consentPage(w.env, body.client_id);
+    const html = await cb.text();
+    expect(cb.status).toBe(200); expect(html).toContain("Claude"); expect(html).toContain("claude.ai"); expect(html).not.toContain("code=");
+    expect([...w.kv.keys()].some((k) => k.startsWith("oauth:code:"))).toBe(false);
+    const ok = await answer(w.env, cookie, html, "allow");
+    expect(new URL(ok.headers.get("location")!).searchParams.get("code")).toBeTruthy();
+  });
+  it("deny returns access_denied and issues no code", async () => {
+    const w = world(); stubGithub();
+    const { body } = await register(w.env);
+    const { cb, cookie } = await consentPage(w.env, body.client_id);
+    const r = await answer(w.env, cookie, await cb.text(), "deny");
+    const u = new URL(r.headers.get("location")!);
+    expect(u.searchParams.get("error")).toBe("access_denied"); expect(u.searchParams.get("code")).toBeNull(); expect(u.searchParams.get("state")).toBe("st1");
+    expect([...w.kv.keys()].some((k) => k.startsWith("oauth:code:"))).toBe(false);
+  });
+  it("refuses a callback or approval from another browser (no cookie)", async () => {
+    const w = world(); stubGithub();
+    const { body } = await register(w.env);
+    expect((await consentPage(w.env, body.client_id, { cookie: null })).cb.status).toBe(400);
+    const { cb, cookie } = await consentPage(w.env, body.client_id);
+    const html = await cb.text();
+    expect((await answer(w.env, "shipvo_oauth=other", html, "allow")).status).toBe(400);
+    expect((await answer(w.env, cookie, html, "allow")).status).toBe(400);   // the failed try used the record up
+  });
+  it("escapes the client name", async () => {
+    const w = world(); stubGithub();
+    const r = await app.request("/oauth/register", { method: "POST", body: JSON.stringify({ redirect_uris: [REDIRECT], client_name: "<script>x</script>" }) }, w.env);
+    const { cb } = await consentPage(w.env, ((await r.json()) as any).client_id);
+    const html = await cb.text();
+    expect(html).not.toContain("<script>"); expect(html).toContain("&#60;script&#62;");
+  });
+});
+
 describe("code exchange", () => {
+  it("rejects a PKCE mismatch and a replayed code", async () => {
+    const w = world(); stubGithub();
+    const { body } = await register(w.env);
+    const code = await signIn(w.env, body.client_id);
+    const bad = await token(w.env, { grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: body.client_id, code_verifier: "w".repeat(50) });
+    expect(bad.status).toBe(400); expect(((await bad.json()) as any).error_description).toContain("PKCE");
+    const replay = await token(w.env, { grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: body.client_id, code_verifier: verifier });
+    expect(replay.status).toBe(400);
+    expect(w.keys).toHaveLength(0);
+  });
+  it("a device login keeps the OAuth connector key; a second device login replaces the first", async () => {
+    const w = world(); stubGithub();
+    const { body } = await register(w.env);
+    await token(w.env, { grant_type: "authorization_code", code: await signIn(w.env, body.client_id), redirect_uri: REDIRECT, client_id: body.client_id, code_verifier: verifier });
+    await issueLoginKey(w.env, 1, "octo"); await issueLoginKey(w.env, 1, "octo");
+    expect(w.keys.map((k) => [k.label.split(" ")[1], !!k.revoked_at])).toEqual([["oauth", false], ["login", true], ["login", false]]);
+  });
+  it("rejects a token request with another redirect_uri", async () => {
+    const w = world(); stubGithub();
+    const { body } = await register(w.env);
+    const code = await signIn(w.env, body.client_id);
+    expect((await token(w.env, { grant_type: "authorization_code", code, redirect_uri: "https://evil.example/cb", client_id: body.client_id, code_verifier: verifier })).status).toBe(400);
+  });
   it("full PKCE flow issues a key, once", async () => {
     const w = world(); stubGithub();
     const { body } = await register(w.env);

@@ -68,6 +68,17 @@ describe("agents setup --hosted", () => {
     expect(text).toContain(`Bearer ${KEY}`);
   });
 
+  it("--json includes the block for print results", async () => {
+    const d = repo(), home = tmp();
+    writeFileSync(join(d, ".mcp.json"), "{}"); git(d, "add", ".mcp.json"); git(d, "commit", "-qm", "x");
+    expect(await run(d, home, ["--json"])).toBe(0);
+    const j = JSON.parse(out.join("\n"));
+    const printed = j.changes.filter((c: any) => c.action === "print");
+    expect(printed.length).toBeGreaterThan(0);
+    for (const c of printed) expect(c.block).toContain(KEY);
+    expect(j.changes.filter((c: any) => c.action !== "print").every((c: any) => !("block" in c))).toBe(true);
+  });
+
   it("prints instead of writing when the file is not git-ignored (or there is no repo)", async () => {
     const d = tmp(), home = tmp();
     expect(await run(d, home)).toBe(0);

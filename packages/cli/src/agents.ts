@@ -198,7 +198,7 @@ async function hostedCmd(dir: string, a: Record<string, string | undefined>, dry
   if (!c) { console.error("Sign-in did not finish, so no key was written. Run `shipvo login`."); return 2; }
   const res = setupHosted({ dir, home: deps.home, url: c.mcp_url, key: c.key, dry, only: a.agent && a.agent !== "true" ? a.agent : undefined });
   const bad = res.some((r) => r.action === "skip");
-  if (json) console.log(JSON.stringify({ ok: !bad, hosted: true, dry_run: dry, url: c.mcp_url, changes: res.map((r) => ({ agent: r.agent, file: r.file, action: r.action, reason: r.reason })) }));
+  if (json) console.log(JSON.stringify({ ok: !bad, hosted: true, dry_run: dry, url: c.mcp_url, changes: res.map((r) => ({ agent: r.agent, file: r.file, action: r.action, reason: r.reason, ...(r.action === "print" ? { block: r.block } : {}) })) }));
   else {
     for (const r of res) {
       if (r.action === "print") console.log(`${r.agent}: not written. ${r.reason}\n${r.block}\n`);
