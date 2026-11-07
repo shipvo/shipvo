@@ -4,7 +4,7 @@ Cast from `scripts/video/cast/README.md` (Mara, Jun, Dana, Pip). Main cut 1:40, 
 
 ## Real recordings (made on the runner with `record_start` / `record_stop`)
 
-Made by `scripts/video/story/record-screens.mjs` against a live `shipvo run android` phone, driven through `@shipvo/mcp`. Tide & Tackle sample app, 1080x1920, 30 fps. The phone sits at x 324, y 485, 432x950 in the frame.
+Made by `scripts/video/story/record-screens.mjs` against a live `shipvo run android` phone, driven through `@shipvo/mcp`. Tide & Tackle sample app, 1080x1920, 30 fps. The phone screen sits at x 197, y 512, 412x910 in the frame.
 
 | File (in `/tmp/agent/media/story-ad/`) | Length | What it shows |
 | --- | --- | --- |
@@ -36,6 +36,10 @@ Dialogue, 8 lines (Lumi voices Pip as host per the cast rule): Mara "Nobody come
 1. 6 s: "From a chat to an app."
 2. 46 s: "Your assistant can order."
 3. 78 s: "Every order, in one list."
+
+## Built so far
+
+Scenes 1 to 6 (0 to 60 s) are in `story/scenes.mjs`. Left: scenes 7 to 10 (rush, orders list, sunset, end card), then the 9:16 cut.
 
 ## Not in this slice
 
