@@ -1,2 +1,2 @@
-- Docs: new page "Score an agent on app tasks" for `shipvo eval run` and `shipvo eval report`; the agents page now covers rooms, the richer `list_sessions` and the `/watch` page.
+- Docs: the agents page now covers rooms, the richer `list_sessions` and the `/watch` page; the eval page is linked from "Grading an agent".
 - Migration: none.
