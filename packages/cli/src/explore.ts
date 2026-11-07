@@ -10,6 +10,7 @@ import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { redactTestSecrets, writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
+import { predict, usable, type RankerModel } from "./ranker.js";
 import { runFlows, renderFlows, parseFlowNames } from "./flows.js";
 
 export type Step =
@@ -134,6 +135,8 @@ export type WalkOptions = {
   shouldStop?: () => boolean;
   /** Called once per action with features and outcome only: roles, counts, types and hashes. Never text. See docs/explore-features.md. */
   onAction?: (r: ActionRecord) => void;
+  /** Action ranker. Each safe action's order score is multiplied by the model's prediction. Without it the walk is the same as before. */
+  ranker?: RankerModel | null;
 };
 /** One line of `--record-features`. Version 1. */
 export type ActionRecord = {
@@ -149,7 +152,7 @@ export type WalkEvent =
   | { type: "screen"; screens: number; sig: string; controls: { role: string; name: string }[] }
   | { type: "finding"; n: number; finding: Finding };
 type Act = { kind: "tap" | "type"; el: El; text?: string; enter?: boolean; risky: boolean; done: boolean };
-type Node = { sig: string; path: Step[]; depth: number; acts: Act[]; n: number; reward: number };
+type Node = { sig: string; path: Step[]; depth: number; acts: Act[]; n: number; reward: number; fields: number };
 
 /**
  * Walks the app. Each round it picks the screen to work on with an upper confidence bound: screens with nothing tried yet
@@ -230,10 +233,23 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
     const taps: Act[] = shuffle(els.filter((e) => e.name && !/^(back|go back)$/i.test(e.name)), rand).map((el) => ({ kind: "tap", el, risky: RISKY.test(el.name), done: false }));
     const fs = driver.type ? parseEls(screen, FIELDS) : [];
     const typeActs = (invalid: boolean): Act[] => fs.map((el) => ({ kind: "type", el, text: sampleValue(el.name, invalid), enter: invalid, risky: false, done: false }));
-    nodes.set(sig, { sig, path, depth, acts: o.input === "bad" ? [...typeActs(true), ...taps] : [...typeActs(false), ...taps, ...typeActs(true)], n: 0, reward: 0 });
+    nodes.set(sig, { sig, path, depth, acts: o.input === "bad" ? [...typeActs(true), ...taps] : [...typeActs(false), ...taps, ...typeActs(true)], n: 0, reward: 0, fields: fs.length });
   }
 
   const todo = (n: Node) => n.acts.filter((a) => !a.done);
+  /** The order score (1, 1/2, 1/3, … down the list of safe actions) times the model's prediction. Risky actions stay last. */
+  function rankedAct(n: Node, model: RankerModel): Act {
+    const left = todo(n); const safe = left.filter((x) => !x.risky);
+    const pool = safe.length ? safe : left;
+    const tried = n.acts.filter((x) => x.done).length;
+    let best = pool[0]!, bestScore = -Infinity;
+    pool.forEach((x, i) => {
+      const p = predict(model, { kind: x.kind, role: x.el.role, risky: x.risky, invalid_input: x.kind === "type" && !!x.enter, enter: !!x.enter, nth: x.el.nth, depth: n.depth, tried, actions: n.acts.length, fields: n.fields });
+      const score = p / (1 + i);
+      if (score > bestScore) { best = x; bestScore = score; }
+    });
+    return best;
+  }
   /** Upper confidence bound over the screens that still have something to try. Untried screens first, risky-only screens last. */
   function pick(here: string | null, total: number): Node | null {
     const all = [...nodes.values()].filter((n) => todo(n).length);
@@ -271,7 +287,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
         }
         screen = landed ?? (await replay(node.path)).screen;
       }
-      const a = todo(node).find((x) => !x.risky) ?? todo(node)[0]!;
+      const a = o.ranker && usable(o.ranker) ? rankedAct(node, o.ranker) : todo(node).find((x) => !x.risky) ?? todo(node)[0]!;
       a.done = true;
       const target = find(screen, a.el, a.kind === "type" ? FIELDS : ACTIONABLE);
       if (!target) { at = node; continue; }
