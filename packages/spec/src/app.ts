@@ -25,6 +25,8 @@ export interface App {
   setField(form: string, field: string, value: unknown): void;
   /** Validates the form. If every field is fine, runs the submit action with the values as its input. */
   submit(form: string): PressResult;
+  /** Runs an action by name, the way a generated MCP tool does. Fills in defaults and refuses missing input. */
+  call(action: string, input?: Record<string, unknown>): PressResult;
   /** Presses a button by its label (or id). */
   press(button: string): PressResult;
   /** Selects a tab by its label. The history starts again at that tab's screen. */
@@ -152,6 +154,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
     }
     try {
       toast = "";
+      current();
       const r = run(a.do ?? [], { ...last.scope(), input });
       return { ok: true, value: r.done ? r.value : undefined };
     } catch (e) {
@@ -199,6 +202,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
       if (r.ok) delete drafts[key];
       return r;
     },
+    call: (action, input = {}) => runAction(action, { ...input }),
     press(button) {
       if (button === "Back" && history.length > 1) { toast = ""; return back(); }
       const b = find("button", button);
