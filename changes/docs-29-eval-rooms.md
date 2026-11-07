@@ -1,0 +1,1 @@
+- docs: new page "Score an agent on an app task" for `shipvo eval run` and `eval report`; agents page covers rooms and the `room` option of `open_app`.

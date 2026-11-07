@@ -78,3 +78,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Self-host upgrade check, backup and restore | [self-hosting](self-hosting.md#back-up-and-upgrade) | | | |
 | iOS apps on the UIScene lifecycle (`SceneDelegate`) | [cli](cli.md) | | | |
 | Test your own build on the hosted phone (`upload_build`, `shipvo sim --hosted`, `app@build:<id>`) | [test-your-build](test-your-build.md) | | | |
+| Score an agent on an app task (`shipvo eval run`, `shipvo eval report`) | [eval](eval.md) | | | |
+| Rooms: phones in one room share one backend (`open_app room`, `list_sessions`) | [agents](agents.md#rooms-several-phones-one-backend) | | | |
+| `shipvo agents setup --hosted` writes the hosted phone config | [cli](cli.md) | | | |
