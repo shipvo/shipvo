@@ -1,0 +1,2 @@
+- store: `shipvo store policy` writes `privacy-policy.md` and `privacy-policy.html` from the capabilities in shipvo.json. Each data use comes from a derived item; open questions are listed for you. Set `listing.privacy.company` and `listing.privacy.contactEmail`; `--strict` exits 1 while either is missing. Nothing is uploaded.
+- store: `@shipvo/store` exports `renderPolicyText`. `StoreManifest.listing` accepts an optional `privacy` object. No migration needed.

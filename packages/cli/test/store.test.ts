@@ -314,3 +314,19 @@ describe("store screenshots --mode frames", () => {
     process.exitCode = undefined;
   });
 });
+
+it("store policy writes md and html, lists missing fields, and --strict exits 1", async () => {
+  const log = vi.spyOn(console, "log");
+  log.mockClear();
+  process.exitCode = undefined;
+  await store(["policy", "--out", "pol"]);
+  expect(readFileSync(join(app, "pol/privacy-policy.md"), "utf8")).toContain("Privacy policy for");
+  expect(readFileSync(join(app, "pol/privacy-policy.html"), "utf8")).toContain("<h1>");
+  const printed = log.mock.calls.map((c) => c.join(" ")).join("\n");
+  expect(printed).toContain("listing.privacy.contactEmail");
+  expect(printed).toContain("Nothing was uploaded");
+  expect(process.exitCode).toBeUndefined();
+  await store(["policy", "--out", "pol", "--strict"]);
+  expect(process.exitCode).toBe(1);
+  process.exitCode = undefined;
+});
