@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ChessStore } from "../src/index.js";
+import { Game, parseFen } from "../src/engine.js";
 
 describe("ChessStore", () => {
   it("labels every square and piece", () => {
@@ -39,7 +40,7 @@ describe("ChessStore", () => {
     for (const [f, t, re] of [
       ["e2", "e5", /Illegal move/],
       ["e4", "e5", /No piece on e4/],
-      ["e7", "e5", /black's turn|white's turn|It is white/],
+      ["e7", "e5", /It is white's turn/],
       ["z9", "e5", /Bad square/],
     ] as const) {
       const r = s.move(f, t);
@@ -57,5 +58,22 @@ describe("ChessStore", () => {
     expect(s.get_board().status.state).toBe("checkmate");
     const r = s.move("a2", "a3");
     expect(r).toMatchObject({ ok: false, reason: "The game is over" });
+  });
+
+  it("asks for a promotion piece and rejects a bad one", () => {
+    const s = new ChessStore();
+    (s as unknown as { game: Game }).game = new Game(parseFen("8/P6k/8/8/8/8/8/K7 w - - 0 1"));
+    const before = s.get_board().fen;
+    const none = s.move("a7", "a8");
+    expect(none).toMatchObject({ ok: false });
+    if (!none.ok) expect(none.reason).toMatch(/Promotion needed/);
+    // "k" is not a promotion piece; cast past the type to test the guard.
+    const bad = s.move("a7", "a8", "k" as never);
+    if (!bad.ok) expect(bad.reason).toMatch(/Illegal promotion: k/);
+    expect(bad.ok).toBe(false);
+    expect(s.get_board().fen).toBe(before);
+    const good = s.move("a7", "a8", "n");
+    expect(good).toMatchObject({ ok: true, move: "a7a8n" });
+    expect(s.get_board().squares.find((q) => q.square === "a8")?.label).toBe("white knight on a8");
   });
 });

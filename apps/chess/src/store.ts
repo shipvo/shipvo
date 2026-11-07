@@ -36,7 +36,7 @@ export interface MoveListRow { number: number; white: string; black: string | nu
 export class ChessStore {
   private game = new Game();
   private listeners = new Set<() => void>();
-  private san: string[] = [];
+  private descriptions: string[] = [];
 
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
@@ -105,7 +105,7 @@ export class ChessStore {
     if (!chosen) return reject(`Illegal promotion: ${promotion ?? "none"}`);
     const text = describeMove(pos, chosen);
     const played = this.game.play(chosen);
-    this.san.push(text);
+    this.descriptions.push(text);
     this.emit();
     return { ok: true, move: moveToUci(played), board: this.get_board() };
   }
@@ -124,7 +124,7 @@ export class ChessStore {
 
   /** Spoken descriptions of each move, for screen readers. */
   moveDescriptions(): string[] {
-    return [...this.san];
+    return [...this.descriptions];
   }
 
   private emit() {
