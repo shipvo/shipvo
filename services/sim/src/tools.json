@@ -934,7 +934,7 @@
   },
   {
     "name": "open_app",
-    "description": "Open an app in a fresh phone-sized session and return its first screen.",
+    "description": "Open an app in a phone-sized session and return its first screen. Opens the phone in the user's browser so they can watch. Pass platform \"android\" or \"ios\" to choose the phone; with no live `shipvo run` in this project, one is started for you. Every session tool works on that phone. Pass show: false for a headless session nobody watches.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -973,6 +973,18 @@
         "dark": {
           "type": "boolean",
           "description": "Dark mode"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Which phone to show: android or ios. Switches the skin of a live run on the other platform."
+        },
+        "show": {
+          "type": "boolean",
+          "description": "true: open the phone in the user's browser so they can watch (starts `shipvo run` if none is live). false: headless. Default: true on a machine with a desktop, false in CI."
         },
         "attach": {
           "type": "string",
