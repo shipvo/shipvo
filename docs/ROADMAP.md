@@ -84,7 +84,7 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 
 - 2026-11-07: `shipvo eval run` and `shipvo eval report` score any agent or model on an app task: pass rate, steps, time, errors and retries on Android and iOS ([Score an agent](eval.md), #1201)
 - 2026-11-07: Phones opened with the same `open_app` `room` share one backend, and `list_sessions` shows app, platform, room and who opened each session ([Agents](agents.md#rooms-several-phones-one-backend), #1203)
-- 2026-11-07: Follow the agent's phone live, view only, at `/watch` on the simulator, in the Android or iOS frame ([Agents](agents.md#watch-the-phone-live), #1217)
+- 2026-11-07: Follow the agent's phone live at `/watch` on the simulator, in the Android and iOS frames, with a Take over toggle to tap and type ([Agents](agents.md#watch-the-phone-live), #1217)
 - 2026-11-07: `shipvo agents setup --hosted` writes the hosted phone's MCP config for each coding agent ([CLI guide](cli.md#shipvo-agents-setup), #1215)
 - 2026-11-07: Run Android and iOS simulators on your own machine or CI runner: 110 open at once on a 2-CPU, 7.8 GB machine ([Shipvo Simulators](https://shipvo.dev/products/simulators/), #1235)
 - 2026-11-07: Test your own build on the hosted phone with `upload_build` or `shipvo sim --hosted`, then `open_app("<app>@build:<id>")` ([Test your build](test-your-build.md), #1171)

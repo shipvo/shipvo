@@ -1,1 +1,1 @@
-- docs: the agents page has a "Watch the phone live" section for the `/watch` page, and `list_sessions` and `end_session` rows show room details; the CLI guide lists `shipvo eval`. No migration.
+- docs: the agents page has a "Watch the phone live" section for the `/watch` page (steps list and Take over), and `list_sessions` and `end_session` rows show room details; the CLI guide lists `shipvo eval`, and the README, ROADMAP and content ledger link to them. No migration.

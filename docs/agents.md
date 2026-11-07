@@ -195,7 +195,7 @@ Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_pol
 
 ## Watch the phone live
 
-The simulator serves a page at `/watch` (for example `http://localhost:4545/watch` for `shipvo sim`). It lists live sessions, follows the newest one, and streams that phone in its Android or iOS frame. Pick another session in the list to stay on it. The page is view only: taps and keys sent to it are ignored. It starts streaming with the first viewer and stops with the last.
+The simulator serves a page at `/watch` (for example `http://localhost:4545/watch` for `shipvo sim`). It lists live sessions, follows the newest one, and streams that phone in its Android or iOS frame, with a list of the agent's steps in plain language, such as "Tapped …" and "Screen did not change". Pick another session in the list to stay on it. The page starts view only. Turn on Take over to tap, swipe, type and press keys on the phone. It starts streaming with the first viewer and stops with the last.
 
 ## Grading an agent
 
