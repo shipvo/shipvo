@@ -19,11 +19,19 @@ enum ShipvoBundleSelector {
   private static var deferredRelease = 0
   private static var deferredIsTrial = false
 
+  /// True once this process has had a screen: the load was visible at selection, or the app became active. It stays true
+  /// if the app goes to the background later, so `markHealthy` still counts after a slow first render.
+  private static var uiSeen = false
+  static var hasShownUi: Bool { Store.lock.lock(); defer { Store.lock.unlock() }; return uiSeen }
+  /// Test hook: forget the screen state, as a new process would.
+  static func resetUiSeen() { Store.lock.lock(); uiSeen = false; Store.lock.unlock() }
+
   /// Counts the deferred load, if one is waiting. Call on `didBecomeActive` (`crashed: false`) and on an uncaught JS error
   /// (`crashed: true`). The release keeps running the same bundle; a trial release that now reaches its limit is reverted
   /// at the next selection.
   static func settleDeferred(_ s: Store, visible: Bool, crashed: Bool) {
     Store.lock.lock(); defer { Store.lock.unlock() }
+    if visible { uiSeen = true }
     let release = deferredRelease
     guard release != 0, countsLater(deferred: true, visible: visible, crashed: crashed) else { return }
     deferredRelease = 0
@@ -96,6 +104,7 @@ enum ShipvoBundleSelector {
 
   private static func choose(_ s: Store, visible: Bool) -> URL? {
     deferredRelease = 0
+    if visible { uiSeen = true }
     Store.bundleSelectedAt = Store.now()
     Store.loadsInProcess += 1
 

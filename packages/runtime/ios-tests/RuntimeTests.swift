@@ -323,6 +323,20 @@ final class RuntimeTests: XCTestCase {
     XCTAssertEqual(load(s)?.path, path); XCTAssertEqual(s.trialBoots, 2)
   }
 
+  func testUiSeenStaysTrueAfterTheAppGoesToBackground() async throws {
+    let s = store("good"); _ = try await Updater.check(s)
+    ShipvoBundleSelector.resetUiSeen()
+    ShipvoBundleSelector.invalidate()
+    _ = ShipvoBundleSelector.select(s, visible: false)
+    XCTAssertFalse(ShipvoBundleSelector.hasShownUi, "a background load has not shown a screen")
+    ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false) // became active
+    XCTAssertTrue(ShipvoBundleSelector.hasShownUi)
+    // The app is backgrounded before JS calls markHealthy: the flag is sticky, so the release still promotes.
+    XCTAssertTrue(ShipvoBundleSelector.hasShownUi)
+    XCTAssertTrue(ShipvoBundleSelector.promoteIfRunning(s))
+    ShipvoBundleSelector.resetUiSeen()
+  }
+
   func testBackgroundLoadThatThrowsStillCountsOneFailedBoot() async throws {
     let s = store("good"); _ = try await Updater.check(s)
     ShipvoBundleSelector.invalidate()
