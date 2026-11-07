@@ -14,7 +14,7 @@ export async function uploadHosted(opts: { root?: string; skipBuild?: boolean; k
   const key = opts.key ?? process.env.SHIPVO_API_KEY ?? "";
   if (!key) throw new HostedBuildFailure("no_api_key", "Set SHIPVO_API_KEY to your Shipvo API key (run `shipvo login` to get one).");
   const url = (opts.url ?? process.env.SHIPVO_HOSTED_URL ?? "https://sim.shipvo.dev").replace(/\/$/, "");
-  const app = opts.app ?? loadConfig().appId;
+  const app = opts.app ?? loadConfig(root).appId;
   if (!opts.skipBuild || !existsSync(join(root, "sim-dist", "index.html"))) {
     try { await rebuildInto({ root, echo: true }); } catch (e) { throw new HostedBuildFailure("build_failed", `The build failed: ${(e as Error).message.split("\n")[0]}`); }
   }

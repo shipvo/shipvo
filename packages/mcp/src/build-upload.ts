@@ -23,7 +23,7 @@ export function appIdOf(dir: string): string | undefined {
 
 /** Build into `<dir>/sim-dist` the same way `shipvo sim` does. */
 export async function buildProject(dir: string): Promise<void> {
-  try { await run("npx", ["expo", "export", "--platform", "web", "--output-dir", "sim-dist", "--clear"], { cwd: dir, env: { ...process.env, PN_SIM: "1" }, maxBuffer: 1 << 24, shell: process.platform === "win32" }); }
+  try { await run("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", "sim-dist"], { cwd: dir, env: { ...process.env, PN_SIM: "1" }, maxBuffer: 1 << 24, shell: process.platform === "win32" }); }
   catch (e) { throw new BuildError("build_failed", `the build failed: ${String((e as Error).message).split("\n")[0]}`); }
 }
 

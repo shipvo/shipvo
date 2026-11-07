@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { spawn, type ChildProcess } from "node:child_process";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const server = resolve(__dirname, "..", "dist", "server.js");
@@ -132,5 +133,47 @@ describe("test the build on your machine on the hosted phone", () => {
     const r: any = await a.callTool({ name: "upload_build", arguments: { dir: proj, skip_build: true } });
     expect(r.structuredContent.code).toBe("no_api_key");
     await a.close();
+  }, 30000);
+});
+
+// The hosted phone: the Worker verifies the key and passes it as x-shipvo-key (and the scope as x-shipvo-scope).
+describe("hosted HTTP server", () => {
+  let proc: ChildProcess; let base = "";
+  beforeAll(async () => {
+    const probe = http.createServer(); const port = await listen(probe); await new Promise((r) => probe.close(r));
+    base = `http://127.0.0.1:${port}`;
+    proc = spawn(process.execPath, [server, "--http", String(port)], { env: { ...process.env, PN_SIM: `http://127.0.0.1:${simPort}`, PN_CONTROL: "http://127.0.0.1:1", PN_APPS: JSON.stringify({ myapp: { name: "My app", description: "x" } }), SHIPVO_HOSTED_URL: `http://127.0.0.1:${hostedPort}`, SHIPVO_API_KEY: "" } as Record<string, string>, stdio: "pipe" });
+    for (let i = 0; i < 100; i++) { try { if ((await fetch(`${base}/health`)).ok) return; } catch {} await new Promise((r) => setTimeout(r, 100)); }
+    throw new Error("server did not start");
+  }, 30000);
+  afterAll(() => { proc?.kill(); });
+  const call = async (name: string, args: unknown, headers: Record<string, string>) => {
+    const r = await fetch(`${base}/mcp`, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...headers }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }) });
+    return ((await r.json()) as any).result;
+  };
+  const upload = async () => (await (async () => { const a = await client("key-a"); const r: any = await a.callTool({ name: "upload_build", arguments: { dir: proj, skip_build: true } }); await a.close(); return r; })()).structuredContent.id as string;
+
+  it("opens a build with the key the Worker passes in x-shipvo-key", async () => {
+    const id = await upload();
+    const r = await call("open_app", { app: `myapp@build:${id}` }, { "x-shipvo-key": "key-a", "x-shipvo-app": "myapp", "x-shipvo-scope": "test" });
+    expect(r.isError).toBeFalsy();
+    expect(r.content[0].text).toContain(`build:${id}`);
+  }, 30000);
+
+  it("does not find the build with another account's key", async () => {
+    const id = await upload();
+    const r = await call("open_app", { app: `myapp@build:${id}` }, { "x-shipvo-key": "key-b", "x-shipvo-app": "myapp", "x-shipvo-scope": "test" });
+    expect(r.structuredContent.code).toBe("build_not_found");
+  }, 30000);
+
+  it("refuses upload_build for a read-only key", async () => {
+    const r = await call("upload_build", { dir: proj }, { "x-shipvo-key": "key-a", "x-shipvo-app": "myapp", "x-shipvo-scope": "read" });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toMatch(/read-only/);
+  }, 30000);
+
+  it("answers stdio_only for upload_build on the hosted server", async () => {
+    const r = await call("upload_build", { dir: proj }, { "x-shipvo-key": "key-a", "x-shipvo-app": "myapp", "x-shipvo-scope": "test" });
+    expect(r.structuredContent.code).toBe("stdio_only");
   }, 30000);
 });
