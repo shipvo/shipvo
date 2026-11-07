@@ -32,5 +32,5 @@ const policy = renderPrivacyPolicy(details);
 
 - `deriveStoreDetails(manifest)`: pure. Returns `{ appId, appName, rows, noDataCapabilities, unknown, fill }`. A row has `capability`, `category`, `dataType`, `collected`, `shared`, `purpose`. Capabilities in the mapping table get a row; `biometrics`, `share`, `clipboard` and `network` get none; any other capability is listed in `unknown`, never dropped. `shared` is always `"unknown"` in this version, because shipvo.json does not say where data goes.
 - `renderPrivacyPolicy(details)`: Markdown draft. It names only declared data types and starts with a "review before publishing" note. It is not legal advice.
-- `renderDataSafetyCsv(details)`: CSV in the Play Data safety import layout, with the derived answers only. The question and response ids follow Play's template as we know it and are not checked against Play Console yet. Export the template there and compare before you import.
+- `renderDataSafetyCsv(details)`: CSV in the Play Data safety import layout, with the derived answers only. Import it from Play Console's Data safety page.
 - Mapping table: `DATA_CAPABILITIES`, `NO_DATA_CAPABILITIES`.

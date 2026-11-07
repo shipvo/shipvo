@@ -940,7 +940,7 @@
       "properties": {
         "app": {
           "type": "string",
-          "description": "App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"
+          "description": "App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run), or 'tide@build:<id>' (a build from upload_build, on the hosted phone)"
         },
         "session": {
           "type": "string",
@@ -2285,6 +2285,37 @@
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "upload_build",
+    "description": "Build the app in this project with the simulated device (the same build `shipvo sim` makes), upload it to the hosted phone for this key, and return a build id. Then call open_app(\"<app>@build:<id>\") on the hosted server. The build is private to your account and is deleted when it expires. Runs only on the local (stdio) server, because it reads your project.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "description": "Project folder (default: the server's working directory)"
+        },
+        "app": {
+          "type": "string",
+          "description": "App id (default: read from the project's shipvo config)"
+        },
+        "skip_build": {
+          "type": "boolean",
+          "description": "Upload the existing sim-dist folder without building again"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
     },
     "execution": {
       "taskSupport": "forbidden"
