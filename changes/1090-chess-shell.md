@@ -1,0 +1,1 @@
+- chess: Expo shell (`app.json`, entry point, Metro config) and `pnpm --filter chess build`, which exports the web build that `shipvo sim` loads on the Android and iOS skins. The running app exposes its typed actions as `globalThis.chess`.

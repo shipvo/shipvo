@@ -287,6 +287,10 @@ class Run {
     if (INTERACTIVE.has(type) && (typeof b.label !== "string" || b.label.trim() === "")) {
       this.error(path, `Interactive block "${type}" has no label.`, "Add \"label\": a short name that people and agents see, for example \"Add goal\".");
     }
+    if (type === "toggle" || type === "segmented") this.checkBind(b, path);
+    if (type === "segmented" && !(Array.isArray(b.options) && b.options.length > 0 && b.options.every((o) => typeof o === "string" && o !== ""))) {
+      this.error(childPath(path, "options"), "Segmented control has no options.", "Add \"options\": a list of two or more short texts, for example [\"day\", \"week\", \"month\"].");
+    }
     if (type === "list" && !isObject(b.empty)) {
       this.warn(path, "List has no empty state.", "Add \"empty\": { \"message\": \"...\" } so an empty list explains itself.");
     }
@@ -307,6 +311,17 @@ class Run {
           }
         }
       }
+    }
+  }
+
+  /** A toggle or segmented control writes to a declared state key: `"bind": "state.name"`. */
+  checkBind(b: Record<string, unknown>, path: string) {
+    const bp = childPath(path, "bind");
+    const m = typeof b.bind === "string" ? /^state\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(b.bind) : null;
+    if (!m) {
+      this.error(bp, `"${String(b.type)}" needs a "bind" to a state value.`, "Add \"bind\": \"state.name\" and declare \"name\" in \"state\".");
+    } else if (!isObject(this.spec.state) || !(m[1]! in this.spec.state)) {
+      this.error(bp, `State "${m[1]}" is not declared.`, `Add "${m[1]}" to "state" with a type and a default.`);
     }
   }
 

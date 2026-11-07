@@ -236,6 +236,12 @@
         "when": { "type": "string", "minLength": 1 },
         "label": { "type": "string", "minLength": 1 },
         "style": { "type": "object" },
+        "bind": { "type": "string", "pattern": "^state\\.[A-Za-z_][A-Za-z0-9_]*$" },
+        "options": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "title": { "type": "string" },
+        "variant": { "type": "string" },
+        "delta": { "type": "string" },
+        "trend": { "enum": ["up", "down", "flat"] },
         "motion": { "type": "object" },
         "children": { "type": "array", "items": { "$ref": "#/$defs/block" } }
       }
@@ -269,6 +275,7 @@
         "http": { "type": "object" },
         "set": { "type": "string" },
         "navigate": { "type": "string" },
+        "presentation": { "enum": ["push", "sheet"] },
         "params": { "type": "object" },
         "notify": { "type": "object" },
         "toast": { "type": "string" },
