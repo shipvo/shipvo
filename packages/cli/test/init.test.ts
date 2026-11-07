@@ -134,9 +134,14 @@ it("--template shop writes list, detail, cart, five products and a test that rea
   expect(cart).toContain("finally { setBusy(false); }");
   expect(readFileSync(join(dir, "src/money.ts"), "utf8")).toContain("minor / 10 ** (decimals ?? 2)");
   expect(readFileSync(join(dir, "src/data/shop.json"), "utf8")).toContain('"code": "USD"');
-  expect(cart).toContain("Payment failed: ");
+  expect(cart).toContain("Your payment was declined. Try another method.");
   expect(test).toContain('nextResult: "decline"');
   expect(test).toContain('waitFor("Order placed")');
+  expect(test).toContain("You're offline. Your cart is saved.");
+  expect(cart).toContain("device.net.online()");
+  expect(cart).toContain('"Plus " + p.name');
+  expect(cart).not.toContain('accessibilityLabel="Undo"');
+  expect(cart).toContain("Back to shop");
   const readme = readFileSync(join(dir, "README.md"), "utf8");
   expect(readme).toContain("src/data/products.json");
   expect(readme).not.toContain("src/release.ts");
@@ -152,7 +157,7 @@ it("--template shop posts a paid order to the backend the simulator records, and
   const cart = readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8");
   const paid = cart.indexOf("if (r.ok) {");
   const send = cart.indexOf("await onOrder?.(");
-  const placed = cart.indexOf('setStatus("Order placed")');
+  const placed = cart.indexOf("setPlaced(");
   expect(paid).toBeGreaterThan(-1);
   expect(send).toBeGreaterThan(paid);
   expect(placed).toBeGreaterThan(send);
@@ -315,4 +320,18 @@ it("writes pnpm-workspace.yaml so pnpm 11 installs fresh Shipvo releases", () =>
   const y = readFileSync(join(tmp, "my-shop", "pnpm-workspace.yaml"), "utf8");
   expect(y).toContain("minimumReleaseAgeExclude:");
   for (const n of ["@shipvo/*", "shipvo", "create-shipvo"]) expect(y).toContain(`"${n}"`);
+});
+
+it("--template shop Cart: wording per reason, offline guard before any charge, 48 x 48 controls", async () => {
+  const dir = join(tmp, "store-checkout");
+  await init([dir, "--template", "shop", "--public-key", "AAAA"]);
+  const cart = readFileSync(join(dir, "src/screens/Cart.tsx"), "utf8");
+  for (const t of ["Your payment was declined. Try another method.", "The payment took too long. Try again.", "Not enough funds.", "Payment cancelled."]) expect(cart).toContain(t);
+  expect(cart).not.toContain("Payment failed: ");
+  expect(cart.indexOf("device.net.online()")).toBeLessThan(cart.indexOf("device.pay.charge"));
+  expect(cart).toContain("setStatus(null);");
+  expect(cart).toMatch(/remove: \{ minHeight: 48, minWidth: 48/);
+  expect(cart).toContain("Order number: ");
+  expect(readFileSync(join(dir, "src/cart.tsx"), "utf8")).toContain("restore");
+  expect(readFileSync(join(dir, "src/screens/List.tsx"), "utf8")).toContain("formatPrice(p.price)");
 });
