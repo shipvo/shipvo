@@ -70,4 +70,30 @@ describe("typed actions on the shared store", () => {
     if (!r.ok) expect(r.reason).toMatch(/promotion/);
     expect(actions.move({ from: "b7", to: "a8", promotion: "q" }).ok).toBe(true);
   });
+
+  it("legal_moves lists four promotions for a promoting target", () => {
+    const { store, actions } = setup();
+    for (const m of ["a2a4", "b7b5", "a4b5", "a7a6", "b5a6", "c8b7", "a6b7", "g8f6"]) store.play(m);
+    const promos = actions.legal_moves({ from: "b7" }).filter((m) => m.to === "a8");
+    expect(promos.map((m) => m.promotion).sort()).toEqual(["b", "n", "q", "r"]);
+  });
+
+  it("legal_moves returns nothing for a bad square", () => {
+    const { actions } = setup();
+    expect(actions.legal_moves({ from: "z9" })).toEqual([]);
+  });
+
+  it("move after the game is over is refused", () => {
+    const { store, actions } = setup();
+    for (const m of ["f2f3", "e7e5", "g2g4", "d8h4"]) store.play(m);
+    expect(actions.get_board().status).toMatch(/checkmate/);
+    const r = actions.move({ from: "a2", to: "a3" });
+    expect(r).toEqual({ ok: false, reason: "The game is over." });
+  });
+
+  it("move works when destructured from the actions object", () => {
+    const { actions } = setup();
+    const { move } = actions;
+    expect(move({ from: "e2", to: "e4" }).ok).toBe(true);
+  });
 });

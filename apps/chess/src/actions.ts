@@ -38,8 +38,7 @@ export interface MoveInput {
 }
 
 export function createActions(store: ChessStore = chessStore) {
-  return {
-    get_board(): BoardState {
+  const getBoard = (): BoardState => {
       const g = store.game;
       const s = g.status();
       const status =
@@ -51,7 +50,10 @@ export function createActions(store: ChessStore = chessStore) {
         squares: boardView(g).map((q) => ({ square: q.name, label: q.label })),
         moves: moveList(g),
       };
-    },
+  };
+
+  return {
+    get_board: getBoard,
 
     /** Legal moves for the side to move, optionally only from one square. */
     legal_moves(input: { from?: string } = {}): LegalMove[] {
@@ -107,7 +109,7 @@ export function createActions(store: ChessStore = chessStore) {
       }
       const description = describeMove(g.position, chosen);
       store.play(chosen);
-      return { ok: true, move: moveToUci(chosen), description, board: this.get_board() };
+      return { ok: true, move: moveToUci(chosen), description, board: getBoard() };
     },
   };
 }
