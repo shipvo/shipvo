@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import http from "node:http";
-import { postHostedBuild } from "../src/sim-hosted.js";
+import { postHostedBuild, simHosted } from "../src/sim-hosted.js";
 
 const serve = (status: number, body: unknown) => new Promise<{ url: string; close: () => void }>((ok) => {
   const s = http.createServer((req, res) => { req.resume(); req.on("end", () => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body)); }); });
@@ -22,5 +22,11 @@ describe("shipvo sim --hosted upload", () => {
     const s = await serve(401, { error: "invalid_api_key" });
     await expect(postHostedBuild({ url: s.url, key: "k", app: "menu", body: Buffer.from("abc") })).rejects.toMatchObject({ code: "unauthorized" });
     s.close();
+  });
+  it("simHosted without a key fails with no_api_key before building anything", async () => {
+    const old = { k: process.env.SHIPVO_API_KEY, h: process.env.SHIPVO_HOME };
+    delete process.env.SHIPVO_API_KEY; process.env.SHIPVO_HOME = "/nonexistent-shipvo-home";
+    try { await expect(simHosted("menu")).rejects.toMatchObject({ code: "no_api_key", message: expect.stringContaining("shipvo login") }); }
+    finally { if (old.k !== undefined) process.env.SHIPVO_API_KEY = old.k; if (old.h === undefined) delete process.env.SHIPVO_HOME; else process.env.SHIPVO_HOME = old.h; }
   });
 });

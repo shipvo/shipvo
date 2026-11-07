@@ -181,8 +181,10 @@ const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string;
     if (ctx.remote) return result("", { ok: false, code: "not_supported_remote", error: "app@build:<id> opens from the stdio server (it holds your key). Run shipvo-mcp locally." });
     const b = await checkBuild(buildId);
     if (!b.ok) return result("", b);
+    // The hosted phone does not serve uploaded builds yet (tracked in #1152). Say so rather than opening another app.
+    return result("", { ok: false, code: "build_not_served", error: `build ${buildId} is uploaded and yours, but the hosted phone cannot open it yet. Test it locally with shipvo sim, or open "${id}" to see the published app.` });
   }
-  const live = attach === "never" || buildId ? undefined : findLiveRun(id);
+  const live = attach === "never" ? undefined : findLiveRun(id);
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
   if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
   if (!keyApps && !live && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
@@ -225,7 +227,7 @@ use(server, tools.upload_build, async ({ dir, app }) => {
   if (!id) return result("", { ok: false, code: "build_failed", error: `no shipvo.json in ${root}: pass app, or dir of the project.` });
   const r = await uploadBuild({ dir: root, app: id });
   if (!r.ok) return result("", r);
-  return text(`build: ${r.id}\napp: ${id}\nexpires: ${r.expires_at}\nopen it with open_app("${id}@build:${r.id}")`);
+  return text(`build: ${r.id}\napp: ${id}\nexpires: ${r.expires_at}`);
 });
 // Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.
 use(server, tools.attach_session, async ({ app, session }) => {

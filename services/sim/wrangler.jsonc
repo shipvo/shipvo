@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [{ "binding": "DB", "database_name": "purenative", "database_id": "292c3334-c9a8-4215-a947-6e47d4792a59" }],
   "r2_buckets": [{ "binding": "BUILDS", "bucket_name": "shipvo-sim-builds" }],
-  "vars": { "CONTROL": "https://api.shipvo.dev", "E2B_TEMPLATE": "shipvo-sim", "SESSION_TIMEOUT_S": "1800" },
+  "vars": { "CONTROL": "https://api.shipvo.dev", "MAX_BUILD_BYTES": "104857600", "BUILD_TTL_S": "3600", "E2B_TEMPLATE": "shipvo-sim", "SESSION_TIMEOUT_S": "1800" },
   "triggers": { "crons": ["17 * * * *"] },
   "workers_dev": true,
   "routes": [{ "pattern": "sim.shipvo.dev", "custom_domain": true }],

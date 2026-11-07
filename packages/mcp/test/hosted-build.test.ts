@@ -15,7 +15,7 @@ const sessions: any[] = [];
 // The stand-in hosted service: two accounts, builds private to the account, a size limit and an expiry.
 const KEYS: Record<string, string> = { "key-a": "a", "key-b": "b" };
 const builds = new Map<string, { account: string; app: string; expires_at: string }>();
-let maxBytes = 1e9;
+let maxBytes = 1e9; let down = false;
 
 beforeAll(async () => {
   out = mkdtempSync(join(root, "dist-test-"));
@@ -24,6 +24,7 @@ beforeAll(async () => {
   hosted = http.createServer(async (req, res) => {
     const chunks: Buffer[] = []; for await (const c of req) chunks.push(c as Buffer);
     const send = (s: number, o: unknown) => { res.writeHead(s, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
+    if (down) return send(503, { code: "down" });
     const account = KEYS[String(req.headers.authorization ?? "").replace("Bearer ", "")];
     if (!account) return send(401, { error: "invalid_api_key" });
     const u = new URL(req.url!, "http://x");
@@ -49,7 +50,15 @@ beforeAll(async () => {
   // A project, and an `npx` that stands in for `expo export` by writing a web build.
   project = mkdtempSync(join(tmpdir(), "hb-proj-")); bin = mkdtempSync(join(tmpdir(), "hb-bin-"));
   writeFileSync(join(project, "shipvo.json"), JSON.stringify({ appId: "menu" }));
-  writeFileSync(join(bin, "npx"), '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = "--output-dir" ] && d="$2"; shift; done\nmkdir -p "$d" && echo "<html>build</html>" > "$d/index.html"\n');
+  // `npx -y @shipvo/cli sim --hosted --json` stands in for the CLI: it posts a tiny build to SHIPVO_HOSTED_URL and prints the CLI's envelope.
+  writeFileSync(join(bin, "npx"), `#!/bin/sh\nexec "${process.execPath}" "${join(bin, "fake-cli.mjs")}"\n`);
+  writeFileSync(join(bin, "fake-cli.mjs"), `
+const r = await fetch(process.env.SHIPVO_HOSTED_URL + "/builds?app=menu", { method: "POST", headers: { authorization: "Bearer " + process.env.SHIPVO_API_KEY }, body: new Uint8Array(8) });
+const d = await r.json().catch(() => ({}));
+const env = r.status === 201 ? { ok: true, code: "uploaded", summary: "ok", data: { build_id: d.id, expires_at: d.expires_at, bytes: d.bytes }, next: [] }
+  : { ok: false, code: r.status === 413 ? "build_too_large" : r.status === 401 ? "unauthorized" : "upload_failed", summary: d.message ?? "failed", data: {}, next: [] };
+console.log(JSON.stringify(env)); process.exitCode = env.ok ? 0 : 1;
+`);
   chmodSync(join(bin, "npx"), 0o755);
 });
 afterAll(() => { hosted?.close(); sim?.close(); for (const d of [out, project, bin]) if (d) rmSync(d, { recursive: true, force: true }); });
@@ -64,17 +73,19 @@ async function connect(key: string) {
 const textOf = (r: any) => r.content[0].text as string;
 
 describe("upload_build and app@build:<id>", () => {
-  it("uploads the build and opens it on the phone", async () => {
+  it("uploads the build, and open_app checks it but says it is not served instead of opening another app", async () => {
     const c = await connect("key-a");
     const up: any = await c.callTool({ name: "upload_build", arguments: {} });
     expect(up.isError).toBeFalsy();
     const id = /build: (\w+)/.exec(textOf(up))![1];
     expect(textOf(up)).toMatch(/expires: \d{4}-/);
+    expect(textOf(up)).not.toContain("open_app");
     expect(builds.get(id)).toMatchObject({ account: "a", app: "menu" });
+    const n = sessions.length;
     const r: any = await c.callTool({ name: "open_app", arguments: { app: `menu@build:${id}` } });
-    expect(r.isError).toBeFalsy();
-    expect(textOf(r)).toContain("Uncommitted change");
-    expect(sessions.at(-1).app).toBe(`menu@build:${id}`);
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toContain("[build_not_served]");
+    expect(sessions.length).toBe(n);
     await c.close();
   }, 60000);
 
@@ -112,6 +123,16 @@ describe("upload_build and app@build:<id>", () => {
       expect(textOf(r)).toMatch(/smaller/);
       await c.close();
     } finally { maxBytes = 1e9; }
+  }, 60000);
+
+  it("a 5xx from the hosted phone is unreachable, not build_not_found", async () => {
+    const c = await connect("key-a");
+    down = true;
+    try {
+      const r: any = await c.callTool({ name: "open_app", arguments: { app: "menu@build:abc" } });
+      expect(textOf(r)).toContain("[unreachable]");
+    } finally { down = false; }
+    await c.close();
   }, 60000);
 
   it("says no_api_key without a key", async () => {

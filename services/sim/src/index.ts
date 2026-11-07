@@ -5,10 +5,11 @@
 //   - Cloudflare Containers backend (wrangler.containers.jsonc): one container per app.
 import { Container, getContainer } from "@cloudflare/containers";
 import TOOLS from "./tools.json";
+import { builds, sweepBuilds, type BuildBucket } from "./builds";
 
 type Env = {
   SIM?: DurableObjectNamespace<SimContainer>; DB: D1Database; CONTROL: string; OWNER_TOKEN?: string;
-  BUILDS?: R2Bucket; MAX_BUILD_BYTES?: string; BUILD_TTL_S?: string; SIM_REV?: string; E2B_API_KEY?: string; E2B_TEMPLATE?: string; E2B_API?: string; E2B_SANDBOX_DOMAIN?: string; SESSION_TIMEOUT_S?: string;
+  BUILDS?: BuildBucket; MAX_BUILD_BYTES?: string; BUILD_TTL_S?: string; SIM_REV?: string; E2B_API_KEY?: string; E2B_TEMPLATE?: string; E2B_API?: string; E2B_SANDBOX_DOMAIN?: string; SESSION_TIMEOUT_S?: string;
 };
 
 export class SimContainer extends Container<Env> {
@@ -70,15 +71,7 @@ async function viaE2B(req: Request, env: Env, row: { id: number; app_id: string;
 /* ---------- Worker ---------- */
 export default {
   // Hourly: delete uploaded builds that have expired.
-  async scheduled(_e: unknown, env: Env): Promise<void> {
-    if (!env.BUILDS) return;
-    const now = new Date().toISOString(); let cursor: string | undefined;
-    do {
-      const l = await env.BUILDS.list({ prefix: "builds/", cursor, include: ["customMetadata"] });
-      for (const o of l.objects) if ((o.customMetadata?.expires_at ?? "") < now) await env.BUILDS.delete(o.key);
-      cursor = l.truncated ? l.cursor : undefined;
-    } while (cursor);
-  },
+  async scheduled(_e: unknown, env: Env): Promise<void> { await sweepBuilds(env); },
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response("", { status: 204, headers: CORS });
@@ -86,7 +79,7 @@ export default {
     // /mcp with Authorization: Bearer <key>, or, for clients that cannot send headers (ChatGPT's custom MCP
     // connectors offer only OAuth or none), /mcp/<key> or /mcp?key=<key>.
     const pathKey = url.pathname.match(/^\/mcp\/([A-Za-z0-9_-]{8,})$/)?.[1];
-    if (url.pathname !== "/mcp" && !pathKey) return json({ error: "not_found" }, 404);
+    if (url.pathname !== "/mcp" && !pathKey && url.pathname !== "/builds" && !url.pathname.startsWith("/builds/")) return json({ error: "not_found" }, 404);
 
     // API key → app and scope. Keys come from the owner command create_api_key; only hashes are stored.
     const key = ((req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim()) || pathKey || url.searchParams.get("key") || "";
@@ -108,7 +101,7 @@ export default {
     if (row.expires_at && row.expires_at < new Date().toISOString()) return json({ error: "expired_api_key", expires_at: row.expires_at, hint: "Run `shipvo login` to get a new key." }, 401);
     env.DB.prepare("UPDATE api_keys SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").bind(row.id).run().catch(() => {});
 
-    if (url.pathname === "/builds" || url.pathname.startsWith("/builds/")) return builds(req, env, url, row.account_id);
+    if (url.pathname === "/builds" || url.pathname.startsWith("/builds/")) return builds(req, env, url, row.account_id, CORS);
     // A signed-in developer's key opens the beta app plus the apps they registered.
     const owned = row.account_id ? ((await env.DB.prepare("SELECT app_id FROM apps WHERE account_id = ?").bind(row.account_id).all()).results as { app_id: string }[]).map((r) => r.app_id) : [];
     const pub = row.account_id ? ((await env.DB.prepare("SELECT app_id FROM apps WHERE listed = 1 AND approved = 1 AND latest_release IS NOT NULL").all()).results as { app_id: string }[]).map((r) => r.app_id) : [];
@@ -131,28 +124,3 @@ export default {
   },
 };
 
-/* ---------- builds: uploaded with upload_build, private to the account, deleted on expiry ---------- */
-// The R2 object holds the build; its custom metadata holds the account and the expiry, so no table is needed.
-async function builds(req: Request, env: Env, url: URL, account: number | null): Promise<Response> {
-  if (!env.BUILDS) return json({ code: "builds_unavailable", message: "uploaded builds are not enabled here" }, 503);
-  if (account == null) return json({ code: "unauthorized", message: "this key has no account" }, 401);
-  const ttl = Number(env.BUILD_TTL_S ?? 3600);
-  if (req.method === "POST" && url.pathname === "/builds") {
-    const max = Number(env.MAX_BUILD_BYTES ?? 0);
-    const declared = Number(req.headers.get("content-length") ?? 0);
-    const body = declared && max && declared > max ? null : await req.arrayBuffer();
-    if (!body || (max && body.byteLength > max)) return json({ code: "build_too_large", message: "the build is too large. Make it smaller: remove unused images, fonts and packages, drop assets the simulator does not need, then upload again." }, 413);
-    const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-    const expires_at = new Date(Date.now() + ttl * 1000).toISOString();
-    await env.BUILDS.put(`builds/${id}`, body, { customMetadata: { account: String(account), app: (url.searchParams.get("app") ?? "").slice(0, 80), expires_at } });
-    return json({ id, expires_at, bytes: body.byteLength }, 201);
-  }
-  const m = req.method === "GET" && /^\/builds\/([A-Za-z0-9_-]+)$/.exec(url.pathname);
-  if (!m) return json({ code: "not_found" }, 404);
-  const head = await env.BUILDS.head(`builds/${m[1]}`);
-  const meta = head?.customMetadata;
-  // Another account's build answers the same as a missing one, so ids cannot be probed.
-  if (!head || !meta || meta.account !== String(account)) return json({ code: "build_not_found" }, 404);
-  if (meta.expires_at < new Date().toISOString()) { await env.BUILDS.delete(`builds/${m[1]}`); return json({ code: "build_expired" }, 410); }
-  return json({ id: m[1], app: meta.app, expires_at: meta.expires_at });
-}

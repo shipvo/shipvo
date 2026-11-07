@@ -940,7 +940,7 @@
       "properties": {
         "app": {
           "type": "string",
-          "description": "App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run), or 'tide@build:<id>' (a build you uploaded with upload_build)"
+          "description": "App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"
         },
         "session": {
           "type": "string",
@@ -2280,7 +2280,7 @@
   },
   {
     "name": "upload_build",
-    "description": "Build the app in this project with the simulated device (the same build `shipvo sim` makes), upload it to the hosted phone for your key, and return a build id. Open it with open_app(\"<app>@build:<id>\"). Only you can open it, and it is deleted when it expires (the result says when). Needs the stdio server, a project directory and an API key (`shipvo login` or SHIPVO_API_KEY).",
+    "description": "Build the app in this project with the simulated device (the same build `shipvo sim` makes), upload it to the hosted phone for your key, and return a build id. Only your account can use the build, and it is deleted when it expires (the result says when). Needs the stdio server, a project directory and an API key (`shipvo login` or SHIPVO_API_KEY).",
     "inputSchema": {
       "type": "object",
       "properties": {
