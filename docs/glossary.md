@@ -79,3 +79,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Build.** Turning your app's files into one copy that can run, here a web copy shown on a simulated phone. The first build is the slowest.
 
 **pnpm.** A tool that downloads the parts a project needs. You turn it on with `corepack enable`, which comes with Node.
+
+**Build id.** The short name Shipvo gives a copy of your app you uploaded for the hosted phone. You open it as `myapp@build:<id>`. It is private to you and deleted when it expires. See [Test your build on the hosted phone](test-your-build.md).
