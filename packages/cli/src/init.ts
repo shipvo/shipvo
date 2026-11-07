@@ -548,7 +548,7 @@ const SHOP_CART_STATE = `import { createContext, useContext, useState, type Reac
 import products from "./data/products.json";
 
 export type Line = { id: string; qty: number };
-type Cart = { lines: Line[]; add: (id: string) => void; remove: (id: string) => void; clear: () => void; totalCents: number };
+type Cart = { lines: Line[]; add: (id: string) => void; remove: (id: string) => void; change: (id: string, by: number) => void; restore: (line: Line, index: number) => void; clear: () => void; totalCents: number };
 
 const Ctx = createContext<Cart | null>(null);
 
@@ -556,9 +556,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<Line[]>([]);
   const add = (id: string) => setLines((l) => l.some((x) => x.id === id) ? l.map((x) => x.id === id ? { ...x, qty: x.qty + 1 } : x) : [...l, { id, qty: 1 }]);
   const remove = (id: string) => setLines((l) => l.filter((x) => x.id !== id));
+  // Plus is +1, minus is -1; a line that reaches 0 is removed.
+  const change = (id: string, by: number) => setLines((l) => l.flatMap((x) => x.id !== id ? [x] : x.qty + by > 0 ? [{ ...x, qty: x.qty + by }] : []));
+  // Puts a removed line back where it was (used by Undo).
+  const restore = (line: Line, index: number) => setLines((l) => l.some((x) => x.id === line.id) ? l : [...l.slice(0, index), line, ...l.slice(index)]);
   const clear = () => setLines([]);
   const totalCents = lines.reduce((sum, x) => sum + x.qty * (products.find((p) => p.id === x.id)?.price ?? 0), 0);
-  return <Ctx.Provider value={{ lines, add, remove, clear, totalCents }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ lines, add, remove, change, restore, clear, totalCents }}>{children}</Ctx.Provider>;
 }
 
 export function useCart() {
@@ -687,20 +691,51 @@ const s = StyleSheet.create({
 });
 `;
 
-const SHOP_CART = `import { useState } from "react";
+const SHOP_CART = `import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { device } from "@shipvo/device";
-import { useCart } from "../cart";
+import { useCart, type Line } from "../cart";
 import { chargeRequest, formatPrice, shopName } from "../money";
 import products from "../data/products.json";
 
+// What the customer reads for each way a payment can end. Never show the raw reason code.
+export function paymentMessage(reason: string): string {
+  switch (reason) {
+    case "declined": return "Your payment was declined. Try another method.";
+    case "timeout": return "The payment took too long. Try again.";
+    case "insufficient_funds": return "Not enough funds.";
+    case "cancelled": return "Payment cancelled.";
+    default: return "The payment did not go through. Try again.";
+  }
+}
+
+type Placed = { id: string; receipt?: string; total: number; items: { name: string; qty: number }[] };
+
 export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order: Record<string, unknown>) => void | Promise<void> }) {
-  const { lines, remove, clear, totalCents } = useCart();
+  const { lines, remove, change, restore, clear, totalCents } = useCart();
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [placed, setPlaced] = useState<Placed | null>(null);
+  const [undo, setUndo] = useState<{ line: Line; index: number; name: string } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  // Remove a line and offer Undo for a few seconds. Removing a second line while
+  // Undo shows replaces it, so only the latest removal can be undone.
+  const removeLine = (id: string) => {
+    const index = lines.findIndex((x) => x.id === id);
+    if (index < 0) return;
+    remove(id);
+    setUndo({ line: lines[index], index, name: products.find((x) => x.id === id)?.name ?? "item" });
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setUndo(null), 5000);
+  };
+  const minus = (l: Line) => (l.qty <= 1 ? removeLine(l.id) : change(l.id, -1));
+  const undoRemove = () => { if (!undo) return; restore(undo.line, undo.index); setUndo(null); if (timer.current) clearTimeout(timer.current); };
   // Replace "to" with your own mobile money number. The PIN here is the sandbox PIN; ask the customer for theirs in a real app.
   const pay = async () => {
     if (busy) return;
+    setStatus(null);
+    if (!device.net.online()) { setStatus("You're offline. Your cart is saved."); return; }
     setBusy(true);
     setStatus("Paying...");
     try {
@@ -709,11 +744,25 @@ export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order
       if (r.ok) {
         // Only a paid order is sent to the backend.
         await onOrder?.({ id: reference, total: totalCents, payment: "mobile_money", receipt: r.receipt, lines: lines.map((l) => ({ product_id: l.id, quantity: l.qty })) });
-        clear(); setStatus("Order placed");
-      } else setStatus("Payment failed: " + r.reason);
-    } catch (e: any) { setStatus("Payment failed: " + String(e?.message ?? e)); }
+        const items = lines.map((l) => ({ name: products.find((x) => x.id === l.id)?.name ?? l.id, qty: l.qty }));
+        setPlaced({ id: reference, receipt: r.receipt, total: totalCents, items });
+        clear(); setStatus(null); setUndo(null);
+      } else setStatus(paymentMessage(r.reason));
+    } catch { setStatus(paymentMessage("error")); }
     finally { setBusy(false); }
   };
+  if (placed) {
+    return (
+      <ScrollView contentContainerStyle={s.page}>
+        <Text style={s.h1} accessibilityRole="header">Order placed</Text>
+        <Text style={s.body}>{"Order number: " + placed.id}</Text>
+        {placed.items.map((i) => <Text key={i.name} style={s.body}>{i.name + " x " + i.qty}</Text>)}
+        <Text style={s.total}>{"Total: " + formatPrice(placed.total)}</Text>
+        {placed.receipt ? <Text style={s.body}>{"Receipt: " + placed.receipt}</Text> : null}
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to shop" onPress={onBack} style={s.pay}><Text style={s.payText}>Back to shop</Text></Pressable>
+      </ScrollView>
+    );
+  }
   return (
     <ScrollView contentContainerStyle={s.page}>
       <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={s.back}><Text style={s.backText}>Back</Text></Pressable>
@@ -724,11 +773,16 @@ export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order
         if (!p) return null;
         return (
           <View key={l.id} style={s.row}>
-            <Text style={s.body}>{p.name} x {l.qty}</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel={"Remove " + p.name} onPress={() => remove(l.id)} style={s.remove}><Text style={s.backText}>Remove</Text></Pressable>
+            <Text style={[s.body, s.name]}>{p.name} x {l.qty}</Text>
+            <View style={s.ctrl}>
+              <Pressable accessibilityRole="button" accessibilityLabel={"Minus " + p.name} onPress={() => minus(l)} style={s.remove}><Text style={s.sign}>{"\u2212"}</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={"Plus " + p.name} onPress={() => change(l.id, 1)} style={s.remove}><Text style={s.sign}>+</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={"Remove " + p.name} onPress={() => removeLine(l.id)} style={s.remove}><Text style={s.backText}>Remove</Text></Pressable>
+            </View>
           </View>
         );
       })}
+      {undo ? <Pressable accessibilityRole="alert" accessibilityLiveRegion="polite" onPress={undoRemove} style={s.remove}><Text style={s.backText}>{"Undo (" + undo.name + " removed)"}</Text></Pressable> : null}
       <Text style={s.total}>{"Total: " + formatPrice(totalCents)}</Text>
       {lines.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Pay" accessibilityState={{ disabled: busy }} onPress={pay} style={s.pay}><Text style={s.payText}>Pay</Text></Pressable> : null}
       {status ? <Text style={s.body} accessibilityRole="alert">{status}</Text> : null}
@@ -741,6 +795,9 @@ const s = StyleSheet.create({
   back: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }, backText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
   h1: { fontSize: 24, fontWeight: "800", color: "#111" },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  name: { flexShrink: 1 },
+  ctrl: { flexDirection: "row", alignItems: "center" },
+  sign: { fontSize: 24, fontWeight: "700", color: "#1F4E5F" },
   remove: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" },
   body: { fontSize: 16, color: "#111" },
   total: { fontSize: 20, fontWeight: "800", color: "#111" },
@@ -783,7 +840,9 @@ test("paying with mobile money places the order and empties the cart", async ({ 
   await phone.tap("Cart");
   await phone.tap("Pay");
   await phone.waitFor("Order placed");
-  expect(phone).toSee("Your cart is empty");
+  await phone.tap("Back to shop");
+  await phone.tap("Cart");
+  await phone.waitFor("Your cart is empty");
 });
 
 test("a declined payment says why and keeps the cart", async ({ phone }) => {
@@ -792,8 +851,100 @@ test("a declined payment says why and keeps the cart", async ({ phone }) => {
   await phone.tap("Add to cart");
   await phone.tap("Cart");
   await phone.tap("Pay");
-  await phone.waitFor("Payment failed: declined");
+  await phone.waitFor("Your payment was declined. Try another method.");
   expect(phone).toSee("Total: " + formatPrice(products[0].price));
   expect(phone.sees("Order placed")).toBe(false);
+});
+
+test("each payment failure is explained in plain words, and a new attempt clears the old message", async ({ phone }) => {
+  const words = { decline: "Your payment was declined. Try another method.", timeout: "The payment took too long. Try again.", insufficient_funds: "Not enough funds.", cancel: "Payment cancelled." };
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  for (const [result, text] of Object.entries(words)) {
+    await phone.device.set({ payment: { nextResult: result, pin: "1234" } });
+    await phone.tap("Pay");
+    await phone.waitFor(text);
+    expect(phone.screen).not.toMatch(/insufficient_funds/);
+  }
+  await phone.device.set({ payment: { nextResult: "approve", pin: "1234" } });
+  await phone.tap("Pay");
+  await phone.waitFor("Order placed");
+  expect(phone.sees("Payment cancelled.")).toBe(false);
+});
+
+test("a new attempt clears the offline message", async ({ phone }) => {
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.device.set({ online: false });
+  await phone.tap("Pay");
+  await phone.waitFor("You're offline. Your cart is saved.");
+  await phone.device.set({ online: true, payment: { nextResult: "timeout", pin: "1234" } });
+  await phone.tap("Pay");
+  await phone.waitFor("The payment took too long. Try again.");
+  expect(phone.sees("You're offline. Your cart is saved.")).toBe(false);
+});
+
+test("paying offline keeps the cart and places no order", async ({ phone }) => {
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.device.set({ online: false });
+  const before = (await phone.deviceLog()).length;
+  await phone.tap("Pay");
+  await phone.waitFor("You're offline. Your cart is saved.");
+  expect(phone).toSee("Total: " + formatPrice(products[0].price));
+  expect(phone.sees("Order placed")).toBe(false);
+  // No charge was attempted, so no order was sent.
+  expect((await phone.deviceLog()).length).toBe(before);
+});
+
+test("plus and minus change the quantity and the total, and minus at 1 removes the line", async ({ phone }) => {
+  const [a] = products;
+  await phone.tap(a.name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Plus " + a.name);
+  await phone.waitFor("Total: " + formatPrice(a.price * 2));
+  await phone.tap("Minus " + a.name);
+  await phone.waitFor("Total: " + formatPrice(a.price));
+  await phone.tap("Minus " + a.name);
+  await phone.waitFor("Your cart is empty");
+});
+
+test("Undo brings a removed line back", async ({ phone }) => {
+  const [a] = products;
+  await phone.tap(a.name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Remove " + a.name);
+  await phone.waitFor("Your cart is empty");
+  await phone.tap("Undo");
+  await phone.waitFor("Total: " + formatPrice(a.price));
+});
+
+test("the Undo row goes away by itself after a few seconds", async ({ phone }) => {
+  const [a] = products;
+  await phone.tap(a.name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Remove " + a.name);
+  await phone.waitFor("Undo");
+  await phone.waitForGone("Undo", { timeout: 10_000 });
+});
+
+test("after paying, the confirmation shows the order number, items and total, and Back to shop returns to the list", async ({ phone }) => {
+  await phone.device.set({ payment: { nextResult: "approve", pin: "1234" } });
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Pay");
+  await phone.waitFor("Order number: order-");
+  expect(phone).toSee(products[0].name + " x 1");
+  expect(phone).toSee("Total: " + formatPrice(products[0].price));
+  expect(phone).toSee("Receipt: ");
+  await phone.tap("Back to shop");
+  await phone.waitFor(products[1].name);
 });
 `;
