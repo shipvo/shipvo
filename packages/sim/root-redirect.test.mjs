@@ -1,5 +1,6 @@
 // GET / on the sim redirects to the app page at /app/.
 import test, { before, after } from "node:test";
+import { pickPort } from "./test-port.mjs";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -9,7 +10,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = 5300 + Math.floor(Math.random() * 300);
+const PORT = pickPort(8900, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-root-"));
 const dist = join(root, "dist");
 let proc;

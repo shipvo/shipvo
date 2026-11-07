@@ -1,5 +1,6 @@
 // set_network_profile against a real sim server: offline rejects, mock rules still win, the change is logged.
 import test, { before, after } from "node:test";
+import { pickPort } from "./test-port.mjs";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { spawn, spawnSync } from "node:child_process";
@@ -10,7 +11,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = 5600 + Math.floor(Math.random() * 300);
+const PORT = pickPort(9300, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-prof-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc, backend, backendUrl;
