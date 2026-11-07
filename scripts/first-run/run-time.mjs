@@ -93,6 +93,7 @@ export async function measureRun({ cli, app, platform = "android", timeoutMs = 1
   const t = { start: now() };
   const out = [];
   // spawn directly (not the CLI helper): we need the live child and its streams to stamp the ready line and stop the process group.
+  rmSync(join(app, ".shipvo", "run.json"), { force: true }); // never reuse the previous platform's token
   const child = spawn(process.execPath, [cli, "run", platform, "--no-open"], { cwd: app, env: cleanEnv(), detached: process.platform !== "win32" });
   let exited = null;
   const sink = (d) => { out.push(String(d)); if (t.listening === undefined && parseListening(out.join(""))) t.listening = now(); };
