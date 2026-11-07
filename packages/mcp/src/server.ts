@@ -187,12 +187,15 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
   // Show the person a phone: switch a live run to the asked platform, or start one from the project.
   // Only a local (stdio) server starts processes. Over HTTP a caller never makes the server host run a command.
   if (!headlessOnly && ctx.scope !== "read" && ctx.local) {
-    const other = live ? undefined : findLiveRun(undefined);
+    const autoStart = show === undefined && attach !== "always" && hasDesktop() && localShipvo(findProjectDir());
+    // Refuse a different app's run only when we are about to start or attach a phone, never for a plain headless call.
+    const wantsPhone = show === true || attach === "always" || Boolean(autoStart);
+    const other = live || !wantsPhone ? undefined : findLiveRun(undefined);
     if (other && other.app !== id) return result("", { ok: false, code: "unknown_app", error: `this project runs "${other.app}", not "${id}". The phone for "${other.app}" is up at ${runUrl(other)}; call open_app("${other.app}") to use it.` });
     if (live && platform && live.platform !== platform) {
       // The run's page does not switch skins over the driver connection yet, so this attaches to the phone that is up and says so.
       launchNote = ` (the live phone is ${live.platform}; to see ${platform}, stop it and run \`shipvo run ${platform}\`)`;
-    } else if (!live && (show === true || (show === undefined && attach !== "always" && hasDesktop() && localShipvo(findProjectDir())))) {
+    } else if (!live && (show === true || autoStart)) {
       const dir = findProjectDir();
       if (dir) {
         try {
@@ -211,6 +214,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
   const mode = attach ?? "auto";
   if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
   let attachNote = launchNote;
+  if (platform && !launchNote && (!live || live.platform !== platform) ) attachNote += ` (platform ${platform} ignored: no phone was started${live ? `; the live phone is ${live.platform}` : ""})`;
   if (live && app.includes("@")) attachNote += ` (${app.split("@")[1]} ignored: the phone runs the local build)`;
   if (live) {
     try {
