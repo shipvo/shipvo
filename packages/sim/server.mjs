@@ -137,16 +137,17 @@ async function endSession(id) {
 async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
-  if (sessions.has(id)) { const old0 = sessions.get(id); leaveRoom(old0, id); }
-  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close(); }
+  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); sessions.delete(id); leaveRoom(old, id); }
   const target = await resolveApp(opts.app);
   const bk = backendOf(id, room);
   if (!room || !rooms.has(room)) { writeFileSync(join(DIR, `${bk}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${bk}.json.log`), ""); }
   if (room) { if (!rooms.has(room)) rooms.set(room, new Set()); rooms.get(room).add(id); }
+  let ctx;
+  try {
   const browser = await browserReady;
   // Optional width, height (output pixels) and scale (device pixel ratio) make a session render at a store screenshot size.
   const size = Number.isInteger(opts.width) && Number.isInteger(opts.height) && opts.width > 0 && opts.height > 0 ? { viewport: { width: Math.round(opts.width / (opts.scale || 1)), height: Math.round(opts.height / (opts.scale || 1)) }, deviceScaleFactor: opts.scale || 1 } : {};
-  const ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
+  ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
   // The app's Linking.openURL for another installed app's scheme lands here: the phone switches to that app and hands it the link once.
@@ -176,6 +177,12 @@ async function newSession(id, opts = {}) {
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
   sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
+  } catch (e) {
+    // A failed open leaves nothing behind: no ghost room member, no backend file.
+    await ctx?.close().catch(() => {});
+    if (room) leaveRoom({ room }, id); else try { rmSync(join(DIR, `${bk}.json`), { force: true }); rmSync(join(DIR, `${bk}.json.log`), { force: true }); } catch {}
+    throw e;
+  }
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an

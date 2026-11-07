@@ -65,3 +65,13 @@ test("a bad room name is refused", async () => {
   const r = await call("/session", { session: "e", room: "a/b" });
   assert.equal(r.ok, false); assert.equal(r.code, "bad_room");
 });
+
+test("a failed open leaves no member in the room and no backend file", async () => {
+  const r = await call("/session", { session: "f", room: "r2", phone: "not json" });   // fails after the room is joined
+  assert.equal(r.ok, false); assert.equal(r.code, "bad_profile");
+  assert.equal((await fetch(`http://localhost:${PORT}/s/~r2/orders`)).status, 404);
+  await call("/session", { session: "g", room: "r2" });   // the room starts empty, not with old orders
+  assert.deepEqual(await orders("~r2"), []);
+  await call("/end", { session: "g" });
+  assert.equal((await fetch(`http://localhost:${PORT}/s/~r2/orders`)).status, 404);
+});
