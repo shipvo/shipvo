@@ -1,0 +1,1 @@
+- mcp-tools: `open_app` takes an optional `platform` (`android` or `ios`). Existing calls keep working. The local and hosted servers share this one schema.

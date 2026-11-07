@@ -24,6 +24,11 @@ describe("tool registry", () => {
     }
   });
 
+  it("lets open_app pick android or ios, and nothing else", () => {
+    const p = (describeTools().find((t) => t.name === "open_app")!.inputSchema as { properties: Record<string, { enum?: string[] }> }).properties.platform;
+    expect(p.enum).toEqual(["android", "ios"]);
+  });
+
   it("marks owner_command as needing an approval card", () => {
     expect(tools.owner_command.needsApproval).toBe(true);
     expect(toolList.filter((t) => t.needsApproval).map((t) => t.name)).toEqual(["owner_command"]);

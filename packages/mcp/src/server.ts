@@ -172,7 +172,7 @@ use(server, tools.list_apps, async ({ query }) => {
   return text(lines.join("\n") || `no apps match "${query}"`);
 });
 
-const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always" }) => {
+const openApp = async ({ app, session, seed_cart, dark, platform, attach }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; platform?: "android" | "ios"; attach?: "auto" | "never" | "always" }) => {
   const id = app.split("@")[0];
   const live = attach === "never" ? undefined : findLiveRun(id);
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
@@ -201,7 +201,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string;
       attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
+  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark, platform }) as Act & { release?: string | number };
   if (r.code === "sim_timeout") return result(sid, r);
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);

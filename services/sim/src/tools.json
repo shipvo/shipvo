@@ -974,6 +974,14 @@
           "type": "boolean",
           "description": "Dark mode"
         },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Phone to open: 'android' or 'ios'. Default: the app's default phone, or the phone of the live `shipvo run`."
+        },
         "attach": {
           "type": "string",
           "enum": [
