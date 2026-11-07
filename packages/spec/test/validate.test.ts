@@ -143,7 +143,7 @@ describe("warnings", () => {
     expect(r.warnings.map((w) => w.message)).toEqual(["List has no empty state."]);
   });
   it("chart without a label", () => {
-    expect(validate(mini([{ type: "chart", kind: "bar" }])).warnings.map((w) => w.message)).toEqual(["Chart has no label."]);
+    expect(validate(mini([{ type: "chart", kind: "bar", from: "a", x: "item.a", y: "item.b" }])).errors.map((w) => w.message)).toEqual(["Chart has no label."]);
   });
   it("action without a description", () => {
     const r = validate(mini([], { actions: { ping: { do: [{ toast: "hi" }] } } }));
