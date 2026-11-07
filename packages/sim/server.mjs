@@ -18,7 +18,7 @@ import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { PhoneBrowser, BrowserError, checkUrl } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
-import { createWatch, watchPage, watchList, closeWatchers, isWatched } from "./watch.mjs";
+import { createWatch, watchPage, watchList, closeWatchers, isWatched, describeStep, changeLine } from "./watch.mjs";
 import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
@@ -565,13 +565,24 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/end") return send(200, { ok: true, ended: await endSession(String(body.session)) });
     if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room")) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
-      try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
+      try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
+        if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
+        log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }
 });
-const watch = createWatch(sessions, acceptWebSocket);
+// Take over: a viewer who turned it on sends taps, swipes and typing to the app page.
+const watch = createWatch(sessions, acceptWebSocket, async (id, m) => {
+  const { page } = sessions.get(id) ?? {}; if (!page) return null;
+  const num = (...v) => { if (!v.every((n) => Number.isFinite(n))) throw new Error("coordinates must be numbers"); };
+  if (m.type === "tap") { num(m.x, m.y); await page.mouse.click(m.x, m.y); return "You tapped the screen"; }
+  if (m.type === "swipe") { num(m.x1, m.y1, m.x2, m.y2); await page.mouse.move(m.x1, m.y1); await page.mouse.wheel(m.x1 - m.x2, m.y1 - m.y2); return "You scrolled"; }
+  if (m.type === "text") { await page.keyboard.type(String(m.text ?? "").slice(0, 2000)); return `You typed "${String(m.text ?? "").slice(0, 40)}"`; }
+  if (m.type === "key" && ["Enter", "Backspace", "Tab"].includes(m.key)) { await page.keyboard.press(m.key); return `You pressed ${m.key}`; }
+  return null;
+});
 // The Browser app's live view: frames out, taps, swipes and typing in. Same trust as the HTTP API (loopback), plus an Origin check
 // so another web page open on this machine cannot drive the phone.
 server.on("upgrade", (req, socket) => {
@@ -582,7 +593,7 @@ server.on("upgrade", (req, socket) => {
   // A missing Origin is allowed (non-browser clients). The Host comparison does not stop DNS rebinding, since both
   // values come from the requester; the HTTP API has the same trust level.
   if (originHost && originHost !== req.headers.host) return refuse("403 Forbidden");
-  if (url.pathname === "/watch/ws") return watch.upgrade(req, socket, url);   // view only
+  if (url.pathname === "/watch/ws") return watch.upgrade(req, socket, url);
   const s = sessions.get(url.searchParams.get("session") ?? ""); if (!s) return refuse("404 Not Found");
   const peer = acceptWebSocket(req, socket, async (text) => {
     let m; try { m = JSON.parse(text); } catch { return; }

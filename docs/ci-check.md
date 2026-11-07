@@ -65,6 +65,39 @@ On a public repository the workflow's token uploads the images to the `shipvo-me
 
 On a private repository, or when the repository cannot be read, nothing is uploaded. The comment lists the file names for each screen and skin, and the images are in the folders you passed to `--before-shots` and `--after-shots`. Upload those folders as an artifact in your workflow to keep them.
 
+## Send a fix to the first band
+
+When a merged pull request fixes a failing flow, `npx shipvo ci fix` runs `shipvo test`. If every flow passes, it publishes to the first band (`b0`, 1% of users) and updates the check comment with the release id. If a flow fails, it publishes nothing and the comment names the flow. It checks `policy` in `shipvo.json` first, and it only ever publishes to `b0`, so it never goes above `maxBand`. Widening stays with release health and the release policy.
+
+Add a workflow. It needs the same secrets as `shipvo publish` and a label named `fixes-flow` on the pull request:
+
+```yaml
+name: Shipvo fix to first band
+on:
+  pull_request:
+    types: [closed]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  fix:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'fixes-flow')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Build the commit that landed, not GitHub's computed merge ref.
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+      - run: npm ci
+      - run: npx shipvo ci fix
+        env:
+          SHIPVO_PR: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # add the publish secrets your app uses
+```
+
+The checkout uses `merge_commit_sha` so the release is built from the commit that landed. The step replaces the body of the check comment with the test results and a "Fix release" section: `Published release N to the first band`, or `Nothing was published` and the failing flow names. The step exits 1 when it publishes nothing.
+
 ## Troubleshooting
 
 | What you see | Why | What to do |

@@ -8,6 +8,7 @@ import { createServer, connect } from "node:net";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
 import { isCapacitorWeb, copyCapacitorWeb } from "./capacitor-web.js";
+import { openBrowser } from "./run.js";
 import { CliFailure, runJson, takeJson, type Done } from "./json-out.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
@@ -124,10 +125,13 @@ export function rebuildInto(opts: { root?: string; command?: string; echo?: bool
   });
 }
 
+/** True if `shipvo sim` should open the /watch page: not with --no-open and not with --json. */
+export const shouldOpenWatch = (o: { noOpen?: boolean; json?: boolean }) => !o.noOpen && !o.json;
+
 const SIM_NEXT = [{ command: "shipvo doctor --json", why: "Check Chromium, the port and your setup." }];
 
 /**
- * `shipvo sim [--port n] [--watch] [--json]`. With `--json` stdout holds one envelope, printed once the simulator
+ * `shipvo sim [--port n] [--watch] [--no-open] [--json]`. With `--json` stdout holds one envelope, printed once the simulator
  * listens (or once it fails to start). The simulator keeps running after that; its output goes to stderr.
  */
 export async function sim(argv: string[]) {
@@ -171,10 +175,13 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });
   if (await waitListening(Number(port), () => exited)) {
     console.error(`Simulator on http://localhost:${port}/app/  (open_app("${cfg.appId}") from @shipvo/mcp; Ctrl-C to stop)`);
+    const watchUrl = `http://localhost:${port}/watch`;
+    console.error(`Watch the agent: ${watchUrl}`);
+    if (shouldOpenWatch({ noOpen: a["no-open"] === "true", json })) openBrowser(watchUrl);
     if (a.watch === "true") {
       watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto(), verbose: a.verbose === "true" });
       console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");
     }
-    if (json) return { code: "listening", summary: `Simulator on http://localhost:${port}/app/`, data: { url: `http://localhost:${port}/app/`, port: Number(port), app_id: cfg.appId, watch: a.watch === "true" }, next: [{ command: `shipvo explore --json --sim http://localhost:${port}`, why: "Walk the app in the running simulator." }, { command: "shipvo test --json", why: "Run the app's tests." }] };
+    if (json) return { code: "listening", summary: `Simulator on http://localhost:${port}/app/`, data: { url: `http://localhost:${port}/app/`, port: Number(port), app_id: cfg.appId, watch_url: watchUrl, watch: a.watch === "true" }, next: [{ command: `shipvo explore --json --sim http://localhost:${port}`, why: "Walk the app in the running simulator." }, { command: "shipvo test --json", why: "Run the app's tests." }] };
   } else if (json) die("The simulator stopped before it started listening.", 1, "sim_exited");
 }
