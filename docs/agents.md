@@ -138,6 +138,7 @@ The `waitFor(/\S/)` lines only wait for the screen to have some text. Replace ea
 shipvo explore --max-steps 100 --max-depth 3
 shipvo explore --sim http://localhost:4545   # use a simulator that is already running
 shipvo explore --seed 1                     # the same seed repeats the same run
+shipvo explore --save-tests tests/lumi      # write one @shipvo/test file per finding
 shipvo explore --skin ios                   # small-target minimum 44 instead of 48
 shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
 shipvo explore --issues-dir issues           # one ready-to-file issue per finding
