@@ -1,0 +1,4 @@
+- `@shipvo/mcp`: `open_app` takes `platform` (`android` or `ios`) and `show`. With show, it starts `shipvo run` if none is live, opens the phone in the user's browser and attaches; a live run on the other platform switches skin. The result and `list_apps` say whether the phone is visible and its URL.
+- `@shipvo/mcp`: on an attached phone, `set_device`, `device_log`, `device_reset`, `push_notification`, `notifications`, `open_notification`, `dismiss_notification`, `open_url`, `get_settings` and `set_setting` work, and `end_session` lists the app's network calls.
+- `@shipvo/cli`: the `shipvo run` page switches skin with `/?skin=ios|android`, and `.shipvo/run.json` follows.
+- Migration: none; new optional input fields. `open_app` now shows the phone by default on a machine with a desktop (not in CI); pass `show: false` for a headless session.

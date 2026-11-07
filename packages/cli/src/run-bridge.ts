@@ -340,6 +340,26 @@ function bridgeMain(win: any, token: string) {
     return { delivery: "delivered", screen: tree() };
   }
 
+  // Device actions go to the same simulated @shipvo/device state the device panel uses (`__pnDevice` in the app iframe).
+  const DEVICE_TYPES = /^(set_device|device_log|device_reset|push_notification|notifications|open_notification|open_url|dismiss_notification|get_settings|set_setting)$/;
+  async function deviceAct(m: any) {
+    let d: any; try { d = frameEl.contentWindow.__pnDevice; } catch {}
+    if (!d) { const e: any = new Error("the app is still loading: try again in a moment"); e.code = "not_ready"; throw e; }
+    switch (m.type) {
+      case "set_device": d.set(m.device ?? {}); return {};
+      case "device_reset": d.reset(m.device ?? undefined); return {};
+      case "device_log": return { log: d.log().slice(), capabilities: d.capabilities() };
+      case "push_notification": { const id = d.push({ title: String(m.title ?? ""), body: String(m.body ?? ""), data: m.data, at: Date.now() }); return { delivered: id != null, id }; }
+      case "notifications": return { notifications: d.notifications() };
+      case "open_notification": if (!d.openNotification(m.id)) throw new Error("no such notification"); return {};
+      case "dismiss_notification": if (m.all) d.clearAll(); else if (!d.dismiss(String(m.id))) throw new Error("no such notification"); return {};
+      case "open_url": if (!(await d.openUrl(String(m.url)))) throw new Error("the app has no handler for that link"); return {};
+      case "get_settings": return { settings: typeof d.settings === "function" ? d.settings() : {} };
+      case "set_setting": { d.set({ [m.key]: m.value }); return {}; }
+    }
+    return {};
+  }
+
   // Screenshots (slice 5 of #448). Order: tab capture if the person said yes, else the iframe drawn to an image.
   // The permission is asked once, on the first request from the agent. getDisplayMedia needs a click, so the question is a button.
   let capture: "ask" | "granted" | "refused" = "ask", stream: any, video: any, asked = false;
@@ -450,6 +470,19 @@ function bridgeMain(win: any, token: string) {
     const words = /^(tap|type|scroll|back)$/.test(m.type) ? (showBanner(), describe(m)) : "";
     const cap = /^(tap|type|scroll|back)$/.test(m.type) ? caption(m) : "";
     if (cap) lumiSay(cap, "working");
+    if (m.type === "skin") {
+      // Switch the phone frame to the other platform. The page reloads on the new skin, so reply first.
+      const to = m.platform === "ios" || m.platform === "android" ? m.platform : "";
+      ws.send(JSON.stringify({ id: m.id, type: "skin", ok: !!to, ...(to ? {} : { error: "skin needs platform android or ios" }) }));
+      if (to) { step("Switched to the " + (to === "ios" ? "iOS" : "Android") + " phone"); win.setTimeout(() => win.location.assign("/?skin=" + to), 50); }
+      return;
+    }
+    if (DEVICE_TYPES.test(m.type)) {
+      step("Device: " + m.type.replace(/_/g, " "), true);
+      Promise.resolve().then(() => deviceAct(m)).then(async (r) => { await sleep(100); ws.send(JSON.stringify({ id: m.id, type: m.type, ok: true, ...r, screen: screenOrUndefined() })); },
+        (err: any) => ws.send(JSON.stringify({ id: m.id, type: m.type, ok: false, error: String(err && err.message || err), screen: screenOrUndefined() })));
+      return;
+    }
     if (m.type === "lumi") {
       // The MCP server names a step the page cannot see itself (opening the app). The text is cut to 80 characters in the frame.
       const ok = typeof m.caption === "string" && ["working", "idle", "happy", "worried"].includes(m.state);

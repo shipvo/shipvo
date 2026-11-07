@@ -41,13 +41,15 @@ const def = <S extends ZodRawShape>(name: string, description: string, input: S,
 
 export const tools = {
   list_apps: def("list_apps", "Apps this server can open, with what each one does. Optional query filters by name, description or category (e.g. 'shop', 'douala').", { query: z.string().optional() }, RO, []),
-  open_app: def("open_app", "Open an app in a fresh phone-sized session and return its first screen.", {
+  open_app: def("open_app", "Open an app in a phone-sized session and return its first screen. Opens the phone in the user's browser so they can watch. Pass platform \"android\" or \"ios\" to choose the phone; with no live `shipvo run` in this project, one is started for you. Every session tool works on that phone. Pass show: false for a headless session nobody watches.", {
   app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"),
   session: z.string().optional().describe("Session name (default: generated). One session is one phone."),
   seed_cart: z.array(z.object({ product_id: z.string().optional(), id: z.string().optional(), quantity: z.number().int().positive().optional(), qty: z.number().int().positive().optional() }).refine((l) => (l.product_id ?? l.id) && (l.quantity ?? l.qty), "each line needs product_id (or id) and quantity (or qty)")).optional().describe("Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."),
   dark: z.boolean().optional().describe("Dark mode"),
+  platform: z.enum(["android", "ios"]).optional().describe("Which phone to show: android or ios. Switches the skin of a live run on the other platform."),
+  show: z.boolean().optional().describe("true: open the phone in the user's browser so they can watch (starts `shipvo run` if none is live). false: headless. Default: true on a machine with a desktop, false in CI."),
   attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
-}, WR, ["attach_failed","no_live_run","unknown_app"]),
+}, WR, ["attach_failed","no_live_run","unknown_app","run_failed"]),
   attach_session: def("attach_session", "Attach to the phone of a live `shipvo run` in this project (read from .shipvo/run.json) and return its screen. The person sees every action in their browser. Same as open_app with attach: 'always', without needing the app id.", {
   app: z.string().optional().describe("App id; default: the app of the live run"),
   session: z.string().optional().describe("Session name (default: generated)"),

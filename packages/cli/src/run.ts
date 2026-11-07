@@ -179,7 +179,10 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
   // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
   const pageToken = randomBytes(24).toString("hex");
   const render = opts.render ?? await loadFrameRenderer();
-  const pages = { light: runFramePage(opts.platform, opts.name, render, false, pageToken), dark: runFramePage(opts.platform, opts.name, render, true, pageToken) };
+  // The skin can change while the run is live (`?skin=ios|android`, asked for by the agent). The next page load and run.json follow it.
+  let skin: Platform = opts.platform;
+  const pageCache = new Map<string, string>();
+  const pageFor = (p: Platform, dark: boolean) => { const k = p + (dark ? ":dark" : ""); let h = pageCache.get(k); if (!h) { h = runFramePage(p, opts.name, render, dark, pageToken); pageCache.set(k, h); } return h; };
   const bridge = bridgeScript();
   // With --lan every request needs this token, in `?t=` or in the cookie the first valid request sets.
   const lanToken = opts.lan ? randomBytes(16).toString("hex") : undefined;
@@ -202,9 +205,12 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     catch { res.writeHead(400); return void res.end("Bad request"); }
     if (path === "/app") { res.writeHead(302, { location: "/app/" }); return void res.end(); }
     if (path === "/" || path === "/index.html") {
-      const dark = new URL(req.url ?? "/", "http://x").searchParams.get("dark") === "1";
+      const q = new URL(req.url ?? "/", "http://x").searchParams;
+      const dark = q.get("dark") === "1";
+      const want = q.get("skin");
+      if ((want === "android" || want === "ios") && want !== skin) { skin = want; writeInfo(); }
       const bare = isMobileUserAgent(req.headers["user-agent"]);
-      res.writeHead(200, { "content-type": TYPES[".html"], vary: "user-agent" }); return void res.end(bare ? runBarePage(opts.name, dark) : dark ? pages.dark : pages.light);
+      res.writeHead(200, { "content-type": TYPES[".html"], vary: "user-agent" }); return void res.end(bare ? runBarePage(opts.name, dark) : pageFor(skin, dark));
     }
     if (path === RELOAD_PATH) {
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
@@ -258,17 +264,20 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     old?.close();
   });
   const infoPath = opts.projectDir ? join(resolve(opts.projectDir), ".shipvo", "run.json") : undefined;
+  let boundInfo: { port: number } | undefined;
+  const writeInfo = () => {
+    if (!infoPath || !boundInfo) return;
+    const info: RunInfo = { port: boundInfo.port, platform: skin, app: opts.appId ?? opts.name, token, pid: process.pid };
+    mkdirSync(join(infoPath, ".."), { recursive: true });
+    writeFileSync(infoPath, JSON.stringify(info, null, 2) + "\n", { mode: 0o600 });
+  };
   const cleanup = () => { if (infoPath) rmSync(infoPath, { force: true }); };
   return new Promise((ok, fail) => {
     server.once("error", fail);
     server.listen(opts.port ?? 0, opts.lan ? "0.0.0.0" : "127.0.0.1", () => {
       const port = (server.address() as { port: number }).port;
       boundPort = port;
-      if (infoPath) {
-        const info: RunInfo = { port, platform: opts.platform, app: opts.appId ?? opts.name, token, pid: process.pid };
-        mkdirSync(join(infoPath, ".."), { recursive: true });
-        writeFileSync(infoPath, JSON.stringify(info, null, 2) + "\n", { mode: 0o600 });
-      }
+      boundInfo = { port }; writeInfo();
       ok({ server, port, token, lanToken, netLog: net.log, notify, close: () => new Promise<void>((r) => { cleanup(); for (const w of watchers) w.end(); for (const p of Object.values(peers)) p?.close(); server.close(() => r()); server.closeAllConnections?.(); }) });
     });
   });

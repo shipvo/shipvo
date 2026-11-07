@@ -20,7 +20,7 @@ import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
 import { Recorder, RecorderError } from "./recorder.js";
-import { connectDriver, findLiveRun, type Driver } from "./attach.js";
+import { connectDriver, findLiveRun, findProjectDir, hasDesktop, openInBrowser, runUrl, startRun, switchSkin, type Driver, type RunInfo } from "./attach.js";
 import { satisfied, sameTree, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -80,7 +80,9 @@ async function storeApps(): Promise<{ ok: true; apps: StoreApp[]; fixture: boole
 const recorder = new Recorder();
 // Sessions attached to a live `shipvo run` phone. Module level: HTTP mode builds a server per request.
 const attached = new Map<string, Driver>();
-const ATTACH_TYPES = new Set(["screen", "screenshot", "tap", "type", "scroll", "back"]);
+const attachedRun = new Map<string, RunInfo>();
+// Everything the run page's bridge answers. The device actions go to the page's simulated @shipvo/device state, as the simulator does for a headless phone.
+const ATTACH_TYPES = new Set(["screen", "screenshot", "tap", "type", "scroll", "back", "set_device", "device_log", "device_reset", "push_notification", "notifications", "open_notification", "dismiss_notification", "open_url", "get_settings", "set_setting"]);
 // One action on a session: through the driver connection when attached, else the simulator.
 async function act(body: Record<string, unknown>): Promise<Act> {
   const end = recorder.actionSpan();
@@ -90,9 +92,9 @@ async function act1(body: Record<string, unknown>): Promise<Act> {
   const d = attached.get(String(body.session));
   if (!d) return sim("/act", body);
   const { session: _s, action, ...args } = body;
-  if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone yet. Use screen, tap, type, scroll or back, or open a headless session with attach: "never".` };
+  if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone. Open a headless session with show: false for it.` };
   const m = await d.request(String(action), args);
-  return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code, ...(typeof m.image === "string" ? { image: m.image } : {}), ...(typeof m.mime === "string" ? { mime: m.mime } : {}), ...(typeof m.source === "string" ? { source: m.source } : {}), ...(Array.isArray(m.unsupported) ? { unsupported: m.unsupported as string[] } : {}) };
+  return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code, ...(m.log !== undefined ? { log: m.log as unknown[] } : {}), ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}), ...(m.notifications !== undefined ? { notifications: m.notifications } : {}), ...(m.settings !== undefined ? { settings: m.settings } : {}), ...(m.delivered !== undefined ? { delivered: m.delivered as boolean } : {}), ...(typeof m.image === "string" ? { image: m.image } : {}), ...(typeof m.mime === "string" ? { mime: m.mime } : {}), ...(typeof m.source === "string" ? { source: m.source } : {}), ...(Array.isArray(m.unsupported) ? { unsupported: m.unsupported as string[] } : {}) };
 }
 // While recording with show_taps, ask the simulator where an element is (0..1 of the viewport). Unknown element or attached phone: undefined, so no dot.
 async function locating(session: string, ref: string, whole = false) {
@@ -169,44 +171,62 @@ use(server, tools.list_apps, async ({ query }) => {
     const d = dir[id] ?? APPS[id]; const desc = d ? `${d.name}. ${d.description}${"category" in d ? ` [${(d as any).category}]` : ""}` : `published with shipvo`;
     return q && !`${id} ${desc}`.toLowerCase().includes(q) ? null : `${id}: ${desc} (open_app("${id}@latest"))`;
   }).filter(Boolean);
-  return text(lines.join("\n") || `no apps match "${query}"`);
+  const liveRun = findLiveRun(undefined);
+  return text((lines.join("\n") || `no apps match "${query}"`) + `\n\n${liveRun ? `live phone: ${liveRun.app} on ${liveRun.platform === "ios" ? "iOS" : "Android"}, visible at ${runUrl(liveRun)}` : "live phone: none yet (open_app with show: true opens one in the user's browser)"}`);
 });
 
-const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always" }) => {
+const visibleLine = (r?: RunInfo) => r ? `phone: visible at ${runUrl(r)} (${r.platform === "ios" ? "iOS" : "Android"}, the user is watching)` : "phone: not visible (headless session)";
+type OpenArgs = { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean };
+const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }: OpenArgs) => {
   const id = app.split("@")[0];
-  const live = attach === "never" ? undefined : findLiveRun(id);
-  // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
+  const wantShow = attach !== "never" && (show ?? hasDesktop());
+  let live = attach === "never" ? undefined : findLiveRun(id);
+  const project = wantShow && !live ? findProjectDir() : undefined;
+  // The key's app list always applies. A live run, or a project we can start one in, only replaces the "simulator knows this app" check.
   if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
-  if (!keyApps && !live && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
+  if (!keyApps && !live && !project && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
   const mode = attach ?? "auto";
-  if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
   let attachNote = "";
+  // show: no live run for this app, so start one from the project and open it in the user's browser.
+  if (wantShow && !live && project) {
+    const started = await startRun(project, platform ?? "android");
+    if (!started.ok) { if (mode === "always" || show === true) return result("", { ok: false, code: "run_failed", error: started.error }); attachNote = ` (could not start the phone: ${started.error})`; }
+    else { live = started.info; openInBrowser(runUrl(live)); }
+  }
+  if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
   if (live) {
     try {
       const d = await connectDriver(live);
-      attached.get(sid)?.close(); attached.set(sid, d);
+      // A live run on the other platform: switch its skin instead of starting a second run.
+      if (platform && live.platform !== platform) {
+        const sw = await switchSkin(live, d, platform);
+        if (!sw.ok) { d.close(); return result("", { ok: false, code: "attach_failed", error: sw.error }); }
+        live = sw.info;
+      }
+      attached.get(sid)?.close(); attached.set(sid, d); attachedRun.set(sid, live);
       const r = await act({ session: sid, action: "screen" });
-      if (!r.ok) { attached.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote = ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
+      if (!r.ok) { attached.delete(sid); attachedRun.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote = ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
       else {
         sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() }); steps.set(sid, [{ action: "open" }]);
         if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
         // Lumi shows the step in the phone frame. tap, type, scroll and back are captioned by the page itself, from the element it acts on.
         void d.request("lumi", { caption: `Opened ${id}`, state: "working", hold: 1800 }, 1000).catch(() => {});
-        return text(`session: ${sid}\napp: ${id} release: local\nmode: attached to the live shipvo run phone\n\n${r.screen ?? ""}`);
+        return text(`session: ${sid}\napp: ${id} release: local\nmode: attached to the live shipvo run phone\n${visibleLine(live)}\n\n${r.screen ?? ""}`);
       }
     } catch (e) {
       if (mode === "always") return result("", { ok: false, code: "attach_failed", error: (e as Error).message });
       attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
+  if (!keyApps && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
   if (r.code === "sim_timeout") return result(sid, r);
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
-  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
+  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n${visibleLine()}\n\n${r.screen ?? ""}`);
 };
 use(server, tools.open_app, openApp);
 // Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.
@@ -378,7 +398,11 @@ use(server, tools.export_test, async ({ session }) => {
 use(server, tools.end_session, async ({ session }) => {
   need(session);
   const live = attached.get(session);
-  if (live) { const s = sessions.get(session); live.close(); attached.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session); return text(JSON.stringify({ session, app: s?.app, mode: "attached", steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000) }, null, 2)); }
+  if (live) {
+    // The report: steps, and the calls the app made to its backend, read from the phone's event log before it closes.
+    const logged = await act({ session, action: "device_log" }) as Act & { log?: { kind?: string; detail?: unknown }[] };
+    const network = (logged.log ?? []).filter((e) => e.kind === "net").map((e) => e.detail);
+    const s = sessions.get(session); live.close(); attached.delete(session); attachedRun.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session); return text(JSON.stringify({ session, app: s?.app, mode: "attached", steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000), network }, null, 2)); }
   // The simulator is the source of truth: end a session it lists even if this server did not open it; otherwise no_session.
   const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string }[] };
   if (!listed.ok) return result(session, listed);
@@ -392,6 +416,7 @@ use(server, tools.end_session, async ({ session }) => {
 // Record the phone frame page to an MP4 (one recording per server). Page: SHIPVO_FRAME_URL, default the simulator's root.
 const recFail = (e: unknown) => { if (e instanceof RecorderError) return result("", { ok: false, code: e.code, error: e.message }); throw e; };
 use(server, tools.record_start, async ({ format, fps, title, show_taps, background, lumi, lumi_voice }) => {
+  if ([...attached.keys()].some((k) => sessions.has(k))) return result("", { ok: false, code: "not_supported_attached", error: "recording opens a second page, which would take the live phone away from the person watching it. Record a headless session (open_app with show: false), or use `shipvo record`." });
   try { const r = await recorder.start({ url: process.env.SHIPVO_FRAME_URL ?? SIM + "/", format, fps, title, showTaps: show_taps, background, lumi, lumiVoice: lumi_voice }); return { ...text(`recording to ${r.file} (${r.width}x${r.height})`), structuredContent: r }; } catch (e) { return recFail(e); }
 });
 use(server, tools.record_marker, async ({ caption }) => {
