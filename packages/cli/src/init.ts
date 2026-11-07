@@ -179,7 +179,7 @@ Public key pinned in the shell: ${publicKey}
 Phones:  the browser phone (npx shipvo run android) needs no Android Studio. For a real build use npx expo run:android (needs Android Studio once) or npx expo run:ios, then shipvo publish --platform all
 Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and SHIPVO_KV_ID (self-hosted); then npm run publish
          (self-hosting instead? see docs/self-hosting.md)
-AI agents: npx -y @shipvo/mcp points Claude / Cursor / ChatGPT at the simulator; then open_app("${appId}")
+AI agents: run shipvo agents setup (adds @shipvo/mcp and writes the MCP entry, node node_modules/@shipvo/mcp/dist/server.js) to point Claude / Cursor / ChatGPT at the simulator; then open_app("${appId}")
 
 ${nodeWarn ? nodeWarn + "\n\n" : ""}Next steps:
   1. cd ${dirArg}
@@ -400,7 +400,7 @@ const README = (name: string, appId: string, cp: string, template = "blank") => 
 
 A [Shipvo](https://github.com/shipvo/shipvo) app: one React Native codebase that people install from the stores and AI agents operate in a simulator, kept current with signed over-the-air releases.
 
-- \`npm run sim\` opens it in the simulator; \`npx -y @shipvo/mcp\` lets Claude, Cursor or ChatGPT use it (\`open_app("${appId}")\`).
+- \`npm run sim\` opens it in the simulator; run \`shipvo agents setup\` (it adds @shipvo/mcp and writes the MCP entry, \`node node_modules/@shipvo/mcp/dist/server.js\`) to let Claude, Cursor or ChatGPT use it (\`open_app("${appId}")\`).
 - \`npx expo run:android\` builds the native shell (the trust root and control plane \`${cp}\` are pinned in it).
 - Push to \`main\`: the publish workflow signs the new JavaScript and every phone and simulator gets it.
 - ${template === "content" ? "`src/data/articles.json` is the first thing to edit: it holds the titles and text. `src/screens/` has the list and detail screens." : template === "shop" ? "`src/data/products.json` is the first thing to edit: it holds the product names, prices (in cents) and descriptions. `src/screens/` has the list, detail and cart screens." : "`src/release.ts` is the first thing to edit; `App.tsx` shows the device API (camera, location, biometrics, notifications)."}
