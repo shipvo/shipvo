@@ -1,0 +1,17 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "board-demo", "name": "Board" },
+  "theme": { "palette": { "primary": "#0B5FFF", "accent": "#C2410C", "background": "#FFFFFF", "surface": "#F3F4F6", "text": "#111827", "muted": "#4B5563", "danger": "#B91C1C", "success": "#047857" } },
+  "data": { "tasks": { "source": "collection", "fields": { "id": "text", "title": "text", "note": "text", "status": "text", "at": "text" }, "seed": [
+    { "id": "t1", "title": "Buy bait", "note": "Worms", "status": "todo", "at": "2026-11-06T08:30" },
+    { "id": "t2", "title": "Fix reel", "note": "", "status": "doing", "at": "2026-11-07T09:15" },
+    { "id": "t3", "title": "Tie knots", "note": "Practice", "status": "todo", "at": "2026-11-07" }
+  ] } },
+  "screens": [{ "id": "home", "title": "Tasks", "body": [
+    { "type": "kanban", "label": "Task board", "from": "tasks", "columns": ["todo", "doing", "done"], "column": "{{ item.status }}", "title": "{{ item.title }}", "detail": "{{ item.note }}", "onMove": { "action": "move_task", "input": { "id": "{{ item.id }}", "status": "{{ column }}" } } },
+    { "type": "timeline", "label": "History", "from": "tasks", "date": "{{ item.at }}", "title": "{{ item.title }}", "detail": "{{ item.note }}" }
+  ] }],
+  "actions": {
+    "move_task": { "description": "Move a task to another column.", "input": { "id": { "type": "text" }, "status": { "type": "text" } }, "do": [{ "update": "tasks", "where": "item.id == input.id", "value": { "status": "{{ input.status }}" } }] }
+  }
+}
