@@ -1,8 +1,7 @@
 // Attach to a live `shipvo run` phone. `open_app` reads `.shipvo/run.json`, and if the run is alive and is the
 // same app, drives it over the agent channel as the `driver`. The types below mirror
 // packages/cli/src/run-protocol.ts: MCP cannot import from the CLI (rootDir is src, and the CLI is not a dependency).
-import { spawn } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 export type RunInfo = { port: number; platform: "android" | "ios"; app: string; token: string; pid: number };
@@ -65,77 +64,4 @@ export function connectDriver(info: RunInfo, ms = 3000): Promise<Driver> {
     };
     ws.onerror = () => {};
   });
-}
-
-// ---- Starting the phone for the user (show: true) ----
-
-/** True when this machine has a desktop where a browser can open: not CI, and a display on Linux. */
-export function hasDesktop(env: NodeJS.ProcessEnv = process.env, platform = process.platform): boolean {
-  if (env.CI && env.CI !== "false" && env.CI !== "0") return false;
-  if (platform === "darwin" || platform === "win32") return true;
-  return Boolean(env.DISPLAY || env.WAYLAND_DISPLAY);
-}
-
-/** The nearest folder with shipvo.json, from `cwd` up. */
-export function findProjectDir(cwd = process.cwd()): string | undefined {
-  let dir = resolve(cwd);
-  for (;;) {
-    if (existsSync(join(dir, "shipvo.json"))) return dir;
-    if (dirname(dir) === dir) return undefined;
-    dir = dirname(dir);
-  }
-}
-
-export const runUrl = (info: Pick<RunInfo, "port">) => `http://127.0.0.1:${info.port}/`;
-
-/** Opens a URL in the user's browser. SHIPVO_BROWSER replaces the opener (tests, unusual desktops). Never throws. */
-export function openInBrowser(url: string): void {
-  const custom = process.env.SHIPVO_BROWSER;
-  const [cmd, args] = custom ? [custom, [url]] : process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
-  try { const p = spawn(cmd, args, { stdio: "ignore", detached: true }); p.on("error", () => {}); p.unref(); } catch {}
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Starts `shipvo run <platform> --no-open` in `dir` and waits until it writes run.json. MCP opens the browser itself,
- * so the person sees one tab. SHIPVO_BIN replaces the `shipvo` command (tests).
- */
-export async function startRun(dir: string, platform: "android" | "ios", waitMs = 240_000): Promise<{ ok: true; info: RunInfo } | { ok: false; error: string }> {
-  mkdirSync(join(dir, ".shipvo"), { recursive: true });
-  const logFile = join(dir, ".shipvo", "run.log");
-  const fd = openSync(logFile, "w");
-  const bin = process.env.SHIPVO_BIN;
-  let exited: number | null | undefined, spawnError: string | undefined;
-  try {
-    const child = bin ? spawn(bin, ["run", platform, "--no-open"], { cwd: dir, stdio: ["ignore", fd, fd], detached: true }) : spawn("npx", ["-y", "shipvo", "run", platform, "--no-open"], { cwd: dir, stdio: ["ignore", fd, fd], detached: true, shell: process.platform === "win32" });
-    child.on("exit", (c) => { exited = c ?? -1; });
-    child.on("error", (e) => { spawnError = e.message; exited = -1; });
-    child.unref();
-  } finally { closeSync(fd); }
-  const end = Date.now() + waitMs;
-  while (Date.now() < end) {
-    const info = findLiveRun(undefined, dir);
-    if (info && info.platform === platform) return { ok: true, info };
-    if (exited !== undefined) {
-      let tail = ""; try { tail = readFileSync(logFile, "utf8").trim().split("\n").slice(-4).join(" "); } catch {}
-      return { ok: false, error: `shipvo run ${platform} stopped before the phone was ready${spawnError ? ` (${spawnError})` : ""}${tail ? `: ${tail}` : ""}` };
-    }
-    await sleep(250);
-  }
-  return { ok: false, error: `shipvo run ${platform} did not become ready within ${Math.round(waitMs / 1000)} s (log: ${logFile})` };
-}
-
-/** Asks the run's page to switch to the other skin, then waits for the reloaded page to answer. Returns the new RunInfo. */
-export async function switchSkin(info: RunInfo, d: Driver, platform: "android" | "ios", dir?: string): Promise<{ ok: true; info: RunInfo } | { ok: false; error: string }> {
-  const r = await d.request("skin", { platform }, 5000);
-  if (r.ok === false) return { ok: false, error: r.error ?? "the phone did not switch" };
-  for (let i = 0; i < 60; i++) {
-    await sleep(250);
-    const now = findLiveRun(info.app, dir ?? process.cwd());
-    if (now?.platform !== platform) continue;
-    const s = await d.request("screen", {}, 1500);
-    if (s.ok !== false && !s.error) return { ok: true, info: now };
-  }
-  return { ok: false, error: `the phone did not come back on ${platform}` };
 }
