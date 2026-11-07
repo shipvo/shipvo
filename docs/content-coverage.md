@@ -77,7 +77,5 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Lumi findings saved as tests (`shipvo explore --save-tests`) | [lumi](lumi.md) | | | |
 | Self-host upgrade check, backup and restore | [self-hosting](self-hosting.md#back-up-and-upgrade) | | | |
 | iOS apps on the UIScene lifecycle (`SceneDelegate`) | [cli](cli.md) | | | |
-| Shop template checkout (plain-words payment errors, offline message, cart plus/minus, Undo, order confirmation) | [getting-started](getting-started.md), [taking-real-orders](taking-real-orders.md) | | | |
-| Migrate from EAS Update (`shipvo migrate --plan`, `--apply`) | [migrate-from-eas-update](migrate-from-eas-update.md) | | | |
-| OTA updates on the simulated phone and network proxy | [phone-updates](phone-updates.md), [phone-network](phone-network.md) | | | |
+| Lumi action ranker (optional model, no-model behaviour, benchmark) | [lumi-ranker](lumi-ranker.md) | | | |
 | Simulator cost and Lumi benchmark (measured) | [sim-bench](sim-bench.md), [lumi-bench](lumi-bench.md) | | | |
