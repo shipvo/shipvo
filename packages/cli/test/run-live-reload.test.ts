@@ -43,6 +43,7 @@ async function session(platform: Platform) {
   const stop = watchAndRebuild({
     dir: root, debounceMs: 50, log: (l) => log.push(l),
     build: () => rebuildInto({ root, command }),
+    onStart: () => server.notify({ type: "building" }),
     onResult: (r) => { if (r.ok) reloadAt = Date.now(); server.notify(r.ok ? { type: "reload" } : { type: "error", message: r.message }); },
   });
   await wait(100);
@@ -64,7 +65,10 @@ describe.each(["android", "ios"] as const)("live reload on %s", (platform) => {
       if (SHOTS) await s.page.screenshot({ path: join(SHOTS, `${platform}-before.png`) });
       const t0 = Date.now();
       s.edit("Hello harbour");
+      await s.page.waitForSelector("#updating:not([hidden])", { timeout: 5000 });
+      expect(s.log[0]).toBe("Rebuilding...");
       await s.app().waitForFunction(() => document.querySelector("h1")?.textContent === "Hello harbour", null, { timeout: 15000 });
+      expect(await s.page.isHidden("#updating")).toBe(true);
       const ms = Date.now() - t0;
       console.log(`save-to-visible ${platform}: ${ms} ms`);
       expect(s.log.at(-1)).toMatch(/^rebuilt in/);
@@ -84,6 +88,9 @@ describe.each(["android", "ios"] as const)("live reload on %s", (platform) => {
       expect(await s.page.evaluate(() => document.getElementById("phone")!.contains(document.getElementById("banner")))).toBe(false);
       if (SHOTS) await s.page.screenshot({ path: join(SHOTS, `${platform}-error.png`) });
       s.edit("Fixed");
+      await s.page.waitForSelector("#updating:not([hidden])", { timeout: 5000 });
+      expect(await s.page.isHidden("#banner")).toBe(true); // the stale error never sits under the pill
+      if (SHOTS) await s.page.screenshot({ path: join(SHOTS, `${platform}-fix-building.png`) });
       await s.app().waitForFunction(() => document.querySelector("h1")?.textContent === "Fixed", null, { timeout: 15000 });
       expect(await s.page.isHidden("#banner")).toBe(true);
     } finally { await s.close(); }

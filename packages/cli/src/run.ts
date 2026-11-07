@@ -82,11 +82,12 @@ export async function loadFrameRenderer(bases: string[] = [process.cwd() + "/pac
 export const RELOAD_PATH = "/__shipvo/reload";
 
 /** Page script: reloads the app iframe (same route) when a rebuild lands, and shows a build error in the banner outside the phone. */
-const RELOAD_CLIENT = `(function(){if(!window.EventSource)return;var b=document.getElementById("banner"),f=document.getElementById("app");
+const RELOAD_CLIENT = `(function(){if(!window.EventSource)return;var b=document.getElementById("banner"),u=document.getElementById("updating"),f=document.getElementById("app");
 var es=new EventSource("${RELOAD_PATH}");
 es.onmessage=function(m){var d;try{d=JSON.parse(m.data)}catch(e){return}
-if(d.type==="error"){if(b){b.textContent=d.message;b.hidden=false;window.fit&&fit()}}
-else if(d.type==="reload"){if(b){b.hidden=true;window.fit&&fit()}try{f.contentWindow.location.reload()}catch(e){f.src=f.src}}}})()`;
+if(d.type==="building"){if(b&&!b.hidden){b.hidden=true;window.fit&&fit()}if(u)u.hidden=false}
+else if(d.type==="error"){if(u)u.hidden=true;if(b){b.textContent=d.message;b.hidden=false;window.fit&&fit()}}
+else if(d.type==="reload"){if(u)u.hidden=true;if(b){b.hidden=true;window.fit&&fit()}try{f.contentWindow.location.reload()}catch(e){f.src=f.src}}}})()`;
 
 /** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. The phone body comes from @shipvo/sim's renderFrame. */
 export function runFramePage(platform: Platform, name: string, render: RenderFrame, dark = false, token?: string): string {
@@ -110,11 +111,14 @@ ${frame.css}
 .sheetbtn{flex:none;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
 .banner{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);max-width:min(90vw,640px);box-sizing:border-box;max-height:30vh;overflow:auto;padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
 .banner[hidden]{display:none}
+.updating{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);padding:4px 10px;border-radius:999px;background:#1d2530;color:#fff;font-size:12px;z-index:9}
+.updating[hidden]{display:none}
 ${runPanelCss()}
 .tag{min-width:0;padding:3px 10px;border-radius:12px;background:#111;color:#fff;font-size:12px;overflow-wrap:anywhere}
 </style></head><body>
 <div class="top" id="top"><div class="tag" role="status">Simulated ${f.label} (${f.width}x${f.height}). The app's web build on the simulated device.</div>
 <button class="sheetbtn" id="sheetbtn" type="button">Show ${f.label} system sheet</button></div>
+<div class="updating" id="updating" role="status" aria-live="polite" data-part="updating" hidden>Updating…</div>
 <div class="banner" id="banner" role="alert" data-part="build-error" hidden></div>
 ${runPanelHtml()}
 <div id="fit"><div id="phone" data-platform="${platform}">${frame.html}</div></div>
@@ -169,7 +173,7 @@ export function ensureShipvoIgnored(dir: string): void {
  * The agent channel is a WebSocket at `/__shipvo/agent?role=screen|driver&token=...`, loopback only. It relays JSON
  * messages between the `screen` and the `driver`. With `projectDir`, `.shipvo/run.json` describes the session while it runs.
  */
-export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string }; onNet?: (r: NetRecord) => void; fetchImpl?: typeof fetch }): Promise<{ server: Server; port: number; token: string; lanToken?: string; netLog: NetRecord[]; notify: (ev: { type: "reload" } | { type: "error"; message: string }) => void; close: () => Promise<void> }> {
+export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string }; onNet?: (r: NetRecord) => void; fetchImpl?: typeof fetch }): Promise<{ server: Server; port: number; token: string; lanToken?: string; netLog: NetRecord[]; notify: (ev: { type: "reload" } | { type: "error"; message: string } | { type: "building" }) => void; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
   const token = randomBytes(24).toString("hex");
   // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
@@ -184,7 +188,7 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
   const net = createNetProxy({ tokens: [pageToken, token], port: () => boundPort, profiles: await loadProfiles(), onRecord: opts.onNet, fetchImpl: opts.fetchImpl });
   const netSnippet = `<script>(${netClientSource()})(window,{token:${JSON.stringify(pageToken)},session:(function(){try{var k="shipvo_net_session";return sessionStorage.getItem(k)||(sessionStorage.setItem(k,crypto.randomUUID()),sessionStorage.getItem(k))}catch(e){return "tab"}})(),profile:function(){return window.__pnNet?window.__pnNet.profile():"online"},online:function(){return window.__pnNet?window.__pnNet.online():true},log:function(d){if(window.__pnNet)window.__pnNet.log(d)}})</script>`;
   const watchers = new Set<ServerResponse>();
-  const notify = (ev: { type: "reload" } | { type: "error"; message: string }) => { for (const w of watchers) w.write(`data: ${JSON.stringify(ev)}\n\n`); };
+  const notify = (ev: { type: "reload" } | { type: "error"; message: string } | { type: "building" }) => { for (const w of watchers) w.write(`data: ${JSON.stringify(ev)}\n\n`); };
   const server = createServer((req, res) => {
     if (!hostAllowed(req.headers.host, boundPort) && !(opts.lan && req.headers.host === `${opts.lan.host}:${boundPort}`)) { res.writeHead(403); return void res.end("Forbidden"); }
     if (lanToken) {
@@ -331,6 +335,7 @@ export async function run(argv: string[]): Promise<number> {
   const stopWatching = watchAndRebuild({
     dir: process.cwd(),
     build: () => rebuildInto({ root: process.cwd() }),
+    onStart: () => s.notify({ type: "building" }),
     onResult: (r) => s.notify(r.ok ? { type: "reload" } : { type: "error", message: r.message }),
   });
   console.error("Watching for changes: the phone reloads when you save.");

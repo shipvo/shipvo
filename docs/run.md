@@ -38,7 +38,7 @@ The page scales the phone to your window. Add `?dark=1` to the address to see th
 
 ## Edit and save, the phone updates
 
-While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`.
+While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`. As soon as a save is seen, the terminal prints `Rebuilding...` and the page shows a small "Updating…" hint until the new build loads.
 
 If a rebuild fails (a typo in your code, say), the phone keeps your last good version. The terminal prints the error, and a small red bar under the phone shows it too. Save a fix and the bar goes away and the phone reloads.
 

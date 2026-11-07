@@ -15,14 +15,33 @@ describe("watchAndRebuild", () => {
   };
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+  it("a save during a build announces the queued rebuild again", async () => {
+    const { watchAndRebuild } = await import("../src/sim");
+    const dir = mkdtempSync(join(tmpdir(), "watch-"));
+    mkdirSync(join(dir, "src"));
+    const log: string[] = []; let starts = 0;
+    const build = vi.fn(() => new Promise<void>((r) => setTimeout(r, 400)));
+    const stop = watchAndRebuild({ dir, build, debounceMs: 50, log: (l) => log.push(l), onStart: () => { starts++; } });
+    await wait(100);
+    writeFileSync(join(dir, "src", "a.ts"), "1");
+    await wait(200); // build 1 is running
+    writeFileSync(join(dir, "src", "a.ts"), "2");
+    await wait(1200);
+    stop();
+    expect(build).toHaveBeenCalledTimes(2);
+    expect(log.filter((l) => l === "Rebuilding...")).toHaveLength(2);
+    expect(starts).toBe(3); // save 1, save 2, and again when the queued build starts after build 1 ended
+  });
+
   it("several quick writes cause one rebuild; ignored folders cause none", async () => {
     const build = vi.fn(async () => {});
     const { dir, log, stop } = await setup(build);
     for (let i = 0; i < 5; i++) { writeFileSync(join(dir, "src", "a.ts"), `v${i}`); await wait(20); }
     await wait(500);
     expect(build).toHaveBeenCalledTimes(1);
-    expect(log).toHaveLength(1);
-    expect(log[0]).toMatch(/^rebuilt in \d+\.\d s$/);
+    expect(log).toHaveLength(2);
+    expect(log[0]).toBe("Rebuilding...");
+    expect(log[1]).toMatch(/^rebuilt in \d+\.\d s$/);
     writeFileSync(join(dir, "node_modules", "x.js"), "x");
     await wait(400);
     expect(build).toHaveBeenCalledTimes(1);
@@ -34,10 +53,11 @@ describe("watchAndRebuild", () => {
     const { dir, log, stop } = await setup(build);
     writeFileSync(join(dir, "src", "a.ts"), "bad");
     await wait(500);
-    expect(log).toEqual(["build failed, still serving the last good build: Unexpected token (run with --verbose for details)"]);
+    expect(log).toEqual(["Rebuilding...", "build failed, still serving the last good build: Unexpected token (run with --verbose for details)"]);
     writeFileSync(join(dir, "src", "a.ts"), "good");
     await wait(500);
-    expect(log[1]).toMatch(/^rebuilt in/);
+    expect(log.at(-1)).toMatch(/^rebuilt in/);
+    expect(log.filter((l) => l === "Rebuilding...")).toHaveLength(2);
     stop();
   });
 });
@@ -54,7 +74,7 @@ describe("watchAndRebuild verbose", () => {
     writeFileSync(join(dir, "src", "a.ts"), "x");
     await new Promise((r) => setTimeout(r, 500));
     stop();
-    expect(log).toEqual(["build failed, still serving the last good build: Unexpected token\n    at transformJSON (x.js:1:1)"]);
+    expect(log).toEqual(["Rebuilding...", "build failed, still serving the last good build: Unexpected token\n    at transformJSON (x.js:1:1)"]);
   });
 });
 
