@@ -46,10 +46,10 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Simulated device:** `@shipvo/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
 - **Shipvo Phone:** `shipvo run android` or `shipvo run ios` opens your app in an Android or iPhone frame in your browser, with live reload, a notification shade, Settings, a Browser app, network profiles and a device panel. No emulator or Xcode needed ([run](docs/run.md)).
 - **Lumi:** `shipvo lumi android|ios` tests your app while you watch: it walks every screen, reports findings with replay buttons, shows coverage and saves findings as tests ([Lumi](docs/lumi.md)).
-- **Score any agent:** `shipvo eval run` gives an agent a task on Android or iOS and checks the real orders and screens; `shipvo eval report` compares agents and models ([docs](docs/eval.md)).
 - **Pull request check:** `shipvo ci init --check` runs your tests and an explore pass on every pull request, with before and after screens of Android and iOS in the comment ([PR check](docs/ci-check.md)).
 - **Behaviour timeline:** the app admin compares how each release and pull request behaves on Android and iOS ([timeline](docs/timeline.md)).
 - **Real devices too:** `shipvo test --device agent-device` runs the same tests on an Android emulator or iOS Simulator through Callstack's agent-device ([testing](docs/testing.md)).
+- **Score an agent:** `shipvo eval run` runs any agent or model on a task and measures pass rate, steps, time, errors and retries on Android and iOS ([eval](docs/eval.md)).
 - **Move over in one command:** `shipvo migrate --plan` and `--apply` switch an app from Expo EAS Update or CodePush ([EAS Update](docs/migrate-from-eas-update.md), [CodePush](docs/migrate-from-codepush.md)).
 - **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/shipvo-design`.
 
