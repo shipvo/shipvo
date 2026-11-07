@@ -380,7 +380,7 @@ async function act(id, body) {
       let r; try { r = resolveUrl(s.apps, body.url, Array.isArray(CFG.schemes) && typeof CFG.appId === "string" ? [{ id: CFG.appId, schemes: CFG.schemes }] : []); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       if (r.app && r.app !== s.apps.current_app && s.apps.installed_apps.some((a) => a.id === r.app)) {
         try { await switchToApp(s, page, r.app); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
-        // one-shot: set after this navigation, no init script, so a later reload or switch never sees it
+        // switchToApp clears the initial URL, so set it after the switch. One-shot: no init script, so a later reload or switch never sees it.
         await page.evaluate((u) => globalThis.__pnDevice?.setInitialUrl?.(u), body.url);
       }
       if (r.app) { await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url); await page.waitForTimeout(400); return { app: r.app, screen: await screen(page) }; }   // a listener, if the app has one, still gets the URL

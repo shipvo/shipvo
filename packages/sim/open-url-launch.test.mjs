@@ -77,14 +77,16 @@ for (const skin of ["android", "iphone"]) {
     assert.equal(await initial(s), null);
   });
 
-  test(`${skin}: open_url link is one-shot: after kill and resume the app sees no link`, async () => {
+  test(`${skin}: two open_url calls leave no registered init scripts: a reload sees no link`, async () => {
     const s = `init-${skin}`;
     assert.ok((await call("/session", { session: s, phone: PHONE })).ok);
     assert.equal((await act(s, { action: "open_url", url: "appb://x" })).ok, true);
     assert.equal((await act(s, { action: "open_url", url: "appc://y" })).ok, true);
     assert.equal((await act(s, { action: "open_recents" })).ok, true);
+    // kill_app reloads the page (a cold start). An init script registered by open_url would run again on that reload and hand the link back.
     const k = await act(s, { action: "kill_app" }); assert.equal(k.ok, true, JSON.stringify(k));
     assert.equal((await act(s, { action: "resume_app" })).ok, true);
+    assert.equal(k.reloads >= 1, true, "the page reloaded");
     assert.equal(await initial(s), null);
   });
 }
