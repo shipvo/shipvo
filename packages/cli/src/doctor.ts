@@ -228,11 +228,12 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
     const have = deps.cliVersion();
     if (latest) {
       const old = compareVersions(latest.version, have) > 0;
+      const cmd = updateCommand(detectProject(deps.cwd).packageManager);
       results.push({
-        name: "@shipvo/cli is up to date", ok: !old,
-        fix: `@shipvo/cli ${latest.version} is out; you have ${have}. Update with: ${updateCommand(detectProject(deps.cwd).packageManager)}`,
-        note: old ? undefined : have,
+        name: "@shipvo/cli is up to date", ok: true, fix: "none",
+        note: old ? `warning: @shipvo/cli ${latest.version} is out; you have ${have}. Update with: ${cmd}` : have,
       });
+
     }
   }
 

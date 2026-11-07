@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { b64, keyFromSeed, sha256Hex, signBytes, signDoc, verifyDoc } from "./index.js";
 import { seed } from "./config.js";
-import { newerCliHasCommand } from "./update-check.js";
+import { newerCliHasCommand, shouldCheckUpdates } from "./update-check.js";
 import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
 import { promote } from "./promote.js";
@@ -91,7 +91,7 @@ switch (cmd) {
   case undefined: case "--help": case "-h": case "help": console.log(help); break;
   default: {
     console.error(unknownCommand(cmd));
-    const newer = await newerCliHasCommand(cmd);
+    const newer = shouldCheckUpdates() ? await newerCliHasCommand(cmd) : null;
     if (newer) console.error(newer);
     process.exit(1);
   }

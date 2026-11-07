@@ -101,3 +101,8 @@ export async function newerCliHasCommand(cmd: string, cwd = process.cwd(), insta
   if (!latest || compareVersions(latest.version, installed) <= 0 || !latest.commands?.includes(cmd)) return null;
   return `'${cmd}' is in @shipvo/cli ${latest.version}; you have ${installed}. Update with: ${updateCommand(detectProject(cwd).packageManager)}`;
 }
+
+/** Look up the registry for an unknown command only in an interactive terminal, so scripts and CI never wait. */
+export function shouldCheckUpdates(env: NodeJS.ProcessEnv = process.env, stderrIsTTY: boolean = !!process.stderr.isTTY): boolean {
+  return !env.CI && stderrIsTTY;
+}

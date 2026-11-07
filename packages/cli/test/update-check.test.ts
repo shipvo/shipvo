@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mergeReleaseAgeExclude, writeReleaseAgeExclude, compareVersions, updateCommand, newerCliHasCommand } from "../src/update-check";
+import { mergeReleaseAgeExclude, shouldCheckUpdates, writeReleaseAgeExclude, compareVersions, updateCommand, newerCliHasCommand } from "../src/update-check";
 import { runDoctorChecks } from "../src/doctor";
 import { COMMANDS } from "../src/help";
 
@@ -31,6 +31,18 @@ describe("pnpm-workspace.yaml", () => {
   });
 });
 
+describe("pnpm-workspace.yaml edge cases", () => {
+  it("keeps CRLF line endings", () => {
+    const out = mergeReleaseAgeExclude("packages:\r\n  - a\r\nminimumReleaseAgeExclude:\r\n  - foo\r\nother: 1\r\n");
+    expect(out).toBe('packages:\r\n  - a\r\nminimumReleaseAgeExclude:\r\n  - foo\r\n  - "@shipvo/*"\r\n  - "shipvo"\r\n  - "create-shipvo"\r\nother: 1\r\n');
+    expect(out).not.toMatch(/[^\r]\n/);
+  });
+  it("reads an existing key that has a trailing comment", () => {
+    const out = mergeReleaseAgeExclude('minimumReleaseAgeExclude:\n  - foo # why\n  - "shipvo" # ours\n');
+    expect(out).toBe('minimumReleaseAgeExclude:\n  - foo # why\n  - "shipvo" # ours\n  - "@shipvo/*"\n  - "create-shipvo"\n');
+  });
+});
+
 describe("version check", () => {
   it("compares versions", () => {
     expect(compareVersions("0.1.6", "0.1.5")).toBe(1);
@@ -42,8 +54,15 @@ describe("version check", () => {
     const cwd = dir(); writeFileSync(join(cwd, "pnpm-lock.yaml"), "");
     const r = await runDoctorChecks({ cwd, cliVersion: () => "0.1.5", fetchFn: registry("0.1.6") });
     const c = r.find((x) => x.name === "@shipvo/cli is up to date")!;
-    expect(c.ok).toBe(false);
-    expect(c.fix).toBe("@shipvo/cli 0.1.6 is out; you have 0.1.5. Update with: pnpm add -D @shipvo/cli@latest");
+    expect(c.ok).toBe(true);
+    expect(c.fix).toBe("none");
+    expect(c.note).toBe("warning: @shipvo/cli 0.1.6 is out; you have 0.1.5. Update with: pnpm add -D @shipvo/cli@latest");
+    expect(r.filter((x) => !x.ok).some((x) => x.name === "@shipvo/cli is up to date")).toBe(false);
+  });
+  it("skips the registry lookup for unknown commands in CI or without a TTY", () => {
+    expect(shouldCheckUpdates({}, true)).toBe(true);
+    expect(shouldCheckUpdates({ CI: "true" }, true)).toBe(false);
+    expect(shouldCheckUpdates({}, false)).toBe(false);
   });
   it("doctor passes when current, and skips when offline or unreachable", async () => {
     const cwd = dir();
