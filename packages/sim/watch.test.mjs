@@ -82,3 +82,71 @@ test("a wrong Origin is refused, the same origin is accepted", async () => {
   await assert.rejects(connect("", { origin: "http://evil.example" }).opened, /refused/);
   const ok = connect("", { origin: `http://localhost:${PORT}` }); await ok.opened; ok.ws.close();
 });
+
+test("a tap through /act is a step on /watch; input is ignored until Take over is on", async () => {
+  await call("/session", { session: "t", skin: "android" });
+  const v = connect("?session=t"); await v.opened;
+  await until(() => v.msgs.find((m) => m.type === "frame"));
+  await call("/act", { session: "t", action: "tap_xy", x: 5, y: 5 });
+  await call("/act", { session: "t", action: "set_device", device: { network: "offline" } });
+  const st = await until(() => v.msgs.filter((m) => m.type === "step" && m.step.by === "agent"));
+  await until(() => v.msgs.filter((m) => m.type === "step").length >= 2);
+  assert.match(v.msgs.filter((m) => m.type === "step")[1].step.text, /^set_device/);
+  assert.match(v.msgs.filter((m) => m.type === "step")[1].step.change, /Screen/);
+  // control off: ignored
+  v.ws.send(JSON.stringify({ type: "text", text: "x" }));
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(v.msgs.some((m) => m.type === "step" && m.step.by === "you"), false);
+  // control on: acted on and shown
+  v.ws.send(JSON.stringify({ type: "control", on: true }));
+  v.ws.send(JSON.stringify({ type: "text", text: "x" }));
+  const mine = await until(() => v.msgs.find((m) => m.type === "step" && m.step.by === "you"));
+  assert.match(mine.step.text, /typed/);
+  v.ws.close();
+});
+
+test("switching to another session sends that session's history, without the old session's steps", async () => {
+  await call("/session", { session: "ha", skin: "android" });
+  const v = connect(); await v.opened;
+  await until(() => v.msgs.find((m) => m.type === "history"));
+  await call("/act", { session: "ha", action: "set_device", device: { network: "offline" } });
+  await until(() => v.msgs.find((m) => m.type === "step" && m.step.text.startsWith("set_device")));
+  const before = v.msgs.length;
+  await call("/session", { session: "hb", skin: "android" });
+  const h = await until(() => v.msgs.slice(before).find((m) => m.type === "history"));
+  assert.deepEqual(h.steps, []);
+  v.ws.close();
+});
+
+test("Take over: swipe and key are acted on, bad coordinates give an error", async () => {
+  await call("/session", { session: "ti", skin: "android" });
+  const v = connect("?session=ti"); await v.opened;
+  await until(() => v.msgs.find((m) => m.type === "frame"));
+  v.ws.send(JSON.stringify({ type: "control", on: true }));
+  v.ws.send(JSON.stringify({ type: "swipe", x1: 5, y1: 50, x2: 5, y2: 5 }));
+  v.ws.send(JSON.stringify({ type: "key", key: "Enter" }));
+  v.ws.send(JSON.stringify({ type: "tap", x: "a", y: 1 }));
+  await until(() => v.msgs.filter((m) => m.type === "step" && m.step.by === "you").length >= 2);
+  const mine = v.msgs.filter((m) => m.type === "step" && m.step.by === "you").map((m) => m.step.text);
+  assert.ok(mine.includes("You scrolled") && mine.includes("You pressed Enter"));
+  const err = await until(() => v.msgs.find((m) => m.type === "error"));
+  assert.match(err.message, /numbers/);
+  v.ws.close();
+});
+
+test("the page has a separate status line for input errors and describes Take over", () => {
+  const html = watchPage("android");
+  assert.match(html, /role="status" data-part="input-error"/);
+  assert.match(html, /aria-describedby="take-over-help"/);
+  assert.match(html, /\.w-view:focus-visible/);
+});
+
+test("the page clears the input error on history, your next step, toggle and reconnect, and has a light error colour in dark mode", () => {
+  const html = watchPage("android");
+  assert.match(html, /function clearErr\(\)/);
+  assert.match(html, /ws\.onopen=function\(\)\{clearSteps\(\);clearErr\(\)/);
+  assert.match(html, /m\.type==="history"\)\{clearSteps\(\);clearErr\(\)/);
+  assert.match(html, /m\.step\.by==="you"\)clearErr\(\)/);
+  assert.match(html, /take\.onchange=function\(\)\{clearErr\(\)/);
+  assert.match(html, /prefers-color-scheme:dark[^`]*\.w-err\{color:#f2b8b5\}/);
+});

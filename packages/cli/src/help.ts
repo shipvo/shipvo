@@ -8,7 +8,7 @@ export const help = `shipvo <command>
 
 Start
   init <dir> [--json]         Create a new app wired to Shipvo
-  sim [--port 4545]           Build the app and run it in the simulator
+  sim [--port 4545] [--no-open]  Build the app and run it in the simulator; opens /watch, where you see the agent's steps and can take over
   sim --hosted [--skip-build]  Build and upload to the hosted service for your key, print the build id
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
                               First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
