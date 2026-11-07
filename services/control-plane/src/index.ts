@@ -2,6 +2,7 @@ import { dispatchSchedules, runScheduleStub } from "./dispatcher";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { ReleasePointerBody, SignedEnvelope, Telemetry, bandForCohort } from "@shipvo/schema";
+import { buildTimeline, compare, parsePoint, prKey } from "./timeline";
 import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand, holdRelease, HOLD_COMMAND, holdDismissedKey } from "./owner";
 import { auth } from "./auth";
@@ -120,12 +121,58 @@ app.post("/r/:app/:release/tests", async (c) => {
   const no = await roleDenied(c, appId, "publish"); if (no) return no;
   const cap = maxReportBytes(c.env);
   const text = await c.req.text();
-  if (new TextEncoder().encode(text).length > cap) return c.json({ error: "report_too_large", message: `The test report is larger than ${cap} bytes. Send fewer flows.` }, 413);
+  if (new TextEncoder().encode(text).length > cap) return c.json({ error: "report_too_large", message: `The test report is larger than ${cap} bytes. Send fewer flows or screens.` }, 413);
   let raw: unknown; try { raw = JSON.parse(text); } catch { return c.json({ error: "bad_report", message: "The test report is not valid JSON." }, 400); }
   const r = sanitizeReport(raw, appId, Number(rel));
   if (!r.ok) return c.json({ error: "bad_report", message: r.message }, 400);
   await c.env.POINTERS.put(reportKey(appId, r.report.release, r.report.platform), JSON.stringify(r.report), { expirationTtl: REPORT_TTL_SECONDS });
   return c.json({ ok: true, release: r.report.release, platform: r.report.platform, flows: r.report.flows.length });
+});
+app.post("/r/:app/pr/:pr/tests", async (c) => {
+  const { app: appId, pr } = c.req.param();
+  if (!ID.test(appId) || !/^\d{1,9}$/.test(pr)) return c.json({ error: "bad_request", message: "Use /r/<app>/pr/<pull request number>/tests." }, 400);
+  if (!(await owner(c, appId)) && !(await publisher(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const no = await roleDenied(c, appId, "publish"); if (no) return no;
+  const cap = maxReportBytes(c.env);
+  const text = await c.req.text();
+  if (new TextEncoder().encode(text).length > cap) return c.json({ error: "report_too_large", message: `The test report is larger than ${cap} bytes. Send fewer flows or screens.` }, 413);
+  let raw: unknown; try { raw = JSON.parse(text); } catch { return c.json({ error: "bad_report", message: "The test report is not valid JSON." }, 400); }
+  const r = sanitizeReport(raw, appId, 0, new Date(), Number(pr));
+  if (!r.ok) return c.json({ error: "bad_report", message: r.message }, 400);
+  await c.env.POINTERS.put(prKey(appId, Number(pr), r.report.platform), JSON.stringify(r.report), { expirationTtl: REPORT_TTL_SECONDS });
+  return c.json({ ok: true, pr: Number(pr), platform: r.report.platform, flows: r.report.flows.length });
+});
+/** Behaviour timeline data. Only the signed-in owner session may read it (a token is refused), because screens can show app content. */
+async function timelinePoints(c: any, appId: string) {
+  const reports: StoredReport[] = [];
+  for (const prefix of [`tr/${appId}/`, `tp/${appId}/`]) {
+    let cursor: string | undefined;
+    do {
+      const page: any = await c.env.POINTERS.list({ prefix, cursor });
+      for (const k of page.keys) { try { const v = JSON.parse((await c.env.POINTERS.get(k.name)) ?? "null"); if (v && v.app === appId) reports.push(v); } catch { /* skip a bad entry */ } }
+      cursor = page.list_complete ? undefined : page.cursor;
+    } while (cursor);
+  }
+  return buildTimeline(reports);
+}
+async function sessionOnly(c: any, appId: string): Promise<Response | null> {
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  const who = await owner(c, appId);
+  if (!who || who === AGENT_ACTOR) return c.json({ error: "unauthorized", message: "Sign in to the admin as the owner." }, 401);
+  return null;
+}
+app.get("/app/:id/timeline.json", async (c) => {
+  const appId = c.req.param("id"); const no = await sessionOnly(c, appId); if (no) return no;
+  return c.json({ app: appId, points: await timelinePoints(c, appId) });
+});
+app.get("/app/:id/timeline/compare", async (c) => {
+  const appId = c.req.param("id"); const no = await sessionOnly(c, appId); if (no) return no;
+  const a = c.req.query("from") ?? "", b = c.req.query("to") ?? "";
+  if (!parsePoint(a) || !parsePoint(b)) return c.json({ error: "bad_request", message: "Use ?from=r3&to=p12 (r<release> or p<pull request>)." }, 400);
+  const pts = await timelinePoints(c, appId);
+  const pa = pts.find((p) => p.id === a), pb = pts.find((p) => p.id === b);
+  if (!pa || !pb) return c.json({ error: "not_found", message: "No test results were uploaded for one of those points." }, 404);
+  return c.json({ app: appId, ...compare(pa, pb) });
 });
 app.get("/r/:app/tests", async (c) => {
   const appId = c.req.param("app");
