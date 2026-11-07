@@ -11,7 +11,7 @@ import { pickPort } from "./test-port.mjs";
 import { makeKey, signedPointer, stubControlPlane } from "./update-fixture.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(6400, 300);
+const PORT = pickPort(7400, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-update-live-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 const key = makeKey();

@@ -25,3 +25,16 @@ test("every blocked port in the 6500-6799 test range is refused by fetch", async
     await assert.rejects(fetch(`http://localhost:${p}/`), (e) => /bad port/.test(e.cause?.message ?? e.message), String(p));
   }
 });
+
+test("no two test files draw ports from overlapping ranges", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const ranges = [];
+  for (const f of readdirSync(new URL(".", import.meta.url))) {
+    if (!f.endsWith(".test.mjs") || f === "test-port.test.mjs") continue;
+    const m = /pickPort\((\d+),\s*(\d+)/.exec(readFileSync(new URL(f, import.meta.url), "utf8"));
+    if (m) ranges.push([f, +m[1], +m[1] + +m[2]]);
+  }
+  for (const [a, a0, a1] of ranges) for (const [b, b0, b1] of ranges) {
+    if (a < b) assert.ok(a1 <= b0 || b1 <= a0, `${a} and ${b} share ports`);
+  }
+});
