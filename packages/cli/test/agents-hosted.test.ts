@@ -15,7 +15,7 @@ let out: string[] = [];
 afterEach(() => vi.restoreAllMocks());
 const run = async (dir: string, home: string, extra: string[] = [], deps: object = {}) => {
   out = []; vi.spyOn(console, "log").mockImplementation((s: string) => { out.push(String(s)); });
-  const code = await agentsCmd(["setup", "--hosted", ...extra], dir, { home, creds, ...deps });
+  const code = await agentsCmd(["setup", "--hosted", ...extra], dir, home, "", { home, creds, ...deps });
   return code;
 };
 
