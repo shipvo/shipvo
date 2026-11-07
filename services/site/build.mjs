@@ -50,6 +50,7 @@ const NAV = [
     { slug: "spec-blocks", src: "docs/spec-blocks.md", title: "App spec: screens and controls", desc: "Write a Shipvo app spec with stat, progress, card, toggle, segmented and sheet screens, check it, and render it the same on Android and iOS." },
     { slug: "ci-check", src: "docs/ci-check.md", title: "Check every pull request", desc: "Add one workflow so every pull request builds your app, runs your Shipvo flows and explores every button. Fails on regressions and crashes only." },
     { slug: "test-your-build", src: "docs/test-your-build.md", title: "Test your build on the hosted phone", desc: "Upload the build on your machine with shipvo sim --hosted or upload_build, then open it as a hosted phone session on Android and iOS." },
+    { slug: "eval", src: "docs/eval.md", title: "Score an agent on an app task", desc: "Run any coding agent or model on a task with shipvo eval, then get measured pass rate, steps, time, errors and retries on Android and iOS." },
     { slug: "timeline", src: "docs/timeline.md", title: "Behaviour timeline", desc: "See every release and pull request check run in one list, with flows, findings and screens, and compare any two points on Android and iOS." },
     { slug: "eval", src: "docs/eval.md", title: "Score an agent with shipvo eval", desc: "Give any AI agent a task on your app, on Android or iOS, and get measured scores: checks passed, steps, time, errors and retries." },
   ]},

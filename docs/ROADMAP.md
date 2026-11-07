@@ -82,7 +82,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
-- 2026-11-07: `shipvo eval run` and `shipvo eval report` score any agent on app tasks for Android and iOS ([Score an agent](eval.md), #1201)
+- 2026-11-07: `shipvo eval run` and `shipvo eval report` score any agent or model on an app task: pass rate, steps, time, errors and retries on Android and iOS ([Score an agent](eval.md), #1201)
 - 2026-11-07: `open_app` takes `room`, so phones in one room share one backend; `list_sessions` shows room, opener and screen ([Agents](agents.md#share-one-backend-between-phones-with-room), #1203)
 - 2026-11-07: `shipvo agents setup --hosted` writes the hosted phone config for each coding agent ([CLI guide](cli.md#shipvo-agents-setup), #1215)
 - 2026-11-07: Run Android and iOS simulators on your own machine or CI runner: 110 open at once on a 2-CPU, 7.8 GB machine ([Shipvo Simulators](https://shipvo.dev/products/simulators/), #1235)

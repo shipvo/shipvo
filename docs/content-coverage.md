@@ -81,6 +81,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Score an agent on app tasks (`shipvo eval run`, `shipvo eval report`) | [eval](eval.md) | | | |
 | Shared rooms: phones in one room share one backend (`open_app` `room`, richer `list_sessions`) | [agents](agents.md#share-one-backend-between-phones-with-room) | | | |
 | `shipvo agents setup --hosted` writes the hosted phone config | [test-your-build](test-your-build.md), [cli](cli.md) | | | |
+| Score agents on app tasks (`shipvo eval run`, `shipvo eval report`) | [eval](eval.md) | | | |
 | Data sources that use a saved key (`auth.secret`, `secret_revoked`, `secret_domain`) | [spec-blocks](spec-blocks.md#data-sources-that-use-a-saved-key) | | | |
 | `open_app` with `platform` and `show` opens the phone in your browser | [agents](agents.md), [run](run.md) | | | |
 | Fuller shop template checkout (plain payment errors, offline message, Undo, confirmation screen) | [getting-started](getting-started.md#the-shop-checkout) | | | |
