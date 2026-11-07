@@ -44,6 +44,7 @@ export const tools = {
   open_app: def("open_app", "Opens the phone in the user's browser so they can watch. Opens an app in a phone-sized session and returns its first screen. With no live `shipvo run` for the project, it starts one (pick platform: 'android' or 'ios') when the project has `shipvo` installed, or when show is true, and only from a local (stdio) server. A live run on the other platform is attached as it is and the result says so. screen, tap, type, scroll, back and screenshot work on that phone. The result says whether the phone is visible and its URL.", {
   app: z.string().describe("App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run), or 'tide@build:<id>' (a build from upload_build, on the hosted phone)"),
   session: z.string().optional().describe("Session name (default: generated). One session is one phone."),
+  room: z.string().optional().describe("Room name. Every session opened with the same room on the same simulator shares one backend (orders, content, telemetry), read and written through the same store. Without room, each session has its own. 1 to 64 letters, digits, _ or -."),
   seed_cart: z.array(z.object({ product_id: z.string().optional(), id: z.string().optional(), quantity: z.number().int().positive().optional(), qty: z.number().int().positive().optional() }).refine((l) => (l.product_id ?? l.id) && (l.quantity ?? l.qty), "each line needs product_id (or id) and quantity (or qty)")).optional().describe("Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."),
   dark: z.boolean().optional().describe("Dark mode"),
   platform: z.enum(["android", "ios"]).optional().describe("Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)"),
@@ -59,7 +60,7 @@ export const tools = {
   app: z.string().optional().describe("App id; default: the app of the live run"),
   session: z.string().optional().describe("Session name (default: generated)"),
 }, WR, ["attach_failed","no_live_run"]),
-  list_sessions: def("list_sessions", "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.", {}, RO, []),
+  list_sessions: def("list_sessions", "Open simulator sessions (phones) on this server: id, app, platform, room, who opened it (the MCP client name), start time and current screen title. Use to resume after a reconnect or to see who shares a room.", {}, RO, []),
   screen: def("screen", "The current screen as an accessibility tree with refs.", { session: sid }, RO, []),
   tap: def("tap", "Tap a button, link or choice by ref. Returns the new screen." + CH + ASYNC, { session: sid, ref, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, []),
   type: def("type", "Type into a text field by ref (replaces its content). Returns the new screen." + CH + " Also gives the field's value after typing.", { session: sid, ref, text: z.string(), enter: z.boolean().optional().describe("Press Enter afterwards"), compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, []),

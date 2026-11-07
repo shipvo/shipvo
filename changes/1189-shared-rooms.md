@@ -1,0 +1,4 @@
+- `@shipvo/mcp`: `open_app` takes `room`. Sessions opened with the same room on the same simulator share one mock backend (orders, content, telemetry). Without `room`, each session keeps its own backend.
+- `@shipvo/mcp`: `list_sessions` shows app, platform, room, who opened each session (the MCP client name), start time and current screen title, and returns them as structured content.
+- `@shipvo/mcp`: `end_session` ends the session in the simulator; a room ends with its last session. The report includes the room.
+- Migration: none; `room` is optional.

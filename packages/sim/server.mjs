@@ -5,7 +5,7 @@
 //   shipvo sim  (or: node packages/sim/server.mjs) [--port 4545] [--dir /tmp/pn-ui] [--dist ./sim-dist] [--app <id>]
 // Reads shipvo.json in the current directory (appId, name, controlPlane) when present.
 import http from "node:http";
-import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync } from "node:fs";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
@@ -18,6 +18,7 @@ import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { PhoneBrowser, BrowserError, checkUrl } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
+import { createWatch, watchPage, watchList, closeWatchers, isWatched } from "./watch.mjs";
 import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
@@ -120,14 +121,34 @@ async function openInBrowserApp(id, url) {
   }
 }
 
+// The mock backend a session uses: its own, or the shared one of its room. A room ends when its last session ends.
+const rooms = new Map();   // room -> Set of session ids
+const backendOf = (id, room) => (room ? `~${room}` : id);
+function leaveRoom(s, id) {
+  if (!s.room) return;
+  const set = rooms.get(s.room); set?.delete(id);
+  if (!set?.size) { rooms.delete(s.room); try { rmSync(join(DIR, `${backendOf(id, s.room)}.json`), { force: true }); rmSync(join(DIR, `${backendOf(id, s.room)}.json.log`), { force: true }); } catch {} }
+}
+async function endSession(id) {
+  const s = sessions.get(id); if (!s) return false;
+  for (const p of s.peers ?? []) p.close(); closeWatchers(s);
+  await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
+  sessions.delete(id); leaveRoom(s, id); return true;
+}
 async function newSession(id, opts = {}) {
-  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close(); }
+  const room = opts.room == null ? undefined : String(opts.room);
+  if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
+  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); sessions.delete(id); leaveRoom(old, id); }
   const target = await resolveApp(opts.app);
-  writeFileSync(join(DIR, `${id}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${id}.json.log`), "");
+  const bk = backendOf(id, room);
+  if (!room || !rooms.has(room)) { writeFileSync(join(DIR, `${bk}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${bk}.json.log`), ""); }
+  if (room) { if (!rooms.has(room)) rooms.set(room, new Set()); rooms.get(room).add(id); }
+  let ctx;
+  try {
   const browser = await browserReady;
   // Optional width, height (output pixels) and scale (device pixel ratio) make a session render at a store screenshot size.
   const size = Number.isInteger(opts.width) && Number.isInteger(opts.height) && opts.width > 0 && opts.height > 0 ? { viewport: { width: Math.round(opts.width / (opts.scale || 1)), height: Math.round(opts.height / (opts.scale || 1)) }, deviceScaleFactor: opts.scale || 1 } : {};
-  const ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
+  ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
   // The app's Linking.openURL for another installed app's scheme lands here: the phone switches to that app and hands it the link once.
@@ -144,7 +165,7 @@ async function newSession(id, opts = {}) {
     try { await s.page.evaluate((u) => { globalThis.__pnDevice?.setInitialUrl?.(u); return globalThis.__pnDevice?.openUrl(u); }, String(url)); } catch {}
     return true;
   });
-  await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
+  await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${bk}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   await ctx.addInitScript(installNetGate);
   const page = await ctx.newPage();
   const errors = [];
@@ -156,7 +177,14 @@ async function newSession(id, opts = {}) {
   await page.waitForTimeout(300);
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
-  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
+  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
+  watch.refresh();   // /watch viewers move to the new session unless they picked one
+  } catch (e) {
+    // A failed open leaves nothing behind: no ghost room member, no backend file.
+    await ctx?.close().catch(() => {});
+    if (room) leaveRoom({ room }, id); else try { rmSync(join(DIR, `${bk}.json`), { force: true }); rmSync(join(DIR, `${bk}.json.log`), { force: true }); } catch {}
+    throw e;
+  }
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -510,7 +538,7 @@ const server = http.createServer(async (req, res) => {
       return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
     }
     // mock control plane per session
-    const m = url.pathname.match(/^\/s\/([\w-]+)\/(.*)$/);
+    const m = url.pathname.match(/^\/s\/(~?[\w-]+)\/(.*)$/);
     if (m) {
       const [, id, rest] = m;
       if (rest.startsWith("c/")) {
@@ -528,12 +556,14 @@ const server = http.createServer(async (req, res) => {
     }
     // the Browser app, in a phone frame
     if (req.method === "GET" && url.pathname === "/browser") return send(200, browserAppPage(url.searchParams.get("skin") === "ios" ? "ios" : "android", url.searchParams.get("session") ?? ""), MIME[".html"]);
+    if (req.method === "GET" && url.pathname === "/watch") { const list = watchList(sessions); const want = url.searchParams.get("skin"); return send(200, watchPage(want ?? list[0]?.skin, url.searchParams.get("session") ?? ""), MIME[".html"]); }
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
-    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: [...sessions.entries()].map(([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, url: s.page.url() })) });
-    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof SimError && e.code === "bad_profile") return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
+    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
+    if (url.pathname === "/end") return send(200, { ok: true, ended: await endSession(String(body.session)) });
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room")) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
@@ -541,16 +571,18 @@ const server = http.createServer(async (req, res) => {
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }
 });
+const watch = createWatch(sessions, acceptWebSocket);
 // The Browser app's live view: frames out, taps, swipes and typing in. Same trust as the HTTP API (loopback), plus an Origin check
 // so another web page open on this machine cannot drive the phone.
 server.on("upgrade", (req, socket) => {
   const url = new URL(req.url, "http://x");
   const refuse = (line) => socket.end(`HTTP/1.1 ${line}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
-  if (url.pathname !== "/browser/ws") return refuse("404 Not Found");
+  if (url.pathname !== "/browser/ws" && url.pathname !== "/watch/ws") return refuse("404 Not Found");
   let originHost = null; try { if (req.headers.origin) originHost = new URL(req.headers.origin).host; } catch { originHost = "invalid"; }
   // A missing Origin is allowed (non-browser clients). The Host comparison does not stop DNS rebinding, since both
   // values come from the requester; the HTTP API has the same trust level.
   if (originHost && originHost !== req.headers.host) return refuse("403 Forbidden");
+  if (url.pathname === "/watch/ws") return watch.upgrade(req, socket, url);   // view only
   const s = sessions.get(url.searchParams.get("session") ?? ""); if (!s) return refuse("404 Not Found");
   const peer = acceptWebSocket(req, socket, async (text) => {
     let m; try { m = JSON.parse(text); } catch { return; }
