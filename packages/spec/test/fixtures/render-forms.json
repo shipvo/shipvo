@@ -1,0 +1,46 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "tasks", "name": "Tasks", "icon": "check", "description": "A task list you can add to." },
+  "theme": { "mode": "light", "palette": { "primary": "#0B5FFF", "text": "#111827", "background": "#FFFFFF", "surface": "#F3F4F6", "muted": "#4B5563" }, "radius": "lg", "density": "comfortable", "elevation": "soft" },
+  "data": {
+    "tasks": { "source": "collection", "fields": { "id": "text", "title": "text", "due": "date", "priority": "enum", "urgent": "bool", "done": "bool" }, "seed": [{ "id": "t1", "title": "Buy bait", "due": "2026-11-08", "priority": "low", "urgent": false, "done": false }] },
+    "open": { "source": "computed", "value": "{{ count(tasks.filter(t, !t.done)) }}" }
+  },
+  "navigation": { "type": "tabs", "items": [{ "screen": "today", "label": "Today", "icon": "sun" }, { "screen": "done", "label": "Done", "icon": "check" }] },
+  "screens": [
+    { "id": "today", "title": "Today", "body": [
+      { "type": "badge", "value": "{{ open }} open" },
+      { "type": "list", "label": "Open tasks", "from": "{{ tasks.filter(t, !t.done) }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ item.due }}", "trailing": "{{ item.priority }}" }, "empty": { "message": "Nothing to do" } },
+      { "type": "button", "label": "Add task", "onPress": { "navigate": "new" } },
+      { "type": "button", "label": "Complete all", "variant": "secondary", "onPress": { "action": "complete_all" } }
+    ] },
+    { "id": "done", "title": "Done", "body": [
+      { "type": "list", "label": "Done tasks", "from": "{{ tasks.filter(t, t.done) }}", "item": { "title": "{{ item.title }}" }, "empty": { "message": "Nothing done yet" } }
+    ] },
+    { "id": "new", "title": "New task", "presentation": "push", "body": [
+      { "type": "form", "label": "New task form", "submit": { "label": "Save task", "action": "add_task" }, "fields": [
+        { "name": "title", "type": "text", "label": "Title", "required": true, "minLength": 2 },
+        { "name": "due", "type": "date", "label": "Due date" },
+        { "name": "priority", "type": "choice", "label": "Priority", "options": ["low", "high"], "default": "low" },
+        { "name": "urgent", "type": "toggle", "label": "Urgent" },
+        { "name": "hours", "type": "number", "label": "Hours", "min": 0, "max": 40, "message": "Hours must be between 0 and 40." }
+      ] },
+      { "type": "button", "label": "Cancel", "variant": "ghost", "onPress": { "back": true } }
+    ] }
+  ],
+  "actions": {
+    "add_task": {
+      "description": "Add a task to the list.",
+      "input": { "title": { "type": "text" }, "due": { "type": "date", "default": "2026-11-07" }, "priority": { "type": "enum", "options": ["low", "high"], "default": "low" }, "urgent": { "type": "bool", "default": false }, "hours": { "type": "number", "default": 0 } },
+      "do": [
+        { "insert": "tasks", "value": { "id": "{{ input.title }}", "title": "{{ input.title }}", "due": "{{ input.due }}", "priority": "{{ input.priority }}", "urgent": "{{ input.urgent }}", "done": false } },
+        { "toast": "Task added" },
+        { "navigate": "back" }
+      ]
+    },
+    "complete_all": {
+      "description": "Mark every task as done.",
+      "do": [{ "update": "tasks", "where": "!item.done", "value": { "done": true } }, { "toast": "All done" }]
+    }
+  }
+}

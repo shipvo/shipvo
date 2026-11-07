@@ -30,6 +30,16 @@ export interface RenderOptions extends EvalOptions {
   state?: Record<string, unknown>;
   /** Route params for the screen. */
   params?: Record<string, unknown>;
+  /** Form values typed so far, by form key (the block's `id`, or its `label`), then field name. Set by {@link createApp}. */
+  drafts?: Record<string, Record<string, unknown>>;
+  /** Validation messages to show, by form key, then field name. Set by {@link createApp}. */
+  fieldErrors?: Record<string, Record<string, string>>;
+  /** Shows a Back button first on the screen. Set by {@link createApp}. */
+  canGoBack?: boolean;
+  /** The tab that is selected. Default: the screen. Set by {@link createApp}. */
+  tab?: string;
+  /** A message to show last, such as the result of an action. Set by {@link createApp}. */
+  toast?: string;
 }
 
 export type RenderResult =
@@ -46,13 +56,22 @@ const VARIANT_SIZE: Record<string, number> = { display: 32, title: 22, body: 16,
 
 /** Renders one screen. Invalid specs are refused with the validator's errors. */
 export function renderScreen(spec: unknown, options: RenderOptions = {}): RenderResult {
+  return renderInternal(spec, options).result;
+}
+
+export interface Registered { kind: "button" | "form"; block: Obj; scope: Record<string, unknown> }
+export interface Internal { result: RenderResult; scope: () => Record<string, unknown>; registry: Map<string, Registered> }
+
+export function renderInternal(spec: unknown, options: RenderOptions): Internal {
+  const registry = new Map<string, Registered>();
+  const fail = (errors: Issue[]): Internal => ({ result: { ok: false, errors }, scope: () => ({}), registry });
   const { errors, warnings } = validate(spec);
-  if (errors.length) return { ok: false, errors };
+  if (errors.length) return fail(errors);
   const s = spec as Obj;
   const style: PhoneStyle = options.style ?? "android";
   const screen: Obj | undefined = options.screen ? s.screens.find((x: Obj) => x.id === options.screen) : s.screens[0];
   if (!screen) {
-    return { ok: false, errors: [{ path: "$.screens", message: `There is no screen "${options.screen}".`, fix: `Use one of: ${s.screens.map((x: Obj) => x.id).join(", ")}.` }] };
+    return fail([{ path: "$.screens", message: `There is no screen "${options.screen}".`, fix: `Use one of: ${s.screens.map((x: Obj) => x.id).join(", ")}.` }]);
   }
 
   const state: Record<string, unknown> = {};
@@ -110,6 +129,13 @@ export function renderScreen(spec: unknown, options: RenderOptions = {}): Render
       }
       case "list":
         return buildList(b, scope, label);
+      case "button": {
+        const key = String(b.id ?? b.label);
+        registry.set(`button:${key}`, { kind: "button", block: b, scope });
+        return { role: "button", name: label, block: "button", children: [], props: { variant: b.variant ?? "primary", key } };
+      }
+      case "form":
+        return buildForm(b, scope, label);
       default:
         return undefined; // other blocks arrive in later slices
     }
@@ -138,11 +164,62 @@ export function renderScreen(spec: unknown, options: RenderOptions = {}): Render
     return { role: "list", name, block: "list", children: rows };
   };
 
+  const buildForm = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
+    const key = String(b.id ?? b.label);
+    registry.set(`form:${key}`, { kind: "form", block: b, scope });
+    const draft = options.drafts?.[key] ?? {};
+    const errs = options.fieldErrors?.[key] ?? {};
+    const kids: ScreenNode[] = [];
+    for (const f of formFields(b)) {
+      const name = str(f.label ?? f.name, scope);
+      const value = f.name in draft ? draft[f.name] : fieldDefault(f);
+      const props = { field: f.name, type: f.type, required: f.required === true, value };
+      const error = errs[f.name];
+      const base: Pick<ScreenNode, "children"> = { children: [] };
+      if (f.type === "choice") {
+        const opts = (f.options ?? []).map(String);
+        kids.push({ role: "radiogroup", name, block: "field", props, children: opts.map((o) => ({ role: "radio", name: o, block: "option", children: [], props: { checked: value === o } })) });
+      } else if (f.type === "toggle") {
+        kids.push({ role: "switch", name, block: "field", ...base, props: { ...props, checked: value === true } });
+      } else {
+        kids.push({ role: f.type === "number" ? "spinbutton" : "textbox", name, block: "field", ...base, props });
+      }
+      if (error) kids.push({ role: "alert", name: error, block: "error", children: [] });
+    }
+    const submit = b.submit ?? {};
+    kids.push({ role: "button", name: str(submit.label ?? "Submit", scope), block: "submit", children: [], props: { key, action: submit.action } });
+    return { role: "form", name: label, block: "form", children: kids, props: { key } };
+  };
+
   const children = (screen.body as Obj[]).map((b) => build(b, base())).filter(Boolean) as ScreenNode[];
+  const nav = s.navigation?.type === "tabs" && Array.isArray(s.navigation.items) ? (s.navigation.items as Obj[]) : [];
+  const selectedTab = options.tab ?? screen.id;
+  if (options.canGoBack) children.unshift({ role: "button", name: "Back", block: "back", children: [] });
+  if (nav.length) {
+    const tabs = nav.map((it): ScreenNode => {
+      const target = s.screens.find((x: Obj) => x.id === it.screen);
+      const name = str(it.label ?? target?.title ?? it.screen, base());
+      return { role: "tab", name, block: "tab", children: [], props: { screen: it.screen, icon: it.icon, selected: it.screen === selectedTab } };
+    });
+    children.push({ role: "tablist", name: "Tabs", block: "tabs", children: tabs });
+  }
+  if (options.toast) children.push({ role: "status", name: options.toast, block: "toast", children: [] });
   const title = str(screen.title ?? s.app?.name ?? "", base());
   const tree: ScreenNode = { role: "main", name: title || s.app?.name || "Screen", block: "screen", children };
   const tokens = themeTokens(s.theme ?? {}, style);
-  return { ok: true, style, title: tree.name, tree, html: toHtml(tree, tokens, style, String(s.app?.name ?? "")), warnings };
+  const result: RenderResult = { ok: true, style, title: tree.name, tree, html: toHtml(tree, tokens, style, String(s.app?.name ?? "")), warnings };
+  return { result, scope: base, registry };
+}
+
+export interface FormField { name: string; type: string; label?: string; required?: boolean; options?: unknown[]; default?: unknown; min?: number; max?: number; minLength?: number; maxLength?: number; pattern?: string; message?: string }
+
+export function formFields(b: Obj): FormField[] {
+  return (Array.isArray(b.fields) ? b.fields : []).filter((f: Obj) => f && typeof f.name === "string" && typeof f.type === "string");
+}
+
+export function fieldDefault(f: FormField): unknown {
+  if (f.default !== undefined) return f.default;
+  return f.type === "toggle" ? false : "";
 }
 
 /** The tree as plain indented text, one node per line: `role "name"`. Useful for tests and agents. */
@@ -245,6 +322,33 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
         const pad = Math.round(12 * t.unit);
         return `<div ${a} style="display:flex;align-items:center;gap:12px;padding:${pad}px ${style === "ios" ? 16 : 8}px;${sep}"><div style="flex:1;min-width:0"><div style="font:${style === "ios" ? 500 : 400} ${Math.round(16 * t.scale)}px ${t.font};color:${t.p.text}">${esc(pr.title)}</div>${pr.subtitle ? `<div style="font:400 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(pr.subtitle)}</div>` : ""}</div>${pr.trailing ? `<div style="font:600 ${Math.round(15 * t.scale)}px ${t.font};color:${t.p.text}">${esc(pr.trailing)}</div>` : ""}</div>`;
       }
+      case "button": {
+        const filled = pr.variant !== "secondary" && pr.variant !== "ghost";
+        const color = pr.variant === "danger" ? t.p.danger : t.p.primary;
+        return `<button type="button" ${a} style="min-height:44px;padding:0 20px;border-radius:${t.radius}px;border:${filled ? "0" : `1px solid ${color}`};background:${filled ? color : "transparent"};color:${filled ? t.p.background : color};font:600 ${Math.round(16 * t.scale)}px ${t.font}">${esc(n.name)}</button>`;
+      }
+      case "submit":
+      case "back":
+        return `<button type="button" ${a} style="min-height:44px;padding:0 20px;border-radius:${t.radius}px;border:${n.block === "back" ? `1px solid ${t.p.primary}` : "0"};background:${n.block === "back" ? "transparent" : t.p.primary};color:${n.block === "back" ? t.p.primary : t.p.background};font:600 ${Math.round(16 * t.scale)}px ${t.font}">${esc(n.name)}</button>`;
+      case "form":
+        return `<form ${a} onsubmit="return false" style="display:flex;flex-direction:column;gap:${gap("md")}px">${inner}</form>`;
+      case "field": {
+        const lab = `font:500 ${Math.round(14 * t.scale)}px ${t.font};color:${t.p.text}`;
+        const box = `min-height:44px;box-sizing:border-box;padding:0 12px;border-radius:${t.radius}px;border:1px solid ${t.p.muted};background:${t.p.background};color:${t.p.text};font:400 ${Math.round(16 * t.scale)}px ${t.font}`;
+        if (n.role === "radiogroup") return `<fieldset ${a} style="border:0;padding:0;margin:0"><legend style="${lab}">${esc(n.name)}</legend>${inner}</fieldset>`;
+        if (n.role === "switch") return `<label style="${lab};display:flex;align-items:center;gap:8px;min-height:44px"><input type="checkbox" role="switch" aria-label="${esc(n.name)}"${pr.checked ? " checked" : ""}>${esc(n.name)}</label>`;
+        const kind = pr.type === "number" ? "number" : pr.type === "date" ? "date" : "text";
+        return `<label style="${lab};display:flex;flex-direction:column;gap:4px">${esc(n.name)}<input type="${kind}" aria-label="${esc(n.name)}" value="${esc(pr.value ?? "")}" style="${box}"></label>`;
+      }
+      case "option":
+        return `<label style="display:flex;align-items:center;gap:8px;min-height:44px;font:400 ${Math.round(16 * t.scale)}px ${t.font};color:${t.p.text}"><input type="radio" aria-label="${esc(n.name)}"${pr.checked ? " checked" : ""}>${esc(n.name)}</label>`;
+      case "error":
+      case "toast":
+        return `<p ${a} style="margin:0;font:500 ${Math.round(14 * t.scale)}px ${t.font};color:${n.block === "error" ? t.p.danger : t.p.success}">${esc(n.name)}</p>`;
+      case "tabs":
+        return `<nav ${a} style="display:flex;justify-content:space-around;border-top:1px solid ${t.dark ? "#ffffff22" : "#00000018"};padding-top:8px">${inner}</nav>`;
+      case "tab":
+        return `<span ${a} aria-selected="${pr.selected === true}" style="min-height:44px;display:inline-flex;align-items:center;padding:0 12px;font:${pr.selected ? 700 : 400} ${Math.round(14 * t.scale)}px ${t.font};color:${pr.selected ? t.p.primary : t.p.muted}">${esc(n.name)}</span>`;
       case "empty":
         return `<p ${a} style="margin:0;padding:24px;text-align:center;font:400 14px ${t.font};color:${t.p.muted}">${esc(n.name)}</p>`;
       default:
