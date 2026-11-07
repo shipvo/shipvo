@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, lstatSync, readlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { easCmd } from "../src/eas";
+import { easCmd, EAS_FUNCTIONS } from "../src/eas";
 
 function fixture(): string {
   const d = mkdtempSync(join(tmpdir(), "shipvo-eas-"));
@@ -99,14 +99,19 @@ describe("shipvo eas setup", () => {
     expect(existsSync(join(d, ".eas"))).toBe(false);
   });
 
-  it("says the iOS signing steps are unproven when iOS is detected, and not otherwise", async () => {
+  it("uses only built-in EAS functions from Expo's docs, and EAS's own output syntax", async () => {
     const d = fixture();
-    expect((await run(d, ["setup"])).out).toContain("iOS signing steps in .eas/build/ios.yml are unproven");
-    expect((await run(d, ["setup", "--dry-run"])).out).toContain("are unproven");
-    const a = mkdtempSync(join(tmpdir(), "shipvo-eas-"));
-    writeFileSync(join(a, "capacitor.config.ts"), "export default {};\n");
-    mkdirSync(join(a, "android"));
-    expect((await run(a, ["setup"])).out).not.toContain("unproven");
+    await run(d, ["setup"]);
+    for (const f of [".eas/build/ios.yml", ".eas/build/android.yml"]) {
+      const yml = readFileSync(join(d, f), "utf8");
+      const used = [...yml.matchAll(/^\s*- (eas\/[a-z_]+)/gm)].map((m) => m[1]);
+      expect(used.length).toBeGreaterThan(0);
+      for (const name of used) expect(EAS_FUNCTIONS as readonly string[]).toContain(name);
+      expect(yml).not.toContain("${{");
+    }
+    const ios = readFileSync(join(d, ".eas/build/ios.yml"), "utf8");
+    expect(ios).toContain("${ steps.resolve_apple_team_id.apple_team_id }");
+    expect(ios).toContain("id: resolve_apple_team_id");
   });
 
   it("--run --dry-run runs nothing", async () => {
