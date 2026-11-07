@@ -1,6 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { args } from "./config.js";
+import { detectPackageManager, type PackageManager } from "./ensure-playwright.js";
 
 export type ProjectKind = "shipvo" | "expo" | "react-native" | "capacitor" | "unknown";
 
@@ -50,17 +53,57 @@ export function upsertSection(text: string, section: string): string | null {
   return text.replace(/\n*$/, "\n\n") + section + "\n";
 }
 
-const SERVER = { command: "npx", args: ["-y", "@shipvo/mcp"] };
+export type McpServerEntry = { command: string; args: string[]; env?: Record<string, string> };
+
+/** The sim port from shipvo.json (`simPort`), else 4545. */
+export function simUrl(dir: string): string {
+  try {
+    const p = JSON.parse(readFileSync(join(dir, "shipvo.json"), "utf8")).simPort;
+    if (Number.isInteger(p) && p > 0 && p < 65536) return `http://localhost:${p}`;
+  } catch { /* no shipvo.json */ }
+  return "http://localhost:4545";
+}
+
+/** The version of @shipvo/mcp installed in the app, or null. */
+export function installedMcpVersion(dir: string): string | null {
+  try { return JSON.parse(readFileSync(createRequire(join(dir, "package.json")).resolve("@shipvo/mcp/package.json"), "utf8")).version ?? null; } catch { return null; }
+}
+
+/** The local file the server entry runs, relative to the app, with `/` separators so it is the same on every OS. Resolved through the package's `./server` export. */
+export function localServerPath(dir: string): string | null {
+  try {
+    const abs = createRequire(join(dir, "package.json")).resolve("@shipvo/mcp/server");
+    const rel = relative(dir, abs).split(sep).join("/");
+    return rel.startsWith("..") ? null : rel;
+  } catch { return null; }
+}
+
+/** The `shipvo` server entry. Default: run the installed file with node (no shell, no npm check). `npx`: a pinned npx command. */
+export function serverEntry(dir: string, opts: { npx?: boolean; version?: string | null; path?: string | null } = {}): McpServerEntry {
+  const env = { PN_SIM: simUrl(dir) };
+  if (opts.npx) return { command: "npx", args: ["-y", `@shipvo/mcp@${opts.version ?? installedMcpVersion(dir) ?? "latest"}`.replace(/@latest$/, "")], env };
+  return { command: "node", args: [opts.path ?? "node_modules/@shipvo/mcp/dist/server.js"], env };
+}
+
+/** The add command per package manager for `@shipvo/mcp` as a dev dependency. */
+export function mcpInstallCommand(pm: PackageManager): { cmd: string; args: string[] } {
+  switch (pm) {
+    case "pnpm": return { cmd: "pnpm", args: ["add", "-D", "@shipvo/mcp"] };
+    case "yarn": return { cmd: "yarn", args: ["add", "-D", "@shipvo/mcp"] };
+    case "bun": return { cmd: "bun", args: ["add", "-d", "@shipvo/mcp"] };
+    default: return { cmd: "npm", args: ["install", "--save-dev", "@shipvo/mcp"] };
+  }
+}
 
 /** Add the `shipvo` server and keep every other server and key. Returns null if the file is not valid JSON. */
-export function mergeMcp(text: string | null): string | null {
+export function mergeMcp(text: string | null, entry: McpServerEntry = serverEntry(process.cwd())): string | null {
   let doc: Record<string, unknown> = {};
   if (text !== null && text.trim()) {
     try { doc = JSON.parse(text); } catch { return null; }
     if (!doc || typeof doc !== "object" || Array.isArray(doc)) return null;
   }
   const servers = (doc.mcpServers && typeof doc.mcpServers === "object" ? doc.mcpServers : {}) as Record<string, unknown>;
-  servers.shipvo = SERVER;
+  servers.shipvo = entry;
   return JSON.stringify({ ...doc, mcpServers: servers }, null, 2) + "\n";
 }
 
@@ -113,15 +156,16 @@ export function skillStatus(dir: string): { package: string; name: string; synce
 type Change = { file: string; action: "create" | "update" | "unchanged" | "skip"; note?: string };
 
 /** `shipvo agents setup [--dry-run] [--json]`. Exit 0 done, 2 error. */
-export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<number> {
+export async function agentsCmd(argv: string[], dir = process.cwd(), deps: { run?: (cmd: string, args: string[], cwd: string) => void } = {}): Promise<number> {
   const [sub, ...rest] = argv;
-  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--dry-run] [--json]"); return 2; }
+  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--dry-run] [--json] [--npx]"); return 2; }
   const only = sub === "skills-sync";
   const a = args(rest);
   const dry = a["dry-run"] !== undefined, json = a.json !== undefined;
   const kind = detectProject(dir);
   const changes: Change[] = [];
   const writes: { path: string; text: string }[] = [];
+  let installed: string | undefined;
   const plan = (file: string, next: string | null, note?: string) => {
     const path = join(dir, file);
     const old = existsSync(path) ? readFileSync(path, "utf8") : null;
@@ -134,9 +178,25 @@ export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<nu
 
   if (!only) {
     plan("AGENTS.md", upsertSection(read("AGENTS.md") ?? "", agentsSection(kind)), "AGENTS.md has a broken shipvo marker; fix it and run again.");
+    const npx = a.npx !== undefined;
+    const hasPkg = existsSync(join(dir, "package.json"));
+    let entry: McpServerEntry;
+    if (npx) entry = serverEntry(dir, { npx: true });
+    else {
+      if (installedMcpVersion(dir) === null && hasPkg) {
+        const pm = detectPackageManager(dir, existsSync);
+        const { cmd, args: cargs } = mcpInstallCommand(pm);
+        if (dry) installed = `would run ${cmd} ${cargs.join(" ")}`;
+        else {
+          try { (deps.run ?? ((c, r, d) => { execFileSync(c, r, { cwd: d, stdio: json ? ["ignore", 2, 2] : "inherit", shell: process.platform === "win32" }); }))(cmd, cargs, dir); installed = `${cmd} ${cargs.join(" ")}`; }
+          catch { console.error(`Could not run \`${cmd} ${cargs.join(" ")}\`. Run it yourself, or use \`shipvo agents setup --npx\`.`); return 2; }
+        }
+      }
+      entry = serverEntry(dir, { path: localServerPath(dir) });
+    }
     const targets = [".mcp.json", ...(existsSync(join(dir, ".cursor")) ? [".cursor/mcp.json"] : [])];
     for (const f of targets) {
-      const merged = mergeMcp(read(f));
+      const merged = mergeMcp(read(f), entry);
       plan(f, merged, `${f} is not valid JSON; I left it alone. Fix it and run again.`);
     }
   }
@@ -145,9 +205,10 @@ export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<nu
   const bad = changes.some((c) => c.action === "skip");
   if (!dry && !bad) for (const w of writes) { mkdirSync(dirname(w.path), { recursive: true }); writeFileSync(w.path, w.text); }
   const wrote = !dry && !bad;
-  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, changes, skill_install: SKILL_LINE, skills: skills.map((e) => ({ package: e.package, name: e.name })) }));
+  if (json) console.log(JSON.stringify({ ok: !bad, project: kind, dry_run: dry, mcp_install: installed ?? null, changes, skill_install: SKILL_LINE, skills: skills.map((e) => ({ package: e.package, name: e.name })) }));
   else {
     console.log(`Project: ${LABEL[kind]}.`);
+    if (installed) console.log(`  @shipvo/mcp: ${dry ? installed : `added with ${installed}`}`);
     for (const c of changes) console.log(`  ${c.file}: ${c.action === "skip" ? c.note : c.action === "unchanged" ? "already up to date" : `${dry ? "would " : ""}${c.action}${dry ? "" : "d"}`}`);
     if (dry) console.log("Dry run: nothing was written.");
     else if (wrote && !changes.some((c) => c.action !== "unchanged")) console.log("Nothing to change.");

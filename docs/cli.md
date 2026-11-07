@@ -164,7 +164,8 @@ shipvo agents setup --json       # machine-readable result
 
 - It detects the project: Shipvo app (`shipvo.json`), Capacitor, Expo, bare React Native.
 - It writes a section to `AGENTS.md` between `<!-- shipvo:begin -->` and `<!-- shipvo:end -->`. A missing file is created. Text outside the markers is never changed.
-- It adds the `shipvo` server (`npx -y @shipvo/mcp`) to `.mcp.json`, and to `.cursor/mcp.json` if `.cursor/` exists. Other servers stay. A file that is not valid JSON is left alone and the command exits 2.
+- It adds `@shipvo/mcp` to devDependencies with your package manager (npm, pnpm, yarn or bun) if it is missing, then adds the `shipvo` server (`node node_modules/@shipvo/mcp/dist/server.js`, with `PN_SIM` set to your sim port) to `.mcp.json`, and to `.cursor/mcp.json` if `.cursor/` exists. Other servers stay. A file that is not valid JSON is left alone and the command exits 2.
+- `--npx` writes a pinned `npx -y @shipvo/mcp@<installed version>` entry instead and installs nothing.
 - It prints the skill install line.
 - Running it again changes nothing.
 

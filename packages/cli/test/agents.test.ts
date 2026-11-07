@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execFileSync: vi.fn() }));
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -51,7 +52,7 @@ describe(".mcp.json", () => {
   it("keeps other servers and keys", () => {
     const out = JSON.parse(mergeMcp(JSON.stringify({ other: 1, mcpServers: { foo: { command: "x" } } }))!);
     expect(out.other).toBe(1); expect(out.mcpServers.foo).toEqual({ command: "x" });
-    expect(out.mcpServers.shipvo.args).toContain("@shipvo/mcp");
+    expect(out.mcpServers.shipvo.command).toBe("node");
   });
   it("returns null for invalid JSON and leaves the file alone", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {}); const d = tmp();
@@ -159,5 +160,44 @@ describe("skills shipped in the packages", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     expect(pkg.files).toContain("skills");
     expect(readFileSync(join(root, "skills", `shipvo-${p}`, "SKILL.md"), "utf8")).toMatch(new RegExp(`^---\\nname: shipvo-${p}\\ndescription: .+\\n---`));
+  });
+});
+
+describe("local server entry", () => {
+  const app = (lock?: string, withMcp = false) => {
+    const d = tmp(); writeFileSync(join(d, "package.json"), JSON.stringify({ name: "a" }));
+    if (lock) writeFileSync(join(d, lock), "");
+    if (withMcp) {
+      const m = join(d, "node_modules/@shipvo/mcp"); mkdirSync(join(m, "dist"), { recursive: true });
+      writeFileSync(join(m, "package.json"), JSON.stringify({ name: "@shipvo/mcp", version: "1.2.3", exports: { "./server": "./dist/server.js", "./package.json": "./package.json" } }));
+      writeFileSync(join(m, "dist/server.js"), "");
+    }
+    return d;
+  };
+  it.each([["pnpm-lock.yaml", "pnpm", ["add", "-D", "@shipvo/mcp"]], ["yarn.lock", "yarn", ["add", "-D", "@shipvo/mcp"]], ["bun.lock", "bun", ["add", "-d", "@shipvo/mcp"]], [undefined, "npm", ["install", "--save-dev", "@shipvo/mcp"]]] as const)(
+    "adds @shipvo/mcp with %s -> %s when missing", async (lock, cmd, cargs) => {
+      quiet(); const d = app(lock); const run = vi.fn();
+      expect(await agentsCmd(["setup"], d, { run })).toBe(0);
+      expect(run).toHaveBeenCalledWith(cmd, [...cargs], d);
+    });
+  it("writes the relative node entry with PN_SIM and skips the install when present", async () => {
+    quiet(); const d = app(undefined, true); const run = vi.fn();
+    writeFileSync(join(d, "shipvo.json"), JSON.stringify({ simPort: 4600 }));
+    await agentsCmd(["setup"], d, { run });
+    expect(run).not.toHaveBeenCalled();
+    expect(JSON.parse(readFileSync(join(d, ".mcp.json"), "utf8")).mcpServers.shipvo).toEqual({ command: "node", args: ["node_modules/@shipvo/mcp/dist/server.js"], env: { PN_SIM: "http://localhost:4600" } });
+  });
+  it("--npx pins the installed version and never installs", async () => {
+    quiet(); const d = app(undefined, true); const run = vi.fn();
+    await agentsCmd(["setup", "--npx"], d, { run });
+    expect(run).not.toHaveBeenCalled();
+    const e = JSON.parse(readFileSync(join(d, ".mcp.json"), "utf8")).mcpServers.shipvo;
+    expect(e).toEqual({ command: "npx", args: ["-y", "@shipvo/mcp@1.2.3"], env: { PN_SIM: "http://localhost:4545" } });
+    expect(JSON.stringify(e)).not.toContain("latest");
+  });
+  it("reports the package version as serverInfo.version", () => {
+    const src = readFileSync(join(__dirname, "../../mcp/src/server.ts"), "utf8");
+    expect(src).not.toContain('SERVER_VERSION = "0.');
+    expect(src).toContain('new URL("../package.json"');
   });
 });
