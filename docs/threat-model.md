@@ -96,6 +96,22 @@ Sealed records carry a `shipvo-vault/v1` tag in their authenticated data. Rotati
 
 Not covered in this slice: injection at call time (a later slice), listing, rotating and revoking keys, rate limits on the vault page, and a restricted Stripe key that has write permissions (the check reads the key prefix, not its permissions). A person who opens the link on a compromised browser can be phished by the page's lookalike; the ticket URL is the only credential, so treat it like a password until it is used.
 
+## Secret vault, injection into data sources (slice 3 of #841)
+
+At call time the spec runner asks the vault for a data source's `auth.secret`, and adds it to a header or query value on the server. Code: `packages/spec/src/run.ts`, `services/control-plane/src/vault-use.ts`, migration `0024_vault_use.sql`. Tests: `packages/spec/test/run.test.ts`, `services/control-plane/test/vault-use.test.ts`.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| The key leaks through data, errors or logs | The runner holds the value only in the outgoing request. Errors say the host, never the URL. Log events carry host, status and source name only. An upstream that echoes the key has it replaced with `[hidden]` before the data is read. | "never returns the key when the upstream echoes it"; "keeps the key out of errors and logs" |
+| A key is sent to the wrong service | The vault compares the request host with the domain the key was saved for. Only an exact match passes: subdomains and look-alike names are refused. The domain is also part of the sealed record, so an edited row does not open. | "refuses another domain, subdomains and look-alikes"; "refuses a row whose domain was edited" |
+| A redirect carries the key elsewhere | The runner asks for `redirect: manual` and treats any 3xx as an error. It never follows one. | "does not follow a redirect, so the key cannot reach another host" |
+| Another person's or app's key is used | The lookup is by app and name and must match the person who saved the key. A mismatch looks the same as a missing key and does not reveal that it exists. | "refuses another person's key and another app's key as missing" |
+| Missing or revoked key | The call is refused before any request. The error tells the person to add the key through the secret form. | "refuses with plain errors when the vault refuses"; "refuses a revoked key" |
+| Use goes unseen | Every use and every refused domain or revoked attempt is written to `vault_uses` (app, name, person, host, outcome, time) and counted on the key. The log never holds a value. `listUses` returns it to the key's owner only. | "returns the value to the owner ... and records the use" |
+| A cached answer is shared between people | An authed source is cached only when the host sets `cacheScope`; the cache key holds the key's name, never its value. | "does not read or write the cache for an authed source without cacheScope" |
+
+Not covered here: a screen for the use log (a later slice), revoking and rotating keys (the check exists; the way to revoke does not), and a service that puts the key in its own response in a form other than the exact value (for example encoded).
+
 ## Person phone and sign-in (slice 2 of #843)
 
 A person signs in with an email magic link and gets one phone: an installed-apps list and a per-app key-value data area. Code: `services/control-plane/src/people.ts`, `phone.ts`, migration `0022_people_phone.sql`. Tests: `services/control-plane/test/phone.test.ts`. Developer auth is unchanged.
