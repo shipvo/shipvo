@@ -37,7 +37,7 @@ describe("shipvo doctor checks", () => {
     const fetchFn = vi.fn(async () => { throw new Error("no network"); });
     const off = await runDoctorChecks({ cwd, offline: true, fetchFn: fetchFn as unknown as typeof fetch });
     const on = await runDoctorChecks({ cwd, fetchFn: fetchFn as unknown as typeof fetch });
-    expect(fetchFn).toHaveBeenCalledTimes(2); // only the online run
+    expect(fetchFn).toHaveBeenCalledTimes(3); // only the online run: two control plane calls and the registry
     expect(nameOf(off, "control plane reachable")).toMatchObject({ ok: true, note: "skipped, --offline" });
     expect(nameOf(off, "control plane /health returns JSON").ok).toBe(true);
     expect(nameOf(on, "control plane reachable").ok).toBe(false);

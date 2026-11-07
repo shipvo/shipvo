@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { b64, keyFromSeed, sha256Hex, signBytes, signDoc, verifyDoc } from "./index.js";
 import { seed } from "./config.js";
+import { newerCliHasCommand } from "./update-check.js";
 import { init } from "./init.js";
 import { publish, rollback } from "./publish.js";
 import { promote } from "./promote.js";
@@ -78,7 +79,12 @@ switch (cmd) {
     const ok = verifyPointer(text, key); console.log(ok ? "valid" : "INVALID"); process.exit(ok ? 0 : 1);
   }
   case undefined: case "--help": case "-h": case "help": console.log(help); break;
-  default: console.error(unknownCommand(cmd)); process.exit(1);
+  default: {
+    console.error(unknownCommand(cmd));
+    const newer = await newerCliHasCommand(cmd);
+    if (newer) console.error(newer);
+    process.exit(1);
+  }
 }
 } catch (e) {
   console.error(failure(e));

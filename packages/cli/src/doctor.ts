@@ -6,6 +6,8 @@ import { portFree } from "./sim.js";
 import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
 import { installedHermesEngine, parseDeclared, parseEngine } from "./hermes.js";
+import { compareVersions, fetchLatestCli, installedCliVersion, updateCommand } from "./update-check.js";
+import { detectProject } from "./adopt.js";
 import { emit, envelope, type Next } from "./json-out.js";
 
 type CheckResult = { name: string; ok: boolean; fix: string; note?: string };
@@ -28,6 +30,8 @@ type DoctorDeps = {
   portFree: (port: number) => Promise<boolean>;
   /** Skip the checks that need the network (control plane reachable and /health). */
   offline: boolean;
+  /** Version of the installed @shipvo/cli. */
+  cliVersion: () => string;
   /** Skip the simulator checks (Chromium, port) even when package.json has a `sim` script. */
   skipSim: boolean;
 };
@@ -46,6 +50,7 @@ const defaultDeps = (): DoctorDeps => ({
   playwrightVersion: (cwd) => { try { return createRequire(join(cwd, "package.json"))("playwright/package.json").version as string; } catch { return null; } },
   portFree,
   offline: false,
+  cliVersion: installedCliVersion,
   skipSim: false,
 });
 
@@ -204,6 +209,20 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
       fix: installedEngine ? `shipvo.json declares ${declaredEngine} but hermes-compiler is ${installedEngine}; install the declared build or update hermesEngine if the shell changed` : `shipvo.json declares ${declaredEngine} but hermes-compiler was not found; install it or remove hermesEngine`,
       note: mismatch ? undefined : declaredEngine ? `${installedEngine}, matches hermesEngine` : `${installedEngine}, hermesEngine not declared in shipvo.json`,
     });
+  }
+
+  // Warn when a newer @shipvo/cli is on npm. Skipped offline or when the registry cannot be reached.
+  if (!deps.offline) {
+    const latest = await fetchLatestCli(deps.fetchFn);
+    const have = deps.cliVersion();
+    if (latest) {
+      const old = compareVersions(latest.version, have) > 0;
+      results.push({
+        name: "@shipvo/cli is up to date", ok: !old,
+        fix: `@shipvo/cli ${latest.version} is out; you have ${have}. Update with: ${updateCommand(detectProject(deps.cwd).packageManager)}`,
+        note: old ? undefined : have,
+      });
+    }
   }
 
   // Simulator checks only apply to projects that have a `sim` script.
