@@ -2,17 +2,19 @@
 // Commands are plain text matched by rules. There is no AI call. `Lumi` is the engine and only needs a `Driver`, so tests run it
 // against a fake app. `lumi()` wires it to the simulator and a small local web server.
 import { createRequire } from "node:module";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { args as parse, loadConfig } from "./config.js";
 import { elements, fieldElements, signature, describeStep, walk, startSim, simDriver, type Driver, type Finding, type Reply, type Skin, type Step, type WalkOptions } from "./explore.js";
+import { saveTests } from "./explore-save.js";
 import { portFree } from "./sim.js";
 import { loadFrameRenderer, openBrowser } from "./run.js";
 
 export type Mood = "idle" | "working" | "happy" | "worried";
 export type Command =
   | { kind: "test-all" } | { kind: "test-flow"; flow: string } | { kind: "bad-input"; flow: string }
-  | { kind: "stop" } | { kind: "replay"; n: number } | { kind: "help" } | { kind: "unknown" };
+  | { kind: "stop" } | { kind: "replay"; n: number } | { kind: "save"; n: number } | { kind: "help" } | { kind: "unknown" };
 
 /** Reads a line of text as a command. No AI: a few patterns, case and spacing ignored. */
 export function parseCommand(text: string): Command {
@@ -21,13 +23,14 @@ export function parseCommand(text: string): Command {
   if (/^(help|\?|commands)$/i.test(t)) return { kind: "help" };
   if (/^(stop|cancel|halt)$/i.test(t)) return { kind: "stop" };
   if ((m = /^replay (?:bug|finding) #?(\d+)$/i.exec(t))) return { kind: "replay", n: Number(m[1]) };
+  if ((m = /^save (?:bug|finding) #?(\d+)(?: as (?:a )?test)?$/i.exec(t))) return { kind: "save", n: Number(m[1]) };
   if (/^test (?:my |the )?(?:whole )?app$/i.test(t) || /^test$/i.test(t)) return { kind: "test-all" };
   if ((m = /^try (.+?) with bad (?:input|data|values)$/i.exec(t))) return { kind: "bad-input", flow: m[1]!.replace(/^(?:the|my) /i, "").replace(/ flow$/i, "") };
   if ((m = /^test (.+)$/i.exec(t))) return { kind: "test-flow", flow: m[1]!.replace(/^(?:the|my) /i, "").replace(/ flow$/i, "") };
   return { kind: "unknown" };
 }
 
-export const COMMAND_LIST = ["test my app", "test <flow>", "try <flow> with bad input", "stop", "replay bug <n>", "help"];
+export const COMMAND_LIST = ["test my app", "test <flow>", "try <flow> with bad input", "stop", "replay bug <n>", "save bug <n> as test", "help"];
 export type FeedItem = { at: string; text: string; kind: "step" | "info" | "bug" };
 export type State = {
   mood: Mood; running: boolean; label: string; feed: FeedItem[];
@@ -38,7 +41,7 @@ type Known = { n: number; key: string; finding: Finding; screens: Set<string>; p
 /** Findings about one control look the same on every screen: report them once and count the screens. */
 const PER_CONTROL = new Set(["small_target", "duplicate_name"]);
 
-export type LumiOptions = { routes?: string[]; maxDepth?: number; maxSteps?: number; seed?: number; skin?: Skin; app?: string; settleMs?: number; walkDelayMs?: number };
+export type LumiOptions = { routes?: string[]; maxDepth?: number; maxSteps?: number; seed?: number; skin?: Skin; app?: string; testsDir?: string; settleMs?: number; walkDelayMs?: number };
 
 export class Lumi {
   private feed: FeedItem[] = []; private known: Known[] = [];
@@ -129,6 +132,15 @@ export class Lumi {
       this.stopFlag = true; this.say("Stopping after this action."); return "Stopping after this action.";
     }
     if (this.running) return "I am busy. Say stop first, or wait for the run to end.";
+    if (c.kind === "save") {
+      const k = this.known[c.n - 1];
+      if (!k) return this.known.length ? `There is no bug ${c.n}. Bugs so far: 1 to ${this.known.length}.` : "There are no bugs to save yet. Say \"test my app\" first.";
+      const dir = this.o.testsDir ?? "tests/lumi";
+      const [file] = saveTests([k.finding], dir, k.n);
+      if (!file) return `Bug ${c.n} cannot be saved as a test: a screen check cannot prove it.`;
+      this.say(`Saved bug ${c.n} as ${file}`, "info");
+      return `Saved bug ${c.n} as ${file}. Run it with shipvo test.`;
+    }
     if (c.kind === "replay") {
       const k = this.known[c.n - 1];
       if (!k) return this.known.length ? `There is no bug ${c.n}. Bugs so far: 1 to ${this.known.length}.` : "There are no bugs to replay yet. Say \"test my app\" first.";
@@ -233,7 +245,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px sy
 .lm{flex:none;width:360px;display:flex;flex-direction:column;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-sizing:border-box;overflow:auto}
 .lm h1{margin:0;font-size:18px}.lm h2{margin:0 0 4px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.lm p{margin:0}.lm-now{color:var(--muted)}
 .lm ol{margin:0;padding:0;list-style:none}.lm-feed{max-height:190px;overflow:auto;font-family:ui-monospace,monospace;font-size:12px}.lm-feed li{padding:2px 0;border-bottom:1px solid var(--line)}.lm-feed .bug,.lm-bugs{color:var(--bad)}
-.lm-bugs{max-height:170px;overflow:auto}.lm-bugs li{display:flex;gap:6px;align-items:flex-start;padding:3px 0}.lm-bugs span{flex:1}.lm-bugs button{flex:none;font:inherit;font-size:12px;padding:2px 8px}
+.lm-bugs{max-height:170px;overflow:auto}.lm-bugs li{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:3px 0}.lm-bugs span{flex:1 1 100%}.lm-bugs button{flex:1 1 auto;min-height:44px;min-width:44px;font:inherit;font-size:13px;padding:6px 12px}
 .lm-cov{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0}.lm-cov dt{color:var(--muted)}.lm-cov dd{margin:0;font-weight:600}
 .lm-cmd label{display:block;margin-bottom:4px;font-weight:600}.lm-cmd div{display:flex;gap:6px}.lm-cmd input{flex:1;min-width:0;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
 .lm-cmd button{font:inherit;padding:8px 14px;border:0;border-radius:8px;background:var(--accent);color:var(--bg);font-weight:600;cursor:pointer}.lm-reply{margin-top:6px;color:var(--muted);min-height:1.2em}
@@ -253,7 +265,7 @@ var last=s.feed[s.feed.length-1];$("now").textContent=s.running?(s.label?"Workin
 var f=$("feed");f.textContent="";s.feed.slice(-40).forEach(function(i){f.append(li(i.text,i.kind==="bug"?"bug":""))});f.scrollTop=f.scrollHeight;
 var b=$("findings");b.textContent="";$("bug-count").textContent=s.findings.length;
 s.findings.forEach(function(x){var e=document.createElement("li"),t=document.createElement("span");t.textContent="Bug "+x.n+": "+x.message;
-var r=document.createElement("button");r.type="button";r.textContent="Replay";r.setAttribute("aria-label","Replay bug "+x.n);r.onclick=function(){send("replay bug "+x.n)};e.append(t,r);b.append(e)});
+var r=document.createElement("button");r.type="button";r.textContent="Replay";r.setAttribute("aria-label","Replay bug "+x.n);r.onclick=function(){send("replay bug "+x.n)};var v=document.createElement("button");v.type="button";v.textContent="Save as test";v.setAttribute("aria-label","Save bug "+x.n+" as test");v.onclick=function(){send("save bug "+x.n+" as test")};e.append(t,r,v);b.append(e)});
 $("cov-screens").textContent=s.coverage.screens;$("cov-tried").textContent=s.coverage.controlsTried+" of "+s.coverage.controlsSeen}
 function send(t){fetch("/cmd",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:t})}).then(function(r){return r.json()}).then(function(j){$("reply").textContent=j.reply||j.error||""}).catch(function(){$("reply").textContent="Could not reach Lumi. Is shipvo lumi still running?"})}
 $("command-form").onsubmit=function(e){e.preventDefault();var i=$("command"),v=i.value.trim();if(!v)return;i.value="";send(v)};
@@ -332,7 +344,7 @@ export async function lumi(argv: string[]): Promise<number> {
   let server: Server | undefined;
   try {
     const driver = real?.driver ?? simDriver(sim.base, cfg.appId, "lumi", skin);
-    const engine = new Lumi(driver, { routes: cfg.routes, maxDepth: num("max-depth", 3) || 3, maxSteps: num("max-steps", 100) || 100, seed: a.seed !== undefined ? num("seed", 1) : undefined, skin, app: cfg.appId });
+    const engine = new Lumi(driver, { routes: cfg.routes, maxDepth: num("max-depth", 3) || 3, maxSteps: num("max-steps", 100) || 100, seed: a.seed !== undefined ? num("seed", 1) : undefined, skin, app: cfg.appId, testsDir: join("tests", "lumi") });
     const first = await driver.open();
     if (!first.ok) throw new Error(`the app did not open: ${first.error ?? "no screen"}`);
     const frame = (await loadFrameRenderer())({ skin, lumi: true, screen: `<img data-part="screen" alt="The app on the phone, live" draggable="false">` });
