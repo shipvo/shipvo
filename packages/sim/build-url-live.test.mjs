@@ -24,12 +24,15 @@ before(async () => {
   host = http.createServer((req, res) => {
     if (req.url === "/files/mine/index.html") { res.writeHead(200, { "content-type": "text/html" }); return res.end(page("My uploaded build")); }
     if (req.url === "/files/mine/app.js") { res.writeHead(200, { "content-type": "text/javascript" }); return res.end("document.title='loaded'"); }
+    if (req.url === "/w/myapp/releases.json") { res.writeHead(200, { "content-type": "application/json" }); return res.end('{"latest":1}'); }
+    if (req.url === "/w/myapp/r1/index.html") { res.writeHead(200, { "content-type": "text/html" }); return res.end(page("Published app")); }
+    if (req.url === "/files/mine/a.txt" || req.url === "/files/mine/b.txt") { res.writeHead(200, { "content-type": "text/plain" }); return res.end("y".repeat(1200)); }
     if (req.url === "/files/big/index.html") { res.writeHead(200, { "content-type": "text/html" }); return res.end(page("x".repeat(5000))); }
     res.writeHead(404); res.end();
   });
   await new Promise((r) => host.listen(0, "127.0.0.1", r)); hostPort = host.address().port;
   const tmp = http.createServer(); await new Promise((r) => tmp.listen(0, "127.0.0.1", r)); closedPort = tmp.address().port; tmp.close();
-  proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", join(root, "state"), "--dist", join(root, "none"), "--build-hosts", "127.0.0.1"], { stdio: ["ignore", "ignore", "pipe"], cwd: here, env: { ...process.env, PN_BUILD_MAX_BYTES: "2000" } });
+  proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", join(root, "state"), "--dist", join(root, "none"), "--build-hosts", "127.0.0.1"], { stdio: ["ignore", "ignore", "pipe"], cwd: here, env: { ...process.env, PN_BUILD_MAX_BYTES: "2000", PN_BUILD_CACHE_BYTES: "2500", PN_CONTROL: `http://127.0.0.1:${hostPort}` } });
   let err = ""; proc.stderr.on("data", (d) => { err += d; });
   let up = false;
   for (let i = 0; i < 450 && !up; i++) { try { await fetch(`http://localhost:${PORT}/`); up = true; } catch { if (proc.exitCode !== null) throw new Error(`sim exited: ${err}`); await new Promise((r) => setTimeout(r, 200)); } }
@@ -54,8 +57,9 @@ for (const skin of ["android", "ios"]) {
 }
 
 test("a session without build_url has no build in the reply", async () => {
-  const r = await call("/session", { session: "plain", phone: { apps: [] } });
-  if (r.ok) assert.equal(r.build, undefined);
+  const r = await call("/session", { session: "plain", app: "myapp", skin: "android" });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.build, undefined);
 });
 
 for (const [name, u, code] of [
@@ -74,3 +78,20 @@ for (const [name, u, code] of [
     assert.ok(!(await listed()).includes(sid));
   });
 }
+
+test("/b/ answers 400 bad_path for a malformed escape and for a path that leaves the build", async () => {
+  assert.equal((await call("/session", { session: "paths", app: "myapp", skin: "android", build_url: url("mine") })).ok, true);
+  for (const p of ["%E0%A4%A", "..%2f..%2fx", "%2e%2e%2f%2e%2e%2fx"]) {
+    const r = await fetch(`http://localhost:${PORT}/b/mine/${p}`);
+    assert.equal(r.status, 400, p); assert.equal((await r.json()).error, "bad_path");
+  }
+});
+
+test("with a small cache budget old files are evicted and every request still succeeds", async () => {
+  assert.equal((await call("/session", { session: "evict", app: "myapp", skin: "android", build_url: url("mine") })).ok, true);
+  for (const p of ["a.txt", "b.txt", "index.html", "a.txt", "b.txt"]) {
+    const r = await fetch(`http://localhost:${PORT}/b/mine/${p}`);
+    assert.equal(r.status, 200, p);
+    assert.ok((await r.text()).length > 0);
+  }
+});

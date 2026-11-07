@@ -21,6 +21,7 @@ import { acceptWebSocket } from "./ws-lite.mjs";
 import { createWatch, watchPage, watchList, closeWatchers, isWatched } from "./watch.mjs";
 import { browserAppPage } from "./browser-app.mjs";
 import { BuildFetchError, parseBuildUrl, fetchBuildFile } from "./build-fetch.mjs";
+import { createBuildCache } from "./build-cache.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
@@ -138,12 +139,13 @@ async function endSession(id) {
 }
 // Uploaded builds (build_url): hosts they may come from, and the ones loaded so far (id -> { base, files }).
 const BUILD_HOSTS = [...new Set([...arg("build-hosts", process.env.PN_BUILD_HOSTS || "").split(","), new URL(CONTROL).hostname, "sim.shipvo.dev"].map((h) => h.trim()).filter(Boolean))];
-const BUILDS = new Map();
+const BUILD_FETCH = { maxBytes: Number(process.env.PN_BUILD_MAX_BYTES) || undefined };
+const BUILDS = createBuildCache({ maxBytes: Number(process.env.PN_BUILD_CACHE_BYTES) || undefined, maxBuilds: Number(process.env.PN_BUILD_CACHE_BUILDS) || undefined, inUse: (id) => [...sessions.values()].some((s) => s.release === `build:${id}`) });
 async function loadBuild(buildUrl) {
   const { id, base } = parseBuildUrl(buildUrl, BUILD_HOSTS);
-  if (BUILDS.get(id)?.base !== base) BUILDS.set(id, { base, files: new Map() });
-  const b = BUILDS.get(id);
-  if (!b.files.has("index.html")) b.files.set("index.html", await fetchBuildFile(base, "index.html", { maxBytes: Number(process.env.PN_BUILD_MAX_BYTES) || undefined }));
+  // index.html is fetched on every session start, so a build uploaded again under the same id is not served stale
+  const index = await fetchBuildFile(base, "index.html", BUILD_FETCH);
+  BUILDS.open(id, base); BUILDS.set(id, "index.html", index);
   return { id, url: `http://localhost:${PORT}/b/${id}/index.html` };
 }
 async function newSession(id, opts = {}) {
@@ -542,9 +544,10 @@ const server = http.createServer(async (req, res) => {
     }
     // an uploaded build, fetched from its allow-listed host and cached for the life of the process
     { const bm = url.pathname.match(/^\/b\/([\w-]+)\/(.*)$/);
-      if (bm) { const b = BUILDS.get(bm[1]); if (!b) return send(404, { error: "no_build" });
-        const rel = decodeURIComponent(bm[2]) || "index.html"; let hit = b.files.get(rel);
-        if (!hit) { try { hit = await fetchBuildFile(b.base, rel, { maxBytes: Number(process.env.PN_BUILD_MAX_BYTES) || undefined }); } catch (e) { return send(e.code === "build_too_large" ? 413 : 404, { error: e.code ?? "build_file" }); } b.files.set(rel, hit); }
+      if (bm) { const base = BUILDS.base(bm[1]); if (!base) return send(404, { error: "no_build" });
+        let rel; try { rel = decodeURIComponent(bm[2]) || "index.html"; } catch { return send(400, { error: "bad_path" }); }
+        let hit = BUILDS.get(bm[1], rel);
+        if (!hit) { try { hit = await fetchBuildFile(base, rel, BUILD_FETCH); } catch (e) { return send(e.code === "build_too_large" ? 413 : e.code === "bad_build_url" ? 400 : 404, { error: e.code === "bad_build_url" ? "bad_path" : e.code ?? "build_file" }); } BUILDS.set(bm[1], rel, hit); }
         return send(200, hit.body, hit.type); } }
     // a bundle this session downloaded and verified: the page that runs is the page that was checked
     { const um = url.pathname.match(/^\/u\/([\w-]+)\/r(\d+)\/index\.html$/);
