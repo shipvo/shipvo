@@ -4,11 +4,13 @@ import { register } from "node:module";
 register("data:text/javascript," + encodeURIComponent(`export async function resolve(s, c, next) { try { return await next(s, c); } catch (e) { if (s.startsWith(".")) return next(s + ".ts", c); throw e; } }`));
 
 // A tiny DOM: enough for notification banners, which are the only drawing these tests reach.
-const el = () => ({ style: {}, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, remove() { removed.push(this); }, appendChild() {}, set innerHTML(_v) {} });
+const el = () => ({ style: {}, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, remove() { removed.push(this); }, appendChild() {}, append() {}, set innerHTML(_v) {} });
 const removed = [];
 globalThis.window = { dispatchEvent: () => true };
 globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
-globalThis.document = { querySelectorAll: () => [], createElement: el, body: { appendChild() {} } };
+const made = [];
+const createElement = (tag) => { const e = el(); e.tag = tag; made.push(e); return e; };
+globalThis.document = { querySelectorAll: () => [], createElement, body: { appendChild() {} } };
 const mod = await import("../src/index.web.ts");
 const dev = globalThis.__pnDevice;
 const { device } = mod;
@@ -200,5 +202,34 @@ test("payment: a cancel result comes back as cancelled", async () => {
   dev.reset({ payment: { nextResult: "cancel", pin: "" } });
   dev.set({ payment: { nextResult: "cancel", pin: "" } });
   assert.deepEqual(await device.pay.charge({ amount: 100 }), { ok: false, reason: "cancelled" });
+  dev.reset();
+});
+
+test("payment: every nextResult value set through __pnDevice reaches the app as its own reason", async () => {
+  const pay = { approve: undefined, decline: "declined", timeout: "timeout", insufficient_funds: "insufficient_funds", cancel: "cancelled" };
+  for (const [next, reason] of Object.entries(pay)) {
+    dev.reset({ payment: { nextResult: "approve", pin: "" } });
+    dev.set({ payment: { nextResult: next } });
+    const r = await device.pay.charge({ amount: 1 });
+    if (reason) assert.deepEqual(r, { ok: false, reason }, next); else assert.equal(r.ok, true);
+    assert.equal(dev.log().at(-1).kind, "payment");
+  }
+  dev.reset({ payment: { nextResult: "approve", pin: "" } });
+  dev.set({ payment: { nextResult: "bogus" } });
+  await assert.rejects(device.pay.charge({ amount: 1 }), /unknown payment.nextResult/);
+  dev.reset();
+});
+
+test("biometrics: every nextResult value set through __pnDevice reaches the app as its own result", async () => {
+  const want = { success: { ok: true }, fail: { ok: false, reason: "failed" }, cancel: { ok: false, reason: "cancelled" } };
+  for (const [next, result] of Object.entries(want)) {
+    dev.reset({ biometrics: { enrolled: true, nextResult: "success" } });
+    dev.set({ biometrics: { nextResult: next } });
+    made.length = 0;
+    const pending = device.auth.confirm("test");
+    made.find((b) => b.tag === "button" && b.textContent === "Use fingerprint").onclick();
+    assert.deepEqual(await pending, result, next);
+    assert.equal(dev.log().at(-1).kind, "auth");
+  }
   dev.reset();
 });
