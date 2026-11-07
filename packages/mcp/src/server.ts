@@ -21,6 +21,7 @@ import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
 import { Recorder, RecorderError } from "./recorder.js";
 import { connectDriver, findLiveRun, type Driver, type RunInfo } from "./attach.js";
+import { BuildError, hostedKey, resolveBuild, uploadBuild } from "./build-upload.js";
 import { findProjectDir, hasDesktop, localShipvo, runUrl, startRun } from "./launch.js";
 import { satisfied, sameTree, type WaitFor, type Waited } from "./wait.js";
 
@@ -152,7 +153,7 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
   const guarded = (args: unknown, extra: unknown) => inputHasKey(args) ? keyRefusal() : (cb as (a: unknown, e: unknown) => unknown)(args, extra);
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
 };
-type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
+type Ctx = { remote?: boolean; key?: string; app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
 /** The package version, read from package.json next to dist/ so it never drifts from the published one. */
 const SERVER_VERSION: string = (() => { try { return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version ?? "0.0.0"; } catch { return "0.0.0"; } })();
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
@@ -183,12 +184,13 @@ use(server, tools.list_apps, async ({ query }) => {
 
 const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
   let id = app.split("@")[0];
+  const buildId = /^[^@]+@build:([A-Za-z0-9_-]+)$/.exec(app)?.[1];
   const headlessOnly = attach === "never" || show === false;
-  let live = headlessOnly ? undefined : findLiveRun(id);
+  let live = buildId || headlessOnly ? undefined : findLiveRun(id);
   let launchNote = "";
   // Show the person a phone: switch a live run to the asked platform, or start one from the project.
   // Only a local (stdio) server starts processes. Over HTTP a caller never makes the server host run a command.
-  if (!headlessOnly && ctx.scope !== "read" && ctx.local) {
+  if (!headlessOnly && !buildId && ctx.scope !== "read" && ctx.local) {
     const autoStart = show === undefined && attach !== "always" && hasDesktop() && localShipvo(findProjectDir());
     // Refuse a different app's run only when we are about to start or attach a phone, never for a plain headless call.
     const wantsPhone = show === true || attach === "always" || Boolean(autoStart);
@@ -226,6 +228,14 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
   if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
   let attachNote = launchNote;
   if (platform && !launchNote && (!live || live.platform !== platform) ) attachNote += ` (platform ${platform} ignored: no phone was started${live ? `; the live phone is ${live.platform}` : ""})`;
+  let buildUrl: string | undefined;
+  if (buildId) {
+    try {
+      const b = await resolveBuild(buildId, ctx.key ?? hostedKey());
+      if (b.app !== id) return result("", { ok: false, code: "build_not_found", error: `build ${buildId} was uploaded for "${b.app}", not "${id}". Use open_app("${b.app}@build:${buildId}") or run upload_build for ${id}.` });
+      buildUrl = b.url;
+    } catch (e) { return result("", { ok: false, code: e instanceof BuildError ? e.code : "build_not_found", error: (e as Error).message }); }
+  }
   if (live && app.includes("@")) attachNote += ` (${app.split("@")[1]} ignored: the phone runs the local build)`;
   if (live) {
     try {
@@ -247,14 +257,29 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show }
   }
   // The check above skips apps with a live run. If that attach failed we are headless now, so the app must be one the simulator knows.
   if (!keyApps && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
-  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number };
+  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
   if (r.code === "sim_timeout") return result(sid, r);
+  // Only report a build as open when the simulator says it loaded that build. Otherwise the phone shows another app version.
+  if (buildId && r.ok !== false && r.build !== buildId) {
+    return result("", { ok: false, code: "build_not_supported", error: `the simulator did not load build ${buildId}, so no session was opened. Open ${id} without @build to use the published app.` });
+  }
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
-  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\nvisible: no\n\n${r.screen ?? ""}`);
+  return text(`session: ${sid}\napp: ${id} release: ${buildId ? `build:${buildId}` : r.release ?? "local"}\nmode: headless session${attachNote}\nvisible: no\n\n${r.screen ?? ""}`);
 };
 use(server, tools.open_app, openApp);
+// Build the project here and upload it for the hosted phone. Needs the project on disk, so stdio only.
+use(server, tools.upload_build, async ({ dir, app, skip_build }) => {
+  if (ctx.scope === "read") throw new Error("this key is read-only: it cannot upload builds");
+  if (ctx.remote) return result("", { ok: false, code: "stdio_only", error: "upload_build reads your project, so it runs only in the local server: add the stdio server (npx @shipvo/mcp) next to this one" });
+  try {
+    if (keyApps && app && !keyApps.includes(app)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
+    const b = await uploadBuild({ dir, app, skipBuild: skip_build });
+    if (keyApps && !keyApps.includes(b.app)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
+    return { ...text(`build: ${b.id}\napp: ${b.app}\nexpires: ${b.expires_at}\nsize: ${b.bytes} bytes\n\nOpen it on the hosted phone: open_app("${b.app}@build:${b.id}")`), structuredContent: { ...b } };
+  } catch (e) { return result("", { ok: false, code: e instanceof BuildError ? e.code : "upload_failed", error: (e as Error).message }); }
+});
 // Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.
 use(server, tools.attach_session, async ({ app, session }) => {
   const live = findLiveRun(app);
@@ -667,7 +692,7 @@ if (argi < 0) {
     // Behind sim.shipvo.dev the Worker has checked the key and says which app and scope it grants; locally
     // there are no such headers and every app is allowed. A client's mcp-session-id header is ignored.
     const h = (n: string) => (req.headers[n] as string) || undefined;
-    const server = makeServer({ app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
+    const server = makeServer({ remote: true, key: h("x-shipvo-key"), app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     if (era2026 && msg) {
       // 2026-07-28 results carry resultType, and tools/list also carries ttlMs and cacheScope. 2025-era responses are untouched.
