@@ -82,6 +82,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-07: Score any agent or model on app tasks with `shipvo eval run` and `shipvo eval report`, on Android and iOS ([docs](eval.md), #1201)
+- 2026-11-07: Watch the agent's phone live at `/watch`, view only; sessions can share a room ([docs](agents.md), #1217, #1203)
 - 2026-11-07: Run Android and iOS simulators on your own machine or CI runner: 110 open at once on a 2-CPU, 7.8 GB machine ([Shipvo Simulators](https://shipvo.dev/products/simulators/), #1235)
 - 2026-11-07: Test your own build on the hosted phone with `upload_build` or `shipvo sim --hosted`, then `open_app("<app>@build:<id>")` ([Test your build](test-your-build.md), #1171)
 - 2026-11-07: Two assistants play a full chess game through `@shipvo/mcp` with `--agents`, and `--record` saves the video and the moves ([Chess on two phones](demos/chess.md), #1166)
