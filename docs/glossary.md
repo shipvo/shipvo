@@ -4,6 +4,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Accessibility tree.** The list of buttons, headings and text on a screen that a screen reader reads aloud. An assistant uses the same list to see your app, so a button it cannot find is also hard for a person using a screen reader.
 
+**Airplane mode (in the simulator).** A switch that turns the phone's network off. The app's calls to the internet then fail, as they do on a real phone, so you can see what your customers see with no signal.
+
+**Deep link.** A web-style address, such as `myapp://item/42`, that opens a particular screen in an app. In Shipvo Phone it opens the app that owns the address and takes you to that screen once.
+
 **App id.** A short name for your app with no spaces, such as `tideshop`. Shipvo uses it to find your app.
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
@@ -66,6 +70,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Lumi.** The small glowing orb beside the Shipvo Phone camera. It shows each step as a caption, looks worried when something fails, and powers `shipvo lumi`, which tests your app while you watch. See [Lumi](lumi.md).
 
-**Network profile.** A named connection speed and reliability for the simulated phone, such as `2g` or `spotty`, so you can see how your app behaves on a poor connection. See [Device API](device-api.md#network-profiles).
+**Network profile.** A named connection speed and reliability for the simulated phone, such as `2g` or `spotty`, so you can see how your app behaves on a poor connection. See [Device API](device-api.md#network).
 
 **Behaviour timeline.** A list in your app's admin page of every release and pull request check run, with its flows, findings and screens, so you can compare any two points. See [Behaviour timeline](timeline.md).

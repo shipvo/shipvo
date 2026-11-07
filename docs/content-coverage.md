@@ -6,7 +6,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-1. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog, tutorial and video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md).
+1. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog, tutorial and video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
 4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
@@ -20,7 +20,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 
 | Feature | Docs | Tutorial | Video | Blog |
 | --- | --- | --- | --- | --- |
-| Chess on Shipvo Phone: live demo and two agents playing through MCP | [demos/chess](demos/chess.md) | | | |
+| Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | | | |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | Signed over-the-air updates | [getting-started](getting-started.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
@@ -64,12 +64,21 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Phone home, recents, shade and power controls | [agents](agents.md), [phone-apps](phone-apps.md) | | | |
 | Lumi on Shipvo Phone (captions, reactions, first-run guide) | [lumi](lumi.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
 | `shipvo lumi` (test your app while you watch) | [lumi](lumi.md), [cli](cli.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | [Have Lumi test your app while you watch](videos.md#have-lumi-test-your-app-while-you-watch) | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
-| Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles) | | | |
+| Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
 | `shipvo agents setup` for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md#shipvo-agents-setup), [agents](agents.md) | | | |
 | `open_app` with `platform` and `show` (start the phone and watch) | [agents](agents.md) | | | |
 | Deep links on Shipvo Phone (`open_url`, `Linking.openURL`, one-shot initial URL) | [phone-apps](phone-apps.md), [testing](testing.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
-| Network off blocks the app's requests | [device-api](device-api.md#network-profiles) | | | |
 | App spec blocks (`stat`, `progress`, `card`, `toggle`, `segmented`, `chart`, sheets) | [@shipvo/spec](../packages/spec/README.md), [app-spec](design/app-spec.md) | | | |
 | Self-hosted control plane `backup` and `restore` | [self-hosting](self-hosting.md) | | | |
+| Network off blocks the app's network calls (`TypeError: Network request failed`) | [device-api](device-api.md#network) | | | |
+| Payment cancel returns `cancelled` (`@shipvo/device` 0.1.5) | [device-api](device-api.md#payments) | | | |
+| Deep links: `open_url` and `Linking.openURL` switch to the owning app | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
+| `shipvo agents setup` writes the MCP config for every coding agent | [cli](cli.md), [agents](agents.md) | | | |
+| Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec](../packages/spec/README.md) | | | |
+| Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
+| Pull-request screenshots before and after (`shipvo ci shots`) | [ci-check](ci-check.md) | | | |
+| Lumi findings saved as tests (`shipvo explore --save-tests`) | [lumi](lumi.md) | | | |
+| Self-host upgrade check, backup and restore | [self-hosting](self-hosting.md#back-up-and-upgrade) | | | |
+| iOS apps on the UIScene lifecycle (`SceneDelegate`) | [cli](cli.md) | | | |
