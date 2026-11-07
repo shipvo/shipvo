@@ -29,7 +29,7 @@ Devices: Android emulators and the iOS Simulator in CI are the test standard (se
 **Epic sweep, every run, first.** Every open epic must always have work in the queue. For each open issue labelled `epic` and `agent:epic-next` (the health check adds it when an epic has no open slice):
 1. Read the epic, its design doc if it links one, and the merged PRs that mention it.
 2. If every goal in the epic is on main, close it with a one-line-per-goal comment (`done in #PR`).
-3. Otherwise file the next 1 to 3 slices: the smallest shippable next steps, each under 400 changed lines, with `agent:ready` (only for slices whose dependencies are merged; the rest `agent:waiting` with "Depends on #n"), an engine label, and "Part of #<epic>" in the body. Add each as a sub-issue of the epic (`gh api -X POST repos/<repo>/issues/<epic>/sub_issues -F sub_issue_id=<id>`).
+3. Otherwise file the next 1 to 3 slices: the smallest shippable next steps, each under 400 changed lines, with `agent:ready` (only for slices whose dependencies are merged; the rest `agent:waiting` with "Depends on #n"), an engine label, and "Part of #<epic>" in the body. Add each as a sub-issue of the epic with `node scripts/agents/sub-issue.mjs <epic> <issue> [<issue> ...]` (`gh api` is not available to agents; `--list` shows an epic's sub-issues).
 4. Remove `agent:epic-next`.
 
 **Keep the backlog lean.** File only the next 1 to 3 slices of an epic, never the whole plan at once. Close duplicates and issues already done on main. An open issue is either in the queue, waiting on a named issue, an epic, or a launch kit for the owner: nothing else stays open.
