@@ -40,6 +40,8 @@ export interface RenderOptions extends EvalOptions {
   canGoBack?: boolean;
   /** The tab that is selected. Default: the screen. Set by {@link createApp}. */
   tab?: string;
+  /** Shows the screen as a bottom sheet. Screens with `"presentation": "sheet"` are always shown that way. Set by {@link createApp}. */
+  sheet?: boolean;
   /** A message to show last, such as the result of an action. Set by {@link createApp}. */
   toast?: string;
 }
@@ -61,7 +63,7 @@ export function renderScreen(spec: unknown, options: RenderOptions = {}): Render
   return renderInternal(spec, options).result;
 }
 
-export interface Registered { kind: "button" | "form"; block: Obj; scope: Record<string, unknown> }
+export interface Registered { kind: "button" | "form" | "toggle" | "segmented"; block: Obj; scope: Record<string, unknown> }
 export interface Internal { result: RenderResult; scope: () => Record<string, unknown>; registry: Map<string, Registered> }
 
 export function renderInternal(spec: unknown, options: RenderOptions): Internal {
@@ -99,6 +101,8 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
     return v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
   };
 
+  const bound = (b: Obj): unknown => (typeof b.bind === "string" ? state[b.bind.replace(/^state\./, "")] : undefined);
+
   const build = (b: Obj, scope: Record<string, unknown>): ScreenNode | undefined => {
     if (typeof b.when === "string") {
       try { if (!evaluate(b.when.replace(/^\{\{\s*|\s*\}\}$/g, ""), scope, options)) return undefined; } catch { return undefined; }
@@ -128,6 +132,40 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
       case "badge": {
         const value = str(b.value ?? b.text, scope);
         return { role: "status", name: label || value, block: "badge", children: [], props: { text: value, tone: b.tone ?? b.variant } };
+      }
+      case "section": {
+        const title = str(b.title ?? b.label, scope);
+        return { role: "region", name: title, block: "section", children: kids() };
+      }
+      case "card":
+        return { role: "group", name: label, block: "card", children: kids(), props: { variant: b.variant ?? "plain" } };
+      case "divider":
+        return { role: "separator", name: "", block: "divider", children: [] };
+      case "stat": {
+        const value = str(b.value, scope), delta = str(b.delta, scope);
+        const trend = typeof b.trend === "string" ? b.trend : delta.startsWith("-") ? "down" : delta.startsWith("+") ? "up" : "";
+        const name = `${label}: ${value}${delta ? `, ${delta}` : ""}`;
+        return { role: "status", name, block: "stat", children: [], props: { label, value, delta, trend, variant: b.variant } };
+      }
+      case "progress": {
+        const max = Number(b.max) > 0 ? Number(b.max) : 100;
+        const raw = Number(tpl(b.value, scope));
+        const pct = Math.round(Math.min(1, Math.max(0, Number.isFinite(raw) ? raw / max : 0)) * 100);
+        return { role: "progressbar", name: `${label || "Progress"}: ${pct}%`, block: "progress", children: [], props: { pct, shape: b.variant === "ring" ? "ring" : "bar" } };
+      }
+      case "toggle": {
+        const key = String(b.id ?? b.label);
+        registry.set(`toggle:${key}`, { kind: "toggle", block: b, scope });
+        const on = bound(b) === true;
+        return { role: "switch", name: `${label}: ${on ? "on" : "off"}`, block: "toggle", children: [], props: { checked: on, label, key } };
+      }
+      case "segmented": {
+        const key = String(b.id ?? b.label);
+        registry.set(`segmented:${key}`, { kind: "segmented", block: b, scope });
+        const cur = bound(b);
+        const opts = (Array.isArray(b.options) ? b.options : []).map(String);
+        const opt = (o: string): ScreenNode => ({ role: "radio", name: o, block: "segment", children: [], props: { checked: cur === o } });
+        return { role: "radiogroup", name: `${label}: ${cur === null || cur === undefined ? "none" : String(cur)}`, block: "segmented", children: opts.map(opt), props: { label, key } };
       }
       case "list":
         return buildList(b, scope, label);
@@ -217,9 +255,14 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
   };
 
   const children = (screen.body as Obj[]).map((b) => build(b, base())).filter(Boolean) as ScreenNode[];
-  const nav = s.navigation?.type === "tabs" && Array.isArray(s.navigation.items) ? (s.navigation.items as Obj[]) : [];
+  const asSheet = options.sheet === true || screen.presentation === "sheet";
+  const nav = !asSheet && s.navigation?.type === "tabs" && Array.isArray(s.navigation.items) ? (s.navigation.items as Obj[]) : [];
   const selectedTab = options.tab ?? screen.id;
-  if (options.canGoBack) children.unshift({ role: "button", name: "Back", block: "back", children: [] });
+  if (asSheet) {
+    const sheetTitle = str(screen.title ?? "", base()) || "Sheet";
+    const sheet: ScreenNode = { role: "dialog", name: sheetTitle, block: "sheet", children: [...children, { role: "button", name: "Close", block: "back", children: [] }] };
+    children.splice(0, children.length, sheet);
+  } else if (options.canGoBack) children.unshift({ role: "button", name: "Back", block: "back", children: [] });
   if (nav.length) {
     const tabs = nav.map((it): ScreenNode => {
       const target = s.screens.find((x: Obj) => x.id === it.screen);
@@ -271,7 +314,7 @@ export function toSnapshot(root: ScreenNode): string {
 
 /** Every node with no role or no name where one is needed (all except plain layout groups). */
 export function unlabelled(node: ScreenNode): ScreenNode[] {
-  const own = !node.role || (!node.name && !["group", "grid", "main"].includes(node.role)) ? [node] : [];
+  const own = !node.role || (!node.name && !["group", "grid", "main", "separator"].includes(node.role)) ? [node] : [];
   return [...own, ...node.children.flatMap(unlabelled)];
 }
 
@@ -305,6 +348,7 @@ const safeSrc = (u: string) => (/^(https:\/\/|data:image\/)/i.test(u) ? u : "");
 
 function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string): string {
   const gap = (g: unknown) => Math.round((GAPS[String(g ?? "md")] ?? GAPS.md!) * t.unit);
+  const ios = style === "ios";
   const node = (n: ScreenNode): string => {
     const a = `role="${n.role}"${n.name ? ` aria-label="${esc(n.name)}"` : ""}`;
     const pr = n.props ?? {};
@@ -336,6 +380,57 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
       case "badge": {
         const color = pr.tone === "danger" ? t.p.danger : pr.tone === "success" ? t.p.success : t.p.primary;
         return `<span ${a} style="display:inline-block;padding:2px 10px;border-radius:999px;background:${t.p.surface};color:${color};border:1px solid ${color};font:600 12px ${t.font}">${esc(pr.text)}</span>`;
+      }
+      case "section":
+        return `<section ${a} style="display:flex;flex-direction:column;gap:${gap("sm")}px"><h3 style="margin:0;font:${ios ? "600 13px" : "500 14px"} ${t.font};color:${t.p.muted};${ios ? "text-transform:uppercase;letter-spacing:.04em" : ""}">${esc(n.name)}</h3>${inner}</section>`;
+      case "card": {
+        const v = String(pr.variant);
+        const bg = v === "filled" ? t.p.surface : v === "outlined" ? "transparent" : t.p.background;
+        const border = v === "outlined" ? `1px solid ${t.dark ? "#ffffff33" : "#00000026"}` : "0";
+        const shadow = v === "plain" && !ios ? t.shadow : "none";
+        return `<div ${a} style="padding:${Math.round(16 * t.unit)}px;border-radius:${Math.round(t.radius * (ios ? 1.2 : 1.4))}px;background:${bg};border:${border};box-shadow:${shadow};display:flex;flex-direction:column;gap:${gap("sm")}px">${inner}</div>`;
+      }
+      case "divider":
+        return `<hr role="separator" style="width:100%;border:0;margin:0;${ios ? "margin-left:16px;height:0.5px" : "height:1px"};background:${t.dark ? "#ffffff22" : "#00000018"}">`;
+      case "stat": {
+        const hero = pr.variant === "hero";
+        const col = pr.trend === "down" ? t.p.danger : pr.trend === "up" ? t.p.success : t.p.muted;
+        const arrow = pr.trend === "down" ? "▼ " : pr.trend === "up" ? "▲ " : "";
+        return `<div ${a} style="display:flex;flex-direction:column;gap:2px"><span style="font:400 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(pr.label)}</span><span style="font:700 ${Math.round((hero ? 36 : 24) * t.scale)}px ${t.display};color:${t.p.text}">${esc(pr.value)}</span>${pr.delta ? `<span style="font:600 ${Math.round(13 * t.scale)}px ${t.font};color:${col}">${arrow}${esc(pr.delta)}</span>` : ""}</div>`;
+      }
+      case "progress": {
+        const pct = Number(pr.pct);
+        if (pr.shape === "ring") {
+          const sw = ios ? 4 : 6, r = 20 - sw / 2, c = +(2 * Math.PI * r).toFixed(2);
+          return `<svg ${a} aria-valuenow="${pct}" width="48" height="48" viewBox="0 0 40 40"><circle cx="20" cy="20" r="${r}" fill="none" stroke="${t.p.surface}" stroke-width="${sw}"/><circle cx="20" cy="20" r="${r}" fill="none" stroke="${t.p.primary}" stroke-width="${sw}" stroke-linecap="${ios ? "round" : "butt"}" stroke-dasharray="${+(c * pct / 100).toFixed(2)} ${c}" transform="rotate(-90 20 20)"/></svg>`;
+        }
+        const h = ios ? 6 : 4;
+        return `<div ${a} aria-valuenow="${pct}" style="height:${h}px;border-radius:${ios ? 999 : 2}px;background:${t.p.surface};overflow:hidden"><div style="width:${pct}%;height:100%;background:${t.p.primary}"></div></div>`;
+      }
+      case "toggle": {
+        const on = pr.checked === true;
+        const w = ios ? 51 : 52, h = ios ? 31 : 32, d = ios ? 27 : on ? 24 : 16, pad = ios ? 2 : on ? 4 : 8;
+        const track = on ? (ios ? t.p.success : t.p.primary) : ios ? (t.dark ? "#ffffff33" : "#78788033") : "transparent";
+        const border = ios || on ? "0" : `2px solid ${t.p.muted}`;
+        const thumb = ios || on ? "#FFFFFF" : t.p.muted;
+        return `<label style="display:flex;align-items:center;justify-content:space-between;min-height:44px;font:400 ${Math.round(16 * t.scale)}px ${t.font};color:${t.p.text}">${esc(pr.label)}<button type="button" role="switch" aria-checked="${on}" aria-label="${esc(pr.label)}" style="position:relative;box-sizing:border-box;width:${w}px;height:${h}px;border-radius:999px;border:${border};background:${track};padding:0"><span style="position:absolute;top:50%;left:${on ? w - d - pad : pad}px;transform:translateY(-50%);width:${d}px;height:${d}px;border-radius:50%;background:${thumb}"></span></button></label>`;
+      }
+      case "segmented": {
+        const wrap = ios
+          ? `display:flex;padding:2px;border-radius:${Math.round(t.radius * 0.8)}px;background:${t.dark ? "#ffffff1f" : "#7676801f"}`
+          : `display:flex;border:1px solid ${t.p.muted};border-radius:999px;overflow:hidden`;
+        return `<div ${a} style="display:flex;flex-direction:column;gap:4px"><span style="font:500 ${Math.round(14 * t.scale)}px ${t.font};color:${t.p.text}">${esc(pr.label)}</span><div role="presentation" style="${wrap}">${inner}</div></div>`;
+      }
+      case "segment": {
+        const on = pr.checked === true;
+        const own = ios
+          ? `border-radius:${Math.round(t.radius * 0.7)}px;background:${on ? (t.dark ? "#636366" : "#FFFFFF") : "transparent"};box-shadow:${on ? "0 1px 3px rgba(0,0,0,.2)" : "none"};font-weight:${on ? 600 : 400}`
+          : `border-left:1px solid ${t.p.muted};background:${on ? t.p.primary : "transparent"};color:${on ? t.p.background : t.p.text}`;
+        return `<button type="button" role="radio" aria-checked="${on}" style="flex:1;min-height:${ios ? 32 : 44}px;border:0;color:${t.p.text};font:500 ${Math.round(14 * t.scale)}px ${t.font};${own}">${esc(n.name)}</button>`;
+      }
+      case "sheet": {
+        const handle = `<div style="width:${ios ? 36 : 32}px;height:${ios ? 5 : 4}px;border-radius:999px;background:${t.p.muted};opacity:.5;margin:8px auto 12px"></div>`;
+        return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.4)"></div><div ${a} aria-modal="true" style="position:fixed;left:0;right:0;bottom:0;max-height:80vh;overflow:auto;box-sizing:border-box;padding:0 16px 24px;background:${t.p.background};border-radius:${ios ? 12 : 28}px ${ios ? 12 : 28}px 0 0;box-shadow:${t.shadow}">${handle}<h2 style="margin:0 0 12px;font:700 ${Math.round(20 * t.scale)}px ${t.display};color:${t.p.text}">${esc(n.name)}</h2><div style="display:flex;flex-direction:column;gap:${gap("md")}px">${inner}</div></div>`;
       }
       case "chart":
         return `<figure style="margin:0;padding:12px;background:${t.p.surface};border-radius:${t.radius}px">${chartSvg(pr.kind as ChartKind, pr.points as ChartPoint[], t.p, n.name, esc, t.font)}</figure>`;
@@ -382,7 +477,6 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
         return inner;
     }
   };
-  const ios = style === "ios";
   const bar = ios
     ? `<header style="padding:54px 16px 10px;text-align:center;font:600 17px ${t.font};color:${t.p.text}">${esc(root.name)}</header>`
     : `<header style="padding:40px 16px 14px;font:500 22px ${t.font};color:${t.p.text};background:${t.p.surface};box-shadow:${t.shadow}">${esc(root.name)}</header>`;

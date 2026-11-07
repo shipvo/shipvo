@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
-import { parseListening, firstTapRef, timings, table, measureRun } from "./run-time.mjs";
+import { parseListening, firstTapRef, timings, table, tableByPlatform, measureRun, main } from "./run-time.mjs";
 
 test("parseListening finds the phone URL", () => {
   assert.equal(parseListening("Building…\nSimulated Android phone at http://127.0.0.1:4123/  (Ctrl+C to stop)\n"), "http://127.0.0.1:4123/");
@@ -27,11 +27,12 @@ test("timings are relative to start and table has four rows", () => {
 });
 
 // A fake `shipvo run`: prints the ready line after a delay and serves the page. With delay -1 it never prints.
-function fakeCli(delayMs) {
+function fakeCli(delayMs, argvFile = null) {
   const d = mkdtempSync(join(tmpdir(), "fake-run-"));
   const cli = join(d, "cli.js");
   writeFileSync(cli, `
 import {createServer} from "node:http"; import {mkdirSync, writeFileSync} from "node:fs";
+${argvFile ? `import {writeFileSync as w} from "node:fs"; w(${JSON.stringify(argvFile)}, process.argv.slice(2).join(" "));` : ""}
 const s = createServer((q,r)=>r.end("<html></html>"));
 s.listen(0,"127.0.0.1",()=>{ const p=s.address().port;
   mkdirSync(".shipvo",{recursive:true}); writeFileSync(".shipvo/run.json", JSON.stringify({token:"t"}));
@@ -76,4 +77,41 @@ test("an empty first tree is not ready; ready is stamped once a ref shows up", a
   const rows = await measureRun({ ...f, timeoutMs: 20000, open: async () => () => {}, drive, poll: 20, now });
   assert.ok(calls >= 2);
   assert.ok(rows[2].ms >= Math.floor(secondAt - start), `ready at ${rows[2].ms} ms, second reply at ${secondAt - start}`);
+});
+
+test("tableByPlatform shows Android and iOS side by side", () => {
+  const a = timings({ start: 0, listening: 6860, ready: 7880, tapped: 8190 });
+  const i = timings({ start: 0, listening: 5000, ready: 6000, tapped: 6500 });
+  const lines = tableByPlatform({ android: a, ios: i }).split("\n");
+  assert.equal(lines.length, 6);
+  assert.equal(lines[0], "| step | Android (seconds since start) | iOS (seconds since start) |");
+  assert.equal(lines[5], "| first tap done | 8.19 | 6.50 |");
+});
+
+test("measureRun passes the platform to shipvo run", async () => {
+  const seen = join(mkdtempSync(join(tmpdir(), "argv-")), "args.txt");
+  const f = fakeCli(0, seen);
+  await measureRun({ ...f, platform: "ios", timeoutMs: 20000, open: async () => () => {}, drive: fakeDriver, poll: 20 });
+  assert.equal(readFileSync(seen, "utf8"), "run ios --no-open");
+});
+
+test("main keeps the Android numbers when iOS fails, then exits 1", async () => {
+  const out = join(mkdtempSync(join(tmpdir(), "rt-out-")), "run-time.json");
+  const rows = timings({ start: 0, listening: 1000, ready: 2000, tapped: 3000 });
+  const measure = async ({ platform }) => { if (platform === "ios") throw new Error("boom"); return rows; };
+  const code = await main(["--out", out], { measure, init: () => ({ exit: 0 }) });
+  assert.equal(code, 1);
+  assert.deepEqual(JSON.parse(readFileSync(out, "utf8")), { android: rows });
+});
+
+test("main exits 0 and writes both platforms when both pass", async () => {
+  const out = join(mkdtempSync(join(tmpdir(), "rt-out-")), "run-time.json");
+  const rows = timings({ start: 0, listening: 1000, ready: 2000, tapped: 3000 });
+  const code = await main(["--out", out], { measure: async () => rows, init: () => ({ exit: 0 }) });
+  assert.equal(code, 0);
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(out, "utf8"))), ["android", "ios"]);
+});
+
+test("main rejects an unknown --platform with exit 2", async () => {
+  assert.equal(await main(["--platform", "web"], { init: () => assert.fail("must not scaffold") }), 2);
 });
