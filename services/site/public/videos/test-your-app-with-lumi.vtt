@@ -1,0 +1,181 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:03.412
+Your app is on a phone, and something is wrong.
+
+2
+00:00:03.412 --> 00:00:04.776
+A button does nothing.
+
+3
+00:00:04.776 --> 00:00:06.015
+You did not find it.
+
+4
+00:00:06.015 --> 00:00:07.750
+Lumi did, while you watched.
+
+5
+00:00:09.500 --> 00:00:14.068
+By the end, Lumi has tested your app, and you have replayed one problem.
+
+6
+00:00:14.068 --> 00:00:17.050
+You need no AI account, and you write no code.
+
+7
+00:00:18.650 --> 00:00:21.270
+Open a terminal in your app folder.
+
+8
+00:00:21.270 --> 00:00:24.114
+Type npx shipvo lumi, and press Enter.
+
+9
+00:00:24.114 --> 00:00:26.884
+Shipvo builds a web copy of your app.
+
+10
+00:00:26.884 --> 00:00:28.605
+For an iPhone, add ios.
+
+11
+00:00:28.605 --> 00:00:31.150
+Android and iOS work the same way.
+
+12
+00:00:32.750 --> 00:00:34.100
+Your browser opens.
+
+13
+00:00:34.100 --> 00:00:35.876
+The phone is on the left.
+
+14
+00:00:35.876 --> 00:00:38.078
+Lumi's sidebar is on the right.
+
+15
+00:00:38.078 --> 00:00:39.783
+Findings starts at zero.
+
+16
+00:00:39.783 --> 00:00:41.275
+Now, give Lumi a job.
+
+17
+00:00:43.750 --> 00:00:46.038
+Type, test my app, and press Enter.
+
+18
+00:00:46.038 --> 00:00:49.306
+Lumi taps through your app, from the start screen.
+
+19
+00:00:49.306 --> 00:00:52.574
+A caption names each step, like, Tapping Checkout.
+
+20
+00:00:52.574 --> 00:00:54.600
+The sidebar lists every action.
+
+21
+00:00:56.750 --> 00:00:58.177
+Now look at Findings.
+
+22
+00:00:58.177 --> 00:01:00.623
+Each one is something Lumi reported.
+
+23
+00:01:00.623 --> 00:01:02.458
+A button that does nothing.
+
+24
+00:01:02.458 --> 00:01:04.225
+A screen that stays blank.
+
+25
+00:01:04.225 --> 00:01:05.992
+A network call that fails.
+
+26
+00:01:05.992 --> 00:01:07.895
+Each problem is listed once.
+
+27
+00:01:07.895 --> 00:01:11.700
+Coverage shows how many screens and controls Lumi tried.
+
+28
+00:01:13.300 --> 00:01:15.173
+Here is the part that matters.
+
+29
+00:01:15.173 --> 00:01:17.108
+Press Replay next to a finding.
+
+30
+00:01:17.108 --> 00:01:19.792
+The phone repeats the steps that led to it.
+
+31
+00:01:19.792 --> 00:01:23.225
+You watch the problem happen again, with your own eyes.
+
+32
+00:01:24.825 --> 00:01:26.160
+Want a harder test?
+
+33
+00:01:26.160 --> 00:01:28.548
+Type, try checkout with bad input.
+
+34
+00:01:28.548 --> 00:01:31.640
+Lumi runs the same path with invalid values.
+
+35
+00:01:31.640 --> 00:01:35.925
+A finding here means your app accepted what it should refuse.
+
+36
+00:01:37.525 --> 00:01:38.111
+Fixed it?
+
+37
+00:01:38.111 --> 00:01:38.698
+Prove it.
+
+38
+00:01:38.698 --> 00:01:40.326
+Stop Lumi with Ctrl+C.
+
+39
+00:01:40.326 --> 00:01:42.737
+Start it again with --seed 1.
+
+40
+00:01:42.737 --> 00:01:47.428
+The same seed gives the same walk, so you can check that the fix worked.
+
+41
+00:01:47.428 --> 00:01:52.900
+And Save as test turns a finding into a test file that fails while the bug is there.
+
+42
+00:01:54.500 --> 00:01:55.274
+That is it.
+
+43
+00:01:55.274 --> 00:01:57.808
+Lumi tests your app while you watch.
+
+44
+00:01:57.808 --> 00:02:00.553
+Try npx shipvo lumi in your app folder.
+
+45
+00:02:00.553 --> 00:02:03.650
+The guide is at shipvo.dev/learn.
