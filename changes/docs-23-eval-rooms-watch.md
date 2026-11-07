@@ -1,0 +1,2 @@
+- Docs: the agents page now covers rooms, the richer `list_sessions` and the `/watch` page; the eval page is linked from "Grading an agent".
+- Migration: none.
