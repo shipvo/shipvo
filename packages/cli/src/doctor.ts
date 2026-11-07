@@ -6,6 +6,7 @@ import { portFree } from "./sim.js";
 import { args as parseArgs } from "./config.js";
 import { b64, keyFromSeed } from "./index.js";
 import { installedHermesEngine, parseDeclared, parseEngine } from "./hermes.js";
+import { nodeRangeWarning } from "./node-range.js";
 import { emit, envelope, type Next } from "./json-out.js";
 
 type CheckResult = { name: string; ok: boolean; fix: string; note?: string };
@@ -124,6 +125,16 @@ export async function runDoctorChecks(overrides: Partial<DoctorDeps> = {}): Prom
     ok: Number.isInteger(nodeMajor) && nodeMajor >= 22,
     fix: "use Node 22 or newer (for example: `nvm use 22`)",
   });
+
+  // Warning only: passes, with the warning in the note. Skipped when expo is not installed.
+  try {
+    const expo = JSON.parse(deps.readText(join(deps.cwd, "node_modules", "expo", "package.json")));
+    const range = expo?.engines?.node;
+    if (typeof range === "string") {
+      const warn = nodeRangeWarning(deps.nodeVersion, range, `Expo ${parseMajor(String(expo.version))}`);
+      results.push({ name: "Node version fits Expo", ok: true, fix: "none", note: warn ? `warning: ${warn}` : `Node ${deps.nodeVersion} is in range` });
+    }
+  } catch {}
 
   const { cfg, parseCheck } = loadShipvoConfig(deps);
   results.push(parseCheck);
