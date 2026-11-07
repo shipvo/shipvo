@@ -1,0 +1,1 @@
+- chess: `pnpm --filter chess demo -- --agents` starts the Android and iOS phones as live runs for two MCP assistants, prints each side's config and prompt, enforces turn order and a move time limit, and `--record` records the game and writes a PGN. See `docs/demos/chess.md`.
