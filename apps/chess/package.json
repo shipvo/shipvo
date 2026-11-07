@@ -9,7 +9,8 @@
     "build": "tsc --noEmit -p tsconfig.json && PN_SIM=1 expo export --platform web --output-dir sim-dist --clear",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "sim": "shipvo sim"
+    "sim": "shipvo sim",
+    "demo": "node demo/serve.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.8.0",
