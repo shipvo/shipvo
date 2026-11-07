@@ -78,8 +78,14 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Behaviour timeline.** A list in your app's admin page of every release and pull request check run, with its flows, findings and screens, so you can compare any two points. See [Behaviour timeline](timeline.md).
 
+**Agents setup.** `shipvo agents setup` gets your coding agent ready in one command: it writes the Shipvo MCP config for each coding agent it finds and copies the Shipvo skills into your project. See [Agents](agents.md).
+
+**Save as test.** A button in Lumi, and the `--save-tests` flag of `shipvo explore`, that turns a bug the walker found into a test file that fails until the bug is fixed. See [Lumi](lumi.md).
+
 **Build.** Turning your app's files into one copy that can run, here a web copy shown on a simulated phone. The first build is the slowest.
 
 **pnpm.** A tool that downloads the parts a project needs. You turn it on with `corepack enable`, which comes with Node.
 
 **Build id.** The short name Shipvo gives a copy of your app you uploaded for the hosted phone. You open it as `myapp@build:<id>`. It is private to you and deleted when it expires. See [Test your build on the hosted phone](test-your-build.md).
+
+**Room.** A name you give `open_app` so two phones share one backend, for example a buyer and a shop owner. See [Agents](agents.md#rooms-several-phones-one-backend).
