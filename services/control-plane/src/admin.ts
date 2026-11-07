@@ -58,6 +58,10 @@ td input{min-height:34px;padding:4px 8px}.num{width:110px}
 .ph .rail{display:flex;gap:10px;overflow-x:auto}.ph .tile{min-width:110px;display:grid;gap:4px;font-size:12px}.ph .thumb{height:90px;border-radius:8px;background:#151C1F;display:grid;place-items:center;color:#9BA7AC;font-weight:800;font-size:12px;text-transform:uppercase;background-size:cover;background-position:center}
 .ph .promo{display:flex;gap:8px;font-size:12px}.ph .promo b{min-width:64px}.ph .pbtn{border-radius:10px;padding:10px;text-align:center;font-weight:700;color:#fff}
 .ph .t-title{font-weight:700}.ph .t-caption{font-size:12px;color:#9BA7AC}
+.tl-pt{display:grid;gap:6px;border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--panel)}
+.tl-pair{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}.tl-pair figure{margin:0;display:grid;gap:4px;font-size:12px;color:var(--text2)}
+.tl-pair img{width:96px;height:auto;border:1px solid var(--border);border-radius:6px;background:var(--sunken)}
+.tl-bad{color:var(--bad);font-weight:700}.tl-ok{color:var(--ok);font-weight:700}
 .empty{padding:20px;text-align:center;color:var(--text2)}
 code,pre{font:13px ui-monospace,SFMono-Regular,Menlo,monospace}pre{background:var(--sunken);border-radius:8px;padding:12px;overflow:auto;margin:0}
 </style></head><body>
@@ -65,7 +69,7 @@ code,pre{font:13px ui-monospace,SFMono-Regular,Menlo,monospace}pre{background:va
 <div class="status"><span id="draftPill" class="pill">Loading…</span><span class="pill" id="livePill"></span>
 <button class="btn" id="discardBtn">Discard changes</button><button class="btn primary" id="publishBtn">Publish to phones</button></div></header>
 <nav role="tablist" aria-label="Sections">
-${["home:Home screen", "products:Products", "promos:Offers", "theme:Brand", "orders:Orders", "history:History", "agents:Agent access"].map((t, i) => { const [k, l] = t.split(":"); return `<button role="tab" data-tab="${k}" aria-selected="${i === 0}">${l}</button>`; }).join("")}
+${["home:Home screen", "products:Products", "promos:Offers", "theme:Brand", "orders:Orders", "history:History", "timeline:Timeline", "agents:Agent access"].map((t, i) => { const [k, l] = t.split(":"); return `<button role="tab" data-tab="${k}" aria-selected="${i === 0}">${l}</button>`; }).join("")}
 </nav>
 <main><div id="panel"></div><div class="previewcol"><div class="phone" aria-label="Live preview of the draft"><div class="ph" id="preview"></div></div>
 <p class="muted" style="text-align:center">Preview of the draft. Publish to send it to phones.</p></div></main>
@@ -104,7 +108,7 @@ function renderPreview(){if(!draft)return;const c=draft,acc=c.theme.accent,p=[];
 
 function render(){const P=$("#panel");if(!draft){P.innerHTML='<div class="empty">Loading…</div>';return}
  if(tab==="home")return renderHome(P);if(tab==="products")return renderProducts(P);if(tab==="promos")return renderPromos(P);
- if(tab==="theme")return renderTheme(P);if(tab==="orders")return renderOrders(P);if(tab==="history")return renderHistory(P);renderAgents(P)}
+ if(tab==="theme")return renderTheme(P);if(tab==="orders")return renderOrders(P);if(tab==="history")return renderHistory(P);if(tab==="timeline")return renderTimeline(P);renderAgents(P)}
 
 const BLOCK_FIELDS={hero:[["title","text"],["body","textarea"],["color","color"]],banner:[["text","text"],["tone","select:info,success,warning,critical"]],departments:[["title","text"]],
  product_rail:[["title","text"],["limit","number"],["filter.department","dept"],["filter.water","select:,salt,fresh"],["filter.tag","text"],["filter.max_price","number"],["filter.in_stock_only","checkbox"]],
@@ -158,6 +162,18 @@ async function renderHistory(P){P.innerHTML='<section><h2>History</h2><div class
  const v=await cmd("list_versions");if(v?.ok)$("#vl").innerHTML=v.result.length?'<table><thead><tr><th>Version</th><th>Published</th><th>By</th><th>Note</th><th></th></tr></thead><tbody>'+v.result.map(x=>'<tr><td>v'+x.version+'</td><td class="muted">'+new Date(x.published_at).toLocaleString()+'</td><td>'+h(x.published_by)+'</td><td>'+h(x.note||"")+'</td><td><button class="btn sm" data-v="'+x.version+'">Restore to draft</button></td></tr>').join("")+'</tbody></table>':'<div class="empty">Nothing published yet.</div>';
  P.querySelectorAll("[data-v]").forEach(b=>b.onclick=async()=>{await cmd("restore_version",{version:Number(b.dataset.v)});toast("v"+b.dataset.v+" loaded into the draft. Publish to make it live.");refresh()});
  const a=await cmd("audit_log");if(a?.ok)$("#al").innerHTML=a.result.length?'<table><tbody>'+a.result.map(x=>'<tr><td class="muted">'+new Date(x.at).toLocaleString()+'</td><td>'+h(x.actor)+'</td><td><code>'+h(x.command)+'</code></td><td>'+(x.ok?"✓":"✗")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No changes yet.</div>'}
+async function renderTimeline(P){P.innerHTML='<section><h2>Behaviour timeline</h2><p class="muted">Every release and pull request check run: flows, explore findings and screens. Pick two points to see what changed on Android and iOS.</p><div class="card" id="tl"><div class="empty">Loading…</div></div><div id="tlc"></div></section>';
+ const r=await fetch("/app/"+APP+"/timeline.json");if(!r.ok){$("#tl").innerHTML='<div class="empty">Could not load the timeline.</div>';return}
+ const pts=(await r.json()).points;const sel=[];
+ $("#tl").innerHTML=pts.length?pts.map(p=>{const bad=p.flows.filter(f=>f.status==="failed").length;return '<label class="tl-pt"><span class="row"><input type="checkbox" style="width:auto;min-height:0" data-pt="'+p.id+'" aria-label="Select '+h(p.id)+'"><b>'+(p.kind==="pr"?"Pull request #":"Release ")+p.number+'</b><span class="muted">'+new Date(p.time).toLocaleString()+' · '+p.platforms.join(" + ")+'</span></span><span>'+(p.flows.length-bad)+' passed, <span class="'+(bad?"tl-bad":"")+'">'+bad+' failed</span> · '+p.findings.length+' findings · '+p.screens.length+' screens</span><span class="tl-pair">'+p.screens.map(s=>'<figure><img src="'+h(s.thumb)+'" alt="'+h(s.name)+' on '+s.platform+'">'+h(s.name)+'</figure>').join("")+(p.findings.length?'</span><span class="muted">'+p.findings.map(f=>h(f.title)).join("; "):'')+'</span></label>'}).join(""):'<div class="empty">No test results uploaded yet. Run shipvo test --report with --upload.</div>';
+ P.querySelectorAll("[data-pt]").forEach(cb=>cb.onchange=async()=>{const i=sel.indexOf(cb.dataset.pt);if(cb.checked&&i<0)sel.push(cb.dataset.pt);if(!cb.checked&&i>=0)sel.splice(i,1);
+  while(sel.length>2){const o=sel.shift();P.querySelector('[data-pt="'+o+'"]').checked=false}
+  if(sel.length<2){$("#tlc").innerHTML="";return}
+  const c=await fetch("/app/"+APP+"/timeline/compare?from="+sel[0]+"&to="+sel[1]);if(!c.ok){$("#tlc").innerHTML='<div class="card">Could not compare.</div>';return}
+  const d=await c.json();const pair=s=>'<figure>'+(s.before?'<img src="'+h(s.before)+'" alt="Before">':'<span>none</span>')+'Before</figure><figure>'+(s.after?'<img src="'+h(s.after)+'" alt="After">':'<span>none</span>')+'After</figure>';
+  $("#tlc").innerHTML='<div class="card"><h3>'+h(d.from)+' to '+h(d.to)+'</h3><h4>Flows that changed</h4>'+(d.flows.length?'<table><tbody>'+d.flows.map(f=>'<tr><td>'+h(f.name)+'</td><td>'+h(f.before)+' to '+h(f.after)+'</td></tr>').join("")+'</tbody></table>':'<p class="muted">No flow changed result.</p>')+
+   '<h4>Explore findings</h4><p>'+(d.findings.added.map(t=>'New: '+h(t)).concat(d.findings.removed.map(t=>'Gone: '+h(t))).join("<br>")||'<span class="muted">No change.</span>')+'</p>'+
+   ["android","ios"].map(pl=>'<h4>'+(pl==="ios"?"iOS":"Android")+' screens that look different</h4>'+(d.screens.filter(s=>s.platform===pl).map(s=>'<div><b>'+h(s.name)+'</b><div class="tl-pair">'+pair(s)+'</div></div>').join("")||'<p class="muted">No screen changed.</p>')).join("")+'</div>'})}
 async function renderAgents(P){const r=await fetch("/app/"+APP+"/api/describe");const d=await r.json();const base=location.origin+"/app/"+APP+"/api";
  const ap=await (await fetch(base+"/approvals")).json();const want=new URLSearchParams(location.search).get("approve");
  const pend='<div class="card"><h3>Waiting for your approval</h3>'+((ap.approvals||[]).length?(ap.approvals).map(x=>'<div style="border-top:1px solid var(--border);padding:10px 8px;border-radius:8px'+(x.id===want?';background:var(--sunken);border:2px solid var(--accent)':'')+'">'+(x.id===want?'<span class="tag">Opened from your link</span><br>':'')+'<b>'+h(x.requester)+'</b> wants to run <code>'+h(x.command)+'</code>:<ul>'+x.plan.map(l=>'<li>'+h(l)+'</li>').join("")+'</ul><span class="muted">Expires '+new Date(x.expires_at).toLocaleTimeString()+'. Works once.</span> <div class="row" style="margin-top:8px"><button class="btn primary" style="min-height:44px" data-ap="approve" data-id="'+h(x.id)+'">Approve</button> <button class="btn" style="min-height:44px" data-ap="deny" data-id="'+h(x.id)+'">Deny</button></div></div>').join(""):'<div class="empty">Nothing is waiting.</div>')+'<p class="muted">Agent policy "ask" (the default): agents cannot approve their own actions. Policy "allow" means agents act without asking.</p></div>';

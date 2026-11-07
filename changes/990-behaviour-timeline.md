@@ -1,0 +1,3 @@
+- control-plane: new Timeline tab in the app admin lists every release and pull request check run with its flows, explore findings and screen thumbnails, and compares any two points for Android and iOS.
+- control-plane: test reports accept optional `findings` and `screens` (small image data URLs); new `POST /r/:app/pr/:n/tests` stores pull request runs.
+- Migration: none; the new fields are optional.
