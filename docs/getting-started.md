@@ -120,6 +120,8 @@ npx expo run:android          # or: npx eas build -p android
 
 The shell contains your public key and control plane URL as manifest meta-data; nothing delivered over the air can change them. The embedded bundle is the first release; every later one is a signed download. On iOS the same runtime verifies and applies releases published with `shipvo publish --platform ios` (or `all`); iOS downloads full bundles, not patches, for now.
 
+On iOS, a scene-based host app (`UIApplicationSceneManifest` and a scene delegate) runs in CI on the iOS Simulator and checks trial boots, `markHealthy` and rollback: job `scene-host` in `.github/workflows/ios-runtime.yml`, source in `packages/runtime/ios-scene-host/`.
+
 ## 5. Publish over the air
 
 **Hosted control plane (the default).** Sign in once and register the app:
