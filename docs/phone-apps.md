@@ -137,7 +137,7 @@ How it works:
 2. You read the permissions and open the approve or decline link yourself. You must be signed in. The assistant cannot approve, and nothing is installed until you do.
 3. Ask the assistant to call `list_installed_apps` to see the app on the phone.
 
-A card expires after 15 minutes. An expired or declined card installs nothing, and a card can be decided once. Permissions come from the published app, never from what the assistant says. This is not `install_app`, which installs into a simulator session only.
+A card expires after 15 minutes. An expired or declined card installs nothing, and a card can be decided once. Permissions come from the published app, never from what the assistant says. `install_app` installs into a simulator session only.
 
 Test: `services/control-plane/test/phone-install.test.ts`.
 

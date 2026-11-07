@@ -31,13 +31,13 @@ Someone could register many fake installs and send failure reports to stop a goo
 - **Fresh installs.** More than half of the failing installs registered in the last hour.
 - **Burst.** At least 10 failure reports in the last 10 minutes, and more than 5 times the app's normal rate for 10 minutes. This needs some history for the app.
 
-If either is true, the release is **not** halted. It stays at its band and a pending hold appears in `shipvo approvals list` and in the app admin, with the reason (`fresh_installs` or `burst`). You decide:
+If either is true, the release is **not** halted. It stays at its band and a hold appears in the app admin under **Waiting for your approval**, with the reason (`fresh_installs` or `burst`). You decide in the admin:
 
-1. Run `shipvo approvals list` and find the hold for the release.
-2. Look at the release and its reports in the app admin.
-3. Confirm the hold to halt the release, or dismiss it to keep the release running.
+1. Open the app admin and find the hold for the release.
+2. Look at the release and its reports.
+3. Select **Approve** to halt the release, or **Deny** to keep it running.
 
-Confirming needs a signed-in person (`shipvo login`). A publish token or an assistant cannot decide. Confirming writes the halt and an audit row. There is one pending hold per release. When the failing installs are older than an hour and there is no burst, the release halts at once as before.
+Deciding needs a person signed in to the admin. A publish token or an assistant cannot decide. Approve writes the halt and an audit row. There is one hold per release. Deny is remembered for that release, so the same release is not held again. If nobody decides within 10 minutes, the hold expires and the release keeps running; the next failure report can raise a new hold. When the failing installs are older than an hour and there is no burst, the release halts at once as before.
 
 Test: `services/control-plane/test/halt-hold.test.ts`.
 
