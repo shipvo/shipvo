@@ -311,6 +311,8 @@ g.__pnDevice = {
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
+  /** Set the URL `Linking.getInitialURL()` returns for this load. `null` clears it. */
+  setInitialUrl(url: string | null) { initialUrl = url ?? null; },
   capabilities: () => device.capabilities(),
   /** What the status bar shows: network, airplane and battery. */
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
@@ -319,7 +321,7 @@ g.__pnDevice = {
     const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey();
     Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: (profile?.platform ?? state.platform) === "android" && (profile?.api ?? state.api) < 33 ? "granted" : "undetermined" },
       source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
-    recent.length = 0; seq = 0;
+    recent.length = 0; seq = 0; initialUrl = null;
     announceSystem(sk, false); announceStatus(before, false, bs); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline()));
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
@@ -354,5 +356,12 @@ function deliverUrl(url: string): boolean | Promise<boolean> {
   return urlSubs.size > 0;
 }
 export const openUrl = async (url: string) => { deliverUrl(url); };
+let initialUrl: string | null = null;
+/** The `Linking` API of a phone, backed by the simulated device. `openURL` goes through `openUrl`; its log entry is marked simulated. */
+export const Linking = {
+  async getInitialURL(): Promise<string | null> { return initialUrl; },
+  addEventListener(type: "url", cb: (e: { url: string }) => void) { const f = (url: string) => cb({ url }); urlSubs.add(f); return { remove: () => { urlSubs.delete(f); } }; },
+  async openURL(url: string): Promise<void> { await deliverUrl(url); },
+};
 // UI-owned bridges exist on native; on the simulated device the sheets are the UI, so they resolve immediately.
 export const scanBridge = { subscribe: () => () => {}, current: () => null, finish: () => {} };
