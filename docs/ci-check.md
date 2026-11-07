@@ -1,6 +1,8 @@
 # Check every pull request
 
-Shipvo can build your app, run your flows and walk every button on each pull request. A failing flow or a crash fails the check. Exploration notes do not.
+This page is for anyone who owns a Shipvo app on GitHub and wants every pull request tested before it merges. You get one check that builds the app, runs your flows, walks the screens that changed on Android and iOS, and posts one comment with the result. A failing flow or a crash fails the check. Exploration notes do not.
+
+If you are not technical, paste the three setup commands below to your coding agent and ask it to open a pull request. After that the check runs by itself.
 
 ## Set up
 
@@ -62,3 +64,21 @@ With `--before-shots <dir> --after-shots <dir>` (each laid out as `<dir>/android
 On a public repository the workflow's token uploads the images to the `shipvo-media` branch of your own repository, so the workflow needs `contents: write`. The comment shows the images inline. Each push uploads its own copies, and the comment is updated in place. A file that is already there counts as uploaded only when it holds the same bytes.
 
 On a private repository, or when the repository cannot be read, nothing is uploaded. The comment lists the file names for each screen and skin, and the images are in the folders you passed to `--before-shots` and `--after-shots`. Upload those folders as an artifact in your workflow to keep them.
+
+## Troubleshooting
+
+| You see | Why | What to do |
+| --- | --- | --- |
+| No comment appears on the pull request | The workflow lacks `pull-requests: write`, or the pull request comes from a fork (the token is read-only there). The check still runs. | Add `pull-requests: write` to the workflow permissions. For forks, read the result in the job log. |
+| The log says it is walking the whole app, not only changed screens | The checkout has no history (`fetch-depth: 0` is missing), or `app.json` has no `expo.scheme`. | Keep `fetch-depth: 0` as in the generated workflow, and set `expo.scheme`. |
+| "Compared with base" is missing | The base report is missing or unreadable, or the base commit could not be checked out. The log says which. | Fix the base build. The check does not fail for this. |
+| The check fails on a flow you did not touch | A flaky flow passed on base and failed on the pull request. | Re-run the job. If it fails again, it is a real regression: read the first failing step in the comment. |
+| Before and after images are file names, not pictures | The repository is private, so nothing is uploaded. | Upload `shipvo-shots-before/` and `shipvo-shots-after/` as an artifact, or open the `shipvo-check` artifact. |
+| A changed screen is not in the screenshots | Dynamic screens such as `[id]` and layouts are skipped, and only four screens are captured. | Add the screen as a flow in `tests/`. |
+
+## Next steps
+
+- [Test your app in CI](testing.md): write the flows the check runs.
+- [Agents](agents.md): what `shipvo explore` looks for.
+- [Lumi](lumi.md): turn a finding into a test with Save as test.
+- [Glossary](glossary.md)

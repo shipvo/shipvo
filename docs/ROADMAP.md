@@ -72,6 +72,19 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-07: Two assistants play a full chess game on an Android phone and an iPhone through `@shipvo/mcp`, and `--record` saves the game ([Chess on two phones](demos/chess.md), #1166)
+- 2026-11-07: `open_app` takes `platform` and `show` and starts or switches the phone in your browser ([Agents](agents.md), #1163)
+- 2026-11-07: `shipvo agents setup` writes the Shipvo MCP config for every coding agent ([Agents](agents.md), #1156)
+- 2026-11-07: Network off blocks the app's network calls in simulator and MCP sessions, Android and iOS ([Device API](device-api.md), #1161)
+- 2026-11-07: A cancelled payment comes back as `cancelled` ([Device API](device-api.md), #1158)
+- 2026-11-07: `open_url` and `Linking.openURL` deliver links to the app that owns them, once ([Phone apps](phone-apps.md), #1132, #1140)
+- 2026-11-07: App spec blocks: charts (line, area, bar, donut), stat, progress, card, section, toggle, segmented and sheet navigation ([App spec](design/app-spec.md), #1129, #1134)
+- 2026-11-07: `shipvo ci shots` captures Android and iOS on base and head ([Check every pull request](ci-check.md), #1126)
+- 2026-11-07: `shipvo explore --save-tests` and Save as test in Lumi ([Lumi](lumi.md), #1085)
+- 2026-11-07: Notes and Tasks, the first first-party spec app on Shipvo Phone ([Phone apps](phone-apps.md), #1088)
+- 2026-11-07: Self-hosted control plane has `backup` and `restore` commands and an upgrade check ([Self-hosting](self-hosting.md), #1087)
+- 2026-11-07: `shipvo run` shows a Rebuilding line as soon as you save, and its start time is measured on Android and iOS ([Run on a phone](run.md), #1111, #1130)
+- 2026-11-07: iOS trial boots run under the UIScene lifecycle ([CLI guide](cli.md), #1103, #1113)
 - 2026-11-07: Live chess demo at [shipvo.dev/demos/chess](https://shipvo.dev/demos/chess/): an Android phone and an iPhone play in your browser, and you can take white ([Chess on two phones](demos/chess.md), #1168)
 - 2026-11-07: Behaviour timeline in the app admin compares releases and pull requests on Android and iOS ([Behaviour timeline](timeline.md), #1084)
 - 2026-11-07: `shipvo test --device agent-device` runs flows on a real emulator or simulator ([Test your app in CI](testing.md), #1041)
