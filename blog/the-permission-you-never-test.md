@@ -59,3 +59,5 @@ The Android and iOS permission systems differ in detail, and the simulator repro
 
 - Android Developers, [Request runtime permissions](https://developer.android.com/training/permissions/requesting).
 - Shipvo, [Test your app in CI](/docs/testing/) and [Device API](/docs/device-api/).
+
+Next: [Test the links that leave your app](/blog/test-links-that-leave-your-app/) covers payment pages, privacy policies and deep links in the phone Browser.
