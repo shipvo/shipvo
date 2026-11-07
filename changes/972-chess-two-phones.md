@@ -1,0 +1,1 @@
+- chess: `pnpm --filter chess demo` starts an Android phone and an iOS phone side by side on the chess app, with a move timer per side and an optional `--autoplay` full game. See `docs/demos/chess.md`.
