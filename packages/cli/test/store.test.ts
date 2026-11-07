@@ -257,7 +257,7 @@ describe("store screenshots --mode frames", () => {
         if (req.url === "/session" && b.width) (srv as any).size = { w: b.width, h: b.height };
         const sz = (srv as any).size ?? { w: 100, h: 100 };
         const data = req.url === "/act" && b.action === "screenshot" ? Buffer.from(encodePng({ width: sz.w, height: sz.h, rgb: new Uint8Array(sz.w * sz.h * 3).fill(180) })).toString("base64") : undefined;
-        res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ ok: true, data }));
+        res.setHeader("content-type", "application/json"); res.setHeader("connection", "close"); res.end(JSON.stringify({ ok: true, data }));
       });
     });
     await new Promise<void>((r) => srv.listen(0, r));
@@ -284,7 +284,7 @@ describe("store screenshots --mode frames", () => {
       req.on("end", () => {
         const b = JSON.parse(body || "{}");
         const data = req.url === "/act" && b.action === "screenshot" ? Buffer.from(jpeg(100, 100)).toString("base64") : undefined;
-        res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ ok: true, data }));
+        res.setHeader("content-type", "application/json"); res.setHeader("connection", "close"); res.end(JSON.stringify({ ok: true, data }));
       });
     });
     await new Promise<void>((r) => srv.listen(0, r));
