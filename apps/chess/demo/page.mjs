@@ -22,12 +22,18 @@ h1{font-size:16px;margin:10px 16px 0}
 .clock{font:600 22px ui-monospace,monospace;padding:2px 10px;border-radius:8px;background:#fff}
 .clock.running{background:#111;color:#fff}
 iframe{flex:1;border:0;width:100%;min-height:0;background:#e8eaed}
+@media (max-width:700px){.row{flex-direction:column;overflow:auto}.side{min-height:480px;flex:none}}
+@media (prefers-color-scheme:dark){
+html,body{background:#14161a;color:#e8eaed}
+.clock{background:#2a2e35;color:#e8eaed}
+.clock.running{background:#e8eaed;color:#111}
+iframe{background:#14161a}}
 </style></head><body>
 <h1>Chess on Android and iOS (simulated)</h1>
 <div id="status" role="status" data-part="game-status">Waiting for both phones</div>
 <div class="row">
-<section class="side" data-side="white"><h2><span>Android plays white</span><span class="clock" id="clock-white" data-part="clock-white" aria-label="White clock">0:00</span></h2><iframe id="phone-white" title="Android phone, white" src="${android}"></iframe></section>
-<section class="side" data-side="black"><h2><span>iOS plays black</span><span class="clock" id="clock-black" data-part="clock-black" aria-label="Black clock">0:00</span></h2><iframe id="phone-black" title="iOS phone, black" src="${ios}"></iframe></section>
+<section class="side" data-side="white"><h2><span>Android plays white</span><span class="clock" id="clock-white" data-part="clock-white" role="timer" aria-label="White clock">0:00</span></h2><iframe id="phone-white" title="Android phone, white" src="${android}"></iframe></section>
+<section class="side" data-side="black"><h2><span>iOS plays black</span><span class="clock" id="clock-black" data-part="clock-black" role="timer" aria-label="Black clock">0:00</span></h2><iframe id="phone-black" title="iOS phone, black" src="${ios}"></iframe></section>
 </div>
 <script>
 ${clockSource()}

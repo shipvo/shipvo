@@ -22,6 +22,7 @@ export function linkToTop(store: ChessStore, win: LinkWindow): () => void {
   if (!top) return () => {};
   const report = () => {
     const b = store.get_board();
+    // "*" is fine: the message holds only move strings, and the app also loads on a plain `shipvo run` page.
     top.postMessage({ type: "chess:moves", moves: b.moves, over: b.status.state !== "playing" }, "*");
   };
   const onMessage = (e: { data: unknown; source: unknown }) => {
