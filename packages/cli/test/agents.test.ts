@@ -83,7 +83,7 @@ describe(".mcp.json", () => {
 describe("flags", () => {
   it("--dry-run writes nothing; --json prints changes and the skill line", async () => {
     const log = quiet(); const d = tmp();
-    expect(await agentsCmd(["setup", "--dry-run", "--json"], d)).toBe(0);
+    expect(await agentsCmd(["setup", "--dry-run", "--json"], d, d, "")).toBe(0);
     expect(existsSync(join(d, "AGENTS.md"))).toBe(false);
     const j = JSON.parse(String(log.mock.calls[0][0]));
     expect(j.dry_run).toBe(true); expect(j.changes.map((c: any) => c.action)).toEqual(["create", "create"]);
