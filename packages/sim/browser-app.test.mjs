@@ -13,7 +13,7 @@ import { pickPort } from "./test-port.mjs";
 import { renderBrowserApp } from "./browser-app.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(9900, 300);
+const PORT = pickPort(7600, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-ba-")); const dist = join(root, "dist");
 let proc, web, base;
 const APP = `<!doctype html><title>app</title><h1 id=h>Home</h1><script>

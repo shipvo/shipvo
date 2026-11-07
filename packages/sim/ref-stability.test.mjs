@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { cases, ONE, TWO } from "./ref-stability.cases.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(4600, 300);
+const PORT = pickPort(8800, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-refs-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc;

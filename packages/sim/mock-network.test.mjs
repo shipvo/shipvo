@@ -11,7 +11,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(5200, 300);
+const PORT = pickPort(7900, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-mock-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc, backend, backendUrl;

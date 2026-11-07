@@ -10,7 +10,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(8900, 300);
+const PORT = pickPort(8200, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-root-"));
 const dist = join(root, "dist");
 let proc;

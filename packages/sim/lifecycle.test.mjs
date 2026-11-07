@@ -33,7 +33,7 @@ test("the frame draws power, volume, lock, boot and menu parts", () => {
 });
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(7700, 300);
+const PORT = pickPort(7000, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-life-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc;
