@@ -159,9 +159,9 @@ export function skillStatus(dir: string): { package: string; name: string; synce
 type Change = { file: string; action: "create" | "update" | "unchanged" | "skip"; note?: string };
 
 /** `shipvo agents setup [--dry-run] [--json]`. Exit 0 done, 2 error. */
-export async function agentsCmd(argv: string[], dir = process.cwd(), home = homedir(), pathVar = process.env.PATH, deps: { run?: (cmd: string, args: string[], cwd: string) => void } = {}): Promise<number> {
+export async function agentsCmd(argv: string[], dir = process.cwd(), home = homedir(), pathVar = process.env.PATH, deps: { run?: (cmd: string, args: string[], cwd: string) => void; creds?: () => { key: string; mcp_url: string } | null; login?: () => Promise<{ key: string; mcp_url: string } | null> } = {}): Promise<number> {
   const [sub, ...rest] = argv;
-  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--for <names>] [--all] [--global] [--npx] [--dry-run] [--json]"); return 2; }
+  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--for <names>] [--all] [--global] [--npx] [--hosted] [--dry-run] [--json]"); return 2; }
   const only = sub === "skills-sync";
   const a = args(rest);
   const dry = a["dry-run"] !== undefined, json = a.json !== undefined;
@@ -182,6 +182,12 @@ export async function agentsCmd(argv: string[], dir = process.cwd(), home = home
   const unknown = [...forced].filter((n) => !TARGETS.some((t) => t.id === n));
   if (unknown.length) { console.error(`Unknown agent: ${unknown.join(", ")}. Known: ${TARGETS.map((t) => t.id).join(", ")}.`); return 2; }
   const all = a.all !== undefined, global = a.global !== undefined;
+  if (a.hosted !== undefined && !only) {
+    const { hostedSetup } = await import("./agents-hosted.js");
+    const lg = deps.login ?? (async () => { const l = await import("./login.js"); return l.loginForKey(json); });
+    const sc = deps.creds ? deps.creds() : (await import("./login.js")).savedCreds();
+    return hostedSetup({ dir, home, pathVar, dry, json, all, forced, creds: sc, login: lg });
+  }
   type AgentResult = { agent: string; name: string; action: "written" | "up-to-date" | "printed" | "not-found" | "skipped"; file?: string; note?: string; block?: string };
   const agentResults: AgentResult[] = [];
   const homeFile = (f: string) => f.startsWith("~/") ? join(home, f.slice(2)) : f;
