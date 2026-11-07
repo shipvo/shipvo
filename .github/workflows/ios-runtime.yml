@@ -49,6 +49,73 @@ jobs:
         if: always()
         run: grep -E "Executed|error:|failed" "$RUNNER_TEMP/swift-test.log" | tail -20 | tee -a "$GITHUB_STEP_SUMMARY"
 
+  # Escalations #1102 and #1106 (issue #1100). A scene-based (UIApplicationSceneManifest + SceneDelegate) host app
+  # proves trial boots under the UIScene lifecycle. The host and its test live in packages/runtime/ios-scene-host/
+  # (product code the engineers own; not under ios-tests/, which SwiftPM compiles as the swift-tests target).
+  # Contract: this job builds the CLI, starts the fixture server on 8099, selects the newest Xcode and boots a
+  # simulator, then runs `bash packages/runtime/ios-scene-host/run.sh` with SIM_UDID, SHIPVO_FIXTURE_BASE,
+  # SHIPVO_FIXTURE_DIR and OUT_DIR set. run.sh builds and runs the host and exits non-zero on any failed case.
+  # It runs on PRs too (only when the host exists), so the PR that adds it is proven on its own head.
+  scene-host-detect:
+    runs-on: ubuntu-latest
+    outputs:
+      present: ${{ steps.d.outputs.present }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: packages/runtime/ios-scene-host }
+      - id: d
+        run: |
+          if [ -f packages/runtime/ios-scene-host/run.sh ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; echo "No scene host yet; skipping." >> "$GITHUB_STEP_SUMMARY"; fi
+
+  scene-host:
+    needs: [swift-tests, scene-host-detect]
+    if: needs.scene-host-detect.outputs.present == 'true'
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter "@shipvo/cli..." build
+      - name: Fake control plane (signed iOS pointers, good and bad)
+        run: |
+          node scripts/ios-fixture.mjs "$RUNNER_TEMP/fx"
+          (node scripts/ios-e2e/server.mjs "$RUNNER_TEMP/fx" 8099 "$RUNNER_TEMP/fx-server.log" > /dev/null 2>&1 &) && sleep 1
+          curl -sf http://127.0.0.1:8099/meta.json
+      - name: Use the newest Xcode
+        run: |
+          X=$(ls -d /Applications/Xcode_2[6-9]*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$X" ] && sudo xcode-select -s "$X/Contents/Developer"
+          xcodebuild -version
+      - name: Boot a simulator
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes available | grep -i "iOS" | tail -1 | grep -o "com.apple.CoreSimulator.SimRuntime.iOS-[0-9-]*")
+          DEVICE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-1[0-9]-*[A-Za-z]*" | head -1)
+          UDID=$(xcrun simctl create shipvo-scene "$DEVICE" "$RUNTIME")
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" && xcrun simctl bootstatus "$UDID" -b
+      - name: Scene host tests (packages/runtime/ios-scene-host/run.sh)
+        env:
+          SHIPVO_FIXTURE_BASE: http://127.0.0.1:8099
+          SHIPVO_FIXTURE_DIR: ${{ runner.temp }}/fx
+          OUT_DIR: ${{ runner.temp }}/scene-host
+        run: |
+          mkdir -p "$OUT_DIR"
+          bash packages/runtime/ios-scene-host/run.sh 2>&1 | tee "$OUT_DIR/run.log"; test ${PIPESTATUS[0]} -eq 0
+      - name: Summary
+        if: always()
+        run: tail -30 "$RUNNER_TEMP/scene-host/run.log" 2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-scene-host
+          path: |
+            ${{ runner.temp }}/scene-host
+            ${{ runner.temp }}/fx-server.log
+
   simulator-e2e:
     if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.e2e)
     needs: swift-tests
