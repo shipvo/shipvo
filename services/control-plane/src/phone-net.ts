@@ -46,7 +46,7 @@ export function isBlockedAddress(ip: string): boolean {
     const [o1, o2, o3] = a as [number, number, number, number];
     return o1 === 0 || o1 === 10 || o1 === 127 || o1 >= 224 || (o1 === 100 && o2 >= 64 && o2 <= 127) || (o1 === 169 && o2 === 254) || (o1 === 172 && o2 >= 16 && o2 <= 31)
       || (o1 === 192 && o2 === 168) || (o1 === 192 && o2 === 0 && o3 === 0) || (o1 === 192 && o2 === 0 && o3 === 2) || (o1 === 198 && (o2 === 18 || o2 === 19))
-      || (o1 === 198 && o2 === 51 && o3 === 100) || (o1 === 203 && o2 === 0 && o3 === 113);
+      || (o1 === 192 && o2 === 88 && o3 === 99) || (o1 === 198 && o2 === 51 && o3 === 100) || (o1 === 203 && o2 === 0 && o3 === 113);
   }
   const g = v6(ip); if (!g) return true;
   const mapped = g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff;   // ::ffff:a.b.c.d
@@ -54,7 +54,7 @@ export function isBlockedAddress(ip: string): boolean {
   if (mapped || nat64) return isBlockedAddress(`${g[6]! >> 8}.${g[6]! & 255}.${g[7]! >> 8}.${g[7]! & 255}`);
   if (g.slice(0, 7).every((x) => x === 0) && g[7]! <= 1) return true;   // :: and ::1
   if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0) return true;   // IPv4-compatible
-  return (g[0]! & 0xfe00) === 0xfc00 || (g[0]! & 0xffc0) === 0xfe80 || (g[0]! & 0xffc0) === 0xfec0 || (g[0]! & 0xff00) === 0xff00 || g[0] === 0x2001 && g[1] === 0x0db8 || g[0] === 0x2002;
+  return (g[0]! & 0xfe00) === 0xfc00 || (g[0]! & 0xffc0) === 0xfe80 || (g[0]! & 0xffc0) === 0xfec0 || (g[0]! & 0xff00) === 0xff00 || g[0] === 0x2001 && g[1] === 0x0db8 || g[0] === 0x2002 || (g[0] === 0x2001 && g[1] === 0);
 }
 
 /** Default resolver: DNS over HTTPS, A and AAAA. Throws when the name does not resolve. */
@@ -120,6 +120,11 @@ async function readCapped(res: Response, max: number): Promise<Uint8Array> {
   return out;
 }
 
+/** Deletes device_log rows older than the retention window. Called from the scheduled handler. */
+export async function pruneDeviceLog(db: D1Database, now = Date.now(), days = 30): Promise<void> {
+  await db.prepare("DELETE FROM device_log WHERE at < ?").bind(new Date(now - days * 86_400_000).toISOString()).run();
+}
+
 export function phoneNetRoutes(opts: { resolve?: Resolver; fetch?: typeof fetch } = {}) {
   const r = new Hono<{ Bindings: PhoneNetEnv & { POINTERS?: KVNamespace } }>();
   r.post("/net", async (c) => {
@@ -146,7 +151,8 @@ export function phoneNetRoutes(opts: { resolve?: Resolver; fetch?: typeof fetch 
 
     // Rate limit per session. Counted before any work, refusals included, so probing the allow-list costs budget too.
     const sess = await sha256((c.req.header("authorization") ?? "").replace(/^Bearer\s+/i, ""));
-    const wait = c.env.POINTERS ? await hit(c.env.POINTERS, "phonenet", { perIp: 0, perInstall: lim.perMinute, perApp: 0, windowSeconds: 60 }, "install", sess) : 0;
+    if (!c.env.POINTERS) return refuse(503, "rate_limit_unavailable");   // no limiter means no proxy
+    const wait = await hit(c.env.POINTERS, "phonenet", { perIp: 0, perInstall: lim.perMinute, perApp: 0, windowSeconds: 60 }, "install", sess);
     if (wait) return refuse(429, "rate_limited", 0, { "retry-after": String(wait) });
 
     const declared = Number(c.req.header("content-length"));

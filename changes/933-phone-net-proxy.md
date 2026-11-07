@@ -1,3 +1,3 @@
 - `@shipvo/schema`: new `network.allow` field for `shipvo.json` with `parseNetwork` and `networkHostMatches`.
 - `control-plane`: `POST /phone/net`, an allow-listed, SSRF-safe request proxy for the hosted phone; `set_network_allow` owner command; `device_log` table (migration 0024).
-- Migration: none; all additions are optional.
+- Migration: run migration 0024 (additive, adds `device_log`) before deploying. Without it the audit trail is not written.

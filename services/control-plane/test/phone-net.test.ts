@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { createRequire } from "node:module";
 import { Hono } from "hono";
 import { peopleRoutes } from "../src/people";
-import { phoneNetRoutes, isBlockedAddress, outboundHeaders, inboundHeaders } from "../src/phone-net";
+import { AGENT_ACTOR, runOwnerCommand } from "../src/owner";
+import { phoneNetRoutes, pruneDeviceLog, loadNetworkAllow, isBlockedAddress, outboundHeaders, inboundHeaders } from "../src/phone-net";
 
 const req_ = createRequire(import.meta.url);
 const { DatabaseSync } = req_("node:sqlite");
@@ -31,7 +32,7 @@ function setup(upstream: (u: string, init: RequestInit) => Response | Promise<Re
   const net = (session: string | undefined, url: string, o: { method?: string; headers?: Record<string, string>; body?: string; app?: string } = {}) =>
     h.request("/phone/net", { method: "POST", headers: { ...(session ? { authorization: `Bearer ${session}` } : {}), "x-shipvo-app": o.app ?? "tide", "x-shipvo-req": encodeURIComponent(JSON.stringify({ url, method: o.method ?? "GET", headers: o.headers ?? {} })) }, body: o.body }, e);
   const log = () => sql.prepare("SELECT * FROM device_log ORDER BY id").all() as any[];
-  return { net, signIn, log, kv, upstreamCalls };
+  return { net, signIn, log, kv, upstreamCalls, db, e };
 }
 const ok = () => new Response('{"hello":1}', { status: 200, headers: { "content-type": "application/json", "set-cookie": "a=b", connection: "close" } });
 
@@ -140,5 +141,70 @@ describe("addresses and headers", () => {
   it("filters headers", () => {
     expect([...outboundHeaders({ Host: "x", "Content-Length": "1", Cookie: "shipvo_s=1", a: "b" }).keys()]).toEqual(["a"]);
     expect([...inboundHeaders(new Headers({ "set-cookie": "a=b", "keep-alive": "1", etag: "1" })).keys()]).toEqual(["etag"]);
+  });
+});
+
+describe("phone proxy hardening", () => {
+  it("answers 503 rate_limit_unavailable when POINTERS is unbound, and calls nothing upstream", async () => {
+    const { net, signIn, upstreamCalls, e } = setup(ok);
+    const s = await signIn();
+    delete e.POINTERS;
+    const r = await net(s, "https://api.shop.dev/");
+    expect(r.status).toBe(503); expect(r.headers.get("x-shipvo-net-error")).toBe("rate_limit_unavailable");
+    expect(upstreamCalls).toEqual([]);
+  });
+  it("blocks Teredo and 6to4 anycast", () => {
+    for (const ip of ["2001:0:4136:e378:8000:63bf:3fff:fdd2", "192.88.99.1"]) expect(isBlockedAddress(ip), ip).toBe(true);
+  });
+  it("drops authorization and cookie on a cross-host redirect, keeps them on the same host", async () => {
+    const seen: Record<string, string | null>[] = [];
+    const { net, signIn } = setup((u, init) => {
+      const h = new Headers(init.headers); seen.push({ u, a: h.get("authorization"), c: h.get("cookie") });
+      if (u.endsWith("/a")) return new Response(null, { status: 302, headers: { location: "/b" } });
+      if (u.endsWith("/b")) return new Response(null, { status: 302, headers: { location: "https://cdn.shop.dev/c" } });
+      return ok();
+    });
+    const r = await net(await signIn(), "https://api.shop.dev/a", { headers: { authorization: "Bearer app-token", cookie: "k=v" } });
+    expect(r.status).toBe(200);
+    expect(seen.map((x) => [x.a, x.c])).toEqual([["Bearer app-token", "k=v"], ["Bearer app-token", "k=v"], [null, null]]);
+  });
+  it("prunes old device_log rows and keeps recent ones", async () => {
+    const { net, signIn, log, db } = setup(ok);
+    await net(await signIn(), "https://api.shop.dev/");
+    await db.prepare("INSERT INTO device_log (at, person_id, app_id, kind) VALUES (?,?,?,?)").bind("2020-01-01T00:00:00.000Z", 1, "tide", "network").run();
+    expect(log()).toHaveLength(2);
+    await pruneDeviceLog(db);
+    expect(log()).toHaveLength(1); expect(log()[0].at > "2026").toBe(true);
+  });
+});
+
+describe("set_network_allow", () => {
+  const mk = () => {
+    const m: Record<string, string> = {}; const audits: any[] = [];
+    const kv = { get: async (k: string) => m[k] ?? null, put: async (k: string, v: string) => { m[k] = v; } } as any;
+    const db = { prepare: (sql: string) => ({ bind: (...a: any[]) => ({
+      first: async () => (sql.includes("content_draft") ? { json: JSON.stringify({ x: 1 }) } : null),
+      run: async () => { if (sql.includes("INSERT INTO audit")) audits.push(a); return {}; } }) }) } as any;
+    return { m, kv, audits, env: (agent: boolean) => ({ db, kv, appId: "tide", actor: agent ? AGENT_ACTOR : "owner (admin)", agent }) };
+  };
+  it("refuses an agent token with admin_only and writes nothing", async () => {
+    const { m, env } = mk();
+    expect((await runOwnerCommand(env(true), "set_network_allow", { hosts: "api.shop.dev" })).error.code).toBe("admin_only");
+    expect(m["c/tide/network_allow"]).toBeUndefined();
+  });
+  it("stores a valid list that loadNetworkAllow reads back, and writes an audit row", async () => {
+    const { m, kv, env, audits } = mk();
+    const r = await runOwnerCommand(env(false), "set_network_allow", { hosts: "api.shop.dev, *.Cdn.shop.dev" });
+    expect(r.ok).toBe(true);
+    expect(await loadNetworkAllow(kv, "tide")).toEqual(["api.shop.dev", "*.cdn.shop.dev"]);
+    expect(m["c/tide/network_allow"]).toBeDefined();
+    expect(audits.some((a) => a[3] === "set_network_allow" && a[5] === 1)).toBe(true);
+  });
+  it("rejects an IP, a scheme or a port with bad_param and writes nothing", async () => {
+    for (const hosts of ["10.0.0.1", "https://api.shop.dev", "api.shop.dev:8443"]) {
+      const { m, env } = mk();
+      expect((await runOwnerCommand(env(false), "set_network_allow", { hosts })).error.code, hosts).toBe("bad_param");
+      expect(m["c/tide/network_allow"], hosts).toBeUndefined();
+    }
   });
 });

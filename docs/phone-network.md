@@ -22,5 +22,6 @@ List the hosts your app calls in `shipvo.json`:
 - Ports 80 and 443 only, no credentials in the URL.
 - Request size, response size, time and request rate are limited per session. Usage quotas apply.
 - Hop-by-hop headers are removed. Shipvo session tokens and cookies are never forwarded. A site's `Set-Cookie` is not passed back.
+- An `authorization` header your app sends is forwarded to the declared host. It is dropped if a redirect leaves that host.
 
-Every request, allowed or refused, is recorded in `device_log` with the app, host, path (no query string), status and the reason for a refusal. A refused call answers with a JSON `error` and the `x-shipvo-net-error` header.
+Every request from a signed-in session, allowed or refused, is recorded in `device_log` with the app, host, path (no query string), status and the reason for a refusal. A refused call answers with a JSON `error` and the `x-shipvo-net-error` header.
