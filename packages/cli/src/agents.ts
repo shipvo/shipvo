@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -69,12 +69,20 @@ export function installedMcpVersion(dir: string): string | null {
   try { return JSON.parse(readFileSync(createRequire(join(dir, "package.json")).resolve("@shipvo/mcp/package.json"), "utf8")).version ?? null; } catch { return null; }
 }
 
-/** The local file the server entry runs, relative to the app, with `/` separators so it is the same on every OS. Resolved through the package's `./server` export. */
+/** The local file the server entry runs, relative to the app, with `/` separators. The path goes through `node_modules/@shipvo/mcp` (the link), not the real package folder, so it survives upgrades under pnpm. */
 export function localServerPath(dir: string): string | null {
   try {
-    const abs = createRequire(join(dir, "package.json")).resolve("@shipvo/mcp/server");
-    const rel = relative(dir, abs).split(sep).join("/");
-    return rel.startsWith("..") ? null : rel;
+    const req = createRequire(join(dir, "package.json"));
+    const pkgDir = dirname(realpathSync(req.resolve("@shipvo/mcp/package.json")));
+    const sub = relative(pkgDir, realpathSync(req.resolve("@shipvo/mcp/server")));
+    if (sub.startsWith("..")) return null;
+    for (let root = dir; ; ) {
+      const link = join(root, "node_modules", "@shipvo", "mcp");
+      if (existsSync(join(link, "package.json"))) return relative(dir, join(link, sub)).split(sep).join("/");
+      const up = dirname(root);
+      if (up === root) return null;
+      root = up;
+    }
   } catch { return null; }
 }
 
@@ -181,7 +189,10 @@ export async function agentsCmd(argv: string[], dir = process.cwd(), deps: { run
     const npx = a.npx !== undefined;
     const hasPkg = existsSync(join(dir, "package.json"));
     let entry: McpServerEntry;
-    if (npx) entry = serverEntry(dir, { npx: true });
+    if (npx) {
+      if (installedMcpVersion(dir) === null) { console.error("`--npx` pins the installed @shipvo/mcp version, and none is installed. Install it (`npm install --save-dev @shipvo/mcp`) and run again, or leave out `--npx`."); return 2; }
+      entry = serverEntry(dir, { npx: true });
+    }
     else {
       if (installedMcpVersion(dir) === null && hasPkg) {
         const pm = detectPackageManager(dir, existsSync);

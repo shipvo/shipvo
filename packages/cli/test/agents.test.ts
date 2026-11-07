@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), execFileSync: vi.fn() }));
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentsCmd, skillStatus, detectProject, upsertSection, mergeMcp, BEGIN, END } from "../src/agents";
@@ -195,9 +195,20 @@ describe("local server entry", () => {
     expect(e).toEqual({ command: "npx", args: ["-y", "@shipvo/mcp@1.2.3"], env: { PN_SIM: "http://localhost:4545" } });
     expect(JSON.stringify(e)).not.toContain("latest");
   });
-  it("reports the package version as serverInfo.version", () => {
-    const src = readFileSync(join(__dirname, "../../mcp/src/server.ts"), "utf8");
-    expect(src).not.toContain('SERVER_VERSION = "0.');
-    expect(src).toContain('new URL("../package.json"');
+  it("--npx fails clearly when no version is installed", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {}); const d = app(); const run = vi.fn();
+    expect(await agentsCmd(["setup", "--npx"], d, { run })).toBe(2);
+    expect(err.mock.calls.join(" ")).toContain("none is installed");
+    expect(existsSync(join(d, ".mcp.json"))).toBe(false);
+  });
+  it("keeps the written path stable with a pnpm-style layout", async () => {
+    quiet(); const d = tmp(); writeFileSync(join(d, "package.json"), JSON.stringify({ name: "a" }));
+    const real = join(d, "node_modules/.pnpm/@shipvo+mcp@1.2.3/node_modules/@shipvo/mcp"); mkdirSync(join(real, "dist"), { recursive: true });
+    writeFileSync(join(real, "package.json"), JSON.stringify({ name: "@shipvo/mcp", version: "1.2.3", exports: { ".": "./dist/server.js", "./server": "./dist/server.js", "./package.json": "./package.json" } }));
+    writeFileSync(join(real, "dist/server.js"), "");
+    mkdirSync(join(d, "node_modules/@shipvo"), { recursive: true });
+    symlinkSync(real, join(d, "node_modules/@shipvo/mcp"), "dir");
+    await agentsCmd(["setup"], d, { run: vi.fn() });
+    expect(JSON.parse(readFileSync(join(d, ".mcp.json"), "utf8")).mcpServers.shipvo.args).toEqual(["node_modules/@shipvo/mcp/dist/server.js"]);
   });
 });

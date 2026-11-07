@@ -9,6 +9,7 @@
   },
   "main": "dist/server.js",
   "exports": {
+    ".": "./dist/server.js",
     "./server": "./dist/server.js",
     "./package.json": "./package.json"
   },
