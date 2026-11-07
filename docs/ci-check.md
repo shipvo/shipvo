@@ -75,8 +75,8 @@ On a private repository, or when the repository cannot be read, nothing is uploa
 | No comment appears on your own pull requests | The workflow lacks `pull-requests: write`. | Add that permission to the job. |
 | The check fails but the flow passes locally | A flaky flow that passed on base and failed now is counted as a regression. | Re-run the job. If it fails twice, the failure is real. |
 | `shipvo explore` walks the whole app, not the changed screens | No `expo.scheme` in `app.json`, or no full history. | Set `expo.scheme`, add an `onUrl` listener and use `fetch-depth: 0`. |
-| Before and after images are file names, not pictures | The repository is private, so nothing is uploaded. | Upload `shipvo-shots-before/` and `shipvo-shots-after/` as an artifact, or open the `shipvo-check` artifact. |
-| A changed screen is not in the screenshots | Dynamic screens such as `[id]` and layouts are skipped, and only four screens are captured. | Add the screen as a flow in `tests/`. |
+| Before and after images are file names, not pictures | The repository is private, so nothing is uploaded. | Open the `shipvo-check` artifact of your workflow run. |
+| A changed screen is not in the screenshots | Dynamic screens such as `[id]` and layouts are skipped, and only the first four routable changed screens are captured. | Add the screen as a flow in `tests/`. |
 | Locally, `Port 4545 is in use` | Another simulator is running. | Stop it, or pass `--port <n>`. |
 
 ## Next steps
