@@ -21,6 +21,21 @@ beforeAll(() => {
 afterAll(() => { if (out) rmSync(out, { recursive: true, force: true }); });
 
 describe("cli", () => {
+  it("prints the package version for --version and -v, and an envelope with --json", () => {
+    const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
+    for (const flag of ["--version", "-v"]) {
+      const r = run(flag);
+      expect(r.status).toBe(0);
+      expect(r.stdout.trim()).toBe(version);
+    }
+    const j = run("--version", "--json");
+    expect(j.status).toBe(0);
+    const doc = JSON.parse(j.stdout);
+    expect(doc.ok).toBe(true);
+    expect(doc.data.version).toBe(version);
+    expect(run("--help").stdout).toContain("--version");
+  });
+
   it("names an unknown command and suggests the closest one", () => {
     const r = run("publsh");
     expect(r.status).toBe(1);
