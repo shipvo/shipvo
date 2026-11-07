@@ -9,4 +9,5 @@ for (const sel of [".post-head .back", ".feed a", ".related-head a"]) {
   const re = new RegExp(sel.replace(/\./g, "\\.") + "\\{[^}]*min-height:44px");
   if (!re.test(phone)) fail(`${sel} needs min-height:44px in the max-width:980px block of blog.css`);
 }
+if (!/\.feed a\{[^}]*min-width:44px/.test(phone)) fail(".feed a needs min-width:44px in the max-width:980px block of blog.css");
 console.log("blog tap targets check ok");
