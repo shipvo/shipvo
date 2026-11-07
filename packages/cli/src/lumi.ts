@@ -29,10 +29,12 @@ export const COMMAND_LIST = ["test my app", "test <flow>", "try <flow> with bad 
 export type FeedItem = { at: string; text: string; kind: "step" | "info" | "bug" };
 export type State = {
   mood: Mood; running: boolean; label: string; feed: FeedItem[];
-  findings: { n: number; kind: string; message: string; steps: string[] }[];
+  findings: { n: number; kind: string; message: string; steps: string[]; screens: number; paths: string[][] }[];
   coverage: { screens: number; controlsSeen: number; controlsTried: number };
 };
-type Known = { n: number; key: string; finding: Finding };
+type Known = { n: number; key: string; finding: Finding; screens: Set<string>; paths: Step[][] };
+/** Findings about one control look the same on every screen: report them once and count the screens. */
+const PER_CONTROL = new Set(["small_target", "duplicate_name"]);
 
 export type LumiOptions = { routes?: string[]; maxDepth?: number; maxSteps?: number; seed?: number; skin?: Skin; app?: string; settleMs?: number; walkDelayMs?: number };
 
@@ -47,7 +49,7 @@ export class Lumi {
   state(): State {
     return {
       mood: this.mood, running: this.running, label: this.label, feed: this.feed.slice(-200),
-      findings: this.known.map((k) => ({ n: k.n, kind: k.finding.kind, message: k.finding.message, steps: k.finding.steps.map(describeStep) })),
+      findings: this.known.map((k) => ({ n: k.n, kind: k.finding.kind, message: k.screens.size > 1 ? `${k.finding.message} on ${k.screens.size} screens` : k.finding.message, steps: k.finding.steps.map(describeStep), screens: k.screens.size, paths: k.paths.map((p) => p.map(describeStep)) })),
       coverage: { screens: this.screens.size, controlsSeen: this.seen.size, controlsTried: this.tried.size },
     };
   }
@@ -117,9 +119,11 @@ export class Lumi {
         } else if (e.type === "screen") {
           this.screens.add(e.sig); for (const c of e.controls) this.seen.add(`${c.role}|${c.name}`); this.emit();
         } else {
-          const key = `${e.finding.kind}|${e.finding.message}|${signature(e.finding.screen)}`;
-          if (this.known.some((k) => k.key === key)) return;
-          const n = this.known.push({ n: this.known.length + 1, key, finding: e.finding });
+          const sig = signature(e.finding.screen);
+          const key = PER_CONTROL.has(e.finding.kind) ? `${e.finding.kind}|${e.finding.message}` : `${e.finding.kind}|${e.finding.message}|${sig}`;
+          const old = this.known.find((k) => k.key === key);
+          if (old) { if (!old.screens.has(sig)) { old.screens.add(sig); old.paths.push(e.finding.steps); this.emit(); } return; }
+          const n = this.known.push({ n: this.known.length + 1, key, finding: e.finding, screens: new Set([sig]), paths: [e.finding.steps] });
           this.say(`Bug ${n}: ${e.finding.message}`, "bug");
         }
       },
@@ -127,7 +131,7 @@ export class Lumi {
     const found = this.known.length - before;
     this.mood = this.known.length ? "worried" : r.error || r.stoppedEarly ? "idle" : "happy";
     const why = r.stoppedEarly ? ` Stopped: ${r.stoppedEarly}.` : "";
-    this.say(`Done. ${r.steps} action${r.steps === 1 ? "" : "s"}, ${r.screens} screen${r.screens === 1 ? "" : "s"}, ${found} new bug${found === 1 ? "" : "s"}.${why}${r.error ? ` Error: ${r.error}` : ""}`);
+    this.say(`Done. ${r.steps} action${r.steps === 1 ? "" : "s"} over ${this.screens.size} screen${this.screens.size === 1 ? "" : "s"} (${r.screens} visit${r.screens === 1 ? "" : "s"}), ${found} new bug${found === 1 ? "" : "s"}, ${this.known.length} in total.${why}${r.error ? ` Error: ${r.error}` : ""}`);
   }
 
   /** Does the steps of a bug again, one by one, and says whether the screen is the same as when it was found. */
