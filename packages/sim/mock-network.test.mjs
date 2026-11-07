@@ -1,4 +1,5 @@
 // set_network_mocks against a real sim server and a tiny local HTTP backend the page calls with fetch.
+import { pickPort } from "./test-port.mjs";
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
@@ -10,7 +11,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = 5300 + Math.floor(Math.random() * 300);
+const PORT = pickPort(7900, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-mock-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc, backend, backendUrl;
