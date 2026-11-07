@@ -1,0 +1,3 @@
+- `@shipvo/runtime` (iOS): a staged release's trial boot is also counted when a scene activates, so apps on the UIScene lifecycle (React Native 0.88, Xcode 27) count one trial boot per load.
+- `@shipvo/cli`: `shipvo init` recognises a project whose Expo setup is in `SceneDelegate`.
+- Migration: none.

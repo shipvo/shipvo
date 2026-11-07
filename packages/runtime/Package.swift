@@ -7,7 +7,7 @@ let package = Package(
   name: "ShipvoRuntimeCore",
   platforms: [.macOS(.v13)],
   targets: [
-    .target(name: "ShipvoCore", path: "ios", exclude: ["ShipvoRuntime.podspec", "ShipvoRuntimeModule.swift", "ShipvoReactDelegateHandler.swift"], sources: ["Store.swift", "Verify.swift", "Updater.swift", "Patch.swift", "HermesGuard.swift", "BundleSelector.swift", "Rotation.swift"]),
+    .target(name: "ShipvoCore", path: "ios", exclude: ["ShipvoRuntime.podspec", "ShipvoRuntimeModule.swift", "ShipvoReactDelegateHandler.swift"], sources: ["Store.swift", "Verify.swift", "Updater.swift", "Patch.swift", "HermesGuard.swift", "BundleSelector.swift", "Rotation.swift", "ForegroundWatcher.swift"]),
     .testTarget(name: "ShipvoCoreTests", dependencies: ["ShipvoCore"], path: "ios-tests"),
   ]
 )

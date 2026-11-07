@@ -67,3 +67,13 @@ it("--yes writes both native files, and a second run changes nothing", async () 
   expect(snapshot()).toEqual(before);
   expect(deps.installExpoModules).not.toHaveBeenCalled();
 });
+
+it("does not run install-expo-modules when the Expo setup is in SceneDelegate", async () => {
+  mkdirSync(join(tmp, "android/app/src/main/java/com/x"), { recursive: true });
+  writeFileSync(join(tmp, "package.json"), JSON.stringify({ name: "shop", dependencies: { "react-native": "0.88.1", expo: "~55.0.0" } }));
+  writeFileSync(join(tmp, "android/app/src/main/java/com/x/MainApplication.kt"), "import expo.modules.ApplicationLifecycleDispatcher\nclass MainApplication");
+  writeFileSync(join(tmp, "ios/Shop/AppDelegate.swift"), "import UIKit\nclass AppDelegate: UIResponder {}");
+  writeFileSync(join(tmp, "ios/Shop/SceneDelegate.swift"), "import Expo\nclass SceneDelegate: UIResponder {}");
+  await adopt([], tmp, deps);
+  expect(deps.installExpoModules).not.toHaveBeenCalled();
+});

@@ -171,7 +171,9 @@ export function checkExpoModules(dir: string): ExpoModulesCheck {
   const has = (file: string | null, re: RegExp) => (file ? re.test(readFileSync(file, "utf8")) : false);
   const android = has(walk(join(dir, "android", "app", "src", "main", "java"), /^MainApplication\.(kt|java)$/),
     /expo\.modules\.(ApplicationLifecycleDispatcher|ReactNativeHostWrapper)|ExpoModulesPackage/);
-  const ios = has(walk(join(dir, "ios"), /^AppDelegate\.(swift|mm?|h)$/), /\bExpo(AppDelegate|ReactDelegate|Modules)?\b|import Expo/);
+  // Apps on the UIScene lifecycle start React from a SceneDelegate; either file with the Expo setup counts.
+  const expoIos = /\bExpo(AppDelegate|ReactDelegate|Modules)?\b|import Expo/;
+  const ios = has(walk(join(dir, "ios"), /^AppDelegate\.(swift|mm?|h)$/), expoIos) || has(walk(join(dir, "ios"), /^SceneDelegate\.(swift|mm?|h)$/), expoIos);
   const installed = expoPackage && android && ios;
   return { installed, expoPackage, android, ios, plan: installed ? [] : ["npx install-expo-modules@latest"] };
 }
