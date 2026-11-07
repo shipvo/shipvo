@@ -1,6 +1,6 @@
 # Content coverage
 
-One row per user-visible feature or advantage. Each column is a link, or empty when nothing exists yet. Docs, blog, tutorial and video agents pick the biggest gap in their column, newest and most important features first, and add their link here in the same commit. Source of features: `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs. First version, backfilled on 2026-11-05 from the docs, blog posts, tutorials and videos that exist; it is not yet complete.
+One row per user-visible feature or advantage. Each column is a link, or empty when nothing exists yet. Docs, blog, tutorial and video agents pick the biggest gap in their column, newest and most important features first, and add their link here in the same commit. Source of features: `CHANGELOG.md`, `changes/`, `docs/ROADMAP.md` and merged PRs. Every row has a Docs link (checked 7 Nov). First version, backfilled on 2026-11-05 from the docs, blog posts, tutorials and videos that exist; it is not yet complete.
 
 ## Priority now
 

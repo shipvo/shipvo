@@ -142,6 +142,14 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
     console.error(msg); process.exit(status);
   };
   const a = parse(argv); const cfg = loadConfig();
+  if (a.hosted === "true") {
+    const { uploadHosted } = await import("./sim-hosted.js");
+    try {
+      const b = await uploadHosted({ skipBuild: a["skip-build"] === "true" });
+      console.error(`Uploaded. It expires ${b.expires_at}. On the hosted phone: open_app("${b.open}")`);
+      return { code: "uploaded", summary: `Uploaded build ${b.id}`, data: b, next: [] } as Done;
+    } catch (e) { return die((e as Error).message, 1, (e as { code?: string }).code ?? "upload_failed"); }
+  }
   const port = a.port || "4545";
   if (!(await portFree(Number(port)))) {
     die(`Port ${port} is in use. Stop the other \`shipvo sim\` or pass --port <n>.`, 1, "port_in_use");
