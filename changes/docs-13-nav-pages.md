@@ -1,1 +1,1 @@
-- docs: eight existing pages now appear in the docs sidebar, search, sitemap and llms.txt: OTA updates on the phone, network calls on the hosted phone, migrate from EAS Update, taking real orders, record-a-demo-video worked example, simulator cost, Lumi benchmark and the Lumi action ranker.
+- docs: three existing pages now appear in the docs sidebar, search, sitemap and llms.txt: the Lumi action ranker, simulator cost and the Lumi benchmark.
