@@ -28,9 +28,11 @@ import { store } from "./store.js";
 import { ci } from "./ci.js";
 import { easCmd } from "./eas.js";
 import { testCmd } from "./test.js";
+import { emit, envelope, EXIT } from "./json-out.js";
 import { failure, help, unknownCommand } from "./help.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
+const isVersion = (a?: string) => a === "--version" || a === "-v";
 try {
 switch (cmd) {
   case "init": await init(rest); break;
@@ -76,6 +78,14 @@ switch (cmd) {
     let text: string;
     try { text = readFileSync(rest[0], "utf8"); } catch { console.error(`Cannot read ${rest[0]}`); process.exit(2); }
     const ok = verifyPointer(text, key); console.log(ok ? "valid" : "INVALID"); process.exit(ok ? 0 : 1);
+  }
+  case "--version": case "-v": case "--json": {
+    const flags = [cmd, ...rest];
+    if (!flags.every((a) => isVersion(a) || a === "--json") || !flags.some(isVersion)) { console.error(unknownCommand(cmd)); process.exit(1); }
+    const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+    if (flags.includes("--json")) emit(envelope("version", `shipvo ${version}`, { version }, [{ command: "shipvo help", why: "See the commands and flags." }], EXIT.ok));
+    else console.log(version);
+    break;
   }
   case undefined: case "--help": case "-h": case "help": console.log(help); break;
   default: console.error(unknownCommand(cmd)); process.exit(1);
