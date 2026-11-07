@@ -1,0 +1,1 @@
+- `docs/run.md`: new "How fast it starts" section with the measured time to a tapped phone for Android and iOS, linked to the CI run.
