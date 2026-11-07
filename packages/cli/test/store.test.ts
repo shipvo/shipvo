@@ -269,11 +269,35 @@ describe("store screenshots --mode frames", () => {
     try { await store(["screenshots", "--mode", "frames", "--out", "json-frames", "--sim", `http://127.0.0.1:${port}`, "--json"]); }
     finally { w.mockRestore(); log.mockRestore(); err.mockRestore(); srv.close(); }
     const doc = JSON.parse(out.join(""));
-    expect(doc.code).toBe("screenshots_ready");
+    expect(doc.code, doc.summary).toBe("screenshots_ready");
     expect(doc.data.mode).toBe("frames");
     expect(doc.data.out).toBe("json-frames");
     expect(doc.data.files).toHaveLength(5);
     expect(doc.data.files.every((f: { ok: boolean }) => f.ok)).toBe(true);
+    process.exitCode = undefined;
+  }, 60000);
+
+  it("--json names the failed file and its problem in the screenshots_failed summary", async () => {
+    const { createServer } = await import("node:http");
+    const srv = createServer((req, res) => {
+      let body = ""; req.on("data", (c) => { body += c; });
+      req.on("end", () => {
+        const b = JSON.parse(body || "{}");
+        const data = req.url === "/act" && b.action === "screenshot" ? Buffer.from(jpeg(100, 100)).toString("base64") : undefined;
+        res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ ok: true, data }));
+      });
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const port = (srv.address() as { port: number }).port;
+    const out: string[] = [];
+    const w = vi.spyOn(process.stdout, "write").mockImplementation(((c: string) => { out.push(String(c)); return true; }) as never);
+    const log = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { out.push(a.join(" ") + "\n"); });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try { await store(["screenshots", "--mode", "frames", "--out", "json-frames-bad", "--sim", `http://127.0.0.1:${port}`, "--json"]); }
+    finally { w.mockRestore(); log.mockRestore(); err.mockRestore(); srv.close(); }
+    const doc = JSON.parse(out.join(""));
+    expect(doc.code).toBe("screenshots_failed");
+    expect(doc.summary).toContain("json-frames-bad/iphone/01-start");
     process.exitCode = undefined;
   }, 60000);
 
