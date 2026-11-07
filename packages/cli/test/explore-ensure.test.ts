@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer } from "node:net";
+
+const freePort = () => new Promise<string>((res, rej) => {
+  const s = createServer(); s.on("error", rej);
+  s.listen(0, () => { const p = (s.address() as { port: number }).port; s.close(() => res(String(p))); });
+});
 
 const ensure = vi.hoisted(() => vi.fn());
 vi.mock("../src/ensure-playwright.js", () => ({ ensurePlaywright: ensure }));
@@ -13,6 +19,7 @@ describe("startSim", () => {
     mkdirSync(join(dir, "sim-dist"));
     writeFileSync(join(dir, "sim-dist", "index.html"), "");
     writeFileSync(join(dir, "package.json"), "{}");
+    const port = await freePort();
     const prev = process.cwd(); process.chdir(dir);
     try {
       const cfg = { name: "demo", appId: "demo", controlPlane: "http://x" };
