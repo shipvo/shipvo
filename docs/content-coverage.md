@@ -78,3 +78,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Self-host upgrade check, backup and restore | [self-hosting](self-hosting.md#back-up-and-upgrade) | | | |
 | iOS apps on the UIScene lifecycle (`SceneDelegate`) | [cli](cli.md) | | | |
 | Test your own build on the hosted phone (`upload_build`, `shipvo sim --hosted`, `app@build:<id>`) | [test-your-build](test-your-build.md) | | | |
+| Request an app install on your own phone with a consent card (`request_app_install`, `list_installed_apps`) | [phone-apps](phone-apps.md#ask-to-add-an-app-to-your-own-phone) | | | |
+| Hold a release when failures look like an attack (fresh installs, burst) | [auto-halt](auto-halt.md#when-failures-look-like-an-attack) | | | |
+| Single sign-on (OIDC) for the dashboard | [sso](sso.md) | | | |
+| Key rotation (`shipvo keys rotate`) | [cli](cli.md) | | | |
+| Log in with test accounts from secrets (`log in as "buyer"`) | [testing](testing.md#test-accounts) | | | |

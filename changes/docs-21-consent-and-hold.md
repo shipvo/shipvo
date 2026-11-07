@@ -1,0 +1,1 @@
+- docs: new sections for `request_app_install` and `list_installed_apps` (phone apps) and for the release hold when failures look like an attack (auto-halt).

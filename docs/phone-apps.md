@@ -122,6 +122,25 @@ uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app, switch_app, uninstall_app, all source "simulated"
 ```
 
+## Ask to add an app to your own phone
+
+These two tools work on your persistent Shipvo Phone, not on a simulator session. The phone is the same in every chat and every assistant. They need an assistant token in `PN_ASSISTANT_TOKEN` on the MCP server.
+
+| Tool | What it does | Errors |
+| --- | --- | --- |
+| `request_app_install { app }` | Asks to add an app. Returns a consent card with the app name, the publisher, the permissions it asks for, and `approve_url` and `decline_url` | `unknown_app`, `already_installed`, `unauthorized` |
+| `list_installed_apps` | Lists the apps on your phone | `unauthorized` |
+
+How it works:
+
+1. Your assistant calls `request_app_install` and shows you the card.
+2. You read the permissions and open the approve or decline link yourself. You must be signed in. The assistant cannot approve, and nothing is installed until you do.
+3. Ask the assistant to call `list_installed_apps` to see the app on the phone.
+
+A card expires after 15 minutes. An expired or declined card installs nothing, and a card can be decided once. Permissions come from the published app, never from what the assistant says. This is not `install_app`, which installs into a simulator session only.
+
+Test: `services/control-plane/test/phone-install.test.ts`.
+
 ## First-party apps
 
 | App | What it does | Actions (MCP tools) | Spec |

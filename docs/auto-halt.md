@@ -24,6 +24,23 @@ All of these must hold:
 
 The Tide and Tackle sample app signs its reports. If it cannot register, it sends them unsigned, and they count as unverified.
 
+## When failures look like an attack
+
+Someone could register many fake installs and send failure reports to stop a good release. So when the numbers pass the rules above, the control plane checks one more thing before it halts:
+
+- **Fresh installs.** More than half of the failing installs registered in the last hour.
+- **Burst.** At least 10 failure reports in the last 10 minutes, and more than 5 times the app's normal rate for 10 minutes. This needs some history for the app.
+
+If either is true, the release is **not** halted. It stays at its band and a pending hold appears in `shipvo approvals list` and in the app admin, with the reason (`fresh_installs` or `burst`). You decide:
+
+1. Run `shipvo approvals list` and find the hold for the release.
+2. Look at the release and its reports in the app admin.
+3. Confirm the hold to halt the release, or dismiss it to keep the release running.
+
+Confirming needs a signed-in person (`shipvo login`). A publish token or an assistant cannot decide. Confirming writes the halt and an audit row. There is one pending hold per release. When the failing installs are older than an hour and there is no burst, the release halts at once as before.
+
+Test: `services/control-plane/test/halt-hold.test.ts`.
+
 ## What does not count
 
 - Unsigned reports, and reports with a bad signature or from an unknown install.
