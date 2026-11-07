@@ -1,12 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { args } from "./config.js";
+import { args, loadConfig } from "./config.js";
 import { explore } from "./explore.js";
 import { testCmd } from "./test.js";
 import { commentCmd, renderComment, upsertComment } from "./ci-comment.js";
 import type { TestReport } from "./report-md.js";
-import { loadConfig } from "./config.js";
 import { checkPublishPolicy } from "./policy.js";
 import { spawnSync } from "node:child_process";
 import { shotsCmd } from "./ci-shots.js";

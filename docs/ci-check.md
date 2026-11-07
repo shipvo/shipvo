@@ -85,6 +85,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Build the commit that landed, not GitHub's computed merge ref.
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
       - run: npm ci
       - run: npx shipvo ci fix
         env:
@@ -93,7 +96,7 @@ jobs:
           # add the publish secrets your app uses
 ```
 
-The comment gets a "Fix release" section: `Published release N to the first band`, or `Nothing was published` and the failing flow names. The step exits 1 when it publishes nothing.
+The checkout uses `merge_commit_sha` so the release is built from the commit that landed. The step replaces the body of the check comment with the test results and a "Fix release" section: `Published release N to the first band`, or `Nothing was published` and the failing flow names. The step exits 1 when it publishes nothing.
 
 ## Troubleshooting
 
