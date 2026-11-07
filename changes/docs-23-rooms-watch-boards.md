@@ -1,0 +1,1 @@
+- docs: new sections for rooms, the `/watch` page and hosted sign-in discovery in the agents guide, and for `kanban` and `timeline` blocks in the app spec guide. A glossary entry for rooms. No migration.
