@@ -1,0 +1,1 @@
+- site: new /playground/ page with a sample app on an Android or iOS phone, dark mode, large text and right-to-left switches, and a feature sidebar with deep links such as /playground/#ota. Linked from the Product menu and the homepage.
