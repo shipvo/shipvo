@@ -747,7 +747,7 @@ export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order
         setPlaced({ id: reference, receipt: r.receipt, total: totalCents, items });
         clear(); setStatus(null); setUndo(null);
       } else setStatus(paymentMessage(r.reason));
-    } catch (e: any) { setStatus(paymentMessage("error")); }
+    } catch { setStatus(paymentMessage("error")); }
     finally { setBusy(false); }
   };
   if (placed) {
@@ -868,15 +868,31 @@ test("each payment failure is explained in plain words, and a new attempt clears
   expect(phone.sees("Payment cancelled.")).toBe(false);
 });
 
-test("paying offline keeps the cart and places no order", async ({ phone }) => {
+test("a new attempt clears the offline message", async ({ phone }) => {
   await phone.tap(products[0].name);
   await phone.tap("Add to cart");
   await phone.tap("Cart");
   await phone.device.set({ online: false });
   await phone.tap("Pay");
   await phone.waitFor("You're offline. Your cart is saved.");
+  await phone.device.set({ online: true, payment: { nextResult: "timeout", pin: "1234" } });
+  await phone.tap("Pay");
+  await phone.waitFor("The payment took too long. Try again.");
+  expect(phone.sees("You're offline. Your cart is saved.")).toBe(false);
+});
+
+test("paying offline keeps the cart and places no order", async ({ phone }) => {
+  await phone.tap(products[0].name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  const before = (await phone.deviceLog()).length;
+  await phone.device.set({ online: false });
+  await phone.tap("Pay");
+  await phone.waitFor("You're offline. Your cart is saved.");
   expect(phone).toSee("Total: " + formatPrice(products[0].price));
   expect(phone.sees("Order placed")).toBe(false);
+  // No charge was attempted, so no order was sent.
+  expect((await phone.deviceLog()).length).toBe(before);
 });
 
 test("plus and minus change the quantity and the total, and minus at 1 removes the line", async ({ phone }) => {
