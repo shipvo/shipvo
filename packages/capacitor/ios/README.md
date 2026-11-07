@@ -8,3 +8,7 @@ Run the tests on a Mac with Xcode, or on Linux with a Swift toolchain:
 cd packages/capacitor/ios
 swift test
 ```
+
+## Capacitor plugin
+
+`Sources/ShipvoCapacitor` is the Capacitor plugin (`Shipvo`). It has the same methods and results as the Android plugin. `../Package.swift` exposes it to `cap sync ios`.
