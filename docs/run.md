@@ -36,6 +36,21 @@ You need the app folder from [Build your first app](getting-started.md) and a te
 
 The page scales the phone to your window. Add `?dark=1` to the address to see the dark frame.
 
+## How fast it starts
+
+CI times `shipvo run android` and `shipvo run ios` on a clean machine with only Node: a fresh `shipvo init` app, its install finished, then `shipvo run <platform> --no-open`. The clock starts when the process is spawned and stops when the first tap on the phone page has been done. Install time is not in the numbers.
+
+Measured on 2026-11-07 on a GitHub-hosted `ubuntu-latest` runner:
+
+| step | Android (seconds since start) | iOS (seconds since start) |
+| --- | ---: | ---: |
+| start (process spawned) | 0.00 | 0.00 |
+| server listening | 8.99 | 8.81 |
+| phone page ready (app loaded) | 10.42 | 9.88 |
+| first tap done | 10.73 | 10.19 |
+
+Run: https://github.com/shipvo/shipvo/actions/runs/42355471525 (job `shipvo run android (time to first tap)`, artifact `run-time`). The script is `scripts/first-run/run-time.mjs`.
+
 ## Edit and save, the phone updates
 
 While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`. As soon as a save is seen, the terminal prints `Rebuilding...` and the page shows a small "Updating…" hint until the new build loads.
