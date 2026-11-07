@@ -3,7 +3,7 @@ name: deploy-site
 on:
   push:
     branches: [main]
-    paths: ["services/site/**", "docs/**", "blog/**", "README.md", "CHANGELOG.md", "packages/*/README.md", ".github/workflows/deploy-site.yml"]
+    paths: ["services/site/**", "docs/**", "blog/**", "README.md", "CHANGELOG.md", "packages/*/README.md", "apps/chess/**", "packages/sim/frame.mjs", ".github/workflows/deploy-site.yml"]
   workflow_dispatch:
 jobs:
   deploy:
@@ -13,6 +13,20 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
+      # The live chess demo at /demos/chess/ (#1153, escalation #1167). Rebuilt from apps/chess on every deploy;
+      # if the build fails, the snapshot committed in services/site/public/demos/chess/ is served instead.
+      - name: Build the chess demo
+        id: chess
+        if: hashFiles('services/site/chess-demo.mjs') != ''
+        continue-on-error: true
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --filter chess... --filter @shipvo/site...
+          pnpm --filter chess build
+          node services/site/chess-demo.mjs
+      - name: Say when the chess snapshot was served
+        if: steps.chess.outcome == 'failure'
+        run: echo "::warning::Chess demo build failed; serving the committed snapshot."
       - name: Build docs from the repo Markdown
         run: npm i --no-audit --no-fund --no-save marked@14 && node services/site/build.mjs
       - name: Media bucket (R2)
