@@ -84,6 +84,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Build id.** The short name Shipvo gives a copy of your app you uploaded for the hosted phone. You open it as `myapp@build:<id>`. It is private to you and deleted when it expires. See [Test your build on the hosted phone](test-your-build.md).
 
-**Eval.** A scored run of an agent on one task in the simulator, started with `shipvo eval run`. It passes when every check on the real orders and screens passes. See [Score an agent](eval.md).
 
 **Room.** A name you give `open_app` so two phones share one backend, for example a buyer and a shop owner. See [Agents](agents.md#rooms-several-phones-one-backend).

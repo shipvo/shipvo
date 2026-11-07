@@ -1,1 +1,1 @@
-- docs: new page "Score an agent on an app task" for `shipvo eval run` and `eval report`; agents page covers rooms and the `room` option of `open_app`.
+- docs: the agents page covers rooms (several phones sharing one backend), the `room` option of `open_app` and the `list_sessions` columns; the glossary defines Room; `shipvo agents setup --hosted` is listed in the coverage ledger.
