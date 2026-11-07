@@ -121,7 +121,7 @@ app.post("/r/:app/:release/tests", async (c) => {
   const no = await roleDenied(c, appId, "publish"); if (no) return no;
   const cap = maxReportBytes(c.env);
   const text = await c.req.text();
-  if (new TextEncoder().encode(text).length > cap) return c.json({ error: "report_too_large", message: `The test report is larger than ${cap} bytes. Send fewer flows.` }, 413);
+  if (new TextEncoder().encode(text).length > cap) return c.json({ error: "report_too_large", message: `The test report is larger than ${cap} bytes. Send fewer flows or screens.` }, 413);
   let raw: unknown; try { raw = JSON.parse(text); } catch { return c.json({ error: "bad_report", message: "The test report is not valid JSON." }, 400); }
   const r = sanitizeReport(raw, appId, Number(rel));
   if (!r.ok) return c.json({ error: "bad_report", message: r.message }, 400);
@@ -135,7 +135,7 @@ app.post("/r/:app/pr/:pr/tests", async (c) => {
   const no = await roleDenied(c, appId, "publish"); if (no) return no;
   const cap = maxReportBytes(c.env);
   const text = await c.req.text();
-  if (new TextEncoder().encode(text).length > cap) return c.json({ error: "report_too_large", message: `The test report is larger than ${cap} bytes. Send fewer flows.` }, 413);
+  if (new TextEncoder().encode(text).length > cap) return c.json({ error: "report_too_large", message: `The test report is larger than ${cap} bytes. Send fewer flows or screens.` }, 413);
   let raw: unknown; try { raw = JSON.parse(text); } catch { return c.json({ error: "bad_report", message: "The test report is not valid JSON." }, 400); }
   const r = sanitizeReport(raw, appId, 0, new Date(), Number(pr));
   if (!r.ok) return c.json({ error: "bad_report", message: r.message }, 400);

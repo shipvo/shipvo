@@ -66,3 +66,43 @@ describe("behaviour timeline", () => {
     expect((await app.request("/app/tide/timeline/compare?from=x&to=r1", { headers: { cookie: ck } }, env)).status).toBe(400);
   });
 });
+
+describe("behaviour timeline: pull requests and report size", () => {
+  const big = (c: string) => `data:image/png;base64,${c.repeat(7900)}`;
+  it("accepts a report with the maximum number of full-size screens", async () => {
+    const env = await setup();
+    const screens = Array.from({ length: 20 }, (_, i) => ({ name: `s${i}`, thumb: big("A") }));
+    expect((await up(env, "/r/tide/1/tests", { flows: flows({ a: "passed" }), screens })).status).toBe(200);
+    expect((await up(env, "/r/tide/pr/3/tests", { flows: flows({ a: "passed" }), screens })).status).toBe(200);
+    const over = await up(env, "/r/tide/1/tests", { flows: [], screens: Array.from({ length: 21 }, (_, i) => ({ name: `s${i}`, thumb: img("a") })) });
+    expect(over.status).toBe(400);
+  });
+  it("names screens in the too-large message", async () => {
+    const env = await setup();
+    env.MAX_TEST_REPORT_BYTES = "100";
+    const r = await up(env, "/r/tide/1/tests", { flows: flows({ a: "passed" }), screens: [{ name: "x", thumb: img("a") }] });
+    expect(r.status).toBe(413);
+    expect(((await r.json()) as any).message).toContain("screens");
+  });
+  it("compares a pull request with a release", async () => {
+    const env = await setup();
+    await up(env, "/r/tide/3/tests", { flows: flows({ checkout: "passed", login: "passed" }), findings: [{ title: "Old bug" }], screens: [{ name: "cart", thumb: img("a") }] });
+    await up(env, "/r/tide/pr/7/tests", { flows: flows({ checkout: "failed", login: "passed" }), findings: [{ title: "New bug" }], screens: [{ name: "cart", thumb: img("b") }, { name: "home", thumb: img("h") }] });
+    const ck = await cookie(env);
+    const d: any = await (await app.request("/app/tide/timeline/compare?from=r3&to=p7", { headers: { cookie: ck } }, env)).json();
+    expect(d.flows).toEqual([{ name: "checkout", before: "passed", after: "failed" }]);
+    expect(d.findings).toEqual({ added: ["New bug"], removed: ["Old bug"] });
+    expect(d.screens).toEqual([
+      { name: "cart", platform: "android", before: img("a"), after: img("b") },
+      { name: "home", platform: "android", before: null, after: img("h") },
+    ]);
+    expect((await app.request("/app/tide/timeline/compare?from=r3&to=p99", { headers: { cookie: ck } }, env)).status).toBe(404);
+  });
+  it("rejects a bad PR number and an unauthenticated PR report", async () => {
+    const env = await setup();
+    expect((await up(env, "/r/tide/pr/abc/tests", { flows: [] })).status).toBe(400);
+    expect((await up(env, "/r/tide/pr/1234567890/tests", { flows: [] })).status).toBe(400);
+    expect((await app.request("/r/tide/pr/7/tests", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ flows: [] }) }, env)).status).toBe(401);
+    expect((await app.request("/r/tide/pr/7/tests", { method: "POST", headers: { authorization: "Bearer sv_publish_bad", "content-type": "application/json" }, body: JSON.stringify({ flows: [] }) }, env)).status).toBe(401);
+  });
+});

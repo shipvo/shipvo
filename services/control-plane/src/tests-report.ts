@@ -12,7 +12,7 @@ export type StoredReport = {
   pr?: number;
 };
 
-export const DEFAULT_MAX_REPORT_BYTES = 64 * 1024;
+export const DEFAULT_MAX_REPORT_BYTES = 256 * 1024; // fits the most screens allowed (20 x 8000 characters) plus flows
 const MAX_FLOWS = 500;
 const MAX_NAME = 200;
 const MAX_FINDINGS = 50;
