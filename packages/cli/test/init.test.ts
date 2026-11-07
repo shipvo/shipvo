@@ -310,3 +310,9 @@ it("scaffolded apps report refusals through @shipvo/runtime, with no event glue 
     expect(JSON.stringify(cfg)).toContain("@shipvo/runtime");
   }
 });
+
+it("writes pnpm-workspace.yaml so pnpm 11 installs fresh Shipvo releases", () => {
+  const y = readFileSync(join(tmp, "my-shop", "pnpm-workspace.yaml"), "utf8");
+  expect(y).toContain("minimumReleaseAgeExclude:");
+  for (const n of ["@shipvo/*", "shipvo", "create-shipvo"]) expect(y).toContain(`"${n}"`);
+});

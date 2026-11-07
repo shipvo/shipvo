@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { args as parse } from "./config.js";
 import { adopt, detectProject, isAdoptArgs, isBareApp, positional } from "./adopt.js";
+import { writeReleaseAgeExclude } from "./update-check.js";
 import { EXPO_NODE_RANGES, nodeRangeWarning } from "./node-range.js";
 import { CliFailure, UsageError, runJson, trapExit } from "./json-out.js";
 
@@ -140,6 +141,7 @@ const withShipvoSim = require("@shipvo/device/metro");
 module.exports = withShipvoSim(getDefaultConfig(__dirname));
 `);
   w("index.ts", `import { registerRootComponent } from "expo";\nimport App from "./App";\nregisterRootComponent(App);\n`);
+  writeReleaseAgeExclude(dir); // pnpm 11 would otherwise hold back a Shipvo release newer than its minimum release age
   w(".gitignore", `node_modules/\n.expo/\ndist/\ndist-ota/\ndist-web/\nsim-dist/\nweb-build/\n/ios\n/android\n.kotlin/\n*.jks\n*.p8\n*.p12\n*.key\n*.mobileprovision\n*.tsbuildinfo\n.env*.local\n.DS_Store\n# never commit the release signing seed\n.shipvo/\n`);
   w("src/release.ts", `// Edit and push: the publish workflow signs and ships this to every installed phone and to the simulator.
 export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/release.ts and run \`shipvo publish\`." };
