@@ -77,7 +77,6 @@ describe("commentCmd", () => {
 describe("upsertComment", () => {
   it("does not overwrite a human comment that quotes the marker", async () => {
     const calls: string[] = [];
-    const posted: any[] = [];
     const fetch = async (url: string, init: any = {}) => {
       const m = init.method ?? "GET"; calls.push(m);
       if (m === "GET") return { ok: true, status: 200, json: async () => [{ id: 1, body: `quote ${MARKER}`, user: { type: "User" } }, { id: 2, body: `${MARKER}\nold`, user: { type: "Bot" } }] };
@@ -93,7 +92,6 @@ describe("upsertComment", () => {
   it("the second run updates the first comment", async () => {
     const store: { id: number; body: string }[] = [{ id: 7, body: "someone else" }];
     const calls: string[] = [];
-    const posted: any[] = [];
     const fetch = async (url: string, init: any = {}) => {
       const m = init.method ?? "GET"; calls.push(`${m} ${url.replace("https://api.github.com/repos/o/r", "")}`);
       if (m === "GET") return { ok: true, status: 200, json: async () => store };
