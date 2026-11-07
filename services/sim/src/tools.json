@@ -934,7 +934,7 @@
   },
   {
     "name": "open_app",
-    "description": "Open an app in a fresh phone-sized session and return its first screen.",
+    "description": "Opens the phone in the user's browser so they can watch. Opens an app in a phone-sized session and returns its first screen. With no live `shipvo run` for the project, it starts one (pick platform: 'android' or 'ios'); a live run on the other platform is switched. Every session tool works on that phone. The result says whether the phone is visible and its URL.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -973,6 +973,18 @@
         "dark": {
           "type": "boolean",
           "description": "Dark mode"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Which phone to show: 'android' or 'ios' (default: the live run's, else android)"
+        },
+        "show": {
+          "type": "boolean",
+          "description": "true: open the phone in the user's browser so they can watch (default on a computer with a desktop). false: headless, nobody sees it (default in CI)."
         },
         "attach": {
           "type": "string",

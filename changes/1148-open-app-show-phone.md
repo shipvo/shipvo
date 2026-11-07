@@ -1,0 +1,4 @@
+- `open_app` takes `platform: "android" | "ios"` and `show: true | false`. It opens the phone in the user's browser so they can watch: it starts `shipvo run <platform>` from the nearest folder with `shipvo.json` when none is live, and asks a live run on the other platform to switch skin. `show` defaults to true on a computer with a desktop and false in CI.
+- Every session tool (set_device, device_log, push_notification, lock, restart and the rest) now goes to the attached phone. Before, they failed with `not_supported_attached`. Only `locate` stays headless-only.
+- `open_app` results carry `visible:` and the phone's URL; `list_apps` shows the visible phone; `end_session` on an attached phone asks the run for its orders.
+- Migration: none. `SHIPVO_RUN_COMMAND` (JSON array) replaces `npx -y shipvo` as the command that starts the run.
