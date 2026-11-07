@@ -263,6 +263,8 @@ function bridgeMain(win: any, token: string) {
     log.appendChild(li); showLog(); log.scrollTop = log.scrollHeight;
     while (log.children.length > 50) log.removeChild(log.firstChild!);
   };
+  // The device panel on the page writes its changes here, so they sit in the same event log, labelled simulated.
+  win.shipvoStep = (text: string, simulated = true) => step(String(text), simulated);
   /** Where the scaled app iframe is on the frame page. */
   const toPage = () => { const f = doc.getElementById("app"); const r = f.getBoundingClientRect(); const k = f.offsetWidth ? r.width / f.offsetWidth : 1; return { left: r.left, top: r.top, k }; };
   function mark(x: number, y: number, el: any) {

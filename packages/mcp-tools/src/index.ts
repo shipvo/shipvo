@@ -68,7 +68,7 @@ export const tools = {
   calendar: z.array(z.object({ id: z.string(), title: z.string(), start: z.string().describe("ISO 8601"), end: z.string().describe("ISO 8601"), allDay: z.boolean().optional(), location: z.string().optional(), notes: z.string().optional() })).optional().describe("Replace the calendar events the app can read (needs calendar permission)"),
   files: z.array(z.object({ name: z.string(), mimeType: z.string(), content: z.string().describe("The file's text") })).optional().describe("Replace the files the file picker offers"),
   biometrics: z.object({ enrolled: z.boolean().optional(), nextResult: z.enum(["success", "fail", "cancel"]).optional() }).optional(),
-  payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds"]).optional(), pin: z.string().optional() }).optional(),
+  payment: z.object({ nextResult: z.enum(["approve", "decline", "timeout", "insufficient_funds", "cancel"]).optional(), pin: z.string().optional() }).optional(),
   online: z.boolean().optional(),
   wifi: z.boolean().optional(), mobileData: z.boolean().optional(), airplane: z.boolean().optional(), locationServices: z.boolean().optional(), darkMode: z.boolean().optional().describe("The app's colour scheme (prefers-color-scheme)"), dnd: z.boolean().optional().describe("Do Not Disturb: notifications go to the shade without a banner"), autoRotate: z.boolean().optional(), flashlight: z.boolean().optional(), orientationLock: z.boolean().optional(), brightness: z.number().min(0).max(100).optional(),
   source: z.enum(["auto", "simulated"]).optional().describe("\"simulated\" forces the simulated camera, microphone and location even when a person could grant the real ones, for reproducible runs"),

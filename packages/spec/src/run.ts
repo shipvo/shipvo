@@ -7,7 +7,7 @@ import { estimateCost, evaluateTemplate, ExpressionError, MAX_COST } from "./eva
 import type { EvalOptions } from "./eval.js";
 
 export type RunErrorCode =
-  | "bad_spec" | "domain_not_allowed" | "secret_missing" | "request_failed"
+  | "bad_spec" | "domain_not_allowed" | "secret_missing" | "secret_revoked" | "secret_domain" | "request_failed"
   | "upstream_error" | "response_too_large" | "cost_limit" | "expression_error" | "unsupported_step";
 
 /** Thrown by {@link runSource} and {@link runAction}. The message never contains a secret value. */
@@ -39,10 +39,16 @@ export function memoryCache(now: () => number = Date.now): RunCache {
   };
 }
 
+export type SecretAnswer = string | undefined | { refused: "missing" | "revoked" | "domain" | "unavailable" };
+
 export interface RunContext {
   fetch: (url: string, init: { method: string; headers: Record<string, string>; redirect: "manual" }) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
-  /** Returns the value of a vault key by name. The only place secrets come from. */
-  secrets: (name: string) => string | undefined | Promise<string | undefined>;
+  /**
+   * Returns the value of a vault key by name, for the host of this request. The only place secrets come from.
+   * The vault binds the key to the person, the app and the service domain, and answers `{ refused }`
+   * when the key is missing, revoked, bound to another domain or cannot be opened.
+   */
+  secrets: (name: string, host: string) => SecretAnswer | Promise<SecretAnswer>;
   cache?: RunCache;
   /** Keeps one person's or app's cache entries apart from another's. Default "". */
   cacheScope?: string;
@@ -175,10 +181,18 @@ export async function runSource(spec: unknown, name: string, ctx: RunContext): P
   }
 
   const headers: Record<string, string> = { accept: "application/json" };
+  let secretValue: string | undefined;
   if (auth) {
     const secretName = String(auth.secret);
-    const value = await ctx.secrets(secretName);
-    if (!value) throw new RunError("secret_missing", `The key ${secretName} is not saved in the vault.`);
+    const answer = await ctx.secrets(secretName, url.hostname);
+    if (typeof answer === "object" && answer !== null) {
+      if (answer.refused === "revoked") throw new RunError("secret_revoked", `The key ${secretName} was revoked. Add it again through the secret form.`);
+      if (answer.refused === "domain") throw new RunError("secret_domain", `The key ${secretName} is saved for a different service than ${url.hostname}, so it was not sent.`);
+      throw new RunError("secret_missing", `The key ${secretName} is not available. Add it through the secret form.`);
+    }
+    const value = answer;
+    if (!value) throw new RunError("secret_missing", `The key ${secretName} is not saved in the vault. Add it through the secret form.`);
+    secretValue = value;
     const type = auth.type ?? "bearer";
     if (type === "bearer") headers.authorization = `Bearer ${value}`;
     else if (type === "basic") {
@@ -201,7 +215,9 @@ export async function runSource(spec: unknown, name: string, ctx: RunContext): P
   ctx.log?.({ event: "source.fetch", source: name, host: url.hostname, status: res.status });
   if (res.status >= 300 && res.status < 400) throw new RunError("upstream_error", `${url.hostname} answered with a redirect, which is not followed.`);
   if (!res.ok) throw new RunError("upstream_error", `${url.hostname} answered with status ${res.status}.`);
-  const text = await res.text();
+  let text = await res.text();
+  // An upstream that echoes the request must not hand the key back through the data.
+  if (secretValue) text = text.split(secretValue).join("[hidden]");
   if (text.length > (ctx.maxResponseChars ?? DEFAULT_MAX_CHARS)) {
     throw new RunError("response_too_large", `The answer from ${url.hostname} is too large.`);
   }

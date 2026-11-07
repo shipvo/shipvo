@@ -168,3 +168,10 @@ test("openUrl: a page the Browser app refuses is logged as refused and openUrl a
   assert.match(entries, /browser_open_refused[^}]*host_not_allowed/); assert.match(entries, /bad_url/);
   assert.equal((entries.match(/browser_opened/g) ?? []).length, 1);   // only the accepted page
 });
+
+test("payment: a cancel result comes back as cancelled", async () => {
+  dev.reset({ payment: { nextResult: "cancel", pin: "" } });
+  dev.set({ payment: { nextResult: "cancel", pin: "" } });
+  assert.deepEqual(await device.pay.charge({ amount: 100 }), { ok: false, reason: "cancelled" });
+  dev.reset();
+});

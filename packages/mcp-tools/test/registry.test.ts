@@ -28,4 +28,12 @@ describe("tool registry", () => {
     expect(tools.owner_command.needsApproval).toBe(true);
     expect(toolList.filter((t) => t.needsApproval).map((t) => t.name)).toEqual(["owner_command"]);
   });
+
+  it("lets set_device send payment.nextResult cancel", () => {
+    const shape = tools.set_device.input as any;
+    const ok = (v: string) => shape.payment.safeParse({ nextResult: v }).success;
+    expect(ok("cancel")).toBe(true);
+    expect(ok("approve")).toBe(true);
+    expect(ok("nope")).toBe(false);
+  });
 });

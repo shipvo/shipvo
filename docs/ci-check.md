@@ -55,3 +55,10 @@ The action also builds the base commit in a second folder and runs the same flow
 A flaky flow can fail on the pull request and pass on base, and then the check fails. Re-run the job to see if the failure repeats. Flows that are new on the pull request and fail are listed under "New flows" but do not fail the check.
 
 
+### Before and after screens
+
+With `--before-shots <dir> --after-shots <dir>` (each laid out as `<dir>/android/<screen>.png` and `<dir>/ios/<screen>.png`), the comment has a "Before and after" section. Each screen gets a table with an Android row and an iOS row, and a Before and an After column. Changed screens come first; up to six are shown and the rest are counted.
+
+On a public repository the workflow's token uploads the images to the `shipvo-media` branch of your own repository, so the workflow needs `contents: write`. The comment shows the images inline. Each push uploads its own copies, and the comment is updated in place. A file that is already there counts as uploaded only when it holds the same bytes.
+
+On a private repository, or when the repository cannot be read, nothing is uploaded. The comment lists the file names for each screen and skin, and the images are in the folders you passed to `--before-shots` and `--after-shots`. Upload those folders as an artifact in your workflow to keep them.

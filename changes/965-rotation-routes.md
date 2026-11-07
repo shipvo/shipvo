@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: new `PUT /rotation/<app>/root` and `POST /rotation/<app>` store a root public key and root-signed key rotation statements. Admin session only; publish tokens and the owner token get 403. Each upload writes a `key_rotation_log` row.
+- Migration: none; new routes.
