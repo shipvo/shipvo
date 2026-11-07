@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { args as parse } from "./config.js";
+import { serverEntry, localServerPath } from "./agents.js";
 import { CliFailure, runJson, type Done } from "./json-out.js";
 
 const HOSTED = "https://api.shipvo.dev";
@@ -66,11 +67,10 @@ export function mcp() {
   printMcp(c.mcp_url, c.key);
 }
 
-const LOCAL_MCP = `Local simulator (no login needed). Run \`npm run sim\` first:\n${JSON.stringify({ mcpServers: { shipvo: { command: "npx", args: ["-y", "@shipvo/mcp"] } } }, null, 2)}`;
-function printLocalMcp() { console.log(LOCAL_MCP); }
+function printLocalMcp() { console.log(`Local simulator (no login needed). Run \`npm run sim\` first (\`shipvo agents setup\` adds @shipvo/mcp and writes this for you):\n${JSON.stringify({ mcpServers: { shipvo: serverEntry(process.cwd(), { path: localServerPath(process.cwd()) }) } }, null, 2)}`); }
 
 function printMcp(url: string, key: string) {
   console.log(`Claude Desktop / Cursor / Claude Code (remote):\n${JSON.stringify({ mcpServers: { shipvo: { url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)}\n`);
   console.log(`ChatGPT (custom MCP connector, cannot send headers): ${url}/${key}\n`);
-  console.log(`Local simulator instead: { "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } } after \`shipvo sim\`.`);
+  console.log(`Local simulator instead (after \`shipvo sim\`): ${JSON.stringify({ mcpServers: { shipvo: serverEntry(process.cwd(), { path: localServerPath(process.cwd()) }) } })}`);
 }
