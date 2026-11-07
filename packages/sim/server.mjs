@@ -20,6 +20,7 @@ import { PhoneBrowser, BrowserError, checkUrl } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
 import { createWatch, watchPage, watchList, closeWatchers, isWatched } from "./watch.mjs";
 import { browserAppPage } from "./browser-app.mjs";
+import { BuildFetchError, parseBuildUrl, fetchBuildFile } from "./build-fetch.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
@@ -135,11 +136,23 @@ async function endSession(id) {
   await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
   sessions.delete(id); leaveRoom(s, id); return true;
 }
+// Uploaded builds (build_url): hosts they may come from, and the ones loaded so far (id -> { base, files }).
+const BUILD_HOSTS = [...new Set([...arg("build-hosts", process.env.PN_BUILD_HOSTS || "").split(","), new URL(CONTROL).hostname, "sim.shipvo.dev"].map((h) => h.trim()).filter(Boolean))];
+const BUILDS = new Map();
+async function loadBuild(buildUrl) {
+  const { id, base } = parseBuildUrl(buildUrl, BUILD_HOSTS);
+  if (BUILDS.get(id)?.base !== base) BUILDS.set(id, { base, files: new Map() });
+  const b = BUILDS.get(id);
+  if (!b.files.has("index.html")) b.files.set("index.html", await fetchBuildFile(base, "index.html", { maxBytes: Number(process.env.PN_BUILD_MAX_BYTES) || undefined }));
+  return { id, url: `http://localhost:${PORT}/b/${id}/index.html` };
+}
 async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
+  // Load the uploaded build first: a bad build_url fails here and leaves no session, room member or backend file behind.
+  const built = opts.build_url != null ? await loadBuild(opts.build_url) : null;
   if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); sessions.delete(id); leaveRoom(old, id); }
-  const target = await resolveApp(opts.app);
+  const target = built ? { app: String(opts.app ?? DEFAULT_APP).split("@")[0], url: built.url, release: `build:${built.id}` } : await resolveApp(opts.app);
   const bk = backendOf(id, room);
   if (!room || !rooms.has(room)) { writeFileSync(join(DIR, `${bk}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${bk}.json.log`), ""); }
   if (room) { if (!rooms.has(room)) rooms.set(room, new Set()); rooms.get(room).add(id); }
@@ -527,6 +540,12 @@ const server = http.createServer(async (req, res) => {
       if (!hit) { const r = await fetch(`${CONTROL}${key}`); if (!r.ok) return send(r.status, { error: "artifact" }); hit = { type: r.headers.get("content-type") ?? "application/octet-stream", body: Buffer.from(await r.arrayBuffer()) }; WCACHE.set(key, hit); }
       return send(200, hit.body, hit.type);
     }
+    // an uploaded build, fetched from its allow-listed host and cached for the life of the process
+    { const bm = url.pathname.match(/^\/b\/([\w-]+)\/(.*)$/);
+      if (bm) { const b = BUILDS.get(bm[1]); if (!b) return send(404, { error: "no_build" });
+        const rel = decodeURIComponent(bm[2]) || "index.html"; let hit = b.files.get(rel);
+        if (!hit) { try { hit = await fetchBuildFile(b.base, rel, { maxBytes: Number(process.env.PN_BUILD_MAX_BYTES) || undefined }); } catch (e) { return send(e.code === "build_too_large" ? 413 : 404, { error: e.code ?? "build_file" }); } b.files.set(rel, hit); }
+        return send(200, hit.body, hit.type); } }
     // a bundle this session downloaded and verified: the page that runs is the page that was checked
     { const um = url.pathname.match(/^\/u\/([\w-]+)\/r(\d+)\/index\.html$/);
       if (um) { const b = sessions.get(um[1])?.update.bundles.get(Number(um[2])); return b ? send(200, b, MIME[".html"]) : send(404, { error: "no_bundle" }); } }
@@ -563,7 +582,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
     if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
     if (url.pathname === "/end") return send(200, { ok: true, ended: await endSession(String(body.session)) });
-    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room")) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if ((e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room")) || e instanceof BuildFetchError) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.release?.startsWith?.("build:") ? { build: s.release.slice(6) } : {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }

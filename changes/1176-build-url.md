@@ -1,0 +1,2 @@
+- `@shipvo/sim`: `POST /session` reads `build_url`, loads the uploaded build from an allow-listed host (size cap and timeout) and serves it as the app. The reply carries `build: <id>`, so `open_app("<app>@build:<id>")` opens the build on Android and iOS sessions. A bad or unreachable URL returns `bad_build_url`, `build_url_not_allowed`, `build_unreachable` or `build_too_large`, and no session is left behind.
+- Migration: none. Extra build hosts can be added with `--build-hosts` or `PN_BUILD_HOSTS`.
