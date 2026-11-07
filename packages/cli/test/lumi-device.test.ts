@@ -1,17 +1,18 @@
+import { createServer } from "node:net";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createServer } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { lumi } from "../src/lumi.js";
 
 const cwd = process.cwd();
 
-/** A port the OS just gave away, so parallel test files cannot collide on a fixed one. */
+/** A port the OS just gave away, so a fixed number cannot collide with another test or process. */
 function freePort(): Promise<number> {
-  return new Promise((res) => {
+  return new Promise((resolve, reject) => {
     const s = createServer();
-    s.listen(0, "127.0.0.1", () => { const { port } = s.address() as { port: number }; s.close(() => res(port)); });
+    s.once("error", reject);
+    s.listen(0, "127.0.0.1", () => { const p = (s.address() as { port: number }).port; s.close(() => resolve(p)); });
   });
 }
 afterEach(() => { process.chdir(cwd); vi.restoreAllMocks(); });
