@@ -11,7 +11,7 @@ import { pickPort } from "./test-port.mjs";
 import { watchPage } from "./watch.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(10000, 100);
+const PORT = pickPort(10300, 100);
 const root = mkdtempSync(join(tmpdir(), "sim-watch-")); const dist = join(root, "dist");
 let proc;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
