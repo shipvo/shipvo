@@ -268,3 +268,22 @@ gh issue create --title "Shipvo flows failed on release 42" --body-file shipvo-r
 3. Or set `"device": "agent-device"` in `shipvo.json`.
 
 In code: `await openApp({ driver: "agent-device", platform: "android" })`. If the CLI is missing you see `agent-device is not installed; npm i -D agent-device, or drop --device to use Shipvo Phone`. Set `SHIPVO_AGENT_DEVICE_BIN` to use a binary in another place. See [`@shipvo/test`](../packages/test/README.md).
+
+## Troubleshooting
+
+**`timed out waiting for "…"` followed by `Screen now:`.** The text never appeared. Read the screen printed under the message: the label may have changed, or the app may still be on the previous screen. Fix the step, or run `npx shipvo test --repair` to see a suggested fix for a renamed label.
+
+**`--repair` lists candidates and changes nothing.** Two elements were equally close, or the role changed. Pick the right one and edit the step yourself. Repair never guesses.
+
+**A login step fails in CI but works on your machine.** The secret is not set in CI. Add it as a repository secret with the same name you use in `secret(name)` or `{secret:NAME}` (see [Logins and other secrets](#logins-and-other-secrets)).
+
+**`--device agent-device` does not run.** Install it with `npm i -D agent-device`, start an Android emulator or an iOS Simulator, then run the command again (see [Run on a real emulator or simulator](#run-on-a-real-emulator-or-simulator-with-agent-device)).
+
+**Offline steps fail with `TypeError: Network request failed`.** That is correct: with the network off the app's requests fail as they do on a phone. Check that the app shows its offline message ([Device API](device-api.md#network)).
+
+## Next steps
+
+- [Check every pull request](ci-check.md): run these tests on each PR.
+- [Gate a rollout on tests](#gate-a-rollout-on-tests) before a release reaches phones.
+- [Agents](agents.md): turn an assistant's session into a test with `export_test`.
+- [Device API](device-api.md): what the simulator can fake (camera, location, payment, network).

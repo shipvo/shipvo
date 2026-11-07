@@ -82,13 +82,15 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
-- 2026-11-07: Test a build from your machine on the hosted phone: `upload_build` and `shipvo sim --hosted` give a private build id, then `open_app("<app>@build:<id>")` ([Agents](agents.md#test-the-build-on-your-machine-on-the-hosted-phone), #1171)
+- 2026-11-07: Run Android and iOS simulators on your own machine or CI runner: 110 open at once on a 2-CPU, 7.8 GB machine ([Shipvo Simulators](https://shipvo.dev/products/simulators/), #1235)
+- 2026-11-07: Test your own build on the hosted phone with `upload_build` or `shipvo sim --hosted`, then `open_app("<app>@build:<id>")` ([Test your build](test-your-build.md), #1171)
 - 2026-11-07: Two assistants play a full chess game through `@shipvo/mcp` with `--agents`, and `--record` saves the video and the moves ([Chess on two phones](demos/chess.md), #1166)
+- 2026-11-07: `open_app` starts or switches the phone (`platform`, `show`) and you watch the agent drive it ([Agents](agents.md), #1163)
 - 2026-11-07: With the network off, the app's `fetch` and `XMLHttpRequest` calls fail like on a phone, in sim, MCP and test sessions on Android and iOS ([Device API](device-api.md#network), #1161)
 - 2026-11-07: Payment cancel comes back as `cancelled` ([Device API](device-api.md#payments), #1158)
 - 2026-11-07: `shipvo agents setup` writes the Shipvo MCP config for every coding agent ([CLI guide](cli.md), #1155, #1156)
 - 2026-11-07: Deep links: `open_url` and `Linking.openURL` switch to the owning app and deliver the link once ([Phone apps](phone-apps.md), #1132, #1140)
-- 2026-11-07: Spec blocks `chart`, `stat`, `progress`, `card`, `toggle`, `segmented` and sheet navigation ([@shipvo/spec](../packages/spec/README.md), #1129, #1134)
+- 2026-11-07: Spec blocks `chart`, `stat`, `progress`, `card`, `toggle`, `segmented` and sheet navigation ([App spec](spec-blocks.md), #1129, #1134)
 - 2026-11-07: Live chess demo at [shipvo.dev/demos/chess](https://shipvo.dev/demos/chess/): an Android phone and an iPhone play in your browser, and you can take white ([Chess on two phones](demos/chess.md), #1168)
 - 2026-11-07: Behaviour timeline in the app admin compares releases and pull requests on Android and iOS ([Behaviour timeline](timeline.md), #1084)
 - 2026-11-07: `shipvo test --device agent-device` runs flows on a real emulator or simulator ([Test your app in CI](testing.md), #1041)
@@ -119,7 +121,9 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-05: Hourly telemetry export to your R2 bucket as Parquet ([Telemetry export](telemetry-export.md), #324)
 - 2026-11-05: `shipvo auto-halt` turns on automatic halting ([CLI guide](cli.md), #302)
 
-## Not doing (for now)
+## Promises
 
-- Shipping compiled native code over the air. Updates stay interpreted JavaScript on capabilities the shell declares.
-- Anything that weakens signing or lets an update replace its own trust root.
+Lines we hold, whatever else changes.
+
+- Updates stay interpreted JavaScript running on the capabilities the shell declares; compiled native code always ships through the stores.
+- Update signing is never weakened, and an update can never replace its own trust root.

@@ -852,7 +852,7 @@
   },
   {
     "name": "list_sessions",
-    "description": "Open simulator sessions (phones) on this server: id, app, release and when each started. Use to resume after a reconnect.",
+    "description": "Open simulator sessions (phones) on this server: id, app, platform, room, who opened it (the MCP client name), start time and current screen title. Use to resume after a reconnect or to see who shares a room.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -945,6 +945,10 @@
         "session": {
           "type": "string",
           "description": "Session name (default: generated). One session is one phone."
+        },
+        "room": {
+          "type": "string",
+          "description": "Room name. Every session opened with the same room on the same simulator shares one backend (orders, content, telemetry), read and written through the same store. Without room, each session has its own. 1 to 64 letters, digits, _ or -."
         },
         "seed_cart": {
           "type": "array",

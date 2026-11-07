@@ -15,14 +15,16 @@
 .pcard:hover{border-color:var(--line-2);transform:translateY(-2px)}
 .pcard[hidden]{display:none}
 .pcard-art{display:block;aspect-ratio:1200/630;background:#0A0F1A;overflow:hidden}
-.pcard-art img{width:100%;height:100%;object-fit:cover;display:block}
+.pcard-art img,.pcard-art svg{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
+.pcard:hover .pcard-art svg{transform:scale(1.025)}
 .pcard-body{padding:20px 22px 22px;display:flex;flex-direction:column;gap:10px;flex:1}
 .pcard h2{font-size:21px;line-height:1.2;margin:0;letter-spacing:-.01em}
 .pcard h2 a{color:var(--paper);text-decoration:none}
 .pcard h2 a:hover{text-decoration:underline;text-underline-offset:3px}
 .pcard p{margin:0;color:var(--mute);font-size:15px;line-height:1.55}
 .pcard.lead{grid-column:1/-1;flex-direction:row}
-.pcard.lead .pcard-art{flex:1.25;aspect-ratio:auto;min-height:320px}
+.pcard.lead .pcard-art{flex:1.25;aspect-ratio:auto;min-height:320px;display:flex;align-items:center;background:radial-gradient(circle at 78% 40%,rgba(124,227,160,.12),transparent 60%),linear-gradient(135deg,#0F1626,#070A12)}
+.pcard.lead .pcard-art svg{height:auto}
 .pcard.lead .pcard-body{flex:1;justify-content:center;padding:clamp(24px,3vw,44px)}
 .pcard.lead h2{font-size:clamp(26px,3vw,36px);line-height:1.1}
 .pcard.lead p{font-size:16.5px}
@@ -43,7 +45,7 @@
 .post-head h1{font-size:clamp(30px,4.4vw,46px);line-height:1.08;letter-spacing:-.025em;margin:14px 0 14px}
 .post-head .lede{font-size:18.5px;margin-bottom:18px}
 .hero-fig{margin:22px 0 28px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
-.hero-fig img{display:block;width:100%;height:auto}
+.hero-fig img,.hero-fig svg{display:block;width:100%;height:auto;border-radius:inherit}
 .contents{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:14px;background:var(--ink-2);padding:16px 20px;margin:0 0 32px}
 .contents b{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:6px;font-weight:500}
 .contents a{color:var(--prose);text-decoration:none;padding:5px 0;font-size:15.5px}
@@ -110,3 +112,11 @@ figure.shot figcaption{max-width:56ch;margin:14px auto 0;text-align:center;color
 .cmp-hero pre code,.cmp-sec pre code,.pcard pre code{background:none;border:0;padding:0;border-radius:0;color:var(--paper);font-size:inherit}
 .cmp-sec .term{position:static;color:var(--paper);font-size:15px;white-space:pre-wrap;overflow-wrap:anywhere}
 .cmp-sec h3.os{font-size:15px;font-weight:600;color:var(--mute);margin:22px 0 8px;letter-spacing:.01em}
+@media(max-width:980px){
+.post-head .back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:8px}
+.feed{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}
+.feed a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:0 6px}
+.related-head a{display:inline-flex;align-items:center;min-height:44px}
+}
+.blog-top .fsearch{margin-top:28px}
+.blog-top .fsearch+.tabs{margin-top:14px}
