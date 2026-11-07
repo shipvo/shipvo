@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
+import { isCapacitorWeb, copyCapacitorWeb } from "./capacitor-web.js";
 import { CliFailure, runJson, takeJson, type Done } from "./json-out.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
@@ -157,7 +158,7 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
   const stdio: "inherit" | ("ignore" | number)[] = json ? ["ignore", 2, 2] : "inherit";
   if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
     console.error(`Building ${cfg.name} for the simulator…`);
-    try { execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio, env: { ...process.env, PN_SIM: "1" } }); }
+    try { if (isCapacitorWeb(process.cwd())) copyCapacitorWeb(process.cwd(), "sim-dist"); else execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio, env: { ...process.env, PN_SIM: "1" } }); }
     catch (e) { if (!json) throw e; die(`The simulator build failed: ${(e as Error).message.split("\n")[0]}`, 1, "build_failed"); }
   }
   try { ensurePlaywright({ cwd: process.cwd() }); }

@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep, extname } from "node:path";
 import { args as parse, loadConfig } from "./config.js";
+import { isCapacitorWeb, copyCapacitorWeb } from "./capacitor-web.js";
 import { spawnBin } from "./spawn-bin.js";
 import { RECORDER_JS } from "./preview-recorder.js";
 
@@ -298,6 +299,7 @@ export async function publishToHereNow(files: PreviewFile[], o: PreviewOpts = {}
 
 export function build(root: string, out: string): Promise<void> {
   rmSync(out, { recursive: true, force: true }); mkdirSync(join(root, ".shipvo"), { recursive: true });
+  if (isCapacitorWeb(root)) { copyCapacitorWeb(root, out); return Promise.resolve(); }
   return new Promise((resolve, reject) => {
     const call = spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out]);
     const p = spawn(call.command, call.args, { cwd: root, shell: call.shell, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });
