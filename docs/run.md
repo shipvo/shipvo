@@ -49,7 +49,7 @@ Measured on 2026-11-07 on a GitHub-hosted `ubuntu-latest` runner:
 | phone page ready (app loaded) | 10.42 | 9.88 |
 | first tap done | 10.73 | 10.19 |
 
-Run: https://github.com/shipvo/shipvo/actions/runs/42355471525 (job `shipvo run android (time to first tap)`, artifact `run-time`). The script is `scripts/first-run/run-time.mjs`.
+Run: [CI run 42355471525](https://github.com/shipvo/shipvo/actions/runs/42355471525) (job `shipvo run android (time to first tap)`, artifact `run-time`). The script is `scripts/first-run/run-time.mjs`.
 
 ## Edit and save, the phone updates
 
