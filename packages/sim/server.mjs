@@ -18,6 +18,7 @@ import { resolveBrowser } from "./browser-resolver.mjs";
 import { PhoneBrowser, BrowserError, checkUrl } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
 import { browserAppPage } from "./browser-app.mjs";
+import { watchPage, describeStep, changeLine } from "./watch.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
@@ -154,7 +155,7 @@ async function newSession(id, opts = {}) {
   await page.waitForTimeout(300);
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
-  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
+  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, startedAt: new Date().toISOString(), skin: opts.skin === "ios" ? "ios" : "android", life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
 }
 
 // Refs are only meaningful for the document that issued them: a full page load restarts Playwright's counter, so an
@@ -250,10 +251,34 @@ async function screen(page) {
   const tree = await page.locator("body").ariaSnapshot({ mode: "ai" });
   await page.evaluate(() => { for (const el of document.querySelectorAll("[data-pn-prev-display]")) { const prev = el.getAttribute("data-pn-prev-display"); if (prev) el.style.display = prev; else el.style.removeProperty("display"); el.removeAttribute("data-pn-prev-display"); } });
   const text = filterTree(tree);
+  lastScreen.set(page, text);
   return epoch ? text.replace(/\[ref=(e\d+)\]/g, `[ref=p${epoch}$1]`) : text;
 }
 
-function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
+function log(id, action, ok, extra = {}, step) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); announce(id, action, ok, step); }
+
+// The /watch page. Viewers get the session list and each step; one screencast per watched session runs only while someone watches it.
+const watchers = new Set();
+const lastScreen = new WeakMap();
+const watchList = () => [...sessions.entries()].map(([id, s]) => ({ session: id, app: s.app, skin: s.skin, started_at: s.startedAt ?? null }));
+const tellWatchers = (msg, only) => { const text = JSON.stringify(msg); for (const w of watchers) if (!only || w.sel === only) w.send(text); };
+function announce(id, action, ok, step) {
+  if (!watchers.size || action === "screen") return;
+  tellWatchers({ type: "step", session: id, ok, text: step?.text ?? describeStep(action, {}), change: step?.change ?? "" }, id);
+}
+async function syncCast(id) {
+  const s = sessions.get(id); if (!s) return;
+  const want = [...watchers].some((w) => w.sel === id);
+  if (want && !s.watchCdp && !s.watchStarting) {
+    s.watchStarting = true;
+    try {
+      const c = await s.ctx.newCDPSession(s.page); s.watchCdp = c;
+      c.on("Page.screencastFrame", (f) => { c.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {}); tellWatchers({ type: "frame", session: id, data: f.data, width: f.metadata.deviceWidth, height: f.metadata.deviceHeight }, id); });
+      await c.send("Page.startScreencast", { format: "jpeg", quality: 60, maxWidth: 400, maxHeight: 860, everyNthFrame: 1 });
+    } catch { s.watchCdp = undefined; } finally { s.watchStarting = false; }
+    if (![...watchers].some((w) => w.sel === id)) return syncCast(id);
+  } else if (!want && s.watchCdp) { const c = s.watchCdp; s.watchCdp = undefined; await c.send("Page.stopScreencast").catch(() => {}); c.detach().catch(() => {}); }
+}
 
 async function act(id, body) {
   const s = sessions.get(id); if (!s) throw new SimError("no_session", `no session '${id}': call /session first`);
@@ -518,29 +543,51 @@ const server = http.createServer(async (req, res) => {
     }
     // the Browser app, in a phone frame
     if (req.method === "GET" && url.pathname === "/browser") return send(200, browserAppPage(url.searchParams.get("skin") === "ios" ? "ios" : "android", url.searchParams.get("session") ?? ""), MIME[".html"]);
+    // watch the agent's phone
+    if (req.method === "GET" && url.pathname === "/watch") return send(200, watchPage(url.searchParams.get("skin") === "ios" ? "ios" : "android"), MIME[".html"]);
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
-    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: [...sessions.entries()].map(([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, url: s.page.url() })) });
-    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof SimError && e.code === "bad_profile") return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
+    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: [...sessions.entries()].map(([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, url: s.page.url(), streaming: !!s.watchCdp })) });
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof SimError && e.code === "bad_profile") return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }, { text: "session started", change: "" }); tellWatchers({ type: "sessions", sessions: watchList() }); void syncCast(body.session); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
-      try { const r = await act(body.session, body); log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
-      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
+      try { const s0 = sessions.get(body.session); const before = s0 ? lastScreen.get(s0.page) : undefined; const r = await act(body.session, body); const s1 = sessions.get(body.session); const step = watchers.size ? { text: describeStep(body.action, body, before), change: s1 && typeof r.screen === "string" ? changeLine(before, r.screen) : "" } : undefined; log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}, step); return send(200, { ok: true, ...r }); }
+      catch (e) { log(body.session, body.action, false, {}, { text: describeStep(body.action, body, sessions.get(body.session) && lastScreen.get(sessions.get(body.session).page)), change: "" }); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }
 });
 // The Browser app's live view: frames out, taps, swipes and typing in. Same trust as the HTTP API (loopback), plus an Origin check
 // so another web page open on this machine cannot drive the phone.
+// /watch: view only until the viewer sends input. Input goes to the app page as a finger and keyboard would.
+function watchSocket(req, socket) {
+  let w;
+  w = acceptWebSocket(req, socket, async (text) => {
+    let m; try { m = JSON.parse(text); } catch { return; }
+    if (m.type === "select") { const prev = w.sel; w.sel = String(m.session ?? ""); if (prev) await syncCast(prev); await syncCast(w.sel); return; }
+    const s = sessions.get(w.sel); if (!s) return;
+    try {
+      if (m.type === "tap" && Number.isFinite(m.x) && Number.isFinite(m.y)) await s.page.touchscreen.tap(m.x, m.y);
+      else if (m.type === "text") await s.page.keyboard.insertText(String(m.text ?? "").slice(0, 2000));
+      else if (m.type === "key" && ["Enter", "Backspace", "Tab"].includes(m.key)) await s.page.keyboard.press(m.key);
+      else return;
+      tellWatchers({ type: "step", session: w.sel, ok: true, text: `you: ${m.type}${m.type === "key" ? " " + m.key : ""}`, change: "" }, w.sel);
+    } catch {}
+  }, () => { watchers.delete(w); if (w.sel) void syncCast(w.sel); });
+  if (!w) return;
+  w.sel = ""; watchers.add(w);
+  w.send(JSON.stringify({ type: "sessions", sessions: watchList() }));
+}
 server.on("upgrade", (req, socket) => {
   const url = new URL(req.url, "http://x");
   const refuse = (line) => socket.end(`HTTP/1.1 ${line}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
-  if (url.pathname !== "/browser/ws") return refuse("404 Not Found");
+  if (url.pathname !== "/browser/ws" && url.pathname !== "/watch/ws") return refuse("404 Not Found");
   let originHost = null; try { if (req.headers.origin) originHost = new URL(req.headers.origin).host; } catch { originHost = "invalid"; }
   // A missing Origin is allowed (non-browser clients). The Host comparison does not stop DNS rebinding, since both
   // values come from the requester; the HTTP API has the same trust level.
   if (originHost && originHost !== req.headers.host) return refuse("403 Forbidden");
+  if (url.pathname === "/watch/ws") return watchSocket(req, socket);
   const s = sessions.get(url.searchParams.get("session") ?? ""); if (!s) return refuse("404 Not Found");
   const peer = acceptWebSocket(req, socket, async (text) => {
     let m; try { m = JSON.parse(text); } catch { return; }

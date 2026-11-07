@@ -29,6 +29,7 @@
     "lumi.mjs",
     "guide.mjs",
     "phone-browser.mjs",
+    "watch.mjs",
     "browser-app.mjs",
     "ws-lite.mjs",
     "lifecycle.mjs",

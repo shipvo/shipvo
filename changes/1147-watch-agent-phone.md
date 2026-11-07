@@ -1,0 +1,3 @@
+- `@shipvo/sim`: `GET /watch` shows every live session and streams the chosen phone in its Android or iOS frame, with the agent's steps beside it. View only by default; "Take over" sends taps and typing. Streaming runs only while someone watches.
+- `@shipvo/cli`: `shipvo sim` prints "Watch the agent: http://localhost:4545/watch" and opens it unless `--no-open`.
+- Migration: none; new page and message.

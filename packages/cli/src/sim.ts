@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
+import { openBrowser } from "./run.js";
 import { CliFailure, runJson, takeJson, type Done } from "./json-out.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
@@ -162,10 +163,13 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });
   if (await waitListening(Number(port), () => exited)) {
     console.error(`Simulator on http://localhost:${port}/app/  (open_app("${cfg.appId}") from @shipvo/mcp; Ctrl-C to stop)`);
+    const watchUrl = `http://localhost:${port}/watch`;
+    console.error(`Watch the agent: ${watchUrl}`);
+    if (!json && a["no-open"] !== "true") openBrowser(watchUrl);
     if (a.watch === "true") {
       watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto(), verbose: a.verbose === "true" });
       console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");
     }
-    if (json) return { code: "listening", summary: `Simulator on http://localhost:${port}/app/`, data: { url: `http://localhost:${port}/app/`, port: Number(port), app_id: cfg.appId, watch: a.watch === "true" }, next: [{ command: `shipvo explore --json --sim http://localhost:${port}`, why: "Walk the app in the running simulator." }, { command: "shipvo test --json", why: "Run the app's tests." }] };
+    if (json) return { code: "listening", summary: `Simulator on http://localhost:${port}/app/`, data: { url: `http://localhost:${port}/app/`, watch_url: watchUrl, port: Number(port), app_id: cfg.appId, watch: a.watch === "true" }, next: [{ command: `shipvo explore --json --sim http://localhost:${port}`, why: "Walk the app in the running simulator." }, { command: "shipvo test --json", why: "Run the app's tests." }] };
   } else if (json) die("The simulator stopped before it started listening.", 1, "sim_exited");
 }
