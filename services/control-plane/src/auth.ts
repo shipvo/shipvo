@@ -2,18 +2,31 @@
 // No client secret is needed for the device flow; GITHUB_CLIENT_ID is a plain var on the Worker.
 import { Hono } from "hono";
 
-type Env = { DB: D1Database; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
+export type AuthEnv = { DB: D1Database; GITHUB_CLIENT_ID?: string; SIM_URL?: string };
+type Env = AuthEnv;
 export const auth = new Hono<{ Bindings: Env }>();
 const BETA_APPS = ["tide"];   // apps anyone may open in the hosted simulator during the beta
 const KEY_TTL_DAYS = 30;
 const DEFAULT_QUOTA_MIN = 600;
 
-const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
-function newKey(scope: string) {
+export const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+export function newKey(scope: string) {
   const rand = crypto.getRandomValues(new Uint8Array(24)); const body = btoa(String.fromCharCode(...rand)).replace(/[+/=]/g, (c) => ({ "+": "a", "/": "b", "=": "" }[c]!));
   const key = `sv_${scope}_${body}`; return { key, prefix: key.slice(0, 12) };
 }
 const gh = (path: string, init: RequestInit) => fetch(`https://github.com${path}`, { ...init, headers: { accept: "application/json", "content-type": "application/json", "user-agent": "shipvo-control", ...(init.headers ?? {}) } });
+
+/** Sign-in result: a new per-account test key (only its hash is stored). A device login replaces the account's earlier test keys, as before. An OAuth sign-in replaces only the earlier key of the same connector. */
+export async function issueLoginKey(env: Env, accountId: number, login: string, via: "device" | "oauth" = "device", client = "") {
+  const { key, prefix } = newKey("test");
+  const label = via === "device" ? `shipvo login (${login})` : `shipvo oauth (${login}) ${client.slice(0, 16)}`;
+  const prior = via === "device" ? "" : " AND label = ?";   // device login: as before, replaces every earlier test key of the account
+  await env.DB.prepare(`UPDATE api_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE account_id = ? AND scope = 'test' AND revoked_at IS NULL${prior}`).bind(...(via === "device" ? [accountId] : [accountId, label])).run();
+  const expires_at = new Date(Date.now() + KEY_TTL_DAYS * 86400_000).toISOString();
+  await env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")
+    .bind(BETA_APPS[0], await sha256(key), prefix, "test", label, accountId, DEFAULT_QUOTA_MIN, expires_at).run();
+  return { key, prefix, expires_at, simUrl: (env.SIM_URL ?? "https://sim.shipvo.dev").replace(/\/$/, "") };
+}
 
 /** Step 1: the CLI asks for a device code and shows the person the URL + code. */
 auth.post("/device/start", async (c) => {
@@ -37,14 +50,7 @@ auth.post("/device/poll", async (c) => {
   await c.env.DB.prepare("INSERT INTO accounts (github_id, github_login, last_login_at) VALUES (?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(github_id) DO UPDATE SET github_login = excluded.github_login, last_login_at = excluded.last_login_at").bind(u.id, u.login).run();
   const acct = (await c.env.DB.prepare("SELECT id FROM accounts WHERE github_id = ?").bind(u.id).first<{ id: number }>())!;
   await c.env.DB.prepare("DELETE FROM device_logins WHERE device_code = ?").bind(device_code).run();
-  // One test key per login, for every beta app (keys are per app today; the simulator reads app_id from the key).
-  const { key, prefix } = newKey("test");
-  // A new login replaces the account's earlier login keys, and the new key expires.
-  await c.env.DB.prepare("UPDATE api_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE account_id = ? AND scope = 'test' AND revoked_at IS NULL").bind(acct.id).run();
-  const expires_at = new Date(Date.now() + KEY_TTL_DAYS * 86400_000).toISOString();
-  await c.env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")
-    .bind(BETA_APPS[0], await sha256(key), prefix, "test", `shipvo login (${u.login})`, acct.id, DEFAULT_QUOTA_MIN, expires_at).run();
-  const simUrl = (c.env.SIM_URL ?? "https://sim.shipvo.dev").replace(/\/$/, "");
+  const { key, prefix, expires_at, simUrl } = await issueLoginKey(c.env, acct.id, u.login);
   return c.json({ login: u.login, key, prefix, scope: "test", apps: BETA_APPS, quota_minutes: DEFAULT_QUOTA_MIN, expires_at,
     mcp: { url: `${simUrl}/mcp`, header: `Authorization: Bearer ${key}`, url_with_key: `${simUrl}/mcp/${key}` },
     note: `Store the key now; it is not shown again. It expires in ${KEY_TTL_DAYS} days; run shipvo login again to renew. It opens the beta apps in the hosted simulator; quota is sandbox minutes.` });

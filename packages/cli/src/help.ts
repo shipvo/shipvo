@@ -46,7 +46,7 @@ Ship
   ci init --framework capacitor [--dry-run] [--force]
                               Write .github/workflows/shipvo-build.yml (signed Android and iOS builds)
   status [--app id] [--json]  Show how releases do; --json lists what to do next (exit 0 ok, 1 action needed, 2 error)
-  agents setup [--dry-run] [--json]  Write AGENTS.md section and .mcp.json for AI agents, and copy the skills of your @shipvo/* dependencies
+  agents setup [--hosted] [--dry-run] [--json]  Write AGENTS.md section and .mcp.json for AI agents (--hosted: connect them to sim.shipvo.dev with your key), and copy the skills of your @shipvo/* dependencies
   skills sync [--dry-run] [--json]   Only copy the skills of your @shipvo/* dependencies into .agents/skills and .claude/skills
   approvals list|approve <id> [--app id] [--json]  List promotes held for a second owner, or approve one
   audit <app> [--format json|csv] [--limit n] [--json]  Export the audit log to stdout

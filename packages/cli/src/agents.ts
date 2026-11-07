@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { args } from "./config.js";
+import { setupHosted } from "./agents-hosted.js";
+import { login, savedCreds } from "./login.js";
 
 export type ProjectKind = "shipvo" | "expo" | "react-native" | "capacitor" | "unknown";
 
@@ -113,12 +115,15 @@ export function skillStatus(dir: string): { package: string; name: string; synce
 type Change = { file: string; action: "create" | "update" | "unchanged" | "skip"; note?: string };
 
 /** `shipvo agents setup [--dry-run] [--json]`. Exit 0 done, 2 error. */
-export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<number> {
+export type HostedDeps = { home?: string; creds?: typeof savedCreds; login?: (argv: string[]) => Promise<unknown> };
+
+export async function agentsCmd(argv: string[], dir = process.cwd(), deps: HostedDeps = {}): Promise<number> {
   const [sub, ...rest] = argv;
-  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--dry-run] [--json]"); return 2; }
+  if (sub !== "setup" && sub !== "skills-sync") { console.error("Usage: shipvo agents setup [--hosted [--agent <name>]] [--dry-run] [--json]"); return 2; }
   const only = sub === "skills-sync";
   const a = args(rest);
   const dry = a["dry-run"] !== undefined, json = a.json !== undefined;
+  if (a.hosted !== undefined && !only) return hostedCmd(dir, a, dry, json, deps);
   const kind = detectProject(dir);
   const changes: Change[] = [];
   const writes: { path: string; text: string }[] = [];
@@ -153,6 +158,31 @@ export async function agentsCmd(argv: string[], dir = process.cwd()): Promise<nu
     else if (wrote && !changes.some((c) => c.action !== "unchanged")) console.log("Nothing to change.");
     if (only && !skills.length) console.log("No installed @shipvo/* dependency ships a skill.");
     if (!only) console.log(`Install the skill: ${SKILL_LINE}`);
+  }
+  return bad ? 2 : 0;
+}
+
+/** `--hosted`: write the remote form for each agent. Signs in first when there is no key yet. */
+async function hostedCmd(dir: string, a: Record<string, string | undefined>, dry: boolean, json: boolean, deps: HostedDeps): Promise<number> {
+  const creds = deps.creds ?? savedCreds;
+  let c = creds();
+  if (!c) {
+    if (dry) { console.error("Not signed in. Run `shipvo login` first (a dry run does not sign in)."); return 2; }
+    await (deps.login ?? login)([]);
+    c = creds();
+  }
+  if (!c) { console.error("Sign-in did not finish, so no key was written. Run `shipvo login`."); return 2; }
+  const res = setupHosted({ dir, home: deps.home, url: c.mcp_url, key: c.key, dry, only: a.agent && a.agent !== "true" ? a.agent : undefined });
+  const bad = res.some((r) => r.action === "skip");
+  if (json) console.log(JSON.stringify({ ok: !bad, hosted: true, dry_run: dry, url: c.mcp_url, changes: res.map((r) => ({ agent: r.agent, file: r.file, action: r.action, reason: r.reason })) }));
+  else {
+    for (const r of res) {
+      if (r.action === "print") console.log(`${r.agent}: not written. ${r.reason}\n${r.block}\n`);
+      else if (r.action === "skip") console.log(`${r.agent}: ${r.reason}`);
+      else console.log(`${r.agent}: ${r.file} ${r.action === "unchanged" ? "already up to date" : `${dry ? "would " : ""}${r.action}${dry ? "" : "d"}`}`);
+    }
+    console.log(`Claude Code can also sign in without a key: claude mcp add --transport http shipvo ${c.mcp_url}`);
+    if (dry) console.log("Dry run: nothing was written.");
   }
   return bad ? 2 : 0;
 }

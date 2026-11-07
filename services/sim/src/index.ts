@@ -17,8 +17,10 @@ export class SimContainer extends Container<Env> {
 }
 
 const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
-const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS", "access-control-expose-headers": "mcp-session-id" };
-const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", ...CORS } });
+const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS", "access-control-expose-headers": "mcp-session-id, www-authenticate" };
+const json = (o: unknown, status = 200, extra: Record<string, string> = {}) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", ...CORS, ...extra } });
+// A 401 points OAuth clients (MCP authorization spec) at the protected resource metadata, so they can sign in.
+const challenge = (url: URL) => ({ "www-authenticate": `Bearer resource_metadata="${url.origin}/.well-known/oauth-protected-resource"` });
 
 class QuotaError extends Error { constructor(public quota: number, public used: number) { super(`quota exhausted: ${used}/${quota} sandbox minutes used`); } }
 
@@ -73,6 +75,8 @@ export default {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response("", { status: 204, headers: CORS });
     if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, service: "shipvo-sim", backend: env.E2B_API_KEY ? "e2b" : env.SIM ? "containers" : "none", mcp: "/mcp", docs: "https://github.com/shipvo/shipvo/tree/main/packages/mcp" });
+    // Protected resource metadata (RFC 9728): the authorization server is the control plane (GitHub sign-in).
+    if (url.pathname === "/.well-known/oauth-protected-resource" || url.pathname === "/.well-known/oauth-protected-resource/mcp") return json({ resource: `${url.origin}/mcp`, authorization_servers: [env.CONTROL.replace(/\/$/, "")], bearer_methods_supported: ["header"], scopes_supported: ["mcp"], resource_name: "Shipvo hosted simulator" });
     // /mcp with Authorization: Bearer <key>, or, for clients that cannot send headers (ChatGPT's custom MCP
     // connectors offer only OAuth or none), /mcp/<key> or /mcp?key=<key>.
     const pathKey = url.pathname.match(/^\/mcp\/([A-Za-z0-9_-]{8,})$/)?.[1];
@@ -92,10 +96,10 @@ export default {
         if (msg.method === "tools/list") return rpc({ tools: TOOLS });
       }
     }
-    if (!key) return json({ error: "missing_api_key", hint: "Authorization: Bearer <key> (create one with the owner command create_api_key)" }, 401);
+    if (!key) return json({ error: "missing_api_key", hint: "Sign in with OAuth, or send Authorization: Bearer <key> (run `shipvo login`)" }, 401, challenge(url));
     const row = await env.DB.prepare("SELECT id, app_id, scope, expires_at, account_id FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL").bind(await sha256(key)).first<{ id: number; app_id: string; scope: string; expires_at: string | null; account_id: number | null }>();
-    if (!row) return json({ error: "invalid_api_key" }, 401);
-    if (row.expires_at && row.expires_at < new Date().toISOString()) return json({ error: "expired_api_key", expires_at: row.expires_at, hint: "Run `shipvo login` to get a new key." }, 401);
+    if (!row) return json({ error: "invalid_api_key" }, 401, challenge(url));
+    if (row.expires_at && row.expires_at < new Date().toISOString()) return json({ error: "expired_api_key", expires_at: row.expires_at, hint: "Run `shipvo login` to get a new key." }, 401, challenge(url));
     env.DB.prepare("UPDATE api_keys SET last_used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?").bind(row.id).run().catch(() => {});
 
     // A signed-in developer's key opens the beta app plus the apps they registered.
