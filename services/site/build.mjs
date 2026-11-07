@@ -48,6 +48,7 @@ const NAV = [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },
     { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real React Native app flows in a headless simulator on every pull request, with typed Vitest tests. No emulator, no device farm." },
     { slug: "ci-check", src: "docs/ci-check.md", title: "Check every pull request", desc: "Add one workflow so every pull request builds your app, runs your Shipvo flows and explores every button. Fails on regressions and crashes only." },
+    { slug: "test-your-build", src: "docs/test-your-build.md", title: "Test your build on the hosted phone", desc: "Upload the build on your machine with shipvo sim --hosted or upload_build, then open it as a hosted phone session on Android and iOS." },
     { slug: "timeline", src: "docs/timeline.md", title: "Behaviour timeline", desc: "See every release and pull request check run in one list, with flows, findings and screens, and compare any two points on Android and iOS." },
   ]},
   { group: "Agents", pages: [
