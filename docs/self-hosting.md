@@ -64,24 +64,24 @@ This is for the Docker control plane above. All state (the local D1 database and
 
 ### Back up
 
-Stop the control plane first, so the files are not copied mid-write. Run these in `services/control-plane`:
+The image has `backup` and `restore` commands. Stop the control plane first, so the files are not copied mid-write. Run these in `services/control-plane`:
 
 ```bash
 docker compose stop
 mkdir -p backup
-docker run --rm -v control-plane_control-plane-data:/data:ro -v "$PWD/backup":/backup node:22-bookworm-slim \
-  tar czf /backup/control-plane-data.tgz -C /data .
+docker compose run --rm --no-deps -v "$PWD/backup":/backup control-plane backup /backup/control-plane-data.tgz
 docker compose start
 ```
 
+`backup` writes to a temporary name and renames it when the copy is complete, so a half-written file never has the final name.
+
 ### Restore
 
-Into a new, empty volume (after `docker compose down -v`, or on another machine):
+Into a new, empty volume (after `docker compose down -v`, or on another machine). `restore` refuses to write over existing data.
 
 ```bash
-docker volume create control-plane_control-plane-data
-docker run --rm -v control-plane_control-plane-data:/data -v "$PWD/backup":/backup:ro node:22-bookworm-slim \
-  tar xzf /backup/control-plane-data.tgz -C /data
+docker compose down -v
+docker compose run --rm --no-deps -v "$PWD/backup":/backup:ro control-plane restore /backup/control-plane-data.tgz
 docker compose up -d
 ```
 

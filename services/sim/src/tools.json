@@ -1894,7 +1894,8 @@
                 "approve",
                 "decline",
                 "timeout",
-                "insufficient_funds"
+                "insufficient_funds",
+                "cancel"
               ]
             },
             "pin": {

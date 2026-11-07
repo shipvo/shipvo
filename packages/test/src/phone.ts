@@ -22,7 +22,7 @@ export type DeviceSettings = {
   /** The files the file picker offers. Replaces the current ones. */
   files?: SeedFile[];
   biometrics?: { enrolled?: boolean; nextResult?: "success" | "fail" | "cancel" };
-  payment?: { nextResult?: "approve" | "decline" | "timeout" | "insufficient_funds"; pin?: string };
+  payment?: { nextResult?: "approve" | "decline" | "timeout" | "insufficient_funds" | "cancel"; pin?: string };
   online?: boolean;
 };
 export type DeviceProfile = { platform?: "android" | "ios"; api?: number };

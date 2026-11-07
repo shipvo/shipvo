@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { Hono } from "hono";
 import { vaultRoutes } from "../src/vault";
 import { decryptSecret } from "../src/vault-crypto";
+import { useSecret } from "../src/vault-use";
 import app from "../src/index";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
@@ -12,6 +13,7 @@ const SECRET = "rk_live_SUPERSECRETVALUE1234567890";
 function setup(fetchImpl?: any) {
   const sql = new DatabaseSync(":memory:");
   sql.exec(require_sql());
+  sql.exec(createRequire(import.meta.url)("node:fs").readFileSync(new URL("../migrations/0024_vault_use.sql", import.meta.url), "utf8"));
   const db = { prepare: (q: string) => { const st = sql.prepare(q); let b: any[] = []; const o: any = {
     bind: (...a: any[]) => { b = a; return o; }, first: async () => st.get(...b) ?? null, all: async () => ({ results: st.all(...b) }), run: async () => ({ meta: { changes: st.run(...b).changes } }) }; return o; } } as any;
   const who = async (c: any, appId: string) => (c.req.header("authorization") === `Bearer owner-${appId}` ? "owner (admin)" : null);
@@ -65,6 +67,25 @@ describe("vault store", () => {
     expect((await store(j.ticket)).status).toBe(201);
     expect((await store(j.ticket, "rk_other")).status).toBe(410);
     expect((await req(`/vault/t/${j.ticket}`)).status).toBe(410);
+  });
+  it("saving a key again clears an earlier revocation", async () => {
+    const { ticket, store, sql, env } = setup();
+    const { j } = await ticket();
+    expect((await store(j.ticket)).status).toBe(201);
+    sql.prepare("INSERT INTO vault_revoked VALUES (?,?,?)").run("tide", "STRIPE_KEY", "2026-02-01");
+    const use = { person: "owner (admin)", app: "tide", name: "STRIPE_KEY", host: "api.stripe.com" };
+    expect(await useSecret(env, use)).toEqual({ ok: false, reason: "revoked" });
+    const again = (await ticket()).j;
+    expect((await store(again.ticket, "rk_live_NEWKEY1234567890")).status).toBe(201);
+    expect(sql.prepare("SELECT COUNT(*) AS n FROM vault_revoked").get().n).toBe(0);
+    expect(await useSecret(env, use)).toEqual({ ok: true, value: "rk_live_NEWKEY1234567890" });
+  });
+  it("a failed revocation clear fails the save and gives the ticket back", async () => {
+    const { ticket, store, sql, req } = setup();
+    const { j } = await ticket();
+    sql.exec("DROP TABLE vault_revoked");
+    expect((await store(j.ticket)).status).toBe(500);
+    expect((await req(`/vault/t/${j.ticket}`)).status).toBe(200);
   });
   it("two racing posts store once", async () => {
     const { ticket, store } = setup();
