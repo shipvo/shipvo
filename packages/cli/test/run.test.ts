@@ -93,6 +93,14 @@ describe("frame page, shared renderer", () => {
       expect(l).toContain('<iframe id="app" src="/app/"'); expect(l).toContain("scale(");
     }
   });
+  it("keeps the label and sheet button in one wrapping row, and reserves room for the error bar below the phone", () => {
+    const h = runFramePage("android", "Tide", renderFrame);
+    expect(h).toContain('<div class="top" id="top"><div class="tag"');
+    expect(h).toMatch(/\.tag\{[^}]*overflow-wrap:anywhere/);
+    expect(h).not.toMatch(/\.tag\{position:fixed/);
+    expect(h).toContain("b.hidden?10:b.offsetHeight+20");
+    expect(h).toContain("window.fit&&fit()");
+  });
   it("loadFrameRenderer resolves @shipvo/sim and returns a function", async () => {
     // @shipvo/sim is not linked into the CLI package, so point at the sim package, which can resolve its own export.
     const sim = join(dirname(fileURLToPath(import.meta.url)), "../../sim/package.json");

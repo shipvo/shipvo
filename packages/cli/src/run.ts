@@ -85,8 +85,8 @@ export const RELOAD_PATH = "/__shipvo/reload";
 const RELOAD_CLIENT = `(function(){if(!window.EventSource)return;var b=document.getElementById("banner"),f=document.getElementById("app");
 var es=new EventSource("${RELOAD_PATH}");
 es.onmessage=function(m){var d;try{d=JSON.parse(m.data)}catch(e){return}
-if(d.type==="error"){if(b){b.textContent=d.message;b.hidden=false}}
-else if(d.type==="reload"){if(b)b.hidden=true;try{f.contentWindow.location.reload()}catch(e){f.src=f.src}}}})()`;
+if(d.type==="error"){if(b){b.textContent=d.message;b.hidden=false;window.fit&&fit()}}
+else if(d.type==="reload"){if(b){b.hidden=true;window.fit&&fit()}try{f.contentWindow.location.reload()}catch(e){f.src=f.src}}}})()`;
 
 /** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. The phone body comes from @shipvo/sim's renderFrame. */
 export function runFramePage(platform: Platform, name: string, render: RenderFrame, dark = false, token?: string): string {
@@ -105,14 +105,16 @@ ${frame.css}
 .sheet.open{display:flex}
 .sheet .box{background:#fff;color:#111;width:${platform === "ios" ? "270px" : "100%"};box-sizing:border-box;padding:20px;border-radius:${platform === "ios" ? "14px" : "28px 28px 0 0"};text-align:center}
 .sheet button{display:block;width:100%;margin-top:8px;padding:10px;border:0;border-radius:${platform === "ios" ? "8px" : "20px"};background:#eee;font:inherit;cursor:pointer}
-.sheetbtn{position:fixed;right:12px;top:10px;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
-.banner{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);max-width:min(90vw,640px);padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
+.top{position:fixed;left:12px;right:12px;top:10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;z-index:6;pointer-events:none}
+.top>*{pointer-events:auto}
+.sheetbtn{flex:none;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
+.banner{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);max-width:min(90vw,640px);box-sizing:border-box;max-height:30vh;overflow:auto;padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
 .banner[hidden]{display:none}
 ${runPanelCss()}
-.tag{position:fixed;left:12px;top:10px;padding:3px 10px;border-radius:12px;background:#111;color:#fff;font-size:12px}
+.tag{min-width:0;padding:3px 10px;border-radius:12px;background:#111;color:#fff;font-size:12px;overflow-wrap:anywhere}
 </style></head><body>
-<div class="tag" role="status">Simulated ${f.label} (${f.width}x${f.height}). The app's web build on the simulated device.</div>
-<button class="sheetbtn" id="sheetbtn" type="button">Show ${f.label} system sheet</button>
+<div class="top" id="top"><div class="tag" role="status">Simulated ${f.label} (${f.width}x${f.height}). The app's web build on the simulated device.</div>
+<button class="sheetbtn" id="sheetbtn" type="button">Show ${f.label} system sheet</button></div>
 <div class="banner" id="banner" role="alert" data-part="build-error" hidden></div>
 ${runPanelHtml()}
 <div id="fit"><div id="phone" data-platform="${platform}">${frame.html}</div></div>
@@ -122,7 +124,7 @@ function sheet(on){sh.classList.toggle("open",on)}
 document.getElementById("sheetbtn").onclick=function(){sheet(!sh.classList.contains("open"))};
 sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet(false)};
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
-function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},(innerHeight-60)/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
+function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var t=document.getElementById("top"),b=document.getElementById("banner");var top=t.offsetHeight+20,bot=b.hidden?10:b.offsetHeight+20;var ah=Math.max(100,innerHeight-top-bot);var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},ah/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.top=(top+ah/2)+"px";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
 </script><script>${runPanelScript()}</script><script>${RELOAD_CLIENT}</script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
