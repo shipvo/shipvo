@@ -1,0 +1,1 @@
+- Docs: "Check every pull request" now says who it is for and has Troubleshooting and Next steps; `shipvo explore --save-tests` is in the Agents guide; the glossary has agents setup, deep link, Save as test and app spec.

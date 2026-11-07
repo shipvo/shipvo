@@ -160,6 +160,20 @@ The control plane has a verifier for OIDC ID tokens from Okta, Entra ID, Google 
 - The issuer and JWKS URL must be https. Keys are cached. An unknown `kid` causes at most one refetch per minute, so forged `kid` values cannot make us hammer the identity provider.
 - A role comes only from a configured group or a verified email domain. The highest matching role wins. No match means no access.
 
+## Single sign-on, SAML response verification (slice of #296)
+
+The control plane has a verifier for SAML 2.0 responses from enterprise identity providers. It is not connected to any route yet. Code: `services/control-plane/src/saml.ts`.
+
+| Threat | What stops it | Test |
+| --- | --- | --- |
+| Unsigned or forged assertion | The assertion or the response must carry an enveloped RSA-SHA256 signature that verifies against the configured certificate. Keys inside the response are ignored. | "refuses an unsigned assertion", "refuses a bad signature ..." |
+| Signature wrapping, or a signature over another element | Exactly one assertion, as a direct child of the response. Duplicate `ID` values and signatures anywhere else are refused. The reference must point at the element that holds the assertion, and the digest is checked against it. | "refuses signature wrapping ...", "refuses a signature over a different element ..." |
+| DTD and external entities | Any `DOCTYPE` or `ENTITY` is refused before parsing. Processing instructions are refused. Only the five built-in entities and character references are read. The parser is our own and fetches nothing. | "refuses a doctype with external entities" |
+| Wrong issuer, audience or time | Issuer, audience, `NotBefore` and `NotOnOrAfter` are checked against a 60 second skew. `NotOnOrAfter` is required. | "refuses the wrong audience", "... expired", "... not valid yet", "... wrong issuer" |
+| Response to another request, or replay | `InResponseTo` must match the request we sent. An assertion id is accepted once, and is recorded only after every other check passes. | "refuses a response to a different request", "refuses a replayed assertion id" |
+
+A role comes from the same group and email-domain mapping as OIDC. No match means no access.
+
 ## Secret vault, key-shaped text in tool inputs (slice 5)
 
 A person may paste an API key into the chat. The model would then pass it to a tool, and it could reach a transcript or log. Code: `packages/mcp-tools/src/secret-guard.ts`, applied in `use()` in `packages/mcp/src/server.ts`, so the stdio and remote servers behave the same.

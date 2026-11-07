@@ -38,8 +38,8 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | Tool | What it does |
 | --- | --- |
 | `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
-| `list_sessions` | Open sessions on this server, to resume after a reconnect |
-| `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
+| `list_sessions` | Open sessions on this server, to resume after a reconnect: app, platform, room, who opened it, start time and screen title |
+| `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?, room?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
 | `attach_session(app?, session?)` | Attach to the live `shipvo run` phone (Android or iOS) from `.shipvo/run.json`, without an app id. Returns `no_live_run` when no run is up (or `app` does not match it) and `attach_failed` when the phone cannot be reached |
 | `screen(session)` | The accessibility tree with refs (`[ref=e12]`) |
@@ -54,6 +54,10 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
+
+## Rooms: several phones, one backend
+
+Give `open_app` the same `room` on two sessions and both phones share one backend: an order placed on one shows up for the other. Use it to test two people in one app, for example a buyer and a shop owner, on Android and iOS. Without `room`, a session gets its own backend. A room name that is not valid returns `bad_room`. A room ends when its last session ends, and `end_session` names the room and its orders.
 
 ## Driving the live phone
 
@@ -138,6 +142,7 @@ The `waitFor(/\S/)` lines only wait for the screen to have some text. Replace ea
 shipvo explore --max-steps 100 --max-depth 3
 shipvo explore --sim http://localhost:4545   # use a simulator that is already running
 shipvo explore --seed 1                     # the same seed repeats the same run
+shipvo explore --save-tests tests/lumi      # write one @shipvo/test file per finding
 shipvo explore --skin ios                   # small-target minimum 44 instead of 48
 shipvo explore --fail-on-findings            # exit 1 when there are findings (default: exit 0)
 shipvo explore --issues-dir issues           # one ready-to-file issue per finding
@@ -190,7 +195,7 @@ Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_pol
 
 ## Grading an agent
 
-`end_session` returns what the app actually sent to its backend, not what the agent says it did. The Tide & Tackle repo has an agent-eval harness that scores tasks that way ([agent-gate-results.md](agent-gate-results.md)).
+`end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval` scores an agent on a task that way: see [Score an agent on an app task](eval.md). Earlier results: [agent-gate-results.md](agent-gate-results.md).
 
 ## Listing your app for every agent
 
@@ -218,5 +223,6 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 - [Test with an assistant](test-with-an-assistant.md): the same flow in plain words, for founders.
 - [Turn a session into a test](#turn-a-session-into-a-test) and [Test your app in CI](testing.md).
+- [Score an agent on an app task](eval.md).
 - [Run on a phone](run.md): watch the assistant work in your browser.
 - [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone.
