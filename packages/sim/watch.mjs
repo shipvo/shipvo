@@ -79,14 +79,15 @@ const CSS = `html,body{margin:0;height:100%;background:#e8eaed;font:14px system-
 body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px;box-sizing:border-box;overflow:auto}
 .w-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}.w-bar select{font:inherit;padding:4px 6px}
 .w-empty{margin:0;color:#444}.w-view{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
-.w-view img{width:100%;height:100%;object-fit:contain;display:block}`;
+.w-view img{width:100%;height:100%;object-fit:contain;display:block}
+@media (prefers-color-scheme:dark){html,body{background:#15171a;color:#eee}.w-empty{color:#bbb}}`;
 
 const SCRIPT = (skin, pinned) => `(function(){
 var $=function(p){return document.querySelector('[data-part="'+p+'"]')},img=$("screen"),pick=$("session-picker"),pinned=${JSON.stringify(pinned)},ws;
 function label(s){return s.app+" \\u00b7 "+(s.skin==="ios"?"iPhone":"Android")+" \\u00b7 "+(s.started_at||"").replace("T"," ").slice(0,19)}
 function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/watch/ws"+(pinned?"?session="+encodeURIComponent(pinned):""));
 ws.onmessage=function(e){var m=JSON.parse(e.data);
-if(m.type==="frame"){img.src="data:image/jpeg;base64,"+m.data;$("viewer").classList.add("has-frame");$("empty").hidden=true}
+if(m.type==="frame"){img.src="data:image/jpeg;base64,"+m.data;$("empty").hidden=true}
 else if(m.type==="sessions"){
 pick.innerHTML="";var f=document.createElement("option");f.value="";f.textContent="Newest session";pick.append(f);
 m.sessions.forEach(function(s){var o=document.createElement("option");o.value=s.session;o.textContent=label(s);pick.append(o)});
@@ -94,7 +95,7 @@ pick.value=m.following?"":m.current||"";
 $("empty").hidden=!!m.current;
 var cur=m.sessions.filter(function(s){return s.session===m.current})[0];
 if(cur&&cur.skin!==${JSON.stringify(skin)})location.replace("/watch?skin="+cur.skin+(pinned?"&session="+encodeURIComponent(pinned):""));
-if(!m.current){img.removeAttribute("src");$("viewer").classList.remove("has-frame")}}};
+if(!m.current){img.removeAttribute("src");0}}};
 ws.onclose=function(){setTimeout(connect,1000)}}
 pick.onchange=function(){pinned=pick.value;if(ws)ws.onclose=null,ws.close();connect()};
 connect();
