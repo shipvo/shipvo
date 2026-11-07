@@ -1,1 +1,1 @@
-- docs: new page "Score an agent with shipvo eval" (task files, checks, run, report, troubleshooting) and a section on `room` in the agents page. Both are in the sidebar and `llms.txt`.
+- docs: new section on `room` in the agents page, with `list_sessions` fields and the room report in `end_session`, and a link to the eval page.
