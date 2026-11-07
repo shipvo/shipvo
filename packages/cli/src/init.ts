@@ -772,16 +772,16 @@ export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order
         if (!p) return null;
         return (
           <View key={l.id} style={s.row}>
-            <Text style={s.body}>{p.name} x {l.qty}</Text>
+            <Text style={[s.body, s.name]}>{p.name} x {l.qty}</Text>
             <View style={s.ctrl}>
-              <Pressable accessibilityRole="button" accessibilityLabel={"Minus " + p.name} onPress={() => minus(l)} style={s.remove}><Text style={s.backText}>-</Text></Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={"Plus " + p.name} onPress={() => change(l.id, 1)} style={s.remove}><Text style={s.backText}>+</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={"Minus " + p.name} onPress={() => minus(l)} style={s.remove}><Text style={s.sign}>{"\u2212"}</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={"Plus " + p.name} onPress={() => change(l.id, 1)} style={s.remove}><Text style={s.sign}>+</Text></Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel={"Remove " + p.name} onPress={() => removeLine(l.id)} style={s.remove}><Text style={s.backText}>Remove</Text></Pressable>
             </View>
           </View>
         );
       })}
-      {undo ? <Pressable accessibilityRole="button" accessibilityLabel="Undo" onPress={undoRemove} style={s.remove}><Text style={s.backText}>{"Undo (" + undo.name + " removed)"}</Text></Pressable> : null}
+      {undo ? <Pressable accessibilityRole="alert" accessibilityLiveRegion="polite" accessibilityLabel="Undo" onPress={undoRemove} style={s.remove}><Text style={s.backText}>{"Undo (" + undo.name + " removed)"}</Text></Pressable> : null}
       <Text style={s.total}>{"Total: " + formatPrice(totalCents)}</Text>
       {lines.length > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Pay" accessibilityState={{ disabled: busy }} onPress={pay} style={s.pay}><Text style={s.payText}>Pay</Text></Pressable> : null}
       {status ? <Text style={s.body} accessibilityRole="alert">{status}</Text> : null}
@@ -794,7 +794,9 @@ const s = StyleSheet.create({
   back: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }, backText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
   h1: { fontSize: 24, fontWeight: "800", color: "#111" },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  name: { flexShrink: 1 },
   ctrl: { flexDirection: "row", alignItems: "center" },
+  sign: { fontSize: 24, fontWeight: "700", color: "#1F4E5F" },
   remove: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" },
   body: { fontSize: 16, color: "#111" },
   total: { fontSize: 20, fontWeight: "800", color: "#111" },
@@ -837,7 +839,9 @@ test("paying with mobile money places the order and empties the cart", async ({ 
   await phone.tap("Cart");
   await phone.tap("Pay");
   await phone.waitFor("Order placed");
-  expect(phone).toSee("Your cart is empty");
+  await phone.tap("Back to shop");
+  await phone.tap("Cart");
+  await phone.waitFor("Your cart is empty");
 });
 
 test("a declined payment says why and keeps the cart", async ({ phone }) => {
@@ -885,8 +889,8 @@ test("paying offline keeps the cart and places no order", async ({ phone }) => {
   await phone.tap(products[0].name);
   await phone.tap("Add to cart");
   await phone.tap("Cart");
-  const before = (await phone.deviceLog()).length;
   await phone.device.set({ online: false });
+  const before = (await phone.deviceLog()).length;
   await phone.tap("Pay");
   await phone.waitFor("You're offline. Your cart is saved.");
   expect(phone).toSee("Total: " + formatPrice(products[0].price));
@@ -917,6 +921,16 @@ test("Undo brings a removed line back", async ({ phone }) => {
   await phone.waitFor("Your cart is empty");
   await phone.tap("Undo");
   await phone.waitFor("Total: " + formatPrice(a.price));
+});
+
+test("the Undo row goes away by itself after a few seconds", async ({ phone }) => {
+  const [a] = products;
+  await phone.tap(a.name);
+  await phone.tap("Add to cart");
+  await phone.tap("Cart");
+  await phone.tap("Remove " + a.name);
+  await phone.waitFor("Undo");
+  await phone.waitForGone("Undo", { timeout: 10_000 });
 });
 
 test("after paying, the confirmation shows the order number, items and total, and Back to shop returns to the list", async ({ phone }) => {
