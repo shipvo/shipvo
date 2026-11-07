@@ -50,7 +50,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | |
 | MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | [run-your-app-on-a-phone](tutorials/run-your-app-on-a-phone.md) | [See your app on a phone in your browser](videos.md#see-your-app-on-a-phone-in-your-browser-with-shipvo-run) | [see-your-react-native-app-on-a-phone-in-your-browser](../blog/see-your-react-native-app-on-a-phone-in-your-browser.md) |
-| Assistant attaches to the live `shipvo run` phone (`open_app`) | [run](run.md), [agents](agents.md) | | | |
+| Assistant attaches to the live `shipvo run` phone (`open_app`, with `platform` and `show` to start the phone and watch) | [run](run.md), [agents](agents.md) | | | |
 | Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md), [worked example](record-a-demo-video.md) | | | |
 | Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | [Get your 12 Google Play testers](videos.md) | [google-play-12-testers-14-days](../blog/google-play-12-testers-14-days.md) |
 | Real camera, microphone and location in the browser | [device-api](device-api.md) | | | |
@@ -67,15 +67,12 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
-| `shipvo agents setup` for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md#shipvo-agents-setup), [agents](agents.md) | | | |
-| `open_app` with `platform` and `show` (start the phone and watch) | [agents](agents.md) | | | |
-| Deep links on Shipvo Phone (`open_url`, `Linking.openURL`, one-shot initial URL) | [phone-apps](phone-apps.md), [testing](testing.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
 | App spec blocks (`stat`, `progress`, `card`, `toggle`, `segmented`, `chart`, sheets) | [@shipvo/spec](../packages/spec/README.md), [app-spec](design/app-spec.md) | | | |
 | Self-hosted control plane `backup` and `restore` | [self-hosting](self-hosting.md) | | | |
 | Network off blocks the app's network calls (`TypeError: Network request failed`) | [device-api](device-api.md#network) | | | |
 | Payment cancel returns `cancelled` (`@shipvo/device` 0.1.5) | [device-api](device-api.md#payments) | | | |
-| Deep links: `open_url` and `Linking.openURL` switch to the owning app | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
-| `shipvo agents setup` writes the MCP config for every coding agent | [cli](cli.md), [agents](agents.md) | | | |
+| Deep links: `open_url` and `Linking.openURL` switch to the owning app; one-shot initial URL | [phone-apps](phone-apps.md), [testing](testing.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
+| `shipvo agents setup` writes the MCP config for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md#shipvo-agents-setup), [agents](agents.md) | | | |
 | Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec](../packages/spec/README.md) | | | |
 | Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
 | Pull-request screenshots before and after (`shipvo ci shots`) | [ci-check](ci-check.md) | | | |

@@ -95,7 +95,7 @@ All of these render in Android and iOS styles and show their value in the screen
 
 Open a screen as a bottom sheet with `{ "navigate": "<screen>", "presentation": "sheet" }`. `back` closes it.
 
-In `createApp`, `app.toggle("Alerts")` flips a toggle (or `app.toggle("Alerts", true)` sets it) and `app.select("Period", "week")` picks a segment. `app.state` starts with the defaults the spec declares. Code that read `app.state` before any change used to see `{}` and now sees those defaults.
+In `createApp`, `app.toggle("Alerts")` flips a toggle (or `app.toggle("Alerts", true)` sets it) and `app.select("Period", "week")` picks a segment. `app.state` starts with the defaults the spec declares.
 
 ### Charts
 
