@@ -71,6 +71,35 @@ try {
   await android.getByTestId("square-e4").click();
   await page.waitForFunction(() => document.querySelectorAll("#cd-moves li").length === 1 && /^1\. e2e4 \S+/.test(document.querySelector("#cd-moves li").textContent), null, { timeout: SLOW });
   assert.deepEqual(errors, []);
+  // Stress: switch mode right after an autoplay move, and let the old phone send late messages while the new one loads.
+  // The page must ignore them. On a timeout, print the Playwright error and the move list.
+  for (let i = 0; i < 3; i++) {
+    try {
+      await page.waitForFunction(() => document.querySelectorAll("#cd-moves li").length > 0, null, { timeout: SLOW });
+      await page.evaluate(() => {
+        const old = document.getElementById("cd-phone-white").contentWindow.frames[0];
+        document.getElementById("cd-mode").click();
+        const send = (moves) => old.eval(`parent.parent.postMessage({ type: "chess:moves", moves: ${JSON.stringify(moves)} }, "*")`);
+        send([]); send(["e2e4", "e7e5", "g1f3"]);
+      });
+      await android.getByTestId("board").waitFor({ timeout: SLOW });
+      await ios.getByTestId("board").waitFor({ timeout: SLOW });
+      await page.waitForFunction(() => /Your move|White to move/.test(document.getElementById("cd-status").textContent), null, { timeout: SLOW });
+      const mode = await page.locator("#cd-mode").textContent();
+      if (/Watch/.test(mode)) {
+        await android.getByTestId("square-e2").click();
+        await android.getByTestId("square-e4").click();
+        await page.waitForFunction(() => document.querySelectorAll("#cd-moves li").length === 1 && /^1\. e2e4 \S+/.test(document.querySelector("#cd-moves li").textContent), null, { timeout: SLOW });
+      } else {
+        await page.waitForFunction(() => /^1\. e2e4/.test(document.querySelector("#cd-moves li")?.textContent || ""), null, { timeout: SLOW });
+      }
+    } catch (err) {
+      const list = await page.locator("#cd-moves").innerText().catch(() => "(unreadable)");
+      console.error(`chess demo: stress round ${i + 1} failed\n${err.message}\nmove list: ${JSON.stringify(list)}`);
+      throw err;
+    }
+  }
+  assert.deepEqual(errors, []);
   // 375 px does not scroll sideways.
   await page.setViewportSize({ width: 375, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll at 375 px");
