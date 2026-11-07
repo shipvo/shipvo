@@ -145,32 +145,37 @@ export async function measureRun({ cli, app, platform = "android", timeoutMs = 1
   }
 }
 
-export async function main(argv) {
+/** `deps` lets tests fake the scaffold step and the measurement. */
+export async function main(argv, { measure = measureRun, init: initStep = runStep } = {}) {
   const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
   const cli = resolve(opt("--cli", join(here, "../../packages/cli/dist/cli.js")));
   const outFile = resolve(opt("--out", "run-time.json"));
   const template = opt("--template", "blank");
   const timeoutMs = Number(opt("--timeout", "120")) * 1000;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) { console.error("--timeout must be a positive number of seconds"); return 2; }
+  const which = opt("--platform", "both");
+  if (!["android", "ios", "both"].includes(which)) { console.error("--platform must be android, ios or both"); return 2; }
   const root = mkdtempSync(join(tmpdir(), "shipvo-run-time-"));
   const app = join(root, "app");
   try {
-    const init = runStep("init", cli, ["init", app, ...(template === "blank" ? [] : ["--template", template])], root);
+    const init = initStep("init", cli, ["init", app, ...(template === "blank" ? [] : ["--template", template])], root);
     if (init.exit !== 0) { console.error(`init failed with exit ${init.exit}:\n${init.stderr}`); return 1; }
     if (argv.includes("--with-install")) {
       const inst = runInstallStep(app);
       if (inst.exit !== 0) { console.error(`install failed with exit ${inst.exit}:\n${inst.stderr}`); return 1; }
     }
-    const which = opt("--platform", "both");
-    if (!["android", "ios", "both"].includes(which)) { console.error("--platform must be android, ios or both"); return 2; }
     const result = {};
+    let failed = false;
+    // A failed platform must not drop the numbers already measured: keep going, record it, report the rest, then exit 1.
     for (const platform of which === "both" ? ["android", "ios"] : [which]) {
-      try { result[platform] = await measureRun({ cli, app, platform, timeoutMs }); }
-      catch (e) { console.error(`shipvo run ${platform}: ${e.message}`); return 1; }
+      try { result[platform] = await measure({ cli, app, platform, timeoutMs }); }
+      catch (e) { failed = true; console.error(`shipvo run ${platform}: ${e.message}`); }
     }
-    writeFileSync(outFile, JSON.stringify(result, null, 2) + "\n");
-    console.log(tableByPlatform(result));
-    return 0;
+    if (Object.keys(result).length > 0) {
+      writeFileSync(outFile, JSON.stringify(result, null, 2) + "\n");
+      console.log(tableByPlatform(result));
+    }
+    return failed ? 1 : 0;
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
