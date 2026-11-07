@@ -66,7 +66,7 @@ When `shipvo run` is up for your app, `open_app` attaches to that phone and the 
 - a dot at each tap point, an outline around the target, and an "Agent is driving" banner;
 - a step log in plain words, such as `Tapped button "Add to cart"`. Events from the simulated device are marked "(simulated)". **Hide steps** collapses the log so it never covers the app.
 
-To let someone follow along without touching the phone, open `/watch` on the simulator. It lists live sessions, follows the newest one unless you pick another, and shows the phone in its Android or iOS frame. It is view only.
+To let someone follow along without touching the phone, open `/watch` on the simulator. It lists live sessions, follows the newest one unless you pick another, and shows the phone in its Android or iOS frame. It starts view only; the viewer can turn on **Take over** to drive the phone.
 
 The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on. An action already in flight when the person takes over still finishes, and its step is logged after "You took over".
 
@@ -197,7 +197,7 @@ Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_pol
 
 ## Grading an agent
 
-`end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval run` scores any agent or model that way: success per check, steps, time, errors and retries. See [Score an agent on app tasks](eval.md). The Tide & Tackle repo also has an agent-eval harness ([agent-gate-results.md](agent-gate-results.md)).
+`end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval run` scores any agent or model that way: success per check, steps, time, errors and retries. See [Score an agent on an app task](eval.md). The Tide & Tackle repo also has an agent-eval harness ([agent-gate-results.md](agent-gate-results.md)).
 
 ## Listing your app for every agent
 

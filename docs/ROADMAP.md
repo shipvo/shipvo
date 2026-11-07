@@ -82,7 +82,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
-- 2026-11-07: Watch the agent's phone live at `/watch`, view only; sessions can share a room ([docs](agents.md), #1217, #1203)
+- 2026-11-07: Watch the agent's phone live at `/watch`; sessions can share a room ([docs](agents.md), #1217, #1203)
 - 2026-11-07: `shipvo eval run` and `shipvo eval report` score any agent or model on an app task: pass rate, steps, time, errors and retries on Android and iOS ([Score an agent](eval.md), #1201)
 - 2026-11-07: Sessions that open an app with the same `room` share one backend; `list_sessions` shows room, opener and screen ([Agents](agents.md#rooms-several-phones-one-backend), #1203)
 - 2026-11-07: `shipvo agents setup --hosted` writes the hosted Shipvo phone config for each coding agent ([CLI guide](cli.md), #1215)
