@@ -34,12 +34,21 @@ public final class ShipvoRuntimeModule: Module {
       let now = Store.now()
       let coldStart = max(0, (Date().timeIntervalSince1970 - Self.processStart()) * 1000)
       let sinceLoad = Store.bundleSelectedAt > 0 ? (now - Store.bundleSelectedAt) * 1000 : -1
+      // markHealthy can be called from a background task or at module init. Only a load that can show a screen is healthy.
+      guard ShipvoBundleSelector.hasShownUi else {
+        return ["release": Store.runningRelease, "coldStartMs": Int(coldStart), "sinceLoadMs": Int(sinceLoad), "promoted": false,
+                "kind": Store.loadsInProcess <= 1 ? "cold" : "reload"]
+      }
+      ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false)
       let promoted = ShipvoBundleSelector.promoteIfRunning(s)
       ShipvoBundleSelector.noteHealthy()
       Self.scheduleStable()
       return ["release": Store.runningRelease, "coldStartMs": Int(coldStart), "sinceLoadMs": Int(sinceLoad), "promoted": promoted,
               "kind": Store.loadsInProcess <= 1 ? "cold" : "reload"]
     }
+
+    // Called by the JS error handler: a background load that throws still counts against its release.
+    Function("noteCrash") { () in ShipvoBundleSelector.settleDeferred(Store(), visible: false, crashed: true) }
 
     OnAppEntersBackground { Self.stableNow() }
 

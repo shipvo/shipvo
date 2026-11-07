@@ -42,8 +42,19 @@ describe("crash hook", () => {
     handler(new Error("warn"), false);
     expect(calls).toEqual(["prev"]);
   });
-  it("installs nothing before markHealthy", async () => {
-    const { setGlobalHandler } = await load();
+  it("installs the hook at load, so a fatal error before markHealthy calls noteCrash", async () => {
+    const { setGlobalHandler, prev } = await load();
+    expect(setGlobalHandler).toHaveBeenCalledOnce();
+    handler(new Error("boom"), true);
+    expect(calls).toEqual(["noteCrash", "prev"]);
+    expect(prev).toHaveBeenCalledOnce();
+  });
+  it("installs nothing when the shell has no noteCrash", async () => {
+    vi.resetModules();
+    const setGlobalHandler = vi.fn();
+    (globalThis as any).ErrorUtils = { getGlobalHandler: () => () => {}, setGlobalHandler };
+    (globalThis as any).__native = { getState: () => ({}), markHealthy: () => ({}), consumeEvents: () => [] };
+    await import("../src/index");
     expect(setGlobalHandler).not.toHaveBeenCalled();
   });
 });

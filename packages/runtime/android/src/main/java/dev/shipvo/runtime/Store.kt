@@ -8,7 +8,7 @@ import java.io.File
 import kotlin.random.Random
 
 /** Persistent runtime state. All bundle decisions go through here so the host handler and module agree. */
-internal class Store(private val ctx: Context) : BootCounts, RotationState {
+internal class Store(private val ctx: Context) : TrialCounts, RotationState {
   private val p: SharedPreferences = ctx.getSharedPreferences("shipvo.runtime", Context.MODE_PRIVATE)
   val dir: File get() = File(ctx.filesDir, "shipvo").apply { mkdirs() }
 
@@ -19,11 +19,11 @@ internal class Store(private val ctx: Context) : BootCounts, RotationState {
     }
   val band: String get() = cohort.let { if (it < 10) "b0" else if (it < 100) "b1" else "b2" }
 
-  var currentRelease: Int get() = p.getInt("current_release", 0); set(v) { p.edit().putInt("current_release", v).commit() }
+  override var currentRelease: Int get() = p.getInt("current_release", 0); set(v) { p.edit().putInt("current_release", v).commit() }
   var currentPath: String? get() = p.getString("current_path", null); set(v) { p.edit().putString("current_path", v).commit() }
   var previousRelease: Int get() = p.getInt("previous_release", 0); set(v) { p.edit().putInt("previous_release", v).commit() }
   var previousPath: String? get() = p.getString("previous_path", null); set(v) { p.edit().putString("previous_path", v).commit() }
-  var pendingRelease: Int get() = p.getInt("pending_release", 0); set(v) { p.edit().putInt("pending_release", v).commit() }
+  override var pendingRelease: Int get() = p.getInt("pending_release", 0); set(v) { p.edit().putInt("pending_release", v).commit() }
   var pendingPath: String? get() = p.getString("pending_path", null); set(v) { p.edit().putString("pending_path", v).commit() }
   var pendingIssuedAt: String? get() = p.getString("pending_issued_at", null); set(v) { p.edit().putString("pending_issued_at", v).commit() }
   /** Highest release this device refused (crash-looped or rolled back). Only newer releases are fetched. */
@@ -62,7 +62,7 @@ internal class Store(private val ctx: Context) : BootCounts, RotationState {
     p.edit().putString(key, sha).commit(); return sha
   }
 
-  var trialBoots: Int get() = p.getInt("trial_boots", 0); set(v) { p.edit().putInt("trial_boots", v).commit() }
+  override var trialBoots: Int get() = p.getInt("trial_boots", 0); set(v) { p.edit().putInt("trial_boots", v).commit() }
   override var unhealthyBoots: Int get() = p.getInt("unhealthy_boots", 0); set(v) { p.edit().putInt("unhealthy_boots", v).commit() }
   override var firstUnhealthyAt: Long get() = p.getLong("first_unhealthy_at", 0); set(v) { p.edit().putLong("first_unhealthy_at", v).commit() }
 
@@ -123,6 +123,8 @@ internal class Store(private val ctx: Context) : BootCounts, RotationState {
     @Volatile var bundleSelectedAt: Long = 0
     /** How many times a bundle was selected in this process: 1 = cold start, more = in-process reload. */
     @Volatile var loadsInProcess: Int = 0
+    /** Counts loads chosen without UI. */
+    internal val gate = LoadGate()
   }
 
   fun now() = SystemClock.elapsedRealtime()

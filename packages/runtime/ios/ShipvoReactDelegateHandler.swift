@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import Foundation
+import UIKit
 
 /// Chooses the JS bundle at load. Order: a staged (pending) release on trial, else the last good release, else the
 /// bundle embedded in the app (returning nil lets React Native use main.jsbundle). A pending release that does not
@@ -10,7 +11,26 @@ public final class ShipvoReactDelegateHandler: ExpoReactDelegateHandler {
 #if DEBUG
     return nil // development builds load from Metro
 #else
-    return ShipvoBundleSelector.select(Store())
+    Self.watchForeground()
+    return ShipvoBundleSelector.select(Store(), visible: Self.appIsVisible())
 #endif
+  }
+
+  /// False when the app was started in the background (a silent push or background task): the load has no screen yet.
+  /// Off the main thread the state cannot be read safely, so the load counts as visible, as it did before.
+  private static func appIsVisible() -> Bool {
+    guard Thread.isMainThread else { return true }
+    return UIApplication.shared.applicationState != .background
+  }
+
+  private static var watching = false
+
+  /// Counts a deferred load on the first `didBecomeActive`.
+  private static func watchForeground() {
+    Store.lock.lock(); let already = watching; watching = true; Store.lock.unlock()
+    if already { return }
+    NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+      ShipvoBundleSelector.settleDeferred(Store(), visible: true, crashed: false)
+    }
   }
 }

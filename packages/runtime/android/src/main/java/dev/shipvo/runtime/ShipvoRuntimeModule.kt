@@ -43,7 +43,12 @@ class ShipvoRuntimeModule : Module() {
       val coldStart = now - Process.getStartElapsedRealtime()
       val sinceLoad = if (Store.bundleSelectedAt > 0) now - Store.bundleSelectedAt else -1
       var promoted = false
+      // markHealthy can be called from a headless task or at module init. Only a load that can show a screen is healthy.
+      val visible = ShipvoHostHandler.canShowUi(ctx)
       synchronized(ShipvoHostHandler.LOCK) {
+        if (!visible) return@Function mapOf("release" to Store.runningRelease, "coldStartMs" to coldStart, "sinceLoadMs" to sinceLoad,
+          "promoted" to false, "kind" to if (Store.loadsInProcess <= 1) "cold" else "reload")
+        ShipvoHostHandler.settleDeferred(s, visible = true, crashed = false) // count the load first
         if (s.pendingRelease != 0 && Store.runningRelease == s.pendingRelease) {
           s.previousPath?.let { old -> if (old != s.currentPath) File(old).delete() }
           s.previousRelease = s.currentRelease; s.previousPath = s.currentPath
@@ -62,7 +67,12 @@ class ShipvoRuntimeModule : Module() {
     }
 
     // Called by the JS error handler before React destroys the host, so the pause that follows is not read as "stable".
-    Function("noteCrash") { synchronized(ShipvoHostHandler.LOCK) { BootRules.noteCrash(Store.loadsInProcess) } }
+    Function("noteCrash") {
+      synchronized(ShipvoHostHandler.LOCK) {
+        BootRules.noteCrash(Store.loadsInProcess)
+        ShipvoHostHandler.settleDeferred(Store(ctx), visible = false, crashed = true) // a headless load that throws still counts
+      }
+    }
 
     OnActivityEntersBackground { stableNow() }
 
