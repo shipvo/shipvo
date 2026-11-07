@@ -82,12 +82,13 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-07: Test your own build on the hosted phone with `upload_build` or `shipvo sim --hosted`, then `open_app("<app>@build:<id>")` ([Test your build](test-your-build.md), #1171)
 - 2026-11-07: Two assistants play a full chess game through `@shipvo/mcp` with `--agents`, and `--record` saves the video and the moves ([Chess on two phones](demos/chess.md), #1166)
 - 2026-11-07: With the network off, the app's `fetch` and `XMLHttpRequest` calls fail like on a phone, in sim, MCP and test sessions on Android and iOS ([Device API](device-api.md#network), #1161)
 - 2026-11-07: Payment cancel comes back as `cancelled` ([Device API](device-api.md#payments), #1158)
 - 2026-11-07: `shipvo agents setup` writes the Shipvo MCP config for every coding agent ([CLI guide](cli.md), #1155, #1156)
 - 2026-11-07: Deep links: `open_url` and `Linking.openURL` switch to the owning app and deliver the link once ([Phone apps](phone-apps.md), #1132, #1140)
-- 2026-11-07: Spec blocks `chart`, `stat`, `progress`, `card`, `toggle`, `segmented` and sheet navigation ([@shipvo/spec](../packages/spec/README.md), #1129, #1134)
+- 2026-11-07: Spec blocks `chart`, `stat`, `progress`, `card`, `toggle`, `segmented` and sheet navigation ([App spec](spec-blocks.md), #1129, #1134)
 - 2026-11-07: Live chess demo at [shipvo.dev/demos/chess](https://shipvo.dev/demos/chess/): an Android phone and an iPhone play in your browser, and you can take white ([Chess on two phones](demos/chess.md), #1168)
 - 2026-11-07: Behaviour timeline in the app admin compares releases and pull requests on Android and iOS ([Behaviour timeline](timeline.md), #1084)
 - 2026-11-07: `shipvo test --device agent-device` runs flows on a real emulator or simulator ([Test your app in CI](testing.md), #1041)
