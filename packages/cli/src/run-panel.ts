@@ -16,7 +16,8 @@ export const runPanelCss = (): string => `
 #dpanel .row{display:flex;gap:6px;flex-wrap:wrap}
 #dpanel input,#dpanel select,#dpanel button{font:inherit;padding:4px 8px;border:1px solid #888;border-radius:8px;background:#fff;color:inherit;min-width:0;cursor:pointer}
 #dpanel input{flex:1 1 70px;cursor:text}#dpanel button[aria-pressed=true]{background:#2563eb;border-color:#2563eb;color:#fff}
-#dpanel .sim{margin:0;font-size:12px;opacity:.7}`;
+#dpanel .sim{margin:0;font-size:12px;opacity:.7}
+@media(prefers-color-scheme:dark){#dpanel{background:#1c1c1e;color:#f2f2f7}#dpanel input,#dpanel select,#dpanel button{background:#2c2c2e;border-color:#666}}`;
 
 export function runPanelHtml(): string {
   const b = (c: string, t: string) => `<button type="button" data-control="${c}">${t}</button>`;

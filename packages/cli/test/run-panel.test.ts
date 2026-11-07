@@ -72,7 +72,6 @@ describe.each(["android", "ios"] as const)("run device panel (%s frame)", (platf
       expect(items.every((t) => t.endsWith("(simulated)"))).toBe(true);
       expect(items.some((t) => /location set to 48\.8566/.test(t))).toBe(true);
       expect(items.some((t) => /test notification sent/.test(t))).toBe(true);
-      await page.screenshot({ path: `/tmp/agent/media/pr-shots/1064/run-panel-${platform}.png` });
     } finally { await page.close(); await server.close(); }
   }, 60_000);
 });
