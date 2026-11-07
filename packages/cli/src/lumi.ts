@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { args as parse, loadConfig } from "./config.js";
-import { elements, fieldElements, signature, describeStep, walk, startSim, simDriver, type Driver, type Finding, type Skin, type Step, type WalkOptions } from "./explore.js";
+import { elements, fieldElements, signature, describeStep, walk, startSim, simDriver, type Driver, type Finding, type Reply, type Skin, type Step, type WalkOptions } from "./explore.js";
 import { portFree } from "./sim.js";
 import { loadFrameRenderer, openBrowser } from "./run.js";
 
@@ -31,10 +31,12 @@ export const COMMAND_LIST = ["test my app", "test <flow>", "try <flow> with bad 
 export type FeedItem = { at: string; text: string; kind: "step" | "info" | "bug" };
 export type State = {
   mood: Mood; running: boolean; label: string; feed: FeedItem[];
-  findings: { n: number; kind: string; message: string; steps: string[] }[];
+  findings: { n: number; kind: string; message: string; steps: string[]; screens: number; paths: string[][] }[];
   coverage: { screens: number; controlsSeen: number; controlsTried: number };
 };
-type Known = { n: number; key: string; finding: Finding };
+type Known = { n: number; key: string; finding: Finding; screens: Set<string>; paths: Step[][] };
+/** Findings about one control look the same on every screen: report them once and count the screens. */
+const PER_CONTROL = new Set(["small_target", "duplicate_name"]);
 
 export type LumiOptions = { routes?: string[]; maxDepth?: number; maxSteps?: number; seed?: number; skin?: Skin; app?: string; settleMs?: number; walkDelayMs?: number };
 
@@ -49,7 +51,7 @@ export class Lumi {
   state(): State {
     return {
       mood: this.mood, running: this.running, label: this.label, feed: this.feed.slice(-200),
-      findings: this.known.map((k) => ({ n: k.n, kind: k.finding.kind, message: k.finding.message, steps: k.finding.steps.map(describeStep) })),
+      findings: this.known.map((k) => ({ n: k.n, kind: k.finding.kind, message: k.screens.size > 1 ? `${k.finding.message} on ${k.screens.size} screens` : k.finding.message, steps: k.finding.steps.map(describeStep), screens: k.screens.size, paths: k.paths.map((p) => p.map(describeStep)) })),
       coverage: { screens: this.screens.size, controlsSeen: this.seen.size, controlsTried: this.tried.size },
     };
   }
@@ -64,17 +66,57 @@ export class Lumi {
     try { const r = await this.driver.open(); if (r.ok && r.screen) for (const e of elements(r.screen)) if (e.name) names.push(e.name); } catch { /* the list is only a hint */ }
     return [...new Set(names)];
   }
-  private async resolve(flow: string): Promise<{ label: string; paths: Step[][] } | { error: string }> {
+  /** Does the steps on a fresh app and returns the last reply. Stops at the first step it cannot do. */
+  private async follow(path: Step[]): Promise<Reply> {
+    let r: Reply = { ok: false, error: "no steps" };
+    for (const s of path) {
+      if (s.action === "open") r = await this.driver.open();
+      else if (s.action === "open_url") r = await this.driver.openUrl(s.url);
+      else if (s.action === "tap") {
+        const el = elements(r.screen ?? "").find((e) => e.role === s.role && e.name === s.name && e.nth === s.nth);
+        if (!el) return { ok: false, error: `no ${s.role} "${s.name}"`, screen: r.screen };
+        r = await this.driver.tap(el.ref);
+      } else r = await this.driver.back();
+      if (!r.ok) return r;
+    }
+    return r;
+  }
+  /** Finds a flow name among the routes and the controls on the start screen, then on the screens one tap away. */
+  private async resolve(flow: string): Promise<{ label: string; paths: Step[][]; via?: string; fields: boolean } | { error: string }> {
     const f = flow.toLowerCase();
-    const routes = (this.o.routes ?? []).filter((r) => routeName(r));
-    const hit = routes.find((r) => routeName(r) === f) ?? routes.find((r) => routeName(r).includes(f));
-    if (hit) return { label: routeName(hit), paths: [[{ action: "open" }, { action: "open_url", url: hit }]] };
-    const r = await this.driver.open();
-    const els = r.ok && r.screen ? elements(r.screen).filter((e) => e.name) : [];
-    const c = els.find((e) => e.name.toLowerCase() === f) ?? els.find((e) => e.name.toLowerCase().includes(f));
-    if (c) return { label: c.name, paths: [[{ action: "open" }, { action: "tap", role: c.role, name: c.name, nth: c.nth }]] };
-    const known = await this.flows();
-    return { error: `I do not know a flow called "${flow}".${known.length ? ` Try one of: ${known.join(", ")}.` : ""}` };
+    const group = SYNONYMS.find((g) => g[0] === f || (g[0] !== "checkout" && g.includes(f)));
+    const terms = [f, ...(group ?? []).filter((x) => x !== f)];
+    type Cand = { name: string; path: Step[] };
+    const cands: Cand[] = (this.o.routes ?? []).filter((r) => routeName(r)).map((r) => ({ name: routeName(r), path: [{ action: "open" }, { action: "open_url", url: r }] }));
+    const find = (): { c: Cand; term: string } | undefined => {
+      for (const term of terms) {
+        const c = cands.find((x) => x.name === term) ?? cands.find((x) => x.name.toLowerCase() === term) ?? cands.find((x) => x.name.toLowerCase().includes(term));
+        if (c) return { c, term };
+      }
+    };
+    const taps = (path: Step[], screen: string): Cand[] => elements(screen).filter((e) => e.name).map((e) => ({ name: e.name, path: [...path, { action: "tap", role: e.role, name: e.name, nth: e.nth }] }));
+    const start = await this.driver.open();
+    const home = start.ok && start.screen ? start.screen : "";
+    cands.push(...taps([{ action: "open" }], home));
+    let hit = find();
+    if (!hit || hit.term !== f) {
+      // Not on the start screen: look one tap further, at the screens the start controls lead to.
+      for (const e of elements(home).filter((x) => x.name && !/^(back|go back|close)$/i.test(x.name) && !RISKY_LABEL.test(x.name)).slice(0, 12)) {
+        const r = await this.follow([{ action: "open" }, { action: "tap", role: e.role, name: e.name, nth: e.nth }]);
+        if (r.ok && r.screen) cands.push(...taps([{ action: "open" }, { action: "tap", role: e.role, name: e.name, nth: e.nth }], r.screen).filter((c) => !/^(back|go back|close)$/i.test(c.name)));
+      }
+      hit = find();
+    }
+    if (!hit) {
+      const known = await this.flows();
+      return { error: `I do not know a flow called "${flow}".${known.length ? ` Try one of: ${known.join(", ")}.` : ""}` };
+    }
+    const end = await this.follow(hit.c.path);
+    const fields = end.ok && !!end.screen && fieldElements(end.screen).length > 0;
+    const route = hit.c.path.some((s) => s.action === "open_url");
+    const names = hit.c.path.flatMap((s) => s.action === "tap" ? [s.name] : s.action === "open_url" ? [routeName(s.url)] : []);
+    const via = hit.term !== f ? `${f[0]!.toUpperCase()}${f.slice(1)}: I'll go ${names.join(" → ")}.` : undefined;
+    return { label: route ? hit.c.name : names.at(-1)!, paths: [hit.c.path], via, fields };
   }
 
   /** Handles one line from the command box. Returns the short reply at once; a run goes on in the background (see `idle`). */
@@ -96,9 +138,11 @@ export class Lumi {
     if (c.kind === "test-all") { this.start("test my app", () => this.run({ routes: this.o.routes })); return "Testing the whole app."; }
     const r = await this.resolve(c.flow);
     if ("error" in r) return r.error;
-    const bad = c.kind === "bad-input";
+    const bad = c.kind === "bad-input" && r.fields;
+    const noFields = c.kind === "bad-input" && !r.fields;
     this.start(bad ? `${r.label} with bad input` : r.label, () => this.run({ startPaths: r.paths, ...(bad ? { input: "bad" as const } : {}) }));
-    return bad ? `Trying ${r.label} with bad input.` : `Testing ${r.label}.`;
+    const say = noFields ? `${cap(c.flow)} has no fields to fill; I'll test it with taps.` : bad ? `Trying ${r.label} with bad input.` : `Testing ${r.label}.`;
+    return r.via ? `${r.via} ${say}` : say;
   }
 
   private start(label: string, fn: () => Promise<void>) {
@@ -119,9 +163,11 @@ export class Lumi {
         } else if (e.type === "screen") {
           this.screens.add(e.sig); for (const c of e.controls) this.seen.add(`${c.role}|${c.name}`); this.emit();
         } else {
-          const key = `${e.finding.kind}|${e.finding.message}|${signature(e.finding.screen)}`;
-          if (this.known.some((k) => k.key === key)) return;
-          const n = this.known.push({ n: this.known.length + 1, key, finding: e.finding });
+          const sig = signature(e.finding.screen);
+          const key = PER_CONTROL.has(e.finding.kind) ? `${e.finding.kind}|${e.finding.message}` : `${e.finding.kind}|${e.finding.message}|${sig}`;
+          const old = this.known.find((k) => k.key === key);
+          if (old) { if (!old.screens.has(sig)) { old.screens.add(sig); old.paths.push(e.finding.steps); this.emit(); } return; }
+          const n = this.known.push({ n: this.known.length + 1, key, finding: e.finding, screens: new Set([sig]), paths: [e.finding.steps] });
           this.say(`Bug ${n}: ${e.finding.message}`, "bug");
         }
       },
@@ -129,7 +175,7 @@ export class Lumi {
     const found = this.known.length - before;
     this.mood = this.known.length ? "worried" : r.error || r.stoppedEarly ? "idle" : "happy";
     const why = r.stoppedEarly ? ` Stopped: ${r.stoppedEarly}.` : "";
-    this.say(`Done. ${r.steps} action${r.steps === 1 ? "" : "s"}, ${r.screens} screen${r.screens === 1 ? "" : "s"}, ${found} new bug${found === 1 ? "" : "s"}.${why}${r.error ? ` Error: ${r.error}` : ""}`);
+    this.say(`Done. ${r.steps} action${r.steps === 1 ? "" : "s"} over ${this.screens.size} screen${this.screens.size === 1 ? "" : "s"} (${r.screens} visit${r.screens === 1 ? "" : "s"}), ${found} new bug${found === 1 ? "" : "s"}, ${this.known.length} in total.${why}${r.error ? ` Error: ${r.error}` : ""}`);
   }
 
   /** Does the steps of a bug again, one by one, and says whether the screen is the same as when it was found. */
@@ -158,6 +204,11 @@ export class Lumi {
     this.say(same ? `Bug ${k.n} is still there: the screen is the same as when I found it.${errs.length ? ` Errors: ${errs.join("; ")}` : ""}` : errs.length ? `Bug ${k.n}: the steps raised ${errs.length} error${errs.length === 1 ? "" : "s"}: ${errs.join("; ")}` : ok ? `Bug ${k.n} did not show up this time. The screen is different.` : `Could not replay bug ${k.n} to the end.`, same || errs.length ? "bug" : "info");
   }
 }
+
+/** Everyday names for the same flow. The first word is the name people type; Lumi tries the others in order. */
+const SYNONYMS = [["checkout", "pay", "buy", "place order", "cart"], ["login", "log in", "sign in"], ["sign up", "register", "create account"]];
+const RISKY_LABEL = /\b(log ?out|sign ?out|delete|remove|erase|deactivate|clear all|unsubscribe)\b/i;
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** "tide://cart" -> "cart", "/orders/open" -> "open". */
 export function routeName(url: string): string {
