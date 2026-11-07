@@ -2,6 +2,7 @@ import schema from "./app-spec.v0.schema.json" with { type: "json" };
 import { checkNames, type NameScope } from "./check.js";
 import { estimateCost, MAX_COST } from "./eval.js";
 import { celSyntaxError, expressionSteps, extractExpressions, MAX_EXPRESSION_STEPS } from "./cel.js";
+import { AGGREGATES, CHART_KINDS } from "./chart.js";
 import { checkSchema } from "./jsonschema.js";
 import { childPath, isObject, type Issue, type ValidationResult } from "./types.js";
 
@@ -293,9 +294,7 @@ class Run {
     if (type === "list" && !isObject(b.empty)) {
       this.warn(path, "List has no empty state.", "Add \"empty\": { \"message\": \"...\" } so an empty list explains itself.");
     }
-    if (type === "chart" && (typeof b.label !== "string" || b.label.trim() === "")) {
-      this.warn(path, "Chart has no label.", "Add \"label\": a one-line description of what the chart shows.");
-    }
+    if (type === "chart") this.chart(b, path);
     if (type === "text" && typeof b.variant === "string") screen.sizes.add(`variant:${b.variant}`);
     if (isObject(b.style)) {
       const st = b.style;
@@ -323,6 +322,26 @@ class Run {
       this.error(bp, `"${String(b.type)}" needs a "bind" to a state value.`, "Add \"bind\": \"state.name\" and declare \"name\" in \"state\".");
     } else if (!isObject(this.spec.state) || !(m[1]! in this.spec.state)) {
       this.error(bp, `State "${m[1]}" is not declared.`, `Add "${m[1]}" to "state" with a type and a default.`);
+    }
+  }
+
+  chart(b: Record<string, unknown>, path: string) {
+    if (typeof b.label !== "string" || b.label.trim() === "") {
+      this.error(childPath(path, "label"), "Chart has no label.", "Add \"label\": a one-line description of what the chart shows, for example \"Revenue by day\".");
+    }
+    if (typeof b.kind !== "string" || !CHART_KINDS.includes(b.kind)) {
+      this.error(childPath(path, "kind"), `Chart kind ${JSON.stringify(b.kind ?? null)} is not supported.`, `Use one of: ${CHART_KINDS.join(", ")}.`);
+    }
+    if (typeof b.from !== "string" || b.from === "") {
+      this.error(childPath(path, "from"), "Chart has no data source.", "Add \"from\": the name of a source in \"data\", for example \"charges\".");
+    }
+    for (const k of ["x", "y"]) {
+      if (typeof b[k] !== "string" || b[k] === "") this.error(childPath(path, k), `Chart has no ${k}.`, `Add "${k}": an expression per item, for example "{{ item.${k === "x" ? "date" : "amount"} }}".`);
+      else this.checkBare(b[k], childPath(path, k));
+    }
+    this.checkBare(b.series, childPath(path, "series"));
+    if (b.aggregate !== undefined && (typeof b.aggregate !== "string" || !AGGREGATES.includes(b.aggregate))) {
+      this.error(childPath(path, "aggregate"), `Aggregate ${JSON.stringify(b.aggregate)} is not supported.`, `Use one of: ${AGGREGATES.join(", ")}.`);
     }
   }
 
