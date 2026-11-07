@@ -26,12 +26,16 @@ const NAV = [
     { slug: "run", src: "docs/run.md", title: "Run on a phone in your browser", desc: "Run your app on a simulated Android or iPhone in your own browser with shipvo run, no Playwright, and let your AI assistant drive the same phone." },
     { slug: "lumi", src: "docs/lumi.md", title: "Lumi on Shipvo Phone", desc: "Watch Lumi show each step on the phone, react to failures, and test your app for you with shipvo lumi. No AI account needed." },
     { slug: "phone-apps", src: "docs/phone-apps.md", title: "Phone Browser, Settings and system controls", desc: "Change dark mode, text size and language, open web pages and use the home screen, shade and power button on the simulated phone." },
+    { slug: "phone-updates", src: "docs/phone-updates.md", title: "OTA updates on the phone", desc: "Publish a release, watch it land on the simulated Android or iPhone, apply it and see a bad one roll back. No device needed." },
+    { slug: "phone-network", src: "docs/phone-network.md", title: "Network calls on the hosted phone", desc: "How the hosted phone sends your app's HTTP calls through a request proxy, with no CORS rules, on Android and iOS." },
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
   { group: "Ship", pages: [
     { slug: "cli-commands", src: "docs/cli.md", title: "CLI guide", desc: "Every Shipvo command with examples: init, preview, publish policy checks, auto-halt and audit export, and fixes for common errors." },
     { slug: "migrate-from-codepush", src: "docs/migrate-from-codepush.md", title: "Migrate from CodePush", desc: "Move a React Native app from react-native-code-push to Shipvo signed over-the-air updates, step by step, with real dry-run output." },
+    { slug: "migrate-from-eas-update", src: "docs/migrate-from-eas-update.md", title: "Migrate from EAS Update", desc: "Move an Expo app from expo-updates (EAS Update) to Shipvo signed over-the-air updates with shipvo migrate --plan and --apply." },
+    { slug: "taking-real-orders", src: "docs/taking-real-orders.md", title: "Taking real orders", desc: "Shipvo stores the orders your app sends; you or your payment provider decide when an order is paid and tell Shipvo." },
     { slug: "store", src: "docs/store.md", title: "Store details and screenshots", desc: "Draft Google Play and App Store details from shipvo.json and check screenshot sizes before you submit. Nothing is uploaded." },
     { slug: "capacitor", src: "docs/capacitor.md", title: "Capacitor apps in your own CI", desc: "Build signed Android and iOS binaries for a Capacitor app in your own GitHub Actions, with no EAS account needed." },
     { slug: "adapters", src: "docs/adapters.md", title: "Adapters for other runtimes", desc: "What a runtime port must do, which release-decision rules exist and where each lives, for maintainers adding a framework adapter." },
@@ -46,6 +50,7 @@ const NAV = [
   { group: "Agents", pages: [
     { slug: "agents", src: "docs/agents.md", title: "Agents and Shipvo apps", desc: "How an AI agent sees and operates a Shipvo app over MCP: the accessibility tree, every tool, hosted access and public listings." },
     { slug: "record", src: "docs/record.md", title: "Record a demo video", desc: "Have your assistant record an MP4 of the phone with chapter markers using record_start, record_marker and record_stop, for store pages and bug reports." },
+    { slug: "record-a-demo-video", src: "docs/record-a-demo-video.md", title: "Record a demo video: worked example", desc: "A worked example for founders: ask your assistant for an MP4 of your app with chapters, music and a voice track." },
     { slug: "demo-chess", src: "docs/demos/chess.md", title: "Chess on two phones", desc: "Watch an Android phone and an iPhone play chess in your browser, or run it and let two assistants play a full game through MCP." },
     { slug: "mcp", src: "packages/mcp/README.md", title: "@shipvo/mcp", desc: "The @shipvo/mcp server for AI agents: run it locally over stdio, remotely over HTTP, or hosted with a key. Config for Claude, Cursor, ChatGPT." },
   ]},
@@ -57,11 +62,16 @@ const NAV = [
     { slug: "test", src: "packages/test/README.md", title: "@shipvo/test", desc: "@shipvo/test: typed end-to-end tests for React Native apps in Vitest or any runner, running against the headless Shipvo simulator in CI." },
     { slug: "sim", src: "packages/sim/README.md", title: "@shipvo/sim", desc: "@shipvo/sim: the headless simulator that runs your app in Playwright and exposes accessibility trees and a simulated phone to agents and tests." },
     { slug: "schema", src: "packages/schema/README.md", title: "@shipvo/schema", desc: "@shipvo/schema: zod schemas for Shipvo release pointers, signed envelopes, shell manifests, gate reports and telemetry." },
+    { slug: "threat-model", src: "docs/threat-model.md", title: "Threat model for signed updates", desc: "What a stolen token or a bad server can and cannot do to phones running a Shipvo-updated app, with the file and test behind each claim." },
+    { slug: "crash-loop-paths", src: "docs/android-crash-loop-paths.md", title: "Crash-loop revert paths", desc: "How a release that crashes on start is reverted by trial boots or promoted boots, and how each path is counted." },
+    { slug: "lumi-ranker", src: "docs/lumi-ranker.md", title: "Lumi action ranker", desc: "The optional model that scores Lumi's next action, what it does with no model, and the benchmark behind it." },
   ]},
   { group: "Measured results", pages: [
     { slug: "parity-results", src: "docs/parity-results.md", title: "Simulator vs device parity", desc: "Simulator vs device parity: every screen of three purchase flows compared on Android and iOS, with the method and every result." },
     { slug: "spike-results", src: "docs/spike-results.md", title: "OTA on a 2 GB phone", desc: "Measured on a 2 GB Redmi 9A in Douala: update size, apply time, cold start, rollback and crash-loop revert, with the raw timeline." },
     { slug: "agent-gate-results", src: "docs/agent-gate-results.md", title: "Agent gate results", desc: "How AI agents scored on real purchase tasks in a React Native app, graded by what the backend received, not what the agent said." },
+    { slug: "sim-bench", src: "docs/sim-bench.md", title: "Simulator cost", desc: "How long a simulator session takes to start and how much memory it uses, measured with scripts/sim-bench/run.mjs." },
+    { slug: "lumi-bench", src: "docs/lumi-bench.md", title: "Lumi benchmark", desc: "How well Lumi Autotest finds problems on a fixed set of apps with a fixed step budget, with the method and every number." },
   ]},
 ];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
