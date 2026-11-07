@@ -4,6 +4,7 @@ import { Marked, Renderer } from "marked";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { symbol } from "./brand.mjs";
+import { cover as drawCover } from "./covers.mjs";
 import { crumbs } from "./shell.mjs";
 
 const SITE = "https://shipvo.dev";
@@ -22,19 +23,9 @@ function parse(file, raw) {
   return { slug: file.replace(/\.md$/, ""), ...meta, order: Number(meta.order ?? 99), tags: meta.tags.split(",").map((t) => t.trim()), body, minutes: Math.max(1, Math.round(words / 200)) };
 }
 
-function cover(p) {
-  const h = [...p.slug].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
-  const PAIRS = [["#FF9A2E", "#5FB8FF"], ["#5FB8FF", "#FF9A2E"], ["#7CE3A0", "#5FB8FF"], ["#B79CFF", "#FF9A2E"], ["#FF9A2E", "#7CE3A0"], ["#5FB8FF", "#B79CFF"]];
-  const [a, b] = PAIRS[h % PAIRS.length], cx = 55 + (h >> 3) % 35, cy = 15 + (h >> 5) % 40;
-  const sym = Buffer.from(symbol("#F4F2EC")).toString("base64");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="${esc(p.title)}"><defs>
-<radialGradient id="a" cx="${cx}%" cy="${cy}%" r="60%"><stop offset="0" stop-color="${a}" stop-opacity=".55"/><stop offset="1" stop-color="${a}" stop-opacity="0"/></radialGradient>
-<radialGradient id="b" cx="12%" cy="100%" r="55%"><stop offset="0" stop-color="${b}" stop-opacity=".4"/><stop offset="1" stop-color="${b}" stop-opacity="0"/></radialGradient>
-<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0E1524"/><stop offset="1" stop-color="#070A12"/></linearGradient></defs>
-<rect width="1200" height="630" fill="url(#g)"/><rect width="1200" height="630" fill="url(#a)"/><rect width="1200" height="630" fill="url(#b)"/>
-<g stroke="#F4F2EC" stroke-opacity=".07">${Array.from({ length: 12 }, (_, i) => `<path d="M${i * 100} 0V630"/>`).join("")}${Array.from({ length: 7 }, (_, i) => `<path d="M0 ${i * 100}H1200"/>`).join("")}</g>
-<image href="data:image/svg+xml;base64,${sym}" x="430" y="150" width="340" height="340"/></svg>`;
-}
+const symSvg = symbol("#F4F2EC");
+let coverN = 0;
+const cover = (p, inline = false) => drawCover(p, { symbolSvg: symSvg, id: inline ? `c${coverN++}` : "c" });
 
 function render(p) {
   const heads = [];
@@ -55,24 +46,24 @@ export function buildBlog({ ROOT, PUB, headTag, navTag, footTag }) {
   const dir = join(ROOT, "blog");
   const posts = readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => parse(f, readFileSync(join(dir, f), "utf8"))).sort((a, b) => b.date.localeCompare(a.date) || (a.order - b.order) || a.slug.localeCompare(b.slug));
   const css = '<link rel="stylesheet" href="/docs.css"><link rel="stylesheet" href="/blog.css">';
-  const shell = (title, desc, path, main, extra = "", seo = {}) => `<!doctype html><html lang="en"><head>${headTag({ title, desc, path, extraCss: css + extra, ...seo })}</head><body class="blogpage">${navTag("blog")}<main id="main">${main}</main>${footTag()}<script src="/blog.js" defer></script></body></html>`;
+  const shell = (title, desc, path, main, extra = "", seo = {}) => `<!doctype html><html lang="en"><head>${headTag({ title, desc, path, extraCss: css + extra, ...seo })}</head><body class="blogpage">${navTag("blog")}<main id="main">${main}</main>${footTag()}<script src="/blog.js" defer></script><script src="/filter.js" defer></script></body></html>`;
 
   for (const p of posts) {
     mkdirSync(join(PUB, "blog", p.slug), { recursive: true });
     writeFileSync(join(PUB, "blog", p.slug, "cover.svg"), cover(p));
   }
   const tags = ["All", ...[...new Set(posts.flatMap((p) => p.tags))].sort()];
-  const card = (p, lead) => `<article class="pcard${lead ? " lead" : ""}" data-tags="${esc(p.tags.join("|"))}"><a class="pcard-art" href="/blog/${p.slug}/" tabindex="-1" aria-hidden="true"><img src="/blog/${p.slug}/cover.svg" alt="" width="1200" height="630" ${lead ? "" : 'loading="lazy"'}></a><div class="pcard-body"><div class="tags">${p.tags.map(tagLink).join("")}</div><h2><a href="/blog/${p.slug}/">${esc(p.title)}</a></h2><p>${esc(p.summary)}</p><div class="meta">${byline(p)}</div></div></article>`;
+  const card = (p, lead) => `<article class="pcard${lead ? " lead" : ""}" data-tags="${esc(p.tags.join("|"))}"><a class="pcard-art" href="/blog/${p.slug}/" tabindex="-1" aria-hidden="true">${lead ? cover(p, true).replace("xMidYMid slice", "xMidYMid meet") : cover(p, true)}</a><div class="pcard-body"><div class="tags">${p.tags.map(tagLink).join("")}</div><h2><a href="/blog/${p.slug}/">${esc(p.title)}</a></h2><p>${esc(p.summary)}</p><div class="meta">${byline(p)}</div></div></article>`;
   const index = `<section class="blog-top"><div class="wrap"><div class="eyebrow">Blog</div><h1>Stories and guides from the Shipvo team</h1><p class="lede">How to test a mobile app with an assistant, what we found when we tested our own, and what we measured along the way.</p>
-<div class="tabs" role="tablist" aria-label="Filter posts">${tags.map((t, i) => `<button type="button" role="tab" aria-selected="${i === 0}" data-tag="${esc(t)}">${esc(t)} <span>${t === "All" ? posts.length : posts.filter((p) => p.tags.includes(t)).length}</span></button>`).join("")}</div></div></section>
-<section class="blog-list"><div class="wrap"><div class="grid" id="posts">${posts.map((p, i) => card(p, i === 0)).join("")}</div><p class="empty" hidden>No posts under this tag yet.</p><p class="feed">Follow along: <a href="/blog/rss.xml">RSS</a> · <a href="https://x.com/HansCadx" rel="noopener">X</a> · <a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></p></div></section>`;
+<div class="fsearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input type="search" placeholder="Search posts" aria-label="Search posts" data-filter="#posts" data-items=".pcard" data-count="#bl-count"><kbd aria-hidden="true">/</kbd><span id="bl-count" class="fcount" aria-live="polite"></span></div><div class="tabs" role="tablist" aria-label="Filter posts">${tags.map((t, i) => `<button type="button" role="tab" aria-selected="${i === 0}" data-tag="${esc(t)}">${esc(t)} <span>${t === "All" ? posts.length : posts.filter((p) => p.tags.includes(t)).length}</span></button>`).join("")}</div></div></section>
+<section class="blog-list"><div class="wrap"><div class="grid" id="posts">${posts.map((p, i) => card(p, i === 0)).join("")}</div><p class="empty" hidden>No posts under this tag yet.</p><p data-filter-empty hidden class="fempty">No post matches that search.</p><p class="feed">Follow along: <a href="/blog/rss.xml">RSS</a> · <a href="https://x.com/HansCadx" rel="noopener">X</a> · <a href="https://github.com/shipvo/shipvo" rel="noopener">GitHub</a></p></div></section>`;
     writeFileSync(join(PUB, "blog", "index.html"), shell("Shipvo Blog: mobile app testing, OTA updates and AI agents", "Guides and stories on testing React Native apps in CI, over-the-air updates, MCP and AI agents. Measured results, with sources.", "/blog/", index, "", { image: "/og/blog.png", imageAlt: "Shipvo blog", ld: [crumbs([["Home", "/"], ["Blog", "/blog/"]]), { "@context": "https://schema.org", "@type": "Blog", name: "Shipvo blog", url: `${SITE}/blog/`, description: "Guides and stories on testing mobile apps, over-the-air updates and AI agents.", publisher: { "@type": "Organization", name: "Shipvo", url: SITE } }] }));
 
   posts.forEach((p, i) => {
     const { html, heads } = render(p);
     const others = posts.filter((x) => x !== p).slice(0, 2);
     const main = `<article class="post"><header class="post-head"><div class="wrap narrow"><a class="back" href="/blog/">← All posts</a><div class="tags">${p.tags.map(tagLink).join("")}</div><h1>${esc(p.title)}</h1><p class="lede">${esc(p.summary)}</p><div class="meta">${byline(p)}</div></div></header>
-<div class="wrap narrow"><figure class="hero-fig"><img src="/blog/${p.slug}/cover.svg" alt="" width="1200" height="630"></figure>
+<div class="wrap narrow"><figure class="hero-fig">${cover(p, true)}</figure>
 ${heads.length >= 3 ? `<nav class="contents" aria-label="In this article"><b>In this article</b>${heads.map((h) => `<a href="#${h.id}">${h.text}</a>`).join("")}</nav>` : ""}
 <div class="prose">${html}</div>
 <div class="share"><span>Share</span><a href="https://x.com/intent/post?text=${encodeURIComponent(p.title)}&url=${encodeURIComponent(`${SITE}/blog/${p.slug}/`)}" rel="noopener">X</a><a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${SITE}/blog/${p.slug}/`)}" rel="noopener">LinkedIn</a><button type="button" data-copy-url>Copy link</button></div>
