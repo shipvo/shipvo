@@ -23,6 +23,7 @@
   "files": [
     "server.mjs",
     "build-fetch.mjs",
+    "build-cache.mjs",
     "net-gate.mjs",
     "chromium-hint.mjs",
     "browser-resolver.mjs",
