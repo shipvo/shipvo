@@ -1,7 +1,6 @@
 // tap_xy and type_keys: coordinate input for the screenshots-only side of scripts/agent-efficiency.
 import { pickPort } from "./test-port.mjs";
 import test, { before, after } from "node:test";
-import { pickPort } from "./test-port.mjs";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
