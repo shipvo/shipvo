@@ -1,0 +1,2 @@
+- `@shipvo/cli`: new `shipvo ci fix` runs `shipvo test` and, when every flow passes, publishes to the first band (`b0`, 1%) and posts the release id to the check comment. A red flow publishes nothing and the comment names it. It never publishes above the first band or the policy. See `docs/ci-check.md`.
+- Migration: none.
