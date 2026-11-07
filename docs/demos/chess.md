@@ -1,5 +1,7 @@
 # Chess on two phones
 
+For developers and for anyone who wants to see what two Shipvo phones and two assistants can do. You can watch the game on [shipvo.dev/demos/chess](https://shipvo.dev/demos/chess/) with nothing to install, or run it yourself with the commands below. On the site page, press "Play against it" to take white; the page answers for black.
+
 Two Shipvo phones side by side, one Android and one iOS, both running our own chess app (`apps/chess`). Android plays white and iOS plays black. A move on one phone shows on the other. Each side has its own move timer.
 
 ## Run it
@@ -61,3 +63,16 @@ Each side has a clock above its phone. The clock of the side to move runs. A mov
 - Both clocks show minutes and seconds, and they stop when the game ends.
 
 `apps/chess/test/link.test.ts` checks the move relay and the timer rules.
+
+## Troubleshooting
+
+- **The page does not open**: run with `--no-open` and open the printed address yourself. Use `--port <n>` if the port is taken.
+- **The web build is missing**: the command builds it on first run. If that fails, run `pnpm -r build` from the repository root and try again.
+- **An assistant's move is refused**: it is not that side's turn. The phone shows whose turn it is and the last move.
+- **A side lost on time**: raise `--move-time <seconds>` (default 60).
+
+## Next steps
+
+- [Agents and Shipvo apps](../agents.md)
+- [Record a demo video](../record.md)
+- [Run on a phone in your browser](../run.md)

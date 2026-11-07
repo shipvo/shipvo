@@ -68,9 +68,6 @@ build:
         command: cd ios/App && pod install
     - eas/resolve_apple_team_id_from_credentials:
         id: resolve_apple_team_id
-    - eas/prebuild_credentials_ios:
-        inputs:
-          project_dir: ios
     - eas/configure_ios_credentials
     - run:
         name: Write ExportOptions.plist
@@ -85,7 +82,7 @@ build:
           <plist version="1.0">
           <dict>
             <key>method</key><string>app-store</string>
-            <key>teamID</key><string>\${{ steps.resolve_apple_team_id.outputs.apple_team_id }}</string>
+            <key>teamID</key><string>\${ steps.resolve_apple_team_id.apple_team_id }</string>
             <key>signingStyle</key><string>manual</string>
             <key>provisioningProfiles</key>
             <dict><key>$BUNDLE_ID</key><string>$PROFILE</string></dict>
@@ -100,7 +97,7 @@ build:
             -scheme App \\
             -configuration Release \\
             -archivePath build/App.xcarchive \\
-            DEVELOPMENT_TEAM="\${{ steps.resolve_apple_team_id.outputs.apple_team_id }}" \\
+            DEVELOPMENT_TEAM="\${ steps.resolve_apple_team_id.apple_team_id }" \\
             CODE_SIGN_STYLE=Manual
           xcodebuild -exportArchive \\
             -archivePath build/App.xcarchive \\
@@ -193,7 +190,9 @@ export const ONE_TIME_STEPS = [
   ["eas-cli", "build:version:set", "-p", "ios"],
 ] as const;
 
-export const IOS_UNPROVEN = "Note: the iOS signing steps in .eas/build/ios.yml are unproven. The step names were not checked against Expo's custom build functions (https://docs.expo.dev/custom-builds/schema/), so your first iOS build is the check.";
+/** Built-in EAS functions the generated configs may use, as listed in Expo's schema docs:
+ *  https://docs.expo.dev/custom-builds/schema/#built-in-eas-functions (checked 2026-11-07). */
+export const EAS_FUNCTIONS = ["eas/checkout", "eas/install_node_modules", "eas/resolve_apple_team_id_from_credentials", "eas/configure_ios_credentials", "eas/inject_android_credentials", "eas/run_gradle", "eas/find_and_upload_build_artifacts"] as const;
 
 export type Runner = (cmd: string, args: string[], cwd: string) => number;
 const defaultRunner: Runner = (cmd, args, cwd) => spawnSync(cmd, args, { cwd, stdio: "inherit" }).status ?? 1;
@@ -228,7 +227,6 @@ export async function easCmd(args: string[], o: EasOptions = {}): Promise<number
     else { mkdirSync(dirname(join(cwd, f.path)), { recursive: true }); writeFileSync(join(cwd, f.path), f.content); }
   }
   if (!plan.length) log("Nothing to change: this repo is already set up for EAS.");
-  if (project.ios) log(IOS_UNPROVEN);
   if (dry) return 0;
   log("\nRemaining one-time steps:");
   for (const s of ONE_TIME_STEPS) log(`  npx ${s.join(" ")}`);

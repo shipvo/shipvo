@@ -58,6 +58,13 @@ The planner keeps this list current: the epics in flight, newest owner direction
 - Framework adapters: Capacitor first, then Cordova (signed web-bundle updates, `shipvo eas setup`, own-CI build template) (#297)
 - Learn: top-level section with interactive tutorials, videos, search and filters
 
+**The assistant's phone and app engine:**
+- The Shipvo app engine: declarative specs become native-feeling Android and iOS apps (#839)
+- The assistant's phone, one per person, with the first five first-party apps (#843)
+- Shipvo Runner: one spec runner, one schedule dispatcher and one MCP tool registry for remote and stdio (#842)
+- Secret vault: keys go from the person straight into an encrypted vault, never through the model (#841)
+- Security hardening from the external review (#732)
+
 **Stage 2:**
 - The closed QA loop: an agent explores, tests in plain language, repairs its tests, and the fix ships to 1% the same hour (#317)
 - Release governance: audit log, approvals, release policy as code (#295)
@@ -72,13 +79,13 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
-- 2026-11-07: Two assistants play a full chess game on an Android phone and an iPhone through `@shipvo/mcp`, and `--record` saves the game ([Chess on two phones](demos/chess.md), #1166)
+- 2026-11-07: Two assistants play a full chess game through `@shipvo/mcp` with `--agents`, and `--record` saves the video and the moves ([Chess on two phones](demos/chess.md), #1166)
+- 2026-11-07: With the network off, the app's `fetch` and `XMLHttpRequest` calls fail like on a phone, in sim, MCP and test sessions on Android and iOS ([Device API](device-api.md#network), #1161)
+- 2026-11-07: Payment cancel comes back as `cancelled` ([Device API](device-api.md#payments), #1158)
+- 2026-11-07: `shipvo agents setup` writes the Shipvo MCP config for every coding agent ([CLI guide](cli.md), #1155, #1156)
+- 2026-11-07: Deep links: `open_url` and `Linking.openURL` switch to the owning app and deliver the link once ([Phone apps](phone-apps.md), #1132, #1140)
+- 2026-11-07: Spec blocks `chart`, `stat`, `progress`, `card`, `toggle`, `segmented` and sheet navigation ([@shipvo/spec](../packages/spec/README.md), #1129, #1134)
 - 2026-11-07: `open_app` takes `platform` and `show` and starts or switches the phone in your browser ([Agents](agents.md), #1163)
-- 2026-11-07: `shipvo agents setup` writes the Shipvo MCP config for every coding agent ([Agents](agents.md), #1156)
-- 2026-11-07: Network off blocks the app's network calls in simulator and MCP sessions, Android and iOS ([Device API](device-api.md), #1161)
-- 2026-11-07: A cancelled payment comes back as `cancelled` ([Device API](device-api.md), #1158)
-- 2026-11-07: `open_url` and `Linking.openURL` deliver links to the app that owns them, once ([Phone apps](phone-apps.md), #1132, #1140)
-- 2026-11-07: App spec blocks: charts (line, area, bar, donut), stat, progress, card, section, toggle, segmented and sheet navigation ([App spec](design/app-spec.md), #1129, #1134)
 - 2026-11-07: `shipvo ci shots` captures Android and iOS on base and head ([Check every pull request](ci-check.md), #1126)
 - 2026-11-07: `shipvo explore --save-tests` and Save as test in Lumi ([Lumi](lumi.md), #1085)
 - 2026-11-07: Notes and Tasks, the first first-party spec app on Shipvo Phone ([Phone apps](phone-apps.md), #1088)
