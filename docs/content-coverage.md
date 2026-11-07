@@ -74,6 +74,9 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Deep links: `open_url` and `Linking.openURL` switch to the owning app; one-shot initial URL | [phone-apps](phone-apps.md), [testing](testing.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
 | `shipvo agents setup` writes the MCP config for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md#shipvo-agents-setup), [agents](agents.md) | | | |
 | Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec](../packages/spec/README.md) | | | |
+| Deep links: `open_url` and `Linking.openURL` switch to the owning app | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
+| `shipvo agents setup` writes the MCP config for every coding agent | [cli](cli.md), [agents](agents.md) | | | |
+| Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec-blocks](spec-blocks.md), [spec](../packages/spec/README.md) | | | |
 | Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
 | Pull-request screenshots before and after (`shipvo ci shots`) | [ci-check](ci-check.md) | | | |
 | Lumi findings saved as tests (`shipvo explore --save-tests`) | [lumi](lumi.md) | | | |
