@@ -940,7 +940,7 @@
       "properties": {
         "app": {
           "type": "string",
-          "description": "App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run)"
+          "description": "App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run), or 'tide@build:<id>' (a build you uploaded with upload_build)"
         },
         "session": {
           "type": "string",
@@ -2273,6 +2273,33 @@
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "upload_build",
+    "description": "Build the app in this project with the simulated device (the same build `shipvo sim` makes), upload it to the hosted phone for your key, and return a build id. Open it with open_app(\"<app>@build:<id>\"). Only you can open it, and it is deleted when it expires (the result says when). Needs the stdio server, a project directory and an API key (`shipvo login` or SHIPVO_API_KEY).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "description": "Project directory (default: the directory the server runs in)"
+        },
+        "app": {
+          "type": "string",
+          "description": "App id (default: from shipvo.json)"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
     },
     "execution": {
       "taskSupport": "forbidden"

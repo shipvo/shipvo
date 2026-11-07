@@ -21,6 +21,7 @@ import { exportTest, type Step } from "./export.js";
 import { findTarget } from "./record.js";
 import { Recorder, RecorderError } from "./recorder.js";
 import { connectDriver, findLiveRun, type Driver } from "./attach.js";
+import { buildIdOf, checkBuild, uploadBuild } from "./hosted-build.js";
 import { satisfied, sameTree, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -146,7 +147,7 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
   const guarded = (args: unknown, extra: unknown) => inputHasKey(args) ? keyRefusal() : (cb as (a: unknown, e: unknown) => unknown)(args, extra);
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
 };
-type Ctx = { app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
+type Ctx = { remote?: boolean; app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string };
 const SERVER_VERSION = "0.0.4";
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
 const TOOLS_LIST_TTL_MS = 60_000;
@@ -174,7 +175,14 @@ use(server, tools.list_apps, async ({ query }) => {
 
 const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always" }) => {
   const id = app.split("@")[0];
-  const live = attach === "never" ? undefined : findLiveRun(id);
+  // A build uploaded with upload_build: the hosted phone must say this key may open it before a session starts.
+  const buildId = buildIdOf(app);
+  if (buildId) {
+    if (ctx.remote) return result("", { ok: false, code: "not_supported_remote", error: "app@build:<id> opens from the stdio server (it holds your key). Run shipvo-mcp locally." });
+    const b = await checkBuild(buildId);
+    if (!b.ok) return result("", b);
+  }
+  const live = attach === "never" || buildId ? undefined : findLiveRun(id);
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
   if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
   if (!keyApps && !live && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
@@ -209,6 +217,16 @@ const openApp = async ({ app, session, seed_cart, dark, attach }: { app: string;
   return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
 };
 use(server, tools.open_app, openApp);
+use(server, tools.upload_build, async ({ dir, app }) => {
+  if (ctx.remote) return result("", { ok: false, code: "not_supported_remote", error: "upload_build reads your project, so it runs only in the stdio server (shipvo-mcp on your machine)." });
+  const root = dir ?? process.cwd();
+  let id = app;
+  if (!id) { try { id = (JSON.parse(readFileSync(join(root, "shipvo.json"), "utf8")) as { appId?: string }).appId; } catch {} }
+  if (!id) return result("", { ok: false, code: "build_failed", error: `no shipvo.json in ${root}: pass app, or dir of the project.` });
+  const r = await uploadBuild({ dir: root, app: id });
+  if (!r.ok) return result("", r);
+  return text(`build: ${r.id}\napp: ${id}\nexpires: ${r.expires_at}\nopen it with open_app("${id}@build:${r.id}")`);
+});
 // Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.
 use(server, tools.attach_session, async ({ app, session }) => {
   const live = findLiveRun(app);
@@ -611,7 +629,7 @@ if (argi < 0) {
     // Behind sim.shipvo.dev the Worker has checked the key and says which app and scope it grants; locally
     // there are no such headers and every app is allowed. A client's mcp-session-id header is ignored.
     const h = (n: string) => (req.headers[n] as string) || undefined;
-    const server = makeServer({ app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
+    const server = makeServer({ remote: true, app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     if (era2026 && msg) {
       // 2026-07-28 results carry resultType, and tools/list also carries ttlMs and cacheScope. 2025-era responses are untouched.

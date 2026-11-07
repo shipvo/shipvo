@@ -1,0 +1,2 @@
+- mcp: new tool `upload_build` (stdio only) builds the app with the simulated device, uploads it to the hosted phone for your key and returns a build id that expires on its own. `open_app("myapp@build:<id>")` opens it. Builds are private to the key's account. New error codes: `build_not_found`, `build_expired`, `build_too_large`, `no_api_key`, `upload_failed`. No migration needed: this adds a tool and does not change existing ones.
+- cli: `shipvo sim --hosted` does the same upload from the terminal and prints the build id and expiry.

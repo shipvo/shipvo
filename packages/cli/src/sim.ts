@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
+import { simHosted, HostedError } from "./sim-hosted.js";
 import { CliFailure, runJson, takeJson, type Done } from "./json-out.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
@@ -142,6 +143,14 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
     console.error(msg); process.exit(status);
   };
   const a = parse(argv); const cfg = loadConfig();
+  if (a.hosted === "true") {
+    try {
+      const u = await simHosted(cfg.appId);
+      const open = `open_app("${cfg.appId}@build:${u.id}")`;
+      console.error(`Uploaded. Build ${u.id} is private to your account and expires at ${u.expires_at}.\nOpen it on the hosted phone with ${open}`);
+      return { code: "uploaded", summary: `Build ${u.id} uploaded; expires ${u.expires_at}`, data: { build_id: u.id, expires_at: u.expires_at, bytes: u.bytes, open_app: `${cfg.appId}@build:${u.id}` }, next: [{ command: open, why: "Open the build on the hosted phone from your agent." }] };
+    } catch (e) { if (e instanceof HostedError) return die(e.message, 1, e.code); throw e; }
+  }
   const port = a.port || "4545";
   if (!(await portFree(Number(port)))) {
     die(`Port ${port} is in use. Stop the other \`shipvo sim\` or pass --port <n>.`, 1, "port_in_use");
