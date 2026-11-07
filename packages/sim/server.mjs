@@ -382,8 +382,8 @@ async function act(id, body) {
       if (r.app) {
         // Switch to the owning app, then hand over the link once: as the initial URL of this launch and as a `url` event. No init script stays behind.
         if (s.apps.current_app !== r.app && s.apps.installed_apps.some((a) => a.id === r.app)) await enterApp(s, page, r.app);
-        s.apps.log.push({ at: Date.now(), name: "open_url", app: r.app, url: body.url, source: "simulated" });
         await page.evaluate((u) => { globalThis.__pnInitialUrl = u; return globalThis.__pnDevice?.openUrl(u); }, body.url);
+        s.apps.log.push({ at: Date.now(), name: "open_url", app: r.app, url: body.url, source: "simulated" });
         await page.waitForTimeout(400); return { app: r.app, screen: await screen(page) };
       }
       const handled = await page.evaluate((u) => globalThis.__pnDevice?.openUrl(u), body.url);

@@ -82,3 +82,11 @@ test("two links in a row leave no script behind: a restart sees no initial URL",
   const r = await act("z", { action: "restart" }); assert.equal(r.ok, true, r.error);
   assert.equal(await readInitial("z"), "null");
 });
+
+test("two links in a row, then switch_app: the next app sees no stale initial URL", async () => {
+  assert.ok((await call("/session", { session: "w", phone: PHONE })).ok);
+  assert.equal((await act("w", { action: "open_url", url: "appb://item/1" })).ok, true);
+  assert.equal((await act("w", { action: "open_url", url: "appc://item/2" })).ok, true);
+  assert.equal((await act("w", { action: "switch_app", id: "appd" })).ok, true);
+  assert.equal(await readInitial("w"), "null");
+});
