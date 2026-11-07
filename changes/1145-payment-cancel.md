@@ -1,0 +1,2 @@
+- `@shipvo/device`: a payment `nextResult` the simulator does not know now throws instead of coming back as `insufficient_funds`.
+- Migration: update the app's `@shipvo/device` to 0.1.5 or newer. Older versions return `insufficient_funds` for `payment.nextResult: "cancel"`.

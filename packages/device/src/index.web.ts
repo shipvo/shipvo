@@ -208,7 +208,7 @@ export const device: Device = {
       await new Promise((r) => setTimeout(r, 300));
       const n = state.payment.nextResult;
       const r: PaymentResult = state.payment.pin && pin !== state.payment.pin ? { ok: false, reason: "declined" }
-        : n === "approve" ? { ok: true, receipt: `SIMULATED-${Date.now().toString(36).toUpperCase()}` } : n === "decline" ? { ok: false, reason: "declined" } : n === "cancel" ? { ok: false, reason: "cancelled" } : n === "timeout" ? { ok: false, reason: "timeout" } : { ok: false, reason: "insufficient_funds" };
+        : n === "approve" ? { ok: true, receipt: `SIMULATED-${Date.now().toString(36).toUpperCase()}` } : n === "decline" ? { ok: false, reason: "declined" } : n === "cancel" ? { ok: false, reason: "cancelled" } : n === "timeout" ? { ok: false, reason: "timeout" } : n === "insufficient_funds" ? { ok: false, reason: "insufficient_funds" } : (() => { throw new Error(`unknown payment.nextResult "${n}"`); })();
       log("payment", { req, r }); return r;
     },
   },

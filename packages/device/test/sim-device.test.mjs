@@ -202,3 +202,18 @@ test("payment: a cancel result comes back as cancelled", async () => {
   assert.deepEqual(await device.pay.charge({ amount: 100 }), { ok: false, reason: "cancelled" });
   dev.reset();
 });
+
+test("payment and biometrics: every nextResult value set through __pnDevice reaches the app as its own reason", async () => {
+  const pay = { approve: undefined, decline: "declined", timeout: "timeout", insufficient_funds: "insufficient_funds", cancel: "cancelled" };
+  for (const [next, reason] of Object.entries(pay)) {
+    dev.reset({ payment: { nextResult: "approve", pin: "" } });
+    dev.set({ payment: { nextResult: next } });
+    const r = await device.pay.charge({ amount: 1 });
+    if (reason) assert.deepEqual(r, { ok: false, reason }, next); else assert.equal(r.ok, true);
+    assert.equal(dev.log().at(-1).kind, "payment");
+  }
+  dev.reset({ payment: { nextResult: "approve", pin: "" } });
+  dev.set({ payment: { nextResult: "bogus" } });
+  await assert.rejects(device.pay.charge({ amount: 1 }), /unknown payment.nextResult/);
+  dev.reset();
+});
