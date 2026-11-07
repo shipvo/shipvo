@@ -1,4 +1,5 @@
 // tap, type and scroll say delivered or not_delivered, with a reason when nothing reached the app.
+import { pickPort } from "./test-port.mjs";
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -9,7 +10,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = 4600 + Math.floor(Math.random() * 300);
+const PORT = pickPort(4600, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-refs-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc;
