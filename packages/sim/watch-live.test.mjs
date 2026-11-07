@@ -1,5 +1,5 @@
-// The Browser app against a real sim server: frames stream, input reaches a local page, Linking.openURL opens the
-// Browser app, and a web link to the app's scheme reaches the app. The app page is a stand-in with the device hooks.
+// The /watch page and its socket against a real sim server: live sessions, steps, view-only until "control" is sent,
+// and the step and change-line helpers. The app page is a stand-in with the device hooks.
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
@@ -32,7 +32,7 @@ const castRunning = async (id) => (await call("/sessions", {})).sessions.find((s
 const until = async (f, ms = 15000) => { const t = Date.now(); for (;;) { const v = await f(); if (v) return v; if (Date.now() - t > ms) throw new Error("timed out"); await new Promise((r) => setTimeout(r, 100)); } };
 const appText = async (s) => (await act(s, { action: "screen" })).screen;
 
-function connect(session) {
+function connect() {
   const ws = new WebSocket(`ws://localhost:${PORT}/watch/ws`);
   const msgs = []; ws.onmessage = (e) => msgs.push(JSON.parse(e.data));
   const opened = new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
@@ -82,7 +82,7 @@ test("a viewer gets frames and the agent's tap; with no viewer no screencast run
   await call("/session", { session: "w" });
   await new Promise((r) => setTimeout(r, 500));
   assert.equal(await castRunning("w"), false);   // nobody watches yet
-  const c = connect("w"); await c.opened;
+  const c = connect(); await c.opened;
   const list = await until(() => c.msgs.find((m) => m.type === "sessions"));
   assert.ok(list.sessions.some((s) => s.session === "w" && s.skin === "android"));
   c.send({ type: "select", session: "w" });

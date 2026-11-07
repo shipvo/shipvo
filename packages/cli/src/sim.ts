@@ -136,6 +136,11 @@ export async function sim(argv: string[]) {
   await runJson(() => simRun(rest, true) as Promise<Done>, SIM_NEXT);
 }
 
+/** Whether `shipvo sim` opens the /watch page: not in `--json` mode and not with `--no-open`. */
+export function shouldOpenWatch(json: boolean, noOpen: string | undefined): boolean {
+  return !json && noOpen !== "true";
+}
+
 async function simRun(argv: string[], json: boolean): Promise<Done | void> {
   // Text mode keeps its plain messages and exit codes. JSON mode throws, so runJson prints the envelope.
   const die = (msg: string, status: number, code: string): never => {
@@ -165,7 +170,7 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
     console.error(`Simulator on http://localhost:${port}/app/  (open_app("${cfg.appId}") from @shipvo/mcp; Ctrl-C to stop)`);
     const watchUrl = `http://localhost:${port}/watch`;
     console.error(`Watch the agent: ${watchUrl}`);
-    if (!json && a["no-open"] !== "true") openBrowser(watchUrl);
+    if (shouldOpenWatch(json, a["no-open"])) openBrowser(watchUrl);
     if (a.watch === "true") {
       watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto(), verbose: a.verbose === "true" });
       console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");
