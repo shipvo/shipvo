@@ -63,6 +63,8 @@ test("/watch serves the page with both skins", async () => {
   const i = await (await fetch(`http://localhost:${PORT}/watch?skin=ios`)).text();
   assert.match(a, /Watch the agent/); assert.match(a, /data-part="takeover"/);
   assert.notEqual(a.length, i.length);
+  assert.match(a, /@media \(max-width:760px\)/); assert.match(a, /aria-live="polite"/);
+  assert.match(a, /aria-label="Live sessions"/); assert.match(a, /aria-label="Steps"/);
 });
 
 test("step words and the change line", () => {
@@ -70,6 +72,10 @@ test("step words and the change line", () => {
   assert.equal(describeStep("set_device", { device: { payment: "decline" } }), "set_device payment=decline");
   assert.equal(changeLine('- heading "Cart"\n- button "Pay" [ref=e1]', '- heading "Cart"\n- text "Added"'), "1 added, 1 removed: text \"Added\"");
   assert.equal(changeLine("- a", "- a"), "screen unchanged");
+  assert.equal(describeStep("tap", { ref: "e9" }, '- button "Pay" [ref=e1]'), "tap e9");
+  assert.equal(describeStep("type", { text: "x".repeat(100) }), `type "${"x".repeat(60)}" into the field`);
+  assert.ok(changeLine("- a", "- " + "y".repeat(200)).length < 120);
+  assert.equal(changeLine(null, "- a"), "");
 });
 
 test("a viewer gets frames and the agent's tap; with no viewer no screencast runs", async () => {
@@ -88,7 +94,12 @@ test("a viewer gets frames and the agent's tap; with no viewer no screencast run
   await act("w", { action: "tap", ref });
   const step = await until(() => c.msgs.find((m) => m.type === "step" && /^tap/.test(m.text)));
   assert.equal(step.ok, true);
+  // view only: a tap before "Take over" does nothing
+  c.send({ type: "tap", x: 60, y: 60 });
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal(c.msgs.some((m) => m.type === "step" && m.text === "you: tap"), false);
   // taking over: a tap from the viewer reaches the page
+  c.send({ type: "control", on: true });
   c.send({ type: "tap", x: 60, y: 60 });
   await until(() => c.msgs.find((m) => m.type === "step" && m.text === "you: tap"));
   c.ws.close();

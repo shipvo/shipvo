@@ -8,7 +8,8 @@ export const help = `shipvo <command>
 
 Start
   init <dir> [--json]         Create a new app wired to Shipvo
-  sim [--port 4545] [--no-open]  Build the app and run it in the simulator; opens the live watch page for the agent's phone
+  sim [--port 4545] [--no-open]
+                              Build the app and run it in the simulator; opens the live watch page for the agent's phone
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
                               First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
                               Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.

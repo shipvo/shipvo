@@ -566,6 +566,8 @@ function watchSocket(req, socket) {
   w = acceptWebSocket(req, socket, async (text) => {
     let m; try { m = JSON.parse(text); } catch { return; }
     if (m.type === "select") { const prev = w.sel; w.sel = String(m.session ?? ""); if (prev) await syncCast(prev); await syncCast(w.sel); return; }
+    if (m.type === "control") { w.control = m.on === true; return; }
+    if (!w.control) return;   // view only until the viewer turns "Take over" on
     const s = sessions.get(w.sel); if (!s) return;
     try {
       if (m.type === "tap" && Number.isFinite(m.x) && Number.isFinite(m.y)) await s.page.touchscreen.tap(m.x, m.y);

@@ -42,6 +42,8 @@ export function watchPage(skin = "android") {
 .w-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}.w-list button{width:100%;text-align:left;border:1px solid #c4c7cc;border-radius:8px;background:#fff;padding:8px 10px;font:inherit;cursor:pointer;min-height:44px}.w-list button[aria-current=true]{outline:2px solid #0a64d6}
 .w-steps{flex:1;min-height:0;overflow:auto;margin:0;padding:0 0 0 20px}.w-steps li{margin:2px 0}.w-steps .bad{color:#a40000}.w-change{margin:0;color:#444}
 .w-bar{display:flex;gap:16px;align-items:center}.w-phone img{display:block;width:100%;height:100%;object-fit:contain;touch-action:none;user-select:none}.w-phone img:not([src]){display:none}.w-empty{position:absolute;inset:0;margin:0;display:flex;align-items:center;justify-content:center;color:#595959}.has-frame .w-empty{display:none}
+@media (max-width:760px){.w{flex-direction:column;height:auto;min-height:100%;gap:12px;padding:8px}.w-phone{min-width:0;width:100%;justify-content:center;zoom:.88}.w-side{min-width:0;min-height:auto}.w-steps{max-height:40vh}.w-bar{flex-wrap:wrap;gap:8px 16px}}
+@media (max-width:400px){.w-phone{zoom:.8}}@media (max-width:350px){.w-phone{zoom:.7}}
 button:focus-visible,input:focus-visible,img:focus-visible{outline:3px solid #0a64d6;outline-offset:2px}
 @media (prefers-color-scheme:dark){html,body{background:#17181a;color:#eee}.w-list button{background:#202124;color:#eee;border-color:#3a3a3c}.w-change{color:#bbb}.w-steps .bad{color:#ff8a8a}.w-empty{color:#b0b0b0}}`;
   const script = `(function(){var $=function(p){return document.querySelector('[data-part="'+p+'"]')},img=$("screen"),ws,sel="",list=[],skin=${JSON.stringify(skin)},vw=393,vh=851,pinned=false;
@@ -55,6 +57,7 @@ b.textContent=s.session+" \\u00b7 "+(s.app||"app")+" \\u00b7 "+(s.skin==="ios"?"
 $("none").hidden=list.length>0}
 function step(m){var li=document.createElement("li");if(!m.ok)li.className="bad";li.textContent=m.text+(m.ok?"":" (failed)");var o=$("steps");o.append(li);o.scrollTop=o.scrollHeight;if(m.change)$("change").textContent=m.change}
 function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/watch/ws");
+ws.onopen=function(){send({type:"control",on:$("takeover").checked})};
 ws.onmessage=function(e){var m=JSON.parse(e.data);
 if(m.type==="sessions"){var had=newest();list=m.sessions;if(!sel||!list.some(function(x){return x.session===sel})||(!pinned&&newest()!==sel)){if(list.length)pick(newest(),false);else{sel="";draw()}}else draw()}
 else if(m.type==="frame"&&m.session===sel){vw=m.width||vw;vh=m.height||vh;img.src="data:image/jpeg;base64,"+m.data;$("phone").classList.add("has-frame")}
@@ -66,9 +69,9 @@ function pt(e){var r=img.getBoundingClientRect(),k=Math.min(r.width/vw,r.height/
 var on=$("takeover");img.tabIndex=0;
 img.addEventListener("pointerup",function(e){if(!on.checked)return;var p=pt(e);send({type:"tap",x:p.x,y:p.y});img.focus()});
 img.addEventListener("keydown",function(e){if(!on.checked)return;if(e.key==="Enter"||e.key==="Backspace"||e.key==="Tab"){e.preventDefault();send({type:"key",key:e.key})}else if(e.key.length===1&&!e.ctrlKey&&!e.metaKey){e.preventDefault();send({type:"text",text:e.key})}});
-on.onchange=function(){$("mode").textContent=on.checked?"You are driving the phone.":"View only."}})();`;
+on.onchange=function(){send({type:"control",on:on.checked});$("mode").textContent=on.checked?"You are driving the phone.":"View only."}})();`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Watch the agent</title><style>${frame.css}\n${css}</style></head><body><div class="w"><div class="w-phone" data-part="phone">${frame.html}</div>
 <div class="w-side"><div class="w-bar"><h2>Watch the agent</h2><label><input type="checkbox" data-part="takeover"> Take over</label><span data-part="mode" role="status">View only.</span></div>
-<ul class="w-list" data-part="sessions"></ul><p data-part="none">No session yet. It appears when an agent starts one.</p>
-<h2>Steps</h2><ol class="w-steps" data-part="steps"></ol><p class="w-change" data-part="change" role="status"></p></div></div><script>${script.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
+<ul class="w-list" data-part="sessions" aria-label="Live sessions"></ul><p data-part="none">No session yet. It appears when an agent starts one.</p>
+<h2>Steps</h2><ol class="w-steps" data-part="steps" aria-label="Steps" aria-live="polite"></ol><p class="w-change" data-part="change" role="status"></p></div></div><script>${script.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
 }
