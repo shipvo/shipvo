@@ -1,0 +1,18 @@
+{
+  "name": "declined-card-then-pay",
+  "app": "shop",
+  "platform": "ios",
+  "instruction": "Open the shop and buy one Canvas tote. The first payment will be declined. Read the message, make the next payment succeed, and finish with one placed order. Call end_session when done.",
+  "start": {
+    "seed_cart": [{ "id": "canvas-tote", "quantity": 1 }],
+    "device": { "payment": { "nextResult": "decline", "pin": "1234" } },
+    "network": { "online": true }
+  },
+  "limits": { "seconds": 300, "steps": 50 },
+  "checks": [
+    { "id": "declined-shown", "type": "text_seen", "text": "Your payment was declined" },
+    { "id": "order", "type": "order_exists", "items": [{ "id": "canvas-tote", "quantity": 1 }], "count": 1 },
+    { "id": "confirmation", "type": "screen_shown", "text": "Order placed" },
+    { "id": "no-crash", "type": "no_crash" }
+  ]
+}
