@@ -1,0 +1,1 @@
+- `shipvo eas setup`: the iOS build config uses only EAS built-in functions (removed `eas/prebuild_credentials_ios`, which EAS does not have) and reads the Apple team id with EAS's output syntax.
