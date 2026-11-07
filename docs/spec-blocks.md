@@ -1,0 +1,143 @@
+# App spec: screens, controls and sheets
+
+This page is for developers and for coding agents that write a Shipvo app spec (`shipvo.app/v0`). You will build one screen from the display and control blocks, check it, render it as Android or iOS, and change its state from a test. The full format is in the [design document](design/app-spec.md). The package is `@shipvo/spec`.
+
+## Install
+
+```bash
+npm install @shipvo/spec
+```
+
+## 1. Write the spec
+
+Save this as `today.json`. It uses `stat`, `segmented`, `card`, `progress`, `divider`, `section`, `toggle` and a sheet.
+
+```json
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "today", "name": "Revenue", "description": "Revenue today." },
+  "state": {
+    "period": { "type": "enum", "options": ["day", "week", "month"], "default": "day" },
+    "alerts": { "type": "bool", "default": false }
+  },
+  "screens": [
+    { "id": "today", "title": "Today", "body": [
+      { "type": "stack", "gap": "lg", "children": [
+        { "type": "stat", "label": "Revenue today", "value": "1250 EUR", "delta": "+12%", "variant": "hero" },
+        { "type": "segmented", "label": "Period", "bind": "state.period", "options": ["day", "week", "month"] },
+        { "type": "card", "variant": "outlined", "label": "Goal", "children": [
+          { "type": "progress", "label": "Monthly goal", "value": 40, "max": 100 },
+          { "type": "progress", "label": "Goal ring", "variant": "ring", "value": 75 }
+        ] },
+        { "type": "divider" },
+        { "type": "section", "title": "Settings", "children": [
+          { "type": "toggle", "label": "Failed payment alerts", "bind": "state.alerts" }
+        ] },
+        { "type": "button", "label": "Details", "onPress": { "navigate": "details", "presentation": "sheet" } }
+      ] }
+    ] },
+    { "id": "details", "title": "Details", "presentation": "sheet", "body": [
+      { "type": "text", "value": "Revenue so far today." },
+      { "type": "button", "label": "Done", "onPress": { "back": true } }
+    ] }
+  ]
+}
+```
+
+## 2. Check it
+
+```ts
+import { readFileSync } from "node:fs";
+import { validate } from "@shipvo/spec";
+
+const spec = JSON.parse(readFileSync("today.json", "utf8"));
+console.log(validate(spec)); // { errors: [], warnings: [] }
+```
+
+## 3. Render it
+
+```ts
+import { renderScreen, describeTree } from "@shipvo/spec";
+
+const r = renderScreen(spec, { style: "ios" }); // or "android"
+if (r.ok) console.log(describeTree(r.tree));
+```
+
+Expected output. Android and iOS give the same tree; only the styling differs.
+
+```text
+main "Today"
+  group ""
+    status "Revenue today: 1250 EUR, +12%"
+    radiogroup "Period: day"
+      radio "day"
+      radio "week"
+      radio "month"
+    group "Goal"
+      progressbar "Monthly goal: 40%"
+      progressbar "Goal ring: 75%"
+    separator ""
+    region "Settings"
+      switch "Failed payment alerts: off"
+    button "Details"
+```
+
+## 4. Use it like an app
+
+`createApp` keeps state between actions. `app.state` starts with the defaults you declared.
+
+```ts
+import { createApp } from "@shipvo/spec";
+
+const made = createApp(spec);
+if (!made.ok) throw new Error(JSON.stringify(made.errors));
+const app = made.app;
+
+app.toggle("Failed payment alerts");   // { ok: true, value: true }
+app.select("Period", "week");          // { ok: true, value: "week" }
+app.state;                             // { period: "week", alerts: true }
+app.press("Details");                  // opens the sheet; app.screen is "details"
+app.press("Done");                     // back to "today"
+app.select("Period", "year");          // { ok: false, error: '"year" is not one of: day, week, month.' }
+```
+
+## Blocks
+
+| Block | Use it for | Main options |
+| --- | --- | --- |
+| `stat` | One number with a label | `label`, `value`, `delta`, `variant` (`hero`) |
+| `progress` | A bar or ring | `label`, `value`, `max` (default 100), `variant` (`ring` for a ring) |
+| `card` | A grouped area | `label`, `variant` (`plain`, `outlined`, `filled`), `children` |
+| `section` | A titled group | `title`, `children` |
+| `divider` | A line between groups | none |
+| `toggle` | On or off | `label`, `bind` to a `bool` state value |
+| `segmented` | One choice from a few | `label`, `bind` to an `enum` state value, `options` |
+
+In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a segmented control reads `Period: week`, and a progress block reads `Monthly goal: 40%`. Assistants and `@shipvo/test` find them by those names.
+
+## Sheets
+
+Add `"presentation": "sheet"` to a screen and to the `navigate` action that opens it. The screen appears as a bottom sheet (a `dialog` in the tree). `{ "back": true }` closes it.
+
+## Errors you may see
+
+`validate` returns the JSON path and a fix for each error.
+
+| Error | Fix |
+| --- | --- |
+| `Interactive block "toggle" has no label.` | Add `label`. |
+| `State "nope" is not declared.` | Add the key to `state` with a type and a default. |
+| `"a" does not match the required format.` (`$.app.id`) | Use lowercase letters, digits and `-`, 2 to 63 characters, starting with a letter. |
+| A `segmented` block without `options` | Add `options`. |
+
+## Troubleshooting
+
+- **`createApp` returns `ok: false`.** The spec has validation errors. Print `made.errors`; each has a path and a fix.
+- **`toggle` or `select` answers `ok: false`.** The label does not match a control on the current screen, or the option is not in `options`. Labels are case-sensitive.
+- **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
+
+## Next steps
+
+- [`@shipvo/spec` package reference](../packages/spec/README.md): every check, expressions and charts.
+- [Test your app in CI](testing.md): write typed tests against the screen tree.
+- [Glossary](glossary.md).
