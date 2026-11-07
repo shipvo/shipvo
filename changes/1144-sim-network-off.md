@@ -1,0 +1,2 @@
+- `@shipvo/sim`: with the network off (`set_device` network off, airplane mode, Wi-Fi and mobile data off, or the offline network profile), the app's `fetch` and `XMLHttpRequest` calls to other origins now fail with `TypeError: Network request failed`, like on a phone. Slow network profiles still add their latency once. This applies to `shipvo sim`, `@shipvo/mcp` and `@shipvo/test` sessions.
+- Migration: none.
