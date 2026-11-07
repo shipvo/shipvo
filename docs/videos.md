@@ -2,6 +2,43 @@
 
 Short videos for people who are new to Shipvo. Each one has captions and a written transcript.
 
+## Test your app
+
+### Have Lumi test your app while you watch
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="Have Lumi test your app while you watch" data-length="2 min 7 s" poster="/videos/test-your-app-with-lumi.jpg" src="/media/videos/test-your-app-with-lumi-ea953cd2.mp4"><track kind="captions" src="/videos/test-your-app-with-lumi.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+2 minutes 7 seconds. Run `npx shipvo lumi`, type `test my app`, read the findings, press Replay to watch a problem happen again, try bad input, and use `--seed 1` to check a fix. No AI account and no code. It follows [Have Lumi test your app while you watch](tutorials/test-your-app-with-lumi.md) and [Lumi on Shipvo Phone](lumi.md).
+
+[Captions (.vtt)](/videos/test-your-app-with-lumi.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "and then its all gone" by Williamson (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>). Source: <a href="https://www.jamendo.com/track/124446">https://www.jamendo.com/track/124446</a></details>
+
+<details>
+<summary>Transcript</summary>
+
+Your app is on a phone, and something is wrong. A button does nothing. You did not find it. Lumi did, while you watched.
+
+By the end, Lumi has tested your app, and you have replayed one problem. You need no AI account, and you write no code.
+
+Open a terminal in your app folder. Type npx shipvo lumi, and press Enter. Shipvo builds a web copy of your app. For an iPhone, add ios. Android and iOS work the same way.
+
+Your browser opens. The phone is on the left. Lumi's sidebar is on the right. Findings starts at zero. Now, give Lumi a job.
+
+Type, test my app, and press Enter. Lumi taps through your app, from the start screen. A caption names each step, like, Tapping Checkout. The sidebar lists every action.
+
+Now look at Findings. Each one is something Lumi reported. A button that does nothing. A screen that stays blank. A network call that fails. Each problem is listed once. Coverage shows how many screens and controls Lumi tried.
+
+Here is the part that matters. Press Replay next to a finding. The phone repeats the steps that led to it. You watch the problem happen again, with your own eyes.
+
+Want a harder test? Type, try checkout with bad input. Lumi runs the same path with invalid values. A finding here means your app accepted what it should refuse.
+
+Fixed it? Prove it. Stop Lumi with Ctrl+C. Start it again with --seed 1. The same seed gives the same walk, so you can check that the fix worked. And Save as test turns a finding into a test file that fails while the bug is there.
+
+That is it. Lumi tests your app while you watch. Try npx shipvo lumi in your app folder. The guide is at shipvo.dev/learn.
+
+</details>
+
 ## Put your app in the stores
 
 ### From working app to Google Play and the App Store

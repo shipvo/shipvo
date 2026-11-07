@@ -69,3 +69,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Lumi.** The small glowing orb beside the Shipvo Phone camera. It shows each step as a caption, looks worried when something fails, and powers `shipvo lumi`, which tests your app while you watch. See [Lumi](lumi.md).
 
 **Network profile.** A named connection speed and reliability for the simulated phone, such as `2g` or `spotty`, so you can see how your app behaves on a poor connection. See [Device API](device-api.md#network-profiles).
+
+**Behaviour timeline.** A list in your app's admin page of every release and pull request check run, with its flows, findings and screens, so you can compare any two points. See [Behaviour timeline](timeline.md).
