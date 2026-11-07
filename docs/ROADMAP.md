@@ -84,6 +84,7 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 
 - 2026-11-07: Ask to add an app to your own phone with a consent card you approve yourself: `request_app_install`, `list_installed_apps` ([Phone apps](phone-apps.md#ask-to-add-an-app-to-your-own-phone), #996)
 - 2026-11-07: A release is held for your decision, not halted, when its failures look like fake fresh installs or a burst ([Auto-halt](auto-halt.md#when-failures-look-like-an-attack), #988)
+- 2026-11-07: Run Android and iOS simulators on your own machine or CI runner: 110 open at once on a 2-CPU, 7.8 GB machine ([Shipvo Simulators](https://shipvo.dev/products/simulators/), #1235)
 - 2026-11-07: Test your own build on the hosted phone with `upload_build` or `shipvo sim --hosted`, then `open_app("<app>@build:<id>")` ([Test your build](test-your-build.md), #1171)
 - 2026-11-07: Two assistants play a full chess game through `@shipvo/mcp` with `--agents`, and `--record` saves the video and the moves ([Chess on two phones](demos/chess.md), #1166)
 - 2026-11-07: With the network off, the app's `fetch` and `XMLHttpRequest` calls fail like on a phone, in sim, MCP and test sessions on Android and iOS ([Device API](device-api.md#network), #1161)

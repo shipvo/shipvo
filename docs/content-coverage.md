@@ -83,3 +83,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Single sign-on (OIDC) for the dashboard | [sso](sso.md) | | | |
 | Key rotation (`shipvo keys rotate`) | [cli](cli.md) | | | |
 | Log in with test accounts from secrets (`log in as "buyer"`) | [testing](testing.md#test-accounts) | | | |
+| Data sources that use a saved key (`auth.secret`, `secret_revoked`, `secret_domain`) | [spec-blocks](spec-blocks.md#data-sources-that-use-a-saved-key) | | | |
+| `open_app` with `platform` and `show` opens the phone in your browser | [agents](agents.md), [run](run.md) | | | |
+| Fuller shop template checkout (plain payment errors, offline message, Undo, confirmation screen) | [getting-started](getting-started.md#the-shop-checkout) | | | |
