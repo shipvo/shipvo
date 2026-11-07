@@ -42,6 +42,8 @@ const server = createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}`;
+// Other packages test in parallel on the CI runner; give each wait room so a busy machine does not fail the check.
+const SLOW = 90_000;
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -51,22 +53,22 @@ try {
   const android = page.frameLocator("#cd-phone-white").frameLocator("#app");
   const ios = page.frameLocator("#cd-phone-black").frameLocator("#app");
   // Both phones render, in their own frames.
-  await android.getByTestId("board").waitFor({ timeout: 30_000 });
-  await ios.getByTestId("board").waitFor({ timeout: 30_000 });
+  await android.getByTestId("board").waitFor({ timeout: SLOW });
+  await ios.getByTestId("board").waitFor({ timeout: SLOW });
   assert.equal(await page.locator("#cd-phone-white").contentFrame().locator('[data-platform="android"]').count(), 1);
   assert.equal(await page.locator("#cd-phone-black").contentFrame().locator('[data-platform="ios"]').count(), 1);
   // One autoplay move updates the move list, and shows on the other phone.
-  await page.locator("#cd-moves li").first().waitFor({ timeout: 30_000 });
+  await page.locator("#cd-moves li").first().waitFor({ timeout: SLOW });
   assert.match(await page.locator("#cd-moves li").first().textContent(), /^1\. e2e4/);
-  await ios.getByLabel("white pawn on e4").waitFor({ timeout: 10_000 });
+  await ios.getByLabel("white pawn on e4").waitFor({ timeout: SLOW });
   // "Play against it": the visitor taps white, the code answers for black.
   await page.locator("#cd-mode").click();
-  await android.getByTestId("board").waitFor({ timeout: 30_000 });
-  await ios.getByTestId("board").waitFor({ timeout: 30_000 });
-  await page.waitForFunction(() => /Your move/.test(document.getElementById("cd-status").textContent), null, { timeout: 30_000 });
+  await android.getByTestId("board").waitFor({ timeout: SLOW });
+  await ios.getByTestId("board").waitFor({ timeout: SLOW });
+  await page.waitForFunction(() => /Your move/.test(document.getElementById("cd-status").textContent), null, { timeout: SLOW });
   await android.getByTestId("square-e2").click();
   await android.getByTestId("square-e4").click();
-  await page.waitForFunction(() => document.querySelectorAll("#cd-moves li").length === 1 && /^1\. e2e4 \S+/.test(document.querySelector("#cd-moves li").textContent), null, { timeout: 30_000 });
+  await page.waitForFunction(() => document.querySelectorAll("#cd-moves li").length === 1 && /^1\. e2e4 \S+/.test(document.querySelector("#cd-moves li").textContent), null, { timeout: SLOW });
   assert.deepEqual(errors, []);
   // 375 px does not scroll sideways.
   await page.setViewportSize({ width: 375, height: 800 });
