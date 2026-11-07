@@ -77,6 +77,7 @@ describe("commentCmd", () => {
 describe("upsertComment", () => {
   it("does not overwrite a human comment that quotes the marker", async () => {
     const calls: string[] = [];
+    const posted: any[] = [];
     const fetch = async (url: string, init: any = {}) => {
       const m = init.method ?? "GET"; calls.push(m);
       if (m === "GET") return { ok: true, status: 200, json: async () => [{ id: 1, body: `quote ${MARKER}`, user: { type: "User" } }, { id: 2, body: `${MARKER}\nold`, user: { type: "Bot" } }] };
@@ -92,6 +93,7 @@ describe("upsertComment", () => {
   it("the second run updates the first comment", async () => {
     const store: { id: number; body: string }[] = [{ id: 7, body: "someone else" }];
     const calls: string[] = [];
+    const posted: any[] = [];
     const fetch = async (url: string, init: any = {}) => {
       const m = init.method ?? "GET"; calls.push(`${m} ${url.replace("https://api.github.com/repos/o/r", "")}`);
       if (m === "GET") return { ok: true, status: 200, json: async () => store };
@@ -122,20 +124,26 @@ describe("before and after screens", () => {
     }
     return { before: join(root, "before"), after: join(root, "after") };
   };
-  const server = (priv: boolean, store: Map<string, string> = new Map()) => {
+  const server = (priv: boolean, store: Map<string, string> = new Map(), opts: { noBranch?: boolean; postStatus?: number; mainSha?: string | null; refStatus?: number } = {}) => {
     const calls: string[] = [];
+    const posted: any[] = [];
     const fetch = async (url: string, init: any = {}) => {
       const m = init.method ?? "GET"; calls.push(`${m} ${url}`);
       const ok = (j: any, status = 200) => ({ ok: true, status, json: async () => j });
       if (url.endsWith("/repos/o/r")) return ok({ private: priv, default_branch: "main" });
-      if (url.includes("/git/ref/heads/shipvo-media")) return ok({});
+      if (url.includes("/git/ref/heads/shipvo-media")) {
+        if (opts.refStatus) return { ok: false, status: opts.refStatus, json: async () => ({}) };
+        return opts.noBranch ? { ok: false, status: 404, json: async () => ({}) } : ok({});
+      }
+      if (url.endsWith("/git/ref/heads/main")) return ok(opts.mainSha === null ? {} : { object: { sha: opts.mainSha ?? "abc123" } });
+      if (m === "POST" && url.endsWith("/git/refs")) { posted.push(JSON.parse(init.body)); return opts.postStatus ? { ok: false, status: opts.postStatus, json: async () => ({}) } : ok({}, 201); }
       if (m === "PUT") {
         if (store.has(url)) return { ok: false, status: 422, json: async () => ({}) };
         store.set(url, JSON.parse(init.body).content); return ok({}, 201);
       }
       return ok({ content: store.get(url.split("?")[0]) });
     };
-    return { fetch, calls };
+    return { fetch, calls, posted };
   };
 
   it("shows one changed screen of five with both skins and different image URLs", async () => {
@@ -151,6 +159,40 @@ describe("before and after screens", () => {
     expect(new Set(imgs).size).toBe(imgs.length);
     expect(images!["before/android/cart.png"]).not.toBe(images!["after/android/cart.png"]);
     expect(images!["before/android/cart.png"]).toContain("/before/");
+    expect(c).toContain('alt="cart Android, before"');
+    expect(c).toContain('alt="cart iOS, after"');
+  });
+  it("creates the media branch from the default branch when the ref answers 404", async () => {
+    const d = dirs();
+    const { pairs } = pairShots(d.before, d.after);
+    const s = server(false, new Map(), { noBranch: true, mainSha: "deadbeef" });
+    const images = await uploadShots({ repo: "o/r", token: "t", key: "k", pairs, beforeDir: d.before, afterDir: d.after, fetch: s.fetch });
+    expect(s.posted).toEqual([{ ref: "refs/heads/shipvo-media", sha: "deadbeef" }]);
+    expect(images).not.toBeNull();
+    expect(s.calls.findIndex((x) => x.startsWith("POST"))).toBeLessThan(s.calls.findIndex((x) => x.startsWith("PUT")));
+  });
+  it("a failed branch creation names contents: write and the comment lists file names", async () => {
+    const d = dirs();
+    const { pairs, moreCount } = pairShots(d.before, d.after);
+    const s = server(false, new Map(), { noBranch: true, postStatus: 403 });
+    await expect(uploadShots({ repo: "o/r", token: "t", key: "k", pairs, beforeDir: d.before, afterDir: d.after, fetch: s.fetch })).rejects.toThrow(/contents: write/);
+    expect(s.calls.some((x) => x.startsWith("PUT"))).toBe(false);
+    const c = renderComment({ pairs, moreCount, images: null });
+    expect(c).toContain("`android/cart.png`");
+  });
+  it("throws a clear error when the default branch sha is missing", async () => {
+    const d = dirs();
+    const { pairs } = pairShots(d.before, d.after);
+    const s = server(false, new Map(), { noBranch: true, mainSha: null });
+    await expect(uploadShots({ repo: "o/r", token: "t", key: "k", pairs, beforeDir: d.before, afterDir: d.after, fetch: s.fetch })).rejects.toThrow(/could not read the main branch/);
+    expect(s.posted).toEqual([]);
+  });
+  it("a non-404 failure on the media branch lookup stops the upload", async () => {
+    const d = dirs();
+    const { pairs } = pairShots(d.before, d.after);
+    const s = server(false, new Map(), { refStatus: 500 });
+    await expect(uploadShots({ repo: "o/r", token: "t", key: "k", pairs, beforeDir: d.before, afterDir: d.after, fetch: s.fetch })).rejects.toThrow(/\(500\)/);
+    expect(s.calls.some((x) => x.startsWith("PUT"))).toBe(false);
   });
   it("a private repo uploads nothing and lists the files", async () => {
     const d = dirs();

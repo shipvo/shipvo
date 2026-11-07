@@ -64,16 +64,16 @@ function pairsSection(pairs: ShotPair[], more: number, images: Record<string, st
     const rows = pairs.filter((p) => p.screen === screen);
     L.push(`**${cell(screen)}**`, "");
     if (images) {
-      const img = (side: "before" | "after", path?: string) => (path && images[`${side}/${path}`] ? `<img src="${images[`${side}/${path}`]}" width="180" alt="${side}">` : "none");
+      const img = (side: "before" | "after", p: ShotPair) => { const path = p[side]; return path && images[`${side}/${path}`] ? `<img src="${images[`${side}/${path}`]}" width="180" alt="${cell(screen)} ${SKIN_NAME[p.skin]}, ${side}">` : "none"; };
       L.push("| | Before | After |", "| --- | --- | --- |");
-      for (const p of rows) L.push(`| ${SKIN_NAME[p.skin]} | ${img("before", p.before)} | ${img("after", p.after)} |`);
+      for (const p of rows) L.push(`| ${SKIN_NAME[p.skin]} | ${img("before", p)} | ${img("after", p)} |`);
     } else {
       for (const p of rows) L.push(`- ${SKIN_NAME[p.skin]}: before ${p.before ? `\`${cell(p.before)}\`` : "none"}, after ${p.after ? `\`${cell(p.after)}\`` : "none"}`);
     }
     L.push("");
   }
-  if (!images) L.push(`The images are in the \`shipvo-check\` artifact of ${runUrl ? `[this run](${runUrl})` : "this run"}.`, "");
-  if (more > 0) L.push(`${more} more in the artifact.`, "");
+  if (!images) L.push("The images are in the before and after folders of this run.", "");
+  if (more > 0) L.push(`${more} more in those folders.`, "");
   return L;
 }
 
@@ -135,9 +135,14 @@ export async function uploadShots(o: { repo: string; token: string; key: string;
   const info = await req(base).catch(() => null);
   const meta = info?.ok ? await info.json() : null;
   if (!meta || meta.private !== false) return null;
-  if ((await req(`${base}/git/ref/heads/${MEDIA_BRANCH}`)).status === 404) {
-    const head = await (await req(`${base}/git/ref/heads/${meta.default_branch ?? "main"}`)).json();
-    const made = await req(`${base}/git/refs`, "POST", { ref: `refs/heads/${MEDIA_BRANCH}`, sha: head?.object?.sha });
+  const have = await req(`${base}/git/ref/heads/${MEDIA_BRANCH}`);
+  if (!have.ok && have.status !== 404) throw new Error(`could not read the ${MEDIA_BRANCH} branch (${have.status})`);
+  if (have.status === 404) {
+    const def = meta.default_branch ?? "main";
+    const headRes = await req(`${base}/git/ref/heads/${def}`);
+    const sha = headRes.ok ? (await headRes.json())?.object?.sha : undefined;
+    if (typeof sha !== "string" || !sha) throw new Error(`could not read the ${def} branch to create ${MEDIA_BRANCH} from (${headRes.status})`);
+    const made = await req(`${base}/git/refs`, "POST", { ref: `refs/heads/${MEDIA_BRANCH}`, sha });
     if (!made.ok) throw new Error(`could not create the ${MEDIA_BRANCH} branch (${made.status}). The token needs contents: write`);
   }
   const urls: Record<string, string> = {};
