@@ -1,0 +1,17 @@
+{
+  "name": "buy-canvas-tote",
+  "app": "shop",
+  "platform": "android",
+  "instruction": "Open the shop. Buy one Canvas tote and pay for it. Call end_session when the order is placed.",
+  "start": {
+    "seed_cart": [],
+    "device": { "payment": { "nextResult": "approve", "pin": "1234" } },
+    "network": { "online": true }
+  },
+  "limits": { "seconds": 300, "steps": 40 },
+  "checks": [
+    { "id": "order", "type": "order_exists", "items": [{ "id": "canvas-tote", "quantity": 1 }], "count": 1 },
+    { "id": "confirmation", "type": "screen_shown", "text": "Order placed" },
+    { "id": "no-crash", "type": "no_crash" }
+  ]
+}
