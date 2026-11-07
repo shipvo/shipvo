@@ -1,0 +1,1 @@
+- Docs: "Data sources that use a saved key" section in the app spec page (`auth`, the four key types, `secret_missing`, `secret_revoked`, `secret_domain`), and a short section on the shop template checkout in Getting started.

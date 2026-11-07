@@ -63,7 +63,7 @@ export function renderScreen(spec: unknown, options: RenderOptions = {}): Render
   return renderInternal(spec, options).result;
 }
 
-export interface Registered { kind: "button" | "form" | "toggle" | "segmented"; block: Obj; scope: Record<string, unknown> }
+export interface Registered { kind: "button" | "form" | "toggle" | "segmented" | "card"; block: Obj; scope: Record<string, unknown> }
 export interface Internal { result: RenderResult; scope: () => Record<string, unknown>; registry: Map<string, Registered> }
 
 export function renderInternal(spec: unknown, options: RenderOptions): Internal {
@@ -171,6 +171,10 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
         return buildList(b, scope, label);
       case "chart":
         return buildChart(b, scope, label);
+      case "kanban":
+        return buildKanban(b, scope, label);
+      case "timeline":
+        return buildTimeline(b, scope, label);
       case "button": {
         const key = String(b.id ?? b.label);
         registry.set(`button:${key}`, { kind: "button", block: b, scope });
@@ -183,15 +187,56 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
     }
   };
 
+  /** A template or a bare expression, evaluated per item. */
+  const each = (src: unknown, sc: Record<string, unknown>): unknown => {
+    if (typeof src !== "string") return "";
+    if (src.includes("{{")) return tpl(src, sc);
+    try { return evaluate(src, sc, options); } catch { return src; }
+  };
+  const text = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
+  const itemsOf = (b: Obj, scope: Record<string, unknown>): unknown[] => {
+    const items = typeof b.from === "string" ? (b.from.includes("{{") ? tpl(b.from, scope) : scope[b.from]) : [];
+    return Array.isArray(items) ? items : [];
+  };
+
+  const buildKanban = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
+    const cols: string[] = (Array.isArray(b.columns) ? b.columns : []).map(String);
+    const items = itemsOf(b, scope);
+    const movable = typeof b.onMove?.action === "string";
+    const children = cols.map((col): ScreenNode => {
+      const cards = items.filter((item) => text(each(b.column, { ...scope, item })) === col).map((item): ScreenNode => {
+        const sc = { ...scope, item };
+        const title = str(b.title, sc), detail = str(b.detail, sc);
+        const key = title;
+        if (movable) registry.set(`card:${key}`, { kind: "card", block: b, scope: sc });
+        return { role: "listitem", name: [title, detail].filter(Boolean).join(", "), block: "kcard", children: [], props: { title, detail, column: col, key } };
+      });
+      return { role: "group", name: `${col}, ${cards.length} ${cards.length === 1 ? "card" : "cards"}`, block: "column", children: cards, props: { title: col } };
+    });
+    return { role: "group", name: label || "Board", block: "kanban", children, props: { columns: cols.length } };
+  };
+
+  const buildTimeline = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
+    const entries = itemsOf(b, scope).map((item) => {
+      const sc = { ...scope, item };
+      const date = text(each(b.date, sc));
+      return { date, day: date.slice(0, 10), title: str(b.title, sc), detail: str(b.detail, sc) };
+    }).filter((e) => /^\d{4}-\d{2}-\d{2}/.test(e.date));
+    // Newest day first; entries keep their order within a day.
+    const days = [...new Set(entries.map((e) => e.day))].sort().reverse();
+    const children = days.map((day): ScreenNode => ({
+      role: "group", name: day, block: "day", props: { day },
+      children: entries.filter((e) => e.day === day).map((e): ScreenNode => ({
+        role: "listitem", name: [e.title, e.detail].filter(Boolean).join(", "), block: "entry", children: [], props: { title: e.title, detail: e.detail, time: e.date.length > 10 ? e.date.slice(11, 16) : "" }
+      }))
+    }));
+    const empty = str(b.empty?.message, scope);
+    return { role: "list", name: label || "Timeline", block: "timeline", children: children.length || !empty ? children : [{ role: "status", name: empty, block: "empty", children: [] }] };
+  };
+
   const buildChart = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
     let items: unknown = [];
     if (typeof b.from === "string") items = b.from.includes("{{") ? tpl(b.from, scope) : scope[b.from];
-    // x, y and series are templates or bare expressions, evaluated per item.
-    const each = (src: unknown, sc: Record<string, unknown>): unknown => {
-      if (typeof src !== "string") return "";
-      if (src.includes("{{")) return tpl(src, sc);
-      try { return evaluate(src, sc, options); } catch { return src; }
-    };
     let points: ChartPoint[] = (Array.isArray(items) ? items : []).map((item) => {
       const sc = { ...scope, item };
       const y = Number(each(b.y, sc));
@@ -434,6 +479,18 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
       }
       case "chart":
         return `<figure style="margin:0;padding:12px;background:${t.p.surface};border-radius:${t.radius}px">${chartSvg(pr.kind as ChartKind, pr.points as ChartPoint[], t.p, n.name, esc, t.font)}</figure>`;
+      case "kanban":
+        return `<div ${a} style="display:flex;gap:${gap("md")}px;overflow-x:auto">${inner}</div>`;
+      case "column":
+        return `<div ${a} style="flex:0 0 ${ios ? 220 : 240}px;box-sizing:border-box;padding:12px;background:${t.p.surface};border-radius:${t.radius}px;display:flex;flex-direction:column;gap:8px"><div style="font:600 ${Math.round(14 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(pr.title)}</div>${inner}</div>`;
+      case "kcard":
+        return `<div ${a} style="padding:12px;background:${t.p.background};border-radius:${Math.round(t.radius * 0.8)}px;box-shadow:${t.shadow};font:500 ${Math.round(15 * t.scale)}px ${t.font};color:${t.p.text}">${esc(pr.title)}${pr.detail ? `<div style="font:400 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(pr.detail)}</div>` : ""}</div>`;
+      case "timeline":
+        return `<div ${a} style="display:flex;flex-direction:column;gap:${gap("md")}px">${inner}</div>`;
+      case "day":
+        return `<div ${a} style="display:flex;flex-direction:column;gap:4px"><div style="font:600 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(n.name)}</div>${inner}</div>`;
+      case "entry":
+        return `<div ${a} style="padding:8px 0 8px 12px;border-left:2px solid ${t.p.primary};font:500 ${Math.round(15 * t.scale)}px ${t.font};color:${t.p.text}">${pr.time ? `<span style="color:${t.p.muted};margin-right:8px">${esc(pr.time)}</span>` : ""}${esc(pr.title)}${pr.detail ? `<div style="font:400 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(pr.detail)}</div>` : ""}</div>`;
       case "list": {
         const ios = style === "ios";
         const wrap = ios ? `background:${t.p.surface};border-radius:${t.radius}px;overflow:hidden` : "";
