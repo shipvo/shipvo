@@ -12,7 +12,7 @@ const frames = { white: $("cd-phone-white"), black: $("cd-phone-black") };
 const appWin = (side) => { try { return frames[side].contentWindow.frames[0]; } catch { return null; } };
 const post = (side, msg) => { const w = appWin(side); if (w) w.postMessage(msg, "*"); };
 
-let mode = "watch", gen = 0, ready = { white: false, black: false }, moves = [], over = false, clock = newClock(Date.now()), started = false, timer = 0, visible = false;
+let mode = "watch", gen = 0, stale = new Set(), ready = { white: false, black: false }, moves = [], over = false, clock = newClock(Date.now()), started = false, timer = 0, visible = false;
 const say = (t) => { $("cd-status").textContent = t; };
 
 function paint() {
@@ -56,7 +56,7 @@ addEventListener("message", (e) => {
   const d = e.data;
   if (!d || d.type !== "chess:moves" || !Array.isArray(d.moves)) return;
   const from = appWin("white") === e.source ? "white" : appWin("black") === e.source ? "black" : null;
-  if (!from) return;
+  if (!from || stale.has(e.source)) return;
   // A reloaded phone first says it has no moves. Any other message before both are ready comes from the page it replaced.
   if (!started && !ready[from] && d.moves.length > 0) return;
   ready[from] = true;
@@ -76,6 +76,8 @@ addEventListener("message", (e) => {
 
 function load() {
   gen++; clearTimeout(timer);
+  // The phone pages still on screen are about to be replaced. A late message from one of them belongs to the last load.
+  stale = new Set([appWin("white"), appWin("black")].filter(Boolean));
   ready = { white: false, black: false }; moves = []; over = false; started = false; clock = newClock(Date.now());
   renderMoves(); paint(); say("Loading the phones");
   for (const f of Object.values(frames)) f.src = f.dataset.src;
