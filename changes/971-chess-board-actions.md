@@ -1,2 +1,0 @@
-- chess app: one shared game store, typed actions `get_board`, `legal_moves`, `move(from, to)`, and a labelled board and move-list view that read the same state.
-- Migration: none; new app code.
