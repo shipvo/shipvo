@@ -6,6 +6,7 @@ import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand, holdRelease, HOLD_COMMAND, holdDismissedKey } from "./owner";
 import { auth } from "./auth";
 import { sso } from "./sso";
+import { rotationRoutes } from "./rotation";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
 import { phoneRoutes } from "./phone";
@@ -572,6 +573,7 @@ app.get("/audit/:app", async (c) => {
 
 app.route("/auth", auth);
 app.route("/vault", vaultRoutes(owner));
+app.route("/rotation", rotationRoutes(owner));
 app.route("/people", peopleRoutes());
 app.route("/phone", phoneRoutes());
 app.route("/", sso);
