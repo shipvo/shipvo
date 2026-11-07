@@ -21,7 +21,7 @@ Taking payments is not a tutorial yet: the shop template has no payment step.
 
 | Tutorial | You will | Time | Level |
 | --- | --- | --- | --- |
-| [See your app on a phone in your browser](run-your-app-on-a-phone.md) | Start a simulated Android or iPhone with one command, tap through your app, see the system sheet, change a word and watch the phone update by itself, and stop it | about 10 minutes | Beginner |
+| [See your app on a phone in your browser](run-your-app-on-a-phone.md) | Start a simulated Android or iPhone with one command, tap through your app, see the system sheet, change a word and watch the phone update by itself, and stop it | about 15 minutes | Beginner |
 
 Letting your assistant drive this same phone is not a tutorial yet: attaching is not available yet.
 

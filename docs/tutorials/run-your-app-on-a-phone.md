@@ -2,7 +2,7 @@
 
 You will type one command and get a phone, Android or iPhone style, in a browser tab, running your app. You will tap through your shop, look at the pretend Android system sheet, switch to the iPhone style and stop it again. You need no real phone, no Android Studio and no Xcode.
 
-**Level:** beginner. **Time:** about 10 minutes to read and follow. On our test machine the first start took within a minute (see "What we measured" at the end).
+**Level:** beginner. **Time:** about 15 minutes to read and follow. On our test machine the first start took within a minute (see "What we measured" at the end).
 
 New words are explained once, and collected in the [glossary](../glossary.md).
 
@@ -82,14 +82,14 @@ Leave the phone running. While it runs, Shipvo watches your app's files. When yo
 
 1. Open your app's folder in a text editor (Notepad, TextEdit or any code editor). Open the file `src/data/products.json`. It is a plain list of your products.
 2. Find `"name": "Wool beanie"` and change the words inside the quotes to `Merino beanie`. Keep the quote marks. Save the file.
-3. Look at the terminal. After a few seconds it prints one line, like `rebuilt in 6.6 s`.
+3. Look at the terminal. After a few seconds it prints one line, like `rebuilt in 8.5 s`.
 4. Look at the phone. The product in the list now says **Merino beanie**. The page did not change address and you did not click anything.
 
 ![The Android phone showing the Tidepool Shop list. The fourth product now reads Merino beanie, $24.00.](/tutorials/run-your-app-on-a-phone/08-after-edit.png)
 
-Now make a mistake on purpose, to see what Shipvo does. In the same file, delete the comma straight after `"name": "Merino beanie"`, so the line ends with a quote mark, and save. The phone keeps showing your last good version. A small red bar appears at the bottom of the phone and the terminal prints the same message, for example `Your file src/data/products.json has a mistake at line 23, column 26: check for a missing or extra comma.`
+Now make a mistake on purpose, to see what Shipvo does. In the same file, delete the comma straight after `"name": "Merino beanie"`, so the line ends with a quote mark, and save. The phone keeps showing your last good version. A small red bar appears just below the phone and the terminal prints the same message, for example `Your file src/data/products.json has a mistake at line 24, column 4: check for a missing or extra comma.`
 
-![The same phone with a red message bar at the bottom. It says the file src/data/products.json has a mistake at line 23, column 26, and that the page still shows your last good version.](/tutorials/run-your-app-on-a-phone/09-error-bar.png)
+![The same phone with a red message bar just below the phone frame. It says the file src/data/products.json has a mistake at line 24, column 4, and that the page still shows your last good version.](/tutorials/run-your-app-on-a-phone/09-error-bar.png)
 
 Put the comma back and save. The red bar goes away and the phone reloads.
 
@@ -132,7 +132,7 @@ Every time you save a change while the phone is on, it updates by itself.
 
 ## What we measured
 
-On 2026-11-07, on a GitHub Actions Linux runner, we saved a name change in `src/data/products.json` while `shipvo run android` was open. The terminal printed `rebuilt in 6.6 s` and the phone showed the new name. A file with a missing comma printed the error and showed the red bar, and the fixed file reloaded the phone (`rebuilt in 6.9 s`). The screenshots in step 5 come from that run. The browser test `packages/cli/test/run-live-reload.test.ts` checks the same behaviour on the Android and iOS frames.
+On 2026-11-07, on a GitHub Actions Linux runner, we saved a name change in `src/data/products.json` while `shipvo run android` was open. The terminal printed `rebuilt in 8.5 s` and the phone showed the new name. A file with a missing comma printed the error and showed the red bar, and the fixed file reloaded the phone (`rebuilt in 8.2 s`). The screenshots in step 5 come from that run. The browser test `packages/cli/test/run-live-reload.test.ts` checks the same behaviour on the Android and iOS frames.
 
 On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a first start of `shipvo run android` for a new shop app, with an empty cache, bundled 204 modules in 6.0 s and was serving the phone within the 60 seconds we waited. We did not time it more closely than that. A start-to-tappable timing on a clean machine is tracked in issue #676. We took every screenshot in this tutorial from that run.
 
