@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createActions } from "../src/actions.js";
+import { Game, parseFen } from "../src/engine.js";
 import { createStore } from "../src/store.js";
 import { boardView, moveList } from "../src/view.js";
+import { initialPress, playMove, pressSquare, type PressState } from "../src/press.js";
 
 function setup() {
   const store = createStore();
@@ -95,5 +97,64 @@ describe("typed actions on the shared store", () => {
     const { actions } = setup();
     const { move } = actions;
     expect(move({ from: "e2", to: "e4" }).ok).toBe(true);
+  });
+});
+
+function promoSetup() {
+  const real = createStore();
+  const game = new Game(parseFen("8/P6k/8/8/8/8/8/K7 w - - 0 1"));
+  const store = { ...real, game, play: (m: Parameters<typeof game.play>[0]) => game.play(m) };
+  return { store, actions: createActions(store) };
+}
+
+describe("tap flow (pressSquare)", () => {
+  const tap = (a: ReturnType<typeof createActions>, s: PressState, ...names: string[]) =>
+    names.reduce((st, n) => pressSquare(a, st, n), s);
+
+  it("selects, then moves on the second tap and clears the selection", () => {
+    const { store, actions } = setup();
+    const s1 = tap(actions, initialPress, "e2");
+    expect(s1.selected).toBe("e2");
+    const s2 = pressSquare(actions, s1, "e4");
+    expect(s2).toEqual({ selected: null, promoting: null, message: "" });
+    expect(boardView(store.game).find((q) => q.name === "e4")?.label).toBe("white pawn on e4");
+  });
+
+  it("tapping another own piece switches the selection", () => {
+    const { store, actions } = setup();
+    const s = tap(actions, initialPress, "e2", "d2");
+    expect(s.selected).toBe("d2");
+    expect(s.message).toBe("");
+    expect(moveList(store.game)).toHaveLength(0);
+  });
+
+  it("tapping the selected square again deselects it", () => {
+    const { actions } = setup();
+    expect(tap(actions, initialPress, "e2", "e2").selected).toBeNull();
+  });
+
+  it("an illegal target clears the selection and shows the reason", () => {
+    const { store, actions } = setup();
+    const s = tap(actions, initialPress, "e2", "e5");
+    expect(s.selected).toBeNull();
+    expect(s.message).toContain("cannot move from e2 to e5");
+    expect(moveList(store.game)).toHaveLength(0);
+  });
+
+  it("a promotion asks for a piece, then plays the chosen one", () => {
+    const { store, actions } = promoSetup();
+    const s1 = tap(actions, initialPress, "a7", "a8");
+    expect(s1.promoting).toEqual({ from: "a7", to: "a8" });
+    expect(s1.selected).toBe("a7");
+    const s2 = playMove(actions, "a7", "a8", "n");
+    expect(s2).toEqual({ selected: null, promoting: null, message: "" });
+    expect(boardView(store.game).find((q) => q.name === "a8")?.label).toBe("white knight on a8");
+  });
+
+  it("tapping elsewhere while choosing a promotion cancels the choice", () => {
+    const { store, actions } = promoSetup();
+    const s1 = tap(actions, initialPress, "a7", "a8");
+    const s2 = pressSquare(actions, s1, "a7");
+    expect(s2.promoting).toBeNull();
   });
 });

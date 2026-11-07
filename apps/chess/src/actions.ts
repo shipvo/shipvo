@@ -50,7 +50,7 @@ export function createActions(store: ChessStore = chessStore) {
       squares: boardView(g).map((q) => ({ square: q.name, label: q.label })),
       moves: moveList(g),
     };
-};
+  };
 
   return {
     get_board: getBoard,

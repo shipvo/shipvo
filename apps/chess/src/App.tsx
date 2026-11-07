@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, useWindowDimen
 import { chessActions } from "./actions.js";
 import { chessStore } from "./store.js";
 import type { Promotion } from "./engine.js";
+import { initialPress, playMove, pressSquare, type PressState } from "./press.js";
 import { boardView, moveList } from "./view.js";
 
 const GLYPH: Record<string, string> = {
@@ -14,9 +15,8 @@ const PROMOTIONS: [Promotion, string][] = [["q", "Queen"], ["r", "Rook"], ["b", 
 
 export default function App() {
   useSyncExternalStore(chessStore.subscribe, chessStore.version);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const [promoting, setPromoting] = useState<{ from: string; to: string } | null>(null);
+  const [ui, setUi] = useState<PressState>(initialPress);
+  const { selected, promoting, message } = ui;
   const dark = useColorScheme() === "dark";
   const { width } = useWindowDimensions();
   const size = Math.floor(width / 8);
@@ -25,31 +25,8 @@ export default function App() {
   const board = chessActions.get_board();
   const targets = new Set(selected ? chessActions.legal_moves({ from: selected }).map((m) => m.to) : []);
 
-  const play = (from: string, to: string, promotion?: Promotion) => {
-    const r = chessActions.move({ from, to, promotion });
-    setMessage(r.ok ? "" : r.reason);
-    setSelected(null);
-    setPromoting(null);
-  };
-
-  const press = (name: string) => {
-    if (promoting) setPromoting(null);
-    if (selected && selected !== name && !targets.has(name) && chessActions.legal_moves({ from: name }).length > 0) {
-      setSelected(name);
-      setMessage("");
-      return;
-    }
-    if (selected && selected !== name) {
-      const options = chessActions.legal_moves({ from: selected }).filter((m) => m.to === name && m.promotion);
-      if (options.length > 1) {
-        setPromoting({ from: selected, to: name });
-        return;
-      }
-      play(selected, name);
-    } else {
-      setSelected(selected === name ? null : name);
-    }
-  };
+  const press = (name: string) => setUi(pressSquare(chessActions, ui, name));
+  const play = (from: string, to: string, promotion?: Promotion) => setUi(playMove(chessActions, from, to, promotion));
 
   return (
     <View style={[s.page, { backgroundColor: dark ? "#121212" : "#ffffff" }]} accessibilityLabel="Chess">
