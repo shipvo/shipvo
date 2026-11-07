@@ -19,7 +19,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
     synchronized(LOCK) {
       watchActivities()
       val s = Store(ctx)
-      val visible = Store.gate.uiStarted || processCanShowUi()
+      val visible = canShowUi(ctx)
       Store.bundleSelectedAt = s.now()
       Store.loadsInProcess = Store.loadsInProcess + 1
 
@@ -62,14 +62,6 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
   private var watching = false
 
-  /** True when the process is in the foreground or visible now. Reads the process state, which is already right while the
-   *  first activity is in `onCreate`, before `onActivityStarted`. */
-  private fun processCanShowUi(): Boolean {
-    val info = ActivityManager.RunningAppProcessInfo()
-    ActivityManager.getMyMemoryState(info)
-    return BootRules.visibleImportance(info.importance)
-  }
-
   /** Counts a deferred load as soon as the first activity starts (the settle trigger for true headless loads). */
   private fun watchActivities() {
     if (watching) return
@@ -99,6 +91,16 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
     /** A release is stable once its process stayed in the foreground this long after markHealthy. iOS uses the same value. */
     const val STABILITY_MS = 30_000L
     val LOCK = Any()
+
+    /** True when an activity exists or the process is in the foreground or visible now. The process state is already right
+     *  while the first activity is in `onCreate`, before `onActivityStarted`. Importance values: 100 foreground, 125
+     *  foreground service (no screen, excluded), 130 top sleeping, 200 visible, 300 service, 400 cached. */
+    internal fun canShowUi(ctx: Context): Boolean {
+      if (Store.gate.uiStarted) return true
+      val info = ActivityManager.RunningAppProcessInfo()
+      ActivityManager.getMyMemoryState(info)
+      return BootRules.visibleImportance(info.importance)
+    }
 
     /** Counts the load that was chosen without UI, if one is waiting. Call inside [LOCK]. The release keeps running
      *  the same bundle; a trial release that now reaches its limit is reverted at the next selection. */

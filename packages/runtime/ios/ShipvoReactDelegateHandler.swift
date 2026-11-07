@@ -23,6 +23,12 @@ public final class ShipvoReactDelegateHandler: ExpoReactDelegateHandler {
     return UIApplication.shared.applicationState != .background
   }
 
+  /// The same state, read from any thread (the JS thread calls `markHealthy`). Hops to the main thread when needed.
+  static func appIsVisibleNow() -> Bool {
+    if Thread.isMainThread { return UIApplication.shared.applicationState != .background }
+    return DispatchQueue.main.sync { UIApplication.shared.applicationState != .background }
+  }
+
   private static var watching = false
 
   /// Counts a deferred load on the first `didBecomeActive`.

@@ -34,7 +34,12 @@ public final class ShipvoRuntimeModule: Module {
       let now = Store.now()
       let coldStart = max(0, (Date().timeIntervalSince1970 - Self.processStart()) * 1000)
       let sinceLoad = Store.bundleSelectedAt > 0 ? (now - Store.bundleSelectedAt) * 1000 : -1
-      ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false) // a first screen means the load is visible
+      // markHealthy can be called from a background task or at module init. Only a load that can show a screen is healthy.
+      guard ShipvoReactDelegateHandler.appIsVisibleNow() else {
+        return ["release": Store.runningRelease, "coldStartMs": Int(coldStart), "sinceLoadMs": Int(sinceLoad), "promoted": false,
+                "kind": Store.loadsInProcess <= 1 ? "cold" : "reload"]
+      }
+      ShipvoBundleSelector.settleDeferred(s, visible: true, crashed: false)
       let promoted = ShipvoBundleSelector.promoteIfRunning(s)
       ShipvoBundleSelector.noteHealthy()
       Self.scheduleStable()

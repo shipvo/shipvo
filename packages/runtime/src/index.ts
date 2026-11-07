@@ -50,8 +50,9 @@ const fallback: Native = {
 };
 const native = requireOptionalNativeModule<Native & { noteCrash?(): void }>("ShipvoRuntime");
 
-// After markHealthy, tell the native side about an uncaught JS error before React destroys the host. Destroying the host
-// pauses the activity, and that pause must not count as "stable". Needs a shell with `noteCrash`; older shells skip it.
+// Tell the native side about an uncaught JS error before React destroys the host. Destroying the host
+// pauses the activity, and that pause must not count as "stable". It also lets a background load that throws count against
+// its release, and that load never reaches markHealthy, so the hook is installed when the module loads. Needs a shell with `noteCrash`; older shells skip it.
 let crashHookInstalled = false;
 function installCrashHook() {
   if (crashHookInstalled || typeof native?.noteCrash !== "function") return;
@@ -64,6 +65,7 @@ function installCrashHook() {
     prev?.(e, isFatal);
   });
 }
+installCrashHook();
 
 let identity: InstallIdentity | null = null;
 let identityCrypto: TelemetryCrypto = webCrypto;
