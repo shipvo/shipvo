@@ -67,20 +67,22 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
+| Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
 | Network off blocks the app's network calls (`TypeError: Network request failed`) | [device-api](device-api.md#network) | | | |
 | Payment cancel returns `cancelled` (`@shipvo/device` 0.1.5) | [device-api](device-api.md#payments) | | | |
 | Deep links: `open_url` and `Linking.openURL` switch to the owning app; one-shot initial URL | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
 | `shipvo agents setup` writes the MCP config for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md), [agents](agents.md) | | | |
 | Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec-blocks](spec-blocks.md), [spec](../packages/spec/README.md) | | | |
-| Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
 | Pull-request screenshots before and after (`shipvo ci shots`) | [ci-check](ci-check.md) | | | |
 | Lumi findings saved as tests (`shipvo explore --save-tests`) | [lumi](lumi.md) | | | |
 | Self-host upgrade check, backup and restore | [self-hosting](self-hosting.md#back-up-and-upgrade) | | | |
 | iOS apps on the UIScene lifecycle (`SceneDelegate`) | [cli](cli.md) | | | |
 | Test your own build on the hosted phone (`upload_build`, `shipvo sim --hosted`, `app@build:<id>`) | [test-your-build](test-your-build.md) | | | |
-| Shared rooms: phones in one room share one backend (`open_app` `room`, richer `list_sessions`) | [agents](agents.md#share-one-backend-between-phones-with-room) | | | |
+| Shared rooms: phones in one room share one backend (`open_app` `room`, richer `list_sessions`) | [agents](agents.md#rooms-several-phones-one-backend) | | | |
 | `shipvo agents setup --hosted` writes the hosted phone config | [test-your-build](test-your-build.md), [cli](cli.md) | | | |
 | Score agents on app tasks (`shipvo eval run`, `shipvo eval report`) | [eval](eval.md) | | | |
+| Rooms: phones in one room share one backend (`open_app room`, `list_sessions`) | [agents](agents.md#rooms-several-phones-one-backend) | | | |
+| `shipvo agents setup --hosted` writes the hosted phone config | [cli](cli.md) | | | |
 | Data sources that use a saved key (`auth.secret`, `secret_revoked`, `secret_domain`) | [spec-blocks](spec-blocks.md#data-sources-that-use-a-saved-key) | | | |
 | `open_app` with `platform` and `show` opens the phone in your browser | [agents](agents.md), [run](run.md) | | | |
 | Fuller shop template checkout (plain payment errors, offline message, Undo, confirmation screen) | [getting-started](getting-started.md#the-shop-checkout) | | | |
