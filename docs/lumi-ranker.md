@@ -8,19 +8,16 @@ No trained model ships. On the held-out app the model did not find more screens,
 
 Benchmark: `scripts/lumi/bench.mjs`, seeds 1, 2 and 3, budgets 40, 50, 60, 80, 100 and 150 steps, planted bugs on, in-process spec apps. `account` is the held-out app. Numbers are for `account` only.
 
-| Steps | Model | Seed | Screens | Flows finished | Bugs found (of 3) |
-| --- | --- | --- | --- | --- | --- |
-| 40 | off | 1, 2, 3 | 0 | 2 | 1 |
-| 40 | on | 1, 2, 3 | 0 | 2 | 1 |
-| 50 | off | 1, 2, 3 | 0 | 2 | 1 |
-| 50 | on | 1, 2, 3 | 0 | 2 | 1 |
-| 60 | off | 1, 2, 3 | 6 | 2 | 3 |
-| 60 | on | 1 | 5 | 2 | 2 |
-| 60 | on | 2 | 6 | 2 | 2 |
-| 60 | on | 3 | 5 | 2 | 2 |
-| 80, 100, 150 | off and on | 1, 2, 3 | 8 | 2 | 3 |
+| Steps | Model | Screens | Flows finished | Bugs found (of 3) |
+| --- | --- | --- | --- | --- |
+| 40, 50 | off and on | 0 | 2 | 1 |
+| 60 | off (seeds 1, 2, 3) | 6 | 2 | 3 |
+| 60 | on, seed 1 | 5 | 2 | 2 |
+| 60 | on, seed 2 | 6 | 2 | 2 |
+| 60 | on, seed 3 | 5 | 2 | 2 |
+| 80, 100, 150 | off and on | 8 | 2 | 3 |
 
-Flows use the first steps of the budget, so the walker only starts to run at 60 steps on this app. The raw tables came from the commands below on the CI runner for this change; the CI run of the pull request repeats the build and tests.
+Flows use the first steps of the budget, so the walker only starts to run at 60 steps on this app. Raw results, one JSON file per seed and setting: [`docs/lumi-ranker-bench/`](lumi-ranker-bench/) (`bench-off-<seed>.json`, `bench-on-<seed>.json`). They were produced by the commands below on the CI runner for this change (the `account` rows are the table above). The model used for `on` was trained by `train.mjs` on the same runner: `shop, library, tasks; 40 seeds; 5386 actions; 2560 positive` (the `trainedOn` line it writes). The trained file was not committed because it did not win.
 
 ## Method
 
@@ -36,8 +33,8 @@ Flows use the first steps of the budget, so the walker only starts to run at 60 
 pnpm --filter @shipvo/cli build
 node scripts/lumi/train.mjs            # writes packages/cli/src/ranker-weights.ts
 pnpm --filter @shipvo/cli build
-node scripts/lumi/bench.mjs --budgets 40,50,60,80,100,150 --seed 1 --ranker off
-node scripts/lumi/bench.mjs --budgets 40,50,60,80,100,150 --seed 1 --ranker on
+node scripts/lumi/bench.mjs --budgets 40,50,60,80,100,150 --seed 1 --ranker off --out bench-off-1.json   # repeat for seeds 2 and 3
+node scripts/lumi/bench.mjs --budgets 40,50,60,80,100,150 --seed 1 --ranker on --out bench-on-1.json   # repeat for seeds 2 and 3
 ```
 
 `--ranker on` needs a trained model in the build. Commit a trained weights file only when the held-out numbers with the model on are better than with it off.

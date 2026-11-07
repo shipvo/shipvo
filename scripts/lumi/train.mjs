@@ -20,12 +20,20 @@ const { FEATURES, featureVector, train } = await import(resolve(root, "packages/
 // Training apps: the tuning spec apps (not held out) and the training-only apps.
 const apps = [...SPEC_APPS.filter((a) => !a.heldOut), ...TRAIN_APPS];
 const rows = [];
+const toRow = (r) => ({
+  x: featureVector({
+    kind: r.action.kind, role: r.action.role, risky: r.action.risky, invalid_input: r.action.invalid_input, enter: r.action.enter, nth: r.action.nth,
+    depth: r.screen.depth, tried: r.screen.tried, actions: r.screen.actions,
+    fields: Object.values(r.screen.field_types).reduce((a, b) => a + b, 0),
+  }),
+  y: r.outcome.new_screen || r.outcome.finding ? 1 : 0,
+});
 for (const app of apps) {
   for (let seed = 1; seed <= seeds; seed++) {
     for (const maxSteps of [8, 20, 60]) {
       await walk(specDriver(app, new Set()), {
         app: app.id, seed, maxSteps, maxDepth: 4, settleMs: 0,
-        onAction: (r) => rows.push({ x: featureVector({ kind: r.action.kind, role: r.action.role, risky: r.action.risky, invalid_input: r.action.invalid_input, enter: r.action.enter, nth: r.action.nth, depth: r.screen.depth, tried: r.screen.tried, actions: r.screen.actions, fields: Object.values(r.screen.field_types).reduce((a, b) => a + b, 0) }), y: r.outcome.new_screen || r.outcome.finding ? 1 : 0 }),
+        onAction: (r) => rows.push(toRow(r)),
       });
     }
   }

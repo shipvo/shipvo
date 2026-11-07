@@ -32,6 +32,15 @@ describe("action ranker", () => {
   it("ships no model, because it did not beat the algorithm", () => {
     expect(RANKER_MODEL).toBeNull();
   });
+  it("a stale model (wrong feature list or length) is ignored by walk", async () => {
+    const old = await order();
+    const good = model({ "role:tab": 6, "role:button": -6 });
+    expect((await order(good)).hashes[0]).not.toBe(old.hashes[0]); // the model works when it matches
+    const short: RankerModel = { ...good, weights: good.weights.slice(0, -1) };
+    const renamed: RankerModel = { ...good, features: good.features.map((f) => `${f}_old`) as unknown as RankerModel["features"] };
+    expect((await order(short)).hashes).toEqual(old.hashes);
+    expect((await order(renamed)).hashes).toEqual(old.hashes);
+  });
   it("model off gives the exact old behaviour", async () => {
     const old = await order();
     expect((await order(null)).report).toEqual(old.report);

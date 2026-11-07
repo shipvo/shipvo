@@ -10,7 +10,7 @@ import { portFree, waitListening } from "./sim.js";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { redactTestSecrets, writeIssues } from "./explore-issues.js";
 import { emit, envelope } from "./json-out.js";
-import { predict, type RankerModel } from "./ranker.js";
+import { predict, usable, type RankerModel } from "./ranker.js";
 import { runFlows, renderFlows, parseFlowNames } from "./flows.js";
 
 export type Step =
@@ -287,7 +287,7 @@ export async function walk(driver: Driver, o: WalkOptions = {}): Promise<Report>
         }
         screen = landed ?? (await replay(node.path)).screen;
       }
-      const a = o.ranker ? rankedAct(node, o.ranker) : todo(node).find((x) => !x.risky) ?? todo(node)[0]!;
+      const a = o.ranker && usable(o.ranker) ? rankedAct(node, o.ranker) : todo(node).find((x) => !x.risky) ?? todo(node)[0]!;
       a.done = true;
       const target = find(screen, a.el, a.kind === "type" ? FIELDS : ACTIONABLE);
       if (!target) { at = node; continue; }
