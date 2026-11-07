@@ -1,5 +1,11 @@
 # Have Lumi test your app while you watch
 
+<video controls preload="metadata" playsinline tabindex="0" data-title="Have Lumi test your app while you watch" data-length="2 min 7 s" poster="/videos/test-your-app-with-lumi.jpg" src="/media/videos/test-your-app-with-lumi-ea953cd2.mp4"><track kind="captions" src="/videos/test-your-app-with-lumi.vtt" srclang="en" label="English">Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
+
+Prefer to watch first? This 2 minute 7 second video covers the same steps. [Captions and transcript](../videos.md#have-lumi-test-your-app-while-you-watch).
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "and then its all gone" by Williamson (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>). Source: <a href="https://www.jamendo.com/track/124446">https://www.jamendo.com/track/124446</a></details>
+
 You will run one command, ask Lumi to test your app, read what it found and watch one problem happen again. You need no AI account and you do not write code.
 
 **Level:** beginner. **Time:** about 10 minutes, most of it the first build.
