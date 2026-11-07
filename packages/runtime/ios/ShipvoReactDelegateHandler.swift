@@ -23,14 +23,9 @@ public final class ShipvoReactDelegateHandler: ExpoReactDelegateHandler {
     return UIApplication.shared.applicationState != .background
   }
 
-  private static var watching = false
-
-  /// Counts a deferred load on the first `didBecomeActive`.
-  private static func watchForeground() {
-    Store.lock.lock(); let already = watching; watching = true; Store.lock.unlock()
-    if already { return }
-    NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
-      ShipvoBundleSelector.settleDeferred(Store(), visible: true, crashed: false)
-    }
+  /// Counts a deferred load on the first `didBecomeActive`, or on the first scene activation in apps that use the
+  /// UIScene lifecycle. Both paths call the same idempotent settle, so one load never counts twice.
+  static func watchForeground() {
+    ShipvoForegroundWatcher.watch([UIApplication.didBecomeActiveNotification, UIScene.didActivateNotification])
   }
 }

@@ -154,6 +154,18 @@ describe("checkExpoModules", () => {
   it("is installed when expo and both setups are present", () => {
     expect(checkExpoModules(app(true))).toEqual({ installed: true, expoPackage: true, android: true, ios: true, plan: [] });
   });
+  it("accepts a scene-based iOS project", () => {
+    const d = app(true);
+    writeFileSync(join(d, "ios/X/AppDelegate.swift"), "import UIKit\nclass AppDelegate: UIResponder {}");
+    writeFileSync(join(d, "ios/X/SceneDelegate.swift"), "import Expo\nclass SceneDelegate: UIResponder, UIWindowSceneDelegate {}");
+    expect(checkExpoModules(d)).toEqual({ installed: true, expoPackage: true, android: true, ios: true, plan: [] });
+  });
+  it("is not installed when neither delegate has the Expo setup", () => {
+    const d = app(true);
+    writeFileSync(join(d, "ios/X/AppDelegate.swift"), "import UIKit\nclass AppDelegate: UIResponder {}");
+    writeFileSync(join(d, "ios/X/SceneDelegate.swift"), "import UIKit\nclass SceneDelegate: UIResponder {}");
+    expect(checkExpoModules(d)).toMatchObject({ installed: false, ios: false });
+  });
   it("returns the install step when missing, and installs nothing", () => {
     const d = app(false);
     const r = checkExpoModules(d);

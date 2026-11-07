@@ -461,3 +461,81 @@ ${chip("What you get")}
 <div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="or">$</span> shipvo store setup</div>
 <div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide is at shipvo.dev/learn.</div>`,
 });
+
+// --- test-your-app-with-lumi: real Lumi screenshots from the tutorial ---
+const desk = (name, x, y, w, d = 0, extra = "") => `<div class="abs in" style="left:${x}px;top:${y}px;width:${w}px;--d:${d}s;${extra}"><div style="border:5px solid #2b3a5c;border-radius:16px;overflow:hidden;background:#05080f;line-height:0"><img src="{{IMG:${name}}}" style="width:100%;display:block"></div></div>`;
+const ring = (x, y, w, h, d) => `<div class="abs pop" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:4px solid var(--or);border-radius:14px;--d:${d}s"></div>`;
+
+Object.assign(SCENES, {
+  lmHook: () => `
+${desk("findings", 520, 110, 720, 0.2)}
+<div class="abs pop" style="left:60px;top:150px;--d:.9s"><span class="badge" style="background:#4a1c24;color:var(--red);font-size:30px">Finding 1</span></div>
+<h1 class="abs in" style="left:60px;top:230px;width:420px;font-size:52px;--d:1.4s">Lumi found <span class="or">the bug.</span></h1>
+<div class="abs in mute" style="left:60px;top:470px;width:400px;font-size:28px;line-height:1.35;--d:4s">A button that does nothing.</div>
+<div class="abs flight" style="left:100px;top:560px;width:110px;--fx:-60px;--fy:60px;--tx:60px;--ty:-20px;--d:4.4s">${plane(110)}</div>`,
+
+  lmPromise: () => `
+${chip("By the end")}
+<h2 class="abs in" style="left:72px;top:110px;--d:.4s">You will have</h2>
+${[["Lumi tested your app", 1.4], ["One problem, replayed", 3.2], ["No AI account. No code.", 5.4]].map(([t, d], k) => `<div class="abs card in" style="left:72px;top:${240 + k * 120}px;width:760px;padding:22px 30px;font-size:34px;--d:${d}s"><span style="color:var(--green)">&check;</span> &nbsp;${t}</div>`).join("")}
+<div class="abs pop" style="left:930px;top:200px;width:240px;--d:2s">${plane(240)}</div>`,
+
+  lmCmd: () => `
+${chip("Step 1")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">One command</h2>
+${tcmd([{ t: "npx shipvo lumi", tt: 1.4, d: 1.6, out: "Building your app for the simulator...<br>Ready. Opening your browser.", od: 3.6 }], 72, 230, 1100, .8, 38)}
+<div class="abs card in mono" style="left:72px;top:500px;padding:16px 26px;font-size:28px;--d:7.4s"><span class="or">$</span> npx shipvo lumi <span class="or">ios</span></div>
+<div class="abs in mute" style="left:560px;top:512px;font-size:28px;--d:9s">Android and iOS work the same.</div>`,
+
+  lmPage: () => `
+${chip("Step 2")}
+<h2 class="abs in" style="left:72px;top:70px;--d:.3s">Phone and sidebar</h2>
+${desk("start", 290, 130, 700, .8)}
+<div class="abs pop" style="left:60px;top:300px;--d:3.2s"><span class="badge" style="background:#1a2540;color:var(--paper);font-size:24px">Phone</span></div>
+<div class="abs pop" style="left:1010px;top:200px;--d:5s"><span class="badge" style="background:#1a2540;color:var(--paper);font-size:24px">Lumi sidebar</span></div>
+<div class="abs pop" style="left:1010px;top:280px;--d:7s"><span class="badge" style="background:#3a2a10;color:var(--or);font-size:24px">Findings 0</span></div>`,
+
+  lmTest: () => `
+${chip("Step 3")}
+<h2 class="abs in" style="left:72px;top:70px;--d:.3s">Ask Lumi to test it</h2>
+<div class="abs term mono in" style="left:72px;top:150px;width:1100px;font-size:34px;--d:.6s"><div class="dots"><i></i><i></i><i></i></div><span class="sky">Tell Lumi what to do</span><br><span class="or">&gt;</span> <span class="type" style="--n:11;--tt:1.4s;--d:1.4s">test my app</span></div>
+${desk("testing", 240, 320, 440, 4, "")}
+<div class="abs card in" style="left:800px;top:350px;width:400px;padding:20px 26px;font-size:26px;line-height:1.5;--d:5.4s"><div class="mono sky" style="font-size:16px">CAPTION</div>Tapping Open search</div>
+<div class="abs card in" style="left:800px;top:500px;width:400px;padding:20px 26px;font-size:26px;line-height:1.5;--d:8.2s"><div class="mono sky" style="font-size:16px">CAPTION</div>Tapping Checkout</div>`,
+
+  lmFindings: () => `
+${chip("Step 4")}
+<h2 class="abs in" style="left:72px;top:70px;--d:.3s">Read the findings</h2>
+${desk("findings", 100, 150, 760, .8)}
+${ring(498, 210, 340, 110, 3.4)}
+${["A button that does nothing", "A screen that stays blank", "A network call that fails"].map((t, k) => `<div class="abs card in" style="left:890px;top:${170 + k * 100}px;width:330px;padding:18px 22px;font-size:25px;--d:${2.4 + k * 2.4}s">${t}</div>`).join("")}
+<div class="abs card in" style="left:890px;top:480px;width:330px;padding:18px 22px;font-size:25px;--d:10s"><div class="mono sky" style="font-size:16px">COVERAGE</div>Screens and controls tried</div>`,
+
+  lmReplay: () => `
+${chip("Watch it again")}
+<h2 class="abs in" style="left:72px;top:70px;--d:.3s">Press <span class="or">Replay</span></h2>
+${desk("findings", 100, 150, 760, .6)}
+<div class="abs pop" style="left:760px;top:230px;width:70px;height:70px;border-radius:50%;border:5px solid var(--or);--d:2.4s"></div>
+<div class="abs card in" style="left:890px;top:190px;width:330px;padding:22px 26px;font-size:28px;line-height:1.4;--d:3.4s">The phone repeats the steps.</div>
+<div class="abs card in mono" style="left:890px;top:350px;width:330px;padding:18px 26px;font-size:26px;--d:6.6s"><span class="sky">replay bug 1</span></div>
+<div class="abs in" style="left:890px;top:470px;width:330px;font-size:28px;--d:8.4s">The problem <span class="or">happens again.</span></div>`,
+
+  lmBad: () => `
+${chip("A harder test")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Try bad input</h2>
+${tcmd([{ t: "try checkout with bad input", tt: 2, d: 1.2, out: "Same path. Invalid values in the text fields.", od: 3.6 }], 72, 230, 1100, .8, 38)}
+<div class="abs card in" style="left:72px;top:470px;width:1100px;padding:24px 32px;font-size:32px;--d:6s">A finding here means your app <span class="or">accepted what it should refuse.</span></div>`,
+
+  lmSeed: () => `
+${chip("Prove the fix")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">Same seed, same walk</h2>
+${tcmd([{ t: "npx shipvo lumi --seed 1", tt: 1.6, d: 1.4, out: "", od: 3 }], 72, 210, 1100, .8, 38)}
+<div class="abs card in" style="left:72px;top:400px;width:540px;padding:22px 28px;--d:5s"><div class="mono sky" style="font-size:18px">SAME SEED</div><div style="font-size:28px;margin-top:6px;line-height:1.35">The same walk, so you can check the fix.</div></div>
+<div class="abs card in" style="left:650px;top:400px;width:540px;padding:22px 28px;--d:9s"><div class="mono or" style="font-size:18px">SAVE AS TEST</div><div style="font-size:28px;margin-top:6px;line-height:1.35">A file that fails while the bug is there. Run it with shipvo test.</div></div>`,
+
+  lmCta: () => `
+<div class="abs pop" style="left:72px;top:140px;width:330px;--d:.3s">{{MARK}}</div>
+<h1 class="abs in" style="left:470px;top:130px;--d:.8s">Lumi tests.<br><span class="or">You watch.</span></h1>
+<div class="abs card in mono" style="left:470px;top:370px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">npx</span> shipvo lumi</div>
+<div class="abs in mute" style="left:470px;top:490px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide: <span class="sky">shipvo.dev</span>/learn</div>`,
+});
