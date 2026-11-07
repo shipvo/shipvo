@@ -49,6 +49,18 @@ describe("admin session only", () => {
       expect(await listRotationLog(DB, "tide")).toEqual([]);
     });
   }
+  it("a token header with a valid admin cookie is let in (the cookie wins)", async () => {
+    const { e } = setup();
+    const c = await cookie();
+    const h = { ...c, authorization: "Bearer sv_publish_x" };
+    expect((await send(e, "PUT", "/rotation/tide/root", h, { root_key: V.root.publicKey })).status).toBe(200);
+  });
+  it("a token header with a bad cookie gets 403, and a bad cookie alone gets 401", async () => {
+    const { e } = setup();
+    const bad = { cookie: "pn_admin=tide.9999999999999.deadbeef" };
+    expect((await send(e, "PUT", "/rotation/tide/root", { ...bad, authorization: "Bearer sv_publish_x" }, { root_key: V.root.publicKey })).status).toBe(403);
+    expect((await send(e, "PUT", "/rotation/tide/root", bad, { root_key: V.root.publicKey })).status).toBe(401);
+  });
   it("no credentials get 401", async () => {
     const { e } = setup();
     expect((await send(e, "PUT", "/rotation/tide/root", {}, { root_key: V.root.publicKey })).status).toBe(401);
@@ -127,7 +139,7 @@ describe("POST /rotation/<app>", () => {
     expect(await highestSequence(DB, "tide")).toBe(0);
     expect(await listRotationLog(DB, "tide")).toEqual([]);
   });
-  it("refuses a statement for another app, a wrong type and a bad envelope", async () => {
+  it("refuses a tampered body, a bad envelope and a missing root key for another app", async () => {
     const { e } = setup(); await register(e);
     const other = await send(e, "POST", "/rotation/other", await cookie("other"), envs(1)[0]);
     expect(other.status).toBe(409); // no root key for "other"
@@ -136,4 +148,29 @@ describe("POST /rotation/<app>", () => {
     expect((await j(await upload(e, { body: 1, signature: 2 }))).reason).toBe("bad_envelope");
     expect((await j(await upload(e, { body: "x".repeat(1025), signature: "AA==" }))).reason).toBe("bad_envelope");
   });
+  const base = { type: "key-rotation", appId: "tide", sequence: 1, newKey: V.keys.K2.publicKey, validFrom: "2026-11-06T00:00:00.000Z" };
+  const signRaw = (body: string) => {
+    const pkcs8 = Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), Buffer.from(V.root.seed, "base64")]);
+    return { body, signature: sign(null, Buffer.from(body), createPrivateKey({ key: pkcs8, format: "der", type: "pkcs8" })).toString("base64") };
+  };
+  const cases: [string, string, string][] = [
+    ["a wrong type", JSON.stringify({ ...base, type: "other" }), "wrong_type"],
+    ["another appId", JSON.stringify({ ...base, appId: "other" }), "wrong_app"],
+    ["a newKey that is not 32 bytes", JSON.stringify({ ...base, newKey: "AAAA" }), "bad_key"],
+    ["a validFrom that is not a time", JSON.stringify({ ...base, validFrom: "nope" }), "bad_valid_from"],
+    ["a validFrom that is not full ISO 8601 UTC", JSON.stringify({ ...base, validFrom: "2026" }), "bad_valid_from"],
+    ["a validFrom with a zone offset", JSON.stringify({ ...base, validFrom: "2026-11-06T00:00:00+01:00" }), "bad_valid_from"],
+    ["a body that is not JSON", "not json", "bad_body"],
+  ];
+  for (const [name, body, reason] of cases) {
+    it(`a validly signed statement with ${name} gets 400 ${reason}, stores nothing and logs nothing`, async () => {
+      const { e, DB } = setup(); await register(e);
+      const r = await upload(e, signRaw(body));
+      expect(r.status).toBe(400);
+      expect((await j(r)).reason).toBe(reason);
+      expect(await highestSequence(DB, "tide")).toBe(0);
+      expect(await listRotations(DB, "tide")).toEqual([]);
+      expect(await listRotationLog(DB, "tide")).toEqual([]);
+    });
+  }
 });

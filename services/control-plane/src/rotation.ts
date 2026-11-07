@@ -7,6 +7,7 @@ import { getRootKey, setRootKey, highestSequence, insertRotation, recordRotation
 
 const ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const MAX_BODY_BYTES = 1024;
+const ISO_UTC = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/;
 const enc = new TextEncoder();
 const unb64 = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (ch) => ch.charCodeAt(0));
 
@@ -32,7 +33,7 @@ const fail = (c: any, status: 400 | 409, reason: string, message: string) => c.j
 export function rotationRoutes(owner: (c: any, appId: string) => Promise<string | null>) {
   const r = new Hono<{ Bindings: any }>();
 
-  /** Admin session only: 401 with nothing, 403 for any token (publish token or owner token). */
+  /** Admin session only: a valid admin cookie wins; otherwise 403 if any authorization header is sent (publish or owner token), 401 if there is no credential. */
   async function admin(c: any, appId: string): Promise<{ actor: string } | Response> {
     if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
     const actor = await owner(c, appId);
@@ -67,7 +68,7 @@ export function rotationRoutes(owner: (c: any, appId: string) => Promise<string 
     if (s.appId !== appId) return fail(c, 400, "wrong_app", "appId does not match this app.");
     if (!Number.isSafeInteger(s.sequence) || s.sequence < 1) return fail(c, 400, "bad_sequence", "sequence must be a whole number, at least 1.");
     if (!key32(s.newKey)) return fail(c, 400, "bad_key", "newKey must be a 32-byte Ed25519 public key (base64).");
-    if (typeof s.validFrom !== "string" || Number.isNaN(Date.parse(s.validFrom))) return fail(c, 400, "bad_valid_from", "validFrom must be an ISO 8601 UTC time.");
+    if (typeof s.validFrom !== "string" || !ISO_UTC.test(s.validFrom) || Number.isNaN(Date.parse(s.validFrom))) return fail(c, 400, "bad_valid_from", "validFrom must be an ISO 8601 UTC time.");
     if (!(await insertRotation(c.env.DB, appId, s.sequence, { body: env.body, signature: env.signature }, s.validFrom))) {
       return c.json({ ok: false, error: "replay", reason: "replay", message: `sequence ${s.sequence} is not above the highest stored (${await highestSequence(c.env.DB, appId)}).` }, 409);
     }
