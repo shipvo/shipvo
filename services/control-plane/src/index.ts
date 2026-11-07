@@ -9,6 +9,7 @@ import { sso } from "./sso";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
 import { phoneRoutes } from "./phone";
+import { phoneNetRoutes } from "./phone-net";
 import { forbidden, type Action } from "./roles";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
@@ -574,6 +575,7 @@ app.route("/auth", auth);
 app.route("/vault", vaultRoutes(owner));
 app.route("/people", peopleRoutes());
 app.route("/phone", phoneRoutes());
+app.route("/phone", phoneNetRoutes());
 app.route("/", sso);
 app.route("/apps", apps);
 

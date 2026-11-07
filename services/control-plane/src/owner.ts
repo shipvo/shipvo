@@ -1,6 +1,6 @@
 // Owner commands: everything the admin can do, as typed commands. The admin UI calls these, and so can an agent
 // holding the owner token. Commands edit the DRAFT; `publish` validates it and makes it live on every device.
-import { AppContent, ContentBlock, ShipvoPolicy } from "@shipvo/schema";
+import { AppContent, ContentBlock, ShipvoPolicy, parseNetwork } from "@shipvo/schema";
 import { parseWebhookUrl } from "./alerts";
 
 type Content = AppContent;
@@ -309,6 +309,12 @@ export const OWNER_COMMANDS: Record<string, OwnerCommand> = {
       if (!r.success) return fail("bad_param", r.error.issues.map((i) => `${i.path.join(".") || "policy"}: ${i.message}`).join("; "));
       await env.kv.put(RELEASE_POLICY_KEY(env.appId), JSON.stringify(r.data)); return r.data;
     } },
+  set_network_allow: { description: "Set the hosts the hosted phone's request proxy may call for this app: comma-separated host names such as api.example.com or *.example.com (the same list as network.allow in shipvo.json). Empty means no host. Owner sign-in only: agents cannot call it.", mutates: false, adminOnly: true,
+    params: { hosts: { type: "string", description: "Comma-separated host patterns", required: false } },
+    run: async (_d, a, env) => {
+      let n; try { n = parseNetwork({ allow: String(a.hosts ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean) }); } catch (e: any) { return fail("bad_param", e.message); }
+      await env.kv.put(`c/${env.appId}/network_allow`, JSON.stringify(n.allow)); return n;
+    } },
   audit_log: { description: "Who changed what, newest first.", params: {}, mutates: false,
     run: async (_d, _a, env) => (await env.db.prepare("SELECT at, actor, command, args_json, ok FROM audit WHERE app_id = ? ORDER BY id DESC LIMIT 100").bind(env.appId).all()).results },
 };
@@ -405,7 +411,7 @@ export async function runOwnerCommand(env: OwnerEnv, name: string, args: Record<
   } catch (e) {
     res = e instanceof OwnerError ? { ok: false, error: { code: e.code, message: e.message } } : { ok: false, error: { code: "internal", message: String(e) } };
   }
-  if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy" || name === "set_release_policy" || name === "set_alert_webhook")
+  if (cmd.mutates || gated || denied || name === "publish" || name === "restore_version" || name === "discard_draft" || name === "set_agent_policy" || name === "set_release_policy" || name === "set_network_allow" || name === "set_alert_webhook")
     await env.db.prepare("INSERT INTO audit (app_id, at, actor, command, args_json, ok) VALUES (?,?,?,?,?,?)")
       .bind(env.appId, new Date().toISOString(), env.actor, name, JSON.stringify(denied ? { ...auditArgs(name, args), denied: true } : usedChallenge ? { ...auditArgs(name, args), approved_by: usedChallenge.approved_by, approval_id: usedChallenge.id, approved_how: usedChallenge.approved_how } : auditArgs(name, args)).slice(0, 2000), res.ok && !denied ? 1 : 0).run();
   return res;

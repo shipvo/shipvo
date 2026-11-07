@@ -337,6 +337,30 @@ export function parsePolicy(value: unknown): ShipvoPolicy {
   throw new Error(r.error.issues.map((i) => `policy${i.path.length ? "." + i.path.join(".") : ""}: ${i.message}`).join("; "));
 }
 
+/**
+ * One host pattern in `network.allow`: a DNS name such as `api.example.com`, or `*.example.com` for any subdomain
+ * (not `example.com` itself). No scheme, port, path, wildcard elsewhere, or IP address.
+ */
+const HOST_LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
+const HOST_PATTERN = new RegExp(`^(?:\\*\\.)?(?:${HOST_LABEL}\\.)+${HOST_LABEL}$`);
+export const NetworkHostPattern = z.string().max(253).refine((h) => HOST_PATTERN.test(h) && !/^[\d.]+$/.test(h) && !/^(?:\*\.)?(?:\d+\.)+\d+$/.test(h), "must be a host name like api.example.com or *.example.com (no scheme, port, path or IP address)");
+/** The optional `network` section of shipvo.json: the hosts the app calls. The hosted phone's request proxy allows only these. */
+export const ShipvoNetwork = z.object({
+  allow: z.array(NetworkHostPattern).max(50).default([]),
+}).strict();
+export type ShipvoNetwork = z.infer<typeof ShipvoNetwork>;
+/** Validates the `network` value from shipvo.json. Throws an Error whose message names each bad field (`network.allow.0: ...`). Host names are lower-cased. */
+export function parseNetwork(value: unknown): ShipvoNetwork {
+  const r = ShipvoNetwork.safeParse(value);
+  if (r.success) return { allow: r.data.allow.map((h) => h.toLowerCase()) };
+  throw new Error(r.error.issues.map((i) => `network${i.path.length ? "." + i.path.join(".") : ""}: ${i.message}`).join("; "));
+}
+/** True when `host` matches a pattern from `network.allow`. `*.example.com` matches `a.example.com` and `a.b.example.com`, not `example.com`. */
+export function networkHostMatches(patterns: readonly string[], host: string): boolean {
+  const h = host.toLowerCase().replace(/\.$/, "");
+  return patterns.some((p) => (p.startsWith("*.") ? h.endsWith(p.slice(1)) && h.length > p.length - 1 : h === p.toLowerCase()));
+}
+
 /* ---------- release telemetry export (Parquet on the owner's R2 bucket) ---------- */
 /** Version of the exported file layout. Bump it when a column is renamed, removed or changes type; adding a nullable column at the end keeps the version. */
 export const TELEMETRY_EXPORT_VERSION = "1";
