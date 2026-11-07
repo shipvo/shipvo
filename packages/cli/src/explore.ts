@@ -474,10 +474,10 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
     }
     let testInfo: Record<string, unknown> = {};
     if (a["save-tests"] !== undefined) {
-      if (a["save-tests"] === "true") throw new Error("--save-tests needs a directory");
-      const files = (await import("./explore-save.js")).saveTests(report.findings, a["save-tests"]);
-      if (!json) console.log(files.length ? `Wrote ${files.length} test file${files.length === 1 ? "" : "s"} to ${a["save-tests"]}` : "No findings that can be saved as a test.");
-      else testInfo = { test_files: files };
+      // Lazy import: explore-save imports types from this file, so a static import would be a cycle.
+      const r = (await import("./explore-save.js")).runSaveTests(report.findings, a["save-tests"]);
+      if (!json) console.log(r.message);
+      else testInfo = r.info;
     }
     const failOn = a["fail-on-findings"] === "true";
     const { exit, code } = outcome(report, flowsFailed, failOn);

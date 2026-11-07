@@ -25,3 +25,11 @@ export function saveTests(findings: Finding[], dir: string, first = 1): string[]
   });
   return files;
 }
+
+/** Handles the `--save-tests <dir>` flag of `shipvo explore`. Returns the line to print and the keys for `--json`. */
+export function runSaveTests(findings: Finding[], dir: string): { files: string[]; message: string; info: Record<string, unknown> } {
+  if (dir === "true") throw new Error("--save-tests needs a directory");
+  const files = saveTests(findings, dir);
+  const message = files.length ? `Wrote ${files.length} test file${files.length === 1 ? "" : "s"} to ${dir}` : "No findings that can be saved as a test.";
+  return { files, message, info: { test_files: files } };
+}

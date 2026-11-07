@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { saveTests, testFileName } from "../src/explore-save";
+import { saveTests, testFileName, runSaveTests } from "../src/explore-save";
 import { exportTest } from "../src/explore-tests";
 import { parseCommand, Lumi } from "../src/lumi";
-import type { Finding, Driver } from "../src/explore";
+import { walk, type Finding, type Driver } from "../src/explore";
 
 const crash: Finding = { kind: "error", message: "boom", screen: "Something went wrong", steps: [{ action: "open" }, { action: "tap", role: "button", name: "Crash", nth: 0 }] };
 const blank: Finding = { kind: "blank_screen", message: "m", screen: "- generic [ref=e1]", steps: [{ action: "open" }] };
@@ -50,6 +50,49 @@ describe("lumi save command", () => {
     const n = l.state().findings.findIndex((f) => f.kind === "error") + 1;
     expect(n).toBeGreaterThan(0);
     expect(await l.command(`save bug ${n} as test`)).toContain("Saved bug");
-    expect(readdirSync(dir).some((f) => f.startsWith("lumi-error-"))).toBe(true);
+    expect(readdirSync(dir)).toContain(`lumi-error-${n}.test.ts`);
+    expect(readFileSync(join(dir, `lumi-error-${n}.test.ts`), "utf8")).toBe(exportTest((l as any).known[n - 1].finding));
+  });
+  it("refuses a finding a screen check cannot prove, and writes no file", async () => {
+    const small = '- button "Tiny" [ref=e1] [size=10x10]';
+    const d: Driver = { async open() { return { ok: true, screen: small }; }, async openUrl() { return { ok: true, screen: small }; }, async tap() { return { ok: true, screen: small, delivery: "delivered" }; }, async back() { return { ok: true, screen: small }; }, async errors() { return []; } };
+    const dir = join(mkdtempSync(join(tmpdir(), "lumi-")), "tests");
+    const l = new Lumi(d, { testsDir: dir, settleMs: 0 });
+    await l.command("test my app"); await l.idle();
+    // Plant the unprovable finding so the branch runs whatever the walker found.
+    (l as any).known = [{ n: 1, finding: unproven }];
+    expect(await l.command("save bug 1 as test")).toContain("cannot be saved as a test");
+    expect(existsSync(dir)).toBe(false);
+  });
+});
+
+describe("explore --save-tests", () => {
+  const planted = (): Driver => {
+    let crashed = false;
+    return { async open() { crashed = false; return { ok: true, screen: '- button "Crash" [ref=e1]' }; }, async openUrl() { return this.open(); }, async tap() { crashed = true; return { ok: true, screen: "Something went wrong", delivery: "delivered" }; }, async back() { return this.open(); }, async errors() { return crashed ? ["boom"] : []; } };
+  };
+  it("writes the exportTest files for a walk on a planted bug", async () => {
+    const report = await walk(planted(), { settleMs: 0 });
+    expect(report.findings.length).toBeGreaterThan(0);
+    const dir = join(mkdtempSync(join(tmpdir(), "save-")), "out");
+    const r = runSaveTests(report.findings, dir);
+    expect(r.files.length).toBeGreaterThan(0);
+    expect(r.info).toEqual({ test_files: r.files });
+    expect(r.message).toBe(`Wrote ${r.files.length} test file${r.files.length === 1 ? "" : "s"} to ${dir}`);
+    for (const f of r.files) {
+      const i = report.findings.findIndex((x) => f.endsWith(testFileName(x.kind, report.findings.indexOf(x) + 1)));
+      expect(i).toBeGreaterThanOrEqual(0);
+      expect(readFileSync(f, "utf8")).toBe(exportTest(report.findings[i]));
+    }
+  });
+  it("needs a directory", () => {
+    expect(() => runSaveTests([crash], "true")).toThrow("--save-tests needs a directory");
+  });
+  it("says so when nothing can be saved", () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "save-")), "none");
+    const r = runSaveTests([unproven], dir);
+    expect(r.message).toBe("No findings that can be saved as a test.");
+    expect(r.files).toEqual([]);
+    expect(existsSync(dir)).toBe(false);
   });
 });
