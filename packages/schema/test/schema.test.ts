@@ -171,3 +171,26 @@ describe("parsePolicy", () => {
     expect(() => parsePolicy({ nope: true })).toThrow(/policy/);
   });
 });
+
+describe("network.allow", () => {
+  it("accepts host names and *. patterns", async () => {
+    const { parseNetwork } = await import("../src/index");
+    expect(parseNetwork({ allow: ["api.example.com", "*.cdn.example.org"] }).allow).toEqual(["api.example.com", "*.cdn.example.org"]);
+    expect(parseNetwork({}).allow).toEqual([]);
+  });
+  it("rejects schemes, ports, paths, IPs, bare wildcards and unknown fields", async () => {
+    const { parseNetwork } = await import("../src/index");
+    for (const bad of ["https://a.com", "a.com:8080", "a.com/x", "10.0.0.1", "*.10.0.0.1", "*", "*.com.*", "localhost", "a*.com", "*.", ""])
+      expect(() => parseNetwork({ allow: [bad] }), bad).toThrow(/network\.allow\.0/);
+    expect(() => parseNetwork({ allow: "a.com" })).toThrow(/network\.allow/);
+    expect(() => parseNetwork({ allow: [], extra: 1 })).toThrow(/network/);
+  });
+  it("matches subdomains only for *. patterns", async () => {
+    const { networkHostMatches } = await import("../src/index");
+    expect(networkHostMatches(["*.example.com"], "a.b.example.com")).toBe(true);
+    expect(networkHostMatches(["*.example.com"], "example.com")).toBe(false);
+    expect(networkHostMatches(["*.example.com"], "evilexample.com")).toBe(false);
+    expect(networkHostMatches(["api.example.com"], "API.example.com.")).toBe(true);
+    expect(networkHostMatches(["api.example.com"], "x.api.example.com")).toBe(false);
+  });
+});

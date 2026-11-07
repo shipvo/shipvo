@@ -11,6 +11,7 @@ import { rotationRoutes } from "./rotation";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
 import { phoneRoutes } from "./phone";
+import { phoneNetRoutes, pruneDeviceLog } from "./phone-net";
 import { forbidden, type Action } from "./roles";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
@@ -623,6 +624,7 @@ app.route("/vault", vaultRoutes(owner));
 app.route("/rotation", rotationRoutes(owner));
 app.route("/people", peopleRoutes());
 app.route("/phone", phoneRoutes());
+app.route("/phone", phoneNetRoutes());
 app.route("/", sso);
 app.route("/apps", apps);
 
@@ -630,6 +632,7 @@ app.route("/apps", apps);
 export default Object.assign(app, {
   scheduled(_e: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(exportTelemetry(env).catch((e) => console.error("telemetry export failed", e)));
+    ctx.waitUntil(pruneDeviceLog(env.DB).catch((e) => console.error("device_log prune failed", e)));
     ctx.waitUntil(dispatchSchedules(env.DB, runScheduleStub).catch((e) => console.error("schedule dispatch failed", e)));
   },
 });
