@@ -67,7 +67,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
-| `open_app` with `platform` and `show` (start the phone in your browser) | [agents](agents.md), [run](run.md) | | | |
 | Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
 | Network off blocks the app's network calls (`TypeError: Network request failed`) | [device-api](device-api.md#network) | | | |
 | Payment cancel returns `cancelled` (`@shipvo/device` 0.1.5) | [device-api](device-api.md#payments) | | | |
