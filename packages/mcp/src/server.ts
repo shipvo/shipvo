@@ -174,7 +174,10 @@ use(server, tools.list_apps, async ({ query }) => {
 
 const openApp = async ({ app, session, seed_cart, dark, platform, attach }: { app: string; session?: string; seed_cart?: any[]; dark?: boolean; platform?: "android" | "ios"; attach?: "auto" | "never" | "always" }) => {
   const id = app.split("@")[0];
-  const live = attach === "never" ? undefined : findLiveRun(id);
+  let live = attach === "never" ? undefined : findLiveRun(id);
+  const mismatch = live && platform && live.platform !== platform ? live.platform : undefined;
+  if (mismatch && attach === "always") return result("", { ok: false, code: "platform_mismatch", error: `the live shipvo run is ${mismatch}, not ${platform}. Start \`shipvo run ${platform}\`, or use attach: "auto" for a headless ${platform} session.` });
+  if (mismatch) live = undefined; // auto: the live phone is the wrong platform, so open a headless session instead
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
   if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
   if (!keyApps && !live && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
@@ -201,12 +204,14 @@ const openApp = async ({ app, session, seed_cart, dark, platform, attach }: { ap
       attachNote = ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark, platform }) as Act & { release?: string | number };
+  const r = await sim("/session", { session: sid, app, seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark, platform }) as Act & { release?: string | number; platform?: string };
   if (r.code === "sim_timeout") return result(sid, r);
+  // The simulator says which phone it opened. If that is not the one asked for, say so instead of handing back another phone.
+  if (r.ok !== false && platform && r.platform !== platform) return result(sid, { ok: false, code: "platform_mismatch", error: `asked for ${platform}, but the simulator opened ${r.platform ?? "a phone that did not report its platform"}` });
   sessions.set(sid, { app: id, steps: 0, startedAt: Date.now() });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
-  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
+  return text(`session: ${sid}\napp: ${id} release: ${r.release ?? "local"}${r.platform ? ` platform: ${r.platform}` : ""}\nmode: headless session${attachNote}\n\n${r.screen ?? ""}`);
 };
 use(server, tools.open_app, openApp);
 // Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.

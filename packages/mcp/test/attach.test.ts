@@ -12,6 +12,7 @@ import { acceptWebSocket } from "../../cli/src/run-ws.js";
 
 const root = resolve(__dirname, "..");
 let out = "", work = "", sim: http.Server, host: http.Server, simPort = 0, hostPort = 0;
+const sessionBodies: Record<string, unknown>[] = [];
 const seen: { type: string; [k: string]: unknown }[] = [];
 let shotSource = "tab-capture";
 const PNG = Buffer.from("png-bytes").toString("base64");
@@ -28,7 +29,7 @@ beforeAll(async () => {
     let raw = ""; for await (const c of req) raw += c;
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu" }] }));
-    if (req.url === "/session") return res.end(JSON.stringify({ ok: true, release: "local", screen: "heading Headless" }));
+    if (req.url === "/session") { const b = JSON.parse(raw || "{}"); sessionBodies.push(b); return res.end(JSON.stringify({ ok: true, release: "local", platform: String(b.session).startsWith("stuck") ? "android" : b.platform, screen: "heading Headless" })); }
     if (JSON.parse(raw || "{}").action === "screenshot") return res.end(JSON.stringify({ ok: true, path: join(work, "headless.png"), screen: "heading Headless" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Headless" }));
   });
@@ -72,6 +73,26 @@ describe("open_app attach", { timeout: 30_000 }, () => {
     // Lumi is told about the open from the real result (#874); the page captions tap, type, scroll and back itself.
     expect(seen.some((m) => m.type === "lumi" && m.caption === "Opened menu" && m.state === "working")).toBe(true);
     await c.close();
+  });
+  it("sends platform to the simulator and reports the phone it opened", async () => {
+    const { c, text } = await open({ attach: "never", platform: "ios", session: "p-ios" });
+    expect(text).toContain("platform: ios");
+    expect(sessionBodies.find((b) => b.session === "p-ios")?.platform).toBe("ios");
+    await c.close();
+  });
+  it("errors when the simulator opens a different platform than asked", async () => {
+    const { c, text, isError } = await open({ attach: "never", platform: "ios", session: "stuck-1" });
+    expect(isError).toBe(true); expect(text).toContain("platform_mismatch"); expect(text).toContain("opened android");
+    await c.close();
+  });
+  it("does not attach to a live run of the other platform", async () => {
+    runJson(process.pid); // the live run is android
+    const a = await open({ attach: "always", platform: "ios" });
+    expect(a.isError).toBe(true); expect(a.text).toContain("platform_mismatch"); await a.c.close();
+    const b = await open({ platform: "ios", session: "p-ios2" });
+    expect(b.text).toContain("mode: headless session"); expect(b.text).toContain("platform: ios"); await b.c.close();
+    const ok = await open({ platform: "android" });
+    expect(ok.text).toContain("attached to the live shipvo run phone"); await ok.c.close();
   });
   it("attaches to the live run's app without a simulator that knows it", async () => {
     runJson(process.pid, "tok", "founder");
