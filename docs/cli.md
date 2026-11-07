@@ -179,6 +179,17 @@ shipvo agents setup --json       # machine-readable result
 - It prints the skill install line.
 - Running it again changes nothing.
 
+## `shipvo eval`
+
+Scores an agent on an app task and compares runs.
+
+```bash
+shipvo eval run buy-canvas-tote --agent claude --model claude-sonnet-5-5
+shipvo eval report --out report.md
+```
+
+`eval run <task>` reads `tasks/<task>.task.json`, opens a session, prints an MCP URL for the agent and checks the result when the agent calls `end_session` or hits a limit. Exit code 0 is a pass, 1 a fail. `eval report` compares saved runs. Every option and check type is in [Score an agent on an app task](eval.md).
+
 ## `shipvo smoke`
 
 Does the app load? Run it after a change, with no test to write.
