@@ -109,14 +109,14 @@ ${frame.css}
 .sheetbtn{position:fixed;right:12px;top:10px;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
 .banner{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);max-width:min(90vw,640px);padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
 .banner[hidden]{display:none}
-.updating{position:fixed;left:50%;top:10px;transform:translateX(-50%);padding:4px 10px;border-radius:999px;background:#1d2530;color:#fff;font-size:12px;z-index:9}
+.updating{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);padding:4px 10px;border-radius:999px;background:#1d2530;color:#fff;font-size:12px;z-index:9}
 .updating[hidden]{display:none}
 ${runPanelCss()}
 .tag{position:fixed;left:12px;top:10px;padding:3px 10px;border-radius:12px;background:#111;color:#fff;font-size:12px}
 </style></head><body>
 <div class="tag" role="status">Simulated ${f.label} (${f.width}x${f.height}). The app's web build on the simulated device.</div>
 <button class="sheetbtn" id="sheetbtn" type="button">Show ${f.label} system sheet</button>
-<div class="updating" id="updating" role="status" data-part="updating" hidden>Updating…</div>
+<div class="updating" id="updating" role="status" aria-live="polite" data-part="updating" hidden>Updating…</div>
 <div class="banner" id="banner" role="alert" data-part="build-error" hidden></div>
 ${runPanelHtml()}
 <div id="fit"><div id="phone" data-platform="${platform}">${frame.html}</div></div>
