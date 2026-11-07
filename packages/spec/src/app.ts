@@ -33,6 +33,8 @@ export interface App {
   toggle(label: string, value?: boolean): PressResult;
   /** Selects a segment of a segmented control, by the control's label and the option. */
   select(label: string, option: string): PressResult;
+  /** Moves a kanban card (by its title) to a column. Runs the board's `onMove` action with the card's values and the column. */
+  move(card: string, column: string): PressResult;
   /** Selects a tab by its label. The history starts again at that tab's screen. */
   selectTab(tab: string): PressResult;
   push(screen: string, params?: Record<string, unknown>): PressResult;
@@ -169,7 +171,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
     }
   };
 
-  const find = (kind: "button" | "form" | "toggle" | "segmented", name: string) => {
+  const find = (kind: "button" | "form" | "toggle" | "segmented" | "card", name: string) => {
     current();
     const hit = last.registry.get(`${kind}:${name}`) ?? [...last.registry.values()].find((r) => r.kind === kind && r.block.label === name);
     return hit;
@@ -236,6 +238,13 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
       state[String(c.block.bind).replace(/^state\./, "")] = option;
       toast = "";
       return { ok: true, value: option };
+    },
+    move(card, column) {
+      const c = find("card", card);
+      if (!c) return { ok: false, error: `There is no card "${card}" on this screen.` };
+      const cols = (Array.isArray(c.block.columns) ? c.block.columns : []).map(String);
+      if (!cols.includes(column)) return { ok: false, error: `"${column}" is not one of: ${cols.join(", ")}.` };
+      return runAction(String(c.block.onMove.action), ev(c.block.onMove.input ?? {}, { ...c.scope, column }) as Obj);
     },
     selectTab(tab) {
       const r = current().result;
