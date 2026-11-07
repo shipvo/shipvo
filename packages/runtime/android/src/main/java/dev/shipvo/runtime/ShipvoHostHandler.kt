@@ -92,11 +92,15 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
     const val STABILITY_MS = 30_000L
     val LOCK = Any()
 
+    /** Test seam: when set, replaces the process-state check in [canShowUi] (an instrumentation process reports foreground). */
+    @Volatile internal var processVisibleOverride: Boolean? = null
+
     /** True when an activity exists or the process is in the foreground or visible now. The process state is already right
      *  while the first activity is in `onCreate`, before `onActivityStarted`. Importance values: 100 foreground, 125
      *  foreground service (no screen, excluded), 130 top sleeping, 200 visible, 300 service, 400 cached. */
     internal fun canShowUi(ctx: Context): Boolean {
       if (Store.gate.uiStarted) return true
+      processVisibleOverride?.let { return it }
       val info = ActivityManager.RunningAppProcessInfo()
       ActivityManager.getMyMemoryState(info)
       return BootRules.visibleImportance(info.importance)
