@@ -351,6 +351,17 @@ function deliverUrl(url: string): boolean | Promise<boolean> {
     }
     log("browser_opened", { url }); return true;
   }
+  // A link for another installed app: the simulator switches to that app and delivers it there (one-shot initial URL plus the url event).
+  const hand = (g as { __pnOpenLink?: (u: string) => Promise<boolean> }).__pnOpenLink;
+  if (hand) {
+    return hand(url).then((took) => {
+      if (took) { log("url_handoff", { url }); return true; }
+      return deliverLocal(url);
+    }, () => deliverLocal(url));
+  }
+  return deliverLocal(url);
+}
+function deliverLocal(url: string): boolean {
   window.dispatchEvent(new CustomEvent("pn:url", { detail: url }));
   urlSubs.forEach((f) => f(url)); log("url_opened", { url, handled: urlSubs.size > 0 });
   return urlSubs.size > 0;

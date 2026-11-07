@@ -169,6 +169,33 @@ test("openUrl: a page the Browser app refuses is logged as refused and openUrl a
   assert.equal((entries.match(/browser_opened/g) ?? []).length, 1);   // only the accepted page
 });
 
+test("Linking.openURL: a link another app owns is handed to the simulator and not delivered locally", async () => {
+  const before = dev.log().length, got = [];
+  const off = mod.onUrl((u) => got.push(u));
+  try {
+    globalThis.__pnOpenLink = async () => true;
+    await mod.Linking.openURL("appb://item/9");
+    assert.deepEqual(got, []);
+    const kinds = dev.log().slice(before).map((l) => l.kind);
+    assert.ok(kinds.includes("url_handoff")); assert.ok(!kinds.includes("url_opened"));
+  } finally { off(); delete globalThis.__pnOpenLink; }
+});
+
+test("Linking.openURL: when the simulator does not take the link, or fails, this app gets it", async () => {
+  const before = dev.log().length, got = [];
+  const off = mod.onUrl((u) => got.push(u));
+  try {
+    globalThis.__pnOpenLink = async () => false;
+    await mod.Linking.openURL("tide://item/1");
+    globalThis.__pnOpenLink = () => Promise.reject(new Error("down"));
+    await mod.Linking.openURL("tide://item/2");
+  } finally { off(); delete globalThis.__pnOpenLink; }
+  assert.deepEqual(got, ["tide://item/1", "tide://item/2"]);
+  const kinds = dev.log().slice(before).map((l) => l.kind);
+  assert.equal(kinds.filter((k) => k === "url_opened").length, 2);
+  assert.ok(!kinds.includes("url_handoff"));
+});
+
 test("payment: a cancel result comes back as cancelled", async () => {
   dev.reset({ payment: { nextResult: "cancel", pin: "" } });
   dev.set({ payment: { nextResult: "cancel", pin: "" } });

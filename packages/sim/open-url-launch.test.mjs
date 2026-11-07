@@ -16,7 +16,7 @@ const PORT = pickPort(9400, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-url-launch-"));
 const dist = join(root, "dist"); const dir = join(root, "state");
 let proc;
-const PAGE = `<!doctype html><html><head><title>fx</title></head><body><h1 id="h">Home</h1><p id="i">initial: null</p>
+const PAGE = `<!doctype html><html><head><title>fx</title></head><body><h1 id="h">Home</h1><p id="i">initial: null</p><button id="go" onclick="linkOut('appb://item/9')">Open B</button><button onclick="linkOut('zzz://x')">Open unknown</button><button onclick="linkOut('appa://self')">Open self</button><button onclick="linkOut('appc://gone')">Open C</button><button onclick="setTimeout(() => linkOut('appb://later'), 800)">Open B later</button><p id="r">result: none</p>
 <script>
 let initial = null;
 window.__pnDevice = {
@@ -24,6 +24,9 @@ window.__pnDevice = {
   getInitialURL() { return initial; },
   openUrl(u) { document.getElementById("h").textContent = "Opened " + u; return true; },
 };
+// A hand-written stand-in for Linking.openURL: ask the simulator whether another app owns the link.
+// The @shipvo/device side of this call is covered by packages/device/test/sim-device.test.mjs.
+window.linkOut = async (u) => { const ok = await window.__pnOpenLink(u); document.getElementById("r").textContent = "result: " + ok; if (!ok) document.getElementById("h").textContent = "Local " + u; };
 </script></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
@@ -90,3 +93,59 @@ for (const skin of ["android", "iphone"]) {
     assert.equal(await initial(s), null);
   });
 }
+
+for (const skin of ["android", "iphone"]) {
+  test(`${skin}: app A opens app B's scheme through the link bridge: B is current and gets the URL`, async () => {
+    const s = `link-${skin}`;
+    assert.ok((await call("/session", { session: s, phone: PHONE })).ok);
+    const snap = (await act(s, { action: "screen" })).screen;
+    const ref = /button "Open B" \[ref=(e\d+)\]/.exec(snap)?.[1];
+    assert.ok(ref, snap);
+    const r = await act(s, { action: "tap", ref });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    await new Promise((x) => setTimeout(x, 800));
+    const sc = await act(s, { action: "screen" });
+    assert.match(sc.screen, /Opened appb:\/\/item\/9/);
+    assert.equal(await initial(s), "appb://item/9");
+    const apps = await act(s, { action: "switch_app", id: "d" });
+    assert.equal(apps.current_app, "d");
+    assert.equal(await initial(s), null);
+  });
+}
+
+// The bridge returns false (the app handles the link itself, nothing switches) for these.
+const tapButton = async (s, name) => {
+  const snap = (await act(s, { action: "screen" })).screen;
+  const ref = new RegExp(`button "${name}" \\[ref=(e\\d+)\\]`).exec(snap)?.[1];
+  assert.ok(ref, snap);
+  const r = await act(s, { action: "tap", ref }); assert.equal(r.ok, true, JSON.stringify(r));
+  await new Promise((x) => setTimeout(x, 500));
+};
+test("bridge returns false for an unknown scheme, the current app and a not-installed app", async () => {
+  const s = "bridge-false";
+  assert.ok((await call("/session", { session: s, phone: PHONE })).ok);
+  for (const name of ["Open unknown", "Open self"]) {
+    await tapButton(s, name);
+    const sc = (await act(s, { action: "screen" })).screen;
+    assert.match(sc, /result: false/); assert.match(sc, /Local /);
+  }
+  assert.equal((await act(s, { action: "uninstall_app", id: "c" })).ok, true);
+  await tapButton(s, "Open C");
+  const sc = (await act(s, { action: "screen" })).screen;
+  assert.match(sc, /result: false/);
+  assert.equal((await act(s, { action: "screen" })).current_app ?? "a", "a");
+});
+test("bridge does not switch apps on a locked phone or when the app is in the background", async () => {
+  for (const how of ["lock", "press_home"]) {
+    const s = `bridge-${how}`;
+    assert.ok((await call("/session", { session: s, phone: PHONE })).ok);
+    await tapButton(s, "Open B later");
+    assert.equal((await act(s, { action: how })).ok, true);
+    await new Promise((x) => setTimeout(x, 1200));
+    assert.equal((await act(s, { action: how === "lock" ? "unlock" : "resume_app" })).ok, true);
+    const sc = await act(s, { action: "screen" });
+    assert.match(sc.screen, /result: false/);
+    assert.doesNotMatch(sc.screen, /Opened appb/);
+    assert.equal((await act(s, { action: "switch_app", id: "a" })).current_app, "a");
+  }
+});
