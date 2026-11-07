@@ -29,6 +29,10 @@ export interface App {
   call(action: string, input?: Record<string, unknown>): PressResult;
   /** Presses a button by its label (or id). */
   press(button: string): PressResult;
+  /** Turns a toggle on or off, by its label. Writes the state value it is bound to. */
+  toggle(label: string, value?: boolean): PressResult;
+  /** Selects a segment of a segmented control, by the control's label and the option. */
+  select(label: string, option: string): PressResult;
   /** Selects a tab by its label. The history starts again at that tab's screen. */
   selectTab(tab: string): PressResult;
   push(screen: string, params?: Record<string, unknown>): PressResult;
@@ -84,10 +88,12 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
   const first = renderInternal(spec, options);
   if (!first.result.ok) return { ok: false, errors: first.result.errors };
   const s = spec as Obj;
-  const state: Record<string, unknown> = { ...options.state };
+  const state: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries<Obj>(s.state ?? {})) state[k] = v.default ?? null;
+  Object.assign(state, options.state);
   const data: Record<string, unknown> = { ...options.data };
   for (const [k, v] of Object.entries<Obj>(s.data ?? {})) if (v.source === "collection" && !(k in data)) data[k] = structuredClone(v.seed ?? []);
-  const history: { screen: string; params: Record<string, unknown> }[] = [{ screen: options.screen ?? s.screens[0].id, params: options.params ?? {} }];
+  const history: { screen: string; params: Record<string, unknown>; sheet?: boolean }[] = [{ screen: options.screen ?? s.screens[0].id, params: options.params ?? {} }];
   const drafts: Record<string, Record<string, unknown>> = {};
   const fieldErrors: Record<string, Record<string, string>> = {};
   let toast = "";
@@ -95,17 +101,18 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
 
   const top = () => history[history.length - 1]!;
   const current = (): Internal => {
-    const r = renderInternal(spec, { ...options, state, data, screen: top().screen, params: top().params, drafts, fieldErrors, canGoBack: history.length > 1, tab: history[0]!.screen, toast });
+    const r = renderInternal(spec, { ...options, state, data, screen: top().screen, params: top().params, drafts, fieldErrors, canGoBack: history.length > 1, sheet: top().sheet === true, tab: history[0]!.screen, toast });
     last = r;
     return r;
   };
   const nav: Obj[] = s.navigation?.type === "tabs" && Array.isArray(s.navigation.items) ? s.navigation.items : [];
   const hasScreen = (id: string) => s.screens.some((x: Obj) => x.id === id);
-  const go = (id: string, params: Record<string, unknown> = {}): PressResult => {
+  const go = (id: string, params: Record<string, unknown> = {}, presentation?: unknown): PressResult => {
     if (id === "back") return back();
     if (!hasScreen(id)) return { ok: false, error: `There is no screen "${id}".` };
     if (nav.some((n) => n.screen === id)) history.splice(0, history.length);
-    history.push({ screen: id, params });
+    const sheet = presentation === "sheet" || s.screens.find((x: Obj) => x.id === id)?.presentation === "sheet";
+    history.push({ screen: id, params, ...(sheet ? { sheet: true } : {}) });
     return { ok: true };
   };
   const back = (): PressResult => {
@@ -134,7 +141,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
         data[st.delete] = coll(st.delete).filter((item) => !(!st.where || test(st.where, { ...scope, item })));
       } else if (typeof st.set === "string") state[st.set.replace(/^state\./, "")] = ev(st.value, scope);
       else if (typeof st.toast === "string") toast = String(ev(st.toast, scope));
-      else if (typeof st.navigate === "string") go(st.navigate, ev(st.params ?? {}, scope) as Obj);
+      else if (typeof st.navigate === "string") go(st.navigate, ev(st.params ?? {}, scope) as Obj, st.presentation);
       else if (typeof st.if === "string") {
         const r = run((test(st.if, scope) ? st.then : st.else) ?? [], scope);
         if (r.done) return r;
@@ -162,7 +169,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
     }
   };
 
-  const find = (kind: "button" | "form", name: string) => {
+  const find = (kind: "button" | "form" | "toggle" | "segmented", name: string) => {
     current();
     const hit = last.registry.get(`${kind}:${name}`) ?? [...last.registry.values()].find((r) => r.kind === kind && r.block.label === name);
     return hit;
@@ -204,14 +211,31 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
     },
     call: (action, input = {}) => runAction(action, { ...input }),
     press(button) {
-      if (button === "Back" && history.length > 1) { toast = ""; return back(); }
+      if ((button === "Back" || (button === "Close" && top().sheet)) && history.length > 1) { toast = ""; return back(); }
       const b = find("button", button);
       if (!b) return { ok: false, error: `There is no button "${button}" on this screen.` };
       const on: Obj = b.block.onPress ?? {};
       if (typeof on.action === "string") return runAction(on.action, ev(on.input ?? {}, b.scope) as Obj);
       if (on.back === true) return back();
-      if (typeof on.navigate === "string") return go(on.navigate, ev(on.params ?? {}, b.scope) as Obj);
+      if (typeof on.navigate === "string") return go(on.navigate, ev(on.params ?? {}, b.scope) as Obj, on.presentation);
       return { ok: false, error: `Button "${button}" has no onPress.` };
+    },
+    toggle(label, value) {
+      const c = find("toggle", label);
+      if (!c) return { ok: false, error: `There is no toggle "${label}" on this screen.` };
+      const key = String(c.block.bind).replace(/^state\./, "");
+      state[key] = typeof value === "boolean" ? value : state[key] !== true;
+      toast = "";
+      return { ok: true, value: state[key] };
+    },
+    select(label, option) {
+      const c = find("segmented", label);
+      if (!c) return { ok: false, error: `There is no segmented control "${label}" on this screen.` };
+      const opts = (Array.isArray(c.block.options) ? c.block.options : []).map(String);
+      if (!opts.includes(option)) return { ok: false, error: `"${option}" is not one of: ${opts.join(", ")}.` };
+      state[String(c.block.bind).replace(/^state\./, "")] = option;
+      toast = "";
+      return { ok: true, value: option };
     },
     selectTab(tab) {
       const r = current().result;

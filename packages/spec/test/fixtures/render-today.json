@@ -1,0 +1,35 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "today", "name": "Revenue", "icon": "sun", "description": "Revenue today." },
+  "theme": { "mode": "light", "palette": { "primary": "#0B5FFF", "text": "#111827", "background": "#FFFFFF", "surface": "#F3F4F6", "muted": "#4B5563" }, "radius": "lg", "density": "comfortable", "elevation": "soft" },
+  "state": {
+    "period": { "type": "enum", "options": ["day", "week", "month"], "default": "day" },
+    "alerts": { "type": "bool", "default": false }
+  },
+  "data": {
+    "revenueToday": { "source": "computed", "value": "{{ 1250 }}" },
+    "failed": { "source": "collection", "fields": { "id": "text", "name": "text", "reason": "text", "amount": "number" }, "seed": [{ "id": "c1", "name": "Ada", "reason": "Card declined", "amount": 40 }] }
+  },
+  "screens": [
+    { "id": "today", "title": "Today", "body": [
+      { "type": "stack", "gap": "lg", "children": [
+        { "type": "stat", "label": "Revenue today", "value": "{{ revenueToday }} EUR", "delta": "+12%", "variant": "hero" },
+        { "type": "segmented", "label": "Period", "bind": "state.period", "options": ["day", "week", "month"] },
+        { "type": "card", "variant": "outlined", "label": "Goal", "children": [
+          { "type": "progress", "label": "Monthly goal", "value": 40, "max": 100 },
+          { "type": "progress", "label": "Goal ring", "variant": "ring", "value": 75 }
+        ] },
+        { "type": "divider" },
+        { "type": "section", "title": "Settings", "children": [
+          { "type": "toggle", "label": "Failed payment alerts", "bind": "state.alerts" }
+        ] },
+        { "type": "list", "label": "Failed payments", "from": "failed", "item": { "title": "{{ item.name }}", "subtitle": "{{ item.reason }}", "trailing": "{{ item.amount }}" }, "empty": { "message": "No failed payments today" } },
+        { "type": "button", "label": "Details", "onPress": { "navigate": "details", "presentation": "sheet" } }
+      ] }
+    ] },
+    { "id": "details", "title": "Details", "presentation": "sheet", "body": [
+      { "type": "text", "value": "Revenue so far today." },
+      { "type": "button", "label": "Done", "onPress": { "back": true } }
+    ] }
+  ]
+}
