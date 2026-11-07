@@ -12,6 +12,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
 
+**Build id.** A short code you get when you upload your app's build with `shipvo sim --hosted`. Your assistant uses it as `open_app("myapp@build:<id>")` to test that exact build on the hosted phone. It is private to your account and is deleted after it expires.
+
 **Command.** One line of text you type in the terminal and run by pressing Enter.
 
 **Control plane.** The Shipvo service that keeps your releases and decides who gets them. You can use the hosted one or run your own.

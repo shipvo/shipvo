@@ -1,0 +1,2 @@
+- Docs: new section "Test the build on your machine on the hosted phone" in Agents, `shipvo sim --hosted` in the CLI guide, `upload_build` in the tool tables, and a glossary entry for build id.
+- Migration: none.
