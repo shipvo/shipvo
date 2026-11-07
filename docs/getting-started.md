@@ -47,6 +47,10 @@ If something fails, run `npx shipvo doctor` in `myshop`. Each line starts with P
 
 To start from a reader app instead, add `--template content`: a list screen and a detail screen that read titles and text from `src/data/articles.json`, with a matching `tests/app.test.ts`. For this template, `src/data/articles.json` is the first thing to edit. For a small shop (product list, product page, cart), use `--template shop`; edit `src/data/products.json`. `--template blank` is the default. `shipvo init --help` lists the templates.
 
+### The shop checkout
+
+The `shop` template has a checkout a customer expects: plus and minus on each cart line, Undo after Remove, payment errors in plain words, a message when the phone is offline, and an order confirmation screen with a Back to shop button. To see it, run `npx shipvo run android` or `npx shipvo run ios`, add a product and open the cart.
+
 `init` writes a complete Expo app:
 
 | File | What it is |
