@@ -181,8 +181,6 @@ From a typed test:
 await phone.act("set_network_profile", { profile: "2g" });
 ```
 
-When the network is off (`set_device` with `online: false`, airplane mode, Wi-Fi and mobile data both off, or the `offline` profile), the app's `fetch` and `XMLHttpRequest` calls to other origins fail with `TypeError: Network request failed`, as they do on a phone. This holds in `shipvo sim`, `@shipvo/mcp` and `@shipvo/test` sessions, so an offline screen can be tested without a mock. Slow profiles add their wait once per request.
-
 A name that is not in the table answers `unknown_profile`. Each change is added to `device_log` with `source: "simulated"`.
 
 ## The simulated device from the agent's side

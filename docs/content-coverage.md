@@ -67,15 +67,10 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
-| App spec blocks (`stat`, `progress`, `card`, `toggle`, `segmented`, `chart`, sheets) | [@shipvo/spec](../packages/spec/README.md), [app-spec](design/app-spec.md) | | | |
-| Self-hosted control plane `backup` and `restore` | [self-hosting](self-hosting.md) | | | |
 | Network off blocks the app's network calls (`TypeError: Network request failed`) | [device-api](device-api.md#network) | | | |
 | Payment cancel returns `cancelled` (`@shipvo/device` 0.1.5) | [device-api](device-api.md#payments) | | | |
-| Deep links: `open_url` and `Linking.openURL` switch to the owning app; one-shot initial URL | [phone-apps](phone-apps.md), [testing](testing.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
-| `shipvo agents setup` writes the MCP config for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md#shipvo-agents-setup), [agents](agents.md) | | | |
-| Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec](../packages/spec/README.md) | | | |
-| Deep links: `open_url` and `Linking.openURL` switch to the owning app | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
-| `shipvo agents setup` writes the MCP config for every coding agent | [cli](cli.md), [agents](agents.md) | | | |
+| Deep links: `open_url` and `Linking.openURL` switch to the owning app; one-shot initial URL | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
+| `shipvo agents setup` writes the MCP config for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md), [agents](agents.md) | | | |
 | Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec-blocks](spec-blocks.md), [spec](../packages/spec/README.md) | | | |
 | Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
 | Pull-request screenshots before and after (`shipvo ci shots`) | [ci-check](ci-check.md) | | | |
