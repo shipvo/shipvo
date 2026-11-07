@@ -41,6 +41,18 @@ await runSteps(phone, parseSteps(`
 
 Lines: `tap "X"`, `type "X" into "Y"` (optional `and press enter`), `scroll down`, `go back`, `see "X"`, `do not see "X"`, `wait for "X"`. An unknown line throws a `PhoneError` with code `step_unparsed` and its line number. `runSteps` stops at the first failing step and names its line.
 
+## Run on an Android emulator or iOS Simulator
+
+Install [agent-device](https://github.com/callstack/agent-device) (MIT) and pick it as the device:
+
+```bash
+npm i -D agent-device
+npx shipvo test --device agent-device --platform ios
+npx shipvo lumi android --device agent-device
+```
+
+Or in code: `await openApp({ driver: "agent-device", platform: "android" })`, or `"device": "agent-device"` in shipvo.json. The screen tree, `tap`, `type`, `scroll`, `back` and `screenshot` work as on Shipvo Phone; element bounds come from the accessibility snapshot.
+
 ## Mock the network
 
 Stub what the app's `fetch` gets back, so you can test slow, empty and failing responses without a backend. Requests that match no rule go to the network as usual.

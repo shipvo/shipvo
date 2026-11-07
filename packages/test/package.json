@@ -27,10 +27,14 @@
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
-    "vitest": ">=2"
+    "vitest": ">=2",
+    "agent-device": ">=0.21"
   },
   "peerDependenciesMeta": {
     "vitest": {
+      "optional": true
+    },
+    "agent-device": {
       "optional": true
     }
   },

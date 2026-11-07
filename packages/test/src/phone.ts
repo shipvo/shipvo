@@ -37,6 +37,10 @@ export type OpenOptions = {
   seedCart?: Record<string, unknown>[];
   /** Applied right after opening, before the first screen is read. */
   device?: DeviceSettings;
+  /** "agent-device" runs on a real simulator or device through the agent-device CLI. Default: SHIPVO_DEVICE_DRIVER, else "device" in shipvo.json, else Shipvo Phone. */
+  driver?: "phone" | "agent-device";
+  /** Platform for agent-device (default: SHIPVO_PLATFORM, else android). */
+  platform?: "android" | "ios";
 };
 export type Notification = { id: string; title: string; body: string; data?: Record<string, unknown> };
 /** An action the simulator refused. `code` is set for typed failures such as `no_url_listener` or `stale_ref`. */
@@ -224,8 +228,18 @@ function defaultApp(): string {
   throw new Error("which app? Pass { app } to openApp, set SHIPVO_APP, or run from a folder with shipvo.json");
 }
 
+function configDriver(): string | undefined {
+  if (!existsSync("shipvo.json")) return undefined;
+  try { return JSON.parse(readFileSync("shipvo.json", "utf8")).device; } catch { return undefined; }
+}
+
 /** Open your app in a fresh simulated phone. */
 export async function openApp(opts: OpenOptions = {}): Promise<Phone> {
+  const driver = opts.driver ?? process.env.SHIPVO_DEVICE_DRIVER ?? configDriver();
+  if (driver === "agent-device") {
+    const { openAgentDevice } = await import("./agent-device.js");
+    return openAgentDevice(opts.app ?? defaultApp(), { platform: opts.platform });
+  }
   const sim = (opts.sim ?? process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
   const app = opts.app ?? defaultApp();
   const session = opts.session ?? `t-${Math.random().toString(36).slice(2, 10)}`;

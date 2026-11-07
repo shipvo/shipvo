@@ -1,0 +1,3 @@
+- `@shipvo/test`: `openApp({ driver: "agent-device" })` runs the same typed API (tap, type, scroll, back, screenshot) on a real Android emulator, iOS Simulator or device through the `agent-device` CLI. `agent-device` is an optional peer dependency. New exports: `AgentDevice`, `openAgentDevice`, `agentDeviceDriver`, `parseSnapshot`, `toScreen`.
+- `@shipvo/cli`: `shipvo test --device agent-device` and `shipvo lumi android --device agent-device` (or `"device": "agent-device"` in shipvo.json) use it.
+- Migration: none; Shipvo Phone stays the default.

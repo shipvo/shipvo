@@ -24,6 +24,8 @@ export type ShipvoConfig = {
   preview?: "here.now" | "control-plane";
   /** Release rules checked by `shipvo publish --dry-run`. Validated there, not at load, so a bad section never breaks other commands. */
   policy?: unknown;
+  /** Where `shipvo test` and `shipvo lumi` run: "phone" (Shipvo Phone, default) or "agent-device" (a real simulator or device through the agent-device CLI). */
+  device?: "phone" | "agent-device";
   /** Deep links `shipvo explore` opens after the start screen (for example "tide://cart"). Needs an onUrl listener in the app. */
   routes?: string[];
   /** Marketplace listing (hosted control plane): shown to agents and on shipvo.dev once reviewed. */

@@ -7,3 +7,5 @@ export type { Step } from "./steps.js";
 export { proposeRepair } from "./repair.js";
 export type { Repair } from "./repair.js";
 export { secret, account, redact } from "./secrets.js";
+export { AgentDevice, AgentDevicePhone, openAgentDevice, agentDeviceDriver, parseSnapshot, toScreen, sizesOf, NOT_INSTALLED } from "./agent-device.js";
+export type { AdNode, AgentDeviceOptions } from "./agent-device.js";

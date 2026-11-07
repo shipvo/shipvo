@@ -101,12 +101,16 @@ export async function testCmd(argv: string[], kit?: TestKit, rawLog?: (s: string
   const reportMdPath = flagValue(argv, "--report-md");
   const platform = flagValue(argv, "--platform") ?? "android";
   const upload = argv.includes("--upload");
+  const deviceFlag = flagValue(argv, "--device");
+  if (argv.includes("--device") && deviceFlag !== "agent-device" && deviceFlag !== "phone") { return fail('--device must be "agent-device" or "phone"', [{ command: "shipvo test --device agent-device", why: "Pass agent-device, or drop --device to use Shipvo Phone." }]); }
   if (platform !== "android" && platform !== "ios") { return fail('--platform must be "android" or "ios"', [{ command: "shipvo test --platform ios", why: "Pass android or ios." }]); }
+  if (deviceFlag) process.env.SHIPVO_DEVICE_DRIVER = deviceFlag;
+  if (deviceFlag === "agent-device") process.env.SHIPVO_PLATFORM = platform;
   if (upload && !reportPath) { return fail("--upload needs --report <file>", [{ command: "shipvo test --report report.json --release 12 --upload", why: "Upload sends the report file." }]); }
   if (upload && !release) { return fail("--upload needs --release <number>", [{ command: "shipvo test --report report.json --release 12 --upload", why: "Results are stored per release." }]); }
   if (argv.includes("--report") && !reportPath) { return fail("--report needs a file name", [{ command: "shipvo test --report report.json", why: "Pass a file name." }]); }
   if (argv.includes("--report-md") && !reportMdPath) { return fail("--report-md needs a file name", [{ command: "shipvo test --report-md report.md", why: "Pass a file name." }]); }
-  const valueIdx = new Set(["--report", "--report-md", "--release", "--platform"].map((f) => argv.indexOf(f) + 1).filter((i) => i > 0));
+  const valueIdx = new Set(["--report", "--report-md", "--release", "--platform", "--device"].map((f) => argv.indexOf(f) + 1).filter((i) => i > 0));
   const given = argv.filter((a, i) => !a.startsWith("--") && !valueIdx.has(i));
   const files = given.length ? given : findStepFiles("tests");
   if (!files.length) { return fail("No tests found. Put plain-language steps in tests/*.steps, or pass file names.", [{ command: "shipvo test tests/example.steps", why: "Pass a steps file, or add tests/*.steps." }]); }
