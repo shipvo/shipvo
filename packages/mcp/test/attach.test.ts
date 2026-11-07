@@ -18,6 +18,11 @@ let shotSource = "tab-capture";
 const PNG = Buffer.from("png-bytes").toString("base64");
 const TREE = '- button "Buy" [ref=e1]';
 
+// How the mock simulator answers /session for a given session name: echo the asked platform, report none, or report android.
+const SIM_REPORTS_NO_PLATFORM = "sim-no-platform";
+const SIM_REPORTS_ANDROID = "sim-reports-android";
+const simPlatform = (session: string, asked?: string) => session === SIM_REPORTS_NO_PLATFORM ? undefined : session === SIM_REPORTS_ANDROID ? "android" : asked;
+
 beforeAll(async () => {
   out = mkdtempSync(join(root, "dist-test-"));
   const b = spawnSync(process.execPath, [createRequire(join(root, "package.json")).resolve("typescript/bin/tsc"), "-p", root, "--outDir", out], { encoding: "utf8" });
@@ -29,7 +34,7 @@ beforeAll(async () => {
     let raw = ""; for await (const c of req) raw += c;
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu" }] }));
-    if (req.url === "/session") { const b = JSON.parse(raw || "{}"); sessionBodies.push(b); return res.end(JSON.stringify({ ok: true, release: "local", ...(String(b.session).startsWith("quiet") ? {} : { platform: String(b.session).startsWith("stuck") ? "android" : b.device?.platform }), screen: "heading Headless" })); }
+    if (req.url === "/session") { const b = JSON.parse(raw || "{}"); sessionBodies.push(b); const reported = simPlatform(b.session, b.device?.platform); return res.end(JSON.stringify({ ok: true, release: "local", ...(reported ? { platform: reported } : {}), screen: "heading Headless" })); }
     if (JSON.parse(raw || "{}").action === "screenshot") return res.end(JSON.stringify({ ok: true, path: join(work, "headless.png"), screen: "heading Headless" }));
     res.end(JSON.stringify({ ok: true, screen: "heading Headless" }));
   });
@@ -82,11 +87,11 @@ describe("open_app attach", { timeout: 30_000 }, () => {
     await c.close();
   });
   it("does not error when the simulator reports no platform", async () => {
-    const { c, text, isError } = await open({ attach: "never", platform: "ios", session: "quiet-1" });
+    const { c, text, isError } = await open({ attach: "never", platform: "ios", session: SIM_REPORTS_NO_PLATFORM });
     expect(isError).toBeFalsy(); expect(text).not.toContain("platform:"); expect(text).toContain("mode: headless session"); await c.close();
   });
   it("errors when the simulator opens a different platform than asked", async () => {
-    const { c, text, isError } = await open({ attach: "never", platform: "ios", session: "stuck-1" });
+    const { c, text, isError } = await open({ attach: "never", platform: "ios", session: SIM_REPORTS_ANDROID });
     expect(isError).toBe(true); expect(text).toContain("platform_mismatch"); expect(text).toContain("opened android");
     await c.close();
   });
