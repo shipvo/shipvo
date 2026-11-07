@@ -17,9 +17,9 @@ Three pillars:
 [![CI](https://github.com/shipvo/shipvo/actions/workflows/ci.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/ci.yml)
 [![Deploy](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml/badge.svg)](https://github.com/shipvo/shipvo/actions/workflows/deploy-control-plane.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-![Status: pre-launch](https://img.shields.io/badge/status-pre--launch-orange)
+[![npm](https://img.shields.io/npm/v/@shipvo/cli?label=%40shipvo%2Fcli)](https://www.npmjs.com/package/@shipvo/cli)
 
-> **Status:** pre-launch, measured. OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on the Android emulator and the iPhone simulator in CI. The iOS OTA runtime is verified on the iOS Simulator in CI on every change to it (fetch, verify, stage, reload, cold start). Measured there on 5 Nov 2026 (`docs/spike-results.md`, [run 41979433300](https://github.com/shipvo/shipvo/actions/runs/41979433300), median of 3, local control plane): launch to new release running and healthy 4.2 s (iOS Simulator; OTA timings on the Redmi 9A are in the same file), full 1.87 MB bundle download 157 ms, apply 266 ms. A first-update bsdiff patch from the embedded bundle was 83,999 bytes against a 1,996,082-byte bundle, 573 ms from last byte to healthy ([run 42087991990](https://github.com/shipvo/shipvo/actions/runs/42087991990)).
+> **Measured.** OTA numbers come from a real low-end phone (Redmi 9A, 2 GB RAM): `docs/spike-results.md`. Agent results: `docs/agent-gate-results.md`. Simulator-vs-device parity: `docs/parity-results.md`. Native-feature parity (camera, location, permissions, payment prompt) is measured on the Android emulator and the iPhone simulator in CI. The iOS OTA runtime is verified on the iOS Simulator in CI on every change to it (fetch, verify, stage, reload, cold start). Measured there on 5 Nov 2026 (`docs/spike-results.md`, [run 41979433300](https://github.com/shipvo/shipvo/actions/runs/41979433300), median of 3, local control plane): launch to new release running and healthy 4.2 s (iOS Simulator; OTA timings on the Redmi 9A are in the same file), full 1.87 MB bundle download 157 ms, apply 266 ms. A first-update bsdiff patch from the embedded bundle was 83,999 bytes against a 1,996,082-byte bundle, 573 ms from last byte to healthy ([run 42087991990](https://github.com/shipvo/shipvo/actions/runs/42087991990)).
 
 ## Why Shipvo
 
@@ -40,19 +40,29 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Crash-loop protection:** a release that fails to boot 3 times is discarded automatically, and you can roll back to the previous release in one call.
 - **Staged rollouts:** cohort bands (1%, 10%, everyone) served as static signed pointers from the edge, with no device registry.
 - **Telemetry for every release:** applied, reverted, cold-start time, download size and time.
-- **Control plane on Cloudflare Workers:** KV, D1 and R2. It's self-hostable, with a Docker target planned.
+- **Control plane you can host yourself:** on Cloudflare Workers (KV, D1 and R2) or with Docker (`docker compose up`), with backup and restore commands ([self-hosting](docs/self-hosting.md)).
 - **Admin per app** at `/app/<id>/admin`: live content, prices, offers, orders, history, publish to every phone in seconds; the same typed owner commands are available to agents with a token.
 - **Agent-operable apps:** every app exposes typed commands and a UI simulator; `@shipvo/mcp` plugs both into Claude, Cursor, Claude Code or PiPilot.
 - **Simulated device:** `@shipvo/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
+- **Shipvo Phone:** `shipvo run android` or `shipvo run ios` opens your app in an Android or iPhone frame in your browser, with live reload, a notification shade, Settings, a Browser app, network profiles and a device panel. No emulator or Xcode needed ([run](docs/run.md)).
+- **Lumi:** `shipvo lumi android|ios` tests your app while you watch: it walks every screen, reports findings with replay buttons, shows coverage and saves findings as tests ([Lumi](docs/lumi.md)).
+- **Pull request check:** `shipvo ci init --check` runs your tests and an explore pass on every pull request, with before and after screens of Android and iOS in the comment ([PR check](docs/ci-check.md)).
+- **Behaviour timeline:** the app admin compares how each release and pull request behaves on Android and iOS ([timeline](docs/timeline.md)).
+- **Real devices too:** `shipvo test --device agent-device` runs the same tests on an Android emulator or iOS Simulator through Callstack's agent-device ([testing](docs/testing.md)).
+- **Move over in one command:** `shipvo migrate --plan` and `--apply` switch an app from Expo EAS Update or CodePush ([EAS Update](docs/migrate-from-eas-update.md), [CodePush](docs/migrate-from-codepush.md)).
 - **Design skill:** a runnable theme generator, screen checker and anti-generic lint in `skills/shipvo-design`.
 
 ## Start
 
 ```bash
-npx -y @shipvo/cli init myshop && cd myshop && npm install && npx playwright install chromium
-npm run sim                      # the app in the simulator; agents: open_app("myshop") through @shipvo/mcp
-npx expo run:android             # the native shell; `shipvo publish` ships changes over the air
+npm create shipvo@latest myshop -- --template shop && cd myshop && npm install
+npx shipvo run android           # your app on Shipvo Phone in the browser (npx shipvo run ios for the iPhone frame)
+npx shipvo lumi android          # Lumi tests it while you watch
+npx shipvo agents setup          # connect your coding agent over MCP
+npx shipvo publish               # ship changes over the air to Android and iOS
 ```
+
+Templates: `blank`, `content` and `shop`.
 
 Guides: [Build your first app](docs/getting-started.md) · [Tutorials](docs/tutorials/index.md) · [CLI](docs/cli.md) · [Test your app in CI](docs/testing.md) · [Test with an assistant](docs/test-with-an-assistant.md) · [Store release](docs/store.md) · [Frameworks and adapters](docs/adapters.md) · [Migrate from CodePush](docs/migrate-from-codepush.md) · [Migrate from Expo EAS Update](docs/migrate-from-eas-update.md) · [Taking real orders](docs/taking-real-orders.md) · [Device API](docs/device-api.md) · [Agents and MCP](docs/agents.md) · [Self-hosting the control plane](docs/self-hosting.md) · [Threat model for signed updates](docs/threat-model.md) · measured results: [OTA on a 2 GB phone](docs/spike-results.md), [simulator vs device parity](docs/parity-results.md), [agent gate](docs/agent-gate-results.md).
 
@@ -70,13 +80,17 @@ The skill is in [`skills/shipvo`](skills/shipvo/SKILL.md). A test checks that ev
 
 [![Shipvo MCP server](https://mcprush.com/badge/shipvo-mcp/card.svg)](https://mcprush.com/to/shipvo-mcp?ref=badge)
 
-Add the MCP server to Claude, Claude Code, Cursor or PiPilot:
+In your app, `npx shipvo agents setup` writes the MCP config for your coding agent. To add it by hand, install it in the app (`npm i -D @shipvo/mcp`) and point the agent at the local server, for example in Claude Code:
 
-```json
-{ "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
+```bash
+claude mcp add shipvo --env PN_SIM=http://localhost:4545 -- node node_modules/@shipvo/mcp/dist/server.js
 ```
 
+Start the simulator with `npx shipvo sim`. When `shipvo run android` or `shipvo run ios` is open, `open_app` drives that phone and you watch the agent work.
+
 Then: `open_app("tide@latest")` returns a phone-sized session and the first screen as an accessibility tree with refs; `tap`, `type`, `scroll`, `back` and `screenshot` act on it; `set_device` decides what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether a payment is approved, network off); `device_log` reports every device event, all marked simulated; `end_session` returns the steps taken and the orders the app sent. `tide@r13` opens exactly the release phones are running; `tide` opens a local build. Full tool list: `packages/mcp/README.md`.
+
+See it live: [two phones playing chess](https://shipvo.dev/demos/chess/), an Android phone and an iPhone, with every square labelled for agents ([run it with your own agents](docs/demos/chess.md)).
 
 What the agent sees is what a person with a screen reader would: only the items of a rail that are on screen (swipe to see more), nothing behind a modal sheet, system dialogs worded as Android or iOS word them.
 
@@ -113,11 +127,14 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 | `packages/store` | `@shipvo/store`: drafts Play Data safety answers and a privacy policy from `shipvo.json`, and checks store screenshot sizes (`docs/store.md`) |
 | `packages/spec` | `@shipvo/spec`: the JSON Schema for `shipvo.app/v0` app specs and a validator that returns errors and warnings with a JSON path and a suggested fix |
 | `packages/shipvo`, `packages/create-shipvo` | `shipvo` and `create-shipvo`: the CLI under its short name (`npx shipvo`, `npm i -g shipvo`) and `npm create shipvo`; both forward to `@shipvo/cli` |
-| `packages/capacitor` | `@shipvo/capacitor`: release decisions, Ed25519 + sha-256 verification and rollback rules for signed Capacitor web bundles (core only; native apply comes next) |
+| `packages/capacitor` | `@shipvo/capacitor`: signed web bundles for Capacitor apps: release decisions, Ed25519 + SHA-256 verification and rollback rules |
+| `packages/mcp-tools` | The one MCP tool registry shared by the local and hosted servers |
 | `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
 | `services/sim` | Hosted simulator Worker: one sandbox per API key, the same MCP tools over HTTPS (sim.shipvo.dev) |
 | `services/site` | shipvo.dev: landing page and the public app marketplace |
 | `apps/tide-and-tackle` | Sample shop app built on the packages above, plus the device drivers and the parity harness (`sim/`) |
+| `apps/chess` | Chess app with a labelled board for agents, and the two-phone demo (`pnpm --filter chess demo`) |
+| `apps/capacitor-sample` | Capacitor sample app, built for Android and iOS in CI |
 | `docs/` | Guides, tutorials, roadmap and measured results (spike, agent gate, parity) |
 | `scripts/` | CI helpers: first-run, Android and iOS end-to-end runs, simulator bench |
 | `skills/shipvo-design` | Design skill with runnable checks |
@@ -128,7 +145,7 @@ For a first store release, `shipvo store setup` and `shipvo store status` say wh
 
 ## Frameworks
 
-Today: React Native with Expo, and bare React Native apps (`shipvo init` inside the app; it writes the Android manifest and `Info.plist` values after you confirm). It does not accept apps that use expo-updates or CodePush. Capacitor is planned (epic #297) and is not built: `docs/adapters.md` lists what a new runtime must do.
+React Native with Expo, and bare React Native apps (`shipvo init` inside the app; it writes the Android manifest and `Info.plist` values after you confirm). Apps on expo-updates or CodePush move over with `shipvo migrate`. Capacitor apps build signed Android and iOS binaries in your own GitHub Actions (`shipvo ci init --framework capacitor`) or on EAS (`shipvo eas setup`): [docs/capacitor.md](docs/capacitor.md). How a framework adapter works: [docs/adapters.md](docs/adapters.md).
 
 ## Try the sample app
 

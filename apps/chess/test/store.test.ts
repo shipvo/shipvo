@@ -77,3 +77,32 @@ describe("ChessStore", () => {
     expect(s.get_board().squares.find((q) => q.square === "a8")?.label).toBe("white knight on a8");
   });
 });
+
+describe("seats, time and notation", () => {
+  it("refuses a move out of turn for a seated phone and says why", () => {
+    const s = new ChessStore();
+    s.setSeat("black");
+    const r = s.move("e2", "e4");
+    expect(r.ok).toBe(false);
+    expect(s.lastNotice()).toContain("Wait for your turn");
+    expect(s.outOfTurn()).toContain("It is white's turn. You play black.");
+    expect(s.move("e2", "e4", undefined, { relay: true }).ok).toBe(true);
+    expect(s.outOfTurn()).toBeNull();
+    expect(s.lastNotice()).toBe("");
+    expect(s.get_board()).toMatchObject({ lastMove: "e2e4", seat: "black", over: false });
+  });
+  it("ends the game on a lost clock", () => {
+    const s = new ChessStore();
+    s.timeout("white");
+    expect(s.get_board()).toMatchObject({ over: true, result: "Time out, black wins", timeLoss: "white" });
+    expect(s.move("e2", "e4").ok).toBe(false);
+  });
+  it("writes standard algebraic notation", () => {
+    const s = new ChessStore();
+    for (const u of ["f2f3", "e7e5", "g2g4", "d8h4"]) expect(s.move(u.slice(0, 2), u.slice(2, 4)).ok).toBe(true);
+    expect(s.sanMoves()).toEqual(["f3", "e5", "g4", "Qh4#"]);
+    const t = new ChessStore();
+    for (const u of ["e2e4", "d7d5", "e4d5", "g8f6", "g1f3", "f6d5", "f1e2", "e7e6", "e1g1"]) t.move(u.slice(0, 2), u.slice(2, 4));
+    expect(t.sanMoves()).toEqual(["e4", "d5", "exd5", "Nf6", "Nf3", "Nxd5", "Be2", "e6", "O-O"]);
+  });
+});
