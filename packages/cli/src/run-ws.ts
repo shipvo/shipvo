@@ -23,8 +23,8 @@ export function acceptWebSocket(req: IncomingMessage, socket: Duplex, onText: (t
   socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
   let buf = Buffer.alloc(0); let parts: Buffer[] = []; let closed = false;
   const done = () => { if (!closed) { closed = true; onClose(); } };
-  const shut = () => { if (!closed) socket.write(frame(8, Buffer.alloc(0))); socket.end(); done(); };
-  socket.on("close", done); socket.on("error", () => { socket.destroy(); done(); });
+  const shut = () => { if (!closed && socket.writable) socket.write(frame(8, Buffer.alloc(0))); socket.end(); done(); };
+  socket.on("end", shut); socket.on("close", done); socket.on("error", () => { socket.destroy(); done(); });
   socket.on("data", (chunk: Buffer) => {
     buf = Buffer.concat([buf, chunk]);
     for (;;) {
