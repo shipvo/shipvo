@@ -1,1 +1,0 @@
-- scripts: `scripts/first-run/run-time.mjs` now times `shipvo run android` and `shipvo run ios` and prints one table with an Android and an iOS column. `run-time.json` is now `{ "android": [...], "ios": [...] }`; use `--platform android|ios` for one skin.
