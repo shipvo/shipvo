@@ -23,6 +23,8 @@ For an iPhone-style phone, type `npx shipvo lumi ios` instead. Android and iOS w
 
 Shipvo builds a web copy of your app. You will see `Building <your app> for the simulator…`. The first build is the slowest. Your browser then opens with the phone on the left and the Lumi sidebar on the right. On a narrow window the sidebar is below the phone.
 
+![Lumi on Tide & Tackle in a desktop browser: the phone on the left shows the app's home screen, the Lumi sidebar on the right says Idle, shows Findings 0 and has a box labelled Tell Lumi what to do.](/tutorials/test-your-app-with-lumi/start.png)
+
 > **If something goes wrong.**
 > - The terminal shows an error from `npx expo export --platform web` and names a file: that file uses something that only works on a real phone. Ask your assistant to fix it.
 > - It says `Port 4547 is in use. Pass --ui-port <n>.`: type `npx shipvo lumi --ui-port 4600`.
@@ -34,9 +36,17 @@ In the box labelled **Tell Lumi what to do**, type `test my app` and press Enter
 
 To test one path, type its everyday name: `test checkout`, `test login` or `test sign up`. Lumi says which path it picked.
 
+![Lumi mid-run: the sidebar lists each tap, such as Tapping Open search, and the phone shows the search screen.](/tutorials/test-your-app-with-lumi/testing.png)
+
 ## 3. Read the findings
 
 Look at **Findings** in the sidebar. Each finding is a problem Lumi found, such as a button that does nothing, a screen that stays blank or a network call that fails. Each problem is listed once. **Coverage** shows how many screens and controls Lumi tried.
+
+![The Lumi sidebar with Findings listing three bugs, each with a Replay button, and Coverage showing 13 screens and 22 of 42 controls tried.](/tutorials/test-your-app-with-lumi/findings.png)
+
+On a phone-width window the sidebar sits below the phone:
+
+![Lumi on a 390 pixel wide window: the phone on top, the sidebar with findings below it.](/tutorials/test-your-app-with-lumi/findings-phone.png)
 
 ## 4. Watch a problem happen again
 

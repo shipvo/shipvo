@@ -18,6 +18,10 @@ npx shipvo lumi
 
 Shipvo builds a web copy of your app and opens it on a phone in your browser. Use `npx shipvo lumi ios` for an iPhone-style phone. Lumi is a small glowing orb beside the camera. Type `test my app` and it taps through your app.
 
+![Lumi running on Tide & Tackle: the phone on the left, the sidebar on the right with a list of taps, three findings with Replay buttons, and coverage of 13 screens and 22 of 42 controls.](/tutorials/test-your-app-with-lumi/findings.png)
+
+![The same Lumi view on a 390 pixel wide window, with the sidebar below the phone.](/tutorials/test-your-app-with-lumi/findings-phone.png)
+
 ## What Lumi finds
 
 Each problem is a finding in the sidebar:
