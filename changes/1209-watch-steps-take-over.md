@@ -1,0 +1,3 @@
+- `@shipvo/sim`: `/watch` lists the agent's steps as they happen, with a line for how the screen changed. A "Take over" toggle (off by default) sends your taps, swipes and typing to the phone. Android and iOS.
+- `shipvo sim` prints "Watch the agent: http://localhost:4545/watch" and opens it. `--no-open` and `--json` do not open it; the JSON result has `watch_url`.
+- Migration: none.
