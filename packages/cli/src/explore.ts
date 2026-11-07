@@ -456,10 +456,17 @@ async function exploreRun(argv: string[], json: boolean): Promise<number> {
         else console.log(`Wrote ${files.length} issue file${files.length === 1 ? "" : "s"} to ${a["issues-dir"]}. To file them:\n${commands.join("\n")}`);
       } else issueInfo = { issue_files: files, file_commands: commands };
     }
+    let testInfo: Record<string, unknown> = {};
+    if (a["save-tests"] !== undefined) {
+      if (a["save-tests"] === "true") throw new Error("--save-tests needs a directory");
+      const files = (await import("./explore-save.js")).saveTests(report.findings, a["save-tests"]);
+      if (!json) console.log(files.length ? `Wrote ${files.length} test file${files.length === 1 ? "" : "s"} to ${a["save-tests"]}` : "No findings that can be saved as a test.");
+      else testInfo = { test_files: files };
+    }
     const failOn = a["fail-on-findings"] === "true";
     const { exit, code } = outcome(report, flowsFailed, failOn);
     if (json) {
-      const data = { ...issueInfo, ...flowInfo, report_files: [`${out}.md`, `${out}.json`, ...flowFiles], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
+      const data = { ...issueInfo, ...testInfo, ...flowInfo, report_files: [`${out}.md`, `${out}.json`, ...flowFiles], steps: report.steps, screens: report.screens, stopped_early: report.stoppedEarly, error: report.error, findings: report.findings.map((f) => ({ kind: f.kind, message: f.message, steps: f.steps.map(describeStep) })) };
       const next = report.error ? [{ command: "shipvo doctor --json", why: "Check the simulator setup." }]
         : report.findings.length || flowsFailed ? [{ command: `open ${out}.md`, why: "Read the steps to reproduce each finding." }, { command: "shipvo explore --json", why: "Run again after fixing to confirm." }]
         : [{ command: "shipvo test --json", why: "Run your step files." }];
