@@ -59,6 +59,10 @@ To start from a reader app instead, add `--template content`: a list screen and 
 | `.github/workflows/publish.yml` | Runs `shipvo publish` for you on every push to `main` (optional; you can always run it yourself). |
 | `.shipvo/seed.txt` | Your Ed25519 release signing seed, git-ignored. **Back it up offline.** Lose it and installed shells will never accept another update. Run `shipvo keys export` and keep a copy ([moving machines](new-machine.md)). |
 
+### The shop checkout
+
+The `shop` template has a checkout a customer expects: plus and minus on each cart line, Undo after Remove, payment errors in plain words (for example "Your payment was declined. Try another method."), a message when the phone is offline, and an order confirmation screen with a Back to shop button. To see it, run `npx shipvo run android` or `npx shipvo run ios`, add a product and open the cart.
+
 ## 2. Run it in the simulator
 
 ```bash
