@@ -128,7 +128,7 @@ Add `"presentation": "sheet"` to a screen and to the `navigate` action that open
 | `Interactive block "toggle" has no label.` | Add `label`. |
 | `State "nope" is not declared.` | Add the key to `state` with a type and a default. |
 | `"a" does not match the required format.` (`$.app.id`) | Use lowercase letters, digits and `-`, 2 to 63 characters, starting with a letter. |
-| A `segmented` block without `options` | Add `options`. |
+| `Segmented control has no options.` | Add `options`: a list of two or more short texts, for example `["day", "week", "month"]`. |
 
 ## Troubleshooting
 
