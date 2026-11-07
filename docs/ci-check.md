@@ -54,7 +54,7 @@ Run it by hand with `npx shipvo ci comment --changed-from <sha> --pr <number>`. 
 
 The action also builds the base commit in a second folder and runs the same flows there. The comment then has a "Compared with base" section: regressions first (flows that passed on base and fail now, with the first failing step), then fixed, then still failing. Flows only on the pull request are not regressions. The check fails on a regression because the action passes `--fail-on-regression`; by hand, use `npx shipvo ci comment --base-report base.json --report shipvo-report.json --fail-on-regression`. If the base report is missing or unreadable, the comment has no such section and the check does not fail. If the pull request report is missing, there is no comparison and no failure either. If the base commit cannot be checked out, the action prints a line saying so and skips the comparison.
 
-A flaky flow can fail on the pull request and pass on base, and then the check fails. Re-run the job to see if the failure repeats. Flows that are new on the pull request and fail are listed under "New flows" but do not fail the check.
+A flaky flow can fail on the pull request and pass on base, and then the check fails. Re-run the job once: a flow that fails again on the pull request is a regression, and one that passes on re-run is flaky. Flows that are new on the pull request and fail are listed under "New flows" but do not fail the check.
 
 
 ### Before and after screens
@@ -72,7 +72,7 @@ On a private repository, or when the repository cannot be read, nothing is uploa
 | No comment appears on the pull request | The workflow lacks `pull-requests: write`, or the pull request comes from a fork (the token is read-only there). The check still runs. | Add `pull-requests: write` to the workflow permissions. For forks, read the result in the job log. |
 | The log says it is walking the whole app, not only changed screens | The checkout has no history (`fetch-depth: 0` is missing), or `app.json` has no `expo.scheme`. | Keep `fetch-depth: 0` as in the generated workflow, and set `expo.scheme`. |
 | "Compared with base" is missing | The base report is missing or unreadable, or the base commit could not be checked out. The log says which. | Fix the base build. The check does not fail for this. |
-| The check fails on a flow you did not touch | A flaky flow passed on base and failed on the pull request. | Re-run the job. If it fails again, it is a real regression: read the first failing step in the comment. |
+| The check fails on a flow you did not touch | The flow passed on base and failed on the pull request. | Re-run the job once. If it fails again, it is a regression: read the first failing step in the comment. If it passes, it is flaky. |
 | Before and after images are file names, not pictures | The repository is private, so nothing is uploaded. | Upload `shipvo-shots-before/` and `shipvo-shots-after/` as an artifact, or open the `shipvo-check` artifact. |
 | A changed screen is not in the screenshots | Dynamic screens such as `[id]` and layouts are skipped, and only four screens are captured. | Add the screen as a flow in `tests/`. |
 

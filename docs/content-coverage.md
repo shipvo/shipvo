@@ -67,16 +67,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
-| `shipvo agents setup` (MCP config for every coding agent) | [agents](agents.md), [cli](cli.md) | | | |
 | `open_app` with `platform` and `show` (start the phone in your browser) | [agents](agents.md), [run](run.md) | | | |
-| Network off blocks the app's calls in sim and MCP sessions | [device-api](device-api.md) | | | |
-| Cancelled payments (`cancelled` result) | [device-api](device-api.md) | | | |
-| Deep links: `open_url` and `Linking.openURL` | [phone-apps](phone-apps.md), [testing](testing.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
-| App spec blocks (charts, stat, progress, card, toggle, segmented) | [app-spec](design/app-spec.md) | | | |
-| `shipvo ci shots` (Android and iOS on base and head) | [ci-check](ci-check.md) | | | |
-| `shipvo explore --save-tests` and Save as test in Lumi | [lumi](lumi.md), [agents](agents.md) | | | |
 | Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
-| Self-hosted backup, restore and upgrade check | [self-hosting](self-hosting.md#back-up-and-upgrade) | | | |
 | Network off blocks the app's network calls (`TypeError: Network request failed`) | [device-api](device-api.md#network) | | | |
 | Payment cancel returns `cancelled` (`@shipvo/device` 0.1.5) | [device-api](device-api.md#payments) | | | |
 | Deep links: `open_url` and `Linking.openURL` switch to the owning app | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
