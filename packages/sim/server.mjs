@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
+import { installNetGate, netGateProfiles } from "./net-gate.mjs";
 import { pushNotification } from "./push-notification.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
@@ -144,6 +145,7 @@ async function newSession(id, opts = {}) {
     return true;
   });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${id}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
+  await ctx.addInitScript(installNetGate, netGateProfiles);
   const page = await ctx.newPage();
   const errors = [];
   // phone.json: the apps and settings this phone starts with. The same profile gives the same phone every run.
@@ -234,6 +236,8 @@ async function setNetworkProfile(s, page, name) {
     return { res, headers: { get: (n) => { const k = String(n).toLowerCase(); return headers[k] ?? (k === "content-length" ? size : null); } } };
   }, profile, { clock: { sleep: (ms) => new Promise((r) => setTimeout(r, ms)) } });
   if (s.profiled) await ensureNetworkRoute(s, page);
+  // The phone itself learns the profile too, so the in-page gate fails offline calls with the phone's own error.
+  await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), name).catch(() => {});
   (s.netLog ??= []).push({ at: Date.now(), name: "network_profile", profile: name, from, source: "simulated" });
 }
 
