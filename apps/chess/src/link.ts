@@ -23,22 +23,26 @@ export function linkToTop(store: ChessStore, win: LinkWindow): () => void {
   const report = () => {
     const b = store.get_board();
     // "*" is fine: the message holds only move strings, and the app also loads on a plain `shipvo run` page.
-    top.postMessage({ type: "chess:moves", moves: b.moves, over: b.status.state !== "playing" }, "*");
+    top.postMessage({ type: "chess:moves", moves: b.moves, san: store.sanMoves(), over: b.over, result: b.result }, "*");
   };
   const onMessage = (e: { data: unknown; source: unknown }) => {
     if (e.source !== top) return;
-    const d = e.data as { type?: string; moves?: unknown; from?: unknown; to?: unknown; promotion?: unknown } | null;
+    const d = e.data as { type?: string; moves?: unknown; from?: unknown; to?: unknown; promotion?: unknown; seat?: unknown; loser?: unknown } | null;
     if (!d || typeof d !== "object") return;
     if (d.type === "chess:moves" && Array.isArray(d.moves)) {
       const have = store.get_board().moves.length;
       for (const uci of d.moves.slice(have)) {
-        if (typeof uci !== "string" || !store.move(...moveArgs(uci)).ok) break;
+        if (typeof uci !== "string" || !store.move(...moveArgs(uci), { relay: true }).ok) break;
       }
     } else if (d.type === "chess:play" && typeof d.from === "string" && typeof d.to === "string") {
-      store.move(d.from, d.to, d.promotion as Promotion | undefined);
+      store.move(d.from, d.to, d.promotion as Promotion | undefined, { relay: true });
+    } else if (d.type === "chess:seat" && (d.seat === "white" || d.seat === "black")) {
+      store.setSeat(d.seat);
+    } else if (d.type === "chess:timeout" && (d.loser === "white" || d.loser === "black")) {
+      store.timeout(d.loser);
     }
   };
-  const moveArgs = (uci: string): [string, string, Promotion?] => {
+  const moveArgs = (uci: string): [string, string, Promotion | undefined] => {
     const m = splitUci(uci);
     return [m.from, m.to, m.promotion];
   };

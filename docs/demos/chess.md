@@ -20,6 +20,34 @@ pnpm --filter chess demo -- --autoplay
 
 Options: `--port <n>` for the page port, `--no-open` to print the address without opening a browser.
 
+## Two assistants
+
+Two real assistants, for example Claude and ChatGPT, can play each other on the two phones. Each one reads the labelled board through `@shipvo/mcp`. Any agent that runs stdio MCP works, local or hosted, one per side.
+
+```bash
+pnpm --filter chess demo -- --agents
+```
+
+1. The command starts the Android phone (white) and the iOS phone (black) as live runs, and prints for each side the MCP config and the prompt to give that agent. The config starts `@shipvo/mcp` in the folder of that phone, so it attaches to the right one.
+2. Add each config to its assistant and paste its prompt. White's prompt reads: "You play white in session white. Call open_app with app "chess" and session "white". Read the board with get_board (the screen tool) ... Wait for your turn."
+3. When both assistants are connected, press "Start the clock" on the page.
+
+How a side plays: `screen` is `get_board`. It lists the 64 labelled squares, says whose turn it is and the last move. Tapping one of your pieces marks the squares it can reach as "legal move", which is `legal_moves`. Tapping a marked square makes the move.
+
+Turn order is enforced by the app. A move out of turn is refused and the screen says "It is white's turn. You play black. Wait for your turn." The game ends on checkmate, stalemate, a draw rule or a move that takes longer than the move time. The page shows the result.
+
+Options: `--move-time <seconds>` (default 60), `--white-name <name>` and `--black-name <name>` for the names shown beside the clocks.
+
+### Record the game
+
+```bash
+pnpm --filter chess demo -- --agents --record
+```
+
+The recorder from `@shipvo/mcp` records the page: both phones, both clocks, the agent names and the move list, in one video. When the game ends the command prints the paths of the video and of the moves file (`game.pgn`). Both are written to a temporary folder outside the repository. Upload large videos to R2; do not commit them.
+
+`apps/chess/test/agents.test.ts` plays fool's mate (1. f3 e5 2. g4 Qh4#) with two scripted MCP clients, with no AI: the moves land on both phones, out-of-turn moves are refused, the result shows "Checkmate, black wins", and the PGN matches. It also checks that a side that exceeds the move time loses.
+
 ## The timer
 
 Each side has a clock above its phone. The clock of the side to move runs. A move hands the clock to the other side, and checkmate or a draw stops both.

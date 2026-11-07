@@ -20,7 +20,7 @@ describe("linkToTop", () => {
     const store = new ChessStore();
     const w = fakeWindow();
     linkToTop(store, w.win);
-    expect(w.posted.at(-1)).toEqual({ type: "chess:moves", moves: [], over: false });
+    expect(w.posted.at(-1)).toEqual({ type: "chess:moves", moves: [], san: [], over: false, result: null });
     w.send({ type: "chess:moves", moves: ["e2e4", "e7e5"] });
     expect(store.get_board().moves).toEqual(["e2e4", "e7e5"]);
     expect(w.posted.at(-1).moves).toEqual(["e2e4", "e7e5"]);
