@@ -10,6 +10,7 @@ import { handleOAuth, wwwAuthenticate } from "./oauth";
 type Env = {
   SIM?: DurableObjectNamespace<SimContainer>; DB: D1Database; CONTROL: string; OWNER_TOKEN?: string;
   SIM_REV?: string; E2B_API_KEY?: string; E2B_TEMPLATE?: string; E2B_API?: string; E2B_SANDBOX_DOMAIN?: string; SESSION_TIMEOUT_S?: string;
+  GITHUB_CLIENT_ID?: string; GITHUB_CLIENT_SECRET?: string; GITHUB_WEB?: string; GITHUB_API?: string;
 };
 
 export class SimContainer extends Container<Env> {
