@@ -35,7 +35,7 @@ runs:
         npx shipvo ci check ${BASE_SHA:+--changed-from "$BASE_SHA"} || rc=$?
         if [ "$EVENT_NAME" = "pull_request" ]; then
           # Screenshots need the PR build on port 4545, so they run before the PR simulator is stopped.
-          npx shipvo ci shots --changed-from "$BASE_SHA" || true
+          npx shipvo ci shots --changed-from "$BASE_SHA" --skins android,ios --out shipvo-shots-after || true
           # Run the same flows on the base commit, built in a second folder, for the regression comparison.
           # The simulator serves one build at a time, so the PR build is stopped first.
           rm -rf shipvo-base
@@ -54,12 +54,19 @@ runs:
               npx shipvo test --report ../shipvo-base-report.json || true
               kill $! 2>/dev/null || true
             ) > shipvo-base.log 2>&1 || echo "Base run failed, see shipvo-base.log. The comment has no comparison."
+            # Same screens on the base commit. A screen the base does not have is skipped, so it shows as after-only.
+            if [ -s shipvo-shots-after/screens.txt ]; then
+              (cd shipvo-base && npx shipvo sim --port 4545 > ../sim-base-shots.log 2>&1 & BP=$!
+               for i in $(seq 1 90); do curl -sf http://localhost:4545/app/ > /dev/null && break; sleep 2; done
+               npx shipvo ci shots --screens "$(cat ../shipvo-shots-after/screens.txt)" --skins android,ios --out ../shipvo-shots-before || true
+               pkill -P $BP 2>/dev/null || true; kill $BP 2>/dev/null || true)
+            fi
             git worktree remove --force shipvo-base || true
           else
             echo "Base commit not available (the checkout needs fetch-depth: 0), skipping comparison."
           fi
           # The comment step runs last. Only exit 1 (a regression) fails the check; other codes are ignored.
-          npx shipvo ci comment --changed-from "$BASE_SHA" --pr "$PR_NUMBER" --base-report shipvo-base-report.json --fail-on-regression || cr=$?
+          npx shipvo ci comment --changed-from "$BASE_SHA" --pr "$PR_NUMBER" --base-report shipvo-base-report.json --before-shots shipvo-shots-before --after-shots shipvo-shots-after --fail-on-regression || cr=$?
           if [ "$cr" = "1" ]; then rc=1; fi
         fi
         exit $rc
@@ -78,5 +85,6 @@ runs:
           shipvo-report.json
           shipvo-base-report.json
           shipvo-base.log
-          shipvo-shots/
+          shipvo-shots-before/
+          shipvo-shots-after/
         if-no-files-found: ignore
