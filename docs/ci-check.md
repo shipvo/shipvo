@@ -1,6 +1,8 @@
 # Check every pull request
 
-Shipvo can build your app, run your flows and walk every button on each pull request. A failing flow or a crash fails the check. Exploration notes do not.
+This page is for anyone who owns a Shipvo app's GitHub repository. In about two minutes you add one workflow file. After that, every pull request gets a check that builds your app, runs your flows and walks every button, then posts one comment with the result. A failing flow or a crash fails the check. Exploration notes do not.
+
+You need: an app made with `shipvo init` (or adopted with it), flows in `tests/*.steps`, and a GitHub repository.
 
 ## Set up
 
@@ -62,3 +64,22 @@ With `--before-shots <dir> --after-shots <dir>` (each laid out as `<dir>/android
 On a public repository the workflow's token uploads the images to the `shipvo-media` branch of your own repository, so the workflow needs `contents: write`. The comment shows the images inline. Each push uploads its own copies, and the comment is updated in place. A file that is already there counts as uploaded only when it holds the same bytes.
 
 On a private repository, or when the repository cannot be read, nothing is uploaded. The comment lists the file names for each screen and skin, and the images are in the folders you passed to `--before-shots` and `--after-shots`. Upload those folders as an artifact in your workflow to keep them.
+
+## Troubleshooting
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| The log says `Base commit not available (the checkout needs fetch-depth: 0), skipping comparison.` | The checkout step fetched only the latest commit. | Add `with: { fetch-depth: 0 }` to `actions/checkout`. The generated workflow already has it. |
+| The log says `Base run failed, see shipvo-base.log. The comment has no comparison.` | The flows could not run on the base commit. | Open `shipvo-base.log` in the `shipvo-check` artifact. The pull request result still counts. |
+| No comment appears on a pull request from a fork | The token on fork pull requests is read-only (GitHub answers 403). | Expected. The check still runs and prints a notice; the reports are in the artifact. |
+| No comment appears on your own pull requests | The workflow lacks `pull-requests: write`. | Add that permission to the job. |
+| The check fails but the flow passes locally | A flaky flow that passed on base and failed now is counted as a regression. | Re-run the job. If it fails twice, the failure is real. |
+| `shipvo explore` walks the whole app, not the changed screens | No `expo.scheme` in `app.json`, or no full history. | Set `expo.scheme`, add an `onUrl` listener and use `fetch-depth: 0`. |
+| Locally, `Port 4545 is in use` | Another simulator is running. | Stop it, or pass `--port <n>`. |
+
+## Next steps
+
+- [Write flows to check](testing.md)
+- [Let Lumi walk the app and save findings as tests](lumi.md)
+- [Compare behaviour between releases](timeline.md)
+- [Ship the fix when the check is green](getting-started.md#5-publish-over-the-air)

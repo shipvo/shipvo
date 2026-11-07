@@ -65,6 +65,9 @@ The planner keeps this list current: the epics in flight, newest owner direction
 - Secret vault: keys go from the person straight into an encrypted vault, never through the model (#841)
 - Security hardening from the external review (#732)
 
+**Agents together (planner epic):**
+- Agents use apps together: shared rooms, sub-agent teams and agent evaluation (#1188)
+
 **Stage 2:**
 - The closed QA loop: an agent explores, tests in plain language, repairs its tests, and the fix ships to 1% the same hour (#317)
 - Release governance: audit log, approvals, release policy as code (#295)
