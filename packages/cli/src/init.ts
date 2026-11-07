@@ -485,7 +485,7 @@ export function Detail({ article, onBack }: { article: Article; onBack: () => vo
 
 const s = StyleSheet.create({
   page: { padding: 20, paddingTop: 56, gap: 12 },
-  back: { minHeight: 48, justifyContent: "center" }, backText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
+  back: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }, backText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
   h1: { fontSize: 24, fontWeight: "800", color: "#111" },
   body: { fontSize: 16, lineHeight: 24, color: "#111" },
 });
@@ -646,7 +646,7 @@ const s = StyleSheet.create({
   page: { padding: 20, paddingTop: 56, gap: 12 },
   head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   h1: { fontSize: 28, fontWeight: "800", color: "#111" },
-  cart: { minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }, cartText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
+  cart: { minHeight: 48, minWidth: 48, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }, cartText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
   row: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: "#CBD5D1", flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, backgroundColor: "#fff" },
   rowText: { fontSize: 16, fontWeight: "700", color: "#111" },
   price: { fontSize: 16, color: "#111" },
@@ -677,7 +677,7 @@ export function Detail({ product, onBack, onCart }: { product: Product; onBack: 
 const s = StyleSheet.create({
   page: { padding: 20, paddingTop: 56, gap: 12 },
   head: { flexDirection: "row", justifyContent: "space-between" },
-  link: { minHeight: 48, justifyContent: "center" }, linkText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
+  link: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }, linkText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
   h1: { fontSize: 24, fontWeight: "800", color: "#111" },
   price: { fontSize: 18, fontWeight: "700", color: "#111" },
   body: { fontSize: 16, lineHeight: 24, color: "#111" },
@@ -736,10 +736,10 @@ export function Cart({ onBack, onOrder }: { onBack: () => void; onOrder?: (order
 
 const s = StyleSheet.create({
   page: { padding: 20, paddingTop: 56, gap: 12 },
-  back: { minHeight: 48, justifyContent: "center" }, backText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
+  back: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }, backText: { fontSize: 16, fontWeight: "700", color: "#1F4E5F" },
   h1: { fontSize: 24, fontWeight: "800", color: "#111" },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  remove: { minHeight: 48, justifyContent: "center" },
+  remove: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" },
   body: { fontSize: 16, color: "#111" },
   total: { fontSize: 20, fontWeight: "800", color: "#111" },
   pay: { minHeight: 48, justifyContent: "center", alignItems: "center", borderRadius: 8, backgroundColor: "#1F4E5F" }, payText: { fontSize: 16, fontWeight: "700", color: "#fff" },
