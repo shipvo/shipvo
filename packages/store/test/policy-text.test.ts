@@ -36,4 +36,20 @@ describe("renderPolicyText", () => {
     expect(markdown).toContain('Capability "hologram"');
     expect(markdown).not.toContain("the app asks for the hologram");
   });
+
+  it("an unmapped capability with no rows does not claim the app uses nothing", () => {
+    const { markdown, html } = renderPolicyText(app(["hologram"]), full);
+    expect(markdown).not.toContain("declares no use");
+    expect(html).not.toContain("declares no use");
+    expect(markdown).toContain("hologram");
+  });
+
+  it("escapes markdown in name, company and email", () => {
+    const d = deriveStoreDetails({ appId: "a", name: "*X* [a](http://evil)" });
+    const { markdown, html } = renderPolicyText(d, { company: "_Co_", contactEmail: "a_b@x.test" });
+    expect(markdown).toContain("\\*X\\* \\[a\\]\\(http://evil\\)");
+    expect(markdown).toContain("\\_Co\\_");
+    expect(markdown).toContain("a\\_b@x.test");
+    expect(html).toContain("*X* [a](http://evil)");
+  });
 });
