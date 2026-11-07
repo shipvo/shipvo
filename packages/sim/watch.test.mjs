@@ -82,3 +82,25 @@ test("a wrong Origin is refused, the same origin is accepted", async () => {
   await assert.rejects(connect("", { origin: "http://evil.example" }).opened, /refused/);
   const ok = connect("", { origin: `http://localhost:${PORT}` }); await ok.opened; ok.ws.close();
 });
+
+test("a tap through /act is a step on /watch; input is ignored until Take over is on", async () => {
+  await call("/session", { session: "t", skin: "android" });
+  const v = connect("?session=t"); await v.opened;
+  await until(() => v.msgs.find((m) => m.type === "frame"));
+  await call("/act", { session: "t", action: "tap_xy", x: 5, y: 5 });
+  await call("/act", { session: "t", action: "set_device", device: { network: "offline" } });
+  const st = await until(() => v.msgs.filter((m) => m.type === "step" && m.step.by === "agent"));
+  await until(() => v.msgs.filter((m) => m.type === "step").length >= 2);
+  assert.match(v.msgs.filter((m) => m.type === "step")[1].step.text, /^set_device/);
+  assert.match(v.msgs.filter((m) => m.type === "step")[1].step.change, /Screen/);
+  // control off: ignored
+  v.ws.send(JSON.stringify({ type: "text", text: "x" }));
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(v.msgs.some((m) => m.type === "step" && m.step.by === "you"), false);
+  // control on: acted on and shown
+  v.ws.send(JSON.stringify({ type: "control", on: true }));
+  v.ws.send(JSON.stringify({ type: "text", text: "x" }));
+  const mine = await until(() => v.msgs.find((m) => m.type === "step" && m.step.by === "you"));
+  assert.match(mine.step.text, /typed/);
+  v.ws.close();
+});
