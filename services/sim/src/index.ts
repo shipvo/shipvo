@@ -106,6 +106,8 @@ export default {
     const headers = new Headers(req.headers);
     headers.set("x-shipvo-app", [...new Set([row.app_id, ...owned, ...pub])].join(","));
     headers.set("x-shipvo-public", pub.join(",")); headers.set("x-shipvo-scope", row.scope); headers.delete("authorization"); headers.delete("host");
+    // The verified key, for the build lookup in open_app. Set after the client headers are copied, so a client-sent x-shipvo-key is replaced.
+    headers.set("x-shipvo-key", key);
     if (row.scope === "owner" && env.OWNER_TOKEN) headers.set("x-shipvo-owner-token", env.OWNER_TOKEN); else headers.delete("x-shipvo-owner-token");
 
     try {

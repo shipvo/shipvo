@@ -1,8 +1,8 @@
 # Check every pull request
 
-This page is for anyone who owns a Shipvo app on GitHub and wants every pull request tested before it merges. You get one check that builds the app, runs your flows, walks the screens that changed on Android and iOS, and posts one comment with the result. A failing flow or a crash fails the check. Exploration notes do not.
+This page is for anyone who owns a Shipvo app's GitHub repository. In about two minutes you add one workflow file. After that, every pull request gets a check that builds your app, runs your flows and walks every button, then posts one comment with the result. A failing flow or a crash fails the check. Exploration notes do not.
 
-If you are not technical, paste the three setup commands below to your coding agent and ask it to open a pull request. After that the check runs by itself.
+You need: an app made with `shipvo init` (or adopted with it), flows in `tests/*.steps`, and a GitHub repository.
 
 ## Set up
 
@@ -67,18 +67,22 @@ On a private repository, or when the repository cannot be read, nothing is uploa
 
 ## Troubleshooting
 
-| You see | Why | What to do |
+| What you see | Why | What to do |
 | --- | --- | --- |
-| No comment appears on the pull request | The workflow lacks `pull-requests: write`, or the pull request comes from a fork (the token is read-only there). The check still runs. | Add `pull-requests: write` to the workflow permissions. For forks, read the result in the job log. |
-| The log says it is walking the whole app, not only changed screens | The checkout has no history (`fetch-depth: 0` is missing), or `app.json` has no `expo.scheme`. | Keep `fetch-depth: 0` as in the generated workflow, and set `expo.scheme`. |
-| "Compared with base" is missing | The base report is missing or unreadable, or the base commit could not be checked out. The log says which. | Fix the base build. The check does not fail for this. |
-| The check fails on a flow you did not touch | The flow passed on base and failed on the pull request. | Re-run the job once. If it fails again, it is a regression: read the first failing step in the comment. If it passes, it is flaky. |
+| The log says `Base commit not available (the checkout needs fetch-depth: 0), skipping comparison.` | The checkout step fetched only the latest commit. | Add `with: { fetch-depth: 0 }` to `actions/checkout`. The generated workflow already has it. |
+| The log says `Base run failed, see shipvo-base.log. The comment has no comparison.` | The flows could not run on the base commit. | Open `shipvo-base.log` in the `shipvo-check` artifact. The pull request result still counts. |
+| No comment appears on a pull request from a fork | The token on fork pull requests is read-only (GitHub answers 403). | Expected. The check still runs and prints a notice; the reports are in the artifact. |
+| No comment appears on your own pull requests | The workflow lacks `pull-requests: write`. | Add that permission to the job. |
+| The check fails but the flow passes locally | A flaky flow that passed on base and failed now is counted as a regression. | Re-run the job. If it fails twice, the failure is real. |
+| `shipvo explore` walks the whole app, not the changed screens | No `expo.scheme` in `app.json`, or no full history. | Set `expo.scheme`, add an `onUrl` listener and use `fetch-depth: 0`. |
 | Before and after images are file names, not pictures | The repository is private, so nothing is uploaded. | Upload `shipvo-shots-before/` and `shipvo-shots-after/` as an artifact, or open the `shipvo-check` artifact. |
 | A changed screen is not in the screenshots | Dynamic screens such as `[id]` and layouts are skipped, and only four screens are captured. | Add the screen as a flow in `tests/`. |
+| Locally, `Port 4545 is in use` | Another simulator is running. | Stop it, or pass `--port <n>`. |
 
 ## Next steps
 
-- [Test your app in CI](testing.md): write the flows the check runs.
-- [Agents](agents.md): what `shipvo explore` looks for.
-- [Lumi](lumi.md): turn a finding into a test with Save as test.
+- [Write flows to check](testing.md)
+- [Let Lumi walk the app and save findings as tests](lumi.md)
+- [Compare behaviour between releases](timeline.md)
 - [Glossary](glossary.md)
+- [Ship the fix when the check is green](getting-started.md#5-publish-over-the-air)
