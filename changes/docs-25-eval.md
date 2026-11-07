@@ -1,0 +1,1 @@
+- Docs: troubleshooting and next steps in "Move to a new machine" and "Migrate from CodePush", and a `shipvo eval` entry in the CLI reference.

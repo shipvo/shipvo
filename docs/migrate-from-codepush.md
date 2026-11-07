@@ -70,7 +70,7 @@ Each line starts with PASS or FAIL. A FAIL line ends with the fix.
 npx shipvo publish --dry-run --out .shipvo/dry-run
 ```
 
-This builds and signs a release and writes files locally. It sends nothing. `--out` defaults to `.shipvo/dry-run`. A dry run builds no patches. Unknown flags are errors, so a typo like `--dryrun` cannot start a real publish.
+This builds and signs a release and writes files locally. It sends nothing. `--out` defaults to `.shipvo/dry-run`. A dry run checks your setup; patches are built when you publish. Unknown flags are errors, so a typo like `--dryrun` cannot start a real publish.
 
 Output from the sample app (`apps/tide-and-tackle`, with a throwaway key; the Metro progress lines are left out):
 
@@ -130,7 +130,14 @@ This signs the code of release 3 as the next release number and publishes it to 
 - It does not update apps that do not contain `@shipvo/runtime`.
 - It is not a drop-in for bare React Native projects without Expo. The publish command calls `expo export`.
 
-## Next
+## Troubleshooting
+
+- **The native build fails after `shipvo migrate --apply`**: a native file still calls CodePush (`MainApplication`, `AppDelegate`, `settings.gradle`, `app/build.gradle` or the `Podfile`). `--apply` lists each file and line under its manual steps. Remove those calls and build again.
+- **`migrate --apply` refuses to run**: your git tree has uncommitted changes. Commit them, or pass `--force`.
+- **`shipvo init` refuses the folder**: it only creates new folders. Run it in a scratch folder and copy the files, as in Step 1.
+- **`shipvo doctor` prints a FAIL line**: the line ends with the fix. Run it again after applying the fix.
+
+## Next steps
 
 - [Build your first app](getting-started.md)
 - [Self-hosting the control plane](self-hosting.md)
