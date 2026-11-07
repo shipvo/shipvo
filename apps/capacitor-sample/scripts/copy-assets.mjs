@@ -9,5 +9,7 @@ await build({
   define: {
     __SHIPVO_PUBLIC_KEY__: JSON.stringify(process.env.SHIPVO_PUBLIC_KEY ?? ""),
     __SHIPVO_BASE_URL__: JSON.stringify(process.env.SHIPVO_BASE_URL ?? ""),
+    // "1" makes the app check for an update at launch and report its version (scripts/ios-sim-check.sh).
+    __SHIPVO_SIM_CHECK__: process.env.SHIPVO_SIM_CHECK === "1" ? "true" : "false",
   },
 });

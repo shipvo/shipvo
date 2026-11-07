@@ -1,2 +1,0 @@
-- Docs: new page "Lumi on Shipvo Phone" (states, captions, `shipvo lumi` options and commands, off switch) and a "Network profiles" section in the Device API page with the profile table.
-- Migration: none.

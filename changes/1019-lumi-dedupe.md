@@ -1,2 +1,0 @@
-- lumi: a small target or duplicate name that repeats on several screens is now one finding ("on N screens"), with every screen kept in its replay paths.
-- lumi: the Done line reads "N actions over S screens (V visits), X new bugs, T in total", using the same screen count as Coverage.

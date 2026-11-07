@@ -1,1 +1,0 @@
-- cli: `shipvo ci shots` takes `--skins android,ios` (default both) and `--screens a,b`, and writes `<out>/<skin>/<screen>.png`. The check action captures the PR head and the base commit and passes both to `ci comment`. Migration: `ci shots` no longer writes PNGs straight into `shipvo-shots/`.

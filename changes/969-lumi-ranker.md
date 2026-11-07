@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `walk` accepts an optional `ranker` model that scores actions; `scripts/lumi/train.mjs` trains one from self-play and `bench.mjs --ranker on|off` compares it. No model ships, because it did not beat the algorithm on the held-out app (docs/lumi-ranker.md).
-- Migration: none; `ranker` is optional and off by default.

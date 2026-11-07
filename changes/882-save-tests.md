@@ -1,2 +1,0 @@
-- `@shipvo/cli`: `shipvo explore --save-tests <dir>` writes one `@shipvo/test` file per finding. `shipvo lumi` has a Save as test button per finding (and `save bug <n> as test`) that writes to `tests/lumi/`. File names are `lumi-<kind>-<n>.test.ts`.
-- Migration: none; new flag and command.

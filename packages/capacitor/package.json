@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/capacitor",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "license": "Apache-2.0",
   "description": "Signed over-the-air updates for Capacitor web bundles: the same release decisions and trust model as the Shipvo React Native runtime.",

@@ -1,1 +1,0 @@
-- `shipvo run` and `shipvo sim --watch` print `Rebuilding...` as soon as a save is seen, and the `shipvo run` page shows a small "Updating…" hint until the new build loads.

@@ -1,1 +1,0 @@
-- device: Linking shim for the simulated device (getInitialURL, url events, openURL) and `__pnDevice.setInitialUrl(url | null)`. The native build re-exports the real `Linking`. No migration needed.

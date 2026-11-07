@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/spec",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "license": "Apache-2.0",
   "description": "The Shipvo app spec (shipvo.app/v0): JSON Schema and a validator that returns errors and warnings with a JSON path and a suggested fix.",

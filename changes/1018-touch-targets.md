@@ -1,1 +1,0 @@
-- create-shipvo: Back, Cart and link buttons in the shop and content templates are at least 48 x 48, so a new app has no small-target findings.

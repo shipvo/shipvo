@@ -1,3 +1,0 @@
-- `@shipvo/test`: the step `log in as "buyer"` signs in with the test account from `SHIPVO_TEST_ACCOUNT_BUYER_USER` and `SHIPVO_TEST_ACCOUNT_BUYER_PASSWORD`. A missing variable fails with its name. New export `account(name)`.
-- `@shipvo/cli`: `shipvo explore` issue files and reports mask the values of `SHIPVO_TEST_*` variables.
-- Migration: none; new step and export.

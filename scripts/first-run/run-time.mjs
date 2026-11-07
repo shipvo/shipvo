@@ -1,10 +1,9 @@
-// Times `shipvo run android` and `shipvo run ios` (both by default) on a scaffolded app: process start, server listening, phone page ready, first tap done.
+// Times `shipvo run android` and `shipvo run ios` on a scaffolded app: process start, server listening, phone page ready, first tap done.
 // Usage: node scripts/first-run/run-time.mjs [--cli path/to/cli.js] [--template blank] [--out run-time.json] [--timeout 120] [--with-install] [--platform android|ios|both]
 // "Phone page ready" means the page answers and the frame reports the app loaded (a `tree` request on the agent channel succeeds).
 // The tap goes through the same agent channel `shipvo run` serves (.shipvo/run.json gives the port and token).
 // Install time is not part of the numbers; --with-install installs the scaffold first (network). The page is opened with
 // playwright's chromium, resolved from packages/sim. The CLI must be built. No login, no secrets.
-// Android runs first, then iOS, in the same app directory, so a warm cache from the first run can help the second. Compare numbers with that order in mind.
 import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -45,6 +44,18 @@ export function table(rows) {
   return ["| step | seconds since start |", "| --- | ---: |", ...rows.map((r) => `| ${r.step} | ${secs(r.ms)} |`)].join("\n");
 }
 
+/** One table with a column per platform. `byPlatform` maps "android" / "ios" to the rows from `timings`. */
+export function tableByPlatform(byPlatform) {
+  const names = Object.keys(byPlatform);
+  const label = (n) => (n === "ios" ? "iOS" : "Android");
+  const first = byPlatform[names[0]];
+  return [
+    `| step | ${names.map((n) => `${label(n)} (seconds since start)`).join(" | ")} |`,
+    `| --- | ${names.map(() => "---:").join(" | ")} |`,
+    ...first.map((r, i) => `| ${r.step} | ${names.map((n) => secs(byPlatform[n][i].ms)).join(" | ")} |`),
+  ].join("\n");
+}
+
 /** Minimal request/reply client for the driver side of the agent channel. */
 function driverClient(port, token, WS = globalThis.WebSocket) {
   const ws = new WS(`ws://127.0.0.1:${port}/__shipvo/agent?role=driver&token=${encodeURIComponent(token)}`);
@@ -82,6 +93,7 @@ export async function measureRun({ cli, app, platform = "android", timeoutMs = 1
   const t = { start: now() };
   const out = [];
   // spawn directly (not the CLI helper): we need the live child and its streams to stamp the ready line and stop the process group.
+  rmSync(join(app, ".shipvo", "run.json"), { force: true }); // never reuse the previous platform's token
   const child = spawn(process.execPath, [cli, "run", platform, "--no-open"], { cwd: app, env: cleanEnv(), detached: process.platform !== "win32" });
   let exited = null;
   const sink = (d) => { out.push(String(d)); if (t.listening === undefined && parseListening(out.join(""))) t.listening = now(); };
@@ -134,45 +146,37 @@ export async function measureRun({ cli, app, platform = "android", timeoutMs = 1
   }
 }
 
-/** One table with a column per skin. `results` maps a skin name to its rows (same steps in each). */
-export function combinedTable(results) {
-  const names = Object.keys(results);
-  const first = results[names[0]];
-  const label = (n) => (n === "ios" ? "iOS" : "Android");
-  return [
-    `| step | ${names.map((n) => `${label(n)} (seconds since start)`).join(" | ")} |`,
-    `| --- | ${names.map(() => "---:").join(" | ")} |`,
-    ...first.map((r, i) => `| ${r.step} | ${names.map((n) => secs(results[n][i].ms)).join(" | ")} |`),
-  ].join("\n");
-}
-
-export async function main(argv) {
+/** `deps` lets tests fake the scaffold step and the measurement. */
+export async function main(argv, { measure = measureRun, init: initStep = runStep } = {}) {
   const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
   const cli = resolve(opt("--cli", join(here, "../../packages/cli/dist/cli.js")));
   const outFile = resolve(opt("--out", "run-time.json"));
   const template = opt("--template", "blank");
-  const which = opt("--platform", "both");
-  if (!["android", "ios", "both"].includes(which)) { console.error("--platform must be android, ios or both"); return 2; }
-  const platforms = which === "both" ? ["android", "ios"] : [which];
   const timeoutMs = Number(opt("--timeout", "120")) * 1000;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) { console.error("--timeout must be a positive number of seconds"); return 2; }
+  const which = opt("--platform", "both");
+  if (!["android", "ios", "both"].includes(which)) { console.error("--platform must be android, ios or both"); return 2; }
   const root = mkdtempSync(join(tmpdir(), "shipvo-run-time-"));
   const app = join(root, "app");
   try {
-    const init = runStep("init", cli, ["init", app, ...(template === "blank" ? [] : ["--template", template])], root);
+    const init = initStep("init", cli, ["init", app, ...(template === "blank" ? [] : ["--template", template])], root);
     if (init.exit !== 0) { console.error(`init failed with exit ${init.exit}:\n${init.stderr}`); return 1; }
     if (argv.includes("--with-install")) {
       const inst = runInstallStep(app);
       if (inst.exit !== 0) { console.error(`install failed with exit ${inst.exit}:\n${inst.stderr}`); return 1; }
     }
-    const results = {};
-    for (const platform of platforms) {
-      try { results[platform] = await measureRun({ cli, app, platform, timeoutMs }); }
-      catch (e) { console.error(`shipvo run ${platform}: ${e.message}`); return 1; }
+    const result = {};
+    let failed = false;
+    // A failed platform must not drop the numbers already measured: keep going, record it, report the rest, then exit 1.
+    for (const platform of which === "both" ? ["android", "ios"] : [which]) {
+      try { result[platform] = await measure({ cli, app, platform, timeoutMs }); }
+      catch (e) { failed = true; console.error(`shipvo run ${platform}: ${e.message}`); }
     }
-    writeFileSync(outFile, JSON.stringify(results, null, 2) + "\n");
-    console.log(combinedTable(results));
-    return 0;
+    if (Object.keys(result).length > 0) {
+      writeFileSync(outFile, JSON.stringify(result, null, 2) + "\n");
+      console.log(tableByPlatform(result));
+    }
+    return failed ? 1 : 0;
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 

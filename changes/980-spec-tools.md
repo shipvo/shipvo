@@ -1,2 +1,0 @@
-- `@shipvo/spec`: new `toolsFromSpec(spec, { reserved })` returns one typed tool definition (name, description, JSON input schema, error shapes) for each spec action, sorted and stable.
-- Migration: none; new export.
