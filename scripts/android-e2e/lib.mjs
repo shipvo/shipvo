@@ -136,7 +136,7 @@ export function tapTarget(xml, label) {
     const n = m[0], attr = (k) => n.match(new RegExp(`\\s${k}="([^"]*)"`))?.[1];
     if (attr("content-desc") !== label && attr("text") !== label) continue;
     const b = attr("bounds")?.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
-    if (b) return { x: Math.round((+b[1] + +b[3]) / 2), y: Math.round((+b[2] + +b[4]) / 2) };
+    if (b && +b[3] > +b[1] && +b[4] > +b[2]) return { x: Math.round((+b[1] + +b[3]) / 2), y: Math.round((+b[2] + +b[4]) / 2) }; // a node scrolled out of view has empty bounds
   }
   return null;
 }

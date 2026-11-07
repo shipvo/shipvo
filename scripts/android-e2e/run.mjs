@@ -124,7 +124,8 @@ for (const mode of ["signature", "hash", "size"]) {
     const e = entries().filter((x) => x.t >= p.at), after = prefs();
     const sawPointer = e.some((x) => x.path === `/p/${APP}/1/${BAND}.json` && x.status === 200);
     const sawBundle = e.some((x) => x.path === `/b/${APP}/r${p.release}.hbc`);
-    const ranIt = !!tele().find((x) => x.release === p.release && x.at >= p.at);
+    // Only an `applied` event means the release ran. Since #752 the runtime also reports the refusal itself under this release.
+    const ranIt = !!tele().find((x) => x.event === "applied" && x.release === p.release && x.at >= p.at);
     const alive = !!pid();
     stop(); await sleep(800); const t1 = Date.now(); launch();
     const again = await waitFor(() => healthy(cur, t1), 30_000);
@@ -175,7 +176,12 @@ await scenario(ROLLBACK_SCENARIO, async () => {
     const b = await updateTrial(bundle("v1"), []); if (!b.ok) throw new Error("release B did not become healthy");
     if (!pid()) launch();
     const dump = () => { sh("uiautomator dump /sdcard/ui.xml"); return sh("cat /sdcard/ui.xml"); };
-    let target = null; await waitFor(() => (target = tapTarget(dump(), "Roll back to previous release")), 20_000, 1000);
+    // The button lives on the "About this build" screen, which the app opens from the home screen.
+    // It sits below the fold: swipe up until the node has bounds.
+    let about = null; await waitFor(() => { about = tapTarget(dump(), "About this build"); if (!about) sh("input swipe 540 1700 540 700 300"); return about; }, 30_000, 500);
+    if (!about) throw new Error("the 'About this build' button was not found on screen");
+    sh(`input tap ${about.x} ${about.y}`);
+    let target = null; await waitFor(() => { target = tapTarget(dump(), "Roll back to previous release"); if (!target) sh("input swipe 540 1700 540 700 300"); return target; }, 20_000, 500);
     if (!target) throw new Error("the rollback button was not found on screen");
     const t0 = Date.now(); sh(`input tap ${target.x} ${target.y}`);
     const goodEv = await waitFor(() => healthy(a.release, t0), 30_000);

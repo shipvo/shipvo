@@ -87,6 +87,10 @@ test("tapTarget finds the centre of a node by content-desc", () => {
   assert.deepEqual(tapTarget(xml, "Roll back to previous release"), { x: 60, y: 330 });
   assert.equal(tapTarget(xml, "missing"), null);
 });
+test("tapTarget skips a node that is scrolled out of view (empty bounds)", () => {
+  const xml = '<hierarchy><node text="" content-desc="About this build" bounds="[0,0][0,0]"/></hierarchy>';
+  assert.equal(tapTarget(xml, "About this build"), null);
+});
 test("rolledBackEvent is keyed on the restored release, not the rolled-back one", () => {
   const t = [{ event: "rolled_back", release: 5, at: 100 }]; // A = 5 runs again, B = 6 was rolled back
   assert.ok(rolledBackEvent(t, 5, 50)); assert.equal(rolledBackEvent(t, 5, 101), null); assert.equal(rolledBackEvent(t, 6, 50), null);
