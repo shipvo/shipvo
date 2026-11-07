@@ -9,7 +9,7 @@ const SCREENS: Record<string, string> = {
   signup: `- heading "Sign up" [ref=e1]\n- textbox "Email" [ref=e2]\n- button "Continue" [ref=e3]\n- button "Back" [ref=e4]`,
   bad: `- heading "Sign up" [ref=e1]\n- text: Enter a valid email\n- textbox "Email" [ref=e2]\n- button "Continue" [ref=e3]\n- button "Back" [ref=e4]`,
   welcome: `- heading "Welcome" [ref=e1]\n- button "Back" [ref=e2]`,
-  cart: `- heading "Cart" [ref=e1]\n- text: Network request failed\n- button "Back" [ref=e2]`,
+  cart: `- heading "Cart" [ref=e1]\n- text: Network request failed\n- button "Back" [ref=e2]\n- button "Pay" [ref=e3]`,
 };
 function shop() {
   let at = "home"; let email = ""; const stack: string[] = []; const typed: string[] = [];
@@ -88,6 +88,19 @@ describe("Lumi", () => {
     expect(r).toMatch(/do not know a flow called "zebra"/); expect(r).toMatch(/cart/); expect(r).toMatch(/Sign up/);
     expect(l.state().running).toBe(false);
   });
+  it("checkout resolves to the Cart then Pay path and says so", async () => {
+    const l = new Lumi(shop().driver, { ...opts, routes: [] });
+    const r = await l.command("test checkout");
+    expect(r).toBe("Checkout: I'll go Cart → Pay. Testing Pay.");
+    await l.idle();
+    const taps = l.state().feed.filter((f) => f.kind === "step").map((f) => f.text);
+    expect(taps.some((t) => /"Pay"/.test(t))).toBe(true);
+  });
+  it("try checkout with bad input says it has no fields and still runs", async () => {
+    const l = new Lumi(shop().driver, { ...opts, routes: [] });
+    expect(await l.command("try checkout with bad input")).toBe("Checkout: I'll go Cart → Pay. Checkout has no fields to fill; I'll test it with taps.");
+    expect(l.state().running).toBe(true); await l.idle();
+  });
   it("try <flow> with bad input types only invalid values", async () => {
     const { driver, typed } = shop(); const l = new Lumi(driver, opts);
     await l.command("try sign up with bad input"); await l.idle();
@@ -103,6 +116,35 @@ describe("Lumi", () => {
     await l.idle();
     expect(l.state().feed.at(-1)!.text).toMatch(/Stopped: stopped by you/);
     expect(l.state().running).toBe(false);
+  });
+  it("reports one small control once with its screen count, and the Done line uses the Coverage count", async () => {
+    const pages: Record<string, string> = {
+      home: `- button "A" [ref=e1]\n- button "B" [ref=e2]\n- button "C" [ref=e3]`,
+      a: `- heading "A" [ref=e1]\n- button "Cart" [ref=e2]\n- button "Back" [ref=e3]`,
+      b: `- heading "B" [ref=e1]\n- button "Cart" [ref=e2]\n- button "Back" [ref=e3]`,
+      c: `- heading "C" [ref=e1]\n- button "Cart" [ref=e2]\n- button "Back" [ref=e3]`,
+    };
+    let at = "home";
+    const view = (): Reply => ({ ok: true, screen: pages[at] });
+    const d: Driver = {
+      async open() { at = "home"; return view(); },
+      async openUrl() { return view(); },
+      async tap(ref) { if (at === "home") at = ({ e1: "a", e2: "b", e3: "c" } as Record<string, string>)[ref]!; return { ...view(), delivery: "delivered" }; },
+      async back() { at = "home"; return view(); },
+      async snapshot() { return view(); },
+      async errors() { return []; },
+      async sizes() { return at === "home" ? {} : { e2: [20, 20] as [number, number] }; },
+    };
+    const l = new Lumi(d, { settleMs: 1, maxSteps: 40, maxDepth: 2 });
+    await l.command("test my app"); await l.idle();
+    const st = l.state();
+    const small = st.findings.filter((f) => /^Small target: .*Cart/.test(f.message));
+    expect(small).toHaveLength(1);
+    expect(small[0]!.message).toMatch(/ on 3 screens$/);
+    expect(small[0]!.screens).toBe(3);
+    expect(small[0]!.paths).toHaveLength(3);
+    expect(st.feed.at(-1)!.text).toContain(`over ${st.coverage.screens} screens (`);
+    expect(st.feed.at(-1)!.text).toMatch(/, \d+ new bugs?, \d+ in total\./);
   });
   it("replay bug <n> does the steps again and says if the bug is still there", async () => {
     const l = new Lumi(shop().driver, opts);

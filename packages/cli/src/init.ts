@@ -7,6 +7,7 @@ import { b64, keyFromSeed } from "./index.js";
 import { args as parse } from "./config.js";
 import { adopt, detectProject, isAdoptArgs, isBareApp, positional } from "./adopt.js";
 import { writeReleaseAgeExclude } from "./update-check.js";
+import { EXPO_NODE_RANGES, nodeRangeWarning } from "./node-range.js";
 import { CliFailure, UsageError, runJson, trapExit } from "./json-out.js";
 
 const HOSTED = "https://api.shipvo.dev";
@@ -167,6 +168,8 @@ export const RELEASE = { headline: "Hello from ${name}.", note: "Edit src/releas
   w("vitest.config.ts", VITEST_CONFIG);
   w("README.md", README(name, appId, controlPlane, template));
 
+  const expoMajor = Number(SDK.expo.match(/\d+/)![0]);
+  const nodeWarn = nodeRangeWarning(process.versions.node, EXPO_NODE_RANGES[expoMajor] ?? "", `Expo ${expoMajor}`);
   console.log(`
 Created ${name} in ${dirArg}
 
@@ -178,7 +181,7 @@ Publish: shipvo login, then shipvo app create (hosted), or set CLOUDFLARE_API_TO
          (self-hosting instead? see docs/self-hosting.md)
 AI agents: npx -y @shipvo/mcp points Claude / Cursor / ChatGPT at the simulator; then open_app("${appId}")
 
-Next steps:
+${nodeWarn ? nodeWarn + "\n\n" : ""}Next steps:
   1. cd ${dirArg}
   2. npm install                   # or pnpm install / bun install; needed before any shipvo command
   3. npx shipvo run android        # the app on a simulated phone in your browser (npx shipvo run ios for iOS)
