@@ -159,6 +159,26 @@ export class SpecHost {
   /** Every version of an app with what changed in it, newest last. */
   history(session, id) { return (this.running.get(key(session, id))?.history ?? []).map((h) => ({ version: h.version, at: h.at, changes: h.changes ?? [] })); }
 
+  /** A spec app as plain JSON: its spec, version, history, and the data and settings the person entered. Live (http) data is fetched again on import. */
+  snapshot(session, id) {
+    const r = this.running.get(key(session, id));
+    if (!r) return null;
+    const coll = Object.entries(r.spec?.data ?? {}).filter(([, v]) => v?.source === "collection").map(([k]) => k);
+    const data = Object.fromEntries(coll.filter((k) => k in r.app.data).map((k) => [k, JSON.parse(JSON.stringify(r.app.data[k]))]));
+    return { spec: r.spec, version: r.version, history: this.history(session, id), data, state: JSON.parse(JSON.stringify(r.app.state)) };
+  }
+
+  /** Starts an app from a snapshot: same spec, version and history, with the data and settings put back. Resolves { ok, warnings, data_errors } or { ok: false, errors }. */
+  async restore(session, id, snap, { style = "android", reduceMotion = false } = {}) {
+    const made = createApp(snap?.spec, { style, reduceMotion, data: snap?.data ?? {}, state: snap?.state ?? {} });
+    if (!made.ok) return { ok: false, errors: made.errors };
+    const version = Number.isInteger(Number(snap.version)) && Number(snap.version) > 0 ? Number(snap.version) : 1;
+    const history = Array.isArray(snap.history) && snap.history.length ? snap.history.map((h) => ({ version: h.version, at: h.at, changes: h.changes ?? [] })) : [{ version, at: Date.now(), changes: ["restored"] }];
+    this.running.set(key(session, id), { app: made.app, spec: snap.spec, style, reduceMotion, version, history, sources: {} });
+    const live = await this.refresh(session, id, { force: true });
+    return { ok: true, warnings: made.app.render().warnings ?? [], data_errors: live.errors };
+  }
+
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
 
   has(session, id) { return this.running.has(key(session, id)); }

@@ -102,6 +102,12 @@ The phone fetches the source when the app is created, again whenever its cache t
 
 Pass `id` for one app and `limit` for the number of recent events. Data and settings a person entered stay across versions, so the history is the record of what the agent changed.
 
+## Export and import a phone
+
+`export_phone` returns the phone's apps as one JSON object (`format: "shipvo.phone/v0"`). Each app has its home screen layout. Apps made with `create_app` also carry their spec, versions with change history, and the data and settings entered in them. Live web data is not stored; it is fetched again on import.
+
+`import_phone` takes that object and puts it on a phone, on Android and iOS. Spec apps start with their data and version, Store apps are installed, and layouts are restored. The result lists `imported`, `skipped` (for example `already_installed`) and `failed` (each with a reason; a bad spec lists its problems). An object that is not an export fails with `bad_export`.
+
 ## Arrange the home screen
 
 `arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then, also across midnight. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.

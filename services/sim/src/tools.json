@@ -855,6 +855,31 @@
     }
   },
   {
+    "name": "export_phone",
+    "description": "Export the phone's apps as JSON (format shipvo.phone/v0): every app with its home screen layout, and for apps made with create_app the spec, versions, change history, and the data and settings entered in it. Live web data is not included; it is fetched again on import. Keep the result to restore it with import_phone.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "export_test",
     "description": "Turn the steps taken in this session (tap, type, scroll, back, set_device) into a @shipvo/test script and return its source. Read-only. Targets are named by their visible text; ambiguous ones become TODO comments and password fields use an environment variable instead of the typed value.",
     "inputSchema": {
@@ -923,6 +948,45 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "import_phone",
+    "description": "Put an export_phone result back on a phone: spec apps start with their data, Store apps are installed, layouts are restored. Apps already installed are skipped. Returns imported, skipped and failed (each with a reason and, for a bad spec, its problems). Fails with bad_export when the object is not an export.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "phone": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The object export_phone returned"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Look of imported spec apps (default android)"
+        }
+      },
+      "required": [
+        "session",
+        "phone"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {

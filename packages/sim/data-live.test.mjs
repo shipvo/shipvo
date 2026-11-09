@@ -92,3 +92,50 @@ test("app_activity lists versions with what changed, sources and events; not_ins
   assert.equal((await act("dl3", { action: "app_activity", id: "prices", limit: 1 })).apps[0].events.length, 1);
   assert.equal((await act("dl3", { action: "app_activity", id: "ghost" })).code, "not_installed");
 });
+
+const GIFTS = {
+  spec: "shipvo.app/v0",
+  app: { id: "gifts", name: "Gift Ideas", icon: "gift", description: "Gifts to buy." },
+  data: { gifts: { source: "collection", fields: { id: "text", name: "text" } } },
+  actions: { add: { description: "Add a gift.", input: { name: { type: "text" } }, do: [{ insert: "gifts", value: { id: "{{ 'g' + string(count(gifts) + 1) }}", name: "{{ input.name }}" } }] } },
+  screens: [{ id: "home", title: "Gifts", body: [{ type: "list", label: "Gift list", from: "{{ gifts }}", item: { title: "{{ item.name }}" }, empty: { message: "No gifts yet" } }] }],
+};
+
+test("export_phone then import_phone on a new phone restores apps, data, versions and layout", async () => {
+  assert.ok((await call("/session", { session: "ex1" })).ok);
+  assert.equal((await act("ex1", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
+  assert.equal((await act("ex1", { action: "app_action", id: "gifts", action_name: "add", input: { name: "Scarf" } })).ok, true);
+  await act("ex1", { action: "update_app", id: "gifts", spec: { ...GIFTS, app: { ...GIFTS.app, description: "Changed" } } });
+  await act("ex1", { action: "arrange_apps", id: "gifts", pinned: true });
+  await act("ex1", { action: "install_app", id: "shop" }).catch(() => {});
+  const out = await act("ex1", { action: "export_phone" });
+  assert.equal(out.ok, true, JSON.stringify(out));
+  assert.equal(out.phone.format, "shipvo.phone/v0");
+  const g = out.phone.apps.find((a) => a.id === "gifts");
+  assert.equal(g.kind, "spec"); assert.deepEqual(g.data.gifts.map((r) => r.name), ["Scarf"]); assert.equal(g.placement.pinned, true);
+  assert.equal(g.history.length, 2);
+  const text = JSON.stringify(out.phone);
+  assert.ok(!/api\.example\.test.*"last_at"/.test(text));
+
+  assert.ok((await call("/session", { session: "ex2" })).ok);
+  const back = await act("ex2", { action: "import_phone", phone: JSON.parse(text) });
+  assert.equal(back.ok, true, JSON.stringify(back));
+  assert.ok(back.imported.includes("gifts")); assert.deepEqual(back.failed, []);
+  const act2 = (await act("ex2", { action: "app_activity", id: "gifts" })).apps[0];
+  assert.equal(act2.version, 2); assert.equal(act2.history.length, 2);
+  assert.deepEqual((await act("ex2", { action: "export_phone" })).phone.apps.find((a) => a.id === "gifts").data.gifts.map((r) => r.name), ["Scarf"]);
+  await act("ex2", { action: "switch_app", id: "gifts" });
+  assert.match((await act("ex2", { action: "screen" })).screen, /Scarf/);
+  const again = await act("ex2", { action: "import_phone", phone: JSON.parse(text) });
+  assert.ok(again.skipped.some((x) => x.id === "gifts" && x.reason === "already_installed"));
+});
+
+test("import_phone refuses a bad export and reports an app whose spec is invalid", async () => {
+  assert.ok((await call("/session", { session: "ex3" })).ok);
+  assert.equal((await act("ex3", { action: "import_phone", phone: { nope: 1 } })).code, "bad_export");
+  const r = await act("ex3", { action: "import_phone", phone: { format: "shipvo.phone/v0", apps: [{ id: "broken", kind: "spec", spec: { spec: "shipvo.app/v0", screens: [] } }, { id: "Bad Id", kind: "spec" }] } });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.imported, []);
+  assert.equal(r.failed[0].id, "broken"); assert.equal(r.failed[0].reason, "invalid_spec"); assert.ok(r.failed[0].errors.length);
+  assert.equal(r.failed[1].reason, "bad_app_id");
+});

@@ -1,0 +1,3 @@
+- `@shipvo/sim`: new `export_phone` and `import_phone` actions. An export holds every app with its layout and, for spec apps, the spec, versions, change history, and the data and settings entered. Import restores them and reports imported, skipped and failed apps.
+- `@shipvo/mcp`: new tools `export_phone` and `import_phone`.
+- Migration: none; new tools.

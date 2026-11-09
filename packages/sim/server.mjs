@@ -429,6 +429,37 @@ async function act(id, body) {
         events: s.apps.log.filter((e) => e.app === a.id && e.source === "real").slice(-limit),
       })) };
     }
+    // Everything on the phone as JSON: each app with its layout, and for spec apps the spec, versions, data and settings the person entered.
+    case "export_phone": {
+      const sid = sidOf(s);
+      const apps = s.apps.installed_apps.map((a) => {
+        const base = { id: a.id, name: a.name, kind: a.kind === "spec" ? "spec" : "store", version: a.version, ...(a.url && a.kind !== "spec" ? { url: a.url } : {}), ...(a.placement ? { placement: a.placement } : {}) };
+        return a.kind === "spec" ? { ...base, ...specHost.snapshot(sid, a.id) } : base;
+      });
+      return { phone: { format: "shipvo.phone/v0", exported_at: new Date().toISOString(), apps } };
+    }
+    // Put an export back: spec apps are started with their data, store apps are installed again, layouts are restored. Reports what was skipped.
+    case "import_phone": {
+      const ph = body.phone;
+      if (!ph || ph.format !== "shipvo.phone/v0" || !Array.isArray(ph.apps)) throw new SimError("bad_export", "phone must be the object export_phone returned (format 'shipvo.phone/v0' with an apps list)");
+      const sid = sidOf(s); const imported = [], skipped = [], failed = [];
+      for (const a of ph.apps.slice(0, 200)) {
+        const id = String(a?.id ?? "");
+        if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id)) { failed.push({ id, reason: "bad_app_id" }); continue; }
+        if (s.apps.installed_apps.some((x) => x.id === id)) { skipped.push({ id, reason: "already_installed" }); continue; }
+        if (a.kind === "spec") {
+          const r = await specHost.restore(sid, id, a, { style: body.style === "ios" ? "ios" : "android" });
+          if (!r.ok) { failed.push({ id, reason: "invalid_spec", errors: r.errors.slice(0, 5).map((e) => `${e.path || "/"}: ${e.message}`) }); continue; }
+          s.apps.installed_apps.push({ id, name: String(a.name ?? id).replace(/[<>"'\\]/g, "").slice(0, 40), url: `spec://${id}`, version: String(specHost.version(sid, id) ?? 1), kind: "spec" });
+        } else {
+          try { installApp(s.apps, id); } catch (e) { if (e instanceof AppsError) { skipped.push({ id, reason: e.code }); continue; } throw e; }
+        }
+        if (a.placement && typeof a.placement === "object") { try { arrangeApp(s.apps, id, a.placement); } catch { /* a bad layout leaves the app unarranged */ } }
+        s.apps.log.push({ at: Date.now(), name: "import_app", app: id, source: "real" });
+        imported.push(id);
+      }
+      return { imported, skipped, failed, installed_apps: s.apps.installed_apps, screen: `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+    }
     // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
     case "app_action": {
       const appId = String(body.id ?? "");
@@ -596,7 +627,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, refresh_app, app_activity, arrange_apps, set_time, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, refresh_app, app_activity, export_phone, import_phone, arrange_apps, set_time, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

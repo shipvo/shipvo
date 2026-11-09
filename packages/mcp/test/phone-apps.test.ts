@@ -31,7 +31,7 @@ beforeAll(async () => {
       if (installed.has(body.id)) return fail("already_installed", "already");
       installed.set(body.id, app.name); return ok();
     }
-    if (body.action === "arrange_apps" || body.action === "set_time" || body.action === "refresh_app" || body.action === "app_activity") return res.end(JSON.stringify({ ok: true, screen: "Home screen" }));
+    if (body.action === "arrange_apps" || body.action === "set_time" || body.action === "refresh_app" || body.action === "app_activity" || body.action === "export_phone" || body.action === "import_phone") return res.end(JSON.stringify({ ok: true, screen: "Home screen" }));
     if (body.action === "update_app") {
       if (!installed.has(body.id)) return fail("not_installed", "not a spec app");
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
@@ -117,6 +117,9 @@ describe("phone app tools", () => {
     expect(seen.filter((b: any) => b.action === "refresh_app").at(-1)).toMatchObject({ id: "prices" });
     expect((await call(c, "app_activity", { session: "s-arr", id: "prices", limit: 5 })).isError).toBeFalsy();
     expect(seen.filter((b: any) => b.action === "app_activity").at(-1)).toMatchObject({ id: "prices", limit: 5 });
+    expect((await call(c, "export_phone", { session: "s-arr" })).isError).toBeFalsy();
+    expect((await call(c, "import_phone", { session: "s-arr", phone: { format: "shipvo.phone/v0", apps: [] }, style: "ios" })).isError).toBeFalsy();
+    expect(seen.filter((b: any) => b.action === "import_phone").at(-1)).toMatchObject({ phone: { apps: [] }, style: "ios" });
     await c.close();
   });
   it("marketplace apps get an app:// url that the sim resolves like open_app", async () => {
