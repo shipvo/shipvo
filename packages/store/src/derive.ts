@@ -2,7 +2,7 @@
 export type StoreManifest = {
   appId: string;
   name?: string;
-  listing?: { description?: string; website?: string; capabilities?: string[] };
+  listing?: { description?: string; website?: string; capabilities?: string[]; privacy?: { company?: string; contactEmail?: string } };
 };
 
 export type Answer = boolean | "unknown";
