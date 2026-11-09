@@ -242,7 +242,23 @@
         "variant": { "type": "string" },
         "delta": { "type": "string" },
         "trend": { "enum": ["up", "down", "flat"] },
-        "motion": { "type": "object" },
+        "motion": {
+          "type": "object",
+          "properties": {
+            "enter": { "enum": ["fade", "slide", "scale"] },
+            "change": { "enum": ["countUp", "pulse"] }
+          }
+        },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "shapes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["shape"],
+            "properties": { "shape": { "enum": ["rect", "circle", "path", "text", "linearGradient"] } }
+          }
+        },
         "children": { "type": "array", "items": { "$ref": "#/$defs/block" } }
       }
     },
