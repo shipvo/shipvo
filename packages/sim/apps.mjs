@@ -15,7 +15,7 @@ export const STORE_FIXTURE = [
 
 const text = (v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n);
 const scheme = (x) => String(x).toLowerCase().replace(/:$/, "");
-const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}), ...(a.placement && typeof a.placement === "object" ? { placement: a.placement } : {}) });
+const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}), ...(cleanPlacement(a.placement) ? { placement: cleanPlacement(a.placement) } : {}) });
 
 /** Phone state for apps. `installed_apps` is a list of { id, name, url, version }; `current_app` is an id or null (the app the phone was started with). */
 export function createApps(profile = {}) {
@@ -96,6 +96,22 @@ export function switchApp(st, id, nav) {
 export const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+/** A placement from outside (phone.json, an export) reduced to what is valid: bad fields are dropped. Returns an object or null. */
+function cleanPlacement(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  var p = {};
+  if (raw.pinned === true) p.pinned = true;
+  if (raw.hidden === true) p.hidden = true;
+  if (Number.isInteger(raw.position) && raw.position >= 0 && raw.position <= 99) p.position = raw.position;
+  var sc = raw.schedule;
+  if (sc && typeof sc === "object" && !Array.isArray(sc)) {
+    var days = Array.isArray(sc.days) && sc.days.length ? Array.from(new Set(sc.days.map(function (d) { return String(d).toLowerCase().slice(0, 3); }))) : DAYS;
+    var from = sc.from == null ? "00:00" : sc.from, to = sc.to == null ? "23:59" : sc.to;
+    if (days.every(function (d) { return DAYS.indexOf(d) >= 0; }) && HHMM.test(from) && HHMM.test(to)) p.schedule = { days: days, from: from, to: to };
+  }
+  return Object.keys(p).length ? p : null;
+}
+
 /**
  * Where an installed app sits on the home screen. `patch` may set: pinned (true or false), hidden (true or false),
  * position (a whole number from 0, or null to clear), schedule ({ days: ["mon",...], from: "HH:MM", to: "HH:MM" }, or null
@@ -133,10 +149,13 @@ export function arrangeApp(st, id, patch = {}) {
 export function appVisible(a, now = new Date()) {
   const p = a.placement ?? {};
   if (p.hidden) return false;
-  if (!p.schedule) return true;
-  const day = DAYS[now.getDay()], t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  if (!p.schedule.days.includes(day)) return false;
-  return p.schedule.from <= p.schedule.to ? t >= p.schedule.from && t <= p.schedule.to : t >= p.schedule.from || t <= p.schedule.to;
+  const sc = p.schedule;
+  if (!sc) return true;
+  const d = now.getDay(), t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const on = (i) => sc.days.includes(DAYS[i]);
+  if (sc.from <= sc.to) return on(d) && t >= sc.from && t <= sc.to;
+  // A window across midnight belongs to the day it starts: its early-morning tail counts against the day before.
+  return (t >= sc.from && on(d)) || (t <= sc.to && on((d + 6) % 7));
 }
 
 /** The apps on the home screen at `now`, in order: pinned first, then by position, then in the order they were installed. */
@@ -189,14 +208,16 @@ export const storeCss = [
 export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
 var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=${JSON.stringify(STORE_FIXTURE)};
-var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},DAYS=${JSON.stringify(DAYS)},appVisible=${appVisible.toString()},homeApps=${homeApps.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
+var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},DAYS=${JSON.stringify(DAYS)},HHMM=${HHMM.toString()},cleanPlacement=${cleanPlacement.toString()},appVisible=${appVisible.toString()},homeApps=${homeApps.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;
 var st;try{st=loadProfile(${JSON.stringify(seed)})}catch(x){st=createApps()}
 st.settings={};
 var box=document.createElement("div");box.className="sf-apps";box.setAttribute("data-part","installed-apps");home.appendChild(box);
-function drawHome(){box.innerHTML=installedIconsHtml(st)}
+function phoneNow(){var c=st.clock;return c?{getDay:function(){return c.day},getHours:function(){return c.h},getMinutes:function(){return c.m}}:new Date()}
+function drawHome(){box.innerHTML=installedIconsHtml(st,phoneNow())}
+window.__pnHome={sync:function(apps,clock){st.installed_apps=apps;st.clock=clock||null;drawHome()}};
 function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)}
 function open(on){sc.hidden=!on;if(on){drawStore();sc.focus({preventScroll:true})}}
 drawHome();

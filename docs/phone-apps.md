@@ -77,7 +77,7 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 
 The app is real HTML with every control labelled, so `screen`, `tap`, `type` and `scroll` work on it like any app. Lists, forms, toggles, segmented controls and tabs react to taps and typing. `run_app_action { session, id, action, input }` runs one action of the spec by name, the way its form does, and the open screen shows the result. If the action refuses the input you get `action_failed` and the reason.
 
-`update_app { session, id, spec }` changes the app by giving its whole new spec. It is a new version of the same app: the data and settings the person entered stay, and the open screen shows the new look at once. A spec with problems comes back with each problem's path and a fix, and the running version is not touched. The version shows on the installed app.
+`update_app { session, id, spec }` changes the app by giving its whole new spec. It is a new version of the same app: the data and settings the person entered stay, and the open screen shows the new look at once. A spec with problems comes back with each problem's path and a fix, and the running version is not touched. The version shows on the installed app. Data and settings the person entered stay; the open screen's back stack and any form text not yet submitted start again, because the app is rebuilt and the page reloaded.
 
 `device_log` records the create, each action and each update (old and new version) with `source: "real"`.
 
@@ -94,9 +94,9 @@ The phone fetches the source when the app is created, again whenever its cache t
 
 ## Arrange the home screen
 
-`arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then, also across midnight. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
+`arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then. A window that crosses midnight belongs to the day it starts: `days: ["fri"], from: "22:00", to: "06:00"` shows Friday 22:00 until Saturday 06:00. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
 
-`set_phone_time { session, at }` sets that clock (`2026-11-14T09:00:00`, or `null` for real time), so a test can check what shows on a Saturday morning. The home screen text lists the apps that are showing as buttons and, for the others, says whether they are hidden or when their schedule starts. In a phone.json, an app can carry the same `placement` object. Errors are `not_installed`, `bad_placement` and `bad_time`. Every change is in `device_log`.
+`set_phone_time { session, at }` sets that clock (`2026-11-14T09:00:00`, or `null` for real time), so a test can check what shows on a Saturday morning. The home screen text lists the apps that are showing as buttons and, for the others, says whether they are hidden or when their schedule starts. In a phone.json, an app can carry the same `placement` object. Errors are `not_installed`, `bad_placement` and `bad_time`. The result has `home` (the home screen text) and `screen` (the open app's screen when an app is in front, otherwise the home text). A placement in a phone.json that is not valid is left out. The standalone phone frame takes the same layout and a phone time through `window.__pnHome.sync(apps, clock)`. Every change is in `device_log`.
 
 ## Install apps and switch between them
 

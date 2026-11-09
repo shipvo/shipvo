@@ -1,0 +1,2 @@
+- `@shipvo/sim`: `POST /session` with a `build_url` fetches the build into the build cache, unpacks it, opens it as the app and replies with `build: <id>`. A bad, oversize or unreachable URL returns a typed error (`bad_url`, `host_not_allowed`, `too_large`, `unreachable`, `bad_build`) and no session is left behind.
+- `@shipvo/mcp`: `open_app("<app>@build:<id>")` sends the build id with `build_url`, so the reply names the build that opened. No exported API changes.
