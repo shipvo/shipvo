@@ -17,7 +17,7 @@ const PORT = pickPort(10700, 150), CP_PORT = pickPort(10850, 150);
 const root = mkdtempSync(join(tmpdir(), "sim-install-real-"));
 const dist = join(root, "dist"), dir = join(root, "state");
 const BUNDLE = "<!doctype html><html><head><title>Notes</title></head><body><h1>Pocket Notes r4</h1></body></html>";
-let proc, cp;
+let proc, cp, hits = 0, gone = false;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
 
@@ -29,6 +29,8 @@ before(async () => {
     if (spawnSync(process.execPath, [cli, "install", "chromium"], { stdio: "inherit" }).status !== 0) throw new Error("could not install Chromium for playwright");
   }
   cp = http.createServer((req, res) => {
+    if (req.url.startsWith("/w/")) hits++;
+    if (gone) { res.writeHead(404); return res.end("gone"); }
     if (req.url === "/w/notes/releases.json") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ latest: 4 })); }
     if (req.url === "/w/notes/r4/index.html") { res.writeHead(200, { "content-type": "text/html" }); return res.end(BUNDLE); }
     res.writeHead(404); res.end("no");
@@ -77,3 +79,15 @@ test("a fixture install stays simulated", async () => {
   assert.equal(e.source, "simulated");
 });
 
+
+test("installing an app twice says already_installed without fetching the bundle again", async () => {
+  assert.ok((await call("/session", { session: "r5" })).ok);
+  const catalog = [{ id: "notes", name: "Pocket Notes", url: "app://notes@r4", version: "r4" }];
+  assert.equal((await act("r5", { action: "install_app", id: "notes", catalog })).ok, true);
+  hits = 0; gone = true;   // the bundle is no longer served
+  const r = await act("r5", { action: "install_app", id: "notes", catalog });
+  gone = false;
+  assert.equal(r.ok, false);
+  assert.equal(r.code, "already_installed");
+  assert.equal(hits, 0);
+});

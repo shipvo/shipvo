@@ -354,13 +354,14 @@ async function act(id, body) {
       const where = s.nav.where;
       return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)\n${describeApps(s.apps)}` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
     }
-    // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log as simulated.
+    // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
     case "install_app": case "uninstall_app": case "switch_app": {
       const id = String(body.id ?? "");
       try {
         if (body.action === "install_app") {
           const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
           const found = catalog.find((a) => a?.id === id);
+          if (found && s.apps.installed_apps.some((a) => a.id === id)) throw new AppsError("already_installed", `'${id}' is already installed`);   // before any download
           // A listing with a real URL is fetched first: the install keeps the bundle's sha256 and size, and fails if the bundle cannot be fetched.
           const real = found && !/^fixture:/i.test(String(found.url ?? "")) ? await fetchAppBundle(found) : undefined;
           installApp(s.apps, id, catalog, real);
