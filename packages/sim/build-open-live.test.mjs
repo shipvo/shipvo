@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { pickPort } from "./test-port.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(10400, 300);
+const PORT = pickPort(10700, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-build-open-"));
 let proc, files, base;
 const page = (t) => `<!doctype html><html><head><title>b</title></head><body><h1>${t}</h1></body></html>`;
