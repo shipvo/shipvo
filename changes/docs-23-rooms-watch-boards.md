@@ -1,0 +1,1 @@
+- docs: the agents guide gains the `/watch` page, a room example and hosted sign-in discovery; the app spec guide gains `kanban` and `timeline` blocks. No migration.

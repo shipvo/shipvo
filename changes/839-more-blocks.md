@@ -1,3 +1,0 @@
-- `@shipvo/spec`: new blocks `stat`, `progress` (bar or ring), `card`, `section`, `divider`, `toggle` and `segmented`, in Android and iOS styles. Toggle and segmented need `label` and `bind` to a declared state value, and show their current value in the screen tree.
-- `@shipvo/spec`: `{ "navigate": "<screen>", "presentation": "sheet" }` opens a screen as a bottom sheet; `back` closes it. `createApp` gains `toggle(label, value?)` and `select(label, option)`, and now starts `app.state` with the spec's state defaults.
-- Migration: none for specs. Code that read `app.state` before any change now sees declared defaults instead of an empty object.

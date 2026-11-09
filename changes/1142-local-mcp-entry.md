@@ -1,3 +1,0 @@
-- agents: `shipvo agents setup` adds `@shipvo/mcp` as a dev dependency and writes `node node_modules/@shipvo/mcp/dist/server.js` with `PN_SIM`, so the server starts without an npm check or download. `--npx` stops with a clear message when no `@shipvo/mcp` is installed; otherwise it writes a pinned `npx -y @shipvo/mcp@<version>` entry. Migration: run `shipvo agents setup` again to replace an old `npx -y @shipvo/mcp` entry.
-- mcp: `@shipvo/mcp` exports `.` and `./server` (both `dist/server.js`) and `./package.json`. Migration: deep imports such as `@shipvo/mcp/dist/...` are not exported; import `@shipvo/mcp` or `@shipvo/mcp/server`. `serverInfo.version` now reports the package version.
-- cli: `shipvo mcp` prints the local entry.

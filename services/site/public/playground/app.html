@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tide and Tackle</title>
+<style>
+:root{--bg:#fff;--fg:#14202b;--card:#eef3f7;--accent:#0b6fa4;--fs:16px}
+html[data-dark]{--bg:#0d141a;--fg:#e8eef3;--card:#18232d;--accent:#5cb8ec}
+html[data-large]{--fs:22px}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:var(--fs)/1.4 system-ui,sans-serif}
+body{padding:16px}
+h1{font-size:1.5em;margin:0 0 12px}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+li{background:var(--card);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+button{min-height:44px;min-width:44px;border:0;border-radius:999px;background:var(--accent);color:var(--bg);font:inherit;font-weight:700;padding:0 16px}
+p{margin:14px 0 0}
+</style></head><body>
+<h1>Tide and Tackle</h1>
+<ul aria-label="Products">
+<li><span>Spinning rod</span><button type="button" data-item="Spinning rod" aria-label="Add Spinning rod to cart">Add</button></li>
+<li><span>Tackle box</span><button type="button" data-item="Tackle box" aria-label="Add Tackle box to cart">Add</button></li>
+<li><span>Tide chart</span><button type="button" data-item="Tide chart" aria-label="Add Tide chart to cart">Add</button></li>
+</ul>
+<p role="status" data-testid="cart">Cart: 0 items</p>
+<script>
+var n=0,c=document.querySelector('[data-testid=cart]');
+document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-item]");if(!b)return;n++;c.textContent="Cart: "+n+(n===1?" item":" items")});
+addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:prefs")return;var h=document.documentElement;
+h.toggleAttribute("data-dark",!!d.dark);h.toggleAttribute("data-large",!!d.large);h.dir=d.rtl?"rtl":"ltr"});
+</script></body></html>

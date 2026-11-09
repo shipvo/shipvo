@@ -86,3 +86,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Fuller shop template checkout (plain payment errors, offline message, Undo, confirmation screen) | [getting-started](getting-started.md#the-shop-checkout) | | | |
 | Shared rooms and richer `list_sessions` | [agents](agents.md) | | | |
 | `/watch` page: watch the agent's phone live | [agents](agents.md) | | | |
+| Watch the agent's phone live (`/watch`, view only) | [agents](agents.md#watch-the-agents-phone) | | | |
+| Hosted MCP sign-in discovery (OAuth metadata, dynamic client registration) | [agents](agents.md) | | | |
+| Kanban and timeline spec blocks (`App.move`) | [spec-blocks](spec-blocks.md#boards-and-timelines) | | | |
