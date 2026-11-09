@@ -32,7 +32,7 @@ Code islands (level 2 in the app spec) run inside the engine's sandbox. Every li
 | 1. Create | Developer | `shipvo app create <id>` registers the app and returns a publish token. |
 | 2. Describe | Developer | Name, tagline, description, category and website go into the listing. |
 | 3. Publish | Developer or CI | `shipvo publish` uploads a signed release and its web artifact. |
-| 4. Review | Owner | The listing appears in the review queue. The owner approves or rejects. |
+| 4. Review | Owner | The listing appears in the review queue. The owner approves or rejects each listing. |
 | 5. Listed | Everyone | The app shows in `/apps/public` and in the Store on every phone. |
 | 6. Update | Developer | A new release repeats step 3. An approved listing stays approved; taking it off the list clears approval, and listing it again goes back to step 4. |
 
