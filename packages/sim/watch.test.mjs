@@ -150,3 +150,24 @@ test("the page clears the input error on history, your next step, toggle and rec
   assert.match(html, /take\.onchange=function\(\)\{clearErr\(\)/);
   assert.match(html, /prefers-color-scheme:dark[^`]*\.w-err\{color:#f2b8b5\}/);
 });
+
+test("hosted watch: ?only=1 follows one session and receives its frames; the hosted page hides Take over unless allowed", async () => {
+  await call("/session", { session: "h1", skin: "ios" });
+  await call("/session", { session: "h2", skin: "android" });   // newer, but the viewer is pinned to h1
+  const v = connect("?session=h1&only=1&hosted=1"); await v.opened;
+  const f = await until(() => v.msgs.find((m) => m.type === "frame"));
+  assert.equal(Buffer.from(f.data, "base64")[0], 0xff);
+  assert.equal(v.msgs.find((m) => m.type === "sessions").current, "h1");
+  const none = connect("?session=missing&only=1"); await none.opened;
+  const s = await until(() => none.msgs.find((m) => m.type === "sessions"));
+  assert.equal(s.current, null);
+  v.ws.close(); none.ws.close();
+  const hosted = await (await fetch(`http://localhost:${PORT}/watch?session=h1&hosted=1&signin=%2Fwatch%2Fsignin`)).text();
+  assert.match(hosted, /data-skin="ios"/); assert.match(hosted, /data-part="take-over"[^>]*disabled/); assert.match(hosted, /Sign in to take over/);
+  assert.doesNotMatch(await (await fetch(`http://localhost:${PORT}/watch?session=h1&hosted=1&takeover=1`)).text(), /data-part="take-over"[^>]*disabled/);
+});
+
+test("hidden parts stay hidden: the page CSS lets the hidden attribute win over display rules", async () => {
+  const html = await (await fetch(`http://localhost:${PORT}/watch?session=h1&hosted=1`)).text();
+  assert.match(html, /\[hidden\]\{display:none!important\}/);
+});
