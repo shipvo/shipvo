@@ -32,6 +32,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Over the air (OTA).** Sending an update to phones through the internet, so people do not have to go to the app store.
 
+
 **Release.** One numbered version of your app that phones can download.
 
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.

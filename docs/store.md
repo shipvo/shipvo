@@ -32,6 +32,16 @@ The command prints "Filled without you: x of y fields". That counts only the der
 
 It also prints the questions it cannot answer: whether each data type is shared, third-party SDKs, sign-in, data deletion and a contact address.
 
+## Privacy policy
+
+`shipvo store policy [--out dir] [--strict]` writes `privacy-policy.md` and `privacy-policy.html` (default folder `.shipvo/store`). Each data use in the text comes from a capability in `shipvo.json`; questions the app cannot answer are listed under "Still to confirm". Set the publisher and contact in `shipvo.json`:
+
+```json
+{ "listing": { "privacy": { "company": "Acme Ltd", "contactEmail": "privacy@acme.example" } } }
+```
+
+The command prints the fields still missing. With `--strict` it exits 1 while any is missing. Review the files and host the page yourself; the command never uploads anything.
+
 ## Store setup and status
 
 `shipvo store setup` and `shipvo store status` (slice 2 of #249) tell you which accounts to open and what to do next. They make no store calls and read no credentials.

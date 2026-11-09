@@ -1,2 +1,0 @@
-- `@shipvo/sim`: new `/watch` page shows the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and is view only. The screencast runs only while someone watches; `/sessions` now reports `skin` and `streaming`.
-- Migration: none.
