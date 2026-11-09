@@ -1,0 +1,2 @@
+- Site: the playground `many` entry (`/playground/#many`) spawns 1 to 12 sample-app phones side by side, as Android, iOS or both alternating. "Copy link" gives a URL such as `?phones=6&mix=both&dark=1#many` that restores the same setup.
+- Migration: none.

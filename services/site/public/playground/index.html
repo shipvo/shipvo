@@ -20,6 +20,9 @@
 <link rel="stylesheet" href="/site.css">
 
 <style>
+.pg-many{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0}.pg-many label{display:flex;align-items:center;gap:8px;font-weight:700}.pg-many input[type=number]{min-height:44px;width:80px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:var(--ink);color:inherit;font:inherit}.pg-mix{display:flex;flex-wrap:wrap;gap:8px}.pg-many button{min-height:44px;min-width:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--ink);color:inherit;font:inherit;font-weight:600;cursor:pointer}.pg-many button[aria-pressed="true"],.pg-many .pg-copy{background:var(--accent,#7cf);color:#04101a;border-color:transparent}
+#pg-link{box-sizing:border-box;width:100%;min-height:44px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:var(--ink);color:inherit;font:inherit}
+.pg-grid{display:flex;flex-wrap:wrap;gap:16px;justify-content:center}.pg-grid[hidden]{display:none}.pg-cell{margin:0;flex:1 1 260px;max-width:340px;min-width:0}.pg-cell figcaption{font-weight:700;text-align:center;min-height:24px}.pg-cell .pg-phone{height:min(700px,170vw)}
 .pg{margin-top:28px;display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;align-items:start}
 .pg-side{display:flex;flex-direction:column;gap:6px}
 .pg-side a{display:flex;align-items:center;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line);color:inherit;text-decoration:none;font-weight:600}
@@ -85,6 +88,7 @@
           <button type="button" id="pg-rtl" aria-pressed="false">Right to left</button>
         </div>
         <section class="pg-panel" id="pg-panel" aria-live="polite"></section>
+        <div class="pg-grid" id="pg-grid" data-testid="many-grid" hidden></div>
         <iframe class="pg-phone" id="pg-phone" title="Phone" data-src-android="/playground/phone-android.html" data-src-ios="/playground/phone-ios.html"></iframe>
       </div>
       <noscript><p>The playground needs JavaScript.</p></noscript>

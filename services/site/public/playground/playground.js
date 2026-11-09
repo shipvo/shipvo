@@ -8,9 +8,82 @@
   ["dark", "large", "rtl"].forEach(function (k) { if (q.get(k) === "1") state[k] = true; });
 
   function send() { try { phone.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} replay(); }
-  function loadPhone() { phone.title = state.platform === "ios" ? "iOS phone" : "Android phone"; phone.src = phone.getAttribute("data-src-" + state.platform); }
+  function loadPhone() { if (phone.hidden) return; phone.title = state.platform === "ios" ? "iOS phone" : "Android phone"; phone.src = phone.getAttribute("data-src-" + state.platform); }
   phone.addEventListener("load", function () { send(); setTimeout(send, 300); });
-  window.addEventListener("message", function (e) { if (e.source === phone.contentWindow && e.data && e.data.type === "pg:ready") send(); });
+  window.addEventListener("message", function (e) {
+    if (!e.data || e.data.type !== "pg:ready") return;
+    if (e.source === phone.contentWindow) send();
+    else if (gridFrames().some(function (f) { return f.contentWindow === e.source; })) sendMany();
+  });
+
+  // Many phones: count, platform mix and prefs live in the URL (?phones=6&mix=both&dark=1), read on load.
+  var many = { phones: 4, mix: "both" }, MAX_PHONES = 12;
+  var qp = parseInt(q.get("phones"), 10);
+  if (qp >= 1) many.phones = Math.min(MAX_PHONES, qp);
+  if (["android", "ios", "both"].indexOf(q.get("mix")) >= 0) many.mix = q.get("mix");
+  function gridFrames() { var g = $("pg-grid"); return g ? Array.prototype.slice.call(g.querySelectorAll("iframe")) : []; }
+  function sendMany() {
+    gridFrames().forEach(function (f) { try { f.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} });
+  }
+  function platformAt(i) { return many.mix === "both" ? (i % 2 === 0 ? "android" : "ios") : many.mix; }
+  function shareLink() {
+    var p = new URLSearchParams();
+    p.set("phones", String(many.phones)); p.set("mix", many.mix);
+    ["dark", "large", "rtl"].forEach(function (k) { if (state[k]) p.set(k, "1"); });
+    return location.origin + location.pathname + "?" + p.toString() + "#many";
+  }
+  function manyPanel(panel) {
+    var bar = document.createElement("div"); bar.className = "pg-many";
+    var lab = document.createElement("label"); lab.textContent = "Phones ";
+    var num = document.createElement("input"); num.type = "number"; num.id = "pg-count"; num.min = "1"; num.max = String(MAX_PHONES); num.value = String(many.phones);
+    lab.appendChild(num); bar.appendChild(lab);
+    var mixes = document.createElement("div"); mixes.setAttribute("role", "group"); mixes.setAttribute("aria-label", "Platform mix"); mixes.className = "pg-mix";
+    [["android", "Android"], ["ios", "iOS"], ["both", "Both"]].forEach(function (m) {
+      var b = document.createElement("button"); b.type = "button"; b.setAttribute("data-mix", m[0]); b.textContent = m[1];
+      b.setAttribute("aria-pressed", String(many.mix === m[0]));
+      b.addEventListener("click", function () {
+        if (many.mix === m[0]) return; many.mix = m[0];
+        Array.prototype.forEach.call(mixes.children, function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        renderGrid();
+      });
+      mixes.appendChild(b);
+    });
+    bar.appendChild(mixes);
+    var copy = document.createElement("button"); copy.type = "button"; copy.id = "pg-copy"; copy.className = "pg-copy"; copy.textContent = "Copy link";
+    var link = document.createElement("input"); link.type = "text"; link.readOnly = true; link.id = "pg-link"; link.hidden = true; link.setAttribute("aria-label", "Shareable link");
+    var note = document.createElement("span"); note.setAttribute("role", "status"); note.id = "pg-copied";
+    copy.addEventListener("click", function () {
+      var url = shareLink(); link.value = url; link.hidden = false;
+      var done = function (ok) { note.textContent = ok ? "Link copied." : "Copy the link from the box."; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { done(true); }, function () { link.select(); done(false); });
+      else { link.select(); done(false); }
+    });
+    num.addEventListener("input", function () {
+      var n = parseInt(num.value, 10);
+      if (!(n >= 1)) return;
+      many.phones = Math.min(MAX_PHONES, n); renderGrid();
+    });
+    num.addEventListener("change", function () { num.value = String(many.phones); });
+    bar.appendChild(copy); panel.appendChild(bar); panel.appendChild(link); panel.appendChild(note);
+  }
+  function renderGrid() {
+    var g = $("pg-grid"), want = [], i;
+    for (i = 0; i < many.phones; i++) want.push(platformAt(i));
+    var cells = Array.prototype.slice.call(g.children);
+    want.forEach(function (pl, i) {
+      var cell = cells[i], f = cell && cell.querySelector("iframe");
+      if (cell && f.getAttribute("data-platform") === pl) return;
+      var nc = document.createElement("figure"); nc.className = "pg-cell";
+      var cap = document.createElement("figcaption"); cap.textContent = (pl === "ios" ? "iOS" : "Android") + " phone " + (i + 1);
+      var fr = document.createElement("iframe"); fr.className = "pg-phone"; fr.setAttribute("data-platform", pl); fr.title = cap.textContent;
+      fr.addEventListener("load", function () { sendMany(); setTimeout(sendMany, 300); });
+      fr.src = "/playground/phone-" + pl + ".html";
+      nc.appendChild(cap); nc.appendChild(fr);
+      if (cell) g.replaceChild(nc, cell); else g.appendChild(nc);
+    });
+    while (g.children.length > want.length) g.removeChild(g.lastChild);
+    g.setAttribute("data-count", String(want.length));
+  }
 
   // Device API controls. Each choice goes to the phone as { type: "pg:device", kind, value }; the phone replays the last choices after a reload.
   var DEVICE = [
@@ -50,7 +123,7 @@
     ["dark", "large", "rtl"].forEach(function (k) { $("pg-" + k).setAttribute("aria-pressed", String(state[k])); });
   }
   ["android", "ios"].forEach(function (p) { $("pg-" + p).addEventListener("click", function () { if (state.platform === p) return; state.platform = p; paintBar(); loadPhone(); }); });
-  ["dark", "large", "rtl"].forEach(function (k) { $("pg-" + k).addEventListener("click", function () { state[k] = !state[k]; paintBar(); send(); }); });
+  ["dark", "large", "rtl"].forEach(function (k) { $("pg-" + k).addEventListener("click", function () { state[k] = !state[k]; paintBar(); send(); sendMany(); }); });
 
   function show() {
     var id = location.hash.slice(1), f = features.filter(function (x) { return x.id === id; })[0] || features[0];
@@ -64,6 +137,10 @@
     if (f.id === "ota") otaPanel(panel);
     if (f.doc) { var a = document.createElement("a"); a.className = "link"; a.href = f.doc; a.textContent = "Read the docs"; panel.appendChild(a); }
     if (f.id === "device") deviceControls(panel);
+    if (f.id === "many") manyPanel(panel);
+    var grid = $("pg-grid"), isMany = f.id === "many";
+    grid.hidden = !isMany; phone.hidden = isMany;
+    if (isMany) renderGrid(); else if (!phone.getAttribute("src")) loadPhone();
     panel.setAttribute("data-feature", f.id);
   }
   // OTA walkthrough. Every number comes from /playground/ota-run.json, which the site build records from the real signer,
@@ -113,5 +190,5 @@
     if (otaRun) paint(); else { paint(); fetch("/playground/ota-run.json").then(function (r) { return r.json(); }).then(function (j) { otaRun = j; if (panel.getAttribute("data-feature") === "ota") { show(); } }); }
   }
   window.addEventListener("hashchange", show);
-  paintBar(); show(); loadPhone();
+  paintBar(); show();
 })();
