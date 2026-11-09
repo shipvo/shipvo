@@ -56,7 +56,7 @@
   });
   function callTool(tool, args) {
     return new Promise(function (res) {
-      var id = ++callId, t = setTimeout(function () { delete calls[id]; res({ error: "timeout" }); }, 5000);
+      var id = ++callId, t = setTimeout(function () { delete calls[id]; res({ error: "timeout" }); }, 15000);
       calls[id] = function (r) { clearTimeout(t); res(r); };
       try { phone.contentWindow.postMessage({ type: "pg:tool", id: id, tool: tool, args: args }, "*"); } catch (e) {}
     });

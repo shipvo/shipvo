@@ -46,9 +46,29 @@ export class SpecHost {
   create(session, id, spec, { style = "android", reduceMotion = false } = {}) {
     const made = createApp(spec, { style, reduceMotion });
     if (!made.ok) return { ok: false, errors: made.errors };
-    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion });
+    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, version: 1, history: [{ version: 1, at: Date.now() }] });
     return { ok: true, warnings: made.app.render().warnings ?? [] };
   }
+
+  /**
+   * Replaces an app's spec with a new version. What the person entered stays: collection data and state values that
+   * the new spec still has carry over. A spec with problems is refused with its errors and the running version is untouched.
+   * Resolves { ok: true, version, from } or { ok: false, errors }.
+   */
+  update(session, id, spec) {
+    const cur = this.running.get(key(session, id));
+    if (!cur) return { ok: false, errors: [{ path: "$", message: "That app is not running", fix: "Create it with create_app" }] };
+    const keep = (names, from) => Object.fromEntries(Object.entries(from).filter(([k]) => names.includes(k)));
+    const collections = Object.entries(spec?.data ?? {}).filter(([, v]) => v?.source === "collection").map(([k]) => k);
+    const stateKeys = Object.keys(spec?.state ?? {});
+    const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
+    if (!made.ok) return { ok: false, errors: made.errors };
+    const from = cur.version;
+    this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now() }] });
+    return { ok: true, version: from + 1, from, warnings: made.app.render().warnings ?? [] };
+  }
+
+  version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
 
   has(session, id) { return this.running.has(key(session, id)); }
   drop(session, id) { return this.running.delete(key(session, id)); }
