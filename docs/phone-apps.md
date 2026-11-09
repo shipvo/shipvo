@@ -75,7 +75,7 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 
 The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools.
 
-The Store in the phone frame and the tools below share one state. A tap-install in a frame attached to a session changes the same `installed_apps`, `current_app` and `device_log` that the tools change, and an install made by a tool draws its icon on the home screen within two seconds. A frame page without a session (`shipvo run`) lists the same marketplace apps and installs them by fetching the published app itself; the marketplace answers with CORS open, so the page needs no proxy.
+A frame page without a session (`shipvo run`) lists the marketplace apps and installs them by fetching the published app itself; the marketplace answers with CORS open, so the page needs no proxy. A failed fetch shows "The app could not be fetched". The tools below change the headless session's phone and record each change in `device_log`.
 
 | Tool | What it does | Typed errors |
 | --- | --- | --- |

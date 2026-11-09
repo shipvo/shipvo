@@ -77,10 +77,3 @@ test("a fixture install stays simulated", async () => {
   assert.equal(e.source, "simulated");
 });
 
-test("phone_apps shows what the MCP tools installed, for the Store screen", async () => {
-  assert.ok((await call("/session", { session: "r4" })).ok);
-  await act("r4", { action: "install_app", id: "weather" });
-  const r = await act("r4", { action: "phone_apps" });
-  assert.equal(r.ok, true);
-  assert.deepEqual(r.installed_apps.map((a) => a.id), ["weather"]);
-});

@@ -3,6 +3,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { MAX_BUNDLE_BYTES } from "./apps.mjs";
+import { MAX_BUILD_BYTES } from "./build-cache.mjs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
@@ -40,3 +42,25 @@ for (const skin of ["android", "ios"]) {
     } finally { await b.close(); }
   });
 }
+
+test("the Store's bundle cap is the build_url cap", () => assert.equal(MAX_BUNDLE_BYTES, MAX_BUILD_BYTES));
+
+test("a network failure shows one plain sentence, in dark mode too", async () => {
+  const b = await chromium.launch();
+  try {
+    const p = await b.newPage({ viewport: { width: 460, height: 960 } });
+    await p.route(`${MP}/**`, (route) => {
+      const u = new URL(route.request().url());
+      if (u.pathname === "/apps/public") return route.fulfill({ status: 200, headers: CORS, body: JSON.stringify({ apps: [{ app_id: "notes", name: "Pocket Notes", latest_release: 4 }] }) });
+      return route.abort("failed");
+    });
+    const f = renderFrame({ skin: "ios", dark: true, screen: `<iframe id="app" srcdoc="<p>x</p>"></iframe>` });
+    await p.setContent(`<style>${f.css}</style>${f.html}<script>${statusClientScript("app", "ios", { apps: [], marketplace: MP })}</script>`);
+    await p.evaluate(() => window.postMessage({ type: "pn:nav", where: "home" }, "*"));
+    await p.getByRole("button", { name: "Store" }).click();
+    await p.getByRole("button", { name: "Install Pocket Notes" }).click();
+    const status = p.getByRole("status").filter({ hasText: "could not be fetched" });
+    await status.waitFor();
+    assert.equal((await status.innerText()).trim(), "The app could not be fetched");
+  } finally { await b.close(); }
+});
