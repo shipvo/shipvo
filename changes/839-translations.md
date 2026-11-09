@@ -1,0 +1,2 @@
+- spec: `renderScreen` takes `language` and `locale`. Text matching a key in `strings[language]` is translated, and money, numbers and dates use the locale. Right-to-left languages set `dir: "rtl"` on the screen tree and the HTML.
+- spec: the validator warns about `strings` keys that no text in the spec uses.
