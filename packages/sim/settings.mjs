@@ -46,7 +46,7 @@ export function describeSettings(values) {
 
 /** Markup for the Settings screen. Hidden until opened. The rows are drawn by the client script. */
 export function settingsHtml() {
-  return `<div class="sf-settings" data-part="settings-screen" role="dialog" aria-label="Settings" tabindex="-1" hidden><h2 class="sf-sh">Settings</h2><div data-part="settings-rows" role="group" aria-label="Settings"></div><button type="button" class="sf-close" data-part="settings-close">Close</button></div>`;
+  return `<div class="sf-settings" data-part="settings-screen" role="dialog" aria-label="Settings" tabindex="-1" hidden><h2 class="sf-sh">Settings</h2><div data-part="settings-rows" role="group" aria-label="Settings"></div><button type="button" class="sf-srow" data-part="secrets-open">Secrets</button><button type="button" class="sf-close" data-part="settings-close">Close</button></div>`;
 }
 /** The Settings icon for the home screen. */
 export function settingsIconHtml() {

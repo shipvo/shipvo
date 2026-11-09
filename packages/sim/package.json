@@ -37,6 +37,7 @@
     "shade.mjs",
     "shade-actions.mjs",
     "settings.mjs",
+    "secrets.mjs",
     "settings-actions.mjs",
     "nav.mjs",
     "update.mjs",

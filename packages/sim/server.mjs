@@ -25,6 +25,7 @@ import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
+import { forwardVault } from "./secrets.mjs";
 import { SettingsError } from "./settings.mjs";
 import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
@@ -526,9 +527,13 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   // CORS plus Chromium's private-network preflight: the app page comes from the public control plane (https) and
   // posts orders and telemetry to this loopback backend.
-  const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-private-network": "true" };
+  const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS", "access-control-allow-private-network": "true" };
   const send = (code, obj, type = "application/json") => { res.writeHead(code, { "content-type": type, ...CORS }); res.end(type === "application/json" ? JSON.stringify(obj) : obj); };
   try {
+    if (url.pathname.startsWith("/vault-ui/")) {   // the Secrets screen; same-origin only, no CORS headers, owner token stays here
+      const r = await forwardVault({ method: req.method, pathname: url.pathname, search: url.search, headers: req.headers }, { control: CONTROL, token: process.env.PN_OWNER_TOKEN });
+      res.writeHead(r.status, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify(r.body));
+    }
     if (req.method === "OPTIONS") return send(204, "", "text/plain");
     // the app's static web build
     if (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/") || url.pathname === "/favicon.ico") {
