@@ -1,0 +1,115 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "shop", "name": "Shop", "icon": "shop", "description": "List products, take orders and see them in one place." },
+  "theme": { "mode": "light", "palette": { "primary": "#0B5FFF", "text": "#111827", "background": "#FFFFFF", "surface": "#F3F4F6", "muted": "#4B5563" }, "radius": "lg", "density": "comfortable", "elevation": "soft" },
+  "data": {
+    "settings": { "source": "collection", "fields": { "currency": "text" }, "seed": [{ "currency": "USD" }] },
+    "products": { "source": "collection", "fields": { "id": "text", "seq": "number", "name": "text", "price": "number", "stock": "number", "photo": "text" }, "seed": [] },
+    "orders": { "source": "collection", "fields": { "id": "text", "seq": "number", "items": "text", "productId": "text", "quantity": "number", "total": "number", "currency": "text", "status": "text" }, "seed": [] },
+    "currency": { "source": "computed", "value": "{{ count(settings) == 0 ? 'USD' : first(settings).currency }}" },
+    "shown": { "source": "computed", "value": "{{ state.query == '' ? products : products.filter(p, lower(p.name).contains(lower(state.query))) }}" },
+    "picked": { "source": "computed", "value": "{{ products.filter(p, p.id == state.pick) }}" }
+  },
+  "state": {
+    "query": { "type": "text", "default": "" },
+    "pick": { "type": "text", "default": "" }
+  },
+  "navigation": { "type": "tabs", "items": [
+    { "screen": "catalogue", "label": "Catalogue", "icon": "shop" },
+    { "screen": "cart", "label": "Cart", "icon": "cart" },
+    { "screen": "orders", "label": "Orders", "icon": "list" }
+  ] },
+  "screens": [
+    { "id": "catalogue", "title": "Catalogue", "body": [
+      { "type": "form", "label": "Find a product form", "submit": { "label": "Find", "action": "show_matches" }, "fields": [
+        { "name": "query", "type": "text", "label": "Find a product by name; leave empty to show all", "maxLength": 200 }
+      ] },
+      { "type": "list", "label": "Products", "from": "{{ sortBy(shown, 'name') }}", "item": { "title": "{{ item.name }}", "subtitle": "{{ item.stock }} in stock, Id {{ item.id }}", "trailing": "{{ money(item.price, currency) }}" }, "onPress": { "navigate": "product", "params": { "id": "{{ item.id }}" } }, "empty": { "message": "No products yet" } },
+      { "type": "form", "label": "New product form", "submit": { "label": "Add product", "action": "add_product" }, "fields": [
+        { "name": "name", "type": "text", "label": "Name", "required": true, "maxLength": 200 },
+        { "name": "price", "type": "number", "label": "Price", "required": true },
+        { "name": "stock", "type": "number", "label": "Stock" },
+        { "name": "photo", "type": "text", "label": "Photo text (what the photo shows)", "maxLength": 500 }
+      ] },
+      { "type": "form", "label": "Currency form", "submit": { "label": "Save currency", "action": "set_currency" }, "fields": [
+        { "name": "currency", "type": "text", "label": "Currency code (like USD, EUR or BRL)", "required": true, "maxLength": 3 }
+      ] }
+    ] },
+    { "id": "product", "title": "Product", "body": [
+      { "type": "list", "label": "Product detail", "from": "{{ products.filter(p, p.id == route.params.id) }}", "item": { "title": "{{ item.name }}", "subtitle": "{{ item.photo }}, {{ item.stock }} in stock, Id {{ item.id }}", "trailing": "{{ money(item.price, currency) }}" }, "empty": { "message": "Product not found" } }
+    ] },
+    { "id": "cart", "title": "Cart", "body": [
+      { "type": "form", "label": "Choose a product form", "submit": { "label": "Show product", "action": "pick_product" }, "fields": [
+        { "name": "id", "type": "text", "label": "Product id (shown under each product)", "required": true, "maxLength": 20 }
+      ] },
+      { "type": "list", "label": "Cart", "from": "{{ picked }}", "item": { "title": "{{ item.name }}", "subtitle": "{{ item.stock }} in stock", "trailing": "{{ money(item.price, currency) }}" }, "empty": { "message": "Nothing chosen" } },
+      { "type": "form", "label": "Order form", "submit": { "label": "Place order", "action": "place_order" }, "fields": [
+        { "name": "productId", "type": "text", "label": "Product id", "required": true, "maxLength": 20 },
+        { "name": "quantity", "type": "number", "label": "Quantity", "required": true }
+      ] }
+    ] },
+    { "id": "orders", "title": "Orders", "body": [
+      { "type": "badge", "value": "{{ count(orders) }} orders" },
+      { "type": "list", "label": "Orders", "from": "{{ sortBy(orders, 'seq', 'desc') }}", "item": { "title": "{{ item.items }}", "subtitle": "{{ item.status }}, Id {{ item.id }}", "trailing": "{{ money(item.total, item.currency) }}" }, "empty": { "message": "No orders yet" } }
+    ] }
+  ],
+  "actions": {
+    "add_product": {
+      "description": "Add a product to the catalogue. Price is in the shop currency. Photo is text that says what the photo shows.",
+      "input": { "name": { "type": "text" }, "price": { "type": "number" }, "stock": { "type": "number", "default": 0 }, "photo": { "type": "text", "default": "" } },
+      "returns": { "id": "text" },
+      "do": [
+        { "insert": "products", "value": { "id": "{{ 'p' + string(count(products) == 0 ? 1 : last(sortBy(products, 'seq')).seq + 1) }}", "seq": "{{ count(products) == 0 ? 1 : last(sortBy(products, 'seq')).seq + 1 }}", "name": "{{ input.name }}", "price": "{{ input.price }}", "stock": "{{ input.stock }}", "photo": "{{ input.photo }}" } },
+        { "toast": "Product added" },
+        { "return": { "id": "{{ last(products).id }}" } }
+      ]
+    },
+    "find_products": {
+      "description": "Find products. Text matches the name and photo text; leave it empty to list all. Results are sorted by name.",
+      "input": { "text": { "type": "text", "default": "" } },
+      "returns": { "products": "list", "currency": "text" },
+      "do": [
+        { "return": { "products": "{{ sortBy(products.filter(p, input.text == '' || lower(p.name + ' ' + p.photo).contains(lower(input.text))), 'name') }}", "currency": "{{ currency }}" } }
+      ]
+    },
+    "place_order": {
+      "description": "Place an order for a quantity of one product, by product id. The order is recorded with status placed and the total in the shop currency. No payment is taken. Stock goes down by the quantity. Returns an empty id and status rejected if the product is missing, the quantity is below 1 or stock is too low.",
+      "input": { "productId": { "type": "text" }, "quantity": { "type": "number", "default": 1 } },
+      "returns": { "id": "text", "total": "number", "currency": "text", "status": "text" },
+      "do": [
+        { "if": "{{ count(products.filter(p, p.id == input.productId && p.stock >= input.quantity)) == 0 || input.quantity < 1 }}",
+          "then": [ { "return": { "id": "", "total": 0, "currency": "{{ currency }}", "status": "rejected" } } ] },
+        { "insert": "orders", "value": { "id": "{{ 'o' + string(count(orders) == 0 ? 1 : last(sortBy(orders, 'seq')).seq + 1) }}", "seq": "{{ count(orders) == 0 ? 1 : last(sortBy(orders, 'seq')).seq + 1 }}", "items": "{{ string(input.quantity) + ' x ' + first(products.filter(p, p.id == input.productId)).name }}", "productId": "{{ input.productId }}", "quantity": "{{ input.quantity }}", "total": "{{ first(products.filter(p, p.id == input.productId)).price * input.quantity }}", "currency": "{{ currency }}", "status": "placed" } },
+        { "update": "products", "where": "item.id == input.productId", "value": { "stock": "{{ first(products.filter(p, p.id == input.productId)).stock - input.quantity }}" } },
+        { "toast": "Order placed" },
+        { "return": { "id": "{{ last(orders).id }}", "total": "{{ last(orders).total }}", "currency": "{{ last(orders).currency }}", "status": "placed" } }
+      ]
+    },
+    "list_orders": {
+      "description": "List orders, newest first. Status (like placed) is optional; leave it empty to list all.",
+      "input": { "status": { "type": "text", "default": "" } },
+      "returns": { "orders": "list" },
+      "do": [
+        { "return": { "orders": "{{ sortBy(orders.filter(o, input.status == '' || o.status == input.status), 'seq', 'desc') }}" } }
+      ]
+    },
+    "set_currency": {
+      "description": "Set the shop currency, as a three-letter code like USD, EUR or BRL. New orders and prices use it.",
+      "input": { "currency": { "type": "text" } },
+      "do": [
+        { "update": "settings", "value": { "currency": "{{ upper(input.currency) }}" } },
+        { "toast": "Currency saved" }
+      ]
+    },
+    "show_matches": {
+      "description": "Show only products whose name contains the text on the Catalogue screen. Leave it empty to show all.",
+      "input": { "query": { "type": "text", "default": "" } },
+      "do": [ { "set": "state.query", "value": "{{ input.query }}" } ]
+    },
+    "pick_product": {
+      "description": "Choose a product by id to show in the Cart screen.",
+      "input": { "id": { "type": "text" } },
+      "do": [ { "set": "state.pick", "value": "{{ input.id }}" } ]
+    }
+  }
+}

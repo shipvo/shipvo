@@ -1,0 +1,1 @@
+- mcp: tool calls with a valid W3C `traceparent` in `_meta` record the trace id in the session's tool-call log, `export_test` output and `shipvo eval` run records, and the result `_meta` echoes `traceparent`. `baggage` is never logged. No migration needed.

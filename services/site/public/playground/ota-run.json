@@ -1,0 +1,57 @@
+{
+ "signature": {
+  "algorithm": "Ed25519",
+  "publicKey": "EJkSph/D03tFPPcTmqNxsJl/XFxlnvSmpNy2FZ1BhZI=",
+  "signature": "02HDVgHnXRS3SvWLgBk/Zueno0kD6/P7laPT3QdI7eyJnwaDkKldQPmL/ohlnw9Du2xZt2pxm/PsI1QaLbS1DQ==",
+  "valid": true,
+  "tamperedValid": false
+ },
+ "maxBoots": 3,
+ "windowSeconds": 60,
+ "stages": [
+  {
+   "id": "stage",
+   "band": "b1",
+   "percent": 10,
+   "cohorts": 100,
+   "of": 1000
+  },
+  {
+   "id": "widen",
+   "band": "b2",
+   "percent": 100,
+   "cohorts": 1000,
+   "of": 1000
+  }
+ ],
+ "boots": [
+  {
+   "start": 1,
+   "running": 2,
+   "crashed": true,
+   "trialBoots": 1
+  },
+  {
+   "start": 2,
+   "running": 2,
+   "crashed": true,
+   "trialBoots": 2
+  },
+  {
+   "start": 3,
+   "running": 2,
+   "crashed": true,
+   "trialBoots": 3
+  },
+  {
+   "start": 4,
+   "running": 1,
+   "event": "crash_loop_revert:2"
+  }
+ ],
+ "revertAtStart": 4,
+ "source": [
+  "packages/runtime/ios/BundleSelector.swift",
+  "packages/runtime/android/src/main/java/dev/shipvo/runtime/ShipvoHostHandler.kt"
+ ]
+}

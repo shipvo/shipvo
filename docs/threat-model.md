@@ -127,6 +127,17 @@ A person signs in with an email magic link and gets one phone: an installed-apps
 | One app filling storage | Each app's data has a size cap set in configuration. | "caps per-app data by configuration" |
 | Data left behind or inherited | Taking an app off the phone deletes its data. Installing it again starts empty. | "removing an app removes its data" |
 
+## Secret vault, list, rotate, revoke and use log (slice 4a of #841)
+
+Routes in `services/control-plane/src/vault.ts`: `GET /vault/keys?app=`, `POST /vault/keys/:app/:name/rotate`, `DELETE /vault/keys/:app/:name`, `GET /vault/keys/:app/:name/uses`. Tests: `services/control-plane/test/vault.test.ts`.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| A list or log shows a value | The list picks app, name, domain, access and last-used time field by field. The log returns time, app, host and outcome. | "lists metadata only" |
+| A revoked key still works | Revoke writes `vault_revoked` first, then blanks `wrapped_key` and `ciphertext`. Status returns `saved: false`, and use is refused with the "revoked" error that asks for a new key. Saving again clears the row. | "revoke blanks the value..." |
+| Rotate widens a key | The new ticket copies app, name, domain and access from the saved key. The old key stays until the new one is saved. | "rotate issues a ticket..." |
+| Someone reads another owner's keys or log | Every query filters by the caller's owner identity; others get 401 or an empty list. | "the use log is owner-scoped" |
+
 ## Secret vault, MCP tools (slice 2)
 
 Two tools let an assistant start and follow the flow without seeing a key. Code: `request_secret` and `secret_status` in `packages/mcp-tools/src/index.ts` (one registry for the stdio and remote servers), handlers in `packages/mcp/src/server.ts`, and `GET /vault/status/:app/:name` in `services/control-plane/src/vault.ts`.
