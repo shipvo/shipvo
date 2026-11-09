@@ -51,7 +51,7 @@
   ];
   var calls = {}, callId = 0;
   window.addEventListener("message", function (e) {
-    var d = e.data; if (e.source !== phone.contentWindow || !d || d.type !== "pg:tool:result" || !calls[d.id]) return;
+    var d = e.data; if (e.source !== phone.contentWindow || e.origin !== location.origin || !d || d.type !== "pg:tool:result" || !calls[d.id]) return;
     calls[d.id](d.result); delete calls[d.id];
   });
   function callTool(tool, args) {
@@ -75,7 +75,7 @@
     }
     sel.addEventListener("change", paintArgs); paintArgs();
     var run = document.createElement("button"); run.type = "submit"; run.id = "pg-run"; run.textContent = "Run tool";
-    var out = document.createElement("pre"); out.id = "pg-out"; out.setAttribute("aria-label", "Tool result"); out.textContent = "Pick a tool and run it.";
+    var out = document.createElement("pre"); out.id = "pg-out"; out.setAttribute("aria-label", "Tool result"); out.setAttribute("role", "status"); out.setAttribute("aria-live", "polite"); out.tabIndex = 0; out.textContent = "Pick a tool and run it.";
     form.addEventListener("submit", function (ev) {
       ev.preventDefault(); var args = {};
       Array.prototype.forEach.call(argBox.querySelectorAll("input"), function (i) { args[i.getAttribute("data-arg")] = i.value; });
@@ -83,17 +83,29 @@
     });
     form.appendChild(sel); form.appendChild(argBox); form.appendChild(run); panel.appendChild(form); panel.appendChild(out);
     var lumi = document.createElement("button"); lumi.type = "button"; lumi.id = "pg-lumi"; lumi.textContent = "Watch Lumi";
-    var cap = document.createElement("ol"); cap.id = "pg-captions"; cap.setAttribute("aria-label", "Lumi captions");
-    var steps = [["Lumi reads the screen.", "screen", {}], ["Lumi taps Add Spinning rod to cart.", "tap", { ref: "e1" }], ["Lumi taps Add Tackle box to cart.", "tap", { ref: "e2" }], ["Lumi taps Add Tide chart to cart.", "tap", { ref: "e3" }]];
+    var cap = document.createElement("ol"); cap.id = "pg-captions"; cap.setAttribute("aria-label", "Lumi captions"); cap.setAttribute("aria-live", "polite");
+    var picks = ["Spinning rod", "Tackle box", "Tide chart"];
+    function refFor(scr, item) {
+      var els = (scr && scr.elements) || [];
+      for (var i = 0; i < els.length; i++) if (els[i].name && els[i].name.indexOf("Add " + item) === 0) return els[i].ref;
+      return null;
+    }
     lumi.addEventListener("click", function () {
-      lumi.disabled = true; cap.textContent = "";
-      steps.reduce(function (p, s) {
-        return p.then(function () {
-          var li = document.createElement("li"); li.textContent = s[0]; cap.appendChild(li);
-          return callTool(s[1], s[2]).then(function (r) { out.textContent = JSON.stringify(r, null, 2); return new Promise(function (ok) { setTimeout(ok, 600); }); });
+      lumi.disabled = true; cap.textContent = ""; lumi.removeAttribute("data-done");
+      function say(t) { var li = document.createElement("li"); li.textContent = t; cap.appendChild(li); }
+      function show(r) { out.textContent = JSON.stringify(r, null, 2); return new Promise(function (ok) { setTimeout(ok, 600); }); }
+      say("Lumi reads the screen.");
+      callTool("screen", {}).then(function (scr) {
+        return show(scr).then(function () {
+          return picks.reduce(function (p, item) {
+            return p.then(function () {
+              var ref = refFor(scr, item); if (!ref) return null;
+              say("Lumi taps Add " + item + " to cart.");
+              return callTool("tap", { ref: ref }).then(show);
+            });
+          }, Promise.resolve());
         });
-      }, Promise.resolve()).then(function () { lumi.disabled = false; lumi.setAttribute("data-done", "true"); });
-      lumi.removeAttribute("data-done");
+      }).then(function () { lumi.disabled = false; lumi.setAttribute("data-done", "true"); });
     });
     panel.appendChild(lumi); panel.appendChild(cap);
   }
