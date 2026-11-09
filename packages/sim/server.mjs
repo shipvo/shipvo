@@ -475,7 +475,10 @@ async function act(id, body) {
         if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id)) { failed.push({ id, reason: "bad_app_id" }); continue; }
         if (s.apps.installed_apps.some((x) => x.id === id)) { skipped.push({ id, reason: "already_installed" }); continue; }
         if (a.kind === "spec") {
-          const r = await specHost.restore(sid, id, a, { style: body.style === "ios" ? "ios" : "android" });
+          let r;
+          try { r = await specHost.restore(sid, id, a, { style: body.style === "ios" ? "ios" : "android" }); }
+          catch (e) { specHost.drop(sid, id); failed.push({ id, reason: "invalid_export", errors: [String(e?.message ?? e).slice(0, 200)] }); continue; }
+          for (const w of r.warnings ?? []) if (/ is not (a collection|a list|in the spec)/.test(w)) warnings.push({ id, reason: "data_skipped", message: w });
           if (!r.ok) { failed.push({ id, reason: "invalid_spec", errors: r.errors.slice(0, 5).map((e) => `${e.path || "/"}: ${e.message}`) }); continue; }
           s.apps.installed_apps.push({ id, name: String(a.name ?? a.spec?.app?.name ?? id).replace(/[<>"'\\]/g, "").slice(0, 40), url: `spec://${id}`, version: String(specHost.version(sid, id) ?? 1), kind: "spec" });
         } else {

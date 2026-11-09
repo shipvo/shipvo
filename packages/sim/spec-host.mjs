@@ -173,13 +173,32 @@ export class SpecHost {
 
   /** Starts an app from a snapshot: same spec, version and history, with the data and settings put back. Resolves { ok, warnings, data_errors } or { ok: false, errors }. */
   async restore(session, id, snap, { style = "android", reduceMotion = false } = {}) {
-    const made = createApp(snap?.spec, { style, reduceMotion, data: snap?.data ?? {}, state: snap?.state ?? {} });
+    const plain = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+    const skipped = [];
+    const declared = plain(snap?.spec?.data) ? snap.spec.data : {};
+    const data = {};
+    for (const [k, rows] of Object.entries(plain(snap?.data) ? snap.data : {})) {
+      if (declared[k]?.source !== "collection") { skipped.push(`data "${k}" is not a collection in the spec`); continue; }
+      if (!Array.isArray(rows) || !rows.every(plain)) { skipped.push(`data "${k}" is not a list of records`); continue; }
+      data[k] = rows;
+    }
+    const declaredState = plain(snap?.spec?.state) ? snap.spec.state : {};
+    const state = {};
+    for (const [k, v] of Object.entries(plain(snap?.state) ? snap.state : {})) {
+      if (!(k in declaredState)) { skipped.push(`setting "${k}" is not in the spec`); continue; }
+      state[k] = v;
+    }
+    const made = createApp(snap?.spec, { style, reduceMotion, data, state });
     if (!made.ok) return { ok: false, errors: made.errors };
     const version = Number.isInteger(Number(snap.version)) && Number(snap.version) > 0 ? Number(snap.version) : 1;
-    const history = Array.isArray(snap.history) && snap.history.length ? snap.history.map((h) => ({ version: h.version, at: h.at, changes: h.changes ?? [] })) : [{ version, at: Date.now(), changes: ["restored"] }];
+    const entries = (Array.isArray(snap.history) ? snap.history : []).filter(plain).map((h) => {
+      const v = Number(h.version), at = Number(h.at);
+      return { version: Number.isInteger(v) && v > 0 ? v : 1, at: Number.isFinite(at) ? at : Date.now(), changes: Array.isArray(h.changes) ? h.changes.map(String) : [] };
+    });
+    const history = entries.length ? entries : [{ version, at: Date.now(), changes: ["restored"] }];
     this.running.set(key(session, id), { app: made.app, spec: snap.spec, style, reduceMotion, version, history, sources: {} });
     const live = await this.refresh(session, id, { force: true });
-    return { ok: true, warnings: made.app.render().warnings ?? [], data_errors: live.errors };
+    return { ok: true, warnings: [...(made.app.render().warnings ?? []), ...skipped], data_errors: live.errors };
   }
 
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
