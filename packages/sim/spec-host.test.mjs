@@ -98,3 +98,26 @@ test("tick refreshes apps side by side, so one slow host does not hold up the ot
   assert.ok(Date.now() - t0 < 350, `tick took ${Date.now() - t0} ms`);
   assert.deepEqual(changed.sort(), ["p1", "p2", "p3"]);
 });
+
+test("a background refresh that fails is reported to onChange, with the last good data kept", async () => {
+  const { st, h } = rig();
+  assert.equal((await h.create("s", "p", SPEC)).ok, true);
+  st.now += 11 * 60_000; st.status = 503; st.body = "down";
+  const seen = [];
+  h.onChange = (s, id, out) => seen.push(out);
+  await h.tick();
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0].updated, []); assert.equal(seen[0].errors[0].source, "prices");
+  assert.deepEqual(names(h), ["Concert A, 40"]);
+});
+
+test("a refresh that finds the same data is not an update, so the open page is left alone", async () => {
+  const { st, h } = rig();
+  assert.equal((await h.create("s", "p", SPEC)).ok, true);
+  st.now += 11 * 60_000;
+  const out = await h.refresh("s", "p");
+  assert.deepEqual(out.fetched, ["prices"]); assert.deepEqual(out.updated, []);
+  st.body = [{ id: "1", name: "Concert A", price: "41" }];
+  st.now += 11 * 60_000;
+  assert.deepEqual((await h.refresh("s", "p")).updated, ["prices"]);
+});

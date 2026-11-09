@@ -172,3 +172,20 @@ test("import_phone: a Store app that is already installed is skipped, a bad layo
   assert.equal(r.warnings[0].id, "gifts"); assert.equal(r.warnings[0].reason, "bad_placement");
   assert.equal(r.installed_apps.find((a) => a.id === "gifts").name, "Gift Ideas");
 });
+
+test("the phone's log records a background fetch that failed", async () => {
+  assert.ok((await call("/session", { session: "dl4" })).ok);
+  serve(200, [{ id: "1", name: "Concert A", price: "40" }]);
+  const made4 = await act("dl4", { action: "create_app", id: "prices", spec: { ...PRICES, data: { prices: { ...PRICES.data.prices, cache: "1s" } } } });
+  assert.equal(made4.ok, true); assert.match(made4.screen, /Concert A/);
+  serve(503, "down");
+  const before = (await act("dl4", { action: "device_log" })).log.filter((e) => e.name === "data_refresh").length;
+  const deadline = Date.now() + 45_000;
+  let hit;
+  while (!hit && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2000));
+    hit = (await act("dl4", { action: "device_log" })).log.filter((e) => e.name === "data_refresh").slice(before).find((e) => e.errors?.includes("prices"));
+  }
+  assert.ok(hit, "the 30 s check should log the failed fetch");
+  assert.match((await act("dl4", { action: "screen" })).screen, /Concert A/);
+});
