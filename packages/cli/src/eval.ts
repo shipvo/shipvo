@@ -15,6 +15,14 @@ export type Task = {
   limits: { seconds: number; steps: number };
   checks: Check[];
 };
+/** Same rules as parseTraceparent in @shipvo/mcp: trim, reject version ff and all-zero ids. */
+function traceIdOf(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const m = /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/.exec(value.trim());
+  if (!m || m[1] === "ff" || /^0+$/.test(m[2]!) || /^0+$/.test(m[3]!)) return undefined;
+  return m[2];
+}
+
 export type Step = { n: number; t: number; tool: string; args: Record<string, unknown>; ok: boolean; code?: string; text: string; traceId?: string };
 export type CheckResult = { id: string; type: string; pass: boolean; detail: string };
 export type RunResult = {
@@ -121,7 +129,7 @@ export async function evalRun(task: Task, o: RunOpts): Promise<RunResult> {
     if (msg?.method !== "tools/call" || !msg.params?.name) return;
     const tool = msg.params.name, args = msg.params.arguments ?? {};
     if (args.session !== undefined && args.session !== session) return;
-    const traceId = typeof msg.params._meta?.traceparent === "string" ? /^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/.exec(msg.params._meta.traceparent)?.[1] : undefined;
+    const traceId = traceIdOf(msg.params._meta?.traceparent);
     const text = textOf(up.json), isErr = Boolean(up.json?.result?.isError) || up.status >= 400;
     const code = (up.json?.result?.structuredContent?.code as string | undefined) ?? /^Error \[([^\]]+)\]/.exec(text)?.[1];
     if (tool === "end_session") {

@@ -156,7 +156,8 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
     const trace = traceFromMeta((extra as { _meta?: unknown } | undefined)?._meta);
     const entry = (): CallEntry => ({ tool: t.name, at: new Date().toISOString(), ...(trace ? { traceId: trace.traceId } : {}) });
     const sid = (args as { session?: unknown } | undefined)?.session;
-    if (typeof sid === "string") callLog.get(sid)?.push(entry());
+    const log = typeof sid === "string" ? callLog.get(sid) : undefined;
+    if (log) { log.push(entry()); if (log.length > 1000) log.splice(0, log.length - 1000); }
     const out = inputHasKey(args) ? keyRefusal() : await (cb as (a: unknown, e: unknown) => unknown)(args, extra);
     if (t.name === "open_app") {
       // The session id is only known once the call returns.

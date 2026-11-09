@@ -39,7 +39,6 @@ async function connect() {
   await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
   return c;
 }
-let await_schema: typeof CallToolResultSchema | undefined;
 const txt = (r: any) => r.content[0].text as string;
 
 describe("export_test", () => {
@@ -67,9 +66,11 @@ describe("export_test", () => {
   it("records a valid traceparent, echoes it, ignores bad ones and never logs baggage", async () => {
     const c = await connect();
     const tp = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
-    const o: any = await c.callTool({ name: "open_app", arguments: { app: "shop", session: "t1" } }, undefined, { timeout: 20000, ...( {} as object) });
+    const o: any = await c.callTool({ name: "open_app", arguments: { app: "shop", session: "t1" } }, undefined, { timeout: 20000 });
     expect(o._meta?.traceparent).toBeUndefined();
-    const call = (name: string, args: object, meta: object) => (c as any).request({ method: "tools/call", params: { name, arguments: args, _meta: meta } }, (await_schema ??= CallToolResultSchema));
+    const plain: any = await c.callTool({ name: "screen", arguments: { session: "t1" } });
+    expect(plain._meta).toBeUndefined();
+    const call = (name: string, args: object, meta: object) => (c as any).request({ method: "tools/call", params: { name, arguments: args, _meta: meta } }, CallToolResultSchema);
     const r: any = await call("tap", { session: "t1", ref: "e3" }, { traceparent: tp, baggage: "user=secret-baggage", tracestate: "v=1" });
     expect(r._meta.traceparent).toBe(tp);
     const bad: any = await call("screen", { session: "t1" }, { traceparent: "garbage" });
@@ -77,7 +78,7 @@ describe("export_test", () => {
     expect(bad._meta?.traceparent).toBeUndefined();
     const e: any = await c.callTool({ name: "export_test", arguments: { session: "t1" } });
     expect(e.structuredContent.traceIds).toEqual(["4bf92f3577b34da6a3ce929d0e0e4736"]);
-    expect(e.structuredContent.calls.map((x: any) => [x.tool, x.traceId])).toEqual([["open_app", undefined], ["tap", "4bf92f3577b34da6a3ce929d0e0e4736"], ["screen", undefined], ["export_test", undefined]].slice(0, 3).concat([["export_test", undefined]]));
+    expect(e.structuredContent.calls.map((x: any) => [x.tool, x.traceId])).toEqual([["open_app", undefined], ["screen", undefined], ["tap", "4bf92f3577b34da6a3ce929d0e0e4736"], ["screen", undefined], ["export_test", undefined]]);
     expect(txt(e)).toContain("// trace id: 4bf92f3577b34da6a3ce929d0e0e4736");
     expect(JSON.stringify(e)).not.toContain("secret-baggage");
     expect(JSON.stringify(e)).not.toContain("tracestate");

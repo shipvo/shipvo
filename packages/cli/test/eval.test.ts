@@ -77,7 +77,10 @@ describe("shipvo eval", () => {
     const r = await evalRun(tote, { agent: "scripted", mcp: upUrl, dir: mkdtempSync(join(tmpdir(), "eval-trace-")), now: () => (now += 2000), onReady: async ({ url, session }) => {
       await call(url, 1, "tap", { session, ref: "tote" }, { traceparent: tp, baggage: "k=secret" });
       await call(url, 2, "tap", { session, ref: "pay" }, { traceparent: "bad" });
-      await call(url, 3, "end_session", { session }, {});
+      await call(url, 3, "tap", { session, ref: "pay" }, { traceparent: "00-00000000000000000000000000000000-00f067aa0ba902b7-01" });
+      await call(url, 4, "tap", { session, ref: "pay" }, { traceparent: "ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" });
+      await call(url, 5, "tap", { session, ref: "pay" }, { traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01" });
+      await call(url, 6, "end_session", { session }, {});
     } });
     expect(r.traceIds).toEqual(["4bf92f3577b34da6a3ce929d0e0e4736"]);
     expect(readFileSync(r.stepsFile, "utf8")).not.toContain("secret");
