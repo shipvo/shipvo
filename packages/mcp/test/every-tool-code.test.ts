@@ -16,6 +16,7 @@ const NO_SESSION: Record<string, string> = {
   open_app: "creates a session",
   attach_session: "creates a session",
   upload_build: "builds the project folder, takes no session",
+  job_status: "reads a slow job by id, takes no session",
   publish_preview: "builds the app folder, takes no session",
   owner_describe: "owner tool, works on an app",
   owner_command: "owner tool, works on an app",
