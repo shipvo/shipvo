@@ -15,12 +15,14 @@ export type Task = {
   limits: { seconds: number; steps: number };
   checks: Check[];
 };
-export type Step = { n: number; t: number; tool: string; args: Record<string, unknown>; ok: boolean; code?: string; text: string };
+export type Step = { n: number; t: number; tool: string; args: Record<string, unknown>; ok: boolean; code?: string; text: string; traceId?: string };
 export type CheckResult = { id: string; type: string; pass: boolean; detail: string };
 export type RunResult = {
   id: string; task: string; agent: string; model?: string; platform: string; ended: "agent" | "step_limit" | "time_limit";
   pass: boolean; steps: number; seconds: number; errors: number; retries: number;
   findings: { code: string; tool: string; count: number }[]; checks: CheckResult[]; stepsFile: string; recording?: string;
+  /** Trace ids the agent sent in tools/call `_meta.traceparent`, so a run ties to the agent's own trace. */
+  traceIds?: string[];
 };
 
 export function loadTask(arg: string, cwd = process.cwd()): Task {
@@ -112,23 +114,24 @@ export async function evalRun(task: Task, o: RunOpts): Promise<RunResult> {
     if (req.method !== "POST" || !req.url?.startsWith("/mcp")) { res.writeHead(404).end(); return; }
     let raw = ""; for await (const ch of req) raw += ch;
     if (ended) { res.writeHead(410, { "content-type": "application/json" }).end(JSON.stringify({ error: "the eval run is over" })); return; }
-    let msg: { method?: string; params?: { name?: string; arguments?: Record<string, unknown> } } | undefined;
+    let msg: { method?: string; params?: { name?: string; arguments?: Record<string, unknown>; _meta?: { traceparent?: unknown } } } | undefined;
     try { msg = JSON.parse(raw); } catch {}
     const up = await post(upstream, o.key, raw).catch((e: Error) => ({ status: 502, text: JSON.stringify({ error: e.message }), json: undefined as Rpc | undefined }));
     res.writeHead(up.status, { "content-type": "application/json" }).end(up.text);
     if (msg?.method !== "tools/call" || !msg.params?.name) return;
     const tool = msg.params.name, args = msg.params.arguments ?? {};
     if (args.session !== undefined && args.session !== session) return;
+    const traceId = typeof msg.params._meta?.traceparent === "string" ? /^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/.exec(msg.params._meta.traceparent)?.[1] : undefined;
     const text = textOf(up.json), isErr = Boolean(up.json?.result?.isError) || up.status >= 400;
     const code = (up.json?.result?.structuredContent?.code as string | undefined) ?? /^Error \[([^\]]+)\]/.exec(text)?.[1];
     if (tool === "end_session") {
       try { orders = (JSON.parse(text) as { orders?: Order[] }).orders ?? []; } catch {}
-      steps.push({ n: steps.length + 1, t: now() - t0, tool, args, ok: !isErr, code, text });
+      steps.push({ n: steps.length + 1, t: now() - t0, tool, args, ok: !isErr, code, text, ...(traceId ? { traceId } : {}) });
       return done("agent");
     }
     if (tool === "record_stop" && !isErr) recording = (up.json?.result?.structuredContent?.file as string | undefined) ?? /"file":\s*"([^"]+)"/.exec(text)?.[1] ?? recording;
     if (!isErr && text && !["record_start", "record_stop", "record_marker", "export_test"].includes(tool)) finalScreen = text;
-    steps.push({ n: steps.length + 1, t: now() - t0, tool, args, ok: !isErr, code, text });
+    steps.push({ n: steps.length + 1, t: now() - t0, tool, args, ok: !isErr, code, text, ...(traceId ? { traceId } : {}) });
     if (steps.length >= task.limits.steps) done("step_limit");
   });
   await new Promise<void>((ok) => server.listen(o.port ?? 0, "127.0.0.1", ok));
@@ -160,10 +163,12 @@ export async function evalRun(task: Task, o: RunOpts): Promise<RunResult> {
   mkdirSync(dir, { recursive: true });
   const stepsFile = join(dir, "steps.jsonl");
   writeFileSync(stepsFile, steps.map((s) => JSON.stringify(s)).join("\n") + "\n");
+  const traceIds = [...new Set(steps.flatMap((s) => (s.traceId ? [s.traceId] : [])))];
   const result: RunResult = {
     id, task: task.name, agent: o.agent, ...(o.model ? { model: o.model } : {}), platform: task.platform, ended: why,
     pass: checks.every((c) => c.pass), steps: acting.length, seconds, errors: acting.filter((s) => !s.ok).length, retries,
     findings: [...counts.values()], checks, stepsFile, ...(recording ? { recording } : {}),
+    ...(traceIds.length ? { traceIds } : {}),
   };
   writeFileSync(join(dir, "run.json"), JSON.stringify(result, null, 2) + "\n");
   return result;
