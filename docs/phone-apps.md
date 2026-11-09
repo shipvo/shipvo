@@ -81,6 +81,12 @@ The app is real HTML with every control labelled, so `screen`, `tap`, `type` and
 
 `device_log` records the create, each action and each update (old and new version) with `source: "real"`.
 
+## Arrange the home screen
+
+`arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then, also across midnight. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
+
+`set_phone_time { session, at }` sets that clock (`2026-11-14T09:00:00`, or `null` for real time), so a test can check what shows on a Saturday morning. The home screen text lists the apps that are showing as buttons and, for the others, says whether they are hidden or when their schedule starts. In a phone.json, an app can carry the same `placement` object. Errors are `not_installed`, `bad_placement` and `bad_time`. Every change is in `device_log`.
+
 ## Install apps and switch between them
 
 The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools.

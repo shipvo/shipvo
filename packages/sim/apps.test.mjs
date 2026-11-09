@@ -86,3 +86,41 @@ test("the Store screen lists the fixture apps and a tap installs one, in both sk
     assert.deepEqual(resolveUrl(loadProfile({ apps: [{ id: "a" }] }), "https://x.dev"), { passthrough: true });
   });
 }
+
+// Placement: pin, hide, order and schedule apps on the home screen.
+import { arrangeApp, homeApps, appVisible } from "./apps.mjs";
+{
+  const mk = () => loadProfile({ apps: [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }] });
+  const ids = (st, d) => homeApps(st, d).map((x) => x.id).join("");
+  const MON = new Date("2026-11-09T10:00:00"), SAT = new Date("2026-11-14T10:00:00");
+  test("home order: pinned first, then position, then install order", () => {
+    const st = mk(); assert.equal(ids(st), "abc");
+    arrangeApp(st, "c", { pinned: true }); assert.equal(ids(st), "cab");
+    arrangeApp(st, "b", { position: 0 }); assert.equal(ids(st), "cba");
+    arrangeApp(st, "c", { pinned: false }); assert.equal(ids(st), "bac");
+  });
+  test("a hidden app is off the home screen, still installed, and described as hidden", () => {
+    const st = mk(); arrangeApp(st, "a", { hidden: true });
+    assert.equal(ids(st), "bc"); assert.equal(st.installed_apps.length, 3);
+    assert.match(describeApps(st), /"A" \(a\): hidden; switch_app still opens it/);
+  });
+  test("a schedule shows the app only on its days and hours, also across midnight", () => {
+    const st = mk();
+    arrangeApp(st, "a", { schedule: { days: ["mon", "tue", "wed", "thu", "fri"], from: "08:00", to: "18:00" } });
+    arrangeApp(st, "b", { schedule: { days: ["sat", "sun"] } });
+    assert.equal(ids(st, MON), "ac"); assert.equal(ids(st, SAT), "bc");
+    assert.equal(appVisible({ placement: { schedule: { days: ["mon"], from: "22:00", to: "02:00" } } }, new Date("2026-11-09T23:30:00")), true);
+    assert.equal(appVisible({ placement: { schedule: { days: ["mon"], from: "22:00", to: "02:00" } } }, new Date("2026-11-09T12:00:00")), false);
+    assert.match(describeApps(st, SAT), /"A" \(a\): not showing now, scheduled mon,tue,wed,thu,fri 08:00-18:00/);
+    arrangeApp(st, "a", { schedule: null }); assert.equal(ids(st, SAT), "abc");
+  });
+  test("placement errors are typed", () => {
+    const st = mk(); const code = (f) => { try { f(); } catch (e) { return e.code; } };
+    assert.equal(code(() => arrangeApp(st, "zzz", { pinned: true })), "not_installed");
+    assert.equal(code(() => arrangeApp(st, "a", { pinned: "yes" })), "bad_placement");
+    assert.equal(code(() => arrangeApp(st, "a", { position: -1 })), "bad_placement");
+    assert.equal(code(() => arrangeApp(st, "a", { schedule: { days: ["noday"] } })), "bad_placement");
+    assert.equal(code(() => arrangeApp(st, "a", { schedule: { from: "9am" } })), "bad_placement");
+    assert.equal(code(() => arrangeApp(st, "a", { colour: "red" })), "bad_placement");
+  });
+}
