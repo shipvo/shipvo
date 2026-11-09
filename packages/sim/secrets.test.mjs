@@ -33,7 +33,7 @@ test("only the four routes map; others are null", () => {
   assert.equal(vaultRoute("POST", "/vault-ui/keys/tide/stripe/rotate").path, "/vault/keys/tide/stripe/rotate");
   assert.equal(vaultRoute("DELETE", "/vault-ui/keys/tide/stripe").path, "/vault/keys/tide/stripe");
   assert.equal(vaultRoute("GET", "/vault-ui/keys/tide/stripe/uses").path, "/vault/keys/tide/stripe/uses");
-  for (const [m, p] of [["POST", "/vault-ui/tickets"], ["GET", "/vault-ui/status/tide/stripe"], ["GET", "/vault-ui/t/abc"], ["GET", "/vault-ui/keys/tide/stripe"], ["POST", "/vault-ui/keys/tide/stripe"], ["GET", "/vault-ui/keys/../x/y/uses"], ["GET", "/vault-ui/keys/a/b/c/d"], ["GET", "/vault/keys"]]) assert.equal(vaultRoute(m, p, "?app=tide"), null, `${m} ${p}`);
+  for (const [m, p] of [["POST", "/vault-ui/tickets"], ["GET", "/vault-ui/status/tide/stripe"], ["GET", "/vault-ui/t/abc"], ["GET", "/vault-ui/keys/tide/stripe"], ["POST", "/vault-ui/keys/tide/stripe"], ["GET", "/vault-ui/keys/../x/y/uses"], ["DELETE", "/vault-ui/keys/../.."], ["GET", "/vault-ui/keys/../x/uses"], ["POST", "/vault-ui/keys/./x/rotate"], ["DELETE", "/vault-ui/keys/tide/.."], ["GET", "/vault-ui/keys/a/b/c/d"], ["GET", "/vault/keys"]]) assert.equal(vaultRoute(m, p, "?app=tide"), null, `${m} ${p}`);
 });
 
 test("the forward rejects other routes, non-loopback Host and cross-origin calls", async () => {

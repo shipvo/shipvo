@@ -2,8 +2,9 @@
 // The screen shows metadata only (app, name, domain, access, last used). A value never reaches the page.
 // The page talks to this server on /vault-ui/*; the server forwards four routes to the control plane and adds the owner token.
 
-const ID = /^[\w.-]{1,64}$/;
-const NAME = /^[\w.-]{1,64}$/;
+// "." and "..": fetch would collapse them and leave /vault/keys.
+const ID = /^(?!\.{1,2}$)[\w.-]{1,64}$/;
+const NAME = ID;
 
 /**
  * Maps a /vault-ui request to a control-plane path, or returns null when the route is not one of the four.
@@ -36,6 +37,7 @@ export function sameOrigin(headers) {
   const site = headers["sec-fetch-site"];
   if (site && site !== "same-origin") return false;
   const origin = headers.origin;
+  // No Origin means a non-browser caller; forwardVault's loopback Host check still applies.
   if (origin === undefined) return true;
   try { return new URL(origin).host === headers.host; } catch { return false; }
 }
@@ -51,6 +53,8 @@ export async function forwardVault(req, { control, token, fetchImpl = fetch }) {
   const route = vaultRoute(method, pathname, search);
   if (!route) return { status: 404, body: { error: "not_found" } };
   if (!token) return { status: 503, body: { error: "no_owner_token", message: "Sign in as the owner to manage saved keys." } };
+  const url = new URL(`${control}${route.path}`);
+  if (!url.pathname.startsWith("/vault/keys")) return { status: 404, body: { error: "not_found" } };
   try {
     const r = await fetchImpl(`${control}${route.path}`, { method: route.method, headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
     const text = await r.text();
