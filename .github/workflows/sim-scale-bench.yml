@@ -1,0 +1,46 @@
+name: sim-scale-bench
+# Runs the simulator scale benchmark (scripts/sim-bench/scale.mjs) on a runner you choose and uploads the JSON.
+# Use a larger-runner label to measure a bigger machine (escalation #1261). An agent then commits the result as
+# docs/product/sim-bench/scale-<date>-<n>cpu-<n>gb.{json,md}.
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner label (a larger-runner label from the organisation's runner settings)
+        default: ubuntu-latest
+      max:
+        description: Highest number of open apps to measure
+        default: "400"
+      step:
+        description: Step between measurements
+        default: "10"
+permissions:
+  contents: read
+jobs:
+  scale:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter "./packages/**" build
+      - run: bash scripts/agents/install-chromium.sh
+      - name: Machine size
+        run: |
+          echo "cpus: $(nproc)"; free -m | awk '/^Mem:/ {print "memory_mb: " $2}'
+          { echo "cpus: $(nproc)"; free -m | awk '/^Mem:/ {print "memory_mb: " $2}'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Build the web export of apps/chess
+        run: pnpm --filter chess build
+      - name: Run the scale benchmark
+        run: node scripts/sim-bench/scale.mjs --max "${{ inputs.max }}" --step "${{ inputs.step }}" --out sim-scale.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sim-scale-${{ github.run_id }}
+          path: sim-scale.json
+          if-no-files-found: ignore
+          retention-days: 30

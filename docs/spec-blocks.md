@@ -114,6 +114,7 @@ app.select("Period", "year");          // { ok: false, error: '"year" is not one
 | `segmented` | One choice from a few | `label`, `bind` to an `enum` state value, `options` |
 | `kanban` | Cards in columns | `label`, `from`, `columns`, `column`, `title`, `detail`, `onMove` |
 | `timeline` | Dated entries, newest day first | `label`, `from`, `date`, `title`, `detail` |
+| `vector` | A small drawing that follows your data | `label`, `value`, `width`, `height`, `shapes`, `motion` |
 
 In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a segmented control reads `Period: week`, and a progress block reads `Monthly goal: 40%`. Assistants and `@shipvo/test` find them by those names.
 
@@ -135,6 +136,51 @@ A `kanban` block shows the rows of a data source as cards in columns. A `timelin
 - `app.move("Buy bait", "done")` moves a card by its title and runs `onMove`. It answers `ok: false` if the card or the column does not exist.
 
 The validator reports a bad column list, a card in a column the board does not have, a missing or invalid date, and an undeclared `onMove` action, each with a path and a fix.
+
+## Vector drawings
+
+A `vector` block draws shapes whose numbers and colours come from expressions, so a gauge or a mini chart follows your state. It needs a `label` (what a screen reader says). `value` is the short text added to its name in the screen tree.
+
+```json
+{ "type": "vector", "label": "Battery", "value": "{{ state.level }}%", "width": 120, "height": 40,
+  "shapes": [
+    { "shape": "rect", "x": 0, "y": 0, "width": "{{ state.level }}", "height": 20, "rx": 4, "fill": "#0B5FFF" },
+    { "shape": "text", "x": 0, "y": 38, "text": "{{ state.level }}%", "fontSize": 10 }
+  ] }
+```
+
+| Shape | Options |
+| --- | --- |
+| `rect` | `x`, `y`, `width`, `height`, `rx`, `fill`, `stroke`, `strokeWidth`, `opacity` |
+| `circle` | `cx`, `cy`, `r`, `fill`, `stroke`, `strokeWidth`, `opacity` |
+| `path` | `d` (path commands such as `M 0 30 L 100 30`), `fill`, `stroke`, `strokeWidth`, `opacity` |
+| `text` | `x`, `y`, `text`, `fontSize`, `fill`, `anchor` (`start`, `middle`, `end`), `opacity` |
+| `linearGradient` | `id`, `x1`, `y1`, `x2`, `y2`, `stops` (each `offset` from 0 to 1 and `color`). Use it as `fill: "url(#id)"`. |
+
+Each option can be a number, a colour or an expression. Colours that are not a hex value, a colour name or `url(#id)` draw as `none`. In the screen tree the block is an image named `Battery: 40%` on the Android and iPhone skins. An unknown shape is a validation error with its JSON path and the list of shapes.
+
+## Motion
+
+Any block can carry `motion`:
+
+```json
+{ "type": "stat", "label": "Revenue", "value": "{{ state.total }}", "motion": { "enter": "fade", "change": "countUp" } }
+```
+
+- `enter` is `fade`, `slide` or `scale`. It plays when the block appears.
+- `change` is `countUp` or `pulse`. It plays when the block's value changes.
+
+Set the theme `motion` to `"none"`, or pass `reduceMotion: true` to `renderScreen`, and no node carries animation fields. The simulated phone passes its reduce-motion setting through, so a test can check both modes.
+
+## Translations and right-to-left
+
+Add `strings` to the spec: a map from language to `{ "original text": "translated text" }`.
+
+```json
+{ "strings": { "fr": { "Battery level": "Niveau de batterie" } } }
+```
+
+`renderScreen(spec, { language: "fr", locale: "fr-FR" })` replaces any text that matches a key. Text with no match stays as written. `money(...)` and `formatDate(...)` use the `locale`. Right-to-left languages such as Arabic and Hebrew set `dir: "rtl"` on the screen tree and on the HTML; other languages set `dir: "ltr"`. `validate` warns about a `strings` key that no text in the spec uses.
 
 ## Sheets
 
@@ -186,6 +232,8 @@ A data source can call a service with a key you saved once in the secret form. T
 - **`toggle` or `select` answers `ok: false`.** The label does not match a control on the current screen, or the option is not in `options`. Labels are case-sensitive.
 - **`Card column "later" is not a board column.`** A row has a column value that is not in `columns`. Use one of the listed names or add the column.
 - **`Entry date "tomorrow" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30`.
+- **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
+- **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps
