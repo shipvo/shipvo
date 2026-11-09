@@ -40,6 +40,6 @@ export function runnerSecrets(env: Env, who: { person: string; app: string }) {
 export async function listUses(env: Env, q: { person: string; app: string; name: string }) {
   const own: any = await env.DB.prepare("SELECT owner FROM vault_secrets WHERE app_id = ? AND name = ?").bind(q.app, q.name).first();
   if (!own || own.owner !== q.person) return [];
-  const r: any = await env.DB.prepare("SELECT domain, outcome, at FROM vault_uses WHERE app_id = ? AND name = ? ORDER BY id DESC LIMIT 100").bind(q.app, q.name).all();
+  const r: any = await env.DB.prepare("SELECT domain, outcome, at FROM vault_uses WHERE app_id = ? AND name = ? AND person = ? ORDER BY id DESC LIMIT 100").bind(q.app, q.name, q.person).all();
   return r.results as { domain: string; outcome: string; at: string }[];
 }
