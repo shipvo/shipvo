@@ -41,19 +41,19 @@
   function otaPanel(panel) {
     var steps = [["pub", "Publish update"], ["stage", "Stage to 10%"], ["widen", "Widen to 100%"], ["crash", "Crash the update"], ["rollback", "Watch rollback"]];
     var row = document.createElement("div"); row.className = "pg-steps"; row.setAttribute("role", "group"); row.setAttribute("aria-label", "Update steps");
-    var out = document.createElement("ol"); out.className = "pg-log"; out.setAttribute("data-testid", "ota-log");
-    var status = document.createElement("p"); status.setAttribute("data-testid", "ota-status");
+    var out = document.createElement("ol"); out.className = "pg-log"; out.setAttribute("data-testid", "ota-log"); out.setAttribute("role", "log"); out.setAttribute("aria-live", "polite"); out.setAttribute("aria-label", "Update log");
+    var status = document.createElement("p"); status.setAttribute("data-testid", "ota-status"); status.setAttribute("aria-live", "polite");
     function line(t) { ota.log.push(t); }
     function paint() {
       Array.prototype.forEach.call(row.children, function (b, i) { b.disabled = b.getAttribute("data-step") === "reset" ? false : (!otaRun || i !== ota.step); });
       out.textContent = ""; ota.log.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; out.appendChild(li); });
-      status.textContent = otaRun ? "Phone runs version " + ota.version + "." : "Loading the recorded run.";
+      status.textContent = !otaRun ? "Loading the recorded run." : "Phone runs version " + ota.version + ". " + (ota.step < steps.length ? "Next: " + steps[ota.step][1] + "." : "All steps done. Press Start over to run it again.");
       panel.setAttribute("data-ota-step", String(ota.step));
     }
     var actions = {
       pub: function () {
         var g = otaRun.signature; setVersion(2);
-        line("Published release 2 (version 2) to the first cohort.");
+        line("Published release 2 (version 2) to the first cohort. A cohort is a slice of your users that gets an update before everyone else.");
         line("Signature check: " + (g.valid ? "valid" : "invalid") + " (" + g.algorithm + ", verifier output). Same release with one field changed: " + (g.tamperedValid ? "valid" : "rejected") + ".");
         line("Public key: " + g.publicKey);
       },

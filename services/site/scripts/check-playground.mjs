@@ -56,7 +56,12 @@ try {
     assert.match(await version.textContent(), /Version 1/);
     const step = (id) => page.locator(`#pg-panel [data-step="${id}"]`);
     assert.equal(await step("stage").isDisabled(), true, "steps run in order");
+    const status = page.getByTestId("ota-status");
+    assert.equal(await status.getAttribute("aria-live"), "polite");
+    assert.equal(await page.getByTestId("ota-log").getAttribute("role"), "log");
+    assert.match(await status.textContent(), /Next: Publish update/);
     await step("pub").click();
+    assert.match(await status.textContent(), /Next: Stage to 10%/);
     await app.getByText("Version 2").waitFor({ timeout: 10_000 });
     assert.match(await page.getByTestId("ota-log").textContent(), /Signature check: valid \(Ed25519/);
     await step("stage").click();
