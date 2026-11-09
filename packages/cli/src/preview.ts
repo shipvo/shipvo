@@ -299,7 +299,7 @@ export async function publishToHereNow(files: PreviewFile[], o: PreviewOpts = {}
 
 export function build(root: string, out: string): Promise<void> {
   rmSync(out, { recursive: true, force: true }); mkdirSync(join(root, ".shipvo"), { recursive: true });
-  if (isCapacitorWeb(root)) { copyCapacitorWeb(root, out); return Promise.resolve(); }
+  if (isCapacitorWeb(root)) { try { copyCapacitorWeb(root, out); return Promise.resolve(); } catch (e) { return Promise.reject(e); } }
   return new Promise((resolve, reject) => {
     const call = spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out]);
     const p = spawn(call.command, call.args, { cwd: root, shell: call.shell, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });

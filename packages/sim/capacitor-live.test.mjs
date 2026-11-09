@@ -52,7 +52,8 @@ for (const skin of ["android", "ios"]) {
     assert.equal(refOf(again.screen, 'button "Show release number"'), ref, "ref is stable between snapshots");
     const r = await act(skin, { action: "tap", ref });
     assert.equal(r.ok, true, JSON.stringify(r));
-    assert.match((await act(skin, { action: "screen" })).screen, /embedded build|Release|release/i);
+    assert.doesNotMatch(first.screen, /Release: embedded build/, "text is not on screen before the tap");
+    assert.match((await act(skin, { action: "screen" })).screen, /Release: embedded build/);
     const item = refOf((await act(skin, { action: "screen" })).screen, "button \"(?!Show|Check)[^\"]+\"");
     const t = await act(skin, { action: "tap", ref: item });
     assert.equal(t.ok, true, JSON.stringify(t));
