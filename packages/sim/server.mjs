@@ -27,7 +27,7 @@ import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -573,7 +573,7 @@ async function act(id, body) {
       const jpeg = body.format === "jpeg"; const p = join(DIR, `${id}-${Date.now()}.${jpeg ? "jpg" : "png"}`);
       // Home screen or switcher showing: draw it over the app for the shot, then take it away. The app stays loaded underneath.
       const away = s.nav.where !== "app";
-      if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME));
+      if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME) + (s.nav.where === "home" ? `<style>${storeCss}</style><div class="sf-apps" style="position:fixed;z-index:2147483647;color:#fff;font-family:system-ui,sans-serif">${installedIconsHtml(s.apps)}</div>` : ""));
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
