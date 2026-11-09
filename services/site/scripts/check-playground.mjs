@@ -182,7 +182,10 @@ try {
   await page.waitForFunction(() => document.getElementById("pg-panel").getAttribute("data-feature") === "many");
   await page.locator("#pg-count").fill("6");
   await page.locator('#pg-panel button[data-mix="both"]').click();
+  await page.waitForFunction(() => document.querySelectorAll("#pg-grid iframe").length === 6);
   await page.locator("#pg-dark").click();
+  await page.locator("#pg-large").click(); await page.locator("#pg-rtl").click();
+  assert.equal(await page.locator("#pg-phone").isVisible(), false, "single phone is hidden on #many");
   const grid = page.getByTestId("many-grid");
   assert.equal(await grid.locator('iframe[data-platform="android"]').count(), 3, "3 Android frames");
   assert.equal(await grid.locator('iframe[data-platform="ios"]').count(), 3, "3 iOS frames");
@@ -190,7 +193,8 @@ try {
   await page.locator("#pg-copy").click();
   await page.waitForFunction(() => document.getElementById("pg-link").value.length > 0);
   const link = await page.locator("#pg-link").inputValue();
-  assert.match(link, /\?phones=6&mix=both&dark=1#many$/, "link holds count, mix and prefs");
+  assert.match(link, /\?phones=6&mix=both&dark=1&large=1&rtl=1#many$/, "link holds count, mix and prefs");
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), link, "clipboard holds the link");
   const page2 = await browser.newPage({ viewport: { width: 375, height: 800 } });
   await page2.goto(link.replace(/^https?:\/\/[^/]+/, base));
   const g2 = page2.getByTestId("many-grid");
@@ -199,12 +203,16 @@ try {
   assert.equal(await g2.locator('iframe[data-platform="ios"]').count(), 3);
   assert.equal(await page2.locator("#pg-count").inputValue(), "6");
   assert.equal(await page2.locator('#pg-panel button[data-mix="both"]').getAttribute("aria-pressed"), "true");
-  assert.equal(await page2.locator("#pg-dark").getAttribute("aria-pressed"), "true");
+  for (const k of ["dark", "large", "rtl"]) assert.equal(await page2.locator("#pg-" + k).getAttribute("aria-pressed"), "true", k + " round-trips");
   await page2.waitForFunction(() => Array.from(document.querySelectorAll("#pg-grid iframe")).every((f) => f.contentDocument?.getElementById("app")?.contentDocument?.documentElement.hasAttribute("data-dark")), null, { timeout: 30_000 });
   assert.ok(await page2.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "many phones: no sideways scroll at 375 px");
   for (const sel of ["#pg-count", "#pg-copy", '#pg-panel button[data-mix="ios"]']) assert.ok((await page2.locator(sel).boundingBox()).height >= 44, `${sel} tap target`);
   await page2.locator("#pg-count").fill("20");
+  await page2.waitForFunction(() => document.querySelectorAll("#pg-grid iframe").length === 12);
   assert.equal(await page2.locator("#pg-grid iframe").count(), 12, "browser limit is 12");
+  await page2.goto(`${base}/playground/#overview`);
+  await page2.waitForFunction(() => document.getElementById("pg-panel").getAttribute("data-feature") === "overview");
+  assert.equal(await page2.locator("#pg-phone").isVisible(), true, "single phone is back on #overview");
   await page2.close();
   console.log("playground: many phones and shareable links work");
   console.log("playground: platform switch, dark, large text, RTL and deep links work");

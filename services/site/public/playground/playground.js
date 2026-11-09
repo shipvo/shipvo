@@ -58,12 +58,14 @@
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { done(true); }, function () { link.select(); done(false); });
       else { link.select(); done(false); }
     });
-    num.addEventListener("input", function () {
+    var countTimer = 0;
+    function applyCount() {
+      clearTimeout(countTimer);
       var n = parseInt(num.value, 10);
-      if (!(n >= 1)) return;
-      many.phones = Math.min(MAX_PHONES, n); renderGrid();
-    });
-    num.addEventListener("change", function () { num.value = String(many.phones); });
+      if (n >= 1) { many.phones = Math.min(MAX_PHONES, n); renderGrid(); }
+    }
+    num.addEventListener("input", function () { clearTimeout(countTimer); countTimer = setTimeout(applyCount, 250); });
+    num.addEventListener("change", function () { applyCount(); num.value = String(many.phones); });
     bar.appendChild(copy); panel.appendChild(bar); panel.appendChild(link); panel.appendChild(note);
   }
   function renderGrid() {
