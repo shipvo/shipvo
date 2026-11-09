@@ -77,7 +77,9 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 
 The app is real HTML with every control labelled, so `screen`, `tap`, `type` and `scroll` work on it like any app. Lists, forms, toggles, segmented controls and tabs react to taps and typing. `run_app_action { session, id, action, input }` runs one action of the spec by name, the way its form does, and the open screen shows the result. If the action refuses the input you get `action_failed` and the reason.
 
-`device_log` records the create and each action with `source: "real"`.
+`update_app { session, id, spec }` changes the app by giving its whole new spec. It is a new version of the same app: the data and settings the person entered stay, and the open screen shows the new look at once. A spec with problems comes back with each problem's path and a fix, and the running version is not touched. The version shows on the installed app.
+
+`device_log` records the create, each action and each update (old and new version) with `source: "real"`.
 
 ## Install apps and switch between them
 

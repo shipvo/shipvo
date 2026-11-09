@@ -107,3 +107,27 @@ test("run_app_action changes the app's data and the open screen shows it; a bad 
   const none = await act("sp-act", { action: "app_action", id: "ghost", action_name: "x" });
   assert.equal(none.code, "not_installed");
 });
+
+test("update_app is a new version: entered data stays, the screen changes, a bad spec changes nothing", async () => {
+  assert.ok((await call("/session", { session: "sp-up" })).ok);
+  assert.equal((await act("sp-up", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
+  await act("sp-up", { action: "app_action", id: "gifts", action_name: "add_gift", input: { name: "Kite" } });
+  // the new version renames the list and adds a heading
+  const v2 = structuredClone(GIFTS);
+  v2.screens[0].body[0].label = "Ideas for the holidays";
+  v2.screens[0].title = "Holiday gifts";
+  const r = await act("sp-up", { action: "update_app", id: "gifts", spec: v2 });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.version, 2);
+  assert.match(r.screen, /Ideas for the holidays/);
+  assert.match(r.screen, /Kite/);   // the gift added in version 1 is still there
+  assert.equal(r.installed_apps.find((a) => a.id === "gifts").version, "2");
+  const bad = await act("sp-up", { action: "update_app", id: "gifts", spec: { spec: "shipvo.app/v0", screens: [] } });
+  assert.equal(bad.ok, false); assert.equal(bad.code, "invalid_spec");
+  const screen = (await act("sp-up", { action: "screen" })).screen;
+  assert.match(screen, /Ideas for the holidays/);   // still version 2
+  const none = await act("sp-up", { action: "update_app", id: "ghost", spec: v2 });
+  assert.equal(none.code, "not_installed");
+  const log = (await act("sp-up", { action: "device_log" })).log.filter((e) => e.name === "update_app");
+  assert.deepEqual(log.map((e) => [e.from, e.version, e.source]), [["1", "2", "real"]]);
+});

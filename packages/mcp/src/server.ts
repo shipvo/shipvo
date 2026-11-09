@@ -380,6 +380,8 @@ use(server, tools.install_app,
   async ({ session, id }) => { need(session); const st = await storeApps(); return result(session, await act({ session, action: "install_app", id, ...(st.ok ? { catalog: st.apps } : {}) })); });
 use(server, tools.create_app, 
   async ({ session, id, spec, name, style, open }) => { need(session); return result(session, await act({ session, action: "create_app", id, spec, ...(name ? { name } : {}), ...(style ? { style } : {}), ...(open === false ? { open: false } : {}) })); });
+use(server, tools.update_app, 
+  async ({ session, id, spec, name }) => { need(session); return result(session, await act({ session, action: "update_app", id, spec, ...(name ? { name } : {}) })); });
 use(server, tools.run_app_action, 
   async ({ session, id, action, input }) => { need(session); return result(session, await act({ session, action: "app_action", id, action_name: action, input: input ?? {} })); });
 use(server, tools.uninstall_app, 

@@ -2387,6 +2387,46 @@
     }
   },
   {
+    "name": "update_app",
+    "description": "Change an app made with create_app by giving its new spec. The change is a new version of the same app: the data and settings the person entered stay, and the open screen shows the new look right away. A spec with problems comes back with each problem's path and a fix, and the running version is not touched. Fails with not_installed (no such spec app) or invalid_spec. Logged in device_log with the old and new version.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id from create_app"
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The whole new spec (shipvo.app/v0)"
+        },
+        "name": {
+          "type": "string",
+          "description": "New name under the icon"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "spec"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "upload_build",
     "description": "Build the app in this project with the simulated device (the same build `shipvo sim` makes), upload it to the hosted phone for this key, and return a build id. Then call open_app(\"<app>@build:<id>\") on the hosted server. The build is private to your account and is deleted when it expires. Runs only on the local (stdio) server, because it reads your project.",
     "inputSchema": {
