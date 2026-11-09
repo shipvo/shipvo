@@ -115,7 +115,6 @@ test("export_phone then import_phone on a new phone restores apps, data, version
   assert.equal(g.kind, "spec"); assert.deepEqual(g.data.gifts.map((r) => r.name), ["Scarf"]); assert.equal(g.placement.pinned, true);
   assert.equal(g.history.length, 2);
   const text = JSON.stringify(out.phone);
-  assert.ok(!/api\.example\.test.*"last_at"/.test(text));
 
   assert.ok((await call("/session", { session: "ex2" })).ok);
   const back = await act("ex2", { action: "import_phone", phone: JSON.parse(text) });
@@ -138,4 +137,38 @@ test("import_phone refuses a bad export and reports an app whose spec is invalid
   assert.deepEqual(r.imported, []);
   assert.equal(r.failed[0].id, "broken"); assert.equal(r.failed[0].reason, "invalid_spec"); assert.ok(r.failed[0].errors.length);
   assert.equal(r.failed[1].reason, "bad_app_id");
+});
+
+test("an export holds no fetched rows from a live source, and import fetches them again", async () => {
+  assert.ok((await call("/session", { session: "ex4" })).ok);
+  assert.equal((await act("ex4", { action: "create_app", id: "prices", spec: PRICES })).ok, true);
+  const out = (await act("ex4", { action: "export_phone" })).phone;
+  const text = JSON.stringify(out);
+  assert.ok(!text.includes("Concert"), "fetched rows must not be in the export");
+  assert.ok(!text.includes("last_at"));
+  assert.deepEqual(out.apps[0].data, {});
+  assert.ok((await call("/session", { session: "ex5" })).ok);
+  serve(200, [{ id: "9", name: "Concert Z", price: "77" }]);
+  const back = await act("ex5", { action: "import_phone", phone: out });
+  assert.deepEqual(back.imported, ["prices"]);
+  assert.match((await act("ex5", { action: "switch_app", id: "prices" })).screen, /Concert Z/);
+});
+
+test("import_phone: a Store app that is already installed is skipped, a bad layout is a warning, the name falls back to the spec, extra apps are listed", async () => {
+  assert.ok((await call("/session", { session: "ex6" })).ok);
+  assert.equal((await act("ex6", { action: "install_app", id: "tide" })).ok, true);
+  const many = Array.from({ length: 203 }, (_, i) => ({ id: `s${i}`, kind: "store" }));
+  const phone = { format: "shipvo.phone/v0", apps: [
+    { id: "tide", kind: "store" },
+    { id: "gifts", kind: "spec", spec: GIFTS, placement: { position: -4 } },
+    ...many.slice(0, 198),
+    ...many.slice(198),
+  ] };
+  const r = await act("ex6", { action: "import_phone", phone });
+  assert.equal(r.ok, true, JSON.stringify(r).slice(0, 300));
+  assert.ok(r.skipped.some((x) => x.id === "tide" && x.reason === "already_installed"));
+  assert.equal(r.skipped.filter((x) => x.reason === "too_many").length, 5);   // 205 apps sent, the first 200 are read
+  assert.ok(r.imported.includes("gifts"));
+  assert.equal(r.warnings[0].id, "gifts"); assert.equal(r.warnings[0].reason, "bad_placement");
+  assert.equal(r.installed_apps.find((a) => a.id === "gifts").name, "Gift Ideas");
 });

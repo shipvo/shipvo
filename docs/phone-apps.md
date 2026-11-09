@@ -106,7 +106,7 @@ Pass `id` for one app and `limit` for the number of recent events. Data and sett
 
 `export_phone` returns the phone's apps as one JSON object (`format: "shipvo.phone/v0"`). Each app has its home screen layout. Apps made with `create_app` also carry their spec, versions with change history, and the data and settings entered in them. Live web data is not stored; it is fetched again on import.
 
-`import_phone` takes that object and puts it on a phone, on Android and iOS. Spec apps start with their data and version, Store apps are installed, and layouts are restored. The result lists `imported`, `skipped` (for example `already_installed`) and `failed` (each with a reason; a bad spec lists its problems). An object that is not an export fails with `bad_export`.
+`import_phone` takes that object and puts it on a phone, on Android and iOS. Spec apps start with their data and version, Store apps are installed, and layouts are restored. The result lists `imported`, `skipped` (for example `already_installed`) and `failed` (each with a reason; a bad spec lists its problems) and `warnings` (an app that installed but whose layout was not valid). Up to 200 apps are read; the rest are listed in `skipped` as `too_many`. An object that is not an export fails with `bad_export`.
 
 ## Arrange the home screen
 

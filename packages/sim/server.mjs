@@ -458,7 +458,8 @@ async function act(id, body) {
     case "import_phone": {
       const ph = body.phone;
       if (!ph || ph.format !== "shipvo.phone/v0" || !Array.isArray(ph.apps)) throw new SimError("bad_export", "phone must be the object export_phone returned (format 'shipvo.phone/v0' with an apps list)");
-      const sid = sidOf(s); const imported = [], skipped = [], failed = [];
+      const sid = sidOf(s); const imported = [], skipped = [], failed = [], warnings = [];
+      for (const a of ph.apps.slice(200)) skipped.push({ id: String(a?.id ?? ""), reason: "too_many" });
       for (const a of ph.apps.slice(0, 200)) {
         const id = String(a?.id ?? "");
         if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id)) { failed.push({ id, reason: "bad_app_id" }); continue; }
@@ -466,15 +467,15 @@ async function act(id, body) {
         if (a.kind === "spec") {
           const r = await specHost.restore(sid, id, a, { style: body.style === "ios" ? "ios" : "android" });
           if (!r.ok) { failed.push({ id, reason: "invalid_spec", errors: r.errors.slice(0, 5).map((e) => `${e.path || "/"}: ${e.message}`) }); continue; }
-          s.apps.installed_apps.push({ id, name: String(a.name ?? id).replace(/[<>"'\\]/g, "").slice(0, 40), url: `spec://${id}`, version: String(specHost.version(sid, id) ?? 1), kind: "spec" });
+          s.apps.installed_apps.push({ id, name: String(a.name ?? a.spec?.app?.name ?? id).replace(/[<>"'\\]/g, "").slice(0, 40), url: `spec://${id}`, version: String(specHost.version(sid, id) ?? 1), kind: "spec" });
         } else {
           try { installApp(s.apps, id); } catch (e) { if (e instanceof AppsError) { skipped.push({ id, reason: e.code }); continue; } throw e; }
         }
-        if (a.placement && typeof a.placement === "object") { try { arrangeApp(s.apps, id, a.placement); } catch { /* a bad layout leaves the app unarranged */ } }
+        if (a.placement && typeof a.placement === "object") { try { arrangeApp(s.apps, id, a.placement); } catch (e) { if (!(e instanceof AppsError)) throw e; warnings.push({ id, reason: e.code, message: e.message }); } }
         s.apps.log.push({ at: Date.now(), name: "import_app", app: id, source: "real" });
         imported.push(id);
       }
-      return { imported, skipped, failed, installed_apps: s.apps.installed_apps, screen: `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+      return { imported, skipped, failed, warnings, installed_apps: s.apps.installed_apps, screen: `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
     case "app_action": {
