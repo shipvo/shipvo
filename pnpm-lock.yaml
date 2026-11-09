@@ -351,6 +351,10 @@ importers:
         version: link:../cli
 
   packages/sim:
+    dependencies:
+      '@shipvo/spec':
+        specifier: workspace:^
+        version: link:../spec
     devDependencies:
       playwright:
         specifier: 1.63.0
