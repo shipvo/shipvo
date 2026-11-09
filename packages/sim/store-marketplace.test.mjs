@@ -28,7 +28,8 @@ for (const skin of ["android", "ios"]) {
       await p.evaluate(() => window.postMessage({ type: "pn:nav", where: "home" }, "*"));
       await p.getByRole("button", { name: "Store" }).click();
       await p.getByRole("button", { name: "Install Pocket Notes" }).waitFor();
-      assert.equal(await p.locator('[data-part="store-rows"] .sf-store-row').count(), 2);   // the marketplace list, not the fixture
+      // The Store draws the fixture list first and swaps in the marketplace list when it arrives, so wait for it.
+      await p.waitForFunction(() => document.querySelectorAll('[data-part="store-rows"] .sf-store-row').length === 2 && !!document.querySelector('[aria-label="Install Gone App"]'));
       await p.getByRole("button", { name: "Install Pocket Notes" }).click();
       await p.locator(".sf-store-have").waitFor();
       assert.ok(fetched.includes("/w/notes/r4/index.html"), `the bundle was fetched: ${fetched}`);
