@@ -1,0 +1,2 @@
+- control-plane: SAML sign-in routes `/saml/<org>/start`, `/saml/<org>/acs` and `/saml/<org>/metadata`, configured with `SAML_ORGS`. Sessions and roles match the OIDC login.
+- Migration: none. New optional setting `SAML_ORGS`.

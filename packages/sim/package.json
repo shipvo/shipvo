@@ -46,6 +46,7 @@
     "push-notification.mjs",
     "network-profiles.mjs",
     "apps.mjs",
+    "build-cache.mjs",
     "README.md"
   ],
   "peerDependencies": {

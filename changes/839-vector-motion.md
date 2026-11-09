@@ -1,0 +1,2 @@
+- spec: the `vector` block draws rect, circle, path, text and linear gradient shapes with attributes bound to expressions, on Android and iOS skins. It needs a `label`, and its screen-tree name includes its `value`. Unknown shapes are validation errors with JSON paths.
+- spec: `motion` on any block supports `enter` (fade, slide, scale) and `change` (countUp, pulse). The theme `motion: "none"` and the new `reduceMotion` render option remove all animation fields. `RenderOptions` gains `reduceMotion`; no migration needed.
