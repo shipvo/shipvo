@@ -128,6 +128,10 @@ device_log { session }                 -> install_app (source "real" for marketp
 | App | What it does | Actions (MCP tools) | Spec |
 | --- | --- | --- | --- |
 | Notes and Tasks | Keeps tasks and notes on the phone, across chats and assistants. Android and iOS. | `add_task`, `complete_task`, `add_note`, `search` | [`templates/notes-tasks/app.json`](../templates/notes-tasks/app.json) |
+| Calendar | Puts events on a calendar, seen by day or month. | `create_event`, `list_events`, `show_day`, `delete_event` | [`templates/calendar/app.json`](../templates/calendar/app.json) |
+| Files and Photos | Keeps files and photos in one place, sorted by album. | `save_file`, `find_files`, `move_to_album`, `show_matches`, `delete_file` | [`templates/files-photos/app.json`](../templates/files-photos/app.json) |
+| Wallet | Keeps tickets, receipts and passes, grouped by kind, with an expiring-soon list. | `save_pass`, `find_pass`, `show_matches`, `delete_pass` | [`templates/wallet/app.json`](../templates/wallet/app.json) |
+| Shop | Lists products, takes orders and shows them in one place; the currency is a setting. | `add_product`, `find_products`, `place_order`, `list_orders`, `set_currency`, `show_matches`, `pick_product` | [`templates/shop/app.json`](../templates/shop/app.json) |
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
 
