@@ -7,10 +7,42 @@
   if (q.get("platform") === "ios") state.platform = "ios";
   ["dark", "large", "rtl"].forEach(function (k) { if (q.get(k) === "1") state[k] = true; });
 
-  function send() { try { phone.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} }
+  function send() { try { phone.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} replay(); }
   function loadPhone() { phone.title = state.platform === "ios" ? "iOS phone" : "Android phone"; phone.src = phone.getAttribute("data-src-" + state.platform); }
   phone.addEventListener("load", function () { send(); setTimeout(send, 300); });
   window.addEventListener("message", function (e) { if (e.source === phone.contentWindow && e.data && e.data.type === "pg:ready") send(); });
+
+  // Device API controls. Each choice goes to the phone as { type: "pg:device", kind, value }; the phone replays the last choices after a reload.
+  var DEVICE = [
+    { kind: "location", label: "Location", opts: [["Lisbon", "Lisbon"], ["Douala", "Douala"], ["Tokyo", "Tokyo"]] },
+    { kind: "camera", label: "Camera", opts: [["Sample photo: harbour", "harbour"], ["Sample photo: lighthouse", "lighthouse"], ["Deny", "denied"]] },
+    { kind: "biometrics", label: "Biometrics", opts: [["Accept", "accepted"], ["Reject", "rejected"], ["Unavailable", "unavailable"]] },
+    { kind: "payment", label: "Payment", opts: [["Approve", "approved"], ["Decline", "declined"], ["Time out", "timeout"]] },
+    { kind: "notification", label: "Notification", opts: [["Send notification", "send"]], action: true },
+    { kind: "airplane", label: "Airplane mode", opts: [["On", "on"], ["Off", "off"]] }
+  ];
+  var chosen = {};
+  function sendDevice(kind, value) { try { phone.contentWindow.postMessage({ type: "pg:device", kind: kind, value: value }, "*"); } catch (e) {} }
+  function deviceControls(panel) {
+    DEVICE.forEach(function (g) {
+      var fs = document.createElement("fieldset"), lg = document.createElement("legend"); lg.textContent = g.label; fs.appendChild(lg);
+      g.opts.forEach(function (o) {
+        var b = document.createElement("button"); b.type = "button"; b.textContent = o[0];
+        b.setAttribute("data-kind", g.kind); b.setAttribute("data-value", o[1]);
+        if (!g.action) b.setAttribute("aria-pressed", String(chosen[g.kind] === o[1]));
+        b.addEventListener("click", function () {
+          if (!g.action) {
+            chosen[g.kind] = o[1];
+            Array.prototype.forEach.call(fs.querySelectorAll("button"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+          }
+          sendDevice(g.kind, o[1]);
+        });
+        fs.appendChild(b);
+      });
+      panel.appendChild(fs);
+    });
+  }
+  function replay() { Object.keys(chosen).forEach(function (k) { sendDevice(k, chosen[k]); }); }
 
   function paintBar() {
     $("pg-android").setAttribute("aria-pressed", String(state.platform === "android"));
@@ -30,6 +62,7 @@
     var h = document.createElement("h2"); h.textContent = f.title; panel.appendChild(h);
     var p = document.createElement("p"); p.textContent = f.text; panel.appendChild(p);
     if (f.doc) { var a = document.createElement("a"); a.className = "link"; a.href = f.doc; a.textContent = "Read the docs"; panel.appendChild(a); }
+    if (f.id === "device") deviceControls(panel);
     panel.setAttribute("data-feature", f.id);
   }
   window.addEventListener("hashchange", show);
