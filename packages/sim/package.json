@@ -47,6 +47,7 @@
     "network-profiles.mjs",
     "apps.mjs",
     "build-cache.mjs",
+    "build-open.mjs",
     "README.md"
   ],
   "peerDependencies": {

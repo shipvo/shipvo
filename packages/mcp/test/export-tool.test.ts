@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const root = resolve(__dirname, "..");
@@ -60,6 +61,27 @@ describe("export_test", () => {
     expect(t).toContain('await phone.tap("Go");');
     expect(t).toContain("await phone.back();");
     expect(t).not.toContain("screen(");
+    await c.close();
+  });
+  it("records a valid traceparent, echoes it, ignores bad ones and never logs baggage", async () => {
+    const c = await connect();
+    const tp = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    const o: any = await c.callTool({ name: "open_app", arguments: { app: "shop", session: "t1" } }, undefined, { timeout: 20000 });
+    expect(o._meta?.traceparent).toBeUndefined();
+    const plain: any = await c.callTool({ name: "screen", arguments: { session: "t1" } });
+    expect(plain._meta).toBeUndefined();
+    const call = (name: string, args: object, meta: object) => (c as any).request({ method: "tools/call", params: { name, arguments: args, _meta: meta } }, CallToolResultSchema);
+    const r: any = await call("tap", { session: "t1", ref: "e3" }, { traceparent: tp, baggage: "user=secret-baggage", tracestate: "v=1" });
+    expect(r._meta.traceparent).toBe(tp);
+    const bad: any = await call("screen", { session: "t1" }, { traceparent: "garbage" });
+    expect(bad.isError).toBeFalsy();
+    expect(bad._meta?.traceparent).toBeUndefined();
+    const e: any = await c.callTool({ name: "export_test", arguments: { session: "t1" } });
+    expect(e.structuredContent.traceIds).toEqual(["4bf92f3577b34da6a3ce929d0e0e4736"]);
+    expect(e.structuredContent.calls.map((x: any) => [x.tool, x.traceId])).toEqual([["open_app", undefined], ["screen", undefined], ["tap", "4bf92f3577b34da6a3ce929d0e0e4736"], ["screen", undefined], ["export_test", undefined]]);
+    expect(txt(e)).toContain("// trace id: 4bf92f3577b34da6a3ce929d0e0e4736");
+    expect(JSON.stringify(e)).not.toContain("secret-baggage");
+    expect(JSON.stringify(e)).not.toContain("tracestate");
     await c.close();
   });
   it("never exports the payment pin", async () => {
