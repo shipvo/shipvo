@@ -37,7 +37,7 @@ test("createSpecApp fails with already_installed for a used id", () => {
   assert.equal(st.installed_apps.length, 1);
 });
 
-const PORT = pickPort(6500, 300);
+const PORT = pickPort(11000, 300);
 const root = mkdtempSync(join(tmpdir(), "sim-create-app-"));
 const dist = join(root, "dist");
 let proc;
