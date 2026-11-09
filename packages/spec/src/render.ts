@@ -7,6 +7,8 @@ import { evaluate, evaluateTemplate } from "./eval.js";
 import type { EvalOptions } from "./eval.js";
 import type { Issue } from "./types.js";
 import { aggregatePoints, chartSvg, chartText } from "./chart.js";
+import { resolveShapes, vectorSvg } from "./vector.js";
+import type { Shape } from "./vector.js";
 import type { Aggregate, ChartKind, ChartPoint } from "./chart.js";
 
 export type PhoneStyle = "android" | "ios";
@@ -42,6 +44,8 @@ export interface RenderOptions extends EvalOptions {
   tab?: string;
   /** Shows the screen as a bottom sheet. Screens with `"presentation": "sheet"` are always shown that way. Set by {@link createApp}. */
   sheet?: boolean;
+  /** The phone's reduce-motion setting. When true, no node carries animation fields. */
+  reduceMotion?: boolean;
   /** A message to show last, such as the result of an action. Set by {@link createApp}. */
   toast?: string;
 }
@@ -103,7 +107,20 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
 
   const bound = (b: Obj): unknown => (typeof b.bind === "string" ? state[b.bind.replace(/^state\./, "")] : undefined);
 
+  const motionOn = (s.theme?.motion ?? "calm") !== "none" && options.reduceMotion !== true;
+  const duration = s.theme?.motion === "lively" ? 400 : 240;
   const build = (b: Obj, scope: Record<string, unknown>): ScreenNode | undefined => {
+    const node = buildBlock(b, scope);
+    if (node && motionOn && b.motion && typeof b.motion === "object" && (b.motion.enter || b.motion.change)) {
+      const m: Record<string, unknown> = { duration };
+      if (b.motion.enter) m.enter = b.motion.enter;
+      if (b.motion.change) { m.change = b.motion.change; m.to = node.props?.value ?? node.name; }
+      node.props = { ...node.props, motion: m };
+    }
+    return node;
+  };
+
+  const buildBlock = (b: Obj, scope: Record<string, unknown>): ScreenNode | undefined => {
     if (typeof b.when === "string") {
       try { if (!evaluate(b.when.replace(/^\{\{\s*|\s*\}\}$/g, ""), scope, options)) return undefined; } catch { return undefined; }
     }
@@ -175,6 +192,13 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
         return buildKanban(b, scope, label);
       case "timeline":
         return buildTimeline(b, scope, label);
+      case "vector": {
+        const width = Number(b.width) > 0 ? Number(b.width) : 100, height = Number(b.height) > 0 ? Number(b.height) : 100;
+        const shapes = resolveShapes(b.shapes, (v) => (typeof v === "string" && v.includes("{{") ? tpl(v, scope) : v));
+        const value = b.value === undefined ? undefined : tpl(b.value, scope);
+        const name = value === undefined || value === null ? label : `${label}: ${text(value)}`;
+        return { role: "img", name, block: "vector", children: [], props: { width, height, value, shapes } };
+      }
       case "button": {
         const key = String(b.id ?? b.label);
         registry.set(`button:${key}`, { kind: "button", block: b, scope });
@@ -395,6 +419,13 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
   const gap = (g: unknown) => Math.round((GAPS[String(g ?? "md")] ?? GAPS.md!) * t.unit);
   const ios = style === "ios";
   const node = (n: ScreenNode): string => {
+    const m = n.props?.motion as Record<string, unknown> | undefined;
+    const html = plain(n);
+    if (!m) return html;
+    const anim = [m.enter ? `sv-${esc(m.enter)} ${m.duration}ms ease-out both` : "", m.change === "pulse" ? `sv-pulse ${m.duration}ms ease-out` : ""].filter(Boolean).join(",");
+    return `<div${m.change ? ` data-change="${esc(m.change)}" data-to="${esc(m.to)}"` : ""} style="${anim ? `animation:${anim}` : ""}">${html}</div>`;
+  };
+  const plain = (n: ScreenNode): string => {
     const a = `role="${n.role}"${n.name ? ` aria-label="${esc(n.name)}"` : ""}`;
     const pr = n.props ?? {};
     const inner = n.children.map(node).join("");
@@ -521,6 +552,8 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
       }
       case "option":
         return `<label style="display:flex;align-items:center;gap:8px;min-height:44px;font:400 ${Math.round(16 * t.scale)}px ${t.font};color:${t.p.text}"><input type="radio" aria-label="${esc(n.name)}"${pr.checked ? " checked" : ""}>${esc(n.name)}</label>`;
+      case "vector":
+        return vectorSvg(Number(pr.width), Number(pr.height), pr.shapes as Shape[], n.name);
       case "error":
       case "toast":
         return `<p ${a} style="margin:0;font:500 ${Math.round(14 * t.scale)}px ${t.font};color:${n.block === "error" ? t.p.danger : t.p.success}">${esc(n.name)}</p>`;
@@ -537,6 +570,6 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
   const bar = ios
     ? `<header style="padding:54px 16px 10px;text-align:center;font:600 17px ${t.font};color:${t.p.text}">${esc(root.name)}</header>`
     : `<header style="padding:40px 16px 14px;font:500 22px ${t.font};color:${t.p.text};background:${t.p.surface};box-shadow:${t.shadow}">${esc(root.name)}</header>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(appName || root.name)}</title><style>[tabindex]:focus-visible{outline:2px solid ${t.p.primary};outline-offset:2px}</style></head>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(appName || root.name)}</title><style>@keyframes sv-fade{from{opacity:0}}@keyframes sv-slide{from{transform:translateY(16px);opacity:0}}@keyframes sv-scale{from{transform:scale(.9);opacity:0}}@keyframes sv-pulse{50%{transform:scale(1.06)}}[tabindex]:focus-visible{outline:2px solid ${t.p.primary};outline-offset:2px}</style></head>
 <body data-style="${style}" style="margin:0;background:${t.p.background}"><main role="main" aria-label="${esc(root.name)}" style="min-height:100vh;box-sizing:border-box;background:${t.p.background}">${bar}<div style="padding:16px;display:flex;flex-direction:column;gap:${gap("md")}px">${root.children.map(node).join("")}</div></main></body></html>`;
 }
