@@ -1,0 +1,2 @@
+- `shipvo.dev`: the playground "Many phones" entry shows 1 to 12 Android and iOS phones side by side, with a count and a mix control.
+- Migration: none.
