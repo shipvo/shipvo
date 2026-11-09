@@ -72,3 +72,23 @@ test("refresh_app on an app that is not running says not_installed", async () =>
   assert.ok((await call("/session", { session: "dl2" })).ok);
   assert.equal((await act("dl2", { action: "refresh_app", id: "ghost" })).code, "not_installed");
 });
+
+test("app_activity lists versions with what changed, sources and events; not_installed for others", async () => {
+  assert.ok((await call("/session", { session: "dl3" })).ok);
+  assert.equal((await act("dl3", { action: "create_app", id: "prices", spec: PRICES })).ok, true);
+  const v2 = { ...PRICES, screens: [...PRICES.screens, { id: "about", title: "About", body: [{ type: "text", value: "Price Watch" }] }] };
+  assert.equal((await act("dl3", { action: "update_app", id: "prices", spec: v2 })).ok, true);
+  await act("dl3", { action: "refresh_app", id: "prices" });
+  const r = await act("dl3", { action: "app_activity" });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.apps.length, 1);
+  const a = r.apps[0];
+  assert.equal(a.id, "prices"); assert.equal(a.version, 2);
+  assert.match(a.history[0].changes[0], /^created: 1 screens, 0 actions, 1 data sources$/);
+  assert.deepEqual(a.history[1].changes, ["added screen 'about'"]);
+  assert.equal(a.sources[0].name, "prices"); assert.equal(typeof a.sources[0].last_at, "number");
+  assert.deepEqual(a.events.map((e) => e.name).filter((n) => n !== "data_refresh"), ["create_app", "update_app"]);
+  assert.deepEqual(a.events.find((e) => e.name === "update_app").changes, ["added screen 'about'"]);
+  assert.equal((await act("dl3", { action: "app_activity", id: "prices", limit: 1 })).apps[0].events.length, 1);
+  assert.equal((await act("dl3", { action: "app_activity", id: "ghost" })).code, "not_installed");
+});

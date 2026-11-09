@@ -92,6 +92,16 @@ An app can read from the web. Declare the host in `permissions.network` and give
 
 The phone fetches the source when the app is created, again whenever its cache time runs out (the sim checks every 30 seconds), and when you call `refresh_app`. The open screen redraws with the new data on Android and iOS. A source that fails keeps its last good data, and `refresh_app` lists the error. Each fetch is logged in `device_log` as `data_refresh`.
 
+## See what was built and changed
+
+`app_activity` shows what happened to each app made with `create_app`. For every app it returns:
+
+- **versions**: each version with plain lines for what changed (`added screen 'about'`, `removed action 'add'`, `changed data 'prices'`);
+- **sources**: each live data source and when it last updated;
+- **events**: create, update, action and data refresh, newest last.
+
+Pass `id` for one app and `limit` for the number of recent events. Data and settings a person entered stay across versions, so the history is the record of what the agent changed.
+
 ## Arrange the home screen
 
 `arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then, also across midnight. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.

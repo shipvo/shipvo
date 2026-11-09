@@ -386,6 +386,8 @@ use(server, tools.arrange_apps,
   async ({ session, ...rest }) => { need(session); return result(session, await act({ session, action: "arrange_apps", ...rest })); });
 use(server, tools.refresh_app, 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "refresh_app", id })); });
+use(server, tools.app_activity, 
+  async ({ session, id, limit }) => { need(session); return result(session, await act({ session, action: "app_activity", ...(id ? { id } : {}), ...(limit ? { limit } : {}) })); });
 use(server, tools.set_phone_time, 
   async ({ session, at }) => { need(session); return result(session, await act({ session, action: "set_time", at })); });
 use(server, tools.run_app_action, 

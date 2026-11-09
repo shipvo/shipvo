@@ -76,3 +76,12 @@ test("an update keeps working live data and fetches again for the new version", 
   assert.equal(st.calls, 2);
   assert.deepEqual(names(h), ["Concert A, 40"]);
 });
+
+test("diffSpec names what was added, removed and changed", async () => {
+  const { diffSpec, describeSpec } = await import("./spec-host.mjs");
+  const a = { spec: "shipvo.app/v0", app: { id: "x", name: "X" }, screens: [{ id: "home", title: "Home" }], actions: { add: { steps: [] } }, data: {} };
+  const b = { ...a, screens: [{ id: "home", title: "Start" }, { id: "more", title: "More" }], actions: {}, data: { items: { source: "collection", fields: {} } } };
+  assert.deepEqual(diffSpec(a, b).sort(), ["added data 'items'", "added screen 'more'", "changed screen 'home'", "removed action 'add'"]);
+  assert.deepEqual(diffSpec(a, a), []);
+  assert.equal(describeSpec(b), "2 screens, 0 actions, 1 data sources");
+});
