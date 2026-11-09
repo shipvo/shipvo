@@ -154,6 +154,24 @@ test("an export holds no fetched rows from a live source, and import fetches the
   assert.match((await act("ex5", { action: "switch_app", id: "prices" })).screen, /Concert Z/);
 });
 
+test("import_phone drops data and settings the spec does not declare, and skips bad history entries", async () => {
+  assert.ok((await call("/session", { session: "ex7" })).ok);
+  const phone = { format: "shipvo.phone/v0", apps: [{
+    id: "gifts", kind: "spec", spec: GIFTS,
+    data: { gifts: "x", other: [{ id: "1" }] },
+    state: { ghost: 1 },
+    history: [null, 7, { version: "nope", at: "x", changes: "no" }],
+  }] };
+  const r = await act("ex7", { action: "import_phone", phone });
+  assert.equal(r.ok, true, JSON.stringify(r).slice(0, 300));
+  assert.deepEqual(r.imported, ["gifts"]); assert.deepEqual(r.failed, []);
+  assert.ok(r.warnings.some((w) => w.id === "gifts" && w.reason === "data_skipped" && /gifts/.test(w.message)));
+  assert.ok(r.warnings.some((w) => /ghost/.test(w.message)));
+  await act("ex7", { action: "switch_app", id: "gifts" });
+  assert.match((await act("ex7", { action: "screen" })).screen, /No gifts yet/);
+  assert.equal((await act("ex7", { action: "app_activity", id: "gifts" })).apps[0].history.length, 1);
+});
+
 test("import_phone: a Store app that is already installed is skipped, a bad layout is a warning, the name falls back to the spec, extra apps are listed", async () => {
   assert.ok((await call("/session", { session: "ex6" })).ok);
   assert.equal((await act("ex6", { action: "install_app", id: "tide" })).ok, true);
