@@ -77,8 +77,9 @@ export function closeWatchers(s) { for (const p of s.watch?.peers ?? []) p.close
  * A viewer asks for a session with ?session=; without it, it follows the newest one.
  */
 export function createWatch(sessions, accept, doInput = async () => {}) {
-  const viewers = new Set();   // { peer, pinned, current }
-  const target = (v) => (v.pinned && sessions.has(v.pinned) ? v.pinned : watchList(sessions)[0]?.session ?? null);
+  const viewers = new Set();   // { peer, pinned, only, current }
+  // A viewer with ?only=1 sees its pinned session and nothing else (the hosted watch link is for one session).
+  const target = (v) => (v.pinned && sessions.has(v.pinned) ? v.pinned : v.only ? null : watchList(sessions)[0]?.session ?? null);
   function attach(v) {
     const id = target(v);
     if (id === v.current) return;
@@ -111,7 +112,7 @@ export function createWatch(sessions, accept, doInput = async () => {}) {
     /** Call after a session starts or ends. */
     refresh() { for (const v of viewers) push(v); },
     upgrade(req, socket, url) {
-      const v = { peer: null, control: false, pinned: url.searchParams.get("session") || null, current: null };
+      const v = { peer: null, control: false, pinned: url.searchParams.get("session") || null, only: url.searchParams.get("only") === "1", current: null };
       v.peer = accept(req, socket, async (text) => {
         let m; try { m = JSON.parse(text); } catch { return; }
         if (m?.type === "control") { v.control = m.on === true; return; }
@@ -143,10 +144,10 @@ body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px
 .w-view img{width:100%;height:100%;object-fit:contain;display:block}
 @media (prefers-color-scheme:dark){html,body{background:#15171a;color:#eee}.w-steps{background:#23262b}.w-steps small{color:#bbb}.w-steps li{border-color:#fff2}.w-empty{color:#bbb}.w-err{color:#f2b8b5}}`;
 
-const SCRIPT = (skin, pinned) => `(function(){
+const SCRIPT = (skin, pinned, hosted) => `(function(){var hosted=${hosted};
 var $=function(p){return document.querySelector('[data-part="'+p+'"]')},img=$("screen"),pick=$("session-picker"),pinned=${JSON.stringify(pinned)},take=$("take-over"),ws;
 function label(s){return s.app+" \\u00b7 "+(s.skin==="ios"?"iPhone":"Android")+" \\u00b7 "+(s.started_at||"").replace("T"," ").slice(0,19)}
-function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/watch/ws"+(pinned?"?session="+encodeURIComponent(pinned):""));
+function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+(hosted?location.pathname.replace(/\\/$/,"")+"/ws"+location.search:"/watch/ws"+(pinned?"?session="+encodeURIComponent(pinned):"")));
 function addStep(s){var li=document.createElement("li");if(s.by==="you")li.className="you";li.textContent=s.text;
 if(s.change){var c=document.createElement("small");c.textContent=s.change;li.append(c)}$("step-list").prepend(li);$("steps-empty").hidden=true}
 function clearErr(){var x=$("input-error");x.textContent="";x.hidden=true}
@@ -163,7 +164,7 @@ m.sessions.forEach(function(s){var o=document.createElement("option");o.value=s.
 pick.value=m.following?"":m.current||"";
 $("empty").hidden=!!m.current;
 var cur=m.sessions.filter(function(s){return s.session===m.current})[0];
-if(cur&&cur.skin!==${JSON.stringify(skin)})location.replace("/watch?skin="+cur.skin+(pinned?"&session="+encodeURIComponent(pinned):""));
+if(cur&&cur.skin!==${JSON.stringify(skin)}){if(hosted){var nu=new URL(location.href);nu.searchParams.set("skin",cur.skin);location.replace(nu.toString())}else location.replace("/watch?skin="+cur.skin+(pinned?"&session="+encodeURIComponent(pinned):""))}
 if(!m.current){img.removeAttribute("src");0}}};
 ws.onclose=function(){setTimeout(connect,1000)}}
 function send(m){if(take.checked&&ws&&ws.readyState===1)ws.send(JSON.stringify(m))}
@@ -182,15 +183,16 @@ connect();
 })();`;
 
 /** The /watch page: the phone frame in the given skin, and a session picker. */
-export function watchPage(skin = "android", pinned = "") {
+export function watchPage(skin = "android", pinned = "", opts = {}) {
+  const hosted = opts.hosted === true, takeOver = !hosted || opts.takeOver === true;
   skin = skin === "ios" ? "ios" : "android";
   const screen = `<div class="w-view" data-part="viewer"><img data-part="screen" alt="The agent's phone" draggable="false"></div>`;
   const frame = renderFrame({ skin, screen });
   const title = `Watch the agent's phone (simulated ${skin === "ios" ? "iPhone" : "Android"})`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
-<style>${CSS}\n${frame.css}</style></head><body><div class="w-bar"><label>Session <select data-part="session-picker" aria-label="Session"><option value="">Newest session</option></select></label>
-<label class="w-take"><input type="checkbox" data-part="take-over" aria-describedby="take-over-help"> Take over</label><span id="take-over-help" class="w-empty">Your taps, swipes and typing go to the phone</span>
+<style>${CSS}\n${frame.css}</style></head><body><div class="w-bar"><label${hosted ? " hidden" : ""}>Session <select data-part="session-picker" aria-label="Session"><option value="">Newest session</option></select></label>
+<label class="w-take"${takeOver ? "" : " hidden"}><input type="checkbox" data-part="take-over" aria-describedby="take-over-help"${takeOver ? "" : " disabled"}> Take over</label><span id="take-over-help" class="w-empty"${takeOver ? "" : " hidden"}>Your taps, swipes and typing go to the phone</span>${!takeOver && opts.signin ? `<a data-part="sign-in" href="${String(opts.signin).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c])}">Sign in to take over</a>` : ""}
 <p class="w-err" role="status" data-part="input-error" hidden></p>
 <p class="w-empty" data-part="empty">No live session yet. It appears here when your agent starts one.</p></div>
-<div class="w-main">${frame.html}<aside class="w-steps" aria-label="Agent steps"><h2>Agent steps</h2><p class="w-empty" data-part="steps-empty">No steps yet.</p><ol data-part="step-list"></ol></aside></div><script>${SCRIPT(skin, pinned).replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
+<div class="w-main">${frame.html}<aside class="w-steps" aria-label="Agent steps"><h2>Agent steps</h2><p class="w-empty" data-part="steps-empty">No steps yet.</p><ol data-part="step-list"></ol></aside></div><script>${SCRIPT(skin, pinned, hosted).replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
 }
