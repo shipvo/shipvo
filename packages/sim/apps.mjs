@@ -69,14 +69,19 @@ export function profilePatch(st) {
   return Object.assign({}, ...Object.entries(st.settings).map(([k, v]) => settingPatch(k, v)));
 }
 
-const note = (st, name, id) => { st.log.push({ at: Date.now(), name, app: id, source: "simulated" }); };
+const note = (st, name, id, extra) => { st.log.push({ at: Date.now(), name, app: id, source: "simulated", ...extra }); };
 
-/** Install an app from the catalog (default: the phone's Store list). Throws unknown_app or already_installed. */
-export function installApp(st, id, catalog = st.store) {
+/**
+ * Install an app from the catalog (default: the phone's Store list). Throws unknown_app or already_installed.
+ * `real` is { sha256, bytes } when the server fetched the app's published bundle first: the install is then logged
+ * with source "real" and the installed entry keeps the hash. Fixture installs stay "simulated".
+ */
+export function installApp(st, id, catalog = st.store, real) {
   const found = (catalog ?? []).find((a) => a.id === id);
   if (!found) throw new AppsError("unknown_app", `no app '${id}' in the Store. Apps: ${(catalog ?? []).map((a) => a.id).join(", ") || "none"}`);
   if (st.installed_apps.some((a) => a.id === id)) throw new AppsError("already_installed", `'${id}' is already installed`);
-  st.installed_apps.push(entry(found)); note(st, "install_app", id); return st;
+  st.installed_apps.push({ ...entry(found), ...(real ? { sha256: real.sha256, bytes: real.bytes } : {}) });
+  note(st, "install_app", id, real ? { source: "real", sha256: real.sha256, bytes: real.bytes } : undefined); return st;
 }
 
 /** Remove an app. If it was in front, the phone goes home and current_app is empty. Throws not_installed. */
@@ -204,6 +209,9 @@ export const storeCss = [
   `.sf-apps{position:absolute;left:28px;right:28px;top:180px;display:flex;flex-wrap:wrap;gap:20px 24px}.sf-apps .sf-icon{position:static}`,
 ].join("");
 
+/** The most a Store app bundle may be: the same cap as build_url (see build-cache.mjs). */
+export const MAX_BUNDLE_BYTES = 200 * 1024 * 1024;
+
 /** Client script: draws installed icons and the Store in the frame page. `seed` is a phone.json object. */
 export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
@@ -212,20 +220,33 @@ var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;
-var st;try{st=loadProfile(${JSON.stringify(seed)})}catch(x){st=createApps()}
+var mp=${JSON.stringify(seed.marketplace ?? null)},urls={},MAXB=${MAX_BUNDLE_BYTES};
+var st;try{st=loadProfile(${JSON.stringify({ ...seed, marketplace: undefined })})}catch(x){st=createApps()}
 st.settings={};
 var box=document.createElement("div");box.className="sf-apps";box.setAttribute("data-part","installed-apps");home.appendChild(box);
 function phoneNow(){var c=st.clock;return c?{getDay:function(){return c.day},getHours:function(){return c.h},getMinutes:function(){return c.m}}:new Date()}
 function drawHome(){box.innerHTML=installedIconsHtml(st,phoneNow())}
 window.__pnHome={sync:function(apps,clock){st.installed_apps=apps;st.clock=clock||null;drawHome()}};
-function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)}
-function open(on){sc.hidden=!on;if(on){drawStore();sc.focus({preventScroll:true})}}
+var msg="";
+function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)+(msg?'<p class="sf-store-msg" role="status">'+esc(msg)+'</p>':"")}
+function loadStore(){if(!mp)return Promise.resolve();return fetch(mp.replace(/\\/$/,"")+"/apps/public").then(function(r){return r.json()}).then(function(j){var l=(j&&j.apps)||[];if(l.length)st.store=l.map(function(a){return entry({id:a.app_id,name:a.name||a.app_id,version:a.latest_release!=null?"r"+a.latest_release:"latest",url:"app://"+a.app_id+(a.latest_release!=null?"@r"+a.latest_release:"@latest")})})}).catch(function(){})}
+// Without a session the page fetches the app itself. The marketplace answers with CORS open, so a page on any origin can read it.
+function bundle(a){var m=/^app:\\/\\/([a-z0-9-]+)(?:@(r?\\d+|latest))?$/.exec(a.url||"");if(!m)return Promise.reject(new Error("This app has no bundle URL"));var b=mp.replace(/\\/$/,"")+"/w/"+m[1]+"/";
+return(m[2]&&m[2]!=="latest"?Promise.resolve("r"+m[2].replace("r","")):fetch(b+"releases.json").then(function(r){if(!r.ok)throw new Error("No published release");return r.json()}).then(function(j){return"r"+j.latest})).then(function(rel){return b+rel+"/index.html"})}
+function sha(buf){if(!(window.crypto&&crypto.subtle))return Promise.resolve(undefined);return crypto.subtle.digest("SHA-256",buf).then(function(d){return Array.prototype.map.call(new Uint8Array(d),function(x){return("0"+x.toString(16)).slice(-2)}).join("")})}
+function localInstall(id){var a=st.store.filter(function(x){return x.id===id})[0];if(!a)return Promise.reject(new Error("No such app"));
+if(!mp||/^fixture:/.test(a.url)){installApp(st,id);return Promise.resolve()}
+var bad=function(){return new Error("The app could not be fetched")};
+return bundle(a).then(function(u){return fetch(u).then(function(r){if(!r.ok||Number(r.headers.get("content-length"))>MAXB)throw bad();return r.arrayBuffer()}).then(function(buf){if(buf.byteLength>MAXB)throw bad();return sha(buf).then(function(h){urls[id]=u;installApp(st,id,st.store,{sha256:h,bytes:buf.byteLength})})})})}
+function open(on){sc.hidden=!on;if(on){msg="";drawStore();sc.focus({preventScroll:true});loadStore().then(drawStore)}}
 drawHome();
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="store-icon"]'))return open(true);
 if(t.closest('[data-part="store-close"]'))return open(false);
-var i=t.closest('[data-part="store-install"]');if(i){try{installApp(st,i.getAttribute("data-app"))}catch(x){}drawStore();drawHome();return}
-var a=t.closest('[data-part="installed-app"]');if(a){try{switchApp(st,a.getAttribute("data-app"))}catch(x){}window.postMessage({type:"pn:nav",where:"app"},"*")}});
+var i=t.closest('[data-part="store-install"]');if(i){var id=i.getAttribute("data-app");
+msg="Installing...";drawStore();localInstall(id).then(function(){msg=""}).catch(function(){msg="The app could not be fetched"}).then(function(){drawStore();drawHome()});return}
+var a=t.closest('[data-part="installed-app"]');if(a){var aid=a.getAttribute("data-app");
+try{switchApp(st,aid)}catch(x){}var fr=document.getElementById(${JSON.stringify(iframeId)});if(fr&&urls[aid])fr.src=urls[aid];window.postMessage({type:"pn:nav",where:"app"},"*")}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)open(false)});
 })();`;
 }
