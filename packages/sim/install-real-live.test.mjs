@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { pickPort } from "./test-port.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(10400, 150), CP_PORT = pickPort(10550, 150);
+const PORT = pickPort(10700, 150), CP_PORT = pickPort(10850, 150);
 const root = mkdtempSync(join(tmpdir(), "sim-install-real-"));
 const dist = join(root, "dist"), dir = join(root, "state");
 const BUNDLE = "<!doctype html><html><head><title>Notes</title></head><body><h1>Pocket Notes r4</h1></body></html>";
