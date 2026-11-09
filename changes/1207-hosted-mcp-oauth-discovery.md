@@ -1,2 +1,0 @@
-- `@shipvo/sim` (sim.shipvo.dev): the hosted MCP serves OAuth discovery (`/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`) and dynamic client registration (`POST /register`, https or loopback redirect URIs). Tool calls without a key get a `401` with a `WWW-Authenticate` header that points to the metadata. `initialize` and `tools/list` stay open; API keys work as before.
-- Migration: apply `services/sim/migrations/0001_oauth_clients.sql` to the D1 database before deploying.

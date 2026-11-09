@@ -1,2 +1,0 @@
-- `@shipvo/control-plane`: added a SAML 2.0 response verifier (`verifySamlResponse`) that checks the signature, issuer, audience, time window, `InResponseTo` and replayed ids, and maps the user to a role like OIDC does. It refuses unsigned assertions, signature wrapping and DTDs. It is not wired to a route yet.
-- Migration: none.
