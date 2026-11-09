@@ -44,6 +44,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:transparent}
 function fit(){var s=Math.min(1,innerWidth/432,innerHeight/949),e=document.getElementById("fit");e.style.width="432px";e.style.height="949px";e.style.transform="translate(-50%,-50%) scale("+s+")"}
 addEventListener("resize",fit);fit();
 var last={},dev={},ota=1;
+addEventListener("message",function(e){var d=e.data,a=document.getElementById("app");if(!d||!a||!a.contentWindow)return;if(d.type==="pg:tool"&&e.source!==a.contentWindow)a.contentWindow.postMessage(d,"*");else if(d.type==="pg:tool:result"&&e.source===a.contentWindow)parent.postMessage(d,"*")});
 addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:device")return;if(d.kind!=="notification")dev[d.kind]=d.value;var a=document.getElementById("app");if(a&&a.contentWindow)a.contentWindow.postMessage(d,"*")});
 function send(){var a=document.getElementById("app");if(a&&a.contentWindow){a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*");for(var k in dev)a.contentWindow.postMessage({type:"pg:device",kind:k,value:dev[k]},"*");a.contentWindow.postMessage({type:"pg:ota",version:ota},"*")}}
 document.getElementById("app").addEventListener("load",send);

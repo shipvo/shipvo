@@ -82,6 +82,9 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-08: Wallet, Calendar, Files and Photos, and Shop first-party spec apps ([Phone apps](phone-apps.md#first-party-apps), #1275, #1252, #1299, #1300)
+- 2026-11-08: App spec `vector` block, `motion`, translations, locale formatting and right-to-left ([App spec](spec-blocks.md#vector-drawings), #1271, #1274)
+- 2026-11-08: Playground Device API and over-the-air update panels, Android and iOS ([Getting started](getting-started.md#try-it-in-your-browser-first), #1276, #1278)
 - 2026-11-07: `kanban` and `timeline` app spec blocks, with `App.move` and an `onMove` action, on Android and iOS skins ([Boards and timelines](spec-blocks.md#boards-and-timelines), #1245)
 - 2026-11-07: The hosted MCP serves OAuth discovery and dynamic client registration, so clients can sign in themselves ([Agents](agents.md), #1216)
 - 2026-11-07: `/watch` shows the agent's phone live, in its Android or iOS frame ([Agents](agents.md#watch-the-agents-phone), #1217)

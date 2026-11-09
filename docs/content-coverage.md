@@ -87,3 +87,9 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Watch the agent's phone live (`/watch`) | [agents](agents.md#watch-the-agents-phone) | | | |
 | Hosted MCP sign-in discovery (OAuth metadata, dynamic client registration) | [agents](agents.md) | | | |
 | Kanban and timeline spec blocks (`App.move`) | [spec-blocks](spec-blocks.md#boards-and-timelines) | | | |
+| Spec `vector` block and `motion` (fade, slide, scale, countUp, pulse) | [spec-blocks](spec-blocks.md#vector-drawings) | | | |
+| Spec translations, locale formatting and right-to-left | [spec-blocks](spec-blocks.md#translations-and-right-to-left) | | | |
+| First-party Calendar, Files and Photos, Wallet and Shop apps | [phone-apps](phone-apps.md#first-party-apps) | | | |
+| Playground: device API and over-the-air update panels in the browser | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
+| `shipvo store policy` (privacy policy from what the app does) | [store](store.md) | | | |
+| `shipvo sim` and `shipvo preview` open a Capacitor project | [capacitor](capacitor.md#see-it-in-the-simulator) | | | |

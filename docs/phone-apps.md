@@ -71,21 +71,32 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 - [Simulated device features](device-api.md): camera, location, payment, notifications.
 - [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
 
+## Describe an app and it appears
+
+`create_app { session, id, spec }` takes an app spec ([app spec](design/app-spec.md), `shipvo.app/v0`), checks it, and puts the app on the phone. A spec with problems is refused with `invalid_spec`: every problem comes back with its path in the spec and a fix, and nothing is installed. A valid spec gets an icon on the home screen and opens (pass `open: false` to stay where you are). Pass `style: "ios"` for the iPhone look; the default is Android.
+
+The app is real HTML with every control labelled, so `screen`, `tap`, `type` and `scroll` work on it like any app. Lists, forms, toggles, segmented controls and tabs react to taps and typing. `run_app_action { session, id, action, input }` runs one action of the spec by name, the way its form does, and the open screen shows the result. If the action refuses the input you get `action_failed` and the reason.
+
+`device_log` records the create and each action with `source: "real"`.
+
+An app's data lives for the session: it starts from the spec's seed data when the app is created, and it is dropped when the session ends or the app is uninstalled.
+
 ## Install apps and switch between them
 
 The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools.
 
-**Limit today:** the Store in the phone frame and the tools below are two separate views. A tap-install in the frame page does not change the session's `current_app` or `device_log`, and an MCP install does not draw an icon on a live `shipvo run` phone. Use the tools for state that tests can check.
-
+A frame page without a session (`shipvo run`) lists the marketplace apps and installs them by fetching the published app itself; the marketplace answers with CORS open, so the page needs no proxy. A failed fetch shows "The app could not be fetched". The tools below change the headless session's phone and record each change in `device_log`.
 
 | Tool | What it does | Typed errors |
 | --- | --- | --- |
 | `list_store_apps` | Lists the marketplace apps (id, name, bundle URL, version) from the control plane | `store_unreachable` |
-| `install_app { id }` | Installs a Store app; its icon appears on the home screen | `unknown_app`, `already_installed` |
+| `install_app { id }` | Fetches the app's bundle and installs it; its icon appears on the home screen | `unknown_app`, `already_installed`, `store_app_unreachable`, `too_large`, `host_not_allowed` |
 | `switch_app { id }` | Opens an installed app; it becomes `current_app` | `not_installed` |
 | `uninstall_app { id }` | Removes it. If it was open, the phone goes home | `not_installed` |
 
-Installing is simulated: nothing real is installed, and `device_log` marks each install, switch and uninstall as `simulated`. If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of three apps (`tide`, `notes`, `weather`) with no network.
+Installing a marketplace app is real. `install_app` fetches the app's published bundle (`app://<id>@rN`, `@latest` or an `http(s)` URL) through the same host guard and size cap as `build_url`, and keeps its `sha256` and `bytes` on the installed app. `device_log` marks the install `source: "real"` and includes the `sha256`. If the bundle cannot be fetched the app is not installed and the error is `store_app_unreachable` (or `too_large` or `host_not_allowed`). Switching and uninstalling record state changes in `device_log`. Fixture apps (`fixture://…`) have no bundle, so their installs are marked `simulated`.
+
+If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of three apps (`tide`, `notes`, `weather`) with no network.
 
 Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
 
@@ -119,7 +130,7 @@ open_app tide                          -> session "tide-abc"
 install_app { session, id: "notes" }   -> Home screen, Pocket Notes is installed
 switch_app { session, id: "notes" }    -> current_app is notes
 uninstall_app { session, id: "notes" } -> back on the home screen
-device_log { session }                 -> install_app, switch_app, uninstall_app, all source "simulated"
+device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
 
 ## First-party apps
@@ -127,6 +138,10 @@ device_log { session }                 -> install_app, switch_app, uninstall_app
 | App | What it does | Actions (MCP tools) | Spec |
 | --- | --- | --- | --- |
 | Notes and Tasks | Keeps tasks and notes on the phone, across chats and assistants. Android and iOS. | `add_task`, `complete_task`, `add_note`, `search` | [`templates/notes-tasks/app.json`](../templates/notes-tasks/app.json) |
+| Calendar | Puts events on a calendar, seen by day or month. | `create_event`, `list_events`, `show_day`, `delete_event` | [`templates/calendar/app.json`](../templates/calendar/app.json) |
+| Files and Photos | Keeps files and photos in one place, sorted by album. | `save_file`, `find_files`, `move_to_album`, `show_matches`, `delete_file` | [`templates/files-photos/app.json`](../templates/files-photos/app.json) |
+| Wallet | Keeps tickets, receipts and passes, grouped by kind, with an expiring-soon list. | `save_pass`, `find_pass`, `show_matches`, `delete_pass` | [`templates/wallet/app.json`](../templates/wallet/app.json) |
+| Shop | Lists products, takes orders and shows them in one place; the currency is a setting. | `add_product`, `find_products`, `place_order`, `list_orders`, `set_currency`, `show_matches`, `pick_product` | [`templates/shop/app.json`](../templates/shop/app.json) |
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
 
