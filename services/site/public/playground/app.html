@@ -27,6 +27,7 @@ ul.dev{margin-top:14px}ul.dev li{padding:8px 14px}
 <li data-testid="location">Location: not set</li><li data-testid="camera">Camera: not set</li><li data-testid="biometrics">Biometrics: not set</li>
 <li data-testid="payment">Payment: not set</li><li data-testid="airplane">Airplane mode: off</li>
 </ul>
+<p data-testid="version">Version 1</p>
 <div id="note" role="alert" data-testid="notification" hidden></div>
 <script>
 var n=0,c=document.querySelector('[data-testid=cart]');
@@ -49,6 +50,6 @@ else if(d.kind==="biometrics"&&W[v])put("biometrics","Biometrics: "+W[v]);
 else if(d.kind==="payment"&&P[v])put("payment","Payment: "+P[v]);
 else if(d.kind==="airplane")put("airplane","Airplane mode: "+(v==="on"?"on, no network":"off"));
 else if(d.kind==="notification"&&v==="send"){ni++;var n=document.getElementById("note");n.hidden=false;n.textContent="Notification "+ni+": Tide at 06:40, your order has shipped";clearTimeout(window.nt);window.nt=setTimeout(function(){n.hidden=true},4000)}});
-addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:prefs")return;var h=document.documentElement;
+addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pg:ota"){document.querySelector("[data-testid=version]").textContent="Version "+d.version;return}if(!d||d.type!=="pg:prefs")return;var h=document.documentElement;
 h.toggleAttribute("data-dark",!!d.dark);h.toggleAttribute("data-large",!!d.large);h.dir=d.rtl?"rtl":"ltr"});
 </script></body></html>
