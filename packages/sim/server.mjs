@@ -236,7 +236,7 @@ async function reapplyNetProfile(s, page) {
 }
 const specHost = new SpecHost();
 const sidOf = (s) => [...sessions].find(([, v]) => v === s)?.[0];
-async function switchToApp(s, page, id) {
+async function switchToApp(s, page, id, fresh = false) {
   const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
   // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
   // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
@@ -250,7 +250,7 @@ async function switchToApp(s, page, id) {
     catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
   }
   switchApp(s.apps, id, s.nav);
-  if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  if (dest && (fresh || page.url() !== dest)) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
   await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
@@ -367,13 +367,17 @@ async function act(id, body) {
     case "create_app": {
       const appId = String(body.id ?? "");
       if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(appId)) throw new SimError("bad_app_id", "id: lowercase letters, digits and dashes, up to 40, starting with a letter or digit");
-      if (s.apps.installed_apps.some((a) => a.id === appId)) throw new SimError("already_installed", `'${appId}' is already installed. Use update_app to change it.`);
+      if (s.apps.installed_apps.some((a) => a.id === appId)) throw new SimError("already_installed", `'${appId}' is already installed. Uninstall it with uninstall_app first.`);
       const made = specHost.create(sidOf(s), appId, body.spec, { style: body.style === "ios" ? "ios" : "android" });
       if (!made.ok) throw new SimError("invalid_spec", made.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
       const nm = String(body.name ?? body.spec?.app?.name ?? appId).replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec" });
       s.apps.log.push({ at: Date.now(), name: "create_app", app: appId, source: "real", version: "1" });
-      if (body.open !== false) await switchToApp(s, page, appId);
+      if (body.open !== false) {
+        // If opening fails, the app is not left installed or running.
+        try { await switchToApp(s, page, appId, true); }
+        catch (e) { s.apps.installed_apps = s.apps.installed_apps.filter((a) => a.id !== appId); s.apps.log = s.apps.log.filter((l) => !(l.app === appId && l.name === "create_app")); specHost.drop(sidOf(s), appId); throw e; }
+      }
       return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
     }
     // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
@@ -390,7 +394,7 @@ async function act(id, body) {
       const id = String(body.id ?? "");
       try {
         if (body.action === "install_app") installApp(s.apps, id, Array.isArray(body.catalog) ? body.catalog : s.apps.store);
-        else if (body.action === "uninstall_app") uninstallApp(s.apps, id, s.nav);
+        else if (body.action === "uninstall_app") { uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); }
         else {
           await switchToApp(s, page, id);
         }
@@ -613,7 +617,7 @@ const server = http.createServer(async (req, res) => {
       if (sp) {
         const [, sid, app, isOp] = sp, key = decodeURIComponent(sid);
         if (!isOp && req.method === "GET") { const html = specHost.page(key, app); return html ? send(200, html, MIME[".html"]) : send(404, { error: "no_app" }); }
-        if (isOp && req.method === "POST") { let b = ""; for await (const ch of req) b += ch; let j = {}; try { j = JSON.parse(b || "{}"); } catch {} return send(200, specHost.op(key, app, j)); }
+        if (isOp && req.method === "POST") { let b = ""; for await (const ch of req) { b += ch; if (b.length > 65536) return send(413, { error: "too_large" }); } let j; try { j = JSON.parse(b || "{}"); } catch { return send(400, { error: "bad_json" }); } return send(200, specHost.op(key, app, j)); }
       } }
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });

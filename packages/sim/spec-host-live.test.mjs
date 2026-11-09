@@ -107,3 +107,27 @@ test("run_app_action changes the app's data and the open screen shows it; a bad 
   const none = await act("sp-act", { action: "app_action", id: "ghost", action_name: "x" });
   assert.equal(none.code, "not_installed");
 });
+
+test("uninstall stops the app: actions say not_installed and a new create starts with fresh data", async () => {
+  assert.ok((await call("/session", { session: "sp-un" })).ok);
+  assert.equal((await act("sp-un", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
+  assert.equal((await act("sp-un", { action: "app_action", id: "gifts", action_name: "add_gift", input: { name: "Kite" } })).ok, true);
+  assert.equal((await act("sp-un", { action: "uninstall_app", id: "gifts" })).ok, true);
+  assert.equal((await act("sp-un", { action: "app_action", id: "gifts", action_name: "add_gift", input: { name: "Drum" } })).code, "not_installed");
+  assert.equal((await fetch(`http://localhost:${PORT}/spec/sp-un/gifts/`)).status, 404);
+  const again = await act("sp-un", { action: "create_app", id: "gifts", spec: GIFTS });
+  assert.equal(again.ok, true);
+  assert.doesNotMatch(again.screen, /Kite/);
+  assert.match(again.screen, /Scarf/);
+  const dup = await act("sp-un", { action: "create_app", id: "gifts", spec: GIFTS });
+  assert.match(dup.error, /uninstall_app/);
+});
+
+test("the control endpoint answers 400 for bad JSON and 413 for a huge body", async () => {
+  assert.ok((await call("/session", { session: "sp-op" })).ok);
+  assert.equal((await act("sp-op", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
+  const url = `http://localhost:${PORT}/spec/sp-op/gifts/op`;
+  assert.equal((await fetch(url, { method: "POST", body: "{nope" })).status, 400);
+  assert.equal((await fetch(url, { method: "POST", body: "x".repeat(70000) })).status, 413);
+  assert.equal((await fetch(url, { method: "POST", body: "{}" })).status, 200);
+});
