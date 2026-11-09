@@ -426,33 +426,6 @@ async function act(id, body) {
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
-    // Describe an app and it appears: a spec is validated, started and installed with an icon on the home screen.
-    case "create_app": {
-      const appId = String(body.id ?? "");
-      if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(appId)) throw new SimError("bad_app_id", "id: lowercase letters, digits and dashes, up to 40, starting with a letter or digit");
-      if (s.apps.installed_apps.some((a) => a.id === appId)) throw new SimError("already_installed", `'${appId}' is already installed. Uninstall it with uninstall_app first.`);
-      const made = specHost.create(sidOf(s), appId, body.spec, { style: body.style === "ios" ? "ios" : "android" });
-      if (!made.ok) throw new SimError("invalid_spec", made.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
-      const nm = String(body.name ?? body.spec?.app?.name ?? appId).replace(/[<>"'\\]/g, "").slice(0, 40);
-      s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec" });
-      s.apps.log.push({ at: Date.now(), name: "create_app", app: appId, source: "real", version: "1" });
-      if (body.open !== false) {
-        // If opening fails, the app is not left installed or running.
-        try { await switchToApp(s, page, appId, true); }
-        catch (e) { s.apps.installed_apps = s.apps.installed_apps.filter((a) => a.id !== appId); s.apps.log = s.apps.log.filter((l) => !(l.app === appId && l.name === "create_app")); specHost.drop(sidOf(s), appId); throw e; }
-      }
-      return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
-    }
-    // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
-    case "app_action": {
-      const appId = String(body.id ?? "");
-      if (!specHost.has(sidOf(s), appId)) throw new SimError("not_installed", `'${appId}' is not a spec app running on this phone`);
-      const res = specHost.call(sidOf(s), appId, String(body.action_name ?? ""), body.input && typeof body.input === "object" ? body.input : {});
-      s.apps.log.push({ at: Date.now(), name: "app_action", app: appId, action: String(body.action_name ?? ""), source: "real" });
-      if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
-      if (res.ok === false) throw new SimError("action_failed", res.error);
-      return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
-    }
     // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
     case "install_app": case "uninstall_app": case "switch_app": {
       const id = String(body.id ?? "");
