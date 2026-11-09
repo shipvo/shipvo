@@ -166,3 +166,8 @@ test("hosted watch: ?only=1 follows one session and receives its frames; the hos
   assert.match(hosted, /data-skin="ios"/); assert.match(hosted, /data-part="take-over"[^>]*disabled/); assert.match(hosted, /Sign in to take over/);
   assert.doesNotMatch(await (await fetch(`http://localhost:${PORT}/watch?session=h1&hosted=1&takeover=1`)).text(), /data-part="take-over"[^>]*disabled/);
 });
+
+test("hidden parts stay hidden: the page CSS lets the hidden attribute win over display rules", async () => {
+  const html = await (await fetch(`http://localhost:${PORT}/watch?session=h1&hosted=1`)).text();
+  assert.match(html, /\[hidden\]\{display:none!important\}/);
+});
