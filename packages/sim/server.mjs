@@ -24,6 +24,7 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
+import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
 import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
@@ -219,6 +220,16 @@ async function boot(s, url) {
 async function reapplyNetProfile(s, page) {
   if (s.netProfile) await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
 }
+// The bundle a Store listing points at: app://<id>[@rN] is the published web artifact; an http(s) URL is fetched as given.
+// Same host guard and size cap as build_url. Resolves { sha256, bytes }, or throws SimError store_app_unreachable / too_large / host_not_allowed.
+async function fetchAppBundle(app) {
+  const url = String(app.url ?? "");
+  let from = url, allowHosts = [];
+  const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
+  if (am) { const t = await resolveApp(am[1].includes("@") ? am[1] : `${am[1]}@latest`).catch((e) => { throw new SimError("store_app_unreachable", String(e.message).split("\n")[0]); }); from = `${CONTROL}/w/${t.app}/r${t.release}/index.html`; allowHosts = [new URL(CONTROL).hostname]; }   // the control plane is the operator's own
+  try { const r = await fetchBuild(from, { dir: join(DIR, "builds"), allowHosts }); return { sha256: r.id, bytes: r.bytes }; }
+  catch (e) { if (e instanceof BuildCacheError) throw new SimError(e.code === "unreachable" ? "store_app_unreachable" : e.code, e.message); throw e; }
+}
 async function switchToApp(s, page, id) {
   const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
   // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
@@ -347,7 +358,13 @@ async function act(id, body) {
     case "install_app": case "uninstall_app": case "switch_app": {
       const id = String(body.id ?? "");
       try {
-        if (body.action === "install_app") installApp(s.apps, id, Array.isArray(body.catalog) ? body.catalog : s.apps.store);
+        if (body.action === "install_app") {
+          const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
+          const found = catalog.find((a) => a?.id === id);
+          // A listing with a real URL is fetched first: the install keeps the bundle's sha256 and size, and fails if the bundle cannot be fetched.
+          const real = found && !/^fixture:/i.test(String(found.url ?? "")) ? await fetchAppBundle(found) : undefined;
+          installApp(s.apps, id, catalog, real);
+        }
         else if (body.action === "uninstall_app") uninstallApp(s.apps, id, s.nav);
         else {
           await switchToApp(s, page, id);
@@ -357,6 +374,8 @@ async function act(id, body) {
       const where = s.nav.where;
       return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
     }
+    // What the phone has installed now, for the Store screen in the frame (same state the MCP tools change).
+    case "phone_apps": return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, where: s.nav.where };
     // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
     case "lock": case "unlock": {
       if (body.action === "lock") s.shade.open = "none";
@@ -501,7 +520,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
