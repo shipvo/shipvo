@@ -1,1 +1,0 @@
-- docs: new page "Score an agent on an app task" covers `shipvo eval run` and `shipvo eval report`: options, task file, check types, scoring and troubleshooting.

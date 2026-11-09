@@ -1,1 +1,0 @@
-- Docs: `docs/test-your-build.md` and the CLI troubleshooting list now say that `shipvo login` followed by `shipvo mcp` shows the API key for hosted build upload.

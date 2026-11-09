@@ -1,2 +1,0 @@
-- `scripts/first-run/run-time.mjs`: times `shipvo run android` and `shipvo run ios` and prints one table with a column for each. `run-time.json` is now `{ "android": [...], "ios": [...] }` instead of one array.
-- Migration: none for users; only readers of `run-time.json` are affected.

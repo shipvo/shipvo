@@ -1,1 +1,0 @@
-- cli: the `shop` template of `shipvo init` has a fuller checkout: plain-words payment errors, an offline message, plus and minus on cart lines, Undo after Remove, and an order confirmation screen with a Back to shop button.

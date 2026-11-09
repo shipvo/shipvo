@@ -1,1 +1,0 @@
-- Docs: new page "App spec: screens and controls" (stat, progress, card, section, toggle, segmented, sheets) with a checked example, and `@shipvo/spec` in the Reference sidebar.

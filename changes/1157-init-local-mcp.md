@@ -1,1 +1,0 @@
-- cli: `shipvo init` next-step text now points at `node node_modules/@shipvo/mcp/dist/server.js`, the entry `shipvo agents setup` writes, instead of `npx -y @shipvo/mcp`.
