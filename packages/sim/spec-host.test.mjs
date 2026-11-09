@@ -85,3 +85,16 @@ test("diffSpec names what was added, removed and changed", async () => {
   assert.deepEqual(diffSpec(a, a), []);
   assert.equal(describeSpec(b), "2 screens, 0 actions, 1 data sources");
 });
+
+test("tick refreshes apps side by side, so one slow host does not hold up the others", async () => {
+  const slow = () => new Promise((r) => setTimeout(() => r({ ok: true, status: 200, text: async () => JSON.stringify([{ id: "1", name: "A", price: "1" }]) }), 150));
+  const st = { now: 1_000_000 };
+  const changed = [];
+  const h = new SpecHost({ fetch: slow, now: () => st.now, onChange: (s, id) => changed.push(id) });
+  for (const id of ["p1", "p2", "p3"]) assert.equal((await h.create("s", id, SPEC)).ok, true);
+  st.now += 11 * 60_000;   // every source is due
+  const t0 = Date.now();
+  await h.tick();
+  assert.ok(Date.now() - t0 < 350, `tick took ${Date.now() - t0} ms`);
+  assert.deepEqual(changed.sort(), ["p1", "p2", "p3"]);
+});

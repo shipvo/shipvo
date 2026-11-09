@@ -115,11 +115,12 @@ export class SpecHost {
 
   /** Checks every running app for due data. Call it on a timer. Tells `onChange` about apps whose data changed. */
   async tick() {
-    for (const k of [...this.running.keys()]) {
+    // Apps are refreshed side by side, so one slow host does not hold up the others.
+    await Promise.all([...this.running.keys()].map(async (k) => {
       const [session, id] = [k.slice(0, k.lastIndexOf("/")), k.slice(k.lastIndexOf("/") + 1)];
       const out = await this.refresh(session, id);
       if (out.updated.length) this.onChange?.(session, id, out);
-    }
+    }));
   }
 
   /** What each live source last did, for the person or agent to see. */

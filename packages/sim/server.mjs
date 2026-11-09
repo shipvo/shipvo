@@ -237,7 +237,7 @@ async function reapplyNetProfile(s, page) {
 // Live data for spec apps: https only, no private hosts. PN_SPEC_FETCH_FIXTURE=<file> answers from a { url: { status, body } } file instead (tests, offline demos).
 async function specFetch(url, init) {
   const fx = process.env.PN_SPEC_FETCH_FIXTURE;
-  if (fx) { const hit = JSON.parse(readFileSync(fx, "utf8"))[url.split("?")[0]] ?? JSON.parse(readFileSync(fx, "utf8"))[url]; const status = hit?.status ?? 404; return { ok: status >= 200 && status < 300, status, text: async () => (typeof hit?.body === "string" ? hit.body : JSON.stringify(hit?.body ?? null)) }; }
+  if (fx) { const table = JSON.parse(readFileSync(fx, "utf8")); const hit = table[url.split("?")[0]] ?? table[url]; const status = hit?.status ?? 404; return { ok: status >= 200 && status < 300, status, text: async () => (typeof hit?.body === "string" ? hit.body : JSON.stringify(hit?.body ?? null)) }; }
   await checkUrl(url, { allowPrivate: false, allowHosts: [] });
   const r = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
   return { ok: r.ok, status: r.status, text: () => r.text() };
@@ -247,7 +247,7 @@ const specHost = new SpecHost({
   onChange: async (sid, appId, out) => {
     const s = sessions.get(sid); if (!s) return;
     s.apps.log.push({ at: Date.now(), name: "data_refresh", app: appId, sources: out.updated, source: "real" });
-    if (s.apps.current_app === appId && s.nav.where === "app") await s.page.reload({ waitUntil: "networkidle" }).catch(() => {});
+    if (s.apps.current_app === appId && s.nav.where === "app") { await s.page.reload({ waitUntil: "networkidle" }).catch(() => {}); await reapplyNetProfile(s, s.page).catch(() => {}); }
   },
 });
 setInterval(() => { specHost.tick().catch(() => {}); }, 30_000).unref();
@@ -410,7 +410,7 @@ async function act(id, body) {
       else { const t = Date.parse(String(body.at)); if (Number.isNaN(t)) throw new SimError("bad_time", "at must be a time like 2026-11-14T09:00:00, or null"); s.clockMs = t; }
       return { now: nowOf(s).toString(), home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
-    // Fetch an app's live data now. Without a source name every live source is fetched. Resolves what changed and each source's state.
+    // Fetch the app's live data now (every http source). Resolves what changed and each source's state.
     case "refresh_app": {
       const appId = String(body.id ?? "");
       if (!specHost.has(sidOf(s), appId)) throw new SimError("not_installed", `'${appId}' is not a spec app running on this phone`);
