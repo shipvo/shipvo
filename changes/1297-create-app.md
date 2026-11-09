@@ -1,0 +1,4 @@
+- `@shipvo/sim`: new `create_app` action starts an app from a spec and installs it with an icon on the home screen; `run_app_action` runs one of its actions by name. Spec apps render as labelled HTML, so tap, type and scroll work on them on Android and iOS.
+- `@shipvo/mcp`: new tools `create_app` and `run_app_action`.
+- `@shipvo/sim` now depends on `@shipvo/spec`.
+- Migration: none; new tools.
