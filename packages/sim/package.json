@@ -75,6 +75,9 @@
     "access": "public",
     "provenance": true
   },
+  "dependencies": {
+    "@shipvo/spec": "workspace:^"
+  },
   "devDependencies": {
     "playwright": "1.63.0"
   }

@@ -26,7 +26,8 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
+import { createApp as createSpecRuntime } from "@shipvo/spec";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, createSpecApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -237,18 +238,42 @@ async function switchToApp(s, page, id) {
   // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
   // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
   let dest = null;
+  const specEntry = s.apps.installed_apps.find((a) => a.id === id && a.spec);
   const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
-  if (am) dest = (await resolveApp(am[1])).url;
+  if (specEntry) { /* a spec app is drawn by the shared renderer below */ }
+  else if (am) dest = (await resolveApp(am[1])).url;
   else if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^fixture:/i.test(url)) {
     try { dest = (await checkUrl(url, { allowPrivate: false, allowHosts: [] })).href; }
     catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
   }
   switchApp(s.apps, id, s.nav);
-  if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  if (specEntry) await openSpecApp(s, page, specEntry);
+  else if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
   await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
   await page.evaluate(() => globalThis.__pnDevice?.setInitialUrl?.(null));
+}
+// A spec app runs in the page: the shared renderer draws the screen, a click on a button runs its action and draws again.
+const SPEC_CLICK = `<script>document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("button");if(b&&window.__svSpecPress)window.__svSpecPress(b.getAttribute("aria-label")||b.textContent||"")})</script>`;
+async function drawSpecApp(s, page) {
+  const r = s.specApp.app.render();
+  if (!r.ok) throw new SimError("invalid_spec", r.errors.map((e) => `${e.path}: ${e.message}`).join("\n"));
+  await page.setContent(r.html + SPEC_CLICK);
+}
+async function openSpecApp(s, page, entry) {
+  const made = createSpecRuntime(entry.spec, { style: s.skin });
+  if (!made.ok) throw new SimError("invalid_spec", made.errors.map((e) => `${e.path}: ${e.message}`).join("\n"));
+  s.specApp = { id: entry.id, app: made.app };
+  if (!s.specBound) {
+    s.specBound = true;
+    await page.exposeFunction("__svSpecPress", async (name) => {
+      if (!s.specApp) return;
+      if (name === "Back") s.specApp.app.back(); else s.specApp.app.press(name);
+      await drawSpecApp(s, page);
+    });
+  }
+  await drawSpecApp(s, page);
 }
 // Fetch layer. Mock rules win; otherwise fetch/XHR run under the session's network profile (default online, untouched).
 async function ensureNetworkRoute(s, page) {
@@ -340,7 +365,7 @@ async function act(id, body) {
     if (covered) throw fail("covered", String(body.ref));
   };
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
-  if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "open_notification", "install_app", "uninstall_app", "switch_app", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "open_notification", "install_app", "create_app", "uninstall_app", "switch_app", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   // Home screen or app switcher showing: the app is in the background and takes no input.
   if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
   // An open panel covers the app on a phone, so input to the app is refused until it is closed.
@@ -357,15 +382,16 @@ async function act(id, body) {
       return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)\n${describeApps(s.apps)}` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
     }
     // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log as simulated.
-    case "install_app": case "uninstall_app": case "switch_app": {
-      const id = String(body.id ?? "");
+    case "install_app": case "create_app": case "uninstall_app": case "switch_app": {
+      const id = String(body.action === "create_app" ? body.spec?.app?.id ?? "" : body.id ?? "");
       try {
         if (body.action === "install_app") installApp(s.apps, id, Array.isArray(body.catalog) ? body.catalog : s.apps.store);
+        else if (body.action === "create_app") createSpecApp(s.apps, body.spec);
         else if (body.action === "uninstall_app") uninstallApp(s.apps, id, s.nav);
         else {
           await switchToApp(s, page, id);
         }
-      } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      } catch (e) { if (e instanceof AppsError) { const se = new SimError(e.code, e.message); if (e.issues) se.issues = e.issues; throw se; } throw e; }
       if (body.action === "uninstall_app" && s.nav.where === "home") await page.evaluate(setVisibilityInPage, "background");
       const where = s.nav.where;
       return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
@@ -514,7 +540,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, get_update_state, check_for_update, apply_update, install_app, create_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -590,7 +616,7 @@ const server = http.createServer(async (req, res) => {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
         log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
-      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
+      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(e.issues ? { issues: e.issues } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }

@@ -568,6 +568,37 @@
     }
   },
   {
+    "name": "create_app",
+    "description": "Make an app from a spec and put it on the phone. The spec is checked first: if it is not valid you get each issue with its path and message, and nothing is installed. If it is valid the app icon appears on the home screen, and open_app or switch_app shows its first screen, where tap, screen refs and the app's own tools work. Fails with invalid_spec or already_installed (the app id is taken). Logged in device_log as simulated.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The app spec (shipvo.app/v0): app id and name, data, screens"
+        }
+      },
+      "required": [
+        "session",
+        "spec"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "device_log",
     "description": "What the app did with the device in this session: permission prompts and answers, location reads, scans, fingerprint checks, payments, notifications, shares.",
     "inputSchema": {

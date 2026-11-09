@@ -395,6 +395,8 @@ use(server, tools.list_store_apps, async () => {
 });
 use(server, tools.install_app, 
   async ({ session, id }) => { need(session); const st = await storeApps(); return result(session, await act({ session, action: "install_app", id, ...(st.ok ? { catalog: st.apps } : {}) })); });
+use(server, tools.create_app, 
+  async ({ session, spec }) => { need(session); return result(session, await act({ session, action: "create_app", spec })); });
 use(server, tools.uninstall_app, 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "uninstall_app", id })); });
 use(server, tools.switch_app, 
