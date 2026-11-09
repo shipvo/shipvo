@@ -2,6 +2,7 @@ import schema from "./app-spec.v0.schema.json" with { type: "json" };
 import { checkNames, type NameScope } from "./check.js";
 import { estimateCost, MAX_COST } from "./eval.js";
 import { celSyntaxError, expressionSteps, extractExpressions, MAX_EXPRESSION_STEPS } from "./cel.js";
+import { VECTOR_SHAPES, ENTER_MOTIONS, CHANGE_MOTIONS } from "./vector.js";
 import { AGGREGATES, CHART_KINDS } from "./chart.js";
 import { checkSchema } from "./jsonschema.js";
 import { childPath, isObject, type Issue, type ValidationResult } from "./types.js";
@@ -113,6 +114,29 @@ class Run {
       v.forEach((x, i) => this.scanStrings(x, childPath(path, i), depth + 1));
     } else if (isObject(v)) {
       for (const [k, x] of Object.entries(v)) this.scanStrings(x, childPath(path, k), depth + 1);
+    }
+  }
+
+  /** Warns about keys in `strings` that no text in the spec uses. */
+  checkStrings() {
+    const table = this.spec.strings;
+    if (!isObject(table)) return;
+    const used = new Set<string>();
+    const collect = (v: unknown, depth = 0) => {
+      if (depth > MAX_WALK_DEPTH) return;
+      if (typeof v === "string") used.add(v);
+      else if (Array.isArray(v)) v.forEach((x) => collect(x, depth + 1));
+      else if (isObject(v)) for (const [k, x] of Object.entries(v)) if (k !== "strings") collect(x, depth + 1);
+    };
+    for (const [k, x] of Object.entries(this.spec)) if (k !== "strings") collect(x);
+    for (const [lang, keys] of Object.entries(table)) {
+      if (!isObject(keys)) continue;
+      for (const key of Object.keys(keys)) {
+        if (!used.has(key)) {
+          this.warn(childPath(childPath("$.strings", lang), key), `The key "${key}" in strings.${lang} matches no text in the spec.`,
+            "Fix the key so it equals the text exactly, or remove it.");
+        }
+      }
     }
   }
 
@@ -297,6 +321,8 @@ class Run {
     }
     if (type === "chart") this.chart(b, path);
     if (type === "kanban") this.kanban(b, path);
+    if (type === "vector") this.vector(b, path);
+    if (b.motion !== undefined) this.motion(b.motion, childPath(path, "motion"));
     if (type === "timeline") this.timeline(b, path);
     if (type === "text" && typeof b.variant === "string") screen.sizes.add(`variant:${b.variant}`);
     if (isObject(b.style)) {
@@ -325,6 +351,36 @@ class Run {
       this.error(bp, `"${String(b.type)}" needs a "bind" to a state value.`, "Add \"bind\": \"state.name\" and declare \"name\" in \"state\".");
     } else if (!isObject(this.spec.state) || !(m[1]! in this.spec.state)) {
       this.error(bp, `State "${m[1]}" is not declared.`, `Add "${m[1]}" to "state" with a type and a default.`);
+    }
+  }
+
+  vector(b: Record<string, unknown>, path: string) {
+    if (typeof b.label !== "string" || b.label.trim() === "") {
+      this.error(childPath(path, "label"), "Vector has no label.", "Add \"label\": a short description agents can read, for example \"Battery gauge\".");
+    }
+    if (!Array.isArray(b.shapes)) {
+      this.error(childPath(path, "shapes"), "Vector has no shapes.", "Add \"shapes\": a list such as [{ \"shape\": \"circle\", \"cx\": 50, \"cy\": 50, \"r\": 40 }].");
+      return;
+    }
+    b.shapes.forEach((s, i) => {
+      const sp = childPath(childPath(path, "shapes"), i);
+      const kind = isObject(s) ? s.shape : undefined;
+      if (typeof kind !== "string" || !(VECTOR_SHAPES as readonly string[]).includes(kind)) {
+        this.error(childPath(sp, "shape"), `Shape ${JSON.stringify(kind ?? null)} is not supported.`, `Use one of: ${VECTOR_SHAPES.join(", ")}.`);
+      }
+    });
+  }
+
+  motion(m: unknown, path: string) {
+    if (!isObject(m)) {
+      this.error(path, "Motion must be an object.", "Use { \"enter\": \"fade\", \"change\": \"pulse\" }.");
+      return;
+    }
+    if (m.enter !== undefined && !(ENTER_MOTIONS as readonly string[]).includes(m.enter as string)) {
+      this.error(childPath(path, "enter"), `Enter motion ${JSON.stringify(m.enter)} is not supported.`, `Use one of: ${ENTER_MOTIONS.join(", ")}.`);
+    }
+    if (m.change !== undefined && !(CHANGE_MOTIONS as readonly string[]).includes(m.change as string)) {
+      this.error(childPath(path, "change"), `Change motion ${JSON.stringify(m.change)} is not supported.`, `Use one of: ${CHANGE_MOTIONS.join(", ")}.`);
     }
   }
 
@@ -465,6 +521,7 @@ export function validate(spec: unknown): ValidationResult {
     run.checkActions();
     run.checkTheme();
     run.checkScreens();
+    run.checkStrings();
     return { errors: run.errors, warnings: run.warnings };
   } catch (e) {
     return {

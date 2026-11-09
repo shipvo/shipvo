@@ -1,1 +1,0 @@
-- docs: seven finished pages are now in the docs sidebar, search and `llms.txt`: auto-halt, single sign-on, taking real orders, OTA updates on the phone, network calls on the hosted phone, migrate from EAS Update, and the record-a-demo-video worked example.

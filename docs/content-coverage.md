@@ -84,3 +84,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Data sources that use a saved key (`auth.secret`, `secret_revoked`, `secret_domain`) | [spec-blocks](spec-blocks.md#data-sources-that-use-a-saved-key) | | | |
 | `open_app` with `platform` and `show` opens the phone in your browser | [agents](agents.md), [run](run.md) | | | |
 | Fuller shop template checkout (plain payment errors, offline message, Undo, confirmation screen) | [getting-started](getting-started.md#the-shop-checkout) | | | |
+| Watch the agent's phone live (`/watch`) | [agents](agents.md#watch-the-agents-phone) | | | |
+| Hosted MCP sign-in discovery (OAuth metadata, dynamic client registration) | [agents](agents.md) | | | |
+| Kanban and timeline spec blocks (`App.move`) | [spec-blocks](spec-blocks.md#boards-and-timelines) | | | |

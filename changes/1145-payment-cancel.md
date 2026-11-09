@@ -1,2 +1,0 @@
-- `@shipvo/device`: a payment `nextResult` the simulator does not know now throws instead of coming back as `insufficient_funds`.
-- Migration: versions before 0.1.5 return `insufficient_funds` for `payment.nextResult: "cancel"`. Update the app's `@shipvo/device` to 0.1.5 or newer. The app template pins `^0.1.0`, so an old version can stay in an app's lockfile; update the lockfile (`pnpm update @shipvo/device`, or the npm/yarn equivalent).

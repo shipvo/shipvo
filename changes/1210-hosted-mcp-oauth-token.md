@@ -1,2 +1,0 @@
-- `services/sim`: the hosted MCP has `GET /authorize` (PKCE S256 required, GitHub sign-in) and `POST /token`. The token is the same per-account key as `shipvo login` (hashed, 30 days, revocable); a new sign-in replaces the account's earlier test key. Codes are single use and last 5 minutes.
-- Migration: apply `services/sim/migrations/0002_oauth_codes.sql` (adds a table). Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` on the sim Worker.

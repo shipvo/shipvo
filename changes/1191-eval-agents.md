@@ -1,2 +1,0 @@
-- `@shipvo/cli`: new `shipvo eval run <task> --agent <name>` and `shipvo eval report`. Run any agent or model on a task file (`tasks/<name>.task.json`) and get scores that Shipvo measures: success per check, steps, time, errors, retries and findings. The report is Markdown and JSON, with links to each run's steps and recording. Two sample tasks on the shop template are in `tasks/`.
-- Migration: none; new command.

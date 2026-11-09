@@ -31,14 +31,14 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 { "mcpServers": { "shipvo": { "url": "https://sim.example.com/mcp", "headers": { "Authorization": "Bearer key1" } } } }
 ```
 
-**3. Hosted**: the Shipvo simulator service runs one sandbox per API key and exposes the same tools at `https://sim.shipvo.dev/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). To sign in with GitHub instead of copying a key, run `claude mcp add --transport http shipvo https://sim.shipvo.dev/mcp` and approve the sign-in in your browser. Sessions persist across reconnects; the sandbox sleeps after 30 idle minutes and comes back on the next call. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta app and the apps you registered with `shipvo app create`; it expires after 30 days and a new login replaces it, `shipvo keys` shows the date), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT. To test a build from your machine, see [Test your build on the hosted phone](test-your-build.md).
+**3. Hosted**: the Shipvo simulator service runs one sandbox per API key and exposes the same tools at `https://sim.shipvo.dev/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). To sign in with GitHub instead of copying a key, run `claude mcp add --transport http shipvo https://sim.shipvo.dev/mcp` and approve the sign-in in your browser. Sessions persist across reconnects; the sandbox sleeps after 30 idle minutes and comes back on the next call. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta app and the apps you registered with `shipvo app create`; it expires after 30 days and a new login replaces it, `shipvo keys` shows the date), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT, and `shipvo agents setup --hosted` writes it into each coding agent's config ([CLI guide](cli.md#shipvo-agents-setup)). Clients that sign in with OAuth can find the sign-in details themselves: the server publishes `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`, accepts dynamic client registration at `POST /register` (https or loopback redirect URIs), and answers a tool call without a key with `401` and a `WWW-Authenticate` header that points to the metadata. `initialize` and `tools/list` need no key, and API keys work as before. To test a build from your machine, see [Test your build on the hosted phone](test-your-build.md).
 
 ## The tools
 
 | Tool | What it does |
 | --- | --- |
 | `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
-| `list_sessions` | Open sessions on this server, to resume after a reconnect: app, platform, room, who opened it, start time and screen title |
+| `list_sessions` | Open sessions on this server, to resume after a reconnect. Each row shows app, platform, room, who opened it (the MCP client name), start time and current screen title |
 | `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?, room?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
 | `attach_session(app?, session?)` | Attach to the live `shipvo run` phone (Android or iOS) from `.shipvo/run.json`, without an app id. Returns `no_live_run` when no run is up (or `app` does not match it) and `attach_failed` when the phone cannot be reached |
@@ -52,12 +52,19 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
 | `get_settings` · `set_setting` · `browser_open` · `browser_snapshot` · `browser_click` · `browser_type` · `browser_scroll` · `browser_back` · `browser_wait_for` · `browser_tabs` · `browser_close_tab` · `browser_screenshot` | Read and change the phone's system settings, and drive its separate web Browser. See [the phone's Browser and Settings](phone-apps.md) |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
-| `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
+| `end_session(session)` | Ends the session. Reports steps taken, duration, the room, and the orders the app posted to its backend during the session. A room ends with its last session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
 
 ## Rooms: several phones, one backend
 
 Give `open_app` the same `room` on two sessions and both phones share one backend: an order placed on one shows up for the other. Use it to test two people in one app, for example a buyer and a shop owner, on Android and iOS. Without `room`, a session gets its own backend. A room name that is not valid returns `bad_room`. A room ends when its last session ends, and `end_session` names the room and its orders.
+
+```text
+open_app("tide-and-tackle@latest", room: "demo")   // session s1, Android
+open_app("tide-and-tackle@latest", room: "demo", platform: "ios")   // session s2, iOS
+```
+
+`list_sessions` shows the room of every session.
 
 ## Driving the live phone
 
@@ -67,6 +74,10 @@ When `shipvo run` is up for your app, `open_app` attaches to that phone and the 
 - a step log in plain words, such as `Tapped button "Add to cart"`. Events from the simulated device are marked "(simulated)". **Hide steps** collapses the log so it never covers the app.
 
 The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on. An action already in flight when the person takes over still finishes, and its step is logged after "You took over".
+
+## Watch the agent's phone
+
+The simulator serves a `/watch` page. Open it in a browser to see the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and starts view only; the viewer can turn on **Take over** to drive the phone. For a phone you can touch directly, see [Driving the live phone](#driving-the-live-phone). The video stream runs only while someone is watching. `/sessions` reports `skin` and `streaming` for each session. For a phone you can also touch, use [`shipvo run`](run.md).
 
 ## What the tree shows (and hides), on purpose
 
@@ -195,7 +206,7 @@ Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_pol
 
 ## Grading an agent
 
-`end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval` scores an agent on a task that way: see [Score an agent on an app task](eval.md). Earlier results: [agent-gate-results.md](agent-gate-results.md).
+`end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval run` scores any agent or model that way: success per check, steps, time, errors and retries. See [Score an agent on an app task](eval.md). Earlier results: [agent-gate-results.md](agent-gate-results.md).
 
 ## Listing your app for every agent
 
@@ -216,6 +227,8 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 **`Error [build_not_supported]`.** The simulator could not load the build you named with `@build:<id>`. Open the app without `@build` to use the published version, or see [Test your own build](test-your-build.md).
 
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
+
+**Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
 
 **Your coding agent does not list the Shipvo tools.** Run `npx shipvo agents setup` in the app folder. It writes the MCP config for each coding agent it finds ([CLI guide](cli.md)). Restart the agent so it reads the new config.
 

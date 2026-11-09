@@ -1,2 +1,0 @@
-- capacitor-sample: launch hook shows the active bundle version in `#version` and the log; the app starts Shipvo on Android and iOS.
-- capacitor-sample: `scripts/ios-sim-check.sh` runs apply, rollback and refused-bad-signature cases on the iOS Simulator.
