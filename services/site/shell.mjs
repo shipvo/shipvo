@@ -39,11 +39,11 @@ ${jsonld}`;
 const PRODUCT = [
   ["Features", "/features/", "Everything Shipvo does, with video and docs"],
   ["Publish", "/docs/getting-started/#5-publish-over-the-air", "Signed OTA updates, cohorts, rollback"],
+  ["Playground", "/playground/", "Try an Android or iOS phone in your browser"],
   ["Simulators", "/products/simulators/", "Android and iOS phones on your machine or CI, no cloud"],
   ["Simulate", "/docs/agents/", "A phone agents can see and operate over MCP"],
   ["Test in CI", "/docs/testing/", "Typed simulator tests on every pull request"],
   ["Verify", "/docs/parity-results/", "Simulator vs device parity, measured nightly"],
-  ["Playground", "/playground/", "Try every feature in your browser, no install"],
   ["Marketplace", "/apps", "Apps any signed-in agent can open"],
   ["CLI", "/docs/cli/", "init · sim · login · app · publish · rollback"],
   ["MCP server", "/docs/mcp/", "Local over stdio, hosted with a key"],

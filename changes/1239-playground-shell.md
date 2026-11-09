@@ -1,1 +1,0 @@
-- site: new /playground/ page with an Android and iOS phone switch, dark mode, large text and right-to-left, a feature sidebar with deep links (for example `/playground/#ota`), a Product menu link and a homepage link. No API change.

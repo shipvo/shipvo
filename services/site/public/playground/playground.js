@@ -1,56 +1,37 @@
-// shipvo.dev/playground: a sample app on an Android or iOS phone, a settings bar and a feature sidebar with deep links.
-import { FEATURES, featureFromHash, settingsFromSearch, searchFromSettings, phoneSrc, appStyle } from "./core.js";
+// shipvo.dev/playground: one phone (Android or iOS), phone settings, and a feature sidebar with deep links (/playground/#ota).
+(function () {
+  var features = JSON.parse(document.getElementById("pg-features").textContent);
+  var $ = function (id) { return document.getElementById(id); };
+  var phone = $("pg-phone"), state = { platform: "android", dark: false, large: false, rtl: false };
+  var q = new URLSearchParams(location.search);
+  if (q.get("platform") === "ios") state.platform = "ios";
+  ["dark", "large", "rtl"].forEach(function (k) { if (q.get(k) === "1") state[k] = true; });
 
-const $ = (id) => document.getElementById(id);
-let settings = settingsFromSearch(location.search);
-const frame = $("pg-phone");
+  function send() { try { phone.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} }
+  function loadPhone() { phone.title = state.platform === "ios" ? "iOS phone" : "Android phone"; phone.src = phone.getAttribute("data-src-" + state.platform); }
+  phone.addEventListener("load", function () { send(); setTimeout(send, 300); });
+  window.addEventListener("message", function (e) { if (e.source === phone.contentWindow && e.data && e.data.type === "pg:ready") send(); });
 
-function applyToApp() {
-  try {
-    const app = frame.contentWindow.frames[0];
-    const d = app && app.document;
-    if (!d || !d.documentElement) return;
-    const a = appStyle(settings);
-    d.documentElement.dir = a.dir;
-    d.documentElement.style.colorScheme = a.colorScheme;
-    d.documentElement.setAttribute("data-color-scheme", a.colorScheme);
-    d.body.style.zoom = a.zoom;
-  } catch { /* the app is not loaded yet; the load handler runs this again */ }
-}
-
-function paintControls() {
-  for (const b of document.querySelectorAll("[data-platform]")) b.setAttribute("aria-pressed", String(b.dataset.platform === settings.platform));
-  for (const k of ["dark", "large", "rtl"]) $("pg-" + k).setAttribute("aria-pressed", String(settings[k]));
-}
-
-function load() {
-  const src = phoneSrc(settings.platform);
-  if (!frame.getAttribute("src") || !frame.getAttribute("src").endsWith(src)) frame.src = src;
-  frame.title = (settings.platform === "ios" ? "iOS" : "Android") + " phone running the sample app";
-  paintControls();
-  applyToApp();
-}
-
-function save() {
-  history.replaceState(null, "", location.pathname + searchFromSettings(settings) + location.hash);
-  load();
-}
-
-function showFeature() {
-  const id = featureFromHash(location.hash);
-  for (const f of FEATURES) {
-    const link = document.querySelector(`[data-feature="${f.id}"]`);
-    link.setAttribute("aria-current", f.id === id ? "page" : "false");
-    $("pg-panel-" + f.id).hidden = f.id !== id;
+  function paintBar() {
+    $("pg-android").setAttribute("aria-pressed", String(state.platform === "android"));
+    $("pg-ios").setAttribute("aria-pressed", String(state.platform === "ios"));
+    ["dark", "large", "rtl"].forEach(function (k) { $("pg-" + k).setAttribute("aria-pressed", String(state[k])); });
   }
-}
+  ["android", "ios"].forEach(function (p) { $("pg-" + p).addEventListener("click", function () { if (state.platform === p) return; state.platform = p; paintBar(); loadPhone(); }); });
+  ["dark", "large", "rtl"].forEach(function (k) { $("pg-" + k).addEventListener("click", function () { state[k] = !state[k]; paintBar(); send(); }); });
 
-for (const b of document.querySelectorAll("[data-platform]")) b.addEventListener("click", () => { settings = { ...settings, platform: b.dataset.platform }; save(); });
-for (const k of ["dark", "large", "rtl"]) $("pg-" + k).addEventListener("click", () => { settings = { ...settings, [k]: !settings[k] }; save(); });
-frame.addEventListener("load", () => {
-  // The app inside the phone loads after the phone page does, so try for a few seconds.
-  let n = 0; const t = setInterval(() => { applyToApp(); if (++n > 40) clearInterval(t); }, 250);
-});
-addEventListener("hashchange", showFeature);
-showFeature();
-load();
+  function show() {
+    var id = location.hash.slice(1), f = features.filter(function (x) { return x.id === id; })[0] || features[0];
+    Array.prototype.forEach.call(document.querySelectorAll("#pg-side a"), function (a) {
+      if (a.getAttribute("data-feature") === f.id) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current");
+    });
+    var panel = $("pg-panel");
+    panel.textContent = "";
+    var h = document.createElement("h2"); h.textContent = f.title; panel.appendChild(h);
+    var p = document.createElement("p"); p.textContent = f.text; panel.appendChild(p);
+    if (f.doc) { var a = document.createElement("a"); a.className = "link"; a.href = f.doc; a.textContent = "Read the docs"; panel.appendChild(a); }
+    panel.setAttribute("data-feature", f.id);
+  }
+  window.addEventListener("hashchange", show);
+  paintBar(); show(); loadPhone();
+})();

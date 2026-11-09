@@ -1,5 +1,5 @@
-// Issue #1239 (shell slice). /playground/ is built, linked from the Product menu and the homepage, and its core logic works.
-// With Playwright, the page opens in Chromium: the Android/iOS switch swaps the phone, the toggles set aria-pressed and the link, and #ota opens its panel.
+// Issue #1240. shipvo.dev/playground/ shows one phone with an Android/iOS switch, dark mode, large text and
+// right-to-left text, and a feature sidebar with deep links (/playground/#ota). Builds the site, serves it, drives it in Chromium.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { execFileSync } from "node:child_process";
@@ -11,31 +11,12 @@ import { fileURLToPath } from "node:url";
 const site = join(dirname(fileURLToPath(import.meta.url)), "..");
 execFileSync(process.execPath, ["build.mjs"], { cwd: site, stdio: "ignore" });
 const pub = join(site, "public");
-
-const core = await import(join(pub, "playground/core.js"));
-assert.equal(core.featureFromHash("#ota"), "ota");
-assert.equal(core.featureFromHash("#nope"), "app");
-assert.equal(core.featureFromHash(""), "app");
-for (const id of ["device", "ota", "agent", "phones"]) assert.equal(core.featureFromHash("#" + id), id);
-const all = { platform: "ios", dark: true, large: true, rtl: true };
-assert.equal(core.searchFromSettings(all), "?platform=ios&dark=1&large=1&rtl=1");
-assert.deepEqual(core.settingsFromSearch(core.searchFromSettings(all)), all);
-assert.equal(core.searchFromSettings(core.DEFAULTS), "");
-assert.deepEqual(core.settingsFromSearch("?platform=bogus&dark=yes"), core.DEFAULTS);
-assert.deepEqual(core.appStyle(all), { dir: "rtl", colorScheme: "dark", zoom: "1.3" });
-assert.deepEqual(core.appStyle(core.DEFAULTS), { dir: "ltr", colorScheme: "light", zoom: "1" });
-assert.equal(core.phoneSrc("ios"), "/demos/chess/phone-ios.html");
-assert.equal(core.phoneSrc("android"), "/demos/chess/phone-android.html");
-
 const html = readFileSync(join(pub, "playground/index.html"), "utf8");
-for (const f of core.FEATURES) {
-  assert.ok(html.includes(`href="#${f.id}"`), `sidebar link #${f.id}`);
-  assert.ok(html.includes(`id="pg-panel-${f.id}"`), `panel ${f.id}`);
-}
-assert.ok(html.includes('data-platform="android"') && html.includes('data-platform="ios"'), "Android and iOS buttons");
-assert.doesNotMatch(html, /<iframe[^>]* src=/, "the phone loads from script");
+for (const f of ["playground.js", "phone-android.html", "phone-ios.html", "app.html"]) assert.ok(existsSync(join(pub, "playground", f)), `missing playground/${f}`);
+for (const id of ["ota", "device", "agent", "many"]) assert.ok(html.includes(`href="#${id}"`), `sidebar lacks #${id}`);
+assert.doesNotMatch(html, /<iframe[^>]* src=/, "the phone loads from script, not with src");
+assert.match(html, /href="\/playground\/"/, "nav links to the playground");
 assert.match(readFileSync(join(site, "pages/index.html"), "utf8"), /href="\/playground\/"/, "homepage links to the playground");
-assert.match(readFileSync(join(site, "shell.mjs"), "utf8"), /"\/playground\/"/, "Product menu links to the playground");
 assert.match(readFileSync(join(pub, "llms.txt"), "utf8"), /https:\/\/shipvo\.dev\/playground\//, "llms.txt links to the playground");
 console.log("playground: static files ok");
 
@@ -54,33 +35,45 @@ const server = createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}`;
-const SLOW = 90_000;
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(`${base}/playground/#ota`);
-  assert.equal(await page.locator("#pg-panel-ota").isVisible(), true, "#ota opens the OTA panel");
-  assert.equal(await page.locator("#pg-panel-app").isVisible(), false);
-  await page.locator('[data-feature="device"]').click();
-  await page.locator("#pg-panel-device").waitFor({ state: "visible" });
-  const phone = page.frameLocator("#pg-phone");
-  await phone.locator('[data-platform="android"]').waitFor({ state: "attached", timeout: SLOW });
-  await page.locator('[data-platform="ios"]').click();
-  await phone.locator('[data-platform="ios"]').waitFor({ state: "attached", timeout: SLOW });
-  assert.match(page.url(), /platform=ios/);
-  assert.equal(await page.locator('[data-platform="ios"]').getAttribute("aria-pressed"), "true");
+  assert.equal(await page.locator("#pg-panel").getAttribute("data-feature"), "ota", "deep link opens the OTA panel");
+  assert.equal(await page.locator('#pg-side a[aria-current="true"]').getAttribute("data-feature"), "ota");
+  const phone = page.frameLocator("#pg-phone"), app = phone.frameLocator("#app");
+  await app.getByRole("button", { name: "Add Spinning rod to cart" }).waitFor({ timeout: 30_000 });
+  assert.equal(await page.locator("#pg-phone").contentFrame().locator('[data-platform="android"]').count(), 1);
+  // The sidebar changes the panel and the hash.
+  await page.locator('#pg-side a[data-feature="device"]').click();
+  await page.waitForFunction(() => document.getElementById("pg-panel").getAttribute("data-feature") === "device");
+  assert.match(page.url(), /#device$/);
+  // iOS switch.
+  await page.locator("#pg-ios").click();
+  await app.getByRole("button", { name: "Add Tackle box to cart" }).waitFor({ timeout: 30_000 });
+  assert.equal(await page.locator("#pg-phone").contentFrame().locator('[data-platform="ios"]').count(), 1);
+  assert.equal(await page.locator("#pg-ios").getAttribute("aria-pressed"), "true");
+  // Dark mode, large text and RTL reach the app inside the phone.
   await page.locator("#pg-dark").click(); await page.locator("#pg-large").click(); await page.locator("#pg-rtl").click();
-  assert.match(page.url(), /dark=1&large=1&rtl=1/);
-  const app = phone.frameLocator("#app");
-  await app.locator("html").waitFor({ state: "attached", timeout: SLOW });
-  await page.waitForFunction(() => { const d = document.getElementById("pg-phone").contentWindow.frames[0]?.document; return d && d.documentElement.dir === "rtl" && d.documentElement.style.colorScheme === "dark" && d.body.style.zoom === "1.3"; }, null, { timeout: SLOW });
-  // A shared link restores the setup.
-  await page.goto(`${base}/playground/?platform=ios&rtl=1#agent`);
-  assert.equal(await page.locator("#pg-panel-agent").isVisible(), true);
-  assert.equal(await page.locator("#pg-rtl").getAttribute("aria-pressed"), "true");
-  await page.frameLocator("#pg-phone").locator('[data-platform="ios"]').waitFor({ state: "attached", timeout: SLOW });
+  const root = app.locator("html");
+  await page.waitForFunction(() => {
+    const d = document.getElementById("pg-phone").contentDocument.getElementById("app").contentDocument.documentElement;
+    return d.hasAttribute("data-dark") && d.hasAttribute("data-large") && d.dir === "rtl";
+  }, null, { timeout: 10_000 });
+  assert.equal(await root.getAttribute("dir"), "rtl");
+  // The app still works: tapping Add updates the cart.
+  await app.getByRole("button", { name: "Add Tackle box to cart" }).click();
+  assert.match(await app.getByTestId("cart").textContent(), /1 item/);
+  // Preferences survive an Android/iOS switch.
+  await page.locator("#pg-android").click();
+  await page.waitForFunction(() => {
+    const d = document.getElementById("pg-phone").contentDocument.getElementById("app")?.contentDocument?.documentElement;
+    return d && d.hasAttribute("data-dark") && d.dir === "rtl";
+  }, null, { timeout: 30_000 });
   assert.deepEqual(errors, []);
-  console.log("playground: browser check ok");
+  await page.setViewportSize({ width: 375, height: 800 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll at 375 px");
+  console.log("playground: platform switch, dark, large text, RTL and deep links work");
 } finally { await browser.close(); server.close(); }
