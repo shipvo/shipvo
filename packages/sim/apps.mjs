@@ -1,11 +1,10 @@
 // Installed apps on the simulated phone: state, the phone.json profile, and the Store screen. Pure: no DOM, no timers.
 // The server uses these rules for the MCP tools install_app, uninstall_app and switch_app. The frame page uses the same
 // functions (serialised into the page) to draw the home screen icons and the Store. Our own artwork: no vendor marks.
-import { validate } from "@shipvo/spec";
 import { SETTINGS, settingPatch } from "./settings.mjs";
 
-/** Typed error: invalid_spec (with `issues`), unknown_app, already_installed, not_installed or bad_profile. */
-export class AppsError extends Error { constructor(code, message, issues) { super(message); this.code = code; if (issues) this.issues = issues; } }
+/** Typed error: unknown_app, already_installed, not_installed or bad_profile. */
+export class AppsError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
 /** The apps the Store lists when there is no network or no marketplace. Used by tests and offline runs. */
 export const STORE_FIXTURE = [
@@ -16,7 +15,7 @@ export const STORE_FIXTURE = [
 
 const text = (v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n);
 const scheme = (x) => String(x).toLowerCase().replace(/:$/, "");
-const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(a.spec && typeof a.spec === "object" ? { spec: a.spec } : {}), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}) });
+const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}) });
 
 /** Phone state for apps. `installed_apps` is a list of { id, name, url, version }; `current_app` is an id or null (the app the phone was started with). */
 export function createApps(profile = {}) {
@@ -83,18 +82,6 @@ export function installApp(st, id, catalog = st.store, real) {
   if (st.installed_apps.some((a) => a.id === id)) throw new AppsError("already_installed", `'${id}' is already installed`);
   st.installed_apps.push({ ...entry(found), ...(real ? { sha256: real.sha256, bytes: real.bytes } : {}) });
   note(st, "install_app", id, real ? { source: "real", sha256: real.sha256, bytes: real.bytes } : undefined); return st;
-}
-
-/**
- * Install an app from a spec. The spec is checked with the spec validator: on failure nothing changes and the error
- * (invalid_spec) carries the validator's issues unchanged. Throws already_installed when the id is taken.
- */
-export function createSpecApp(st, spec) {
-  const { errors } = validate(spec);
-  if (errors.length) throw new AppsError("invalid_spec", `the spec is not valid:\n${errors.map((e) => `${e.path}: ${e.message}`).join("\n")}`, errors);
-  const id = String(spec.app?.id ?? "");
-  if (st.installed_apps.some((a) => a.id === id)) throw new AppsError("already_installed", `'${id}' is already installed`);
-  st.installed_apps.push(entry({ id, name: spec.app?.name || id, url: `spec://${id}`, version: spec.app?.version, spec })); note(st, "create_app", id); return st;
 }
 
 /** Remove an app. If it was in front, the phone goes home and current_app is empty. Throws not_installed. */

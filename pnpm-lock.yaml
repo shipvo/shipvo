@@ -446,7 +446,7 @@ importers:
         version: 2.1.9(@types/node@22.20.5)(lightningcss@1.33.0)(terser@5.51.2)
       wrangler:
         specifier: ^4.40.0
-        version: 4.156.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.5)
+        version: 4.156.0(@cloudflare/workers-types@4.20260702.1)
 
   services/site:
     devDependencies:
@@ -461,7 +461,7 @@ importers:
         version: 5.9.3
       wrangler:
         specifier: ^4.20.0
-        version: 4.156.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.5)
+        version: 4.156.0(@cloudflare/workers-types@4.20260702.1)
 
 packages:
 
@@ -4765,6 +4765,8 @@ packages:
 
 snapshots:
 
+  2g@1.0.1: {}
+
   2g@1.0.1(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
@@ -5802,26 +5804,26 @@ snapshots:
 
   '@expo/cli@58.1.17(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(expo-constants@58.0.14(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)))(expo-font@58.0.11(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)':
     dependencies:
-      2g: 1.0.1(typescript@6.0.3)
+      2g: 1.0.1
       '@expo/code-signing-certificates': 0.0.7
-      '@expo/config': 58.0.9(typescript@6.0.3)
-      '@expo/config-plugins': 58.0.11(typescript@6.0.3)
+      '@expo/config': 58.0.9
+      '@expo/config-plugins': 58.0.11
       '@expo/devcert': 1.2.2
       '@expo/env': 2.5.3
-      '@expo/image-utils': 0.12.6(typescript@6.0.3)
-      '@expo/inline-modules': 0.2.8(typescript@6.0.3)
+      '@expo/image-utils': 0.12.6
+      '@expo/inline-modules': 0.2.8
       '@expo/json-file': 11.2.1
       '@expo/log-box': 58.0.13(@expo/dom-webview@58.0.2)(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       '@expo/log-box-utils': 58.0.2
       '@expo/metro': 58.0.0
       '@expo/metro-config': 58.0.19(expo@58.0.21)
-      '@expo/metro-file-map': 58.0.5(typescript@6.0.3)
+      '@expo/metro-file-map': 58.0.5
       '@expo/osascript': 2.8.1
       '@expo/package-manager': 1.14.2
       '@expo/platforms': 58.0.1
       '@expo/plist': 0.10.1
       '@expo/prebuild-config': 58.0.17
-      '@expo/require-utils': 58.0.5(typescript@6.0.3)
+      '@expo/require-utils': 58.0.5
       '@expo/router-server': 58.0.19(@expo/metro-runtime@58.0.15)(expo-constants@58.0.14(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)))(expo-font@58.0.11(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(expo-server@58.0.6)(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@expo/schema-utils': 58.0.2
       '@expo/spawn-async': 1.8.0
@@ -5885,6 +5887,25 @@ snapshots:
     dependencies:
       node-forge: 1.4.2
 
+  '@expo/config-plugins@58.0.11':
+    dependencies:
+      '@expo/config-types': 58.0.3
+      '@expo/json-file': 11.2.1
+      '@expo/plist': 0.10.1
+      '@expo/require-utils': 58.0.5
+      '@expo/sdk-runtime-versions': 1.0.1
+      chalk: 4.1.2
+      debug: 4.4.3
+      getenv: 2.0.0
+      glob: 13.0.6
+      semver: 7.8.5
+      slugify: 1.6.9
+      xcode: 4.0.0
+      xml2js: 0.6.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   '@expo/config-plugins@58.0.11(typescript@5.9.3)':
     dependencies:
       '@expo/config-types': 58.0.3
@@ -5924,6 +5945,23 @@ snapshots:
       - typescript
 
   '@expo/config-types@58.0.3': {}
+
+  '@expo/config@58.0.9':
+    dependencies:
+      '@expo/config-plugins': 58.0.11
+      '@expo/config-types': 58.0.3
+      '@expo/json-file': 11.2.1
+      '@expo/platforms': 58.0.1
+      '@expo/require-utils': 58.0.5
+      deepmerge: 4.3.1
+      getenv: 2.0.0
+      glob: 13.0.6
+      resolve-workspace-root: 2.0.1
+      semver: 7.8.5
+      slugify: 1.6.9
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   '@expo/config@58.0.9(typescript@5.9.3)':
     dependencies:
@@ -6004,6 +6042,19 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@expo/image-utils@0.12.6':
+    dependencies:
+      '@expo/require-utils': 58.0.5
+      '@expo/spawn-async': 1.8.0
+      chalk: 4.1.2
+      getenv: 2.0.0
+      jimp-compact: 0.16.1
+      parse-png: 2.1.0
+      semver: 7.8.5
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   '@expo/image-utils@0.12.6(typescript@5.9.3)':
     dependencies:
       '@expo/require-utils': 58.0.5(typescript@5.9.3)
@@ -6030,6 +6081,13 @@ snapshots:
       - supports-color
       - typescript
 
+  '@expo/inline-modules@0.2.8':
+    dependencies:
+      '@expo/config-plugins': 58.0.11
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   '@expo/inline-modules@0.2.8(typescript@5.9.3)':
     dependencies:
       '@expo/config-plugins': 58.0.11(typescript@5.9.3)
@@ -6051,7 +6109,7 @@ snapshots:
 
   '@expo/local-build-cache-provider@58.0.9':
     dependencies:
-      '@expo/config': 58.0.9(typescript@6.0.3)
+      '@expo/config': 58.0.9
       chalk: 4.1.2
     transitivePeerDependencies:
       - supports-color
@@ -6088,16 +6146,16 @@ snapshots:
 
   '@expo/metro-config@58.0.19(expo@58.0.21)':
     dependencies:
-      2g: 1.0.1(typescript@6.0.3)
+      2g: 1.0.1
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7
       '@babel/generator': 7.29.12
-      '@expo/config': 58.0.9(typescript@6.0.3)
+      '@expo/config': 58.0.9
       '@expo/env': 2.5.3
       '@expo/json-file': 11.2.1
       '@expo/metro': 58.0.0
       '@expo/platforms': 58.0.1
-      '@expo/require-utils': 58.0.5(typescript@6.0.3)
+      '@expo/require-utils': 58.0.5
       '@expo/spawn-async': 1.8.0
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/remapping': 2.3.5
@@ -6200,6 +6258,18 @@ snapshots:
       - typescript
       - utf-8-validate
 
+  '@expo/metro-file-map@58.0.5':
+    dependencies:
+      2g: 1.0.1
+      debug: 4.4.3
+      fb-watchman: 2.0.4
+      invariant: 2.2.4
+      jest-worker: 29.7.0
+      walker: 1.0.8
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   '@expo/metro-file-map@58.0.5(typescript@5.9.3)':
     dependencies:
       2g: 1.0.1(typescript@5.9.3)
@@ -6293,14 +6363,14 @@ snapshots:
 
   '@expo/prebuild-config@58.0.17':
     dependencies:
-      '@expo/config': 58.0.9(typescript@6.0.3)
-      '@expo/config-plugins': 58.0.11(typescript@6.0.3)
+      '@expo/config': 58.0.9
+      '@expo/config-plugins': 58.0.11
       '@expo/config-types': 58.0.3
-      '@expo/image-utils': 0.12.6(typescript@6.0.3)
+      '@expo/image-utils': 0.12.6
       '@expo/json-file': 11.2.1
       '@react-native/normalize-colors': 0.88.1
       debug: 4.4.3
-      expo-modules-autolinking: 58.0.16(typescript@6.0.3)
+      expo-modules-autolinking: 58.0.16
       resolve-from: 5.0.0
       semver: 7.8.5
     transitivePeerDependencies:
@@ -6338,6 +6408,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
       - typescript
+
+  '@expo/require-utils@58.0.5':
+    dependencies:
+      '@babel/code-frame': 7.29.7
+      '@babel/core': 7.29.7
+      '@babel/plugin-transform-modules-commonjs': 7.29.7(@babel/core@7.29.7)
+    transitivePeerDependencies:
+      - supports-color
 
   '@expo/require-utils@58.0.5(typescript@5.9.3)':
     dependencies:
@@ -7653,7 +7731,7 @@ snapshots:
 
   expo-asset@58.0.19(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0):
     dependencies:
-      '@expo/image-utils': 0.12.6(typescript@6.0.3)
+      '@expo/image-utils': 0.12.6
       expo: 58.0.21(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       expo-constants: 58.0.14(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))
       react: 19.3.0
@@ -7709,7 +7787,7 @@ snapshots:
   expo-constants@58.0.14(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)):
     dependencies:
       '@expo/env': 2.5.3
-      '@expo/require-utils': 58.0.5(typescript@6.0.3)
+      '@expo/require-utils': 58.0.5
       expo: 58.0.21(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       react-native: 0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)
     transitivePeerDependencies:
@@ -7769,7 +7847,7 @@ snapshots:
 
   expo-location@58.0.20(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0):
     dependencies:
-      '@expo/image-utils': 0.12.6(typescript@6.0.3)
+      '@expo/image-utils': 0.12.6
       expo: 58.0.21(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)
@@ -7783,6 +7861,17 @@ snapshots:
       expo: 58.0.21(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  expo-modules-autolinking@58.0.16:
+    dependencies:
+      '@expo/platforms': 58.0.1
+      '@expo/require-utils': 58.0.5
+      '@expo/spawn-async': 1.8.0
+      chalk: 4.1.2
+      commander: 7.2.0
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -7835,7 +7924,7 @@ snapshots:
 
   expo-notifications@58.1.7(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0):
     dependencies:
-      '@expo/image-utils': 0.12.6(typescript@6.0.3)
+      '@expo/image-utils': 0.12.6
       abort-controller: 3.0.0
       badgin: 1.2.3
       expo: 58.0.21(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
@@ -7884,8 +7973,8 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.29.10
       '@expo/cli': 58.1.17(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(expo-constants@58.0.14(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)))(expo-font@58.0.11(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
-      '@expo/config': 58.0.9(typescript@6.0.3)
-      '@expo/config-plugins': 58.0.11(typescript@6.0.3)
+      '@expo/config': 58.0.9
+      '@expo/config-plugins': 58.0.11
       '@expo/devtools': 58.0.2(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       '@expo/fingerprint': 0.21.7
       '@expo/local-build-cache-provider': 58.0.9
@@ -7900,7 +7989,7 @@ snapshots:
       expo-file-system: 58.0.13(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))
       expo-font: 58.0.11(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       expo-keep-awake: 58.0.3(expo@58.0.21)(react@19.3.0)
-      expo-modules-autolinking: 58.0.16(typescript@6.0.3)
+      expo-modules-autolinking: 58.0.16
       expo-modules-cli: 0.4.0
       expo-modules-core: 58.0.28(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       pretty-format: 29.7.0
@@ -8827,10 +8916,10 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  miniflare@5.20261023.3-beta(@types/node@22.20.5):
+  miniflare@5.20261023.3-beta:
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
-      sharp: 0.35.5(@types/node@22.20.5)
+      sharp: 0.35.5
       undici: 7.30.1
       workerd: 1.20261023.1
       ws: 8.21.0
@@ -9372,7 +9461,7 @@ snapshots:
       '@img/sharp-win32-x64': 0.33.5
     optional: true
 
-  sharp@0.35.5(@types/node@22.20.5):
+  sharp@0.35.5:
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
@@ -9403,7 +9492,6 @@ snapshots:
       '@img/sharp-win32-arm64': 0.35.5
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
-      '@types/node': 22.20.5
 
   shebang-command@2.0.0:
     dependencies:
@@ -9809,13 +9897,13 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  wrangler@4.156.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.5):
+  wrangler@4.156.0(@cloudflare/workers-types@4.20260702.1):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
       '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261023.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
-      miniflare: 5.20261023.3-beta(@types/node@22.20.5)
+      miniflare: 5.20261023.3-beta
       path-to-regexp: 6.3.0
       unenv: 2.0.0-rc.24
       workerd: 1.20261023.1

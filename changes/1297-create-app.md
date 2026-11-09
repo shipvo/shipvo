@@ -1,1 +1,5 @@
-- sim: new MCP tool `create_app(spec)`. It checks the spec, returns each issue (path and message) if it is not valid, and otherwise installs the app on the phone. Its icon shows on the home screen, and `open_app` or `switch_app` opens its first screen on Android and iOS, where taps, `snapshot` refs and the app's own tools work. Fails with `already_installed` if the app id is taken.
+- `@shipvo/sim`: new `create_app` action starts an app from a spec and installs it with an icon on the home screen; `run_app_action` runs one of its actions by name. Spec apps render as labelled HTML, so tap, type and scroll work on them on Android and iOS.
+- `@shipvo/mcp`: new tools `create_app` and `run_app_action`.
+- `@shipvo/sim` now depends on `@shipvo/spec`.
+- Migration: none; new tools.
+- `@shipvo/sim`: a `screenshot` taken on the home screen now includes the icons of installed apps.

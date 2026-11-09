@@ -33,6 +33,7 @@
     "browser-app.mjs",
     "watch.mjs",
     "ws-lite.mjs",
+    "spec-host.mjs",
     "lifecycle.mjs",
     "shade.mjs",
     "shade-actions.mjs",
@@ -75,10 +76,10 @@
     "access": "public",
     "provenance": true
   },
-  "dependencies": {
-    "@shipvo/spec": "workspace:^"
-  },
   "devDependencies": {
     "playwright": "1.63.0"
+  },
+  "dependencies": {
+    "@shipvo/spec": "workspace:^"
   }
 }

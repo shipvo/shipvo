@@ -569,7 +569,7 @@
   },
   {
     "name": "create_app",
-    "description": "Make an app from a spec and put it on the phone. The spec is checked first: if it is not valid you get each issue with its path and message, and nothing is installed. If it is valid the app icon appears on the home screen, and open_app or switch_app shows its first screen, where tap, screen refs and the app's own tools work. Fails with invalid_spec or already_installed (the app id is taken). Logged in device_log as simulated.",
+    "description": "Describe an app and it appears on the phone. Pass an app spec (JSON, shipvo.app/v0: data, actions, screens). The spec is checked first: every problem comes back with its path and a fix, and nothing is installed until it is valid. A valid spec is started, gets an icon on the home screen, and opens (pass open: false to stay where you are). Every control is labelled, so tap, type, scroll and screen work on it like any app, and each action can be run by name with run_app_action. Fails with invalid_spec, bad_app_id or already_installed. Logged in device_log as a real create.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -577,14 +577,35 @@
           "type": "string",
           "description": "Session from open_app"
         },
+        "id": {
+          "type": "string",
+          "description": "App id: lowercase letters, digits and dashes, up to 40"
+        },
         "spec": {
           "type": "object",
           "additionalProperties": {},
-          "description": "The app spec (shipvo.app/v0): app id and name, data, screens"
+          "description": "The app spec (shipvo.app/v0)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name under the icon. Default: app.name in the spec"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Look of the app. Default android"
+        },
+        "open": {
+          "type": "boolean",
+          "description": "Open the app right away (default true)"
         }
       },
       "required": [
         "session",
+        "id",
         "spec"
       ],
       "additionalProperties": false,
@@ -1545,6 +1566,46 @@
       },
       "required": [
         "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "run_app_action",
+    "description": "Run one action of an app made with create_app, by name, with its input (for example add_task with { title }). The action changes the app's data the same way tapping its form does, and the open screen shows the result. Fails with not_installed (no such spec app) or action_failed (the action refused the input, with the reason).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action name from the spec"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The action's input"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "action"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
