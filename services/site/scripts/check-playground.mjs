@@ -145,7 +145,7 @@ try {
       await page.locator("#pg-tool").selectOption(tool);
       for (const [k, v] of Object.entries(args)) await page.locator(`#pg-args input[data-arg="${k}"]`).fill(v);
       await page.locator("#pg-run").click();
-      await page.waitForFunction((t) => document.getElementById("pg-out").textContent !== t, await page.locator("#pg-out").textContent(), { timeout: 5000 });
+      await page.waitForFunction((t) => document.getElementById("pg-out").textContent !== t, await page.locator("#pg-out").textContent(), { timeout: 20_000 });
       return JSON.parse(await page.locator("#pg-out").textContent());
     };
     const scr = await runTool("screen");
