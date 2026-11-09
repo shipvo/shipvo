@@ -71,6 +71,16 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 - [Simulated device features](device-api.md): camera, location, payment, notifications.
 - [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
 
+## Describe an app and it appears
+
+`create_app { session, id, spec }` takes an app spec ([app spec](design/app-spec.md), `shipvo.app/v0`), checks it, and puts the app on the phone. A spec with problems is refused with `invalid_spec`: every problem comes back with its path in the spec and a fix, and nothing is installed. A valid spec gets an icon on the home screen and opens (pass `open: false` to stay where you are). Pass `style: "ios"` for the iPhone look; the default is Android.
+
+The app is real HTML with every control labelled, so `screen`, `tap`, `type` and `scroll` work on it like any app. Lists, forms, toggles, segmented controls and tabs react to taps and typing. `run_app_action { session, id, action, input }` runs one action of the spec by name, the way its form does, and the open screen shows the result. If the action refuses the input you get `action_failed` and the reason.
+
+`device_log` records the create and each action with `source: "real"`.
+
+An app's data lives for the session: it starts from the spec's seed data when the app is created, and it is dropped when the session ends or the app is uninstalled.
+
 ## Install apps and switch between them
 
 The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools.
