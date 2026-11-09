@@ -2,6 +2,7 @@
 // build.mjs calls writePlayground(). The page itself comes from pages/playground.html.
 // Files: phone-android.html and phone-ios.html (the frames from @shipvo/sim, each with the sample app inside)
 // and app.html (the sample app). The shell page sends { type: "pg:prefs", dark, large, rtl } to a phone frame.
+import { recordOtaRun } from "./playground-ota.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -44,6 +45,7 @@ ul.dev{margin-top:14px}ul.dev li{padding:8px 14px}
 <li data-testid="location">Location: not set</li><li data-testid="camera">Camera: not set</li><li data-testid="biometrics">Biometrics: not set</li>
 <li data-testid="payment">Payment: not set</li><li data-testid="airplane">Airplane mode: off</li>
 </ul>
+<p data-testid="version">Version 1</p>
 <div id="note" role="alert" data-testid="notification" hidden></div>
 <script>
 var n=0,c=document.querySelector('[data-testid=cart]');
@@ -57,7 +59,7 @@ else if(d.kind==="biometrics"&&W[v])put("biometrics","Biometrics: "+W[v]);
 else if(d.kind==="payment"&&P[v])put("payment","Payment: "+P[v]);
 else if(d.kind==="airplane")put("airplane","Airplane mode: "+(v==="on"?"on, no network":"off"));
 else if(d.kind==="notification"&&v==="send"){ni++;var n=document.getElementById("note");n.hidden=false;n.textContent="Notification "+ni+": Tide at 06:40, your order has shipped";clearTimeout(window.nt);window.nt=setTimeout(function(){n.hidden=true},4000)}});
-addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:prefs")return;var h=document.documentElement;
+addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pg:ota"){document.querySelector("[data-testid=version]").textContent="Version "+d.version;return}if(!d||d.type!=="pg:prefs")return;var h=document.documentElement;
 h.toggleAttribute("data-dark",!!d.dark);h.toggleAttribute("data-large",!!d.large);h.dir=d.rtl?"rtl":"ltr"});
 </script></body></html>
 `;
@@ -66,6 +68,7 @@ export async function writePlayground(pub) {
   const out = join(pub, "playground");
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "app.html"), APP);
+  writeFileSync(join(out, "ota-run.json"), JSON.stringify(await recordOtaRun(ROOT), null, 1) + "\n");
   const { renderFrame } = await import(pathToFileURL(join(ROOT, "packages/sim/frame.mjs")).href);
   for (const skin of ["android", "ios"]) {
     const name = skin === "ios" ? "iOS" : "Android";
@@ -82,11 +85,11 @@ ${f.css}
 <script>
 function fit(){var s=Math.min(1,innerWidth/${f.outerWidth},innerHeight/${f.outerHeight}),e=document.getElementById("fit");e.style.width="${f.outerWidth}px";e.style.height="${f.outerHeight}px";e.style.transform="translate(-50%,-50%) scale("+s+")"}
 addEventListener("resize",fit);fit();
-var last={},dev={};
+var last={},dev={},ota=1;
 addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:device")return;if(d.kind!=="notification")dev[d.kind]=d.value;var a=document.getElementById("app");if(a&&a.contentWindow)a.contentWindow.postMessage(d,"*")});
-function send(){var a=document.getElementById("app");if(a&&a.contentWindow){a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*");for(var k in dev)a.contentWindow.postMessage({type:"pg:device",kind:k,value:dev[k]},"*")}}
+function send(){var a=document.getElementById("app");if(a&&a.contentWindow){a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*");for(var k in dev)a.contentWindow.postMessage({type:"pg:device",kind:k,value:dev[k]},"*");a.contentWindow.postMessage({type:"pg:ota",version:ota},"*")}}
 document.getElementById("app").addEventListener("load",send);
-addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:prefs")return;last={dark:!!d.dark,large:!!d.large,rtl:!!d.rtl};
+addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pg:ota"){ota=d.version;send();return}if(!d||d.type!=="pg:prefs")return;last={dark:!!d.dark,large:!!d.large,rtl:!!d.rtl};
 var b=document.querySelector(".sf-body");b.dataset.theme=last.dark?"dark":"light";b.style.setProperty("--sf-bg",last.dark?"#000":"#fff");b.style.setProperty("--sf-fg",last.dark?"#fff":"#111");
 document.querySelector(".sf-status").style.setProperty("--sf-status-fg",last.dark?"#fff":"#111");send()});
 </script></body></html>`);
