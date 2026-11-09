@@ -10,7 +10,6 @@ import { join, extname, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { openBuild } from "./build-open.mjs";
-import { BuildCacheError } from "./build-cache.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { installNetGate } from "./net-gate.mjs";
@@ -26,8 +25,9 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
+import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -136,6 +136,7 @@ function leaveRoom(s, id) {
 }
 async function endSession(id) {
   const s = sessions.get(id); if (!s) return false;
+  specHost.dropSession(id);
   for (const p of s.peers ?? []) p.close(); closeWatchers(s);
   await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
   sessions.delete(id); leaveRoom(s, id); return true;
@@ -143,7 +144,7 @@ async function endSession(id) {
 async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
-  if (sessions.has(id)) { const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); sessions.delete(id); leaveRoom(old, id); }
+  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); sessions.delete(id); leaveRoom(old, id); }
   let target, buildId;
   if (opts.build_url != null) {
     // Fetch the build before anything else is created, so a bad URL leaves no session behind.
@@ -233,6 +234,8 @@ async function boot(s, url) {
 async function reapplyNetProfile(s, page) {
   if (s.netProfile) await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
 }
+const specHost = new SpecHost();
+const sidOf = (s) => [...sessions].find(([, v]) => v === s)?.[0];
 // The bundle a Store listing points at: app://<id>[@rN] is the published web artifact; an http(s) URL is fetched as given.
 // Same host guard and size cap as build_url. Resolves { sha256, bytes }, or throws SimError store_app_unreachable / too_large / host_not_allowed.
 async function fetchAppBundle(app) {
@@ -243,19 +246,21 @@ async function fetchAppBundle(app) {
   try { const r = await fetchBuild(from, { dir: join(DIR, "builds"), allowHosts }); return { sha256: r.id, bytes: r.bytes }; }
   catch (e) { if (e instanceof BuildCacheError) throw new SimError(e.code === "unreachable" ? "store_app_unreachable" : e.code, e.message); throw e; }
 }
-async function switchToApp(s, page, id) {
+async function switchToApp(s, page, id, fresh = false) {
   const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
   // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
   // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
   let dest = null;
   const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
-  if (am) dest = (await resolveApp(am[1])).url;
+  const sm = /^spec:\/\/([a-z0-9-]+)$/.exec(url);
+  if (sm) { if (!specHost.has(sidOf(s), sm[1])) throw new SimError("not_installed", `the spec app '${sm[1]}' is not running on this phone`); dest = `http://localhost:${PORT}/spec/${encodeURIComponent(sidOf(s))}/${sm[1]}/`; }
+  else if (am) dest = (await resolveApp(am[1])).url;
   else if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^fixture:/i.test(url)) {
     try { dest = (await checkUrl(url, { allowPrivate: false, allowHosts: [] })).href; }
     catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
   }
   switchApp(s.apps, id, s.nav);
-  if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  if (dest && (fresh || page.url() !== dest)) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
   await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
@@ -367,6 +372,33 @@ async function act(id, body) {
       const where = s.nav.where;
       return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)\n${describeApps(s.apps)}` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
     }
+    // Describe an app and it appears: a spec is validated, started and installed with an icon on the home screen.
+    case "create_app": {
+      const appId = String(body.id ?? "");
+      if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(appId)) throw new SimError("bad_app_id", "id: lowercase letters, digits and dashes, up to 40, starting with a letter or digit");
+      if (s.apps.installed_apps.some((a) => a.id === appId)) throw new SimError("already_installed", `'${appId}' is already installed. Uninstall it with uninstall_app first.`);
+      const made = specHost.create(sidOf(s), appId, body.spec, { style: body.style === "ios" ? "ios" : "android" });
+      if (!made.ok) throw new SimError("invalid_spec", made.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
+      const nm = String(body.name ?? body.spec?.app?.name ?? appId).replace(/[<>"'\\]/g, "").slice(0, 40);
+      s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec" });
+      s.apps.log.push({ at: Date.now(), name: "create_app", app: appId, source: "real", version: "1" });
+      if (body.open !== false) {
+        // If opening fails, the app is not left installed or running.
+        try { await switchToApp(s, page, appId, true); }
+        catch (e) { s.apps.installed_apps = s.apps.installed_apps.filter((a) => a.id !== appId); s.apps.log = s.apps.log.filter((l) => !(l.app === appId && l.name === "create_app")); specHost.drop(sidOf(s), appId); throw e; }
+      }
+      return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+    }
+    // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
+    case "app_action": {
+      const appId = String(body.id ?? "");
+      if (!specHost.has(sidOf(s), appId)) throw new SimError("not_installed", `'${appId}' is not a spec app running on this phone`);
+      const res = specHost.call(sidOf(s), appId, String(body.action_name ?? ""), body.input && typeof body.input === "object" ? body.input : {});
+      s.apps.log.push({ at: Date.now(), name: "app_action", app: appId, action: String(body.action_name ?? ""), source: "real" });
+      if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (res.ok === false) throw new SimError("action_failed", res.error);
+      return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
+    }
     // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
     case "install_app": case "uninstall_app": case "switch_app": {
       const id = String(body.id ?? "");
@@ -379,7 +411,7 @@ async function act(id, body) {
           const real = found && !/^fixture:/i.test(String(found.url ?? "")) ? await fetchAppBundle(found) : undefined;
           installApp(s.apps, id, catalog, real);
         }
-        else if (body.action === "uninstall_app") uninstallApp(s.apps, id, s.nav);
+        else if (body.action === "uninstall_app") { uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); }
         else {
           await switchToApp(s, page, id);
         }
@@ -528,11 +560,11 @@ async function act(id, body) {
       const jpeg = body.format === "jpeg"; const p = join(DIR, `${id}-${Date.now()}.${jpeg ? "jpg" : "png"}`);
       // Home screen or switcher showing: draw it over the app for the shot, then take it away. The app stays loaded underneath.
       const away = s.nav.where !== "app";
-      if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME));
+      if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME) + (s.nav.where === "home" ? `<style>${storeCss}</style><div class="sf-apps" style="position:fixed;z-index:2147483647;color:#fff;font-family:system-ui,sans-serif">${installedIconsHtml(s.apps)}</div>` : ""));
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -597,6 +629,13 @@ const server = http.createServer(async (req, res) => {
     // the Browser app, in a phone frame
     if (req.method === "GET" && url.pathname === "/browser") return send(200, browserAppPage(url.searchParams.get("skin") === "ios" ? "ios" : "android", url.searchParams.get("session") ?? ""), MIME[".html"]);
     if (req.method === "GET" && url.pathname === "/watch") { const list = watchList(sessions); const want = url.searchParams.get("skin"); return send(200, watchPage(want ?? (url.searchParams.get("session") ? sessions.get(url.searchParams.get("session"))?.skin : null) ?? list[0]?.skin, url.searchParams.get("session") ?? "", { hosted: url.searchParams.get("hosted") === "1", takeOver: url.searchParams.get("takeover") === "1", signin: url.searchParams.get("signin") ?? "" }), MIME[".html"]); }
+    // Spec apps: the page for an app's current screen, and the control events the page sends back.
+    { const sp = url.pathname.match(/^\/spec\/([^/]+)\/([a-z0-9-]+)\/(op)?$/);
+      if (sp) {
+        const [, sid, app, isOp] = sp, key = decodeURIComponent(sid);
+        if (!isOp && req.method === "GET") { const html = specHost.page(key, app); return html ? send(200, html, MIME[".html"]) : send(404, { error: "no_app" }); }
+        if (isOp && req.method === "POST") { let b = ""; for await (const ch of req) { b += ch; if (b.length > 65536) return send(413, { error: "too_large" }); } let j; try { j = JSON.parse(b || "{}"); } catch { return send(400, { error: "bad_json" }); } return send(200, specHost.op(key, app, j)); }
+      } }
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
