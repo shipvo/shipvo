@@ -80,12 +80,13 @@ The phone can hold several apps. The home screen has a **Store** icon. The Store
 
 | Tool | What it does | Typed errors |
 | --- | --- | --- |
+| `find_apps` | Searches the Store by need, country, language and currency; install a result with `install_app` or `request_app_install` | `store_unreachable` |
 | `list_store_apps` | Lists the marketplace apps (id, name, bundle URL, version) from the control plane | `store_unreachable` |
 | `install_app { id }` | Installs a Store app; its icon appears on the home screen | `unknown_app`, `already_installed` |
 | `switch_app { id }` | Opens an installed app; it becomes `current_app` | `not_installed` |
 | `uninstall_app { id }` | Removes it. If it was open, the phone goes home | `not_installed` |
 
-Installing is simulated: nothing real is installed, and `device_log` marks each install, switch and uninstall as `simulated`. If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of three apps (`tide`, `notes`, `weather`) with no network.
+Installing is simulated: nothing real is installed, and `device_log` marks each install, switch and uninstall as `simulated`. If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of four apps (`tide`, `notes`, `weather`, `splitly`) with no network.
 
 Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
 

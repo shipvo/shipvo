@@ -64,7 +64,7 @@ describe("phone app tools", () => {
     await c.close();
     const f = await connect({ PN_STORE_FIXTURE: "1" });
     const ok = await call(f, "list_store_apps");
-    expect(ok.structuredContent.apps.map((a: any) => a.id)).toEqual(["tide", "notes", "weather"]);
+    expect(ok.structuredContent.apps.map((a: any) => a.id)).toEqual(["tide", "notes", "weather", "splitly"]);
     await f.close();
   });
   it("install, switch and uninstall return typed codes", async () => {
@@ -90,5 +90,14 @@ describe("phone app tools", () => {
     const r = await call(c, "list_store_apps");
     expect(r.structuredContent.apps.map((a: any) => a.url)).toEqual(["app://tide@r13", "app://fresh@latest"]);
     await c.close(); cp.close();
+  });
+});
+
+describe("find_apps", () => {
+  it("is store_unreachable offline and finds the fixture app by need", async () => {
+    const c = await connect();
+    const r = await call(c, "find_apps", { session: "s1", query: "split bills" });
+    expect(r.isError).toBe(true); expect(r.structuredContent.code).toBe("store_unreachable");
+    await c.close();
   });
 });

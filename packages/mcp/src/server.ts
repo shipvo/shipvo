@@ -65,19 +65,20 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
   }
 }
 // The marketplace list for the phone's Store: the control plane's public apps. PN_STORE_FIXTURE=1 uses a local list (tests, offline demos).
-type StoreApp = { id: string; name: string; url: string; version: string };
+type StoreApp = { id: string; name: string; url: string; version: string; description?: string; tags?: string[]; countries?: string[]; languages?: string[]; currencies?: string[] };
 const STORE_FIXTURE: StoreApp[] = [
   { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0" },
   { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1" },
   { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0" },
+  { id: "splitly", name: "Splitly", url: "fixture://splitly", version: "1.2.0", description: "Split bills with friends and settle up.", tags: ["bills", "expenses", "money"], currencies: ["EUR", "GBP"], languages: ["en", "fr"] },
 ];
 async function storeApps(): Promise<{ ok: true; apps: StoreApp[]; fixture: boolean } | { ok: false; code: "store_unreachable"; error: string }> {
   if (process.env.PN_STORE_FIXTURE === "1") return { ok: true, apps: STORE_FIXTURE, fixture: true };
   try {
     const r = await fetch(`${CONTROL}/apps/public`, { signal: AbortSignal.timeout(simTimeoutMs()) });
     if (!r.ok) throw new Error(`status ${r.status}`);
-    const list = ((await r.json()) as { apps?: { app_id: string; name?: string; latest_release?: number }[] }).apps ?? [];
-    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, url: a.latest_release != null ? `app://${a.app_id}@r${a.latest_release}` : `app://${a.app_id}@latest`, version: a.latest_release != null ? `r${a.latest_release}` : "latest" })) };
+    const list = ((await r.json()) as { apps?: { app_id: string; name?: string; latest_release?: number; description?: string; tags?: string[]; countries?: string[]; languages?: string[]; currencies?: string[] }[] }).apps ?? [];
+    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, description: a.description, tags: a.tags, countries: a.countries, languages: a.languages, currencies: a.currencies, url: a.latest_release != null ? `app://${a.app_id}@r${a.latest_release}` : `app://${a.app_id}@latest`, version: a.latest_release != null ? `r${a.latest_release}` : "latest" })) };
   } catch (e) { return { ok: false, code: "store_unreachable", error: `the marketplace at ${CONTROL} did not answer (${(e as Error).message}). Try again when the network is back.` }; }
 }
 const recorder = new Recorder();
@@ -392,6 +393,14 @@ use(server, tools.list_store_apps, async () => {
   const r = await storeApps();
   if (!r.ok) return result("", r);
   return { ...text(JSON.stringify(r.apps, null, 2)), structuredContent: { apps: r.apps } };
+});
+use(server, tools.find_apps, async ({ session, query, country, language, currency, limit }) => {
+  need(session);
+  const st = await storeApps();
+  if (!st.ok) return result(session, st);
+  const r = await act({ session: session, action: "find_apps", query, country, language, currency, limit, catalog: st.apps }) as Act & { apps?: unknown[] };
+  if (!r.ok) return result(session, r);
+  return { ...text(JSON.stringify(r.apps ?? [], null, 2)), structuredContent: { apps: r.apps ?? [] } };
 });
 use(server, tools.install_app, 
   async ({ session, id }) => { need(session); const st = await storeApps(); return result(session, await act({ session, action: "install_app", id, ...(st.ok ? { catalog: st.apps } : {}) })); });

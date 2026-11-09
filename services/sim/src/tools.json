@@ -709,6 +709,54 @@
     }
   },
   {
+    "name": "find_apps",
+    "description": "Search the Store by need, for example \"split bills\". Matches the query against app name, description and tags (case-insensitive, word based) and filters by country, language and currency when an app declares them; apps that declare nothing for a filter still match. Returns up to limit apps (default 10, max 25) with id, name, one-line description, version and whether it is installed, best match first. An empty list means nothing matched. Fails with store_unreachable when the marketplace cannot be reached (nothing is guessed). Install a result on the simulator with install_app, or on the person's own phone with request_app_install. Logged in device_log as simulated.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "query": {
+          "type": "string",
+          "description": "What the person needs, for example \"split bills\""
+        },
+        "country": {
+          "type": "string",
+          "description": "Country code, for example FR"
+        },
+        "language": {
+          "type": "string",
+          "description": "Language code, for example fr"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code, for example EUR"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 25,
+          "description": "Most results to return (default 10, max 25)"
+        }
+      },
+      "required": [
+        "session",
+        "query"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "get_settings",
     "description": "Read the phone's system settings from the Settings screen: dark_mode, font_size (small, default, large, largest), bold_text, reduce_motion, language (en, fr, ar) and rtl. Returns each setting and the screen as rows.",
     "inputSchema": {

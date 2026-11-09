@@ -26,7 +26,7 @@ import { launchErrorMessage } from "./chromium-hint.mjs";
 import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps } from "./apps.mjs";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, describeApps } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -369,6 +369,13 @@ async function act(id, body) {
       if (body.action === "uninstall_app" && s.nav.where === "home") await page.evaluate(setVisibilityInPage, "background");
       const where = s.nav.where;
       return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+    }
+    // Search the Store by need. Read-only; logged in device_log as simulated.
+    case "find_apps": {
+      const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
+      const apps = findApps(catalog, { query: body.query, country: body.country, language: body.language, currency: body.currency, limit: body.limit }, s.apps.installed_apps);
+      s.apps.log.push({ at: Date.now(), name: "find_apps", query: String(body.query ?? "").slice(0, 200), results: apps.length, source: "simulated" });
+      return { apps, screen: null };
     }
     // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
     case "lock": case "unlock": {
