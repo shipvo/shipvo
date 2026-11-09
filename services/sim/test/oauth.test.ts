@@ -39,6 +39,8 @@ describe("metadata", () => {
     expect(m.code_challenge_methods_supported).toEqual(["S256"]);
     expect(m.grant_types_supported).toEqual(["authorization_code", "refresh_token"]);
     expect(m.response_types_supported).toEqual(["code"]);
+    expect(m.client_id_metadata_document_supported).toBe(true);
+    expect(m.authorization_response_iss_parameter_supported).toBe(true);
   });
 });
 
@@ -220,5 +222,83 @@ describe("authorize and token", () => {
     const e = await rpc(env, "tools/call", h); expect(e.status).toBe(401); expect(((await e.json()) as any).error).toBe("expired_api_key");
     sql.exec("UPDATE api_keys SET expires_at = '2999-01-01T00:00:00.000Z', revoked_at = '2026-01-01'");
     const v = await rpc(env, "tools/call", h); expect(v.status).toBe(401); expect(((await v.json()) as any).error).toBe("invalid_api_key");
+  });
+});
+
+/* ---------- Client ID Metadata Documents and iss ---------- */
+function stubWithDocs(docs: Record<string, () => Response>) {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: any, init?: any) => {
+    const u = String(input?.url ?? input);
+    if (docs[u]) { calls.push(u); expect(init.redirect).toBe("manual"); return docs[u](); }
+    if (u === "https://github.com/login/oauth/access_token") { const b = JSON.parse(init.body); return Response.json(b.code === "gh-ok" ? { access_token: "gho_x" } : { error: "bad" }); }
+    if (u === "https://api.github.com/user") return Response.json({ id: 42, login: "octo" });
+    throw new Error("unexpected fetch " + u);
+  });
+  return calls;
+}
+const docRes = (body: unknown, headers: Record<string, string> = {}) => () => new Response(typeof body === "string" ? body : JSON.stringify(body), { headers: { "content-type": "application/json", ...headers } });
+
+describe("Client ID Metadata Documents", () => {
+  it("runs the full PKCE flow with a URL client id, and caches the document", async () => {
+    const id = "https://app.example/oauth/client.json";
+    const calls = stubWithDocs({ [id]: docRes({ client_id: id, client_name: "Example Agent", redirect_uris: [REDIR] }, { "cache-control": "max-age=600" }) });
+    const { env } = setup();
+    const { loc } = await signIn(env, id);
+    expect(loc.origin + loc.pathname).toBe(REDIR); expect(loc.searchParams.get("iss")).toBe(O);
+    const r = await tok(env, id, loc.searchParams.get("code")!);
+    expect(r.status).toBe(200); expect(((await r.json()) as any).access_token).toMatch(/^sv_test_/);
+    expect(calls).toHaveLength(1);
+  });
+  it("refuses a document whose client_id differs from the URL", async () => {
+    const id = "https://mismatch.example/c.json";
+    stubWithDocs({ [id]: docRes({ client_id: "https://other.example/c.json", redirect_uris: [REDIR] }) });
+    const { env, sql } = setup();
+    const r = await startAuthorize(env, id);
+    expect(r.status).toBe(400); expect(r.headers.get("location")).toBeNull();
+    expect(sql.prepare("SELECT COUNT(*) n FROM oauth_codes").get().n).toBe(0);
+  });
+  it("refuses an unlisted redirect without redirecting, and shows the client name escaped", async () => {
+    const id = "https://unlisted.example/c.json";
+    stubWithDocs({ [id]: docRes({ client_id: id, client_name: "<b>Agent</b>", redirect_uris: [REDIR] }) });
+    const { env } = setup();
+    const r = await startAuthorize(env, id, { redirect_uri: "https://evil.example/cb" });
+    expect(r.status).toBe(400); expect(r.headers.get("location")).toBeNull();
+    const html = await r.text(); expect(html).toContain("&#60;b&#62;Agent"); expect(html).not.toContain("<b>");
+  });
+  it.each([
+    ["loopback", "https://127.0.0.1/c.json"], ["private 10.x", "https://10.0.0.5/c.json"], ["link-local", "https://169.254.169.254/c.json"],
+    ["localhost", "https://localhost/c.json"], ["ipv6", "https://[::1]/c.json"], ["internal name", "https://svc.internal/c.json"],
+  ])("never fetches a %s address", async (_n, id) => {
+    const calls = stubWithDocs({ [id]: docRes({ client_id: id, redirect_uris: [REDIR] }) });
+    const { env } = setup();
+    expect((await startAuthorize(env, id)).status).toBe(400); expect(calls).toHaveLength(0);
+  });
+  it("refuses oversize, non-JSON, redirecting and bad-redirect-list documents", async () => {
+    const big = "https://big.example/c.json", html = "https://html.example/c.json", red = "https://red.example/c.json", none = "https://none.example/c.json", many = "https://many.example/c.json";
+    stubWithDocs({
+      [big]: docRes({ client_id: big, redirect_uris: [REDIR], pad: "x".repeat(20_000) }),
+      [html]: () => new Response(JSON.stringify({ client_id: html, redirect_uris: [REDIR] }), { headers: { "content-type": "text/html" } }),
+      [red]: () => new Response(null, { status: 302, headers: { location: "http://127.0.0.1/x" } }),
+      [none]: docRes({ client_id: none, redirect_uris: [] }),
+      [many]: docRes({ client_id: many, redirect_uris: Array.from({ length: 11 }, (_, i) => `https://a.dev/${i}`) }),
+    });
+    const { env } = setup();
+    for (const id of [big, html, red, none, many]) { const r = await startAuthorize(env, id, { redirect_uri: id === many ? "https://a.dev/1" : REDIR }); expect(r.status).toBe(400); expect(r.headers.get("location")).toBeNull(); }
+  });
+  it("a URL without a path is not a document client", async () => {
+    stubWithDocs({});
+    const { env } = setup();
+    expect((await startAuthorize(env, "https://root.example/")).status).toBe(400);
+  });
+});
+
+describe("iss on redirects", () => {
+  it("is on the code redirect, the sign-in error redirect and authorize errors", async () => {
+    stubGitHub(); const { env } = setup(); const cid = await register(env);
+    expect((await signIn(env, cid)).loc.searchParams.get("iss")).toBe(O);
+    expect((await signIn(env, cid, "gh-bad")).loc.searchParams.get("iss")).toBe(O);
+    const r = await startAuthorize(env, cid, { response_type: "token" });
+    expect(new URL(r.headers.get("location")!).searchParams.get("iss")).toBe(O);
   });
 });
