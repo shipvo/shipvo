@@ -216,7 +216,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
   const mode = attach ?? "auto";
   if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
   let attachNote = launchNote;
-  if (platform && !launchNote && (!live || live.platform !== platform) ) attachNote += ` (platform ${platform} ignored: no phone was started${live ? `; the live phone is ${live.platform}` : ""})`;
+  if (platform && !ctx.remote && !launchNote && (!live || live.platform !== platform) ) attachNote += ` (platform ${platform} ignored: no phone was started${live ? `; the live phone is ${live.platform}` : ""})`;
   let buildUrl: string | undefined;
   if (buildId) {
     try {
@@ -244,14 +244,14 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       attachNote += ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(buildUrl ? { build: buildId } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
+  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), ...(buildUrl ? { build: buildId } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
   if (r.code === "sim_timeout") return result(sid, r);
   // Only report a build as open when the simulator says it loaded that build. Otherwise the phone shows another app version.
   if (buildId && r.ok !== false && r.build !== buildId) {
     return result("", { ok: false, code: "build_not_supported", error: `the simulator did not load build ${buildId}, so no session was opened. Open ${id} without @build to use the published app.` });
   }
   if (r.ok === false) return result(sid, r);
-  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: "headless" });
+  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: ctx.remote ? platform ?? "android" : "headless" });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${buildId ? `build:${buildId}` : r.release ?? "local"}\nmode: headless session${attachNote}\nvisible: no\n\n${r.screen ?? ""}`);

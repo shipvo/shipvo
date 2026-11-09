@@ -43,8 +43,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:transparent}
 <script>
 function fit(){var s=Math.min(1,innerWidth/417,innerHeight/890),e=document.getElementById("fit");e.style.width="417px";e.style.height="890px";e.style.transform="translate(-50%,-50%) scale("+s+")"}
 addEventListener("resize",fit);fit();
-var last={};
-function send(){var a=document.getElementById("app");if(a&&a.contentWindow)a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*")}
+var last={},dev={};
+addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:device")return;if(d.kind!=="notification")dev[d.kind]=d.value;var a=document.getElementById("app");if(a&&a.contentWindow)a.contentWindow.postMessage(d,"*")});
+function send(){var a=document.getElementById("app");if(a&&a.contentWindow){a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*");for(var k in dev)a.contentWindow.postMessage({type:"pg:device",kind:k,value:dev[k]},"*")}}
 document.getElementById("app").addEventListener("load",send);
 addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:prefs")return;last={dark:!!d.dark,large:!!d.large,rtl:!!d.rtl};
 var b=document.querySelector(".sf-body");b.dataset.theme=last.dark?"dark":"light";b.style.setProperty("--sf-bg",last.dark?"#000":"#fff");b.style.setProperty("--sf-fg",last.dark?"#fff":"#111");

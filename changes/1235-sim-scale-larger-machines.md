@@ -1,0 +1,1 @@
+- Measured scale benchmark on larger machines: 4-CPU, 15.6 GB result, shown on the simulators page and covered by the page check.

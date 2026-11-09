@@ -25,6 +25,8 @@ export interface ScreenNode {
 }
 
 export interface RenderOptions extends EvalOptions {
+  /** The person's language, such as "fr". Text that matches a key in `strings[language]` is translated. Default: the language of `locale`, else "en". */
+  language?: string;
   style?: PhoneStyle;
   /** Screen id. Default: the first screen. */
   screen?: string;
@@ -48,6 +50,14 @@ export interface RenderOptions extends EvalOptions {
   reduceMotion?: boolean;
   /** A message to show last, such as the result of an action. Set by {@link createApp}. */
   toast?: string;
+}
+
+const RTL = new Set(["ar", "he", "fa", "ur", "yi", "ps", "sd", "ug", "dv", "ckb"]);
+
+/** "rtl" for right-to-left languages such as Arabic and Hebrew, else "ltr". Accepts "ar", "he-IL", "ar_EG". */
+export function textDirection(tag: string): "ltr" | "rtl" {
+  const lang = tag.toLowerCase().split(/[-_]/)[0] ?? "";
+  return RTL.has(lang === "iw" ? "he" : lang) ? "rtl" : "ltr";
 }
 
 export type RenderResult =
@@ -77,6 +87,10 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
   if (errors.length) return fail(errors);
   const s = spec as Obj;
   const style: PhoneStyle = options.style ?? "android";
+  const language = options.language ?? options.locale?.split(/[-_]/)[0] ?? "en";
+  if (!options.locale && options.language) options = { ...options, locale: options.language };
+  const table: Record<string, string> = s.strings && typeof s.strings[language] === "object" && s.strings[language] ? s.strings[language] : {};
+  const translate = (t: string) => (Object.prototype.hasOwnProperty.call(table, t) ? table[t]! : t);
   const screen: Obj | undefined = options.screen ? s.screens.find((x: Obj) => x.id === options.screen) : s.screens[0];
   if (!screen) {
     return fail([{ path: "$.screens", message: `There is no screen "${options.screen}".`, fix: `Use one of: ${s.screens.map((x: Obj) => x.id).join(", ")}.` }]);
@@ -101,8 +115,9 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
     try { return evaluateTemplate(text, scope, options); } catch { return ""; }
   };
   const str = (text: unknown, scope: Record<string, unknown>) => {
+    if (typeof text === "string" && Object.prototype.hasOwnProperty.call(table, text)) return table[text]!;
     const v = tpl(text, scope);
-    return v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+    return v === null || v === undefined ? "" : typeof v === "object" ? translate(JSON.stringify(v)) : translate(String(v));
   };
 
   const bound = (b: Obj): unknown => (typeof b.bind === "string" ? state[b.bind.replace(/^state\./, "")] : undefined);
@@ -342,9 +357,10 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
   }
   if (options.toast) children.push({ role: "status", name: options.toast, block: "toast", children: [] });
   const title = str(screen.title ?? s.app?.name ?? "", base());
-  const tree: ScreenNode = { role: "main", name: title || s.app?.name || "Screen", block: "screen", children };
+  const dir = textDirection(options.locale ?? language);
+  const tree: ScreenNode = { role: "main", name: title || s.app?.name || "Screen", block: "screen", children, props: { dir, language } };
   const tokens = themeTokens(s.theme ?? {}, style);
-  const result: RenderResult = { ok: true, style, title: tree.name, tree, html: toHtml(tree, tokens, style, String(s.app?.name ?? "")), warnings };
+  const result: RenderResult = { ok: true, style, title: tree.name, tree, html: toHtml(tree, tokens, style, String(s.app?.name ?? ""), language, dir), warnings };
   return { result, scope: base, registry };
 }
 
@@ -415,7 +431,7 @@ function themeTokens(theme: Obj, style: PhoneStyle): Tokens {
 const esc = (t: unknown) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const safeSrc = (u: string) => (/^(https:\/\/|data:image\/)/i.test(u) ? u : "");
 
-function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string): string {
+function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string, language = "en", dir = "ltr"): string {
   const gap = (g: unknown) => Math.round((GAPS[String(g ?? "md")] ?? GAPS.md!) * t.unit);
   const ios = style === "ios";
   const node = (n: ScreenNode): string => {
@@ -570,6 +586,6 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
   const bar = ios
     ? `<header style="padding:54px 16px 10px;text-align:center;font:600 17px ${t.font};color:${t.p.text}">${esc(root.name)}</header>`
     : `<header style="padding:40px 16px 14px;font:500 22px ${t.font};color:${t.p.text};background:${t.p.surface};box-shadow:${t.shadow}">${esc(root.name)}</header>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(appName || root.name)}</title><style>@keyframes sv-fade{from{opacity:0}}@keyframes sv-slide{from{transform:translateY(16px);opacity:0}}@keyframes sv-scale{from{transform:scale(.9);opacity:0}}@keyframes sv-pulse{50%{transform:scale(1.06)}}[tabindex]:focus-visible{outline:2px solid ${t.p.primary};outline-offset:2px}</style></head>
+  return `<!doctype html><html lang="${esc(language)}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(appName || root.name)}</title><style>@keyframes sv-fade{from{opacity:0}}@keyframes sv-slide{from{transform:translateY(16px);opacity:0}}@keyframes sv-scale{from{transform:scale(.9);opacity:0}}@keyframes sv-pulse{50%{transform:scale(1.06)}}[tabindex]:focus-visible{outline:2px solid ${t.p.primary};outline-offset:2px}</style></head>
 <body data-style="${style}" style="margin:0;background:${t.p.background}"><main role="main" aria-label="${esc(root.name)}" style="min-height:100vh;box-sizing:border-box;background:${t.p.background}">${bar}<div style="padding:16px;display:flex;flex-direction:column;gap:${gap("md")}px">${root.children.map(node).join("")}</div></main></body></html>`;
 }
