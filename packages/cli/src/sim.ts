@@ -8,6 +8,7 @@ import { createServer, connect } from "node:net";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
 import { openBrowser } from "./run.js";
+import { capacitorWeb } from "./capacitor-web.js";
 import { CliFailure, runJson, takeJson, type Done } from "./json-out.js";
 
 /** True if nothing is listening on the port (checks by binding, then closing). */
@@ -145,7 +146,10 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
     if (json) throw new CliFailure(msg, code, status, SIM_NEXT);
     console.error(msg); process.exit(status);
   };
-  const a = parse(argv); const cfg = loadConfig();
+  const a = parse(argv);
+  // A Capacitor project is served from its built web directory. It needs no shipvo.json to open.
+  const cap = existsSync("shipvo.json") ? undefined : capacitorWeb();
+  const cfg = cap ? { appId: cap.appId, name: cap.appId, controlPlane: "" } : loadConfig();
   if (a.hosted === "true") {
     const { uploadHosted } = await import("./sim-hosted.js");
     try {
@@ -159,7 +163,9 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
     die(`Port ${port} is in use. Stop the other \`shipvo sim\` or pass --port <n>.`, 1, "port_in_use");
   }
   const stdio: "inherit" | ("ignore" | number)[] = json ? ["ignore", 2, 2] : "inherit";
-  if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
+  if (cap) {
+    if (!existsSync(join(cap.webDir, "index.html"))) die(`No index.html in ${cap.webDir}. Build your web app first (the folder is "webDir" in capacitor.config).`, 1, "build_missing");
+  } else if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
     console.error(`Building ${cfg.name} for the simulator…`);
     try { execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio, env: { ...process.env, PN_SIM: "1" } }); }
     catch (e) { if (!json) throw e; die(`The simulator build failed: ${(e as Error).message.split("\n")[0]}`, 1, "build_failed"); }
@@ -169,7 +175,7 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
   let server = "";
   try { server = createRequire(process.cwd() + "/package.json").resolve("@shipvo/sim/server.mjs"); }
   catch { die("@shipvo/sim is not installed in this app. Run `npm i -D @shipvo/sim` (or use your package manager).", 2, "no_sim"); }
-  const p = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId, ...(a.dir ? ["--dir", a.dir] : [])], { stdio, env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
+  const p = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId, ...(cap ? ["--dist", cap.webDir] : []), ...(a.dir ? ["--dir", a.dir] : [])], { stdio, env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
   let exited = false;
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });
   if (await waitListening(Number(port), () => exited)) {

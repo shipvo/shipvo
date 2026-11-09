@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo sim` and `shipvo preview` open a Capacitor project (a `capacitor.config.*` and no `shipvo.json`) from its built `webDir`, on the Android and iOS skins.
+- Migration: none; new behaviour.
