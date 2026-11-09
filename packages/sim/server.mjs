@@ -10,7 +10,6 @@ import { join, extname, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { openBuild } from "./build-open.mjs";
-import { BuildCacheError } from "./build-cache.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { installNetGate } from "./net-gate.mjs";
@@ -27,6 +26,7 @@ import { shadeAction, SHADE_ACTIONS } from "./shade-actions.mjs";
 import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.mjs";
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
+import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
 import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, uninstallApp, switchApp, describeApps, arrangeApp } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
@@ -255,6 +255,16 @@ setInterval(() => { specHost.tick().catch(() => {}); }, 30_000).unref();
 // The phone's clock: the real time, or the time a test set with set_time.
 const nowOf = (s) => (s.clockMs != null ? new Date(s.clockMs) : new Date());
 const sidOf = (s) => [...sessions].find(([, v]) => v === s)?.[0];
+// The bundle a Store listing points at: app://<id>[@rN] is the published web artifact; an http(s) URL is fetched as given.
+// Same host guard and size cap as build_url. Resolves { sha256, bytes }, or throws SimError store_app_unreachable / too_large / host_not_allowed.
+async function fetchAppBundle(app) {
+  const url = String(app.url ?? "");
+  let from = url, allowHosts = [];
+  const am = /^app:\/\/([a-z0-9-]+(?:@(?:r?\d+|latest))?)$/.exec(url);
+  if (am) { const t = await resolveApp(am[1].includes("@") ? am[1] : `${am[1]}@latest`).catch((e) => { throw new SimError("store_app_unreachable", String(e.message).split("\n")[0]); }); from = `${CONTROL}/w/${t.app}/r${t.release}/index.html`; allowHosts = [new URL(CONTROL).hostname]; }   // the control plane is the operator's own
+  try { const r = await fetchBuild(from, { dir: join(DIR, "builds"), allowHosts }); return { sha256: r.id, bytes: r.bytes }; }
+  catch (e) { if (e instanceof BuildCacheError) throw new SimError(e.code === "unreachable" ? "store_app_unreachable" : e.code, e.message); throw e; }
+}
 async function switchToApp(s, page, id, fresh = false) {
   const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
   // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
@@ -381,7 +391,6 @@ async function act(id, body) {
       const where = s.nav.where;
       return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)\n${describeApps(s.apps, nowOf(s))}` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
     }
-    // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log as simulated.
     // Describe an app and it appears: a spec is validated, started and installed with an icon on the home screen.
     case "create_app": {
       const appId = String(body.id ?? "");
@@ -443,10 +452,18 @@ async function act(id, body) {
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
+    // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
     case "install_app": case "uninstall_app": case "switch_app": {
       const id = String(body.id ?? "");
       try {
-        if (body.action === "install_app") installApp(s.apps, id, Array.isArray(body.catalog) ? body.catalog : s.apps.store);
+        if (body.action === "install_app") {
+          const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
+          const found = catalog.find((a) => a?.id === id);
+          if (found && s.apps.installed_apps.some((a) => a.id === id)) throw new AppsError("already_installed", `'${id}' is already installed`);   // before any download
+          // A listing with a real URL is fetched first: the install keeps the bundle's sha256 and size, and fails if the bundle cannot be fetched.
+          const real = found && !/^fixture:/i.test(String(found.url ?? "")) ? await fetchAppBundle(found) : undefined;
+          installApp(s.apps, id, catalog, real);
+        }
         else if (body.action === "uninstall_app") { uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); }
         else {
           await switchToApp(s, page, id);

@@ -102,17 +102,18 @@ The phone fetches the source when the app is created, again whenever its cache t
 
 The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools.
 
-**Limit today:** the Store in the phone frame and the tools below are two separate views. A tap-install in the frame page does not change the session's `current_app` or `device_log`, and an MCP install does not draw an icon on a live `shipvo run` phone. Use the tools for state that tests can check.
-
+A frame page without a session (`shipvo run`) lists the marketplace apps and installs them by fetching the published app itself; the marketplace answers with CORS open, so the page needs no proxy. A failed fetch shows "The app could not be fetched". The tools below change the headless session's phone and record each change in `device_log`.
 
 | Tool | What it does | Typed errors |
 | --- | --- | --- |
 | `list_store_apps` | Lists the marketplace apps (id, name, bundle URL, version) from the control plane | `store_unreachable` |
-| `install_app { id }` | Installs a Store app; its icon appears on the home screen | `unknown_app`, `already_installed` |
+| `install_app { id }` | Fetches the app's bundle and installs it; its icon appears on the home screen | `unknown_app`, `already_installed`, `store_app_unreachable`, `too_large`, `host_not_allowed` |
 | `switch_app { id }` | Opens an installed app; it becomes `current_app` | `not_installed` |
 | `uninstall_app { id }` | Removes it. If it was open, the phone goes home | `not_installed` |
 
-Installing is simulated: nothing real is installed, and `device_log` marks each install, switch and uninstall as `simulated`. If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of three apps (`tide`, `notes`, `weather`) with no network.
+Installing a marketplace app is real. `install_app` fetches the app's published bundle (`app://<id>@rN`, `@latest` or an `http(s)` URL) through the same host guard and size cap as `build_url`, and keeps its `sha256` and `bytes` on the installed app. `device_log` marks the install `source: "real"` and includes the `sha256`. If the bundle cannot be fetched the app is not installed and the error is `store_app_unreachable` (or `too_large` or `host_not_allowed`). Switching and uninstalling record state changes in `device_log`. Fixture apps (`fixture://…`) have no bundle, so their installs are marked `simulated`.
+
+If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of three apps (`tide`, `notes`, `weather`) with no network.
 
 Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
 
@@ -146,7 +147,7 @@ open_app tide                          -> session "tide-abc"
 install_app { session, id: "notes" }   -> Home screen, Pocket Notes is installed
 switch_app { session, id: "notes" }    -> current_app is notes
 uninstall_app { session, id: "notes" } -> back on the home screen
-device_log { session }                 -> install_app, switch_app, uninstall_app, all source "simulated"
+device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
 
 ## First-party apps
