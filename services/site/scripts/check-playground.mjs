@@ -94,8 +94,20 @@ try {
     await page.locator('#pg-panel button[data-kind="notification"]').click();
     await app.getByTestId("notification").filter({ hasText: /Notification 1/ }).waitFor({ timeout: 5000 });
   }
+  // The choice survives an Android/iOS switch: set payment, switch phone, read it back.
+  await page.locator('#pg-panel button[data-kind="payment"][data-value="declined"]').click();
+  await app.getByTestId("payment").filter({ hasText: /Payment: declined/ }).waitFor({ timeout: 5000 });
+  await page.locator("#pg-android").click();
+  await app.getByRole("button", { name: "Add Tackle box to cart" }).waitFor({ timeout: 30_000 });
+  await app.getByTestId("payment").filter({ hasText: /Payment: declined/ }).waitFor({ timeout: 5000 });
   assert.deepEqual(errors, []);
   await page.setViewportSize({ width: 375, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll at 375 px");
+  // Device panel open at 375 px: all 15 buttons keep 44 px targets and the page does not scroll sideways.
+  const small = await page.locator("#pg-panel button[data-kind]");
+  const count = await small.count();
+  assert.ok(count >= 15, "device panel has its buttons");
+  for (let i = 0; i < count; i++) assert.ok((await small.nth(i).boundingBox()).height >= 44, `button ${i} tap target at 375 px`);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "device panel: no sideways scroll at 375 px");
   console.log("playground: platform switch, dark, large text, RTL and deep links work");
 } finally { await browser.close(); server.close(); }
