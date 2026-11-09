@@ -131,3 +131,12 @@ test("the control endpoint answers 400 for bad JSON and 413 for a huge body", as
   assert.equal((await fetch(url, { method: "POST", body: "x".repeat(70000) })).status, 413);
   assert.equal((await fetch(url, { method: "POST", body: "{}" })).status, 200);
 });
+
+test("a home-screen screenshot shows the created app's icon", async () => {
+  const shot = async (sid) => { await act(sid, { action: "press_home" }); const r = await act(sid, { action: "screenshot", inline: true }); assert.ok(r.data, JSON.stringify(r)); return r.data; };
+  assert.ok((await call("/session", { session: "sp-shot-a" })).ok);
+  assert.ok((await call("/session", { session: "sp-shot-b" })).ok);
+  assert.equal((await act("sp-shot-b", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
+  // The phone with the extra app has a different home screen from the one without.
+  assert.notEqual(await shot("sp-shot-b"), await shot("sp-shot-a"));
+});

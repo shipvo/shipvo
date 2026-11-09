@@ -79,6 +79,8 @@ The app is real HTML with every control labelled, so `screen`, `tap`, `type` and
 
 `device_log` records the create and each action with `source: "real"`.
 
+An app's data lives for the session: it starts from the spec's seed data when the app is created, and it is dropped when the session ends or the app is uninstalled.
+
 ## Install apps and switch between them
 
 The phone can hold several apps. The home screen has a **Store** icon. The Store lists apps with an Install button for each. An installed app gets an icon on the home screen, and a tap opens it. All of it is in the accessibility tree, so an agent can use it by tap or with these tools.
