@@ -1,17 +1,32 @@
-// A Capacitor project's built web directory, for `shipvo sim` and `shipvo preview`.
-import { existsSync, readFileSync } from "node:fs";
+// Capacitor projects are web apps: `shipvo sim` and `shipvo preview` open the built web directory (`webDir`) as it is.
+import { cpSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
+import { detectCapacitor } from "./eas.js";
 
-export type CapacitorWeb = { appId: string; webDir: string };
+/** True when `root` is a Capacitor project that is not an Expo app (Expo apps keep using `expo export`). */
+export function isCapacitorWeb(root: string): boolean {
+  if (existsSync(join(root, "app.json")) || existsSync(join(root, "app.config.ts")) || existsSync(join(root, "app.config.js"))) return false;
+  try { return !!detectCapacitor(root); } catch { return false; }
+}
 
-/** Reads capacitor.config.json or capacitor.config.ts (literal `appId` and `webDir` strings). Undefined when the folder is not a Capacitor project. */
-export function capacitorWeb(root = process.cwd()): CapacitorWeb | undefined {
-  const file = ["capacitor.config.json", "capacitor.config.ts", "capacitor.config.js"].map((f) => join(root, f)).find(existsSync);
-  if (!file) return undefined;
-  const src = readFileSync(file, "utf8");
-  const pick = (k: string) => (file.endsWith(".json") ? (JSON.parse(src)[k] as string | undefined) : new RegExp(`\\b${k}\\s*:\\s*["'\`]([^"'\`]+)["'\`]`).exec(src)?.[1]);
-  const webDir = pick("webDir") ?? "www";
-  const abs = isAbsolute(webDir) ? webDir : resolve(root, webDir);
-  if (abs !== resolve(root) && !abs.startsWith(resolve(root) + sep)) return undefined;
-  return { appId: pick("appId") ?? "capacitor-app", webDir: abs };
+/** The `webDir` set in capacitor.config.* (default `www`), as an absolute path inside `root`. */
+export function capacitorWebDir(root: string): string {
+  const file = detectCapacitor(root)?.configFile;
+  let dir = "www";
+  if (file) {
+    const text = readFileSync(join(root, file), "utf8");
+    const m = /["']?webDir["']?\s*:\s*(["'`])([^"'`]+)\1/.exec(text);
+    if (m) dir = m[2];
+  }
+  const abs = isAbsolute(dir) ? dir : resolve(root, dir);
+  if (abs !== resolve(root) && !abs.startsWith(resolve(root) + sep)) throw new Error(`capacitor.config webDir "${dir}" is outside the project.`);
+  return abs;
+}
+
+/** Copies the built web directory to `out`. Throws a plain message when it has not been built. */
+export function copyCapacitorWeb(root: string, out: string): void {
+  const src = capacitorWebDir(root);
+  if (!existsSync(join(src, "index.html"))) throw new Error(`No index.html in ${src}. Build your web app first (for example \`npm run build\`, then \`npx cap copy\`).`);
+  rmSync(out, { recursive: true, force: true });
+  cpSync(src, out, { recursive: true });
 }
