@@ -90,3 +90,11 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Build id.** The short name Shipvo gives a copy of your app you uploaded for the hosted phone. You open it as `myapp@build:<id>`. It is private to you and deleted when it expires. See [Test your build on the hosted phone](test-your-build.md).
 
 **Room.** A name you give `open_app` so two phones share one backend, for example a buyer and a shop owner. See [Agents](agents.md#rooms-several-phones-one-backend).
+
+**Vector block.** A small drawing in an app spec, made of shapes (rectangles, circles, lines, text) whose size and colour follow your data. A battery bar is one. See [App spec](spec-blocks.md#vector-drawings).
+
+**Motion (in an app spec).** A short fade, slide, count-up or pulse on a block. It turns off when the theme says `none` or the phone's reduce-motion setting is on. See [App spec](spec-blocks.md#motion).
+
+**Right-to-left (RTL).** Languages such as Arabic and Hebrew that read from right to left. A spec with `strings` for that language lays out right to left. See [App spec](spec-blocks.md#translations-and-right-to-left).
+
+**Playground.** The page at shipvo.dev/playground where a sample app runs on an Android phone and an iPhone in your browser, so you can try Shipvo before you install it.
