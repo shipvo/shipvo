@@ -43,8 +43,9 @@ function lineFor(s: Step): string[] {
   }
 }
 
-export function exportTest(app: string, steps: Step[]): string {
+export function exportTest(app: string, steps: Step[], traceIds: string[] = []): string {
   const out = [
+    ...traceIds.map((id) => `// trace id: ${id}`),
     `import { test } from "@shipvo/test/vitest";`,
     `import { openApp } from "@shipvo/test";`,
     ``,

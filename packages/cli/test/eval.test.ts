@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import http from "node:http";
 import { mkdtempSync } from "node:fs";
@@ -66,6 +67,23 @@ describe("shipvo eval", () => {
     expect(r.pass).toBe(true);
     expect(r.steps).toBe(2);
     expect(r.checks.every((c) => c.pass)).toBe(true);
+  });
+
+  it("records the trace id from a valid traceparent and ignores a bad one", async () => {
+    const tp = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    const call = (url: string, id: number, name: string, args: Record<string, unknown>, meta: object) =>
+      fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args, _meta: meta } }) });
+    let now = 1_000_000;
+    const r = await evalRun(tote, { agent: "scripted", mcp: upUrl, dir: mkdtempSync(join(tmpdir(), "eval-trace-")), now: () => (now += 2000), onReady: async ({ url, session }) => {
+      await call(url, 1, "tap", { session, ref: "tote" }, { traceparent: tp, baggage: "k=secret" });
+      await call(url, 2, "tap", { session, ref: "pay" }, { traceparent: "bad" });
+      await call(url, 3, "tap", { session, ref: "pay" }, { traceparent: "00-00000000000000000000000000000000-00f067aa0ba902b7-01" });
+      await call(url, 4, "tap", { session, ref: "pay" }, { traceparent: "ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" });
+      await call(url, 5, "tap", { session, ref: "pay" }, { traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01" });
+      await call(url, 6, "end_session", { session }, {});
+    } });
+    expect(r.traceIds).toEqual(["4bf92f3577b34da6a3ce929d0e0e4736"]);
+    expect(readFileSync(r.stepsFile, "utf8")).not.toContain("secret");
   });
 
   it("fails a run on purpose: the payment is declined and the agent gives up", async () => {

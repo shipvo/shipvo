@@ -1,0 +1,3 @@
+- `@shipvo/control-plane`: new vault routes `GET /vault/keys?app=` (metadata only), `POST /vault/keys/:app/:name/rotate`, `DELETE /vault/keys/:app/:name` and `GET /vault/keys/:app/:name/uses`. After a revoke, `GET /vault/status/:app/:name` returns `saved: false`.
+- The use log now returns only the calling owner's rows.
+- Migration: none; uses existing tables.

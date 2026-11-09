@@ -264,3 +264,47 @@ describe("vault status and plain errors", () => {
     expect(((await r.json()) as any).message).toContain("Ask the assistant for a new one");
   });
 });
+
+describe("vault keys: list, rotate, revoke, uses", () => {
+  const owner = { headers: { authorization: "Bearer owner-tide" } };
+  const saved = async () => { const s = setup(); const { j } = await s.ticket(); await s.store(j.ticket); return s; };
+  it("lists metadata only", async () => {
+    const { req, sql } = await saved();
+    const r = await req("/vault/keys?app=tide", owner);
+    const text = await r.text();
+    expect(JSON.parse(text).keys).toEqual([{ app: "tide", name: "STRIPE_KEY", domain: "api.stripe.com", access: "read", last_used_at: null }]);
+    const row = sql.prepare("SELECT wrapped_key, ciphertext FROM vault_secrets").get();
+    for (const x of [SECRET, row.wrapped_key, row.ciphertext]) expect(text).not.toContain(x);
+    expect((await req("/vault/keys?app=tide")).status).toBe(401);
+    expect(JSON.parse(await (await req("/vault/keys?app=other", { headers: { authorization: "Bearer owner-other" } })).text()).keys).toEqual([]);
+  });
+  it("rotate issues a ticket for the same app, name, domain and access", async () => {
+    const { req, sql, store } = await saved();
+    const r = await req("/vault/keys/tide/STRIPE_KEY/rotate", { method: "POST", ...owner });
+    expect(r.status).toBe(201);
+    const j: any = await r.json();
+    expect(sql.prepare("SELECT app_id, name, domain, access FROM vault_tickets WHERE used_at IS NULL").all()).toHaveLength(1);
+    expect(j).toMatchObject({ app: "tide", name: "STRIPE_KEY", domain: "api.stripe.com", access: "read" });
+    expect((await store(j.ticket, "rk_live_ROTATED1234567890")).status).toBe(201);
+    expect((await req("/vault/keys/tide/NOPE/rotate", { method: "POST", ...owner })).status).toBe(404);
+    expect((await req("/vault/keys/tide/STRIPE_KEY/rotate", { method: "POST" })).status).toBe(401);
+  });
+  it("revoke blanks the value, status says not saved and use asks for a new key", async () => {
+    const { req, sql, env } = await saved();
+    expect((await req("/vault/keys/tide/STRIPE_KEY", { method: "DELETE" })).status).toBe(401);
+    expect((await req("/vault/keys/tide/STRIPE_KEY", { method: "DELETE", ...owner })).status).toBe(200);
+    expect(sql.prepare("SELECT wrapped_key, ciphertext FROM vault_secrets").get()).toEqual({ wrapped_key: "", ciphertext: "" });
+    expect(await (await req("/vault/status/tide/STRIPE_KEY", owner)).json()).toMatchObject({ saved: false });
+    expect(JSON.parse(await (await req("/vault/keys?app=tide", owner)).text()).keys).toEqual([]);
+    expect(await useSecret(env, { person: "owner (admin)", app: "tide", name: "STRIPE_KEY", host: "api.stripe.com" })).toEqual({ ok: false, reason: "revoked" });
+  });
+  it("the use log is owner-scoped", async () => {
+    const { req, env, sql } = await saved();
+    await useSecret(env, { person: "owner (admin)", app: "tide", name: "STRIPE_KEY", host: "api.stripe.com" });
+    sql.prepare("INSERT INTO vault_uses (app_id, name, person, domain, outcome, at) VALUES (?,?,?,?,?,?)").run("tide", "STRIPE_KEY", "someone else", "evil.test", "used", "2026-01-01");
+    const j: any = await (await req("/vault/keys/tide/STRIPE_KEY/uses", owner)).json();
+    expect(j.uses).toHaveLength(1);
+    expect(j.uses[0]).toMatchObject({ app: "tide", host: "api.stripe.com", outcome: "used" });
+    expect((await req("/vault/keys/tide/STRIPE_KEY/uses", { headers: { authorization: "Bearer owner-other" } })).status).toBe(401);
+  });
+});
