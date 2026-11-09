@@ -1,0 +1,76 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "wallet", "name": "Wallet", "icon": "wallet", "description": "Keep tickets, receipts and passes in one place and find one fast." },
+  "theme": { "mode": "light", "palette": { "primary": "#0B5FFF", "text": "#111827", "background": "#FFFFFF", "surface": "#F3F4F6", "muted": "#4B5563" }, "radius": "lg", "density": "comfortable", "elevation": "soft" },
+  "data": {
+    "passes": { "source": "collection", "fields": { "id": "text", "seq": "number", "title": "text", "kind": "text", "issuer": "text", "date": "text", "amount": "number", "barcode": "text", "notes": "text" }, "seed": [] },
+    "shown": { "source": "computed", "value": "{{ state.query == '' ? passes : passes.filter(p, lower(p.title + ' ' + p.issuer + ' ' + p.notes).contains(lower(state.query))) }}" },
+    "soon": { "source": "computed", "value": "{{ shown.filter(p, p.kind != 'receipt' && p.date != '' && diffDays(p.date, today()) >= 0 && diffDays(p.date, today()) <= 7) }}" },
+    "tickets": { "source": "computed", "value": "{{ shown.filter(p, p.kind == 'ticket') }}" },
+    "passList": { "source": "computed", "value": "{{ shown.filter(p, p.kind == 'pass') }}" },
+    "receipts": { "source": "computed", "value": "{{ shown.filter(p, p.kind == 'receipt') }}" }
+  },
+  "state": {
+    "query": { "type": "text", "default": "" }
+  },
+  "screens": [
+    { "id": "wallet", "title": "Wallet", "body": [
+      { "type": "form", "label": "Find a pass form", "submit": { "label": "Find", "action": "show_matches" }, "fields": [
+        { "name": "query", "type": "text", "label": "Find a pass (title, issuer or notes); leave empty to show all", "maxLength": 200 }
+      ] },
+      { "type": "badge", "value": "{{ count(soon) }} expiring within 7 days" },
+      { "type": "list", "label": "Expiring soon", "from": "{{ sortBy(soon, 'date') }}", "item": { "title": "{{ item.title }}", "subtitle": "Soon: {{ formatDate(item.date, 'date') }}, Id {{ item.id }}" }, "empty": { "message": "Nothing expires this week" } },
+      { "type": "text", "variant": "title", "value": "Tickets" },
+      { "type": "list", "label": "Tickets", "from": "{{ sortBy(tickets, 'date') }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ item.issuer }}{{ item.date == '' ? '' : ', ' + formatDate(item.date, 'date') }}, Id {{ item.id }}" }, "empty": { "message": "No tickets" } },
+      { "type": "text", "variant": "title", "value": "Passes" },
+      { "type": "list", "label": "Passes", "from": "{{ sortBy(passList, 'date') }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ item.issuer }}{{ item.date == '' ? '' : ', ' + formatDate(item.date, 'date') }}, Id {{ item.id }}" }, "empty": { "message": "No passes" } },
+      { "type": "text", "variant": "title", "value": "Receipts" },
+      { "type": "list", "label": "Receipts", "from": "{{ sortBy(receipts, 'date') }}", "item": { "title": "{{ item.title }}", "subtitle": "{{ item.issuer }}{{ item.date == '' ? '' : ', ' + formatDate(item.date, 'date') }}, Id {{ item.id }}" }, "empty": { "message": "No receipts" } },
+      { "type": "form", "label": "New pass form", "submit": { "label": "Save pass", "action": "save_pass" }, "fields": [
+        { "name": "title", "type": "text", "label": "Title", "required": true, "maxLength": 200 },
+        { "name": "kind", "type": "choice", "label": "Kind", "options": ["ticket", "receipt", "pass"], "required": true },
+        { "name": "issuer", "type": "text", "label": "Issuer", "maxLength": 200 },
+        { "name": "date", "type": "text", "label": "Date (like 2026-11-10)", "maxLength": 40 },
+        { "name": "amount", "type": "number", "label": "Amount" },
+        { "name": "barcode", "type": "text", "label": "Barcode text", "maxLength": 500 },
+        { "name": "notes", "type": "text", "label": "Notes", "maxLength": 1000 }
+      ] },
+      { "type": "form", "label": "Delete pass form", "submit": { "label": "Delete pass", "action": "delete_pass" }, "fields": [
+        { "name": "id", "type": "text", "label": "Pass id (shown under each pass)", "required": true, "maxLength": 20 }
+      ] }
+    ] }
+  ],
+  "actions": {
+    "save_pass": {
+      "description": "Save a ticket, receipt or pass. Kind is ticket, receipt or pass. Date is a day like 2026-11-10 (the event day, the purchase day or the expiry day). Barcode is the text under the code.",
+      "input": { "title": { "type": "text" }, "kind": { "type": "enum", "options": ["ticket", "receipt", "pass"] }, "issuer": { "type": "text", "default": "" }, "date": { "type": "text", "default": "" }, "amount": { "type": "number", "default": 0 }, "barcode": { "type": "text", "default": "" }, "notes": { "type": "text", "default": "" } },
+      "returns": { "id": "text" },
+      "do": [
+        { "insert": "passes", "value": { "id": "{{ 'p' + string(count(passes) == 0 ? 1 : last(sortBy(passes, 'seq')).seq + 1) }}", "seq": "{{ count(passes) == 0 ? 1 : last(sortBy(passes, 'seq')).seq + 1 }}", "title": "{{ input.title }}", "kind": "{{ input.kind }}", "issuer": "{{ input.issuer }}", "date": "{{ input.date == '' ? '' : formatDate(input.date, 'iso') }}", "amount": "{{ input.amount }}", "barcode": "{{ input.barcode }}", "notes": "{{ input.notes }}" } },
+        { "toast": "Pass saved" },
+        { "return": { "id": "{{ last(passes).id }}" } }
+      ]
+    },
+    "find_pass": {
+      "description": "Find passes. Text matches the title, issuer and notes. Kind (ticket, receipt or pass), from and to (days like 2026-11-10) are optional; leave them empty to skip. Results are newest first.",
+      "input": { "text": { "type": "text", "default": "" }, "kind": { "type": "text", "default": "" }, "from": { "type": "text", "default": "" }, "to": { "type": "text", "default": "" } },
+      "returns": { "passes": "list" },
+      "do": [
+        { "return": { "passes": "{{ sortBy(passes.filter(p, (input.text == '' || lower(p.title + ' ' + p.issuer + ' ' + p.notes).contains(lower(input.text))) && (input.kind == '' || p.kind == input.kind) && (input.from == '' || (p.date != '' && startOf('day', p.date) >= startOf('day', input.from))) && (input.to == '' || (p.date != '' && startOf('day', p.date) <= startOf('day', input.to)))), 'date', 'desc') }}" } }
+      ]
+    },
+    "show_matches": {
+      "description": "Show only passes whose title, issuer or notes contain the text on the Wallet screen. Leave it empty to show all.",
+      "input": { "query": { "type": "text", "default": "" } },
+      "do": [ { "set": "state.query", "value": "{{ input.query }}" } ]
+    },
+    "delete_pass": {
+      "description": "Remove a pass, by its id.",
+      "input": { "id": { "type": "text" } },
+      "do": [
+        { "delete": "passes", "where": "item.id == input.id" },
+        { "toast": "Pass deleted" }
+      ]
+    }
+  }
+}
