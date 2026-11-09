@@ -556,7 +556,7 @@ const server = http.createServer(async (req, res) => {
     }
     // the Browser app, in a phone frame
     if (req.method === "GET" && url.pathname === "/browser") return send(200, browserAppPage(url.searchParams.get("skin") === "ios" ? "ios" : "android", url.searchParams.get("session") ?? ""), MIME[".html"]);
-    if (req.method === "GET" && url.pathname === "/watch") { const list = watchList(sessions); const want = url.searchParams.get("skin"); return send(200, watchPage(want ?? list[0]?.skin, url.searchParams.get("session") ?? ""), MIME[".html"]); }
+    if (req.method === "GET" && url.pathname === "/watch") { const list = watchList(sessions); const want = url.searchParams.get("skin"); return send(200, watchPage(want ?? (url.searchParams.get("session") ? sessions.get(url.searchParams.get("session"))?.skin : null) ?? list[0]?.skin, url.searchParams.get("session") ?? "", { hosted: url.searchParams.get("hosted") === "1", takeOver: url.searchParams.get("takeover") === "1", signin: url.searchParams.get("signin") ?? "" }), MIME[".html"]); }
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
