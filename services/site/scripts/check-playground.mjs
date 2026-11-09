@@ -72,6 +72,28 @@ try {
     const d = document.getElementById("pg-phone").contentDocument.getElementById("app")?.contentDocument?.documentElement;
     return d && d.hasAttribute("data-dark") && d.dir === "rtl";
   }, null, { timeout: 30_000 });
+  // Device panel: every control changes visible text in the app, on both phones.
+  await page.goto(`${base}/playground/#device`);
+  assert.equal(await page.locator("#pg-panel").getAttribute("data-feature"), "device", "deep link opens the device panel");
+  const cases = [
+    ["location", "Lisbon", /Location: Lisbon/], ["location", "Tokyo", /Location: Tokyo/],
+    ["camera", "harbour", /Camera: sample photo, harbour/], ["camera", "denied", /Camera: permission denied/],
+    ["biometrics", "accepted", /Biometrics: success/], ["biometrics", "rejected", /Biometrics: failed/], ["biometrics", "unavailable", /Biometrics: unavailable/],
+    ["payment", "approved", /Payment: approved/], ["payment", "declined", /Payment: declined/], ["payment", "timeout", /Payment: timeout/],
+    ["airplane", "on", /Airplane mode: on/], ["airplane", "off", /Airplane mode: off/],
+  ];
+  for (const skin of ["android", "ios"]) {
+    await page.locator(`#pg-${skin}`).click();
+    await app.getByRole("button", { name: "Add Tackle box to cart" }).waitFor({ timeout: 30_000 });
+    for (const [kind, value, re] of cases) {
+      const b = page.locator(`#pg-panel button[data-kind="${kind}"][data-value="${value}"]`);
+      assert.ok((await b.boundingBox()).height >= 44, `${kind} ${value} tap target`);
+      await b.click();
+      await app.getByTestId(kind).filter({ hasText: re }).waitFor({ timeout: 5000 });
+    }
+    await page.locator('#pg-panel button[data-kind="notification"]').click();
+    await app.getByTestId("notification").filter({ hasText: /Notification 1/ }).waitFor({ timeout: 5000 });
+  }
   assert.deepEqual(errors, []);
   await page.setViewportSize({ width: 375, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll at 375 px");
