@@ -31,6 +31,11 @@ beforeAll(async () => {
       if (installed.has(body.id)) return fail("already_installed", "already");
       installed.set(body.id, app.name); return ok();
     }
+    if (body.action === "update_app") {
+      if (!installed.has(body.id)) return fail("not_installed", "not a spec app");
+      if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
+      return ok();
+    }
     if (body.action === "create_app") {
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
       if (installed.has(body.id)) return fail("already_installed", "already");
@@ -96,6 +101,9 @@ describe("phone app tools", () => {
     expect(sent).toMatchObject({ id: "gifts", style: "ios", name: "Gift Tracker" });
     expect(sent.spec.app.id).toBe("gifts");
     expect((await call(c, "create_app", { session: s, id: "gifts", spec })).structuredContent.code).toBe("already_installed");
+    expect((await call(c, "update_app", { session: s, id: "ghost", spec })).structuredContent.code).toBe("not_installed");
+    expect((await call(c, "update_app", { session: s, id: "gifts", spec: { spec: "shipvo.app/v0", screens: [] } })).structuredContent.code).toBe("invalid_spec");
+    expect((await call(c, "update_app", { session: s, id: "gifts", spec })).isError).toBeFalsy();
     await c.close();
   });
   it("marketplace apps get an app:// url that the sim resolves like open_app", async () => {
