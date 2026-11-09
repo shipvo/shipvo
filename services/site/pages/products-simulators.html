@@ -32,6 +32,9 @@
 .sx-stat{background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:18px 20px;position:relative;overflow:hidden}
 .sx-stat b{display:block;font-size:clamp(32px,3.6vw,46px);font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
 .sx-stat.wide b{font-size:clamp(26px,2.7vw,36px);white-space:nowrap}
+.sx-stat.wide{grid-column:1/-1}
+.sx-stat a{color:var(--sky-text);text-decoration:underline;text-underline-offset:3px}
+.sx-stat a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
 .sx-stat span{display:block;margin-top:8px;color:var(--mute);font-size:15px;line-height:1.35}
 .sx-stat::after{content:"";position:absolute;right:-24px;top:-24px;width:80px;height:80px;border-radius:50%;background:radial-gradient(rgba(255,154,46,.2),transparent 70%)}
 .sx-stat:nth-child(even)::after{background:radial-gradient(rgba(95,184,255,.2),transparent 70%)}
@@ -157,14 +160,14 @@
         <div class="sx-legend" aria-hidden="true"><span><i style="background:#FF9A2E"></i>Android</span><span><i style="background:#5FB8FF"></i>iOS</span><span>one machine, 2 CPUs, 7.8 GB</span></div>
       </div>
       <div class="sx-swarm" id="sx-swarm" role="img" aria-label="110 small phones, alternating Android and iOS, all running at once"></div>
-      <p class="sx-note">Each phone is a separate session with its own storage, network and device state. Measured on 2026-11-07: <a href="https://github.com/shipvo/shipvo/blob/main/docs/product/sim-bench/scale-2026-11-07.md" rel="noopener">110 open at once, every sampled one answering</a>.</p>
+      <p class="sx-note">Each phone is a separate session with its own storage, network and device state. Measured on 2026-11-07: <a href="https://github.com/shipvo/shipvo/blob/main/docs/product/sim-bench/scale-2026-11-07.md" rel="noopener">110 open at once, every sampled one answering</a>. The swarm above shows the 2-CPU, 7.8 GB run; a 4-CPU, 15.6 GB machine held 260.</p>
     </div>
 
     <div class="sx-stats">
       <div class="sx-stat"><b data-to="110">110</b><span>simulators open at once on a 2-CPU, 7.8 GB machine</span></div>
       <div class="sx-stat"><b data-to="57.1" data-dec="1">57.1<small style="font-size:.4em"> MB</small></b><span>of memory for each simulator</span></div>
       <div class="sx-stat"><b data-to="5.1" data-dec="1">5.1<small style="font-size:.4em"> s</small></b><span>or less to start each batch of 10, up to 100 open</span></div>
-      <div class="sx-stat"><b data-to="260">260</b><span>simulators open at once on a 4-CPU, 15.6 GB machine (<a href="https://github.com/shipvo/shipvo/blob/main/docs/product/sim-bench/scale-2026-11-07-4cpu-15gb.md" rel="noopener">result</a>)</span></div>
+      <div class="sx-stat"><b data-to="260">260</b><span>simulators open at once on a 4-CPU, 15.6 GB machine: <a href="https://github.com/shipvo/shipvo/blob/main/docs/product/sim-bench/scale-2026-11-07-4cpu-15gb.md" rel="noopener">write-up</a></span></div>
       <div class="sx-stat wide"><b>10.7 / 10.2<small style="font-size:.4em"> s</small></b><span>to the first tap on Android / iOS, from a clean machine</span></div>
     </div>
   </div>
