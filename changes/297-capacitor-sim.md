@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo sim` and `shipvo preview` open a Capacitor project's built web directory (`webDir` from `capacitor.config.*`) on the Android and iOS skins.
+- Migration: none; Expo apps build as before.
