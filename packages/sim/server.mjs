@@ -10,7 +10,6 @@ import { join, extname, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { openBuild } from "./build-open.mjs";
-import { BuildCacheError } from "./build-cache.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { installNetGate } from "./net-gate.mjs";
