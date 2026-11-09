@@ -246,8 +246,9 @@ const specHost = new SpecHost({
   fetch: specFetch,
   onChange: async (sid, appId, out) => {
     const s = sessions.get(sid); if (!s) return;
-    s.apps.log.push({ at: Date.now(), name: "data_refresh", app: appId, sources: out.updated, source: "real" });
-    if (s.apps.current_app === appId && s.nav.where === "app") { await s.page.reload({ waitUntil: "networkidle" }).catch(() => {}); await reapplyNetProfile(s, s.page).catch(() => {}); }
+    s.apps.log.push({ at: Date.now(), name: "data_refresh", app: appId, sources: out.updated, errors: out.errors.map((e) => e.source), source: "real" });
+    // Reload the open page only when the data changed, so text being typed is not lost to a refresh that found nothing new.
+    if (out.updated.length && s.apps.current_app === appId && s.nav.where === "app") { await s.page.reload({ waitUntil: "networkidle" }).catch(() => {}); await reapplyNetProfile(s, s.page).catch(() => {}); }
   },
 });
 setInterval(() => { specHost.tick().catch(() => {}); }, 30_000).unref();

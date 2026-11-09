@@ -90,7 +90,7 @@ An app can read from the web. Declare the host in `permissions.network` and give
 "data": { "prices": { "source": "http", "get": "https://api.example.com/prices", "cache": "10m", "fields": { "id": "text", "name": "text", "price": "text" } } }
 ```
 
-The phone fetches the source when the app is created, again whenever its cache time runs out (the sim checks every 30 seconds), and when you call `refresh_app`. The open screen redraws with the new data on Android and iOS. A source that fails keeps its last good data, and `refresh_app` lists the error. Each fetch is logged in `device_log` as `data_refresh`.
+The phone fetches the source when the app is created, again whenever its cache time runs out (the sim checks every 30 seconds), and when you call `refresh_app`. The open screen redraws with the new data on Android and iOS. The open screen reloads only when a source's data changed, so a refresh that finds nothing new never drops text someone is typing. A source that fails keeps its last good data, and `refresh_app` lists the error. Every fetch, including a background one that failed, is logged in `device_log` as `data_refresh` with the sources that changed and the sources that failed.
 
 ## Arrange the home screen
 

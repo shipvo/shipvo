@@ -50,7 +50,7 @@ export class SpecHost {
   /**
    * @param opts.fetch  how live data is fetched (default: the global fetch). Same shape as RunContext.fetch.
    * @param opts.now    clock in ms, for tests.
-   * @param opts.onChange  called with (session, id) when background refresh changed an app's data.
+   * @param opts.onChange  called with (session, id, out) after a background refresh fetched or failed.
    */
   constructor(opts = {}) {
     this.running = new Map();
@@ -62,36 +62,38 @@ export class SpecHost {
   /**
    * Fetches the app's live data sources (the spec's `http` sources) that are due, or all of them with `force`.
    * Data that comes back replaces the source's data in the running app; a source that fails keeps its last good data.
-   * Resolves { updated: [names], errors: [{ source, code, message }] }.
+   * Resolves { fetched: [names fetched], updated: [names whose data changed], errors: [{ source, code, message }] }.
    */
   async refresh(session, id, { force = false } = {}) {
     const r = this.running.get(key(session, id));
-    if (!r) return { updated: [], errors: [{ source: "", code: "not_running", message: "That app is not running" }] };
-    const updated = [], errors = [];
+    if (!r) return { fetched: [], updated: [], errors: [{ source: "", code: "not_running", message: "That app is not running" }] };
+    const fetched = [], updated = [], errors = [];
     for (const [name, src] of Object.entries(r.spec.data ?? {})) {
       if (src?.source !== "http") continue;
       const info = (r.sources[name] ??= { at: 0 });
       if (!force && info.at && this.now() - info.at < refreshEvery(src)) continue;
       info.at = this.now();
       try {
+        const before = JSON.stringify(r.app.data[name] ?? null);
         r.app.data[name] = await runSource(r.spec, name, { fetch: this.fetch, secrets: () => ({ refused: "unavailable" }), scope: { state: r.app.state, data: r.app.data } });
-        info.ok = true; delete info.error; updated.push(name);
+        info.ok = true; delete info.error; fetched.push(name);
+        if (JSON.stringify(r.app.data[name] ?? null) !== before) updated.push(name);
       } catch (e) {
         const code = e instanceof RunError ? e.code : "fetch_failed";
         info.ok = false; info.error = { code, message: String(e?.message ?? e).split("\n")[0] };
         errors.push({ source: name, ...info.error });
       }
     }
-    return { updated, errors };
+    return { fetched, updated, errors };
   }
 
-  /** Checks every running app for due data. Call it on a timer. Tells `onChange` about apps whose data changed. */
+  /** Checks every running app for due data. Call it on a timer. Tells `onChange` about apps that fetched or failed to fetch, so each is logged. */
   async tick() {
     // Apps are refreshed side by side, so one slow host does not hold up the others.
     await Promise.all([...this.running.keys()].map(async (k) => {
       const [session, id] = [k.slice(0, k.lastIndexOf("/")), k.slice(k.lastIndexOf("/") + 1)];
       const out = await this.refresh(session, id);
-      if (out.updated.length) this.onChange?.(session, id, out);
+      if (out.fetched.length || out.errors.length) this.onChange?.(session, id, out);
     }));
   }
 
