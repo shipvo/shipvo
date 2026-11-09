@@ -46,6 +46,37 @@ try {
   const phone = page.frameLocator("#pg-phone"), app = phone.frameLocator("#app");
   await app.getByRole("button", { name: "Add Spinning rod to cart" }).waitFor({ timeout: 30_000 });
   assert.equal(await page.locator("#pg-phone").contentFrame().locator('[data-platform="android"]').count(), 1);
+  // OTA walkthrough on the Android frame, then on the iOS frame: the four steps change the sample app.
+  const run = JSON.parse(readFileSync(join(pub, "playground/ota-run.json"), "utf8"));
+  assert.equal(run.maxBoots, Number(readFileSync(join(site, "../../packages/runtime/ios/BundleSelector.swift"), "utf8").match(/static let maxBoots = (\d+)/)[1]), "threshold comes from the runtime code");
+  assert.equal(run.signature.valid, true); assert.equal(run.signature.tamperedValid, false);
+  async function walkOta(platform) {
+    const version = app.getByTestId("version");
+    await version.waitFor({ timeout: 30_000 });
+    assert.match(await version.textContent(), /Version 1/);
+    const step = (id) => page.locator(`#pg-panel [data-step="${id}"]`);
+    assert.equal(await step("stage").isDisabled(), true, "steps run in order");
+    await step("pub").click();
+    await app.getByText("Version 2").waitFor({ timeout: 10_000 });
+    assert.match(await page.getByTestId("ota-log").textContent(), /Signature check: valid \(Ed25519/);
+    await step("stage").click();
+    assert.match(await page.getByTestId("ota-log").textContent(), new RegExp(`${run.stages[0].cohorts} of ${run.stages[0].of} cohorts`));
+    await step("widen").click();
+    await step("crash").click();
+    assert.match(await page.getByTestId("ota-log").textContent(), new RegExp(`allows ${run.maxBoots} crashing starts`));
+    assert.match(await version.textContent(), /Version 2/, "still version 2 before the threshold is used");
+    await step("rollback").click();
+    await app.getByText("Version 1").waitFor({ timeout: 10_000 });
+    assert.match(await page.getByTestId("ota-log").textContent(), /crash_loop_revert/);
+    assert.ok(await page.locator("#pg-phone").contentFrame().locator(`[data-platform="${platform}"]`).count() === 1);
+  }
+  await walkOta("android");
+  await page.locator("#pg-ios").click();
+  await page.locator('#pg-panel [data-step="reset"]').click();
+  await app.getByRole("button", { name: "Add Tackle box to cart" }).waitFor({ timeout: 30_000 });
+  await walkOta("ios");
+  await page.locator("#pg-android").click();
+  await app.getByRole("button", { name: "Add Tackle box to cart" }).waitFor({ timeout: 30_000 });
   // The sidebar changes the panel and the hash.
   await page.locator('#pg-side a[data-feature="device"]').click();
   await page.waitForFunction(() => document.getElementById("pg-panel").getAttribute("data-feature") === "device");

@@ -2,6 +2,7 @@
 // build.mjs calls writePlayground(). The page itself comes from pages/playground.html.
 // Files: phone-android.html and phone-ios.html (the frames from @shipvo/sim, each with the sample app inside)
 // and app.html (the sample app). The shell page sends { type: "pg:prefs", dark, large, rtl } to a phone frame.
+import { recordOtaRun } from "./playground-ota.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -38,10 +39,11 @@ p{margin:14px 0 0}
 <li><span>Tide chart</span><button type="button" data-item="Tide chart" aria-label="Add Tide chart to cart">Add</button></li>
 </ul>
 <p role="status" data-testid="cart">Cart: 0 items</p>
+<p data-testid="version">Version 1</p>
 <script>
 var n=0,c=document.querySelector('[data-testid=cart]');
 document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-item]");if(!b)return;n++;c.textContent="Cart: "+n+(n===1?" item":" items")});
-addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:prefs")return;var h=document.documentElement;
+addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pg:ota"){document.querySelector("[data-testid=version]").textContent="Version "+d.version;return}if(!d||d.type!=="pg:prefs")return;var h=document.documentElement;
 h.toggleAttribute("data-dark",!!d.dark);h.toggleAttribute("data-large",!!d.large);h.dir=d.rtl?"rtl":"ltr"});
 </script></body></html>
 `;
@@ -50,6 +52,7 @@ export async function writePlayground(pub) {
   const out = join(pub, "playground");
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "app.html"), APP);
+  writeFileSync(join(out, "ota-run.json"), JSON.stringify(await recordOtaRun(ROOT), null, 1) + "\n");
   const { renderFrame } = await import(pathToFileURL(join(ROOT, "packages/sim/frame.mjs")).href);
   for (const skin of ["android", "ios"]) {
     const name = skin === "ios" ? "iOS" : "Android";
@@ -66,10 +69,10 @@ ${f.css}
 <script>
 function fit(){var s=Math.min(1,innerWidth/${f.outerWidth},innerHeight/${f.outerHeight}),e=document.getElementById("fit");e.style.width="${f.outerWidth}px";e.style.height="${f.outerHeight}px";e.style.transform="translate(-50%,-50%) scale("+s+")"}
 addEventListener("resize",fit);fit();
-var last={};
-function send(){var a=document.getElementById("app");if(a&&a.contentWindow)a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*")}
+var last={},ota=1;
+function send(){var a=document.getElementById("app");if(a&&a.contentWindow){a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*");a.contentWindow.postMessage({type:"pg:ota",version:ota},"*")}}
 document.getElementById("app").addEventListener("load",send);
-addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:prefs")return;last={dark:!!d.dark,large:!!d.large,rtl:!!d.rtl};
+addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pg:ota"){ota=d.version;send();return}if(!d||d.type!=="pg:prefs")return;last={dark:!!d.dark,large:!!d.large,rtl:!!d.rtl};
 var b=document.querySelector(".sf-body");b.dataset.theme=last.dark?"dark":"light";b.style.setProperty("--sf-bg",last.dark?"#000":"#fff");b.style.setProperty("--sf-fg",last.dark?"#fff":"#111");
 document.querySelector(".sf-status").style.setProperty("--sf-status-fg",last.dark?"#fff":"#111");send()});
 </script></body></html>`);
