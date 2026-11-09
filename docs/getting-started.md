@@ -30,6 +30,15 @@ The `first-run-cross-os` workflow packs the CLI and runs the first-run path from
 
 Each step exited with code 0, and no step failed on any system in this run. The Linux simulator run is in the first-run numbers above and in [`scripts/first-run/`](../scripts/first-run/).
 
+## Try it in your browser first
+
+Open [shipvo.dev/playground](https://shipvo.dev/playground/). No install. The sample app runs on an Android phone and an iPhone side by side. Two panels let you try the main features:
+
+- **Device API:** set location, camera, biometrics, payment, notification and airplane mode, and see the sample app show each result.
+- **Over-the-air updates:** publish a signed update, stage it to 10% and then 100% of phones, crash it, and watch the rollback. The signature result, cohort counts and crash-loop threshold on that panel come from the real signer, verifier, cohort bands and runtime code, recorded when the site was built.
+
+If a panel does not load, reload the page; it needs JavaScript on.
+
 ## 1. Create the app
 
 Already have an Expo app or a bare React Native app? Run `npx -y @shipvo/cli init` inside it instead: see [adopt mode](cli.md#adopt-mode) and [bare React Native apps](cli.md#bare-react-native-apps). For a bare app, run `cd ios && pod install` and rebuild both apps afterwards. Then continue at step 2 or 3.

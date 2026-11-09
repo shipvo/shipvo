@@ -31,6 +31,11 @@ beforeAll(async () => {
       if (installed.has(body.id)) return fail("already_installed", "already");
       installed.set(body.id, app.name); return ok();
     }
+    if (body.action === "create_app") {
+      if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
+      if (installed.has(body.id)) return fail("already_installed", "already");
+      installed.set(body.id, body.name ?? body.id); if (body.open !== false) current = body.id; return ok();
+    }
     if (!installed.has(body.id)) return fail("not_installed", "not installed");
     if (body.action === "switch_app") { current = body.id; return ok(); }
     if (body.action === "uninstall_app") { installed.delete(body.id); if (current === body.id) current = null; return ok(); }
@@ -77,6 +82,20 @@ describe("phone app tools", () => {
     expect((await call(c, "uninstall_app", { session: s, id: "weather" })).structuredContent.code).toBe("not_installed");
     expect((await call(c, "switch_app", { session: s, id: "notes" })).content[0].text).toMatch(/current: notes/);
     expect((await call(c, "uninstall_app", { session: s, id: "notes" })).content[0].text).toMatch(/current: null/);
+    await c.close();
+  });
+  it("create_app sends the spec to the phone and reports a bad spec with its code", async () => {
+    const c = await connect();
+    const s = "s-create";
+    const bad = await call(c, "create_app", { session: s, id: "gifts", spec: { spec: "shipvo.app/v0", screens: [] } });
+    expect(bad.isError).toBe(true); expect(bad.structuredContent.code).toBe("invalid_spec");
+    const spec = { spec: "shipvo.app/v0", app: { id: "gifts", name: "Gifts" }, screens: [{ id: "home", title: "Gifts", body: [] }] };
+    const ok = await call(c, "create_app", { session: s, id: "gifts", spec, style: "ios", name: "Gift Tracker" });
+    expect(ok.isError).toBeFalsy(); expect(ok.content[0].text).toMatch(/current: gifts/);
+    const sent = seen.filter((b: any) => b.action === "create_app").at(-1);
+    expect(sent).toMatchObject({ id: "gifts", style: "ios", name: "Gift Tracker" });
+    expect(sent.spec.app.id).toBe("gifts");
+    expect((await call(c, "create_app", { session: s, id: "gifts", spec })).structuredContent.code).toBe("already_installed");
     await c.close();
   });
   it("marketplace apps get an app:// url that the sim resolves like open_app", async () => {
