@@ -1,0 +1,1 @@
+- site: the playground Agent panel has a tool console (`screen`, `tap`, `type`, `device_log`) and a "Watch Lumi" run on the sample app, on Android and iOS.
