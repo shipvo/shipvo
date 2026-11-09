@@ -124,3 +124,32 @@ import { arrangeApp, homeApps, appVisible } from "./apps.mjs";
     assert.equal(code(() => arrangeApp(st, "a", { colour: "red" })), "bad_placement");
   });
 }
+
+test("a schedule across midnight counts its early-morning tail against the day it started", async () => {
+  const { appVisible } = await import("./apps.mjs");
+  const a = { id: "x", placement: { schedule: { days: ["fri"], from: "22:00", to: "06:00" } } };
+  const at = (day, h, m = 0) => ({ getDay: () => day, getHours: () => h, getMinutes: () => m });
+  assert.equal(appVisible(a, at(5, 23)), true);    // Friday 23:00
+  assert.equal(appVisible(a, at(6, 5)), true);     // Saturday 05:00: the tail of Friday's window
+  assert.equal(appVisible(a, at(5, 5)), false);    // Friday 05:00: the tail of Thursday's window
+  assert.equal(appVisible(a, at(6, 23)), false);   // Saturday 23:00
+  assert.equal(appVisible(a, at(6, 6, 1)), false); // just after the window
+  const day = { placement: { schedule: { days: ["mon"], from: "08:00", to: "18:00" } } };
+  assert.equal(appVisible(day, at(1, 9)), true); assert.equal(appVisible(day, at(2, 9)), false);
+});
+
+test("a bad placement in a profile is dropped, never thrown on", async () => {
+  const { loadProfile, describeApps, homeApps } = await import("./apps.mjs");
+  const st = loadProfile({ apps: [
+    { id: "a", name: "A", placement: { schedule: "weekdays" } },
+    { id: "b", name: "B", placement: { schedule: { days: ["mon", "noday"], from: "08:00", to: "18:00" }, pinned: true } },
+    { id: "c", name: "C", placement: { schedule: { from: "9am" }, position: "first" } },
+    { id: "d", name: "D", placement: { schedule: {}, hidden: true } },
+  ] });
+  assert.doesNotThrow(() => describeApps(st, new Date()));
+  assert.equal(st.installed_apps[0].placement, undefined);
+  assert.deepEqual(st.installed_apps[1].placement, { pinned: true });
+  assert.equal(st.installed_apps[2].placement, undefined);
+  assert.deepEqual(st.installed_apps[3].placement, { hidden: true, schedule: { days: ["sun","mon","tue","wed","thu","fri","sat"], from: "00:00", to: "23:59" } });
+  assert.deepEqual(homeApps(st, new Date()).map((a) => a.id), ["b", "a", "c"]);
+});

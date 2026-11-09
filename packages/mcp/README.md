@@ -89,3 +89,14 @@ The HTTP endpoint is stateless. There is no protocol session: each POST is handl
 - This package uses `@modelcontextprotocol/sdk` 1.x (the TypeScript SDK v2 is not stable on npm yet; 1.32.2 is `latest`). Tested by `test/http-stateless.test.ts`: discover without `initialize`, header/body mismatch, scope per request, 2025-era `initialize` clients. Stdio is unchanged.
 
  Requests without a valid key are refused. The hosted version at `sim.shipvo.dev` will issue keys per account with scopes (test, owner, read).
+
+## Trace context
+
+If your agent sends a W3C `traceparent` in the `_meta` of a `tools/call`, Shipvo records its trace id with that call in the session's tool-call log and echoes `traceparent` in the result `_meta`. A malformed value is ignored. `tracestate` and `baggage` are never read, stored or logged, and nothing is forwarded to a third party.
+
+```json
+{ "method": "tools/call", "params": { "name": "tap", "arguments": { "session": "s1", "ref": "e3" },
+  "_meta": { "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" } } }
+```
+
+`export_test` returns the log in `structuredContent` (`traceIds` and `calls`) and puts a `// trace id:` comment at the top of the script. `shipvo eval` run records (`run.json`) list the `traceIds` the agent sent, and each step in `steps.jsonl` carries its `traceId`.
