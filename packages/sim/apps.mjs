@@ -237,7 +237,7 @@ if(!mp||/^fixture:/.test(a.url)){installApp(st,id);return Promise.resolve()}
 var bad=function(){return new Error("The app could not be fetched")};
 return bundle(a).then(function(u){return fetch(u).then(function(r){if(!r.ok||Number(r.headers.get("content-length"))>MAXB)throw bad();return r.arrayBuffer()}).then(function(buf){if(buf.byteLength>MAXB)throw bad();return sha(buf).then(function(h){urls[id]=u;installApp(st,id,st.store,{sha256:h,bytes:buf.byteLength})})})})}
 function open(on){sc.hidden=!on;if(on){msg="";drawStore();sc.focus({preventScroll:true});loadStore().then(drawStore)}}
-drawHome();
+drawHome();setInterval(drawHome,30000);
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="store-icon"]'))return open(true);
 if(t.closest('[data-part="store-close"]'))return open(false);

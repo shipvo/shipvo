@@ -83,6 +83,26 @@ for (const skin of ["android", "ios"]) {
   });
 }
 
+for (const skin of ["android", "ios"]) {
+  test(`${skin}: the frame's home screen updates when a schedule starts or ends`, async () => {
+    const { chromium } = createRequire(import.meta.url)("playwright");
+    const b = await chromium.launch();
+    try {
+      const ctx = await b.newContext({ viewport: { width: 460, height: 960 } });
+      const p = await ctx.newPage();
+      await p.clock.install({ time: new Date("2026-11-09T17:59:00") });   // Monday, one minute before the planner's window ends
+      const f = renderFrame({ skin, screen: `<iframe id="app" srcdoc="<p>x</p>"></iframe>` });
+      const phone = { apps: [{ id: "plan", name: "Planner", placement: { schedule: { days: ["mon"], from: "08:00", to: "18:00" } } }, { id: "mail", name: "Mail" }] };
+      await p.setContent(`<style>${f.css}</style>${f.html}<script>${statusClientScript("app", skin, phone)}</script>`);
+      await p.evaluate(() => window.postMessage({ type: "pn:nav", where: "home" }, "*"));
+      const names = () => p.locator('[data-part="installed-app"]').evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+      assert.deepEqual(await names(), ["Planner", "Mail"]);
+      await p.clock.runFor(120000);
+      assert.deepEqual(await names(), ["Mail"]);
+    } finally { await b.close(); }
+  });
+}
+
 test("arrange_apps and set_time return the open screen when an app is in front, and the home text as home", async () => {
   assert.ok((await call("/session", { session: "pl3", phone: PHONE })).ok);
   const r = await act("pl3", { action: "arrange_apps", id: "mail", pinned: true });
