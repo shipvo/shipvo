@@ -31,6 +31,8 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 li{background:var(--card);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center}
 button{min-height:44px;min-width:44px;border:0;border-radius:999px;background:var(--accent);color:var(--bg);font:inherit;font-weight:700;padding:0 16px}
 p{margin:14px 0 0}
+ul.dev{margin-top:14px}ul.dev li{padding:8px 14px}
+#note{position:fixed;left:12px;right:12px;top:12px;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 14px}
 </style></head><body>
 <h1>Tide and Tackle</h1>
 <ul aria-label="Products">
@@ -39,10 +41,24 @@ p{margin:14px 0 0}
 <li><span>Tide chart</span><button type="button" data-item="Tide chart" aria-label="Add Tide chart to cart">Add</button></li>
 </ul>
 <p role="status" data-testid="cart">Cart: 0 items</p>
+<ul class="dev" aria-label="Device">
+<li data-testid="location">Location: not set</li><li data-testid="camera">Camera: not set</li><li data-testid="biometrics">Biometrics: not set</li>
+<li data-testid="payment">Payment: not set</li><li data-testid="airplane">Airplane mode: off</li>
+</ul>
 <p data-testid="version">Version 1</p>
+<div id="note" role="alert" data-testid="notification" hidden></div>
 <script>
 var n=0,c=document.querySelector('[data-testid=cart]');
 document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-item]");if(!b)return;n++;c.textContent="Cart: "+n+(n===1?" item":" items")});
+var L={Lisbon:"Lisbon",Douala:"Douala",Tokyo:"Tokyo"},W={accepted:"success",rejected:"failed",unavailable:"unavailable"},P={approved:"approved",declined:"declined",timeout:"timeout"},ni=0;
+function put(k,t){document.querySelector("[data-testid="+k+"]").textContent=t}
+addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:device")return;var v=d.value;
+if(d.kind==="location"&&L[v])put("location","Location: "+L[v]);
+else if(d.kind==="camera")put("camera",v==="denied"?"Camera: permission denied":"Camera: sample photo, "+v);
+else if(d.kind==="biometrics"&&W[v])put("biometrics","Biometrics: "+W[v]);
+else if(d.kind==="payment"&&P[v])put("payment","Payment: "+P[v]);
+else if(d.kind==="airplane")put("airplane","Airplane mode: "+(v==="on"?"on, no network":"off"));
+else if(d.kind==="notification"&&v==="send"){ni++;var n=document.getElementById("note");n.hidden=false;n.textContent="Notification "+ni+": Tide at 06:40, your order has shipped";clearTimeout(window.nt);window.nt=setTimeout(function(){n.hidden=true},4000)}});
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pg:ota"){document.querySelector("[data-testid=version]").textContent="Version "+d.version;return}if(!d||d.type!=="pg:prefs")return;var h=document.documentElement;
 h.toggleAttribute("data-dark",!!d.dark);h.toggleAttribute("data-large",!!d.large);h.dir=d.rtl?"rtl":"ltr"});
 </script></body></html>
@@ -69,8 +85,9 @@ ${f.css}
 <script>
 function fit(){var s=Math.min(1,innerWidth/${f.outerWidth},innerHeight/${f.outerHeight}),e=document.getElementById("fit");e.style.width="${f.outerWidth}px";e.style.height="${f.outerHeight}px";e.style.transform="translate(-50%,-50%) scale("+s+")"}
 addEventListener("resize",fit);fit();
-var last={},ota=1;
-function send(){var a=document.getElementById("app");if(a&&a.contentWindow){a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*");a.contentWindow.postMessage({type:"pg:ota",version:ota},"*")}}
+var last={},dev={},ota=1;
+addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:device")return;if(d.kind!=="notification")dev[d.kind]=d.value;var a=document.getElementById("app");if(a&&a.contentWindow)a.contentWindow.postMessage(d,"*")});
+function send(){var a=document.getElementById("app");if(a&&a.contentWindow){a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*");for(var k in dev)a.contentWindow.postMessage({type:"pg:device",kind:k,value:dev[k]},"*");a.contentWindow.postMessage({type:"pg:ota",version:ota},"*")}
 document.getElementById("app").addEventListener("load",send);
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="pg:ota"){ota=d.version;send();return}if(!d||d.type!=="pg:prefs")return;last={dark:!!d.dark,large:!!d.large,rtl:!!d.rtl};
 var b=document.querySelector(".sf-body");b.dataset.theme=last.dark?"dark":"light";b.style.setProperty("--sf-bg",last.dark?"#000":"#fff");b.style.setProperty("--sf-fg",last.dark?"#fff":"#111");
