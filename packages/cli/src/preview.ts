@@ -3,8 +3,8 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep, extname } from "node:path";
-import { capacitorWeb } from "./capacitor-web.js";
 import { args as parse, loadConfig } from "./config.js";
+import { isCapacitorWeb, copyCapacitorWeb } from "./capacitor-web.js";
 import { spawnBin } from "./spawn-bin.js";
 import { RECORDER_JS } from "./preview-recorder.js";
 
@@ -299,6 +299,7 @@ export async function publishToHereNow(files: PreviewFile[], o: PreviewOpts = {}
 
 export function build(root: string, out: string): Promise<void> {
   rmSync(out, { recursive: true, force: true }); mkdirSync(join(root, ".shipvo"), { recursive: true });
+  if (isCapacitorWeb(root)) { try { copyCapacitorWeb(root, out); return Promise.resolve(); } catch (e) { return Promise.reject(e); } }
   return new Promise((resolve, reject) => {
     const call = spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", out]);
     const p = spawn(call.command, call.args, { cwd: root, shell: call.shell, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "ignore", "inherit"] });
@@ -311,9 +312,6 @@ export const NOTICE = "This link is public: anyone who has it can open the previ
 
 /** Builds, wraps and publishes. Used by the CLI and by the MCP `publish_preview` tool (through `shipvo preview --json`). */
 export async function runPreview(root: string, o: PreviewOpts & { skipBuild?: boolean; buildDir?: string } = {}): Promise<PreviewResult> {
-  // A Capacitor project (no shipvo.json) is previewed from its built web directory.
-  const cap = existsSync(join(root, "shipvo.json")) ? undefined : capacitorWeb(root);
-  if (cap) return publishToHereNow(wrapBuild(o.buildDir ?? cap.webDir, cap.appId, cap.appId), o);
   const cfg = loadConfig(root);
   const provider = cfg.preview ?? "here.now";
   if (provider === "control-plane") throw new Error('shipvo.json sets "preview": "control-plane". That provider is not built yet. Remove the setting or use "here.now".');

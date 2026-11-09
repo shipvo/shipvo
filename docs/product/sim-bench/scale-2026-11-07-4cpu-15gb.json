@@ -1,0 +1,280 @@
+{
+  "date": "2026-11-07T13:52:27.283Z",
+  "app": "apps/chess",
+  "machine": {
+    "platform": "linux",
+    "cpus": 4,
+    "cpuModel": "AMD EPYC 9V74 80-Core Processor",
+    "ramGb": 15.6
+  },
+  "node": "v22.23.4",
+  "requested": 300,
+  "step": 10,
+  "idleRssMb": 686,
+  "idleAvailableMb": 14600,
+  "steps": [
+    {
+      "open": 10,
+      "batchSeconds": 4.4,
+      "medianStartMs": 4400,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 3928,
+      "processes": 28,
+      "availableMb": 13756
+    },
+    {
+      "open": 20,
+      "batchSeconds": 3,
+      "medianStartMs": 2964,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 7133,
+      "processes": 48,
+      "availableMb": 13096
+    },
+    {
+      "open": 30,
+      "batchSeconds": 3,
+      "medianStartMs": 2978,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 10321,
+      "processes": 68,
+      "availableMb": 12419
+    },
+    {
+      "open": 40,
+      "batchSeconds": 3,
+      "medianStartMs": 2933,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 13517,
+      "processes": 88,
+      "availableMb": 11768
+    },
+    {
+      "open": 50,
+      "batchSeconds": 3.2,
+      "medianStartMs": 3010,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 16722,
+      "processes": 108,
+      "availableMb": 11095
+    },
+    {
+      "open": 60,
+      "batchSeconds": 3,
+      "medianStartMs": 2915,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 19912,
+      "processes": 128,
+      "availableMb": 10368
+    },
+    {
+      "open": 70,
+      "batchSeconds": 3,
+      "medianStartMs": 2987,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 23107,
+      "processes": 148,
+      "availableMb": 9689
+    },
+    {
+      "open": 80,
+      "batchSeconds": 3.2,
+      "medianStartMs": 3140,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 26279,
+      "processes": 168,
+      "availableMb": 9220
+    },
+    {
+      "open": 90,
+      "batchSeconds": 3.3,
+      "medianStartMs": 3155,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 29444,
+      "processes": 188,
+      "availableMb": 8693
+    },
+    {
+      "open": 100,
+      "batchSeconds": 3.1,
+      "medianStartMs": 3061,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 32626,
+      "processes": 208,
+      "availableMb": 8111
+    },
+    {
+      "open": 110,
+      "batchSeconds": 3.1,
+      "medianStartMs": 3104,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 35772,
+      "processes": 228,
+      "availableMb": 7686
+    },
+    {
+      "open": 120,
+      "batchSeconds": 3.3,
+      "medianStartMs": 3191,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 38964,
+      "processes": 248,
+      "availableMb": 7140
+    },
+    {
+      "open": 130,
+      "batchSeconds": 3.4,
+      "medianStartMs": 3256,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 42186,
+      "processes": 268,
+      "availableMb": 6611
+    },
+    {
+      "open": 140,
+      "batchSeconds": 3.4,
+      "medianStartMs": 3337,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 45365,
+      "processes": 288,
+      "availableMb": 6054
+    },
+    {
+      "open": 150,
+      "batchSeconds": 3.8,
+      "medianStartMs": 3687,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 48530,
+      "processes": 308,
+      "availableMb": 5546
+    },
+    {
+      "open": 160,
+      "batchSeconds": 3.4,
+      "medianStartMs": 3359,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 51703,
+      "processes": 328,
+      "availableMb": 5004
+    },
+    {
+      "open": 170,
+      "batchSeconds": 3.6,
+      "medianStartMs": 3466,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 54882,
+      "processes": 348,
+      "availableMb": 4481
+    },
+    {
+      "open": 180,
+      "batchSeconds": 3.6,
+      "medianStartMs": 3469,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 58032,
+      "processes": 368,
+      "availableMb": 3997
+    },
+    {
+      "open": 190,
+      "batchSeconds": 4,
+      "medianStartMs": 3929,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 61231,
+      "processes": 388,
+      "availableMb": 3533
+    },
+    {
+      "open": 200,
+      "batchSeconds": 3.8,
+      "medianStartMs": 3722,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 64456,
+      "processes": 408,
+      "availableMb": 2972
+    },
+    {
+      "open": 210,
+      "batchSeconds": 4,
+      "medianStartMs": 3977,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 67645,
+      "processes": 428,
+      "availableMb": 2519
+    },
+    {
+      "open": 220,
+      "batchSeconds": 3.6,
+      "medianStartMs": 3490,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 70847,
+      "processes": 448,
+      "availableMb": 2012
+    },
+    {
+      "open": 230,
+      "batchSeconds": 3.5,
+      "medianStartMs": 3416,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 74038,
+      "processes": 468,
+      "availableMb": 1549
+    },
+    {
+      "open": 240,
+      "batchSeconds": 4.1,
+      "medianStartMs": 3975,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 77299,
+      "processes": 488,
+      "availableMb": 1051
+    },
+    {
+      "open": 250,
+      "batchSeconds": 4.2,
+      "medianStartMs": 4123,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 80462,
+      "processes": 508,
+      "availableMb": 766
+    },
+    {
+      "open": 260,
+      "batchSeconds": 5.6,
+      "medianStartMs": 5516,
+      "failed": 0,
+      "answering": "3/3",
+      "rssMb": 80298,
+      "processes": 528,
+      "availableMb": 578
+    }
+  ],
+  "stopped": "stopped with 600 MB of memory still free, to keep the machine responsive",
+  "perSimulatorMb": 53.9,
+  "note": "rssMb sums the sim process and its descendants and counts shared pages once per process, so it over-counts. perSimulatorMb uses the fall in MemAvailable."
+}

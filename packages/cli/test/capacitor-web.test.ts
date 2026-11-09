@@ -1,26 +1,35 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { capacitorWeb } from "../src/capacitor-web";
+import { capacitorWebDir, copyCapacitorWeb, isCapacitorWeb } from "../src/capacitor-web.js";
 
-const dir = () => mkdtempSync(join(tmpdir(), "cap-"));
+function project(config: string, extra: Record<string, string> = {}) {
+  const d = mkdtempSync(join(tmpdir(), "cap-web-"));
+  writeFileSync(join(d, "capacitor.config.ts"), config);
+  mkdirSync(join(d, "android"));
+  for (const [f, body] of Object.entries(extra)) { mkdirSync(join(d, f, ".."), { recursive: true }); writeFileSync(join(d, f), body); }
+  return d;
+}
 
-describe("capacitorWeb", () => {
-  it("reads webDir and appId from capacitor.config.ts", () => {
-    const d = dir();
-    writeFileSync(join(d, "capacitor.config.ts"), `const config = { appId: "dev.x.app", appName: "X", webDir: "www" };`);
-    expect(capacitorWeb(d)).toEqual({ appId: "dev.x.app", webDir: join(d, "www") });
+describe("capacitor web directory", () => {
+  it("reads webDir from the config and defaults to www", () => {
+    expect(capacitorWebDir(project(`export default { webDir: "dist/web" };`))).toMatch(/dist[\\/]web$/);
+    expect(capacitorWebDir(project(`export default { appId: "x" };`))).toMatch(/www$/);
   });
-  it("reads capacitor.config.json", () => {
-    const d = dir();
-    writeFileSync(join(d, "capacitor.config.json"), JSON.stringify({ appId: "a.b", webDir: "dist/web" }));
-    expect(capacitorWeb(d)?.webDir).toBe(join(d, "dist", "web"));
+  it("refuses a webDir outside the project", () => {
+    expect(() => capacitorWebDir(project(`export default { webDir: "../../etc" };`))).toThrow(/outside/);
   });
-  it("is undefined for a folder without a Capacitor config, or a webDir outside the project", () => {
-    const d = dir();
-    expect(capacitorWeb(d)).toBeUndefined();
-    writeFileSync(join(d, "capacitor.config.json"), JSON.stringify({ appId: "a.b", webDir: "../elsewhere" }));
-    expect(capacitorWeb(d)).toBeUndefined();
+  it("copies the built directory and says so when it is not built", () => {
+    const d = project(`export default { webDir: "www" };`, { "www/index.html": "<h1>hi</h1>", "www/a/b.js": "1" });
+    expect(isCapacitorWeb(d)).toBe(true);
+    const out = join(d, "out");
+    copyCapacitorWeb(d, out);
+    expect(readFileSync(join(out, "index.html"), "utf8")).toBe("<h1>hi</h1>");
+    expect(existsSync(join(out, "a/b.js"))).toBe(true);
+    expect(() => copyCapacitorWeb(project(`export default {};`), join(d, "o2"))).toThrow(/No index.html/);
+  });
+  it("leaves Expo apps alone", () => {
+    expect(isCapacitorWeb(project(`export default {};`, { "app.json": "{}" }))).toBe(false);
   });
 });

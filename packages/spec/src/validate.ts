@@ -117,6 +117,29 @@ class Run {
     }
   }
 
+  /** Warns about keys in `strings` that no text in the spec uses. */
+  checkStrings() {
+    const table = this.spec.strings;
+    if (!isObject(table)) return;
+    const used = new Set<string>();
+    const collect = (v: unknown, depth = 0) => {
+      if (depth > MAX_WALK_DEPTH) return;
+      if (typeof v === "string") used.add(v);
+      else if (Array.isArray(v)) v.forEach((x) => collect(x, depth + 1));
+      else if (isObject(v)) for (const [k, x] of Object.entries(v)) if (k !== "strings") collect(x, depth + 1);
+    };
+    for (const [k, x] of Object.entries(this.spec)) if (k !== "strings") collect(x);
+    for (const [lang, keys] of Object.entries(table)) {
+      if (!isObject(keys)) continue;
+      for (const key of Object.keys(keys)) {
+        if (!used.has(key)) {
+          this.warn(childPath(childPath("$.strings", lang), key), `The key "${key}" in strings.${lang} matches no text in the spec.`,
+            "Fix the key so it equals the text exactly, or remove it.");
+        }
+      }
+    }
+  }
+
   checkExpression(src: string, path: string) {
     if (src.length > MAX_EXPRESSION_LENGTH) {
       this.error(path, `Expression is ${src.length} characters; the limit is ${MAX_EXPRESSION_LENGTH}.`,
@@ -498,6 +521,7 @@ export function validate(spec: unknown): ValidationResult {
     run.checkActions();
     run.checkTheme();
     run.checkScreens();
+    run.checkStrings();
     return { errors: run.errors, warnings: run.warnings };
   } catch (e) {
     return {
