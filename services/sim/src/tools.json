@@ -1539,6 +1539,36 @@
     }
   },
   {
+    "name": "refresh_app",
+    "description": "Fetch the live data of a spec app now (its http data sources) and redraw the open screen. Apps also refresh by themselves when a source cache time runs out. The result lists updated sources and any errors; a source that fails keeps its last good data. Fails with not_installed. Logged in device_log as data_refresh.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "request_app_install",
     "description": "Ask to add an app to the person's own persistent phone (not the simulator). Returns a consent card: app name, publisher, the permissions it asks for, and approve_url and decline_url. Show the card to the person and tell them to open a link themselves: you cannot approve, and nothing is installed until they do. A card expires after 15 minutes. Fails with unknown_app, already_installed or unauthorized. Needs PN_ASSISTANT_TOKEN.",
     "inputSchema": {

@@ -221,7 +221,23 @@ async function boot(s, url) {
 async function reapplyNetProfile(s, page) {
   if (s.netProfile) await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
 }
-const specHost = new SpecHost();
+// Live data for spec apps: https only, no private hosts. PN_SPEC_FETCH_FIXTURE=<file> answers from a { url: { status, body } } file instead (tests, offline demos).
+async function specFetch(url, init) {
+  const fx = process.env.PN_SPEC_FETCH_FIXTURE;
+  if (fx) { const hit = JSON.parse(readFileSync(fx, "utf8"))[url.split("?")[0]] ?? JSON.parse(readFileSync(fx, "utf8"))[url]; const status = hit?.status ?? 404; return { ok: status >= 200 && status < 300, status, text: async () => (typeof hit?.body === "string" ? hit.body : JSON.stringify(hit?.body ?? null)) }; }
+  await checkUrl(url, { allowPrivate: false, allowHosts: [] });
+  const r = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
+  return { ok: r.ok, status: r.status, text: () => r.text() };
+}
+const specHost = new SpecHost({
+  fetch: specFetch,
+  onChange: async (sid, appId, out) => {
+    const s = sessions.get(sid); if (!s) return;
+    s.apps.log.push({ at: Date.now(), name: "data_refresh", app: appId, sources: out.updated, source: "real" });
+    if (s.apps.current_app === appId && s.nav.where === "app") await s.page.reload({ waitUntil: "networkidle" }).catch(() => {});
+  },
+});
+setInterval(() => { specHost.tick().catch(() => {}); }, 30_000).unref();
 // The phone's clock: the real time, or the time a test set with set_time.
 const nowOf = (s) => (s.clockMs != null ? new Date(s.clockMs) : new Date());
 const sidOf = (s) => [...sessions].find(([, v]) => v === s)?.[0];
@@ -357,13 +373,13 @@ async function act(id, body) {
       const appId = String(body.id ?? "");
       if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(appId)) throw new SimError("bad_app_id", "id: lowercase letters, digits and dashes, up to 40, starting with a letter or digit");
       if (s.apps.installed_apps.some((a) => a.id === appId)) throw new SimError("already_installed", `'${appId}' is already installed. Use update_app to change it.`);
-      const made = specHost.create(sidOf(s), appId, body.spec, { style: body.style === "ios" ? "ios" : "android" });
+      const made = await specHost.create(sidOf(s), appId, body.spec, { style: body.style === "ios" ? "ios" : "android" });
       if (!made.ok) throw new SimError("invalid_spec", made.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
       const nm = String(body.name ?? body.spec?.app?.name ?? appId).replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec" });
       s.apps.log.push({ at: Date.now(), name: "create_app", app: appId, source: "real", version: "1" });
       if (body.open !== false) await switchToApp(s, page, appId);
-      return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+      return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, data_errors: made.data_errors, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Home screen layout: pin, hide, reorder and schedule an installed app.
     case "arrange_apps": {
@@ -378,18 +394,27 @@ async function act(id, body) {
       else { const t = Date.parse(String(body.at)); if (Number.isNaN(t)) throw new SimError("bad_time", "at must be a time like 2026-11-14T09:00:00, or null"); s.clockMs = t; }
       return { now: nowOf(s).toString(), screen: `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
+    // Fetch an app's live data now. Without a source name every live source is fetched. Resolves what changed and each source's state.
+    case "refresh_app": {
+      const appId = String(body.id ?? "");
+      if (!specHost.has(sidOf(s), appId)) throw new SimError("not_installed", `'${appId}' is not a spec app running on this phone`);
+      const out = await specHost.refresh(sidOf(s), appId, { force: true });
+      s.apps.log.push({ at: Date.now(), name: "data_refresh", app: appId, sources: out.updated, errors: out.errors.map((e) => e.source), source: "real" });
+      if (out.updated.length && s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      return { updated: out.updated, errors: out.errors, sources: specHost.sources(sidOf(s), appId), screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
+    }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
     case "update_app": {
       const appId = String(body.id ?? "");
       const entry = s.apps.installed_apps.find((a) => a.id === appId);
       if (!entry || entry.kind !== "spec") throw new SimError("not_installed", `'${appId}' is not a spec app on this phone. Use create_app first.`);
-      const up = specHost.update(sidOf(s), appId, body.spec);
+      const up = await specHost.update(sidOf(s), appId, body.spec);
       if (!up.ok) throw new SimError("invalid_spec", up.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
       entry.version = String(up.version);
       if (typeof body.name === "string" && body.name.trim()) entry.name = body.name.replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.log.push({ at: Date.now(), name: "update_app", app: appId, from: String(up.from), version: String(up.version), source: "real" });
       if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
-      return { version: up.version, installed_apps: s.apps.installed_apps, warnings: up.warnings, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
+      return { version: up.version, installed_apps: s.apps.installed_apps, warnings: up.warnings, data_errors: up.data_errors, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
     // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
     case "app_action": {
@@ -558,7 +583,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, arrange_apps, set_time, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, refresh_app, arrange_apps, set_time, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

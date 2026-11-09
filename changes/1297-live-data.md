@@ -1,0 +1,3 @@
+- `@shipvo/sim`: spec apps with `http` data sources load their data when created and refresh when the cache time runs out; new `refresh_app` action redraws the open screen. A failed fetch keeps the last good data. Logged as `data_refresh`.
+- `@shipvo/mcp`: new tool `refresh_app`.
+- Migration: none; new tool.

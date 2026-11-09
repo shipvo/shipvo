@@ -81,6 +81,17 @@ The app is real HTML with every control labelled, so `screen`, `tap`, `type` and
 
 `device_log` records the create, each action and each update (old and new version) with `source: "real"`.
 
+## Live data that refreshes
+
+An app can read from the web. Declare the host in `permissions.network` and give a data source `source: "http"`, a `get` URL (https only) and an optional `cache` time such as `"10m"`:
+
+```json
+"permissions": { "network": ["api.example.com"] },
+"data": { "prices": { "source": "http", "get": "https://api.example.com/prices", "cache": "10m", "fields": { "id": "text", "name": "text", "price": "text" } } }
+```
+
+The phone fetches the source when the app is created, again whenever its cache time runs out (the sim checks every 30 seconds), and when you call `refresh_app`. The open screen redraws with the new data on Android and iOS. A source that fails keeps its last good data, and `refresh_app` lists the error. Each fetch is logged in `device_log` as `data_refresh`.
+
 ## Arrange the home screen
 
 `arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then, also across midnight. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.

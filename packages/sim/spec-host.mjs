@@ -1,7 +1,7 @@
 // Runs app specs on the simulated phone. A spec app is a JSON document (see @shipvo/spec). This host keeps one running
 // app per phone and app id, renders its screen as a page the phone shows, and applies the taps, typing and choices
 // that page sends back. The page is real HTML with labelled controls, so the screen and tap tools work on it as on any app.
-import { createApp } from "@shipvo/spec";
+import { createApp, runSource, RunError } from "@shipvo/spec";
 
 /** The script the page runs. Controls are found by their role and accessible name, as an agent finds them. */
 export const HOST_SCRIPT = `(function(){
@@ -39,15 +39,74 @@ function fieldName(spec, form, shown) {
   return found ?? shown;
 }
 
+const UNIT = { s: 1e3, m: 6e4, h: 36e5, d: 864e5 };
+/** How often a live data source is fetched again: its `cache` time in the spec, else every 5 minutes. */
+export function refreshEvery(source) {
+  const m = /^(\d+)(s|m|h|d)$/.exec(String(source?.cache ?? ""));
+  return m ? Number(m[1]) * UNIT[m[2]] : 5 * 6e4;
+}
+
 export class SpecHost {
-  constructor() { this.running = new Map(); }
+  /**
+   * @param opts.fetch  how live data is fetched (default: the global fetch). Same shape as RunContext.fetch.
+   * @param opts.now    clock in ms, for tests.
+   * @param opts.onChange  called with (session, id) when background refresh changed an app's data.
+   */
+  constructor(opts = {}) {
+    this.running = new Map();
+    this.fetch = opts.fetch ?? ((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(10_000) }));
+    this.now = opts.now ?? Date.now;
+    this.onChange = opts.onChange;
+  }
+
+  /**
+   * Fetches the app's live data sources (the spec's `http` sources) that are due, or all of them with `force`.
+   * Data that comes back replaces the source's data in the running app; a source that fails keeps its last good data.
+   * Resolves { updated: [names], errors: [{ source, code, message }] }.
+   */
+  async refresh(session, id, { force = false } = {}) {
+    const r = this.running.get(key(session, id));
+    if (!r) return { updated: [], errors: [{ source: "", code: "not_running", message: "That app is not running" }] };
+    const updated = [], errors = [];
+    for (const [name, src] of Object.entries(r.spec.data ?? {})) {
+      if (src?.source !== "http") continue;
+      const info = (r.sources[name] ??= { at: 0 });
+      if (!force && info.at && this.now() - info.at < refreshEvery(src)) continue;
+      info.at = this.now();
+      try {
+        r.app.data[name] = await runSource(r.spec, name, { fetch: this.fetch, secrets: () => ({ refused: "unavailable" }), scope: { state: r.app.state, data: r.app.data } });
+        info.ok = true; delete info.error; updated.push(name);
+      } catch (e) {
+        const code = e instanceof RunError ? e.code : "fetch_failed";
+        info.ok = false; info.error = { code, message: String(e?.message ?? e).split("\n")[0] };
+        errors.push({ source: name, ...info.error });
+      }
+    }
+    return { updated, errors };
+  }
+
+  /** Checks every running app for due data. Call it on a timer. Tells `onChange` about apps whose data changed. */
+  async tick() {
+    for (const k of [...this.running.keys()]) {
+      const [session, id] = [k.slice(0, k.lastIndexOf("/")), k.slice(k.lastIndexOf("/") + 1)];
+      const out = await this.refresh(session, id);
+      if (out.updated.length) this.onChange?.(session, id, out);
+    }
+  }
+
+  /** What each live source last did, for the person or agent to see. */
+  sources(session, id) {
+    const r = this.running.get(key(session, id));
+    return r ? Object.entries(r.sources).map(([name, i]) => ({ name, every_ms: refreshEvery(r.spec.data[name]), last_at: i.at || null, ok: i.ok ?? null, ...(i.error ? { error: i.error } : {}) })) : [];
+  }
 
   /** Starts an app from a spec. Resolves { ok: true } or { ok: false, errors } with a JSON path and a fix for each problem. */
-  create(session, id, spec, { style = "android", reduceMotion = false } = {}) {
+  async create(session, id, spec, { style = "android", reduceMotion = false } = {}) {
     const made = createApp(spec, { style, reduceMotion });
     if (!made.ok) return { ok: false, errors: made.errors };
-    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, version: 1, history: [{ version: 1, at: Date.now() }] });
-    return { ok: true, warnings: made.app.render().warnings ?? [] };
+    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, version: 1, history: [{ version: 1, at: Date.now() }], sources: {} });
+    const live = await this.refresh(session, id, { force: true });
+    return { ok: true, warnings: made.app.render().warnings ?? [], data_errors: live.errors };
   }
 
   /**
@@ -55,7 +114,7 @@ export class SpecHost {
    * the new spec still has carry over. A spec with problems is refused with its errors and the running version is untouched.
    * Resolves { ok: true, version, from } or { ok: false, errors }.
    */
-  update(session, id, spec) {
+  async update(session, id, spec) {
     const cur = this.running.get(key(session, id));
     if (!cur) return { ok: false, errors: [{ path: "$", message: "That app is not running", fix: "Create it with create_app" }] };
     const keep = (names, from) => Object.fromEntries(Object.entries(from).filter(([k]) => names.includes(k)));
@@ -64,8 +123,9 @@ export class SpecHost {
     const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
     if (!made.ok) return { ok: false, errors: made.errors };
     const from = cur.version;
-    this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now() }] });
-    return { ok: true, version: from + 1, from, warnings: made.app.render().warnings ?? [] };
+    this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now() }], sources: {} });
+    const live = await this.refresh(session, id, { force: true });
+    return { ok: true, version: from + 1, from, warnings: made.app.render().warnings ?? [], data_errors: live.errors };
   }
 
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
