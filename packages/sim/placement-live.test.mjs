@@ -48,7 +48,7 @@ test("a weekly planner shows on weekdays and weekend plans on Saturday, by the p
   assert.match(mon, /"Weekend plans" \(wknd\): not showing now/);
   const sat = await at("2026-11-14T09:00:00");
   assert.match(sat, /button "Weekend plans"/); assert.doesNotMatch(sat, /button "Weekly planner"/);
-  assert.equal((await act("pl1", { action: "switch_app", id: "plan" })).ok, true);   // hidden apps still open by tool
+  assert.equal((await act("pl1", { action: "switch_app", id: "plan" })).ok, true);   // not showing on Saturday, still opens by tool
 });
 
 test("pin, hide and position change the order; errors are typed; changes are in device_log", async () => {
@@ -56,8 +56,10 @@ test("pin, hide and position change the order; errors are typed; changes are in 
   const order = (screen) => [...screen.matchAll(/button "([^"]+)"/g)].map((m) => m[1]).filter((n) => n !== "Store").join(",");
   await act("pl2", { action: "arrange_apps", id: "mail", pinned: true });
   assert.match(order((await act("pl2", { action: "arrange_apps", id: "plan", position: 0 })).home), /^Mail,Weekly planner,Weekend plans/);
-  await act("pl2", { action: "arrange_apps", id: "mail", hidden: true });
-  assert.doesNotMatch((await act("pl2", { action: "arrange_apps", id: "mail", hidden: true })).home, /button "Mail"/);
+  const hid = (await act("pl2", { action: "arrange_apps", id: "mail", hidden: true })).home;
+  assert.doesNotMatch(hid, /button "Mail"/);
+  assert.match(order(hid), /^Weekly planner,Weekend plans/);   // the pinned app is hidden, so the position order shows
+  assert.equal((await act("pl2", { action: "switch_app", id: "mail" })).ok, true);   // a hidden app still opens by tool
   assert.equal((await act("pl2", { action: "arrange_apps", id: "ghost", pinned: true })).code, "not_installed");
   assert.equal((await act("pl2", { action: "arrange_apps", id: "mail", position: -3 })).code, "bad_placement");
   assert.equal((await act("pl2", { action: "set_time", at: "tomorrow-ish" })).code, "bad_time");
