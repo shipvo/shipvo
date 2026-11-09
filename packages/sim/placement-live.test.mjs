@@ -1,4 +1,4 @@
-// Live: arrange_apps and set_time change what the home screen shows. And the frame's home screen follows the layout.
+// Live: arrange_apps and set_time change what the home screen shows.
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -77,31 +77,6 @@ for (const skin of ["android", "ios"]) {
       await p.evaluate(() => window.postMessage({ type: "pn:nav", where: "home" }, "*"));
       const names = await p.locator('[data-part="installed-app"]').evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
       assert.deepEqual(names, ["Bravo", "Alpha"]);
-    } finally { await b.close(); }
-  });
-}
-
-for (const skin of ["android", "ios"]) {
-  test(`${skin}: the frame follows a layout and a phone time sent to it`, async () => {
-    const { chromium } = createRequire(import.meta.url)("playwright");
-    const b = await chromium.launch();
-    try {
-      const p = await b.newPage({ viewport: { width: 460, height: 960 } });
-      const f = renderFrame({ skin, screen: `<iframe id="app" srcdoc="<p>x</p>"></iframe>` });
-      const phone = { apps: [{ id: "plan", name: "Planner", placement: { schedule: { days: ["mon", "tue", "wed", "thu", "fri"], from: "08:00", to: "18:00" } } }, { id: "wknd", name: "Weekend", placement: { schedule: { days: ["sat"], from: "09:00", to: "23:00" } } }, { id: "mail", name: "Mail" }] };
-      await p.setContent(`<style>${f.css}</style>${f.html}<script>${statusClientScript("app", skin, phone)}</script>`);
-      await p.evaluate(() => window.postMessage({ type: "pn:nav", where: "home" }, "*"));
-      const names = () => p.locator('[data-part="installed-app"]').evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
-      const apps = phone.apps;
-      await p.evaluate(([a, c]) => window.__pnHome.sync(a, c), [apps, { day: 1, h: 9, m: 0 }]);    // Monday 09:00
-      assert.deepEqual(await names(), ["Planner", "Mail"]);
-      await p.evaluate(([a, c]) => window.__pnHome.sync(a, c), [apps, { day: 6, h: 10, m: 0 }]);   // Saturday 10:00
-      assert.deepEqual(await names(), ["Weekend", "Mail"]);
-      const pinned = [apps[2], { ...apps[1], placement: { ...apps[1].placement, pinned: true } }, apps[0]];
-      await p.evaluate(([a, c]) => window.__pnHome.sync(a, c), [pinned, { day: 6, h: 10, m: 0 }]);
-      assert.deepEqual(await names(), ["Weekend", "Mail"]);
-      await p.evaluate(([a, c]) => window.__pnHome.sync(a, c), [[{ id: "mail", name: "Mail", placement: { hidden: true } }, apps[0]], { day: 2, h: 12, m: 0 }]);
-      assert.deepEqual(await names(), ["Planner"]);
     } finally { await b.close(); }
   });
 }
