@@ -6,9 +6,11 @@
 // Reads shipvo.json in the current directory (appId, name, controlPlane) when present.
 import http from "node:http";
 import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync } from "node:fs";
-import { join, extname, dirname } from "node:path";
+import { join, extname, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
+import { openBuild } from "./build-open.mjs";
+import { BuildCacheError } from "./build-cache.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { installNetGate } from "./net-gate.mjs";
@@ -66,6 +68,8 @@ async function resolveApp(spec) {
   return { app, url: `http://localhost:${PORT}/w/${app}/r${n}/index.html`, release: n };
 }
 mkdirSync(DIR, { recursive: true });
+const BUILD_DIR = join(DIR, "builds"), BUILDS = new Map();   // content id -> unpacked folder
+const BUILD_HOSTS = (process.env.PN_BUILD_ALLOW_HOSTS || "").split(",").map((h) => h.trim()).filter(Boolean);
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".ico": "image/x-icon", ".ttf": "font/ttf", ".css": "text/css" };
 // Chromium starts after the server is listening (see the end of this file). Handlers await this shared promise.
 const LAUNCH_TIMEOUT_MS = 60_000;
@@ -141,7 +145,15 @@ async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
   if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); sessions.delete(id); leaveRoom(old, id); }
-  const target = await resolveApp(opts.app);
+  let target, buildId;
+  if (opts.build_url != null) {
+    // Fetch the build before anything else is created, so a bad URL leaves no session behind.
+    const spec = /^([a-z0-9-]+)/.exec(String(opts.app || DEFAULT_APP)); if (!spec) throw new SimError("bad_app", `bad app spec "${opts.app}"`);
+    const b = await openBuild(String(opts.build_url), { dir: BUILD_DIR, allowHosts: BUILD_HOSTS, ...(Number(process.env.PN_BUILD_MAX_BYTES) > 0 ? { maxBytes: Number(process.env.PN_BUILD_MAX_BYTES) } : {}) });
+    BUILDS.set(b.id, b.root);
+    buildId = typeof opts.build === "string" && /^[\w-]{1,64}$/.test(opts.build) ? opts.build : b.id;
+    target = { app: spec[1], url: `http://localhost:${PORT}/b/${b.id}/index.html`, release: `build:${buildId}` };
+  } else target = await resolveApp(opts.app);
   const bk = backendOf(id, room);
   if (!room || !rooms.has(room)) { writeFileSync(join(DIR, `${bk}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${bk}.json.log`), ""); }
   if (room) { if (!rooms.has(room)) rooms.set(room, new Set()); rooms.get(room).add(id); }
@@ -180,6 +192,7 @@ async function newSession(id, opts = {}) {
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
   sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
+  if (buildId) sessions.get(id).build = buildId;
   watch.refresh();   // /watch viewers move to the new session unless they picked one
   } catch (e) {
     // A failed open leaves nothing behind: no ghost room member, no backend file.
@@ -223,7 +236,7 @@ async function reapplyNetProfile(s, page) {
 }
 const specHost = new SpecHost();
 const sidOf = (s) => [...sessions].find(([, v]) => v === s)?.[0];
-async function switchToApp(s, page, id) {
+async function switchToApp(s, page, id, fresh = false) {
   const url = s.apps.installed_apps.find((a) => a.id === id)?.url ?? "";
   // fixture: pages are stand-ins (no navigation). app://<id>[@rN] loads a published release like open_app. Anything else
   // must pass the same private-host guard as the Browser app, so a profile cannot point Chromium at the local network.
@@ -237,7 +250,7 @@ async function switchToApp(s, page, id) {
     catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
   }
   switchApp(s.apps, id, s.nav);
-  if (dest && page.url() !== dest) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  if (dest && (fresh || page.url() !== dest)) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
   await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
@@ -354,13 +367,17 @@ async function act(id, body) {
     case "create_app": {
       const appId = String(body.id ?? "");
       if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(appId)) throw new SimError("bad_app_id", "id: lowercase letters, digits and dashes, up to 40, starting with a letter or digit");
-      if (s.apps.installed_apps.some((a) => a.id === appId)) throw new SimError("already_installed", `'${appId}' is already installed. Use update_app to change it.`);
+      if (s.apps.installed_apps.some((a) => a.id === appId)) throw new SimError("already_installed", `'${appId}' is already installed. Uninstall it with uninstall_app first.`);
       const made = specHost.create(sidOf(s), appId, body.spec, { style: body.style === "ios" ? "ios" : "android" });
       if (!made.ok) throw new SimError("invalid_spec", made.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
       const nm = String(body.name ?? body.spec?.app?.name ?? appId).replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec" });
       s.apps.log.push({ at: Date.now(), name: "create_app", app: appId, source: "real", version: "1" });
-      if (body.open !== false) await switchToApp(s, page, appId);
+      if (body.open !== false) {
+        // If opening fails, the app is not left installed or running.
+        try { await switchToApp(s, page, appId, true); }
+        catch (e) { s.apps.installed_apps = s.apps.installed_apps.filter((a) => a.id !== appId); s.apps.log = s.apps.log.filter((l) => !(l.app === appId && l.name === "create_app")); specHost.drop(sidOf(s), appId); throw e; }
+      }
       return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
     }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
@@ -390,7 +407,7 @@ async function act(id, body) {
       const id = String(body.id ?? "");
       try {
         if (body.action === "install_app") installApp(s.apps, id, Array.isArray(body.catalog) ? body.catalog : s.apps.store);
-        else if (body.action === "uninstall_app") uninstallApp(s.apps, id, s.nav);
+        else if (body.action === "uninstall_app") { uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); }
         else {
           await switchToApp(s, page, id);
         }
@@ -574,6 +591,15 @@ const server = http.createServer(async (req, res) => {
       if (um) { const b = sessions.get(um[1])?.update.bundles.get(Number(um[2])); return b ? send(200, b, MIME[".html"]) : send(404, { error: "no_bundle" }); } }
     // a founder opening the printed link lands on the app
     if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/") { res.writeHead(302, { location: "/app/", ...CORS }); return res.end(); }
+    { const bm = url.pathname.match(/^\/b\/([0-9a-f]{64})\/(.*)$/);
+      if (bm) {
+        const root = BUILDS.get(bm[1]); if (!root) return send(404, { error: "no_build" });
+        let p = join(root, decodeURIComponent(bm[2]) || "index.html");
+        if (p !== root && !p.startsWith(root + sep)) return send(404, { error: "no_build" });
+        if (!existsSync(p) || statSync(p).isDirectory()) p = join(root, "index.html");
+        if (extname(p) === ".html") return send(200, withAppName(readFileSync(p, "utf8"), APP_NAME), MIME[".html"]);
+        return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
+      } }
     if (url.pathname.startsWith("/app/")) {
       let p = join(DIST, url.pathname.slice(5) || "index.html"); if (!existsSync(p) || statSync(p).isDirectory()) p = join(DIST, "index.html");
       if (extname(p) === ".html") return send(200, withAppName(readFileSync(p, "utf8"), APP_NAME), MIME[".html"]);
@@ -604,7 +630,7 @@ const server = http.createServer(async (req, res) => {
       if (sp) {
         const [, sid, app, isOp] = sp, key = decodeURIComponent(sid);
         if (!isOp && req.method === "GET") { const html = specHost.page(key, app); return html ? send(200, html, MIME[".html"]) : send(404, { error: "no_app" }); }
-        if (isOp && req.method === "POST") { let b = ""; for await (const ch of req) b += ch; let j = {}; try { j = JSON.parse(b || "{}"); } catch {} return send(200, specHost.op(key, app, j)); }
+        if (isOp && req.method === "POST") { let b = ""; for await (const ch of req) { b += ch; if (b.length > 65536) return send(413, { error: "too_large" }); } let j; try { j = JSON.parse(b || "{}"); } catch { return send(400, { error: "bad_json" }); } return send(200, specHost.op(key, app, j)); }
       } }
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
@@ -612,7 +638,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
     if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
     if (url.pathname === "/end") return send(200, { ok: true, ended: await endSession(String(body.session)) });
-    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room")) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, screen: await screen(s.page) }); }
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
