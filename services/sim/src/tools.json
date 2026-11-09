@@ -79,7 +79,7 @@
   },
   {
     "name": "arrange_apps",
-    "description": "Lay out an installed app on the home screen: pinned (first), hidden (not on the home screen, still opens with switch_app), position (0 first) and schedule (days, from, to: the app shows only then, e.g. a weekly planner Monday to Friday 08:00-18:00 and weekend plans on Saturday). Pass schedule: null to always show. Fails with not_installed or bad_placement. The home screen text says which apps are showing and why one is not. Logged in device_log.",
+    "description": "Lay out an installed app on the home screen: pinned (first), hidden (not on the home screen, still opens with switch_app), position (0 first) and schedule (days, from, to: the app shows only then, e.g. a weekly planner Monday to Friday 08:00-18:00 and weekend plans on Saturday). Leave days out or pass an empty list for every day. Pass schedule: null to always show. Fails with not_installed or bad_placement. The home screen text says which apps are showing and why one is not. Logged in device_log.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2169,7 +2169,7 @@
   },
   {
     "name": "set_phone_time",
-    "description": "Set the phone's clock to a time like 2026-11-14T09:00:00 so scheduled apps show or hide as they would then, or pass null to go back to the real time. Fails with bad_time.",
+    "description": "Set the phone's clock to a time like 2026-11-14T09:00:00 so scheduled apps show or hide as they would then, or pass null to go back to the real time. The clock stays at the time you set; it does not tick. Fails with bad_time.",
     "inputSchema": {
       "type": "object",
       "properties": {
