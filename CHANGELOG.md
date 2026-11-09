@@ -2,6 +2,97 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## 2026-11-09 (release)
+
+- **@shipvo/cli 0.1.8**: ci: a fix that turns a failing flow green publishes to the first band; sim: /watch shows the agent's steps and Take over; shipvo sim opens it; init: point next-step text at the local MCP entry; cli: shipvo agents setup --hosted writes the remote MCP config per agent; cli: shipvo eval run and report score agents on app tasks
+- **@shipvo/device 0.1.6**: device: payment cancel comes back as cancelled; unknown results no longer become insufficient_funds; sim: Linking.openURL delivers links to the owning app, one launch only (slice 2 of #930)
+- **@shipvo/mcp 0.0.12**: sim + mcp: shared rooms, so phones in one room share one backend; docs: test your local build on the hosted phone (upload_build); mcp: test the build on your machine on the hosted phone (upload_build, app@build:<id>); mcp: open_app starts or switches the phone (platform, show) and every session tool works on it; agents setup: start the MCP server from the local file (slice 1 of #1141)
+- **@shipvo/sim 0.1.8**: sim: /watch shows the agent's steps and Take over; shipvo sim opens it; sim: /watch page streams the agent's phone live, view only; sim + mcp: shared rooms, so phones in one room share one backend; sim: network off blocks the app's network calls in sim and MCP sessions; sim: Linking.openURL delivers links to the owning app, one launch only (slice 2 of #930)
+- **@shipvo/spec 0.0.4**: apps: Calendar first-party spec app (slice 4b of #843); spec: kanban and timeline blocks (slice 5a of #839); docs: spec blocks, network-off behaviour, roadmap and ledger catch-up; spec: stat, progress, card, section, toggle, segmented and sheet navigation
+
+### Changes
+
+- chess: Expo shell (`app.json`, entry point, Metro config) and `pnpm --filter chess build`, which exports the web build that `shipvo sim` loads on the Android and iOS skins. The running app exposes its typed actions as `globalThis.chess`.
+- `scripts/first-run/run-time.mjs`: times `shipvo run android` and `shipvo run ios` and prints one table with a column for each. `run-time.json` is now `{ "android": [...], "ios": [...] }` instead of one array.
+- Migration: none for users; only readers of `run-time.json` are affected.
+- agents: `shipvo agents setup` adds `@shipvo/mcp` as a dev dependency and writes `node node_modules/@shipvo/mcp/dist/server.js` with `PN_SIM`, so the server starts without an npm check or download. `--npx` stops with a clear message when no `@shipvo/mcp` is installed; otherwise it writes a pinned `npx -y @shipvo/mcp@<version>` entry. Migration: run `shipvo agents setup` again to replace an old `npx -y @shipvo/mcp` entry.
+- mcp: `@shipvo/mcp` exports `.` and `./server` (both `dist/server.js`) and `./package.json`. Migration: deep imports such as `@shipvo/mcp/dist/...` are not exported; import `@shipvo/mcp` or `@shipvo/mcp/server`. `serverInfo.version` now reports the package version.
+- cli: `shipvo mcp` prints the local entry.
+- `@shipvo/cli`: `shipvo agents setup` writes the Shipvo MCP server into the config of Claude Code, Cursor, VS Code / Copilot, Gemini CLI, Qwen Code, Roo Code, Kiro and opencode (merged, other servers kept). `--global` also writes Codex CLI and Windsurf; Claude Desktop, Cline, Zed, Goose, Continue and Amp get a block to paste. New flags: `--for`, `--all`, `--global`; `--json` now has an `agents` list.
+- Migration: none; `.mcp.json` is still written, `.cursor/mcp.json` when Cursor is found.
+- `@shipvo/sim`: with the network off (`set_device` network off, airplane mode, Wi-Fi and mobile data off, or the offline network profile), the app's `fetch` and `XMLHttpRequest` calls to other origins now fail with `TypeError: Network request failed`, like on a phone. Slow network profiles still add their latency once. This applies to `shipvo sim`, `@shipvo/mcp` and `@shipvo/test` sessions.
+- Migration: none.
+- `@shipvo/device`: a payment `nextResult` the simulator does not know now throws instead of coming back as `insufficient_funds`.
+- Migration: versions before 0.1.5 return `insufficient_funds` for `payment.nextResult: "cancel"`. Update the app's `@shipvo/device` to 0.1.5 or newer. The app template pins `^0.1.0`, so an old version can stay in an app's lockfile; update the lockfile (`pnpm update @shipvo/device`, or the npm/yarn equivalent).
+- cli: the `shop` template of `shipvo init` has a fuller checkout: plain-words payment errors, an offline message, plus and minus on cart lines, Undo after Remove, and an order confirmation screen with a Back to shop button.
+- `open_app` takes `platform: "android" | "ios"` and `show: true | false`. It opens the phone in the user's browser so they can watch: it starts `shipvo run <platform>` from the nearest folder with `shipvo.json` when none is live. With `show` unset it does this only on a computer with a desktop whose project has `shipvo` installed; `show: true` also works through `npx`. A live run on the other platform is attached as it is and the result says so.
+- `open_app` results carry `visible:` and the phone's URL; `list_apps` shows the visible phone; `record_start` records the attached phone. `open_app` refuses with `unknown_app` when the project's run is for another app.
+- Migration: none. `SHIPVO_RUN_COMMAND` (JSON array) replaces the command that starts the run.
+- `open_app` starts a run only from a local (stdio) server. A server over HTTP never starts a process, whatever `show` is.
+- `list_apps` now ends with a `Phone:` line saying which phone is visible (or that none is). Clients that parse the list should ignore that line.
+- `@shipvo/mcp`: new tool `upload_build` builds your project with the simulated device and uploads it for your key. Builds are private to your account and deleted when they expire.
+- `@shipvo/cli`: `shipvo sim --hosted` builds and uploads from the terminal and prints the build id.
+- Migration: none; new tool and flag.
+- site: shipvo.dev/demos/chess/ shows an Android phone and an iPhone playing chess in the browser, with a clock per side and a move list. Press "Play against it" to take white. It is static files only. Migration: none.
+- chess: `pnpm --filter chess demo -- --agents` starts the Android and iOS phones as live runs for two MCP assistants, prints each side's config and prompt, enforces turn order and a move time limit, and `--record` records the game and writes a PGN. See `docs/demos/chess.md`.
+- cli: `shipvo init` next-step text now points at `node node_modules/@shipvo/mcp/dist/server.js`, the entry `shipvo agents setup` writes, instead of `npx -y @shipvo/mcp`.
+- Docs: new tutorial "Play chess on two phones" with screenshots, and two glossary entries (build, pnpm).
+- Migration: none.
+- `shipvo eas setup`: the iOS build config uses only EAS built-in functions (removed `eas/prebuild_credentials_ios`, which EAS does not have) and reads the Apple team id with EAS's output syntax.
+- `@shipvo/mcp`: `open_app` takes `room`. Sessions opened with the same room on the same simulator share one mock backend (orders, content, telemetry). Without `room`, each session keeps its own backend.
+- `@shipvo/mcp`: `list_sessions` shows app, platform, room, who opened each session (the MCP client name), start time and current screen title, and returns them as structured content.
+- `@shipvo/mcp`: `end_session` ends the session in the simulator; a room ends with its last session. The report includes the room.
+- Migration: none; `room` is optional.
+- `@shipvo/cli`: new `shipvo eval run <task> --agent <name>` and `shipvo eval report`. Run any agent or model on a task file (`tasks/<name>.task.json`) and get scores that Shipvo measures: success per check, steps, time, errors, retries and findings. The report is Markdown and JSON, with links to each run's steps and recording. Two sample tasks on the shop template are in `tasks/`.
+- Migration: none; new command.
+- `@shipvo/sim`: new `/watch` page shows the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and is view only. The screencast runs only while someone watches; `/sessions` now reports `skin` and `streaming`.
+- Migration: none.
+- cli: `shipvo agents setup --hosted` writes the hosted Shipvo phone (remote MCP URL plus `Authorization` header) into each agent's config, and signs you in first if there is no key. Claude Desktop and ChatGPT get the key-in-path URL. Project files that git tracks or does not ignore are never written; the block is printed with the reason. Printed output never shows the key. No migration needed.
+- `@shipvo/sim` (sim.shipvo.dev): the hosted MCP serves OAuth discovery (`/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server`) and dynamic client registration (`POST /register`, https or loopback redirect URIs). Tool calls without a key get a `401` with a `WWW-Authenticate` header that points to the metadata. `initialize` and `tools/list` stay open; API keys work as before.
+- Migration: apply `services/sim/migrations/0001_oauth_clients.sql` to the D1 database before deploying.
+- `@shipvo/sim`: `/watch` lists the agent's steps as they happen, with a line for how the screen changed. A "Take over" toggle (off by default) sends your taps, swipes and typing to the phone. Android and iOS.
+- `shipvo sim` prints "Watch the agent: http://localhost:4545/watch" and opens it. `--no-open` and `--json` do not open it; the JSON result has `watch_url`.
+- Migration: none.
+- `services/sim`: the hosted MCP has `GET /authorize` (PKCE S256 required, GitHub sign-in) and `POST /token`. The token is the same per-account key as `shipvo login` (hashed, 30 days, revocable); a new sign-in replaces the account's earlier test key. Codes are single use and last 5 minutes.
+- Migration: apply `services/sim/migrations/0002_oauth_codes.sql` (adds a table). Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` on the sim Worker.
+- site: new product page at `/products/simulators/`: Android and iOS simulators on your own machine or CI runner, with the measured numbers, a drag-to-explore chart and animated demos. It is linked from the Product menu and the footer.
+- sim: `scripts/sim-bench/scale.mjs` opens simulators in batches and records memory and start time. The first published run opened 110 at once on a 2-CPU, 7.8 GB machine, at 57.1 MB each (`docs/product/sim-bench/`).
+- Migration: none.
+- site: new /playground/ page with a sample app on an Android or iOS phone, dark mode, large text and right-to-left switches, and a feature sidebar with deep links such as /playground/#ota. Linked from the Product menu and the homepage.
+- `@shipvo/control-plane`: added a SAML 2.0 response verifier (`verifySamlResponse`) that checks the signature, issuer, audience, time window, `InResponseTo` and replayed ids, and maps the user to a role like OIDC does. It refuses unsigned assertions, signature wrapping and DTDs. It is not wired to a route yet.
+- Migration: none.
+- `@shipvo/cli`: new `shipvo ci fix` runs `shipvo test` and, when every flow passes, publishes to the first band (`b0`, 1%) and posts the release id to the check comment. A red flow publishes nothing and the comment names it. It never publishes above the first band or the policy. See `docs/ci-check.md`.
+- Migration: none.
+- `docs/run.md`: new "How fast it starts" section with the measured time to a tapped phone for Android and iOS, linked to the CI run.
+- `@shipvo/sim`: `open_url` switches to the app that owns the link and hands it the URL once, as its initial URL, then sends the `url` event. A later switch or reload does not see the link.
+- `@shipvo/device`: `Linking.openURL` on the simulated device hands a link for another installed app to the simulator, which switches to that app and delivers it once. The log entry is marked simulated.
+- Migration: none.
+- `@shipvo/spec`: new `kanban` block (columns, cards with title and detail, `onMove` action) and `timeline` block (dated entries grouped by day). Both appear in the labelled screen tree on the Android and iPhone skins, and the validator checks columns and dates with a path and a fix.
+- `@shipvo/spec`: `App.move(card, column)` moves a kanban card and runs its `onMove` action.
+- Migration: none; new block types and a new method.
+- `@shipvo/spec`: new blocks `stat`, `progress` (bar or ring), `card`, `section`, `divider`, `toggle` and `segmented`, in Android and iOS styles. Toggle and segmented need `label` and `bind` to a declared state value, and show their current value in the screen tree.
+- `@shipvo/spec`: `{ "navigate": "<screen>", "presentation": "sheet" }` opens a screen as a bottom sheet; `back` closes it. `createApp` gains `toggle(label, value?)` and `select(label, option)`, and now starts `app.state` with the spec's state defaults.
+- Migration: none for specs. Code that read `app.state` before any change now sees declared defaults instead of an empty object.
+- `templates/calendar`: Calendar, the second first-party spec app. The Day tab shows one day (today, or a date you pick). The Month tab shows last, this or next month with a month label. It has an event form and the actions `create_event`, `list_events`, `show_day` and `delete_event`. Events live in phone storage and use the phone's time zone.
+- Migration: none; new template.
+- docs: `@shipvo/spec` README lists the new blocks (`stat`, `progress`, `card`, `section`, `divider`, `toggle`, `segmented`) and sheet navigation; the Device API guide says what happens to the app's requests when the network is off.
+- Migration: none.
+- chess: `pnpm --filter chess demo` starts an Android phone and an iOS phone side by side on the chess app, with a move timer per side and an optional `--autoplay` full game. See `docs/demos/chess.md`.
+- capacitor-sample: launch hook shows the active bundle version in `#version` and the log; the app starts Shipvo on Android and iOS.
+- capacitor-sample: `scripts/ios-sim-check.sh` runs apply, rollback and refused-bad-signature cases on the iOS Simulator.
+- Docs: "Check every pull request" now says who it is for and has Troubleshooting and Next steps; `shipvo explore --save-tests` is in the Agents guide; the glossary has agents setup, deep link, Save as test and app spec.
+- docs: seven finished pages are now in the docs sidebar, search and `llms.txt`: auto-halt, single sign-on, taking real orders, OTA updates on the phone, network calls on the hosted phone, migrate from EAS Update, and the record-a-demo-video worked example.
+- docs: "Build your first app" and "Check every pull request" open with who they are for and end with a Troubleshooting table (messages taken from the CLI and the App Builder reports) and Next steps; the roadmap lists the agents-together epic (#1188).
+- Docs: new page "App spec: screens and controls" (stat, progress, card, section, toggle, segmented, sheets) with a checked example, and `@shipvo/spec` in the Reference sidebar.
+- docs: new page "Test your build on the hosted phone" covers `upload_build`, `shipvo sim --hosted`, `app@build:<id>`, errors and troubleshooting.
+- docs: new page "Score an agent on an app task" covers `shipvo eval run` and `shipvo eval report`: options, task file, check types, scoring and troubleshooting.
+- Docs: `docs/test-your-build.md` and the CLI troubleshooting list now say that `shipvo login` followed by `shipvo mcp` shows the API key for hosted build upload.
+- docs: Agents and Test your app in CI pages now have Troubleshooting (real error messages) and Next steps sections.
+- Docs: "Data sources that use a saved key" section in the app spec page (`auth`, the four key types, `secret_missing`, `secret_revoked`, `secret_domain`), and a short section on the shop template checkout in Getting started.
+- docs: the agents page covers rooms (several phones sharing one backend), the `room` option of `open_app` and the `list_sessions` columns; the glossary defines Room; `shipvo agents setup --hosted` is listed in the coverage ledger.
+- docs: the chess demo page is in the docs sidebar with a link to the live page and a Troubleshooting section; Device API documents what happens with the network off and the `cancelled` payment result (with the 0.1.5 migration note); the roadmap Now and Shipped lists and the content ledger are current.
+- `@shipvo/cli`: `shipvo run` now notices when a browser tab closes without a WebSocket close frame and frees that connection.
+
 ## 2026-11-07 (release)
 
 - **@shipvo/capacitor 0.0.3**: capacitor: iOS plugin class and sample wiring (slice 2 of #985); capacitor: iOS Swift bundle verify, store and rollback with tests (slice 1 of #985)

@@ -1,2 +1,0 @@
-- Docs: new tutorial "Play chess on two phones" with screenshots, and two glossary entries (build, pnpm).
-- Migration: none.

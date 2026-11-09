@@ -1,3 +1,0 @@
-- `@shipvo/mcp`: new tool `upload_build` builds your project with the simulated device and uploads it for your key. Builds are private to your account and deleted when they expire.
-- `@shipvo/cli`: `shipvo sim --hosted` builds and uploads from the terminal and prints the build id.
-- Migration: none; new tool and flag.
