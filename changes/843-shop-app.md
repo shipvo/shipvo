@@ -1,0 +1,2 @@
+- `@shipvo/spec`: new first-party Shop spec app in `templates/shop` with `add_product`, `find_products`, `place_order` and `list_orders`, and a currency setting.
+- Migration: none; new template.
