@@ -1,0 +1,348 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "files-photos",
+    "name": "Files and Photos",
+    "icon": "folder",
+    "description": "Keep files and photos in one place and find one fast."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable",
+    "elevation": "soft"
+  },
+  "data": {
+    "items": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "seq": "number",
+        "name": "text",
+        "kind": "text",
+        "album": "text",
+        "size": "number",
+        "added": "text",
+        "notes": "text"
+      },
+      "seed": []
+    },
+    "shown": {
+      "source": "computed",
+      "value": "{{ state.query == '' ? items : items.filter(p, lower(p.name + ' ' + p.album + ' ' + p.notes).contains(lower(state.query))) }}"
+    },
+    "photos": {
+      "source": "computed",
+      "value": "{{ shown.filter(p, p.kind == 'photo') }}"
+    },
+    "files": {
+      "source": "computed",
+      "value": "{{ shown.filter(p, p.kind == 'file') }}"
+    }
+  },
+  "state": {
+    "query": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Files and Photos",
+      "body": [
+        {
+          "type": "form",
+          "label": "Find an item form",
+          "submit": {
+            "label": "Find",
+            "action": "show_matches"
+          },
+          "fields": [
+            {
+              "name": "query",
+              "type": "text",
+              "label": "Find by name, album or notes; leave empty to show all",
+              "maxLength": 200
+            }
+          ]
+        },
+        {
+          "type": "badge",
+          "value": "{{ count(photos) }} photos, {{ count(files) }} files"
+        },
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Photos"
+        },
+        {
+          "type": "list",
+          "label": "Photos",
+          "from": "{{ sortBy(photos, 'album') }}",
+          "item": {
+            "title": "{{ item.name }}",
+            "subtitle": "{{ item.album == '' ? 'No album' : item.album }}, {{ formatDate(item.added, 'date') }}, {{ item.size }} KB, Id {{ item.id }}"
+          },
+          "empty": {
+            "message": "No photos"
+          }
+        },
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Files"
+        },
+        {
+          "type": "list",
+          "label": "Files",
+          "from": "{{ sortBy(files, 'album') }}",
+          "item": {
+            "title": "{{ item.name }}",
+            "subtitle": "{{ item.album == '' ? 'No album' : item.album }}, {{ formatDate(item.added, 'date') }}, {{ item.size }} KB, Id {{ item.id }}"
+          },
+          "empty": {
+            "message": "No files"
+          }
+        },
+        {
+          "type": "form",
+          "label": "New item form",
+          "submit": {
+            "label": "Save item",
+            "action": "save_file"
+          },
+          "fields": [
+            {
+              "name": "name",
+              "type": "text",
+              "label": "Name",
+              "required": true,
+              "maxLength": 200
+            },
+            {
+              "name": "kind",
+              "type": "choice",
+              "label": "Kind",
+              "options": [
+                "file",
+                "photo"
+              ],
+              "required": true
+            },
+            {
+              "name": "album",
+              "type": "text",
+              "label": "Album",
+              "maxLength": 100
+            },
+            {
+              "name": "size",
+              "type": "number",
+              "label": "Size in KB"
+            },
+            {
+              "name": "notes",
+              "type": "text",
+              "label": "Notes",
+              "maxLength": 1000
+            }
+          ]
+        },
+        {
+          "type": "form",
+          "label": "Move item form",
+          "submit": {
+            "label": "Move item",
+            "action": "move_to_album"
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": "text",
+              "label": "Item id (shown under each item)",
+              "required": true,
+              "maxLength": 20
+            },
+            {
+              "name": "album",
+              "type": "text",
+              "label": "Album",
+              "required": true,
+              "maxLength": 100
+            }
+          ]
+        },
+        {
+          "type": "form",
+          "label": "Delete item form",
+          "submit": {
+            "label": "Delete item",
+            "action": "delete_file"
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": "text",
+              "label": "Item id (shown under each item)",
+              "required": true,
+              "maxLength": 20
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "save_file": {
+      "description": "Save a file or photo entry. Kind is file or photo. Album is optional. Size is in KB. Added date is today.",
+      "input": {
+        "name": {
+          "type": "text"
+        },
+        "kind": {
+          "type": "enum",
+          "options": [
+            "file",
+            "photo"
+          ]
+        },
+        "album": {
+          "type": "text",
+          "default": ""
+        },
+        "size": {
+          "type": "number",
+          "default": 0
+        },
+        "notes": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "items",
+          "value": {
+            "id": "{{ 'f' + string(count(items) == 0 ? 1 : last(sortBy(items, 'seq')).seq + 1) }}",
+            "seq": "{{ count(items) == 0 ? 1 : last(sortBy(items, 'seq')).seq + 1 }}",
+            "name": "{{ input.name }}",
+            "kind": "{{ input.kind }}",
+            "album": "{{ input.album }}",
+            "size": "{{ input.size }}",
+            "added": "{{ formatDate(today(), 'iso') }}",
+            "notes": "{{ input.notes }}"
+          }
+        },
+        {
+          "toast": "Item saved"
+        },
+        {
+          "return": {
+            "id": "{{ last(items).id }}"
+          }
+        }
+      ]
+    },
+    "find_files": {
+      "description": "Find files and photos. Text matches the name, album and notes. Kind (file or photo), album, from and to (days like 2026-11-10) are optional; leave them empty to skip. Results are newest first.",
+      "input": {
+        "text": {
+          "type": "text",
+          "default": ""
+        },
+        "kind": {
+          "type": "text",
+          "default": ""
+        },
+        "album": {
+          "type": "text",
+          "default": ""
+        },
+        "from": {
+          "type": "text",
+          "default": ""
+        },
+        "to": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "items": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "items": "{{ sortBy(items.filter(p, (input.text == '' || lower(p.name + ' ' + p.album + ' ' + p.notes).contains(lower(input.text))) && (input.kind == '' || p.kind == input.kind) && (input.album == '' || lower(p.album) == lower(input.album)) && (input.from == '' || (p.added != '' && startOf('day', p.added) >= startOf('day', input.from))) && (input.to == '' || (p.added != '' && startOf('day', p.added) <= startOf('day', input.to)))), 'seq', 'desc') }}"
+          }
+        }
+      ]
+    },
+    "move_to_album": {
+      "description": "Move a file or photo to an album, by its id.",
+      "input": {
+        "id": {
+          "type": "text"
+        },
+        "album": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "update": "items",
+          "where": "item.id == input.id",
+          "value": {
+            "album": "{{ input.album }}"
+          }
+        },
+        {
+          "toast": "Item moved"
+        }
+      ]
+    },
+    "show_matches": {
+      "description": "Show only items whose name, album or notes contain the text on the screen. Leave it empty to show all.",
+      "input": {
+        "query": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "do": [
+        {
+          "set": "state.query",
+          "value": "{{ input.query }}"
+        }
+      ]
+    },
+    "delete_file": {
+      "description": "Remove a file or photo, by its id.",
+      "input": {
+        "id": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "delete": "items",
+          "where": "item.id == input.id"
+        },
+        {
+          "toast": "Item deleted"
+        }
+      ]
+    }
+  }
+}
