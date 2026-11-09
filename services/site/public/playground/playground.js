@@ -8,7 +8,7 @@
   ["dark", "large", "rtl"].forEach(function (k) { if (q.get(k) === "1") state[k] = true; });
 
   function send() { try { phone.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} replay(); }
-  function loadPhone() { if (phone.hidden) return; phone.title = state.platform === "ios" ? "iOS phone" : "Android phone"; phone.src = phone.getAttribute("data-src-" + state.platform); }
+  function loadPhone() { if (phone.hidden) return; phone.title = state.platform === "ios" ? "iOS phone" : "Android phone"; phone.src = phone.getAttribute("data-src-" + state.platform); phone.setAttribute("data-loaded", state.platform); }
   phone.addEventListener("load", function () { send(); setTimeout(send, 300); });
   window.addEventListener("message", function (e) {
     if (!e.data || e.data.type !== "pg:ready") return;
@@ -209,7 +209,7 @@
     if (f.id === "many") manyPanel(panel);
     var grid = $("pg-grid"), isMany = f.id === "many";
     grid.hidden = !isMany; phone.hidden = isMany;
-    if (isMany) renderGrid(); else if (!phone.getAttribute("src")) loadPhone();
+    if (isMany) renderGrid(); else if (!phone.getAttribute("src") || phone.getAttribute("data-loaded") !== state.platform) loadPhone();
     panel.setAttribute("data-feature", f.id);
   }
   // OTA walkthrough. Every number comes from /playground/ota-run.json, which the site build records from the real signer,

@@ -213,6 +213,15 @@ try {
   await page2.goto(`${base}/playground/#overview`);
   await page2.waitForFunction(() => document.getElementById("pg-panel").getAttribute("data-feature") === "overview");
   assert.equal(await page2.locator("#pg-phone").isVisible(), true, "single phone is back on #overview");
+  // Platform picked on #many reaches the single phone when it comes back.
+  await page2.goto(`${base}/playground/#overview`);
+  await page2.waitForFunction(() => document.getElementById("pg-phone").getAttribute("data-loaded") === "android");
+  await page2.locator("#pg-side a[data-feature=\"many\"]").click();
+  await page2.waitForFunction(() => document.getElementById("pg-panel").getAttribute("data-feature") === "many");
+  await page2.locator("#pg-ios").click();
+  await page2.locator("#pg-side a[data-feature=\"overview\"]").click();
+  await page2.waitForFunction(() => document.getElementById("pg-phone").getAttribute("data-loaded") === "ios");
+  assert.match(await page2.locator("#pg-phone").getAttribute("src"), /ios/i, "single phone follows the platform chosen on #many");
   await page2.close();
   console.log("playground: many phones and shareable links work");
   console.log("playground: platform switch, dark, large text, RTL and deep links work");
