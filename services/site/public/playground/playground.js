@@ -44,6 +44,60 @@
   }
   function replay() { Object.keys(chosen).forEach(function (k) { sendDevice(k, chosen[k]); }); }
 
+  // Agent panel. Tool names and result shapes follow @shipvo/mcp-tools (screen, tap, type, device_log). The phone runs each call.
+  var TOOLS = [
+    { name: "screen", args: [] }, { name: "tap", args: [["ref", "e1"]] },
+    { name: "type", args: [["ref", "e4"], ["text", "Leave at the door"]] }, { name: "device_log", args: [] }
+  ];
+  var calls = {}, callId = 0;
+  window.addEventListener("message", function (e) {
+    var d = e.data; if (e.source !== phone.contentWindow || !d || d.type !== "pg:tool:result" || !calls[d.id]) return;
+    calls[d.id](d.result); delete calls[d.id];
+  });
+  function callTool(tool, args) {
+    return new Promise(function (res) {
+      var id = ++callId, t = setTimeout(function () { delete calls[id]; res({ error: "timeout" }); }, 5000);
+      calls[id] = function (r) { clearTimeout(t); res(r); };
+      try { phone.contentWindow.postMessage({ type: "pg:tool", id: id, tool: tool, args: args }, "*"); } catch (e) {}
+    });
+  }
+  function agentPanel(panel) {
+    var form = document.createElement("form"); form.className = "pg-console";
+    var sel = document.createElement("select"); sel.id = "pg-tool"; sel.setAttribute("aria-label", "Tool");
+    TOOLS.forEach(function (t) { var o = document.createElement("option"); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
+    var argBox = document.createElement("div"); argBox.id = "pg-args";
+    function paintArgs() {
+      argBox.textContent = "";
+      TOOLS.filter(function (t) { return t.name === sel.value; })[0].args.forEach(function (a) {
+        var l = document.createElement("label"); l.textContent = a[0] + " "; var i = document.createElement("input");
+        i.name = a[0]; i.value = a[1]; i.setAttribute("data-arg", a[0]); l.appendChild(i); argBox.appendChild(l);
+      });
+    }
+    sel.addEventListener("change", paintArgs); paintArgs();
+    var run = document.createElement("button"); run.type = "submit"; run.id = "pg-run"; run.textContent = "Run tool";
+    var out = document.createElement("pre"); out.id = "pg-out"; out.setAttribute("aria-label", "Tool result"); out.textContent = "Pick a tool and run it.";
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault(); var args = {};
+      Array.prototype.forEach.call(argBox.querySelectorAll("input"), function (i) { args[i.getAttribute("data-arg")] = i.value; });
+      callTool(sel.value, args).then(function (r) { out.textContent = JSON.stringify(r, null, 2); });
+    });
+    form.appendChild(sel); form.appendChild(argBox); form.appendChild(run); panel.appendChild(form); panel.appendChild(out);
+    var lumi = document.createElement("button"); lumi.type = "button"; lumi.id = "pg-lumi"; lumi.textContent = "Watch Lumi";
+    var cap = document.createElement("ol"); cap.id = "pg-captions"; cap.setAttribute("aria-label", "Lumi captions");
+    var steps = [["Lumi reads the screen.", "screen", {}], ["Lumi taps Add Spinning rod to cart.", "tap", { ref: "e1" }], ["Lumi taps Add Tackle box to cart.", "tap", { ref: "e2" }], ["Lumi taps Add Tide chart to cart.", "tap", { ref: "e3" }]];
+    lumi.addEventListener("click", function () {
+      lumi.disabled = true; cap.textContent = "";
+      steps.reduce(function (p, s) {
+        return p.then(function () {
+          var li = document.createElement("li"); li.textContent = s[0]; cap.appendChild(li);
+          return callTool(s[1], s[2]).then(function (r) { out.textContent = JSON.stringify(r, null, 2); return new Promise(function (ok) { setTimeout(ok, 600); }); });
+        });
+      }, Promise.resolve()).then(function () { lumi.disabled = false; lumi.setAttribute("data-done", "true"); });
+      lumi.removeAttribute("data-done");
+    });
+    panel.appendChild(lumi); panel.appendChild(cap);
+  }
+
   function paintBar() {
     $("pg-android").setAttribute("aria-pressed", String(state.platform === "android"));
     $("pg-ios").setAttribute("aria-pressed", String(state.platform === "ios"));
@@ -63,6 +117,7 @@
     var p = document.createElement("p"); p.textContent = f.text; panel.appendChild(p);
     if (f.doc) { var a = document.createElement("a"); a.className = "link"; a.href = f.doc; a.textContent = "Read the docs"; panel.appendChild(a); }
     if (f.id === "device") deviceControls(panel);
+    if (f.id === "agent") agentPanel(panel);
     panel.setAttribute("data-feature", f.id);
   }
   window.addEventListener("hashchange", show);

@@ -39,6 +39,7 @@ ul.dev{margin-top:14px}ul.dev li{padding:8px 14px}
 <li><span>Tackle box</span><button type="button" data-item="Tackle box" aria-label="Add Tackle box to cart">Add</button></li>
 <li><span>Tide chart</span><button type="button" data-item="Tide chart" aria-label="Add Tide chart to cart">Add</button></li>
 </ul>
+<p><label>Order note <input type="text" data-testid="note-field" aria-label="Order note" style="font:inherit;min-height:44px;box-sizing:border-box;width:100%;border-radius:12px;border:1px solid var(--accent);background:var(--card);color:var(--fg);padding:0 12px"></label></p>
 <p role="status" data-testid="cart">Cart: 0 items</p>
 <ul class="dev" aria-label="Device">
 <li data-testid="location">Location: not set</li><li data-testid="camera">Camera: not set</li><li data-testid="biometrics">Biometrics: not set</li>
@@ -48,8 +49,17 @@ ul.dev{margin-top:14px}ul.dev li{padding:8px 14px}
 <script>
 var n=0,c=document.querySelector('[data-testid=cart]');
 document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-item]");if(!b)return;n++;c.textContent="Cart: "+n+(n===1?" item":" items")});
+var log=[];
+function els(){return Array.prototype.map.call(document.querySelectorAll("button[data-item],input[data-testid=note-field]"),function(x,i){return {ref:"e"+(i+1),role:x.tagName==="INPUT"?"textbox":"button",name:x.getAttribute("aria-label"),el:x}})}
+function scr(){return {elements:els().map(function(x){var o={ref:x.ref,role:x.role,name:x.name};if(x.role==="textbox")o.value=x.el.value;return o}),text:[c.textContent]}}
+function runTool(t,a){a=a||{};if(t==="screen")return scr();if(t==="device_log")return {entries:log.slice()};
+var m=els().filter(function(x){return x.ref===a.ref})[0];if(!m)return {error:"no_such_ref",message:"No element "+a.ref+" on this screen. Call screen for the current refs."};
+if(t==="tap"){if(m.role!=="button")return {error:"not_tappable",message:m.ref+" is a "+m.role};m.el.click();return scr()}
+if(t==="type"){if(m.role!=="textbox")return {error:"not_a_field",message:m.ref+" is not a text field"};m.el.value=String(a.text==null?"":a.text);var r=scr();r.value=m.el.value;return r}
+return {error:"unknown_tool",message:t}}
+addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:tool")return;parent.postMessage({type:"pg:tool:result",id:d.id,result:runTool(d.tool,d.args)},"*")});
 var L={Lisbon:"Lisbon",Douala:"Douala",Tokyo:"Tokyo"},W={accepted:"success",rejected:"failed",unavailable:"unavailable"},P={approved:"approved",declined:"declined",timeout:"timeout"},ni=0;
-function put(k,t){document.querySelector("[data-testid="+k+"]").textContent=t}
+function put(k,t){log.push(k+": "+t);document.querySelector("[data-testid="+k+"]").textContent=t}
 addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:device")return;var v=d.value;
 if(d.kind==="location"&&L[v])put("location","Location: "+L[v]);
 else if(d.kind==="camera")put("camera",v==="denied"?"Camera: permission denied":"Camera: sample photo, "+v);
@@ -83,6 +93,7 @@ ${f.css}
 function fit(){var s=Math.min(1,innerWidth/${f.outerWidth},innerHeight/${f.outerHeight}),e=document.getElementById("fit");e.style.width="${f.outerWidth}px";e.style.height="${f.outerHeight}px";e.style.transform="translate(-50%,-50%) scale("+s+")"}
 addEventListener("resize",fit);fit();
 var last={},dev={};
+addEventListener("message",function(e){var d=e.data,a=document.getElementById("app");if(!d||!a||!a.contentWindow)return;if(d.type==="pg:tool"&&e.source!==a.contentWindow)a.contentWindow.postMessage(d,"*");else if(d.type==="pg:tool:result"&&e.source===a.contentWindow)parent.postMessage(d,"*")});
 addEventListener("message",function(e){var d=e.data;if(!d||d.type!=="pg:device")return;if(d.kind!=="notification")dev[d.kind]=d.value;var a=document.getElementById("app");if(a&&a.contentWindow)a.contentWindow.postMessage(d,"*")});
 function send(){var a=document.getElementById("app");if(a&&a.contentWindow){a.contentWindow.postMessage(Object.assign({type:"pg:prefs"},last),"*");for(var k in dev)a.contentWindow.postMessage({type:"pg:device",kind:k,value:dev[k]},"*")}}
 document.getElementById("app").addEventListener("load",send);

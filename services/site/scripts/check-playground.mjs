@@ -100,10 +100,41 @@ try {
   await page.locator("#pg-android").click();
   await app.getByRole("button", { name: "Add Tackle box to cart" }).waitFor({ timeout: 30_000 });
   await app.getByTestId("payment").filter({ hasText: /Payment: declined/ }).waitFor({ timeout: 5000 });
+  // Agent panel: console tools and Lumi, on both phones.
+  for (const skin of ["android", "ios"]) {
+    await page.goto(`${base}/playground/?platform=${skin}#agent`);
+    assert.equal(await page.locator("#pg-panel").getAttribute("data-feature"), "agent", "deep link opens the agent panel");
+    await app.getByRole("button", { name: "Add Tackle box to cart" }).waitFor({ timeout: 30_000 });
+    const runTool = async (tool, args = {}) => {
+      await page.locator("#pg-tool").selectOption(tool);
+      for (const [k, v] of Object.entries(args)) await page.locator(`#pg-args input[data-arg="${k}"]`).fill(v);
+      await page.locator("#pg-run").click();
+      await page.waitForFunction((t) => document.getElementById("pg-out").textContent !== t, await page.locator("#pg-out").textContent(), { timeout: 5000 });
+      return JSON.parse(await page.locator("#pg-out").textContent());
+    };
+    const scr = await runTool("screen");
+    assert.ok(scr.elements.some((e) => e.ref === "e1" && e.name === "Add Spinning rod to cart"), `${skin}: screen lists the labelled elements`);
+    const after = await runTool("tap", { ref: "e1" });
+    assert.match(after.text[0], /1 item/);
+    assert.match(await app.getByTestId("cart").textContent(), /Cart: 1 item/, `${skin}: tap adds to the cart`);
+    const typed = await runTool("type", { ref: "e4", text: "Leave at the door" });
+    assert.equal(typed.value, "Leave at the door");
+    assert.equal(await app.getByTestId("note-field").inputValue(), "Leave at the door");
+    assert.ok(Array.isArray((await runTool("device_log")).entries));
+    // Lumi adds three items with three tap captions (reload for a fresh cart).
+    await page.reload();
+    await app.getByRole("button", { name: "Add Tackle box to cart" }).waitFor({ timeout: 30_000 });
+    await page.locator("#pg-lumi").click();
+    await page.locator('#pg-lumi[data-done="true"]').waitFor({ timeout: 15_000 });
+    assert.equal(await page.locator("#pg-captions li").filter({ hasText: /taps/ }).count(), 3, `${skin}: three tap captions`);
+    assert.match(await app.getByTestId("cart").textContent(), /Cart: 3 items/, `${skin}: Lumi adds three items`);
+  }
   assert.deepEqual(errors, []);
   await page.setViewportSize({ width: 375, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll at 375 px");
   // Device panel open at 375 px: all 15 buttons keep 44 px targets and the page does not scroll sideways.
+  await page.evaluate(() => { location.hash = "#device"; });
+  await page.waitForFunction(() => document.getElementById("pg-panel").getAttribute("data-feature") === "device");
   const small = await page.locator("#pg-panel button[data-kind]");
   const count = await small.count();
   assert.ok(count >= 15, "device panel has its buttons");
