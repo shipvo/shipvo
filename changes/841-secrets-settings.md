@@ -1,2 +1,3 @@
 - `@shipvo/sim`: the phone's Settings app has a Secrets screen on Android and iPhone. It lists saved keys (app, name, domain, access, last used), rotates a key to a one-time ticket link, revokes a key and shows its use log. No value is shown. The sim forwards only the four `/vault-ui/*` routes, checks loopback Host and same-origin, and keeps the owner token (`PN_OWNER_TOKEN`) on the server.
+- `@shipvo/sim`: the sim reads the owner token from `PN_OWNER_TOKEN`. When it is unset, the Secrets screen shows "Sign in as the owner to manage saved keys." Revoke asks for confirmation first, and a failed rotate, revoke or use log shows its error next to the key. `statusClientScript` takes the app id as `phone.app`.
 - Migration: none; new screen.

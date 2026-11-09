@@ -119,7 +119,7 @@ if(a==="restart"){show(q("boot-screen"),true);var f=document.getElementById(${JS
 else{show(q("lock-screen"),false);show(q("off-screen"),true);pw.focus()}})})();
 ${shadeClientScript(iframeId, skin)}
 ${settingsClientScript(iframeId)}
-${secretsClientScript()}
+${secretsClientScript(phone.app)}
 ${appsClientScript(iframeId, phone)}
 ${updateClientScript()}
 ${lumiClientScript()}

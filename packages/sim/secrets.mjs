@@ -85,34 +85,38 @@ export function secretsHtml() {
 
 export const secretsCss = [
   `.sf-secrets{z-index:9}.sf-secrets[hidden]{display:none}.sf-key{margin:8px 0;padding:12px;border-radius:14px;background:#2c3036}.sf-key b{display:block}.sf-key small{display:block;opacity:.75;margin-top:2px}`,
-  `.sf-key .sf-acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.sf-key button{padding:8px 12px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:inherit}.sf-key button[data-act=revoke]{border-color:#ff7b72;color:#ff7b72}`,
+  `.sf-key .sf-acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.sf-key button{min-height:44px;padding:8px 14px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:inherit}.sf-key button[data-act=revoke]{border-color:#ff7b72;color:#ff7b72}`,
   `.sf-uses{margin:8px 0 0;padding:0;list-style:none;font-size:13px}.sf-uses li{padding:2px 0}.sf-secrets a{color:#4da3ff;word-break:break-all}`,
   `.sf-secrets :focus-visible{outline:3px solid #4da3ff;outline-offset:2px}`,
 ].join("\n");
 
-/** Browser script: opens Secrets from Settings, lists keys, rotates, revokes and shows the use log. Calls /vault-ui/* on the page's own origin. */
+/** Browser script: opens Secrets from Settings, lists keys, rotates, revokes (after a confirm step) and shows the use log. Calls /vault-ui/* on the page's own origin. `app` is the sim's app id. */
 export function secretsClientScript(app = "") {
   return `(function(){
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("secrets-screen");if(!sc)return;
-var APP=${JSON.stringify(app)};
+var APP=${JSON.stringify(String(app || ""))};
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function api(m,p){return fetch("/vault-ui/"+p,{method:m}).then(function(x){return x.json().then(function(b){return{ok:x.ok,body:b}})})}
-function app(){return APP||(new URLSearchParams(location.search).get("app"))||"default"}
+function api(m,p){return fetch("/vault-ui/"+p,{method:m}).then(function(x){return x.json().then(function(b){return{ok:x.ok,body:b||{}}},function(){return{ok:x.ok,body:{}}})},function(){return{ok:false,body:{}}})}
 function note(t){q("secrets-note").textContent=t||""}
 function key(k){return encodeURIComponent(k.app)+"/"+encodeURIComponent(k.name)}
-function load(){api("GET","keys?app="+encodeURIComponent(app())).then(function(x){var rows=q("secrets-rows");
+function fail(ex,x,t){ex.innerHTML='<p data-part="key-error" role="alert">'+esc(x.body.message||t)+'</p>'}
+function empty(){if(!q("secrets-rows").querySelector(".sf-key"))note("No saved keys.")}
+function load(){if(!APP){q("secrets-rows").innerHTML="";note("No app is selected.");return}
+api("GET","keys?app="+encodeURIComponent(APP)).then(function(x){var rows=q("secrets-rows");
 if(!x.ok){rows.innerHTML="";note(x.body.message||"Could not load saved keys.");return}
 var ks=x.body.keys||[];note(ks.length?"":"No saved keys.");
-rows.innerHTML=ks.map(function(k){return '<div class="sf-key" role="listitem" data-app="'+esc(k.app)+'" data-name="'+esc(k.name)+'"><b>'+esc(k.name)+'</b><small>'+esc(k.app)+' · '+esc(k.domain)+' · '+esc(k.access)+' · last used '+esc(k.last_used_at||"never")+'</small><div class="sf-acts"><button type="button" data-act="rotate">Rotate</button><button type="button" data-act="revoke">Revoke</button><button type="button" data-act="uses">Use log</button></div><div data-part="key-extra"></div></div>'}).join("")})}
+rows.innerHTML=ks.map(function(k){return '<div class="sf-key" role="listitem" data-app="'+esc(k.app)+'" data-name="'+esc(k.name)+'"><b>'+esc(k.name)+'</b><small>'+esc(k.app)+' · '+esc(k.domain)+' · '+esc(k.access)+' · last used '+esc(k.last_used_at||"never")+'</small><div class="sf-acts"><button type="button" data-act="rotate">Rotate</button><button type="button" data-act="revoke">Revoke</button><button type="button" data-act="uses">Use log</button></div><div data-part="key-extra" aria-live="polite"></div></div>'}).join("")})}
 function show(on){sc.hidden=!on;if(on){load();sc.focus({preventScroll:true})}}
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="secrets-open"]'))return show(true);
 if(t.closest('[data-part="secrets-close"]'))return show(false);
-var b=t.closest("[data-act]");if(!b)return;var row=b.closest(".sf-key"),k={app:row.getAttribute("data-app"),name:row.getAttribute("data-name")},ex=row.querySelector('[data-part="key-extra"]'),a=b.getAttribute("data-act");
-if(a==="revoke")api("DELETE","keys/"+key(k)).then(function(x){if(x.ok){row.remove();note("Revoked "+k.name+".")}else note(x.body.message||"Could not revoke.")});
-if(a==="rotate")api("POST","keys/"+key(k)+"/rotate").then(function(x){if(x.ok&&/^https?:\\/\\//.test(x.body.url||""))ex.innerHTML='<p>One-time link to save the new key (expires in '+esc(Math.round((x.body.expires_in||0)/60))+' min):</p><a href="'+esc(x.body.url)+'" target="_blank" rel="noopener">'+esc(x.body.url)+'</a>';else note(x.body.message||"Could not rotate.")});
-if(a==="uses")api("GET","keys/"+key(k)+"/uses").then(function(x){var u=x.body.uses||[];ex.innerHTML=u.length?'<ul class="sf-uses">'+u.map(function(i){return'<li>'+esc(i.at)+' · '+esc(i.app)+' · '+esc(i.host)+'</li>'}).join("")+'</ul>':'<p>Not used yet.</p>'})});
+var b=t.closest("[data-act]");if(!b)return;var row=b.closest(".sf-key");if(!row)return;var k={app:row.getAttribute("data-app"),name:row.getAttribute("data-name")},ex=row.querySelector('[data-part="key-extra"]'),a=b.getAttribute("data-act");
+if(a==="revoke")ex.innerHTML='<p>Revoke '+esc(k.name)+'? This cannot be undone.</p><div class="sf-acts"><button type="button" data-act="revoke-yes">Revoke</button><button type="button" data-act="revoke-no">Cancel</button></div>';
+if(a==="revoke-no")ex.innerHTML="";
+if(a==="revoke-yes")api("DELETE","keys/"+key(k)).then(function(x){if(x.ok){row.remove();note("Revoked "+k.name+".");empty()}else fail(ex,x,"Could not revoke.")});
+if(a==="rotate")api("POST","keys/"+key(k)+"/rotate").then(function(x){if(x.ok&&/^https?:\\/\\//.test(x.body.url||""))ex.innerHTML='<p>One-time link to save the new key (expires in '+esc(Math.round((x.body.expires_in||0)/60))+' min):</p><a href="'+esc(x.body.url)+'" target="_blank" rel="noopener">'+esc(x.body.url)+'</a>';else fail(ex,x,"Could not rotate.")});
+if(a==="uses")api("GET","keys/"+key(k)+"/uses").then(function(x){if(!x.ok)return fail(ex,x,"Could not load the use log.");var u=x.body.uses||[];ex.innerHTML=u.length?'<ul class="sf-uses">'+u.map(function(i){return'<li>'+esc(i.at)+' · '+esc(i.app)+' · '+esc(i.host)+'</li>'}).join("")+'</ul>':'<p>Not used yet.</p>'})});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)show(false)});
 })();`;
 }
