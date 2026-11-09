@@ -63,7 +63,7 @@ export const FRAMES = {
 
 export type RenderFrame = ((o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string; lumi?: boolean; guide?: boolean }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string }) & {
   /** Script that keeps the status bar live from the app's `pn:status` events. Absent in older @shipvo/sim. */
-  statusScript?: (iframeId?: string, skin?: string) => string;
+  statusScript?: (iframeId?: string, skin?: string, phone?: Record<string, unknown>) => string;
 };
 
 /** Loads the frame renderer from @shipvo/sim: the app's install first, then the one next to this CLI. */
@@ -130,7 +130,7 @@ sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
 function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var t=document.getElementById("top"),b=document.getElementById("banner");var top=t.offsetHeight+20,bot=b.hidden?10:b.offsetHeight+20;var ah=Math.max(100,innerHeight-top-bot);var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},ah/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.top=(top+ah/2)+"px";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
-</script><script>${runPanelScript()}</script><script>${RELOAD_CLIENT}</script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
+</script><script>${runPanelScript()}</script><script>${RELOAD_CLIENT}</script>${render.statusScript ? `<script>${render.statusScript("app", platform, { marketplace: (process.env.PN_CONTROL || "https://api.shipvo.dev").replace(/\/$/, "") }).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
 
 /** True for a phone or tablet browser, by user agent. */
