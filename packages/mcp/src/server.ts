@@ -18,6 +18,7 @@ import { z } from "zod";
 import { tools, inputHasKey, KEY_REFUSAL, KEY_IN_INPUT, type ToolDef } from "@shipvo/mcp-tools";
 import { classify, compactDiff, fieldValue } from "./change.js";
 import { exportTest, type Step } from "./export.js";
+import { traceFromMeta } from "./trace.js";
 import { findTarget } from "./record.js";
 import { Recorder, RecorderError } from "./recorder.js";
 import { connectDriver, findLiveRun, type Driver, type RunInfo } from "./attach.js";
@@ -118,6 +119,9 @@ const sessions = new Map<string, { app: string; steps: number; startedAt: number
 const trees = new Map<string, string>();
 // Recorded steps per session, for export_test. Dropped when the session ends.
 const steps = new Map<string, Step[]>();
+// Tool calls per session with the caller's trace id (when it sent a valid traceparent). Dropped when the session ends.
+type CallEntry = { tool: string; at: string; traceId?: string };
+const callLog = new Map<string, CallEntry[]>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
@@ -148,7 +152,20 @@ const need = (_sid: string) => {};
 // Register a tool from the shared registry (@shipvo/mcp-tools): name, description, schema and hints come from there.
 const keyRefusal = () => ({ content: [{ type: "text" as const, text: KEY_REFUSAL }], isError: true as const, structuredContent: { ok: false, code: KEY_IN_INPUT, error: KEY_REFUSAL } });
 const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => {
-  const guarded = (args: unknown, extra: unknown) => inputHasKey(args) ? keyRefusal() : (cb as (a: unknown, e: unknown) => unknown)(args, extra);
+  const guarded = async (args: unknown, extra: unknown) => {
+    const trace = traceFromMeta((extra as { _meta?: unknown } | undefined)?._meta);
+    const entry = (): CallEntry => ({ tool: t.name, at: new Date().toISOString(), ...(trace ? { traceId: trace.traceId } : {}) });
+    const sid = (args as { session?: unknown } | undefined)?.session;
+    const log = typeof sid === "string" ? callLog.get(sid) : undefined;
+    if (log) { log.push(entry()); if (log.length > 1000) log.splice(0, log.length - 1000); }
+    const out = inputHasKey(args) ? keyRefusal() : await (cb as (a: unknown, e: unknown) => unknown)(args, extra);
+    if (t.name === "open_app") {
+      // The session id is only known once the call returns.
+      const opened = /^session: (\S+)/.exec((out as { content?: { text?: string }[] })?.content?.[0]?.text ?? "")?.[1];
+      if (opened && sessions.has(opened)) callLog.set(opened, [entry()]);
+    }
+    return trace && out && typeof out === "object" ? { ...out, _meta: { ...((out as { _meta?: object })._meta ?? {}), traceparent: trace.traceparent } } : out;
+  };
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
 };
 type Ctx = { remote?: boolean; key?: string; app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
@@ -244,7 +261,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       attachNote += ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
+  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), ...(buildUrl ? { build: buildId } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
   if (r.code === "sim_timeout") return result(sid, r);
   // Only report a build as open when the simulator says it loaded that build. Otherwise the phone shows another app version.
   if (buildId && r.ok !== false && r.build !== buildId) {
@@ -444,7 +461,9 @@ use(server, tools.device_reset,
 use(server, tools.export_test, async ({ session }) => {
   const rec = steps.get(session), s = sessions.get(session);
   if (!rec || !s) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
-  return text(exportTest(s.app, rec));
+  const calls = callLog.get(session) ?? [];
+  const traceIds = [...new Set(calls.flatMap((c) => (c.traceId ? [c.traceId] : [])))];
+  return { ...text(exportTest(s.app, rec, traceIds)), structuredContent: { traceIds, calls } };
 });
 
 use(server, tools.end_session, async ({ session }) => {
@@ -452,14 +471,14 @@ use(server, tools.end_session, async ({ session }) => {
   const live = attached.get(session);
   if (live) {
     const s = sessions.get(session); const run = attachedRun.get(session);
-    live.close(); attached.delete(session); attachedRun.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session);
+    live.close(); attached.delete(session); attachedRun.delete(session); sessions.delete(session); trees.delete(session); steps.delete(session); callLog.delete(session);
     return text(JSON.stringify({ session, app: s?.app, mode: "attached", visible: true, url: run ? runUrl(run) : undefined, steps: s?.steps ?? 0, seconds: Math.round((Date.now() - (s?.startedAt ?? Date.now())) / 1000) }, null, 2));
   }
   // The simulator is the source of truth: end a session it lists even if this server did not open it; otherwise no_session.
   const listed = await sim("/sessions", {}) as Act & { sessions?: { session: string; room?: string | null }[] };
   if (!listed.ok) return result(session, listed);
   if (!(listed.sessions ?? []).some((x) => x.session === session)) return result(session, { ok: false, code: "no_session", error: `no session '${session}': call open_app first` });
-  const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() } as NonNullable<ReturnType<typeof sessions.get>>; sessions.delete(session); trees.delete(session); steps.delete(session);
+  const s = sessions.get(session) ?? { app: session.split("-")[0], steps: 0, startedAt: Date.now() } as NonNullable<ReturnType<typeof sessions.get>>; sessions.delete(session); trees.delete(session); steps.delete(session); callLog.delete(session);
   const room = s.room ?? (listed.sessions as { session: string; room?: string | null }[]).find((x) => x.session === session)?.room ?? undefined;
   // A room shares one store, so the report lists the room's orders. The room's files go when its last session ends.
   let orders: unknown[] = [];

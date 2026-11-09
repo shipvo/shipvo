@@ -52,6 +52,14 @@ What flow C does **not** measure: barcode decoding. The emulator's virtual camer
 
 **A bug flow C found:** on a phone, "Use my location" never showed the system permission dialog; the device API read the position without asking and the app reported "Could not get your location." Fixed in release 19 (`@shipvo/device` now requests permission first).
 
+## Capacitor sample (apps/capacitor-sample)
+
+The Capacitor sample's built web directory opens in the simulator on the Android and iOS skins. In CI, on both skins, the tree has stable refs (the same ref for "Show release number" in two snapshots), a tap on it shows "Release: embedded build", and a tap on a list item opens its detail screen with a Back button.
+
+| App | Android skin | iOS skin | CI run |
+| --- | --- | --- | --- |
+| Capacitor sample | 1 of 1 flow passes, refs stable | 1 of 1 flow passes, refs stable | [ci run 42706961327](https://github.com/shipvo/shipvo/actions/runs/42706961327) (`packages/sim/capacitor-live.test.mjs`, tests 43 and 44) |
+
 ## What made the simulator faithful
 
 The gap was closed by making the simulator behave like a phone, not by loosening the comparison:
