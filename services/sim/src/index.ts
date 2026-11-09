@@ -6,11 +6,12 @@
 import { Container, getContainer } from "@cloudflare/containers";
 import TOOLS from "./tools.json";
 import { handleOAuth, wwwAuthenticate } from "./oauth";
+import { handleWatch, addWatchUrl, watchUrl } from "./watch";
 
 type Env = {
   SIM?: DurableObjectNamespace<SimContainer>; DB: D1Database; CONTROL: string; OWNER_TOKEN?: string;
   SIM_REV?: string; E2B_API_KEY?: string; E2B_TEMPLATE?: string; E2B_API?: string; E2B_SANDBOX_DOMAIN?: string; SESSION_TIMEOUT_S?: string;
-  GITHUB_CLIENT_ID?: string; GITHUB_CLIENT_SECRET?: string; GITHUB_WEB?: string; GITHUB_API?: string;
+  WATCH_SECRET?: string; GITHUB_CLIENT_ID?: string; GITHUB_CLIENT_SECRET?: string; GITHUB_WEB?: string; GITHUB_API?: string;
 };
 
 export class SimContainer extends Container<Env> {
@@ -64,9 +65,28 @@ async function sandboxForKey(env: Env, keyId: number, app: string, scope: string
 }
 async function viaE2B(req: Request, env: Env, row: { id: number; app_id: string; scope: string }, headers: Headers): Promise<Response> {
   const target = await sandboxForKey(env, row.id, row.app_id, row.scope);
+  const reqText = req.method === "POST" ? await req.clone().text() : "";
   const res = await fetch(`${target.host}/mcp`, { method: req.method, headers, body: req.body, redirect: "manual" });
   const h = new Headers(res.headers); for (const [k, v] of Object.entries(CORS)) h.set(k, v);
-  return new Response(res.body, { status: res.status, headers: h });
+  return decorate(req, env, row.id, new Response(res.body, { status: res.status, headers: h }), reqText);
+}
+// open_app results carry the watch link. The Worker signs it, so the sandbox never holds the secret.
+async function decorate(req: Request, env: Env, keyId: number, res: Response, reqText: string): Promise<Response> {
+  if (!env.WATCH_SECRET || req.method !== "POST" || !/"name"\s*:\s*"open_app"/.test(reqText) || !(res.headers.get("content-type") ?? "").includes("application/json")) return res;
+  const body = await addWatchUrl(await res.text(), (s) => watchUrl(new URL(req.url).origin, env.WATCH_SECRET!, s, keyId));
+  const h = new Headers(res.headers); h.delete("content-length");
+  return new Response(body, { status: res.status, headers: h });
+}
+// An existing sandbox of a key (never starts one), for the watch page.
+async function existingSandbox(env: Env, keyId: number, path: string, init?: RequestInit): Promise<Response> {
+  if (env.E2B_API_KEY) {
+    const row = await env.DB.prepare("SELECT sandbox_host FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).first<{ sandbox_host: string }>();
+    if (!row) throw new Error("no sandbox");
+    return fetch(`${row.sandbox_host}${path}`, init);
+  }
+  const k = await env.DB.prepare("SELECT app_id FROM api_keys WHERE id = ?").bind(keyId).first<{ app_id: string }>();
+  if (!env.SIM || !k) throw new Error("no sandbox");
+  return getContainer(env.SIM, `app:${k.app_id}`).fetch(new Request(`http://sim${path}`, init));
 }
 
 /* ---------- Worker ---------- */
@@ -76,6 +96,7 @@ export default {
     if (req.method === "OPTIONS") return new Response("", { status: 204, headers: CORS });
     if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, service: "shipvo-sim", backend: env.E2B_API_KEY ? "e2b" : env.SIM ? "containers" : "none", mcp: "/mcp", docs: "https://github.com/shipvo/shipvo/tree/main/packages/mcp" });
     const oauth = await handleOAuth(req, env); if (oauth) return oauth;
+    const watch = await handleWatch(req, env, (k, p, i) => existingSandbox(env, k, p, i)); if (watch) return watch;
     // /mcp with Authorization: Bearer <key>, or, for clients that cannot send headers (ChatGPT's custom MCP
     // connectors offer only OAuth or none), /mcp/<key> or /mcp?key=<key>.
     const pathKey = url.pathname.match(/^\/mcp\/([A-Za-z0-9_-]{8,})$/)?.[1];
