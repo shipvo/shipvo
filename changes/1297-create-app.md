@@ -2,3 +2,4 @@
 - `@shipvo/mcp`: new tools `create_app` and `run_app_action`.
 - `@shipvo/sim` now depends on `@shipvo/spec`.
 - Migration: none; new tools.
+- `@shipvo/sim`: a `screenshot` taken on the home screen now includes the icons of installed apps.

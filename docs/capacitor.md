@@ -2,6 +2,10 @@
 
 Shipvo gives you a workflow that builds signed Android and iOS binaries in your own repository. You do not need EAS.
 
+## See it in the simulator
+
+From a Capacitor project, after `npx cap sync` or your web build, run `shipvo sim` or `shipvo preview`. Shipvo opens the built web folder (`webDir` in `capacitor.config.*`) on the Android and iOS skins. Expo apps build as before.
+
 ## Add the workflow
 
 From the root of your Capacitor repo:
