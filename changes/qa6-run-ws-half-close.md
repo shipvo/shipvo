@@ -1,1 +1,0 @@
-- `@shipvo/cli`: `shipvo run` now notices when a browser tab closes without a WebSocket close frame and frees that connection.

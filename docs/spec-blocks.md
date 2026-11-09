@@ -112,8 +112,29 @@ app.select("Period", "year");          // { ok: false, error: '"year" is not one
 | `divider` | A line between groups | none |
 | `toggle` | On or off | `label`, `bind` to a `bool` state value |
 | `segmented` | One choice from a few | `label`, `bind` to an `enum` state value, `options` |
+| `kanban` | Cards in columns | `label`, `from`, `columns`, `column`, `title`, `detail`, `onMove` |
+| `timeline` | Dated entries, newest day first | `label`, `from`, `date`, `title`, `detail` |
 
 In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a segmented control reads `Period: week`, and a progress block reads `Monthly goal: 40%`. Assistants and `@shipvo/test` find them by those names.
+
+## Boards and timelines
+
+A `kanban` block shows the rows of a data source as cards in columns. A `timeline` block shows them grouped by day. Both need a `label` and a `from` (the name of a source in `data`); the rest are expressions that run once per row as `item`.
+
+```json
+{ "type": "kanban", "label": "Task board", "from": "tasks", "columns": ["todo", "doing", "done"],
+  "column": "{{ item.status }}", "title": "{{ item.title }}", "detail": "{{ item.note }}",
+  "onMove": { "action": "move_task", "input": { "id": "{{ item.id }}", "status": "{{ column }}" } } }
+{ "type": "timeline", "label": "History", "from": "tasks", "date": "{{ item.at }}", "title": "{{ item.title }}", "detail": "{{ item.note }}" }
+```
+
+- `columns` is a list of unique names. Every row's `column` value must be one of them.
+- `onMove` names an action from `actions`. It runs when a card moves, and `{{ column }}` is the new column.
+- `date` is `2026-11-07` or `2026-11-07T09:30`. The timeline groups by the date part.
+- In the screen tree a column reads `todo, 2 cards` and a card reads `Buy bait, Worms` (title, then detail), on the Android and iPhone skins.
+- `app.move("Buy bait", "done")` moves a card by its title and runs `onMove`. It answers `ok: false` if the card or the column does not exist.
+
+The validator reports a bad column list, a card in a column the board does not have, a missing or invalid date, and an undeclared `onMove` action, each with a path and a fix.
 
 ## Sheets
 
@@ -163,6 +184,8 @@ A data source can call a service with a key you saved once in the secret form. T
 
 - **`createApp` returns `ok: false`.** The spec has validation errors. Print `made.errors`; each has a path and a fix.
 - **`toggle` or `select` answers `ok: false`.** The label does not match a control on the current screen, or the option is not in `options`. Labels are case-sensitive.
+- **`Card column "later" is not a board column.`** A row has a column value that is not in `columns`. Use one of the listed names or add the column.
+- **`Entry date "tomorrow" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30`.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps

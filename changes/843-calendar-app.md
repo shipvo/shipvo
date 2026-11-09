@@ -1,2 +1,0 @@
-- `templates/calendar`: Calendar, the second first-party spec app. The Day tab shows one day (today, or a date you pick). The Month tab shows last, this or next month with a month label. It has an event form and the actions `create_event`, `list_events`, `show_day` and `delete_event`. Events live in phone storage and use the phone's time zone.
-- Migration: none; new template.
