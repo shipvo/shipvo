@@ -42,7 +42,7 @@ test("a weekly planner shows on weekdays and weekend plans on Saturday, by the p
   assert.ok((await call("/session", { session: "pl1", phone: PHONE })).ok);
   assert.equal((await act("pl1", { action: "arrange_apps", id: "plan", schedule: { days: ["mon", "tue", "wed", "thu", "fri"], from: "06:00", to: "20:00" } })).ok, true);
   assert.equal((await act("pl1", { action: "arrange_apps", id: "wknd", schedule: { days: ["sat", "sun"] } })).ok, true);
-  const at = async (iso) => (await act("pl1", { action: "set_time", at: iso })).screen;
+  const at = async (iso) => (await act("pl1", { action: "set_time", at: iso })).home;
   const mon = await at("2026-11-09T09:00:00");
   assert.match(mon, /button "Weekly planner"/); assert.doesNotMatch(mon, /button "Weekend plans"/);
   assert.match(mon, /"Weekend plans" \(wknd\): not showing now/);
@@ -55,9 +55,9 @@ test("pin, hide and position change the order; errors are typed; changes are in 
   assert.ok((await call("/session", { session: "pl2", phone: PHONE })).ok);
   const order = (screen) => [...screen.matchAll(/button "([^"]+)"/g)].map((m) => m[1]).filter((n) => n !== "Store").join(",");
   await act("pl2", { action: "arrange_apps", id: "mail", pinned: true });
-  assert.match(order((await act("pl2", { action: "arrange_apps", id: "plan", position: 0 })).screen), /^Mail,Weekly planner,Weekend plans/);
+  assert.match(order((await act("pl2", { action: "arrange_apps", id: "plan", position: 0 })).home), /^Mail,Weekly planner,Weekend plans/);
   await act("pl2", { action: "arrange_apps", id: "mail", hidden: true });
-  assert.doesNotMatch((await act("pl2", { action: "arrange_apps", id: "mail", hidden: true })).screen, /button "Mail"/);
+  assert.doesNotMatch((await act("pl2", { action: "arrange_apps", id: "mail", hidden: true })).home, /button "Mail"/);
   assert.equal((await act("pl2", { action: "arrange_apps", id: "ghost", pinned: true })).code, "not_installed");
   assert.equal((await act("pl2", { action: "arrange_apps", id: "mail", position: -3 })).code, "bad_placement");
   assert.equal((await act("pl2", { action: "set_time", at: "tomorrow-ish" })).code, "bad_time");
@@ -80,3 +80,35 @@ for (const skin of ["android", "ios"]) {
     } finally { await b.close(); }
   });
 }
+
+for (const skin of ["android", "ios"]) {
+  test(`${skin}: the frame follows a layout and a phone time sent to it`, async () => {
+    const { chromium } = createRequire(import.meta.url)("playwright");
+    const b = await chromium.launch();
+    try {
+      const p = await b.newPage({ viewport: { width: 460, height: 960 } });
+      const f = renderFrame({ skin, screen: `<iframe id="app" srcdoc="<p>x</p>"></iframe>` });
+      const phone = { apps: [{ id: "plan", name: "Planner", placement: { schedule: { days: ["mon", "tue", "wed", "thu", "fri"], from: "08:00", to: "18:00" } } }, { id: "wknd", name: "Weekend", placement: { schedule: { days: ["sat"], from: "09:00", to: "23:00" } } }, { id: "mail", name: "Mail" }] };
+      await p.setContent(`<style>${f.css}</style>${f.html}<script>${statusClientScript("app", skin, phone)}</script>`);
+      await p.evaluate(() => window.postMessage({ type: "pn:nav", where: "home" }, "*"));
+      const names = () => p.locator('[data-part="installed-app"]').evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+      const apps = phone.apps;
+      await p.evaluate(([a, c]) => window.__pnHome.sync(a, c), [apps, { day: 1, h: 9, m: 0 }]);    // Monday 09:00
+      assert.deepEqual(await names(), ["Planner", "Mail"]);
+      await p.evaluate(([a, c]) => window.__pnHome.sync(a, c), [apps, { day: 6, h: 10, m: 0 }]);   // Saturday 10:00
+      assert.deepEqual(await names(), ["Weekend", "Mail"]);
+      const pinned = [apps[2], { ...apps[1], placement: { ...apps[1].placement, pinned: true } }, apps[0]];
+      await p.evaluate(([a, c]) => window.__pnHome.sync(a, c), [pinned, { day: 6, h: 10, m: 0 }]);
+      assert.deepEqual(await names(), ["Weekend", "Mail"]);
+      await p.evaluate(([a, c]) => window.__pnHome.sync(a, c), [[{ id: "mail", name: "Mail", placement: { hidden: true } }, apps[0]], { day: 2, h: 12, m: 0 }]);
+      assert.deepEqual(await names(), ["Planner"]);
+    } finally { await b.close(); }
+  });
+}
+
+test("arrange_apps and set_time return the open screen when an app is in front, and the home text as home", async () => {
+  assert.ok((await call("/session", { session: "pl3", phone: PHONE })).ok);
+  const r = await act("pl3", { action: "arrange_apps", id: "mail", pinned: true });
+  assert.match(r.screen, /heading "Home"/);
+  assert.match(r.home, /^Home screen\nInstalled apps\n- button "Mail"/);
+});

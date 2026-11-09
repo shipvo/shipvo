@@ -386,14 +386,13 @@ async function act(id, body) {
     case "arrange_apps": {
       const { id: appId, ...patch } = body; delete patch.action; delete patch.session;
       try { arrangeApp(s.apps, String(appId ?? ""), patch); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
-      if (s.nav.where === "app") { /* the app in front is unchanged */ }
-      return { installed_apps: s.apps.installed_apps, screen: `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+      return { installed_apps: s.apps.installed_apps, home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // The phone's clock, for schedules. at: an ISO time like 2026-11-14T09:00:00, or null for the real time.
     case "set_time": {
       if (body.at == null) s.clockMs = null;
       else { const t = Date.parse(String(body.at)); if (Number.isNaN(t)) throw new SimError("bad_time", "at must be a time like 2026-11-14T09:00:00, or null"); s.clockMs = t; }
-      return { now: nowOf(s).toString(), screen: `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+      return { now: nowOf(s).toString(), home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
     case "update_app": {
