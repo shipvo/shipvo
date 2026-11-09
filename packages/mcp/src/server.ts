@@ -244,7 +244,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       attachNote += ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
+  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), ...(buildUrl ? { build: buildId } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
   if (r.code === "sim_timeout") return result(sid, r);
   // Only report a build as open when the simulator says it loaded that build. Otherwise the phone shows another app version.
   if (buildId && r.ok !== false && r.build !== buildId) {
