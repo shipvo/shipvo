@@ -55,10 +55,20 @@ describe("migrateRows generations", () => {
   });
 });
 
+describe("migrateRows order", () => {
+  it("applies steps in since order whatever the array order", () => {
+    const s = base({ c: "text" }, { version: 3, migrate: [{ since: 3, rename: { from: "b", to: "c" } }, { since: 2, rename: { from: "a", to: "b" } }] });
+    expect(migrateRows(s, "notes", [{ a: "x" }], 1)).toEqual([{ c: "x" }]);
+  });
+});
+
 describe("validate migrate", () => {
   it("requires version to rise when the shape changed", () => {
     const r = validate(base({ title: "text", count: "text" }, { migrate: [{ since: 2, drop: { field: "old" } }] }), v1);
     expect(r.errors.some((e) => e.path === "$.data.notes.version")).toBe(true);
+  });
+  it("allows adding a field without a version bump or migrate", () => {
+    expect(validate(base({ title: "text", old: "text", count: "text", extra: "text" }), v1).errors).toEqual([]);
   });
   it("requires since on each step", () => {
     const r = validate(base({ a: "text" }, { version: 2, migrate: [{ drop: { field: "b" } }] }));

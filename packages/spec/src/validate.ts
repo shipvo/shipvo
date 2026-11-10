@@ -12,7 +12,6 @@ export const MAX_SCREENS = 40;
 export const MAX_BLOCKS = 2000;
 export const MAX_EXPRESSION_LENGTH = 2000;
 const MAX_WALK_DEPTH = 100;
-const shapeKey = (f: Record<string, unknown>) => JSON.stringify(Object.entries(f).sort(([a], [b]) => (a < b ? -1 : 1)));
 const BLOCK_CONTAINERS = ["children"];
 
 const INTERACTIVE = new Set([
@@ -301,8 +300,9 @@ class Run {
       if (!isObject(old) || !isObject(old.fields)) continue;
       const nowV = typeof src.version === "number" ? src.version : 1;
       const wasV = typeof old.version === "number" ? old.version : 1;
-      if (shapeKey(old.fields) !== shapeKey(fields) && nowV <= wasV) {
-        this.error(childPath(base, "version"), `"${name}" changed shape but "version" is still ${nowV}, so saved rows would not be migrated.`, `Set "${name}.version" to ${wasV + 1} or higher.`);
+      const breaking = Object.entries(old.fields).some(([f, t]) => !Object.hasOwn(fields, f) || fields[f] !== t);
+      if (breaking && nowV <= wasV) {
+        this.error(childPath(base, "version"), `"${name}" removed or retyped a field but "version" is still ${nowV}, so saved rows would not be migrated.`, `Set "${name}.version" to ${wasV + 1} or higher.`);
       }
       for (const [f, t] of Object.entries(old.fields)) {
         const at = childPath(childPath(base, "fields"), f);

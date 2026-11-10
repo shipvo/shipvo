@@ -283,10 +283,12 @@ export function migrateRows(spec: unknown, name: string, rows: unknown[], savedV
   const version = typeof c.version === "number" ? c.version : 1;
   const steps = Array.isArray(c.migrate) ? c.migrate : [];
   if (savedVersion >= version || steps.length === 0) return rows;
+  const sinceOf = (st: unknown) => (isObj(st) && typeof st.since === "number" ? st.since : 2);
+  const ordered = [...steps].sort((a, b) => sinceOf(a) - sinceOf(b));
   return rows.map((row) => {
     if (!isObj(row)) return row;
     let out: Json = { ...row };
-    for (const st of steps) {
+    for (const st of ordered) {
       if (!isObj(st)) continue;
       const since = typeof st.since === "number" ? st.since : 2;
       if (!(savedVersion < since && since <= version)) continue;
@@ -297,8 +299,11 @@ export function migrateRows(spec: unknown, name: string, rows: unknown[], savedV
           out = { ...rest, [to]: v };
         }
       } else if (isObj(st.drop)) {
-        const { [String(st.drop.field)]: _gone, ...rest } = out;
-        out = rest;
+        const field = String(st.drop.field);
+        if (Object.hasOwn(out, field)) {
+          out = { ...out };
+          delete out[field];
+        }
       } else if (isObj(st.retype)) {
         const { field, using } = st.retype as { field: string; using: string };
         if (Object.hasOwn(out, field)) {
