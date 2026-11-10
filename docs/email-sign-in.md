@@ -67,14 +67,15 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 
 | You see | Cause | Fix |
 | --- | --- | --- |
-| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ends | Check the app really called the stubbed request. Use `list()` (or `inbox_read`) to see what arrived, and loosen `subject`. Raise `timeout` (at most 25000 ms). |
+| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
 | `inbox_no_code` | The mail has no 4 to 8 digit number | Read `text` from `waitFor`, and put a 4 to 8 digit number in the stub's mail text. For a link, use `links[0]`. |
-| Status 550 from `/send` | The mail was addressed to someone other than the session's own address | Send to the address from `address()` or `inbox_read`. |
-| Mail from an earlier attempt is picked up | The inbox keeps mail until the session ends | Call `clear()` (or `inbox_clear`) before each attempt. |
-| The address changed | A new session has a new address | Read the address again after every `open_app`. |
+| `bad_timeout` | `timeout_ms` is above 25000 or not a whole number | Use a whole number from 0 to 25000. |
+| `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
+| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `inbox_read` or `phone.inbox.address()`. |
+| An old code is picked up | The inbox still holds mail from an earlier attempt | Call `inbox_clear` (or `phone.inbox.clear()`) before each attempt. |
 
 ## Next steps
 
-- [Test with an assistant](test-with-an-assistant.md): give your assistant the phone and the inbox.
-- [Test your app in CI](testing.md): run the sign-in test on every pull request.
-- [Agents and MCP tools](agents.md): every tool, including the inbox tools.
+- [Testing](testing.md) for `mockNetwork` and the rest of the typed test API.
+- [Agents](agents.md) for the other tools an assistant can call on the phone.
+- [Phone apps](phone-apps.md) for the apps on the phone that send and read mail.
