@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 
 /** The two cohort cut-offs from `c < A ... c < B` in a native Store. */
-export function thresholds(src: string): number[] {
+function thresholds(src: string): number[] {
   const line = src.split("\n").find((l) => /\b(band|cohort)\b.*<\s*\d+.*<\s*\d+/.test(l) && l.includes("b0"));
   if (!line) throw new Error("band line not found");
   return [...line.matchAll(/<\s*(\d+)/g)].map((m) => Number(m[1]));

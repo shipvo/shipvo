@@ -26,10 +26,20 @@ class PointerQueryTest {
     assertEquals("https://x.dev/p/app/1/b2.json?nm=%40s%2Fp%401.2.3,b%402.0.0", url(null, "@s/p@1.2.3,b@2.0.0"))
   }
 
-  @Test fun refusesPointerForAnotherPlatform() {
+  @Test fun platformCheckMatchesWireFormat() {
     assertTrue(PointerQuery.isForAndroid("android"))
     assertFalse(PointerQuery.isForAndroid("ios"))
-    assertFalse(PointerQuery.isForAndroid(null))
+    assertTrue(PointerQuery.isForAndroid(null))
+    assertFalse(PointerQuery.isForAndroid("other"))
+    assertFalse(PointerQuery.isForAndroid(""))
+  }
+
+  @Test fun acceptsAndroidPointerBodyWithoutPlatform() {
+    val body = org.json.JSONObject("{\"app_id\":\"a\",\"shell_major\":1,\"release\":2}")
+    val platform = if (body.has("platform") && !body.isNull("platform")) body.getString("platform") else null
+    assertTrue(PointerQuery.isForAndroid(platform))
+    val ios = org.json.JSONObject("{\"platform\":\"ios\"}")
+    assertFalse(PointerQuery.isForAndroid(ios.getString("platform")))
   }
 
   @Test fun readsTypedReason() {

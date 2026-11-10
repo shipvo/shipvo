@@ -20,8 +20,8 @@ internal object PointerQuery {
     return if (q.isEmpty()) path else path + "?" + q.joinToString("&")
   }
 
-  /** A pointer is for this device only when its `platform` is `android` (iOS checks the same). */
-  fun isForAndroid(platform: String?): Boolean = platform == "android"
+  /** Android pointers carry no `platform`; a pointer marked for any other platform (such as `ios`) is refused. */
+  fun isForAndroid(platform: String?): Boolean = platform == null || platform == "android"
 
   /** The typed reason in a 404 body, or null for any other answer. */
   fun mismatchReason(body: String?): String? {

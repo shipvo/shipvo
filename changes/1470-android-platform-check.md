@@ -1,1 +1,1 @@
-- Runtime (Android): a pointer whose `platform` is not `android` is refused, as on iOS. A test keeps the band thresholds in the schema, `Store.kt` and `Store.swift` equal.
+- Runtime (Android): a pointer marked for iOS is refused. Android pointers carry no `platform` and are accepted. A test keeps the band thresholds in the schema, `Store.kt` and `Store.swift` equal.
