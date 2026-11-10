@@ -79,7 +79,7 @@ Your products live in one file: `src/data/products.json` inside the `sandbar` fo
 
 - `id`: a short name with no spaces. Customers never see it. Each product needs a different one.
 - `name`: what customers see on the list. Give every product a different name, and do not make one name a part of another, for example "Mug" and "Mug set".
-- `price`: the price **in cents**, with no dollar sign and no dot. `650` shows as `$6.50`. `1800` shows as `$18.00`.
+- `price`: the price **in cents**, with no dollar sign and no dot. `650` shows as `$6.50`. `1800` shows as `$18.00`. If you write `24.00` or `24`, the shop warns you in plain words (see Troubleshooting).
 - `description`: one or two sentences on the product page.
 
 This file is **JSON**, a plain way to write a list. Keep the quote marks, the curly brackets `{ }` and the commas exactly as they are. Every block ends with `},` except the last, which ends with `}`.
@@ -206,11 +206,18 @@ You:
 5. checked the cart and ran the tests,
 6. built and checked a release without sending it.
 
-## What this shop does not do yet
+## Change the currency
 
-- **It does not take payments.** The cart shows a total and nothing else.
-- **Prices show in dollars until you change `src/data/shop.json`.** Set `currency`, `position` (`before` or `after`), `decimals` and `locale`. For FCFA: `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole minor units (6500 with `decimals` 0).
-- **It has no pictures.** Products show a name, a price and a description.
+Open `src/data/shop.json` and set `currency`, `position` (`before` or `after`), `decimals` and `locale`. For FCFA: `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole numbers in the smallest unit (6500 with `decimals` 0, 650 with `decimals` 2).
+
+## Troubleshooting
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| A price shows as `$0.24` when you meant `$24` | JSON reads `24.00` as `24`, and `24` means 24 cents | Write `2400`. The shop prints `[shop] <name>: price 24 is less than one whole unit... write 2400 for 24.` when the app loads |
+| `[shop] <name>: price 6.5 is not a whole number` | A price has a dot | Write `650` for `6.50` |
+| `npm test` fails on "every price is in the smallest unit" | One or more prices have the problem above | Fix the prices the message names, then run `npm test` again |
+| Prices use the wrong symbol or order | `src/data/shop.json` still has the dollar defaults | See "Change the currency" |
 
 ## What we measured
 
