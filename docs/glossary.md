@@ -47,6 +47,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Simulator.** A copy of a phone that runs on your computer and opens in your web browser. It shows your app without a real phone.
 
+**State version.** A whole number in `shipvo.json` (`stateVersion`) that says which layout of saved data a release uses. `shipvo rollback` stops if it would send phones to a lower one. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
+
 **Template.** A ready-made app you change into your own, such as the shop template.
 
 **Terminal.** A window where you type commands instead of clicking. On a Mac it is called Terminal. On Windows use "Windows Terminal" or "PowerShell". On Linux it is also called Terminal.

@@ -127,3 +127,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
 | Held release when failures look fake (fresh installs or a burst; owner approves or denies) | [auto-halt](auto-halt.md#when-the-failures-look-like-an-attack) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
+| Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
