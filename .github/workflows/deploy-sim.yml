@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["services/sim/**", "packages/mcp/**", "packages/mcp-tools/**", "packages/sim/*.mjs", ".github/workflows/deploy-sim.yml"]
+    paths: ["services/sim/**", "packages/mcp/**", "packages/mcp-tools/**", "packages/sim/*.mjs", "packages/spec/**", ".github/workflows/deploy-sim.yml"]
 jobs:
   deploy:
     runs-on: ubuntu-latest

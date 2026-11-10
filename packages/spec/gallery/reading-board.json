@@ -1,0 +1,151 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "reading-board",
+    "name": "Reading board",
+    "description": "Move books from To read to Reading to Done and see the pages on your list."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "books": {
+      "source": "collection",
+      "fields": {
+        "title": "text",
+        "author": "text",
+        "status": "text",
+        "pages": "number"
+      },
+      "seed": []
+    },
+    "total": {
+      "source": "computed",
+      "value": "{{ sum(books.map(b, b.pages)) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Books",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Pages on the board: {{ total }}"
+        },
+        {
+          "type": "kanban",
+          "label": "Reading board",
+          "from": "books",
+          "columns": [
+            "To read",
+            "Reading",
+            "Done"
+          ],
+          "column": "{{ item.status }}",
+          "title": "{{ item.title }}",
+          "detail": "{{ item.author }}",
+          "onMove": {
+            "action": "move_book",
+            "input": {
+              "title": "{{ item.title }}",
+              "status": "{{ column }}"
+            }
+          }
+        },
+        {
+          "type": "form",
+          "label": "Add book form",
+          "submit": {
+            "label": "Add book",
+            "action": "add_book"
+          },
+          "fields": [
+            {
+              "name": "title",
+              "type": "text",
+              "label": "Title",
+              "required": true,
+              "maxLength": 80
+            },
+            {
+              "name": "author",
+              "type": "text",
+              "label": "Author",
+              "required": true,
+              "maxLength": 60
+            },
+            {
+              "name": "pages",
+              "type": "number",
+              "label": "Pages",
+              "min": 1,
+              "max": 5000
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "add_book": {
+      "description": "Add a book to the To read column.",
+      "input": {
+        "title": {
+          "type": "text"
+        },
+        "author": {
+          "type": "text"
+        },
+        "pages": {
+          "type": "number",
+          "default": 100
+        }
+      },
+      "do": [
+        {
+          "insert": "books",
+          "value": {
+            "title": "{{ input.title }}",
+            "author": "{{ input.author }}",
+            "status": "To read",
+            "pages": "{{ input.pages }}"
+          }
+        },
+        {
+          "toast": "Book added"
+        }
+      ]
+    },
+    "move_book": {
+      "description": "Move a book to another column.",
+      "input": {
+        "title": {
+          "type": "text"
+        },
+        "status": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "update": "books",
+          "where": "item.title == input.title",
+          "value": {
+            "status": "{{ input.status }}"
+          }
+        }
+      ]
+    }
+  }
+}
