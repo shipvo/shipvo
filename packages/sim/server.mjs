@@ -179,6 +179,16 @@ async function newSession(id, opts = {}) {
     try { await s.page.evaluate((u) => { globalThis.__pnDevice?.setInitialUrl?.(u); return globalThis.__pnDevice?.openUrl(u); }, String(url)); } catch {}
     return true;
   });
+  // The share sheet: which installed apps it lists, and what happens when one is picked. Same hand-off as a link for another app.
+  await ctx.exposeFunction("__pnShareTargets", () => { const s = sessions.get(id); return s ? s.apps.installed_apps.filter((a) => a.id !== s.apps.current_app).map((a) => ({ id: a.id, name: a.name })) : []; });
+  await ctx.exposeFunction("__pnShareTo", async (target, payload) => {
+    const s = sessions.get(id); if (!s) return false;
+    try { assertUnlocked(s.life); assertForeground(s.nav); } catch { return false; }
+    if (target === s.apps.current_app || !s.apps.installed_apps.some((a) => a.id === target)) return false;
+    try { await switchToApp(s, s.page, target); } catch { return s.apps.current_app === target; }
+    try { await s.page.evaluate((p) => globalThis.__pnDevice?.deliverShare?.(p), { message: payload?.message, url: payload?.url, title: payload?.title }); } catch {}
+    return true;
+  });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${bk}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   await ctx.addInitScript(installNetGate);
   const page = await ctx.newPage();
@@ -356,9 +366,9 @@ async function act(id, body) {
     if (covered) throw fail("covered", String(body.ref));
   };
   // A locked phone takes no input: say so with a typed error before anything reaches the app.
-  if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "open_notification", "install_app", "uninstall_app", "switch_app", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "share_to", "open_notification", "install_app", "uninstall_app", "switch_app", ...SHADE_ACTIONS, ...SETTINGS_ACTIONS].includes(body.action)) { try { assertUnlocked(s.life); } catch (e) { throw new SimError(e.code, e.message); } }
   // Home screen or app switcher showing: the app is in the background and takes no input.
-  if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
+  if (["tap", "tap_xy", "type_keys", "type", "scroll", "back", "open_url", "share_to", "open_notification", "open_notifications", "open_control_center", "toggle_tile", "dismiss_notification"].includes(body.action)) { try { assertForeground(s.nav); } catch (e) { throw new SimError(e.code, e.message); } }
   // An open panel covers the app on a phone, so input to the app is refused until it is closed.
   if (["tap", "tap_xy", "type_keys", "type", "scroll"].includes(body.action) && s.shade.open !== "none") throw new SimError("panel_open", `a panel (${s.shade.open}) is open and covers the app, so nothing was sent to it. Close it first (close_panels).`);
   switch (body.action) {
@@ -560,6 +570,14 @@ async function act(id, body) {
       if (!handled) throw new SimError("no_url_listener", `the app has no URL listener, so it did not handle ${body.url}. Register one with onUrl from @shipvo/device.`);
       await page.waitForTimeout(400); break;
     }
+    case "share_to": {
+      if (typeof body.app_id !== "string" || !body.app_id) throw new SimError("bad_app", "share_to needs an app_id, the app to share to");
+      const r = await page.evaluate((id) => globalThis.__pnDevice?.shareTo?.(id) ?? "none", body.app_id);
+      if (r === "none") throw new SimError("no_share_sheet", "no share sheet is open. Call Share.share in the app first.");
+      if (r === "unknown") throw new SimError("not_share_target", `the share sheet does not list '${body.app_id}'. Pick an installed app other than the one sharing.`);
+      await page.waitForTimeout(700);
+      return { app: body.app_id, screen: await screen(s.page) };
+    }
     // Stub fetch/XHR on the page. Rules live on the session; unmatched requests continue untouched.
     case "set_network_mocks": {
       let rules; try { rules = parseMockRules(body.rules ?? []); } catch (e) { throw new SimError(e.code ?? "mock_invalid", e.message); }
@@ -621,7 +639,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, share_to, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

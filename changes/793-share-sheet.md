@@ -1,0 +1,3 @@
+- sim + device: `Share.share({ message, url })` opens a share sheet that lists the other installed apps and Copy, in the Android and iPhone skins. It is labelled "Share sheet" in the accessibility tree.
+- mcp: new `share_to { app_id }` tool picks an app on the open sheet. The app comes to the front and gets the message and url through `onShare` (and `getInitialShare`) from `@shipvo/device`. Errors: `no_share_sheet`, `not_share_target`. Device-log entries are marked simulated.
+- device: `device.share.text` now uses the same sheet.

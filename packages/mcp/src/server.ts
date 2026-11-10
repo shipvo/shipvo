@@ -377,6 +377,8 @@ use(server, tools.open_notification,
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "open_notification", id })); });
 use(server, tools.open_url, 
   async ({ session, url }) => { need(session); return result(session, await act({ session, action: "open_url", url })); });
+use(server, tools.share_to, 
+  async ({ session, app_id }) => { need(session); return result(session, await act({ session, action: "share_to", app_id })); });
 use(server, tools.lock, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "lock" })); });
 use(server, tools.unlock, 

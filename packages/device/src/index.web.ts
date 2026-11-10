@@ -223,15 +223,7 @@ export const device: Device = {
     onReceived(cb) { recvSubs.add(cb); return () => { recvSubs.delete(cb); }; },
   },
   share: {
-    async text(text, title) {
-      let ok = false;
-      await sheet("Share", (card, close) => {
-        card.append(p(title ?? text));
-        for (const t of ["WhatsApp", "Messages", "Copy"]) card.append(btn(t, () => { ok = true; if (t === "Copy") state.clipboard = text; log("share", { target: t, text }); close(); }));
-        card.append(btn("Cancel", () => close()));
-      });
-      return ok;
-    },
+    async text(text, title) { return shareSheet({ message: text, title }); },
   },
   contacts: {
     async getAll() {
@@ -314,6 +306,10 @@ g.__pnDevice = {
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
   /** Set the URL `Linking.getInitialURL()` returns for this load. `null` clears it. */
   setInitialUrl(url: string | null) { initialUrl = url ?? null; },
+  /** Hand the app a share from another app, and set what `getInitialShare()` returns. */
+  deliverShare(p: SharePayload) { initialShare = p; return deliverShare(p); },
+  /** Pick an app on the open share sheet. "none" when no sheet is open, "unknown" when the sheet does not list that app. */
+  shareTo(id: string): "ok" | "none" | "unknown" { if (!openShare) return "none"; if (!openShare.ids.includes(id)) return "unknown"; openShare.pick(id); return "ok"; },
   capabilities: () => device.capabilities(),
   /** What the status bar shows: network, airplane and battery. */
   status: () => ({ online: isOnline(), airplane: state.airplane, battery: { ...state.battery } }),
@@ -368,6 +364,59 @@ function deliverLocal(url: string): boolean {
   return urlSubs.size > 0;
 }
 export const openUrl = async (url: string) => { deliverUrl(url); };
+export type SharePayload = { message?: string; url?: string; title?: string };
+const shareSubs = new Set<(p: SharePayload) => void>();
+let initialShare: SharePayload | null = null;
+/** Call `cb` with each share another app sends to this one (the simulator's share sheet). Returns an unsubscribe function. */
+export const onShare = (cb: (p: SharePayload) => void) => { shareSubs.add(cb); return () => { shareSubs.delete(cb); }; };
+/** The share this app was opened with, once. */
+export const getInitialShare = (): SharePayload | null => { const s = initialShare; initialShare = null; return s; };
+function deliverShare(p: SharePayload): boolean {
+  window.dispatchEvent(new CustomEvent("pn:share", { detail: p }));
+  shareSubs.forEach((f) => f(p)); log("share_received", { message: p.message, url: p.url, handled: shareSubs.size > 0 });
+  return shareSubs.size > 0;
+}
+let openShare: { ids: string[]; pick: (id: string) => void } | null = null;
+const ICONS = { app: "M5 5h14v14H5z", copy: "M8 8h11v11H8zM5 5h11v2H7v9H5z" };
+const icon = (d: string) => `<svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+/** The share sheet of a phone: lists the installed apps that take shares, plus Copy. The same sheet on Android and iOS, styled for each. */
+async function shareSheet(c: SharePayload): Promise<boolean> {
+  const list = (g as { __pnShareTargets?: () => Promise<{ id: string; name: string }[]> }).__pnShareTargets;
+  let targets: { id: string; name: string }[] = [];
+  try { targets = list ? await list() : []; } catch { targets = []; }
+  const hand = (g as { __pnShareTo?: (id: string, p: SharePayload) => Promise<boolean> }).__pnShareTo;
+  let shared = false;
+  await sheet("Share", (card, close) => {
+    const host = card.parentElement as HTMLElement;
+    const ios = state.platform === "ios";
+    host.setAttribute("data-pn-share", ios ? "ios" : "android");
+    host.setAttribute("aria-label", "Share sheet");
+    if (ios) Object.assign(card.style, { borderRadius: "14px 14px 0 0", background: "#f2f2f7" });
+    card.append(p(c.title ?? c.message ?? c.url ?? ""));
+    if (c.message && c.url) card.append(p(c.url));
+    const row = (label: string, d: string, id: string | null, run: () => void) => {
+      const b = btn("", run); b.setAttribute("aria-label", label); if (id) b.setAttribute("data-pn-share-app", id);
+      b.innerHTML = `${icon(d)}<span style="margin-left:10px">${label.replace(/^Share to /, "").replace(/[<>&]/g, "")}</span>`;
+      Object.assign(b.style, { display: "flex", alignItems: "center", justifyContent: "flex-start", width: "100%", textAlign: "left" });
+      return b;
+    };
+    const ids: string[] = [];
+    for (const t of targets) {
+      ids.push(t.id);
+      card.append(row(`Share to ${t.name}`, ICONS.app, t.id, () => { shared = true; log("share", { target: t.id, message: c.message, url: c.url }); const done = hand ? hand(t.id, c).catch(() => false) : Promise.resolve(false); done.finally(close); }));
+    }
+    card.append(row("Copy", ICONS.copy, null, () => { shared = true; state.clipboard = [c.message, c.url].filter(Boolean).join("\n"); log("share", { target: "Copy", message: c.message, url: c.url }); close(); }));
+    card.append(btn("Cancel", () => close()));
+    openShare = { ids, pick: (id) => (host.querySelector(`[data-pn-share-app="${id}"]`) as HTMLElement | null)?.click() };
+  });
+  openShare = null;
+  return shared;
+}
+/** `Share` from react-native, on the simulated phone. Opens the share sheet and resolves when it closes. */
+export const Share = {
+  sharedAction: "sharedAction", dismissedAction: "dismissedAction",
+  async share(content: SharePayload) { return { action: (await shareSheet(content)) ? "sharedAction" : "dismissedAction" }; },
+};
 let initialUrl: string | null = null;
 /** The `Linking` API of a phone, backed by the simulated device. `openURL` goes through `openUrl`; its log entry is marked simulated. */
 export const Linking = {

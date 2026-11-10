@@ -2279,6 +2279,36 @@
     }
   },
   {
+    "name": "share_to",
+    "description": "Pick an app on the share sheet that the running app opened with Share.share. The chosen app comes to the front and receives the shared message and url (onShare from @shipvo/device). Fails with no_share_sheet when no sheet is open, or not_share_target if the sheet does not list that app.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "app_id": {
+          "type": "string",
+          "description": "The id of an installed app listed on the sheet"
+        }
+      },
+      "required": [
+        "session",
+        "app_id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "title": "Share to an app",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
     "name": "switch_app",
     "description": "Open an installed app (tap its icon on the home screen): it becomes current_app and comes to the front. Fails with not_installed. Logged in device_log as simulated.",
     "inputSchema": {
