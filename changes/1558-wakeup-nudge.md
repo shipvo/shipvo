@@ -1,0 +1,2 @@
+- `register_wakeup` takes `format`: `json` (default), `text` (one plain line for a push service such as ntfy) or `slack` (`{"text": line}`). The text and slack formats tell the person to open their chat when a message or task arrives for an assistant that no URL can start. New error code `bad_format`. `list_wakeups` shows the format.
+- Migration: none; `format` is optional.
