@@ -211,34 +211,35 @@ Add `strings` to the spec: a map from language to `{ "original text": "translate
 
 Add `"presentation": "sheet"` to a screen and to the `navigate` action that opens it. The screen appears as a bottom sheet (a `dialog` in the tree). `{ "back": true }` closes it.
 
-## Data that stays fresh
+## Keep a data source fresh
 
-Add `refresh` to an `http` data source and Shipvo fetches it again on that many seconds while the app is installed. A pinned or long-open app shows current prices or counts with no tap.
+Add `refresh` to an `http` data source to run it again on a timer while the app is installed. The value is a number of seconds, 30 or more. The open screen updates when new data arrives, so a price or a score stays current without a tap.
 
 ```json
-"permissions": { "network": ["api.example.com"] },
 "data": {
-  "price": { "source": "http", "get": "https://api.example.com/price", "refresh": 60 }
+  "price": {
+    "source": "http",
+    "get": "https://api.example.com/price",
+    "refresh": 60
+  }
 }
 ```
 
-- `refresh` is in seconds, 30 or more. The next screen render and the labelled tree show the new value.
-- Each refresh uses the same domain checks, size limits and trimming as the first fetch. Refreshed values are not written to the `cache`.
-- A failed refresh keeps the last value. A source never overlaps itself.
-- Refreshing stops when the app is uninstalled or the session ends, and restarts when you update the spec.
+- Each refresh calls the service again. It does not read `cache`, and refreshed values are not written to it.
+- If a refresh fails, the screen keeps the last value and the next tick tries again.
+- Only public `http` and `https` hosts are called, and redirects are not followed.
+- The timer stops when the app is removed or replaced.
+- The `refresh_app` sim tool runs the same fetch once, on demand.
 
-| Error | Fix |
-| --- | --- |
-| `10 is below the minimum 30.` (`$.data.price.refresh`) | Use 30 or more. |
-| `refresh is only for http data sources.` | Remove `refresh`, or change the source to `http`. |
+| Error path | Meaning | Fix |
+| --- | --- | --- |
+| `$.data.<name>.refresh` below 30 | The interval is too short. | Use 30 or more. |
+| `$.data.<name>.refresh` is not a number | Seconds must be a number, not text. | Write `60`, not `"60"`. |
+| `$.data.<name>.refresh` on a non-`http` source | Only `http` sources refresh. | Remove `refresh`, or change the source to `http`. |
 
 ## Example specs
 
-`packages/spec/gallery/` holds complete specs to copy and change: a habit tracker and a workout log. Each has a collection, a computed total, an action, a form, a bar chart and a list. The workout log uses a dark theme. The gallery tests check that each spec passes `validate`, renders the same tree on the Android and iOS skins, and runs its action.
-
-```bash
-cp packages/spec/gallery/habit-tracker.json my-app.json
-```
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
 
 ## Data sources that use a saved key
 

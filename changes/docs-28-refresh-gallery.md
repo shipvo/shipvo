@@ -1,0 +1,2 @@
+- docs: App spec page covers data source `refresh` and the example specs; `shipvo run` page notes faster rebuilds after a save.
+- Migration: none.

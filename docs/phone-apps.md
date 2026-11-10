@@ -84,6 +84,16 @@ An app's data lives for the session: it starts from the spec's seed data when th
 
 A spec app with an `http` data source can refresh on an interval (`refresh`, in seconds). To fetch it right away, call `refresh_app` with the app id. The phone runs each `http` source, skips its cache, and redraws the open screen if the data changed. The result lists the sources that changed and any errors. A source that fails keeps its last good data. Each call is logged in `device_log` as `data_refresh`.
 
+## See what was built and changed
+
+`app_activity` shows what happened to each app made with `create_app`. For every app it returns:
+
+- **history**: each version with plain lines for what changed (`added screen 'about'`, `removed action 'add'`, `changed data 'prices'`);
+- **sources**: each `http` data source and its refresh interval in seconds (null when only `refresh_app` fetches it);
+- **events**: create, update, action and data refresh, newest last.
+
+Pass `id` for one app and `limit` for the number of recent events. Data and settings a person entered stay across versions, so the history is the record of what the agent changed.
+
 ## Arrange the home screen
 
 `arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then. A window that crosses midnight belongs to the day it starts: `days: ["fri"], from: "22:00", to: "06:00"` shows Friday 22:00 until Saturday 06:00. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
