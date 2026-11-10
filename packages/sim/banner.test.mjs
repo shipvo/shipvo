@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pendingBanner } from "./banner.mjs";
+import { pendingBanner, pendingIds, waitForNew } from "./banner.mjs";
 
 const data = {
   messages: [{ to: "chatgpt", read: false }, { to: "chatgpt", read: false }, { to: "chatgpt", read: true }, { to: "claude", read: false }],
@@ -19,4 +19,22 @@ test("nothing waiting, no caller or no app gives an empty line", () => {
   assert.equal(pendingBanner(data, "gemini"), "");
   assert.equal(pendingBanner(data, ""), "");
   assert.equal(pendingBanner(undefined, "claude"), "");
+});
+
+test("pendingIds lists the ids that wait for the caller", () => {
+  const d = { messages: [{ id: "m1", to: "x", read: false }, { id: "m2", to: "x", read: true }], handoffs: [{ id: "h1", to: "anyone", status: "open" }, { id: "h2", to: "x", status: "done" }] };
+  assert.deepEqual(pendingIds(d, "X"), { messages: ["m1"], tasks: ["h1"] });
+  assert.deepEqual(pendingIds(d, ""), { messages: [], tasks: [] });
+});
+test("waitForNew returns only ids it has not returned, waits for the next arrival, and times out with null", async () => {
+  const d = { messages: [], handoffs: [{ id: "h1", to: "x", status: "open" }] };
+  const seen = new Set();
+  assert.deepEqual(await waitForNew(() => d, "x", seen, 500, 10), { messages: [], tasks: ["h1"] });
+  // the task is still open but was already returned: the wait must time out, not spin
+  const t0 = Date.now();
+  assert.equal(await waitForNew(() => d, "x", seen, 80, 10), null);
+  assert.ok(Date.now() - t0 >= 70);
+  setTimeout(() => d.messages.push({ id: "m1", to: "x", read: false }), 40);
+  assert.deepEqual(await waitForNew(() => d, "x", seen, 2000, 10), { messages: ["m1"], tasks: [] });
+  assert.equal(await waitForNew(() => d, "x", seen, 60, 10), null);
 });

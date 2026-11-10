@@ -35,6 +35,14 @@ describe("event reporting", () => {
     Runtime.markHealthy();
     expect(sent(fetchMock).map((b: any) => b.event)).toEqual(["crash_loop_revert"]);
   });
+  it("sends load_kind with a crash_loop_revert", async () => {
+    const { reportRuntimeEvents, fetchMock } = await load();
+    queue.push("crash_loop_revert:4:reload");
+    reportRuntimeEvents();
+    const [body] = sent(fetchMock);
+    expect(body.load_kind).toBe("reload");
+    expect(Telemetry.safeParse(body).success).toBe(true);
+  });
   it("does not throw or drop other events when fetch rejects", async () => {
     const { Runtime, fetchMock } = await load({ fail: true });
     await expect(Runtime.checkForUpdate(true)).resolves.toMatchObject({ status: "none" });

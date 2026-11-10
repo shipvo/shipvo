@@ -135,6 +135,74 @@ for (const style of ["android", "ios"]) {
   });
 }
 
+for (const style of ["android", "ios"]) {
+  test(`${style}: wait_for_event returns when a message arrives for the caller, and times out when none does`, async () => {
+    const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+    const sid = `sp-wait-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "inbox", spec: INBOX, style })).ok, true);
+    const quiet = await act(sid, { action: "wait_for_event", timeout_ms: 300, agent: "claude-ai" });
+    assert.equal(quiet.ok, true); assert.equal(quiet.event, false);
+    // claude starts waiting; chatgpt sends a message half a second later
+    const waiting = act(sid, { action: "wait_for_event", timeout_ms: 10000, agent: "claude-ai" });
+    await new Promise((r) => setTimeout(r, 500));
+    await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Review please." }, agent: "openai-mcp" });
+    const t0 = Date.now(); const got = await waiting;
+    assert.equal(got.event, true); assert.equal(got.pending.messages.length, 1); assert.deepEqual(got.pending.tasks, []);
+    assert.ok(Date.now() - t0 < 5000);
+    // the same unread message does not wake claude again; a new open task does once, and then not again while it stays open
+    assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 300, agent: "claude-ai" })).event, false);
+    await act(sid, { action: "app_action", id: "inbox", action_name: "hand_off", input: { to: "claude", title: "Test checkout", detail: "" }, agent: "openai-mcp" });
+    const task = await act(sid, { action: "wait_for_event", timeout_ms: 2000, agent: "claude-ai" });
+    assert.equal(task.event, true); assert.deepEqual(task.pending.messages, []); assert.equal(task.pending.tasks.length, 1);
+    assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 300, agent: "claude-ai" })).event, false);
+    // the sender has nothing waiting; a client with no name cannot wait
+    assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 200, agent: "openai-mcp" })).event, false);
+    const anon = await act(sid, { action: "wait_for_event", timeout_ms: 200 });
+    assert.equal(anon.ok, false); assert.equal(anon.code, "no_caller");
+    const bad = await act(sid, { action: "wait_for_event", timeout_ms: 99999, agent: "claude-ai" });
+    assert.equal(bad.ok, false); assert.equal(bad.code, "bad_timeout");
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: register_wakeup POSTs a signed note when a message arrives for that assistant, with no one asking`, async () => {
+    const { createServer } = await import("node:http");
+    const { createHmac } = await import("node:crypto");
+    const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+    const sid = `sp-wake-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "inbox", spec: INBOX, style })).ok, true);
+    const posts = [];
+    const rx = createServer(async (req, res) => { let raw = ""; for await (const c of req) raw += c; posts.push({ h: req.headers, raw }); res.writeHead(204); res.end(); });
+    await new Promise((r) => rx.listen(0, "127.0.0.1", r));
+    try {
+      const url = `http://127.0.0.1:${rx.address().port}/wake`;
+      const refused = await act(sid, { action: "register_wakeup", name: "claude", url });
+      assert.equal(refused.ok, false); assert.equal(refused.code, "host_not_allowed", JSON.stringify(refused).slice(0, 300));
+      const reg = await act(sid, { action: "register_wakeup", name: "claude", url, allow_private: true });
+      assert.equal(reg.ok, true); assert.equal(reg.wakeup.name, "claude"); assert.ok(reg.wakeup.secret);
+      assert.deepEqual((await act(sid, { action: "list_wakeups" })).wakeups.map((w) => w.name), ["claude"]);
+      await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Review the checkout flow." }, agent: "openai-mcp" });
+      for (let i = 0; i < 50 && !posts.length; i++) await new Promise((r) => setTimeout(r, 100));
+      assert.equal(posts.length, 1);
+      const note = JSON.parse(posts[0].raw);
+      assert.equal(note.to, "claude"); assert.equal(note.event, "message"); assert.equal(note.messages.length, 1);
+      assert.ok(!posts[0].raw.includes("checkout"));
+      const m = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(posts[0].h["x-shipvo-signature"]);
+      assert.equal(m[2], createHmac("sha256", reg.wakeup.secret).update(`${m[1]}.${posts[0].raw}`).digest("hex"));
+      const log = (await act(sid, { action: "device_log" })).log.filter((e) => e.name === "wakeup");
+      assert.equal(log.length, 1); assert.equal(log[0].ok, true); assert.equal(log[0].status, 204); assert.equal(log[0].to, "claude");
+      // the other assistant is not woken, and clearing stops it
+      await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "chatgpt", body: "hi" }, agent: "claude-ai" });
+      assert.equal((await act(sid, { action: "clear_wakeup", name: "claude" })).cleared, true);
+      await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "again" }, agent: "openai-mcp" });
+      await new Promise((r) => setTimeout(r, 1200));
+      assert.equal(posts.length, 1);
+    } finally { rx.close(); }
+  });
+}
+
 test("update_app is a new version: entered data stays, the screen changes, a bad spec changes nothing", async () => {
   assert.ok((await call("/session", { session: "sp-up" })).ok);
   assert.equal((await act("sp-up", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);

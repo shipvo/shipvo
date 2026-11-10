@@ -398,16 +398,22 @@ use(server, tools.push_notification,
     if (r.ok && r.delivered === false) return result(session, { ...r, screen: `Not delivered: notification permission is not granted (use set_device permissions.notifications).\n\n${r.screen ?? ""}` });
     return result(session, r);
   });
+use(server, tools.wait_for_event,
+  async ({ session, timeout_ms }) => { need(session); const r = await act({ session, action: "wait_for_event", timeout_ms }) as Act & { event?: boolean; banner?: string; pending?: unknown };
+    if (!r.ok) return result(session, r);
+    return { ...text(r.event ? "Something is waiting for you. Read it with check_inbox or my_tasks." : "nothing yet"), structuredContent: { event: r.event === true, ...(r.pending ? { pending: r.pending } : {}) } }; });
+use(server, tools.register_wakeup,
+  async ({ session, name, url, events, secret, allow_private }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events, secret, allow_private }) as Act & { wakeup?: unknown };
+    if (!r.ok) return result(session, r);
+    return text(JSON.stringify(r.wakeup, null, 2)); });
+use(server, tools.list_wakeups,
+  async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
+use(server, tools.clear_wakeup,
+  async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
 use(server, tools.inbox_wait,
   async ({ session, subject, from, timeout_ms }) => { need(session); const r = await act({ session, action: "inbox_wait", subject, from, timeout_ms }) as Act & { address?: string; message?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, message: r.message }, null, 2)); });
 use(server, tools.inbox_read,
   async ({ session, subject, from }) => { need(session); const r = await act({ session, action: "inbox_read", subject, from }) as Act & { address?: string; messages?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, messages: r.messages }, null, 2)); });
-use(server, tools.register_wakeup,
-  async ({ session, name, url, events }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events }) as Act & { wakeup?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ ...(r.wakeup as object), note: "Keep the secret: it is shown only now. Verify x-shipvo-signature as sha256= plus the hex HMAC-SHA256 of the raw body." }, null, 2)); });
-use(server, tools.list_wakeups,
-  async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
-use(server, tools.remove_wakeup,
-  async ({ session, name }) => { need(session); const r = await act({ session, action: "remove_wakeup", name }) as Act & { removed?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ removed: r.removed })); });
 use(server, tools.inbox_clear,
   async ({ session }) => { need(session); const r = await act({ session, action: "inbox_clear" }) as Act & { cleared?: number }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared })); });
 use(server, tools.notifications, 

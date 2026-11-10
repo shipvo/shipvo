@@ -1,2 +1,0 @@
-- `@shipvo/mcp`: new tools `register_wakeup`, `list_wakeups` and `remove_wakeup`. When a message or task arrives in the Assistant Inbox for a registered name, the phone POSTs `{ to, event, summary }` to the assistant's https URL, signed with HMAC-SHA256 in `x-shipvo-signature` (secret shown once). Failed deliveries are retried 3 times, and every attempt is in `device_log`. Localhost, private and link-local addresses are refused, also after a redirect.
-- Migration: none. Additive tools.
