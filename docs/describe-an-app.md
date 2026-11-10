@@ -24,9 +24,9 @@ If step 2 fails, the agent gets a list of problems, each with where it is and ho
 | `create_app { session, id, spec, name?, style?, open? }` | Checks the spec, installs the app and opens it. `style` is `"android"` (default) or `"ios"`. `open: false` stays on the current screen. |
 | `update_app { session, id, spec }` | Replaces the spec as a new version of the same app. Data and settings people entered stay. The back stack and unsent form text start again. |
 | `run_app_action { session, id, action, input }` | Runs one action by name, as its form would. |
-| `refresh_app { session, id }` | Fetches the app's `http` data sources now. |
-| `app_activity { session, id?, limit? }` | Versions with plain change lines, data sources, and events (create, update, action, data refresh). |
-| `export_phone_apps` / `import_phone_apps` | Copy spec apps, with their data and layout, to another phone. |
+| `refresh_app { session, id }` | Fetches the app's `http` data sources now. The text says which sources updated (`Refreshed notes: updated feed`) and lists any source error with "kept last good data". `structuredContent` is `{ updated, errors }`. |
+| `app_activity { session, id?, limit? }` | Versions with plain change lines, data sources, and events (create, update, action, data refresh). The text lists each app's versions, sources (`every 60 s` or `refresh on request`) and events, one per line. `structuredContent` is `{ apps }`. With no spec apps it says "No spec apps on this phone." |
+| `export_phone_apps` / `import_phone_apps` | Copy spec apps, with their data and layout, to another phone. `export_phone_apps` returns the JSON as text and as `structuredContent` `{ format, apps }`. |
 
 The `id` you pass to `create_app` uses lowercase letters, digits and dashes, up to 40 characters, and it starts with a letter or digit. The `app.id` inside the spec follows the spec schema and is a separate rule.
 
