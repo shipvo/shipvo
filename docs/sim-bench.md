@@ -1,24 +1,24 @@
 # Simulator cost
 
-This page is for developers who run the simulator on their own machine or in CI and want to size it. You will get the measured session start time and memory for the Shipvo simulator, and a script that measures them on your hardware. These numbers come from `scripts/sim-bench/run.mjs`. Nothing here is an estimate.
+This page is for developers and self-hosters who want to know what one simulator session costs. You will measure how long a session takes to start and how much memory it uses, then compare with the numbers measured in this repo. All numbers come from `scripts/sim-bench/run.mjs`.
 
 ## Run it
 
-1. Build the sample app for the web (from the repository root):
+1. Build the sample app for the web:
 
    ```bash
    cd apps/tide-and-tackle && PN_SIM=1 npx expo export --platform web --output-dir sim-dist && cd ../..
    ```
 
-2. Run the benchmark:
+2. Run the bench:
 
    ```bash
    node scripts/sim-bench/run.mjs --sessions 5 --out .shipvo/sim-bench.json
    ```
 
-   Options: `--sessions <n>` (whole number, 1 or more, default 5), `--out <file>` (JSON result, default `.shipvo/sim-bench.json`), `--port <n>` (default 4749).
+3. Read the table it prints, or open `.shipvo/sim-bench.json`.
 
-3. Read the table it prints (session start in ms, then memory after 1, 3 and 5 open sessions) and the JSON file with the same data.
+Options: `--sessions` (whole number, 1 or more; default 5), `--out` (JSON file; default `.shipvo/sim-bench.json`) and `--port` (default 4749).
 
 The script starts `@shipvo/sim` for the sample app, waits for Chromium to launch, then opens sessions one after another and keeps them open.
 
@@ -52,16 +52,18 @@ Measured on 2026-11-05, 5 sessions, sample app `apps/tide-and-tackle` (local web
 
 From the table, each extra session added about 135 MB on this run (1142.1 − 599.8, over 4 sessions: 135.6 MB).
 
-Run the script on your own machine to get your numbers.
+These numbers are from one run of the sample app, on the machine above. For measurements at higher session counts, see [Simulator scale results](https://shipvo.dev/products/simulators/).
 
 ## Troubleshooting
 
-- **`No web build found. Run: cd apps/tide-and-tackle && PN_SIM=1 npx expo export ...`**: step 1 has not run, or it ran in another folder. Run it again and check that `apps/tide-and-tackle/sim-dist/index.html` exists.
-- **`--sessions must be a whole number, 1 or more`**: pass a whole number such as `--sessions 3`.
-- **Memory shows `n/a`**: memory is read from `/proc`, which exists on Linux. Run the script on Linux, for example in CI.
+| You see | Why | Fix |
+| --- | --- | --- |
+| `No web build found. Run: cd apps/tide-and-tackle && PN_SIM=1 npx expo export ...` | `sim-dist/index.html` does not exist yet. | Run step 1. |
+| `--sessions must be a whole number, 1 or more` | The value is zero, negative or not a number. | Pass `--sessions 5`. |
+| Memory shows `n/a` | The script reads `/proc`, which only Linux has. | Run it on Linux, or use the session start times. |
 
 ## Next steps
 
-- [Agents and the simulator](agents.md): what a session is and how an assistant drives it.
-- [Measured simulator parity](parity-results.md): how closely the simulator matches Android and iOS.
-- [Self-hosting](self-hosting.md): run the simulator and control plane on your own account.
+- [Agent simulator](agents.md): drive the simulator over MCP.
+- [Parity results](parity-results.md): how closely it matches Android and iOS.
+- [Self-hosting](self-hosting.md): run the simulator service yourself.

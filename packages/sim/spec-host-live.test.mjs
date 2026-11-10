@@ -135,6 +135,36 @@ for (const style of ["android", "ios"]) {
   });
 }
 
+for (const style of ["android", "ios"]) {
+  test(`${style}: wait_for_event returns when a message arrives for the caller, and times out when none does`, async () => {
+    const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+    const sid = `sp-wait-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "inbox", spec: INBOX, style })).ok, true);
+    const quiet = await act(sid, { action: "wait_for_event", timeout_ms: 300, agent: "claude-ai" });
+    assert.equal(quiet.ok, true); assert.equal(quiet.event, false);
+    // claude starts waiting; chatgpt sends a message half a second later
+    const waiting = act(sid, { action: "wait_for_event", timeout_ms: 10000, agent: "claude-ai" });
+    await new Promise((r) => setTimeout(r, 500));
+    await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Review please." }, agent: "openai-mcp" });
+    const t0 = Date.now(); const got = await waiting;
+    assert.equal(got.event, true); assert.equal(got.pending.messages.length, 1); assert.deepEqual(got.pending.tasks, []);
+    assert.ok(Date.now() - t0 < 5000);
+    // the same unread message does not wake claude again; a new open task does once, and then not again while it stays open
+    assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 300, agent: "claude-ai" })).event, false);
+    await act(sid, { action: "app_action", id: "inbox", action_name: "hand_off", input: { to: "claude", title: "Test checkout", detail: "" }, agent: "openai-mcp" });
+    const task = await act(sid, { action: "wait_for_event", timeout_ms: 2000, agent: "claude-ai" });
+    assert.equal(task.event, true); assert.deepEqual(task.pending.messages, []); assert.equal(task.pending.tasks.length, 1);
+    assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 300, agent: "claude-ai" })).event, false);
+    // the sender has nothing waiting; a client with no name cannot wait
+    assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 200, agent: "openai-mcp" })).event, false);
+    const anon = await act(sid, { action: "wait_for_event", timeout_ms: 200 });
+    assert.equal(anon.ok, false); assert.equal(anon.code, "no_caller");
+    const bad = await act(sid, { action: "wait_for_event", timeout_ms: 99999, agent: "claude-ai" });
+    assert.equal(bad.ok, false); assert.equal(bad.code, "bad_timeout");
+  });
+}
+
 test("update_app is a new version: entered data stays, the screen changes, a bad spec changes nothing", async () => {
   assert.ok((await call("/session", { session: "sp-up" })).ok);
   assert.equal((await act("sp-up", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);

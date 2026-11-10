@@ -81,9 +81,10 @@ const NAV = [
   { group: "Measured results", pages: [
     { slug: "parity-results", src: "docs/parity-results.md", title: "Simulator vs device parity", desc: "Simulator vs device parity: every screen of three purchase flows compared on Android and iOS, with the method and every result." },
     { slug: "spike-results", src: "docs/spike-results.md", title: "OTA on a 2 GB phone", desc: "Measured on a 2 GB Redmi 9A in Douala: update size, apply time, cold start, rollback and crash-loop revert, with the raw timeline." },
-    { slug: "sim-bench", src: "docs/sim-bench.md", title: "Simulator cost", desc: "Measured session start time and memory for the Shipvo simulator, with the script that measures them on your machine." },
     { slug: "android-crash-loop-paths", src: "docs/android-crash-loop-paths.md", title: "Crash-loop revert on Android", desc: "How an Android phone reverts a release that keeps crashing: the trial path, the promoted path, the 3-boot limit and the 60 s window." },
     { slug: "agent-gate-results", src: "docs/agent-gate-results.md", title: "Agent gate results", desc: "How AI agents scored on real purchase tasks in a React Native app, graded by what the backend received, not what the agent said." },
+    { slug: "sim-bench", src: "docs/sim-bench.md", title: "Simulator cost", desc: "How long a simulator session takes to start and how much memory it uses, measured with a script you can run yourself." },
+    { slug: "lumi-bench", src: "docs/lumi-bench.md", title: "Lumi benchmark", desc: "Screens reached, flows finished and planted bugs found by Lumi on fixed apps, with the command to reproduce every number." },
   ]},
 ];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
