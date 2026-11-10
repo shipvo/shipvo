@@ -1,0 +1,82 @@
+name: save-to-visible
+# Times how long a one-word save takes to show in `shipvo run` on the shop template (issues #1363, #1382).
+# Reads the "rebuilt in N s" line that watchAndRebuild prints, with a warm Metro cache and with a cleared one.
+# Writes both numbers to the run summary and uploads save-to-visible.json so docs can quote them with a link to this run.
+on:
+  workflow_dispatch:
+  schedule: [{ cron: "23 5 * * 1" }]
+permissions:
+  contents: read
+concurrency: { group: save-to-visible, cancel-in-progress: true }
+jobs:
+  measure:
+    name: save to visible (shop template)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --filter "./packages/**" build
+      - name: Scaffold the shop template
+        run: |
+          CLI="$GITHUB_WORKSPACE/packages/cli/dist/cli.js"
+          [ -f "$CLI" ] || CLI=$(node -e "console.log(require.resolve('@shipvo/cli/dist/cli.js',{paths:[process.cwd()+'/packages/cli']}))" 2>/dev/null || true)
+          [ -f "$CLI" ] || { echo "CLI entry not found"; ls packages/cli/dist | head; exit 1; }
+          echo "CLI=$CLI" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/m" && cd "$RUNNER_TEMP/m"
+          node "$CLI" init shop-app --template shop
+          cd shop-app && npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Measure warm and cold
+        run: |
+          set -u
+          cd "$RUNNER_TEMP/m/shop-app"
+          F=src/data/products.json
+          [ -f "$F" ] || F=$(grep -rl '"Enamel mug"' src | head -1)
+          echo "edit file: $F"
+          wait_for() { # file pattern timeout-seconds
+            for i in $(seq 1 "$3"); do grep -q -- "$2" "$1" && return 0; sleep 1; done
+            echo "timed out waiting for: $2"; tail -40 "$1"; return 1
+          }
+          measure() { # label log -> prints seconds
+            local log="$2"
+            : > "$log"
+            node "$CLI" run android --no-open > "$log" 2>&1 &
+            local pid=$!
+            wait_for "$log" "phone at http" 300 || { kill $pid 2>/dev/null; return 1; }
+            sleep 5
+            local before; before=$(grep -c "rebuilt in" "$log" || true)
+            sed -i 's/Enamel mug/Enamel cup/' "$F"
+            for i in $(seq 1 300); do [ "$(grep -c 'rebuilt in' "$log" || true)" -gt "$before" ] && break; sleep 1; done
+            kill $pid 2>/dev/null || true; sleep 2
+            grep "rebuilt in" "$log" | tail -1 | sed -E 's/.*rebuilt in ([0-9.]+) s.*/\1/'
+          }
+          WARM=$(measure warm "$RUNNER_TEMP/warm.log")
+          sed -i 's/Enamel cup/Enamel mug/' "$F"
+          rm -rf "${TMPDIR:-/tmp}"/metro-* "$RUNNER_TEMP"/metro-* .expo .shipvo/sim-next 2>/dev/null || true
+          COLD=$(measure cold "$RUNNER_TEMP/cold.log")
+          echo "warm=$WARM cold=$COLD"
+          printf '{"template":"shop","runner":"ubuntu-latest","warmSeconds":%s,"coldSeconds":%s,"run":"%s/%s/actions/runs/%s"}\n' \
+            "$WARM" "$COLD" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$RUNNER_TEMP/save-to-visible.json"
+          {
+            echo "### One-word save to rebuilt page, shop template, \`shipvo run\` on ubuntu-latest"
+            echo
+            echo "| Metro cache | rebuilt in |"
+            echo "| --- | --- |"
+            echo "| warm | $WARM s |"
+            echo "| cleared | $COLD s |"
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: save-to-visible
+          path: |
+            ${{ runner.temp }}/save-to-visible.json
+            ${{ runner.temp }}/warm.log
+            ${{ runner.temp }}/cold.log
+          if-no-files-found: ignore
