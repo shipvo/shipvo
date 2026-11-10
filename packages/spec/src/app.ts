@@ -14,6 +14,9 @@ export type PressResult =
   | { ok: false; errors: Record<string, string> }
   | { ok: false; error: string };
 
+/** Who is calling. `caller` is the assistant's name (for example "claude" or "chatgpt"); actions read it as `{{ caller }}`. Empty when a person taps the screen. */
+export interface CallContext { caller?: string }
+
 export interface App {
   /** The screen on top of the history. */
   readonly screen: string;
@@ -26,7 +29,7 @@ export interface App {
   /** Validates the form. If every field is fine, runs the submit action with the values as its input. */
   submit(form: string): PressResult;
   /** Runs an action by name, the way a generated MCP tool does. Fills in defaults and refuses missing input. */
-  call(action: string, input?: Record<string, unknown>): PressResult;
+  call(action: string, input?: Record<string, unknown>, context?: CallContext): PressResult;
   /** Presses a button by its label (or id). */
   press(button: string): PressResult;
   /** Turns a toggle on or off, by its label. Writes the state value it is bound to. */
@@ -172,7 +175,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
     return { done: false };
   };
 
-  const runAction = (name: string, input: Obj): PressResult => {
+  const runAction = (name: string, input: Obj, callerName = ""): PressResult => {
     const a = s.actions?.[name];
     if (!a) return { ok: false, error: `There is no action "${name}".` };
     for (const [k, def] of Object.entries<Obj>(a.input ?? {})) {
@@ -186,7 +189,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
     try {
       toast = "";
       current();
-      const r = run(a.do ?? [], { ...last.scope(), input });
+      const r = run(a.do ?? [], { ...last.scope(), input, caller: callerName });
       return { ok: true, value: r.done ? r.value : undefined };
     } catch (e) {
       return { ok: false, error: `action_failed: ${e instanceof Error ? e.message : String(e)}` };
@@ -233,7 +236,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
       if (r.ok) delete drafts[key];
       return r;
     },
-    call: (action, input = {}) => runAction(action, { ...input }),
+    call: (action, input = {}, context) => runAction(action, { ...input }, context?.caller ?? ""),
     press(button) {
       if ((button === "Back" || (button === "Close" && top().sheet)) && history.length > 1) { toast = ""; return back(); }
       const b = find("button", button);
