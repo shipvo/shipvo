@@ -235,6 +235,7 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 - Each refresh calls the service again. It does not read `cache`, and refreshed values are not written to it.
 - If a refresh fails, the screen keeps the last value and the next tick tries again.
 - Only public `http` and `https` hosts are called, and redirects are not followed.
+- Call `refresh_app` with the app id to run every `http` source now and skip the cache. See [phone apps](phone-apps.md).
 - The timer stops when the app is removed or replaced.
 
 | Error path | Meaning | Fix |
@@ -299,6 +300,7 @@ A data source can call a service with a key you saved once in the secret form. T
 - **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
+- **A refreshed value never changes.** Check that `refresh` is 30 or more and the source is `http`. A failed refresh keeps the last value, so check the domain is in `permissions.network`.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps
