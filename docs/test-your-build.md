@@ -58,7 +58,7 @@ The simulator's `POST /session` also takes a `build_url`: a link to a `.tar.gz` 
 | Code | Meaning | What to do |
 | --- | --- | --- |
 | `bad_url` | The URL is not a valid `http(s)` URL. | Check the address. |
-| `host_not_allowed` | The host (or a redirect target) is not an allowed host. | Use an allowed host. To host a build without a link, use [Upload from the terminal](#upload-from-the-terminal). |
+| `host_not_allowed` | The host (or a redirect target) is not an allowed host. | Use a host listed in the simulator's `PN_BUILD_ALLOW_HOSTS` setting (comma-separated host names). To host a build without a link, use [Upload from the terminal](#upload-from-the-terminal). |
 | `too_large` | The file is over the size cap. | Remove unused assets and try again. |
 | `unreachable` | The fetch timed out or the host did not answer. | Check the link opens in a browser, then retry. |
 | `bad_build` | The file must be a `.tar.gz` with `index.html` at the top level and no links. | Fix the archive and try again. |
