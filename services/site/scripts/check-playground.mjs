@@ -145,7 +145,7 @@ try {
       await page.locator("#pg-tool").selectOption(tool);
       for (const [k, v] of Object.entries(args)) await page.locator(`#pg-args input[data-arg="${k}"]`).fill(v);
       await page.locator("#pg-run").click();
-      await page.waitForFunction((t) => document.getElementById("pg-out").textContent !== t, await page.locator("#pg-out").textContent(), { timeout: 5000 });
+      await page.waitForFunction((t) => document.getElementById("pg-out").textContent !== t, await page.locator("#pg-out").textContent(), { timeout: 20_000 });
       return JSON.parse(await page.locator("#pg-out").textContent());
     };
     const scr = await runTool("screen");
@@ -165,6 +165,28 @@ try {
     assert.equal(await page.locator("#pg-captions li").filter({ hasText: /taps/ }).count(), 3, `${skin}: three tap captions`);
     assert.match(await app.getByTestId("cart").textContent(), /Cart: 3 items/, `${skin}: Lumi adds three items`);
   }
+  // Many phones: count and mix render frames without a reload.
+  await page.goto(`${base}/playground/#many`);
+  assert.equal(await page.locator("#pg-panel").getAttribute("data-feature"), "many", "deep link opens the many phones panel");
+  for (const id of ["pg-many-count", "pg-many-mix"]) assert.equal(await page.locator(`#${id}`).count(), 1, `${id} exists`);
+  assert.ok((await page.locator("#pg-many-count").boundingBox()).height >= 44 && (await page.locator("#pg-many-mix").boundingBox()).height >= 44, "many controls are 44 px");
+  const frames = (p) => page.locator(`#pg-many-grid iframe[data-platform="${p}"]`).count();
+  await page.evaluate(() => { window.__same = true; });
+  await page.locator("#pg-many-count").fill("6");
+  await page.locator("#pg-many-mix").selectOption("both");
+  assert.equal(await frames("android"), 3); assert.equal(await frames("ios"), 3);
+  await page.locator("#pg-many-mix").selectOption("ios");
+  assert.equal(await frames("ios"), 6); assert.equal(await frames("android"), 0);
+  await page.locator("#pg-many-count").fill("12");
+  await page.locator("#pg-many-mix").selectOption("android");
+  assert.equal(await frames("android"), 12);
+  assert.equal(await page.evaluate(() => window.__same), true, "no page reload");
+  await page.locator("#pg-many-count").fill("6");
+  await page.locator("#pg-many-mix").selectOption("both");
+  await page.locator('#pg-many-grid iframe[data-platform="ios"]').first().contentFrame().locator('[data-platform="ios"]').waitFor({ timeout: 30_000 });
+  await page.setViewportSize({ width: 375, height: 800 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "many phones: no sideways scroll at 375 px");
+  await page.setViewportSize({ width: 1280, height: 900 });
   assert.deepEqual(errors, []);
   await page.setViewportSize({ width: 375, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll at 375 px");

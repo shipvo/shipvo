@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
-import { loadProfile, installApp, uninstallApp, switchApp, describeApps, profilePatch, AppsError, STORE_FIXTURE, resolveUrl } from "./apps.mjs";
+import { findApps, loadProfile, installApp, uninstallApp, switchApp, describeApps, profilePatch, AppsError, STORE_FIXTURE, resolveUrl } from "./apps.mjs";
 import { createNav } from "./nav.mjs";
 
 const code = (fn) => { try { fn(); } catch (e) { return e.code; } return null; };
@@ -152,4 +152,30 @@ test("a bad placement in a profile is dropped, never thrown on", async () => {
   assert.equal(st.installed_apps[2].placement, undefined);
   assert.deepEqual(st.installed_apps[3].placement, { hidden: true, schedule: { days: ["sun","mon","tue","wed","thu","fri","sat"], from: "00:00", to: "23:59" } });
   assert.deepEqual(homeApps(st, new Date()).map((a) => a.id), ["b", "a", "c"]);
+});
+
+const shelf = [
+  { id: "splitly", name: "Splitly", description: "Split bills with friends. Settle up fast.", tags: ["expenses"], currencies: ["EUR"], version: "1.2.0" },
+  { id: "dollar", name: "Dollar Share", description: "Split bills in dollars.", currencies: ["USD"], version: "1.0.0" },
+  { id: "anyone", name: "Bill Notes", description: "Keep notes on each bill.", version: "0.1.0" },
+  { id: "tide", name: "Tide & Tackle", description: "Fishing shop.", version: "1.0.0" },
+];
+
+test("find_apps: 'split bills' returns the matching app first, with installed flag", () => {
+  const r = findApps(shelf, { query: "Split Bills" }, [{ id: "splitly" }]);
+  assert.equal(r[0].id, "splitly"); assert.equal(r[0].installed, true);
+  assert.equal(r[0].description, "Split bills with friends.");
+  assert.deepEqual(r.map((a) => a.id), ["splitly", "dollar"]);
+});
+
+test("find_apps: currency drops other currencies and keeps apps that declare none", () => {
+  const ids = findApps(shelf, { query: "bill", currency: "eur" }).map((a) => a.id);
+  assert.deepEqual(ids, ["anyone", "splitly"]);
+});
+
+test("find_apps: no match is an empty list; limit is capped at 25", () => {
+  assert.deepEqual(findApps(shelf, { query: "zebra" }), []);
+  const many = Array.from({ length: 40 }, (_, i) => ({ id: `a${i}`, name: `Bill ${i}`, version: "1" }));
+  assert.equal(findApps(many, { query: "bill", limit: 99 }).length, 25);
+  assert.equal(findApps(many, { query: "bill" }).length, 10);
 });
