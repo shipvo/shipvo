@@ -74,16 +74,14 @@ duration=0.733
 
 ## Troubleshooting
 
-| What you see | Why | What to do |
+| What you see | What it means | What to do |
 | --- | --- | --- |
-| `recorder_unavailable` | Playwright or Chromium is not installed. | Run `npm i -D playwright && npx playwright install chromium`, then record again. |
-| `music_unavailable` | You installed from npm, which does not include the mixer script. | Set `SHIPVO_BGMUSIC` to a copy of `scripts/video/bgmusic.py`, or record from a repo checkout. The silent video is kept. |
-| `music_failed` | The mix failed, for example `python3` is missing. | Install `python3` and run the recording again. |
-| `narration_unreadable` | The path to the `.wav` is wrong or the file is not audio. | Check the path from the folder your assistant runs in. The silent video is kept. |
-| `encode_failed` | `ffmpeg` is not installed. | Install `ffmpeg` and `ffprobe`, then record again. |
-| The video is shorter than your narration | The narration is cut to the video length. | Add real steps and waits to the demo, then record again. `notes` in the result says when this happened. |
+| `recorder_unavailable` | The tool that films the phone is not installed | Ask your assistant to run `npm i -D playwright && npx playwright install chromium`, then try again |
+| `frame_unreachable` | The phone is not running | Start it with `shipvo sim` or `shipvo run`, then record again |
+| `encode_failed` | `ffmpeg` is missing | Install ffmpeg, then record again |
+| `narration_unreadable` or `music_failed` | The voice file or music step failed | Your silent video is kept. Fix the file path or install `python3`, then add sound again |
 
-All error codes are in [Record a demo video of the phone](record.md#troubleshooting).
+Every error code is explained in [Record a demo video of the phone](record.md#troubleshooting).
 
 ## Next steps
 
