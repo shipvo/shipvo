@@ -24,8 +24,10 @@ const NAV = [
   { group: "Get started", pages: [
     { slug: "overview", src: "README.md", title: "What Shipvo is", desc: "Shipvo is an open-source React Native framework: signed over-the-air updates for phones and a simulator AI agents operate over MCP." },
     { slug: "getting-started", src: "docs/getting-started.md", title: "Build your first app", desc: "Twenty minutes from nothing to a React Native app that AI agents can open in a simulator and phones update over the air." },
+    { slug: "playground", src: "docs/playground.md", title: "Playground: try Shipvo in your browser", desc: "Try a sample app on an Android phone and an iPhone in your browser, with device features, signed updates and rollback, and a shareable many-phones link." },
     { slug: "run", src: "docs/run.md", title: "Run on a phone in your browser", desc: "Run your app on a simulated Android or iPhone in your own browser with shipvo run, no Playwright, and let your AI assistant drive the same phone." },
     { slug: "lumi", src: "docs/lumi.md", title: "Lumi on Shipvo Phone", desc: "Watch Lumi show each step on the phone, react to failures, and test your app for you with shipvo lumi. No AI account needed." },
+    { slug: "describe-an-app", src: "docs/describe-an-app.md", title: "Describe an app and it appears", desc: "Ask your coding agent for a small app and it appears on an Android or iOS phone; change it later and keep what people entered, with every tool and error explained." },
     { slug: "phone-apps", src: "docs/phone-apps.md", title: "Phone Browser, Settings and system controls", desc: "Change dark mode, text size and language, open web pages and use the home screen, shade and power button on the simulated phone." },
     { slug: "phone-updates", src: "docs/phone-updates.md", title: "OTA updates on the phone", desc: "Publish a release, watch it land on the simulated Android or iOS phone, apply it and see a bad one roll back." },
     { slug: "phone-network", src: "docs/phone-network.md", title: "Network calls on the hosted phone", desc: "How the hosted phone sends your app's HTTP calls through a request proxy, the same on Android and iOS." },

@@ -47,8 +47,9 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 2. Tap Settings, then tap **Secrets**.
 3. Each saved key shows its name, the app, the domain it may call, its access, and when it was last used ("never" if it has not been used).
 4. To replace a key, tap **Rotate** next to it. The screen shows a one-time link. Open that link and paste the new value there. The old value keeps working until you do. Only web links (http or https) are shown, and the key value is never displayed.
-5. To remove a key, tap **Revoke** on its row and confirm. The prompt says this cannot be undone. The key is deleted and its row disappears. Tap **Cancel** and nothing is sent. Apps that used the key can no longer call the service until you save a key again.
-6. Tap **Back** to return to Settings.
+5. To see where a key was used, tap **Use log** on its row. It lists each use with the time (UTC), the app, the host and the outcome. Tap **Use log** again to hide it. A key that was never used says "Not used yet." If the list cannot load, the row says "Could not load the use log. Try again."
+6. To remove a key, tap **Revoke** on its row and confirm. The prompt says this cannot be undone. The key is deleted and its row disappears. Tap **Cancel** and nothing is sent. Apps that used the key can no longer call the service until you save a key again.
+7. Tap **Back** to return to Settings.
 
 If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 
@@ -69,6 +70,8 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 **Private addresses are refused.** `localhost`, `127.x`, `10.x`, `192.168.x`, `169.254.x`, CGNAT addresses, `.local` and `.internal` fail with `host_not_allowed`. To allow them, pass `allow_private: true` (all of them) or `allow_hosts: ["my-dev-box.local"]` (only these). Each navigation is logged in `device_log`. In the app, `openUrl` logs `browser_open_refused` and returns `false` when the Browser refuses a page, so `await` it.
 
 ## Describe an app and it appears
+
+For a step-by-step walkthrough, see [Describe an app](describe-an-app.md).
 
 `create_app { session, id, spec }` takes an app spec ([app spec](design/app-spec.md), `shipvo.app/v0`), checks it, and puts the app on the phone. A spec with problems is refused with `invalid_spec`: every problem comes back with its path in the spec and a fix, and nothing is installed. A valid spec gets an icon on the home screen and opens (pass `open: false` to stay where you are). Pass `style: "ios"` for the iPhone look; the default is Android.
 

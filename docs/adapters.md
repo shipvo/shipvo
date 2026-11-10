@@ -47,7 +47,7 @@ Telemetry event names are in `packages/schema/src/index.ts` (`Telemetry.event`).
 
 ## Where each rule runs
 
-Per platform on the device (Android and iOS each have their own code): rules 2 to 5, the device side of rule 6 (sending the bytecode version), and 9 to 15. On the control plane for both platforms: 1, 6 (server side), 7 and 8. The device sends `?hbc=` and `?nm=` and reads the typed 404 answer.
+For the React Native runtimes, per platform on the device (Android and iOS each have their own code): rules 2 to 5, the device side of rule 6 (sending the bytecode version), and 9 to 15. Rule 1 runs on the control plane for both platforms, plus a device check on iOS. Rule 15 is per platform. On the control plane for both platforms: 1, 6 (server side), 7 and 8. The device sends `?hbc=` and `?nm=` and reads the typed 404 answer.
 
 A runtime port that loads web assets from a server path (as Capacitor does) picks its bundle through its own host hook, so rules 10 to 14 are written against that hook. `@shipvo/capacitor` does this in `packages/capacitor/src/engine.ts`.
 
