@@ -29,7 +29,7 @@ import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, pinApp, hideApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, describeApps, pinApp, hideApp, arrangeApp, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -239,6 +239,8 @@ async function reapplyNetProfile(s, page) {
   if (s.netProfile) await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
 }
 const specHost = new SpecHost();
+// The phone's clock: the real time, or the time a test set with set_time.
+const nowOf = (s) => (s.clockMs != null ? new Date(s.clockMs) : new Date());
 const sidOf = (s) => [...sessions].find(([, v]) => v === s)?.[0];
 // The bundle a Store listing points at: app://<id>[@rN] is the published web artifact; an http(s) URL is fetched as given.
 // Same host guard and size cap as build_url. Resolves { sha256, bytes }, or throws SimError store_app_unreachable / too_large / host_not_allowed.
@@ -374,7 +376,7 @@ async function act(id, body) {
       if (ev) await page.evaluate(setVisibilityInPage, ev);
       if (body.action === "kill_app") { s.life.reloads++; await boot(s); await page.evaluate(setVisibilityInPage, "background"); }
       const where = s.nav.where;
-      return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)\n${describeApps(s.apps)}` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
+      return { where, appState: where === "app" ? "active" : "background", reloads: s.life.reloads, screen: where === "app" ? await screen(page) : where === "home" ? `Home screen\n- button "${APP_NAME}" (the app icon: resume_app opens it)\n${describeApps(s.apps, nowOf(s))}` : `App switcher\n- card "${APP_NAME}" (resume_app opens it, kill_app closes it)` };
     }
     // Describe an app and it appears: a spec is validated, started and installed with an icon on the home screen.
     case "create_app": {
@@ -391,7 +393,19 @@ async function act(id, body) {
         try { await switchToApp(s, page, appId, true); }
         catch (e) { s.apps.installed_apps = s.apps.installed_apps.filter((a) => a.id !== appId); s.apps.log = s.apps.log.filter((l) => !(l.app === appId && l.name === "create_app")); specHost.drop(sidOf(s), appId); throw e; }
       }
-      return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+      return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+    }
+    // Home screen layout: pin, hide, reorder and schedule an installed app.
+    case "arrange_apps": {
+      const { id: appId, ...patch } = body; delete patch.action; delete patch.session;
+      try { arrangeApp(s.apps, String(appId ?? ""), patch); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      return { installed_apps: s.apps.installed_apps, home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+    }
+    // The phone's clock, for schedules. at: an ISO time like 2026-11-14T09:00:00, or null for the real time.
+    case "set_time": {
+      if (body.at == null) s.clockMs = null;
+      else { const t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/.test(String(body.at)) ? Date.parse(String(body.at)) : NaN; if (Number.isNaN(t)) throw new SimError("bad_time", "at must be a time like 2026-11-14T09:00:00, or null"); s.clockMs = t; }
+      return { now: nowOf(s).toString(), home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Copy every spec app out of the phone: spec, style, collection data and settings. Vault values are never held by the phone, so none can appear.
     case "export_apps": {
@@ -428,7 +442,7 @@ async function act(id, body) {
         s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec" });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }
-      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
     case "update_app": {
@@ -448,7 +462,7 @@ async function act(id, body) {
       const id = String(body.id ?? "");
       try { (body.action === "pin_app" ? pinApp : hideApp)(s.apps, id, body.action === "pin_app" ? body.pinned !== false : body.hidden !== false); }
       catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
-      return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+      return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
     case "app_action": {
@@ -479,10 +493,10 @@ async function act(id, body) {
       } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       if (body.action === "uninstall_app" && s.nav.where === "home") await page.evaluate(setVisibilityInPage, "background");
       const where = s.nav.where;
-      return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+      return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Read-only: what a frame page needs to draw this phone's home screen and Store. Not in device_log.
-    case "phone_apps": return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, store: s.apps.store, locked: s.life.locked, skin: s.skin, screen: null };
+    case "phone_apps": return { now: nowOf(s).getTime(), where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, store: s.apps.store, locked: s.life.locked, skin: s.skin, screen: null };
     // Search the Store by need. Read-only; logged in device_log as simulated.
     case "find_apps": {
       const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
@@ -631,11 +645,11 @@ async function act(id, body) {
       const jpeg = body.format === "jpeg"; const p = join(DIR, `${id}-${Date.now()}.${jpeg ? "jpg" : "png"}`);
       // Home screen or switcher showing: draw it over the app for the shot, then take it away. The app stays loaded underneath.
       const away = s.nav.where !== "app";
-      if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME) + (s.nav.where === "home" ? `<style>${storeCss}</style><div class="sf-apps" style="position:fixed;z-index:2147483647;color:#fff;font-family:system-ui,sans-serif">${installedIconsHtml(s.apps)}</div>` : ""));
+      if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME) + (s.nav.where === "home" ? `<style>${storeCss}</style><div class="sf-apps" style="position:fixed;z-index:2147483647;color:#fff;font-family:system-ui,sans-serif">${installedIconsHtml(s.apps, nowOf(s))}</div>` : ""));
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, arrange_apps, set_time, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
