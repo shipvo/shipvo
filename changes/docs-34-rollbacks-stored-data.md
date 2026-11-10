@@ -1,0 +1,1 @@
+- Docs: "Rollbacks and stored data" is now in the docs sidebar, with options and troubleshooting, and `state version` is in the glossary.

@@ -27,3 +27,26 @@ shipvo rollback --to 5 --allow-state-downgrade
 ```
 
 The control plane records a rollback that lowers `state_version` in the audit log (`shipvo audit <app>`) with the `from` and `to` versions.
+
+## Options
+
+| Where | Option | What it does |
+| --- | --- | --- |
+| `shipvo.json` | `stateVersion` | Positive integer, signed into each release by `shipvo publish`. Leave it out if you never change stored data. |
+| `shipvo rollback` | `--allow-state-downgrade` | Roll back even when the target's `state_version` is lower than the one phones run. |
+| `shipvo rollback` | `--bands b0,b1,b2` | The check uses the highest `state_version` across the bands you chose. |
+| `shipvo rollback` | `--json` | The refusal is returned with code `state_downgrade` and a ready-to-run command that adds the flag. |
+
+## Troubleshooting
+
+**Rollback stops with "has state_version none".** The target release was published without `stateVersion`, and phones run a release that has one. Publish a fix forward, or pass `--allow-state-downgrade` if you know the old code can read the data.
+
+**I raised `stateVersion` but the check does not fire.** The check compares against the release pointers on the bands you roll back. Run `shipvo rollback --to <n> --dry-run` to see it before anything changes.
+
+**I want to see who chose a downgrade.** Run `shipvo audit <app>`. The entry lists `from` and `to`.
+
+## Next steps
+
+- [CLI guide](cli.md): `publish`, `rollback` and `--json` output.
+- [Staged rollouts and rollback](getting-started.md): ship to a few phones first.
+- [Glossary](glossary.md): state version.

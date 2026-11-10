@@ -125,6 +125,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Home-screen layout (`placement`).** How an app sits on the phone's home screen: pinned, hidden, its position and the days and hours it shows. `export_phone_apps` carries it and `import_phone_apps` restores it.
 
+**State version.** A number you set in `shipvo.json` (`stateVersion`) that says which layout of saved data a release uses. `shipvo rollback` checks it before sending phones to older code. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
+
 **Root key.** An offline key that only signs rotation statements, never updates. `shipvo keys root` creates it. See [Key rotation](key-rotation.md).
 
 **Rotation statement.** A note signed by the root key that tells phones to trust a new release key. `shipvo keys rotate sign` makes it.
