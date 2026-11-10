@@ -391,6 +391,10 @@ use(server, tools.toggle_tile,
   async ({ session, tile, value }) => { need(session); return result(session, await act({ session, action: "toggle_tile", tile, value })); });
 use(server, tools.get_settings, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "get_settings" })); });
+use(server, tools.set_network_profile, 
+  async ({ session, profile }) => { need(session); return result(session, await act({ session, action: "set_network_profile", profile })); });
+use(server, tools.get_network_profile, 
+  async ({ session }) => { need(session); return result(session, await act({ session, action: "get_network_profile" })); });
 use(server, tools.set_setting, 
   async ({ session, key, value }) => { need(session); return result(session, await act({ session, action: "set_setting", key, value })); });
 use(server, tools.dismiss_notification, 
