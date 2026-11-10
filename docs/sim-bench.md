@@ -52,7 +52,7 @@ Measured on 2026-11-05, 5 sessions, sample app `apps/tide-and-tackle` (local web
 
 From the table, each extra session added about 135 MB on this run (1142.1 − 599.8, over 4 sessions: 135.6 MB).
 
-This is a single run, so treat it as one data point, not a range. It covers the sample app only and says nothing about the hosted `services/sim`.
+Run the script on your own machine to get your numbers.
 
 ## Troubleshooting
 

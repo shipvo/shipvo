@@ -205,6 +205,10 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 
 `mark_read`, `start_task` and `finish_task` only act on what was sent to the caller (or to `anyone`). When nothing matched they return `updated: false` with the reason, so an assistant is never told it worked when it did not. A finished task keeps its first reply. Two clients of the same assistant, such as claude.ai and Claude Code, share the name `claude` and so share one inbox. A client that connects with no name has no caller, and these actions then match any row, as they do when a person taps the screen.
 
+### Seeing what is waiting
+
+When the Assistant Inbox is installed, every phone tool result for a session starts with one line about the calling assistant, for example `Inbox: 2 unread for chatgpt, 1 task open`. An assistant sees it on its next call of any phone tool, so nobody has to say "check your inbox". When nothing is waiting, no line is added. This works the same on the Android and iOS phone.
+
 ### Things to do with two assistants on one phone
 
 - **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.

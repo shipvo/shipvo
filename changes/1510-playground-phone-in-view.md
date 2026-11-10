@@ -1,0 +1,1 @@
+- site: on a phone screen, the playground scrolls the phone into view after a Device API choice or a signed-update step, and shows the result line next to the buttons.

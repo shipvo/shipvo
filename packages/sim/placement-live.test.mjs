@@ -27,7 +27,7 @@ before(async () => {
     if (spawnSync(process.execPath, [cli, "install", "chromium"], { stdio: "inherit" }).status !== 0) throw new Error("could not install Chromium for playwright");
   }
   mkdirSync(dist, { recursive: true }); writeFileSync(join(dist, "index.html"), "<!doctype html><title>home</title><h1>Home</h1>");
-  proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", dir, "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
+  proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", dir, "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here, env: { ...process.env, TZ: "UTC" } });
   let err = ""; proc.stderr.on("data", (d) => { err += d; });
   let up = false;
   for (let i = 0; i < 450 && !up; i++) { try { await fetch(`http://localhost:${PORT}/`); up = true; } catch { if (proc.exitCode !== null) throw new Error(`sim exited: ${err}`); await new Promise((r) => setTimeout(r, 200)); } }
@@ -79,6 +79,34 @@ for (const skin of ["android", "ios"]) {
     assert.equal(bad.ok, false); assert.equal(bad.code, "bad_placement");
     assert.equal((await act(sid, { action: "schedule_app", id: "nope", from: "08:00", to: "09:00" })).code, "not_installed");
     assert.equal((await act(sid, { action: "clear_schedule", id: "nope" })).code, "not_installed");
+  });
+}
+
+for (const skin of ["android", "ios"]) {
+  test(`${skin}: schedule_app timezone reads the window in that zone, also across midnight and on days; bad_timezone for an unknown name`, async () => {
+    const sid = `pl8-${skin}`;
+    assert.ok((await call("/session", { session: sid, phone: PHONE, skin })).ok);
+    const at = async (iso) => (await act(sid, { action: "set_time", at: iso })).home;
+    // Phone clock 23:00 UTC on Monday 2026-11-09 is 08:00 Tuesday in Tokyo.
+    assert.equal((await act(sid, { action: "schedule_app", id: "mail", from: "08:00", to: "10:00", timezone: "Asia/Tokyo" })).ok, true);
+    assert.match(await at("2026-11-09T23:00:00"), /button "Mail"/);
+    assert.equal((await act(sid, { action: "schedule_app", id: "mail", from: "08:00", to: "10:00" })).ok, true);
+    assert.doesNotMatch(await at("2026-11-09T23:00:00"), /button "Mail"/);
+    // New York is UTC-5 in November: 23:00 UTC is 18:00 Monday there, and a Monday-only 17:00-19:00 window shows.
+    assert.equal((await act(sid, { action: "schedule_app", id: "mail", days: ["mon"], from: "17:00", to: "19:00", timezone: "America/New_York" })).ok, true);
+    assert.match(await at("2026-11-09T23:00:00"), /button "Mail"/);
+    assert.doesNotMatch(await at("2026-11-10T23:00:00"), /button "Mail"/);   // Tuesday in New York too
+    // Across midnight in New York: Monday 22:00 to 02:00. 03:00 UTC Tuesday is 22:00 Monday there; 08:00 UTC is 03:00.
+    assert.equal((await act(sid, { action: "schedule_app", id: "mail", days: ["mon"], from: "22:00", to: "02:00", timezone: "America/New_York" })).ok, true);
+    assert.match(await at("2026-11-10T03:00:00"), /button "Mail"/);
+    assert.match(await at("2026-11-10T06:30:00"), /button "Mail"/);   // 01:30 Tuesday in New York, the tail of Monday's window
+    assert.doesNotMatch(await at("2026-11-10T08:00:00"), /button "Mail"/);
+    assert.match(await at("2026-11-10T08:00:00"), /America\/New_York/);
+    const bad = await act(sid, { action: "schedule_app", id: "mail", from: "08:00", to: "10:00", timezone: "Mars/Olympus" });
+    assert.equal(bad.ok, false); assert.equal(bad.code, "bad_timezone");
+    const bad2 = await act(sid, { action: "arrange_apps", id: "mail", schedule: { timezone: "nope" } });
+    assert.equal(bad2.code, "bad_timezone");
+    assert.equal((await act(sid, { action: "arrange_apps", id: "mail", schedule: { from: "08:00", to: "10:00", timezone: "Europe/Berlin" } })).installed_apps.find((a) => a.id === "mail").placement.schedule.timezone, "Europe/Berlin");
   });
 }
 
