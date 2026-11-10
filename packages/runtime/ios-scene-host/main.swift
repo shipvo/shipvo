@@ -70,8 +70,16 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     window?.makeKeyAndVisible()
     guard Host.mode == "load" || Host.mode == "healthy" else { return }
     Host.startReact(visible: UIApplication.shared.applicationState != .background)
-    // Give both activation notifications time to arrive, then report. Two counts for one load would show here.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+    // Wait until the app is active (a slow runner can take many seconds), then give both activation notifications
+    // time to arrive and report. Two counts for one load would show here.
+    func report(waited: Double) {
+      if UIApplication.shared.applicationState != .active && waited < 60 {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { report(waited: waited + 0.25) }
+        return
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 2) { finish() }
+    }
+    func finish() {
       let s = Host.makeStore()
       var extra: [String: Any] = ["scene": true]
       if Host.mode == "healthy" {
@@ -80,6 +88,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       }
       Host.write(s, extra); exit(0)
     }
+    report(waited: 0)
   }
 }
 
