@@ -118,3 +118,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Describe an app.** Ask your assistant for a small app in plain words. It writes a spec, `create_app` puts the app on an Android or iOS phone with an icon, and `update_app` changes it later while keeping what people entered. See [Describe an app and it appears](describe-an-app.md).
 
 **App activity.** The list `app_activity` returns for an app made this way: each version with plain lines for what changed, its data sources and its recent events. See [Describe an app and it appears](describe-an-app.md).
+**Signing seed.** The secret key that signs your releases. Every installed app pins its matching public key and accepts only updates signed with it. Shipvo never holds your seed, so back it up (see [Moving to a new machine](new-machine.md)).
+
+**Publish token.** A key that lets one machine or CI job publish releases for your app. `shipvo app create` issues a new one and revokes the old one.
+
+**Shell.** The app build you install from a store. It carries the runtime and your public key. Over-the-air updates change the code inside it.
+
+**Home-screen layout (`placement`).** How an app sits on the phone's home screen: pinned, hidden, its position and the days and hours it shows. `export_phone_apps` carries it and `import_phone_apps` restores it.
