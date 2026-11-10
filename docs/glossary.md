@@ -43,6 +43,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.
 
+**Signing seed.** The secret file (`.shipvo/seed.txt`) that makes the stamp. Back it up once: without it you cannot update phones that already have your app. See [Moving to a new machine](new-machine.md).
+
 **Simulator.** A copy of a phone that runs on your computer and opens in your web browser. It shows your app without a real phone.
 
 **Template.** A ready-made app you change into your own, such as the shop template.
@@ -122,3 +124,9 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Shell.** The app build you install from a store. It carries the runtime and your public key. Over-the-air updates change the code inside it.
 
 **Home-screen layout (`placement`).** How an app sits on the phone's home screen: pinned, hidden, its position and the days and hours it shows. `export_phone_apps` carries it and `import_phone_apps` restores it.
+
+**Root key.** An offline key that only signs rotation statements, never updates. `shipvo keys root` creates it. See [Key rotation](key-rotation.md).
+
+**Rotation statement.** A note signed by the root key that tells phones to trust a new release key. `shipvo keys rotate sign` makes it.
+
+**App permission.** A device permission (such as notifications or location) an app declares and you allow or deny on its install card or in Settings. See [phone apps](phone-apps.md#device-permissions-per-app).

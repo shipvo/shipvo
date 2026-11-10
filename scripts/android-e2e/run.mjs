@@ -92,11 +92,26 @@ await scenario("install and cold start on the bundled release", async () => {
   return { pass: runs.every((r) => r.healthy && r.alive) && !fatal(), firstLaunch: runs[0], runs, median: summarize(runs, ["totalMs", "waitMs", "reportedColdStartMs"]), devicePolledPointer: polled, cohort: prefs().cohort };
 });
 function await_band() { const c = prefs().cohort ?? 0; return c < 10 ? "b0" : c < 100 ? "b1" : "b2"; }
-const BAND = await_band();
+let BAND = await_band(); // changes with every fresh install: the cohort is drawn again
 
+const FIRST_TRIALS = Number(arg("first-trials", 3));
 await scenario("first update after install: patch against the APK's own bundle", async () => {
-  const t = await updateTrial(bundle("v1"), [embedded]);
-  return { pass: t.ok && t.via === "patch", ...t, fullBundleBytes: t.bundleBytes };
+  const trials = [];
+  for (let i = 0; i < FIRST_TRIALS; i++) {
+    // Fresh install each time: uninstall, install, start, wait for the bundled release to report healthy, then publish.
+    // Remove the pointers left by earlier releases first: a new install would apply them before this trial publishes.
+    stop(); try { adb("uninstall", PKG); } catch {}
+    rmSync(join(TREE, "p"), { recursive: true, force: true });
+    if (!/Success/.test(adb("install", "-r", APK))) throw new Error("reinstall failed");
+    const t0 = Date.now(); launch();
+    if (!(await waitFor(() => healthy(0, t0), 30_000))) throw new Error("bundled release not healthy after reinstall " + (i + 1));
+    BAND = await_band();
+    trials.push({ ...(await updateTrial(bundle("v1"), [embedded])), band: BAND });
+  }
+  const gap = (k) => median(trials.map((t) => t.timeline?.gaps?.[k]));
+  return { pass: trials.every((t) => t.ok && t.via === "patch" && t.timeline?.gaps?.pointerToPatchMs != null), trials, trialCount: FIRST_TRIALS, fullBundleBytes: trials[0].bundleBytes,
+    median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"]),
+    phaseMedianMs: { pointerToPatchMs: gap("pointerToPatchMs"), patchToStagedMs: gap("patchToStagedMs"), stagedToHealthyMs: gap("stagedToHealthyMs") } };
 });
 
 await scenario(FULL_BUNDLE_SCENARIO, async () => {
@@ -110,7 +125,7 @@ await scenario("update: bsdiff patch from the running release", async () => {
   const trials = [];
   for (let i = 0; i < PATCH_TRIALS; i++) { const n = 2 + TRIALS + i, prev = history.at(-1).bytes; trials.push(await updateTrial(bundle("v" + n), [prev])); }
   const steady = steadyTrials(trials), keys = ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"];
-  const phase = (k) => median(steady.map((t) => t.timeline.gaps[k]));
+  const phase = (k) => median(steady.map((t) => t.timeline?.gaps?.[k]));
   return { pass: trials.every((t) => t.ok && t.via === "patch"), trials, trialCount: PATCH_TRIALS, trialsInMedian: steady.length, median: summarize(steady, keys),
     phaseMedianMs: { publishToPointerMs: phase("publishToPointerMs"), pointerToPatchMs: phase("pointerToPatchMs"), patchToStagedMs: phase("patchToStagedMs"), stagedToHealthyMs: phase("stagedToHealthyMs"), unaccountedMs: median(steady.map((t) => t.timeline.unaccountedMs)) } };
 });

@@ -1,6 +1,6 @@
 # Moving to a new machine
 
-Switching laptops, or joining a teammate's repo, takes two small steps. One of them matters a lot: the **signing seed**.
+This page is for anyone who is switching laptops or joining a teammate's repo. You will end with the new machine able to publish updates to the phones that already have your app. One step matters a lot: the **signing seed**, a secret value that proves an update is yours (see the [glossary](glossary.md)).
 
 ## What lives where
 
@@ -38,6 +38,21 @@ npx -y @shipvo/cli publish
 
 `keys import` checks the seed against the public key in `shipvo.json` and refuses one that does not match, so you find out now, not when a release is rejected. It writes `.shipvo/seed.txt` with owner-only permissions.
 
+You should see:
+
+```text
+Signing key for "<your app>" restored to .shipvo/seed.txt (matches shipvo.json).
+Next: `shipvo login` then `shipvo app create` to get a publish token on this machine.
+```
+
+Check it worked:
+
+```bash
+npx -y @shipvo/cli doctor
+```
+
+The line `signing key matches shipvo.json publicKey` should pass.
+
 ## If the seed is truly lost
 
 - Phones that already have the app keep working on the release they have. They will never accept another update.
@@ -57,6 +72,20 @@ So back it up once, today, even if you are not moving.
 ## Teams
 
 Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`) and let CI publish, or keep it in a shared vault your team already trusts. Each person runs their own `shipvo login` and `shipvo app create`; publish tokens are per machine.
+
+## Troubleshooting
+
+**`Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE ... or keep it at .shipvo/seed.txt`.** This machine has no seed yet. Run `shipvo keys import --file seed.txt` in the app folder.
+
+**`That does not look like a Shipvo signing seed (a 32-byte value in base64).`** The text you pasted was cut or changed. Copy the whole seed again from your password manager. Do not add quotes.
+
+**`This seed belongs to a different key ... but shipvo.json pins ...`.** The seed is for another app, or for an older key. Find the seed that was saved for this app. Do not change `publicKey` in `shipvo.json` to match it: installed apps would reject your updates.
+
+**`Usage: shipvo keys import <seed>`.** You gave no seed. Pass it as an argument, with `--file`, or on standard input: `echo <seed> | shipvo keys import`.
+
+**`Warning: .gitignore does not ignore .shipvo/`.** Add `.shipvo/` to `.gitignore` so the seed is never committed.
+
+**Not sure everything is in place?** Run `shipvo doctor`. It checks that the signing key matches `shipvo.json` and tells you the command to fix it.
 
 ## Next steps
 
