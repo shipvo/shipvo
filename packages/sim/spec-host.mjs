@@ -1,7 +1,7 @@
 // Runs app specs on the simulated phone. A spec app is a JSON document (see @shipvo/spec). This host keeps one running
 // app per phone and app id, renders its screen as a page the phone shows, and applies the taps, typing and choices
 // that page sends back. The page is real HTML with labelled controls, so the screen and tap tools work on it as on any app.
-import { createApp } from "@shipvo/spec";
+import { createApp, runSource, memoryCache } from "@shipvo/spec";
 
 /** The script the page runs. Controls are found by their role and accessible name, as an agent finds them. */
 export const HOST_SCRIPT = `(function(){
@@ -40,13 +40,56 @@ function fieldName(spec, form, shown) {
 }
 
 export class SpecHost {
-  constructor() { this.running = new Map(); }
+  /**
+   * `timers` is { setInterval, clearInterval } and `context(session, id)` returns the runner context for an app
+   * (fetch, secrets, limits). Both can be replaced in tests; the defaults use the real clock and network.
+   */
+  constructor({ timers = { setInterval, clearInterval }, context } = {}) {
+    this.running = new Map();
+    this.timers = timers;
+    this.cache = memoryCache();
+    this.context = context ?? (() => ({ fetch: (url, init) => fetch(url, init), secrets: () => ({ refused: "unavailable" }), cache: this.cache }));
+    this.refreshing = new Map();
+  }
+
+  /** Re-runs each http data source that sets `refresh` (seconds) on that interval, until the app is dropped or replaced. */
+  schedule(session, id) {
+    const k = key(session, id);
+    this.unschedule(k);
+    const r = this.running.get(k);
+    const handles = [];
+    for (const [name, src] of Object.entries(r?.spec?.data ?? {})) {
+      if (src?.source !== "http" || typeof src.refresh !== "number" || !(src.refresh >= 30)) continue;
+      let busy = false;
+      const h = this.timers.setInterval(async () => {
+        if (busy) return;
+        busy = true;
+        try {
+          const cur = this.running.get(k);
+          if (!cur || cur !== r) return;
+          const value = await runSource(cur.spec, name, { ...this.context(session, id), scope: { state: cur.app.state, data: cur.app.data, ...cur.app.data } });
+          // The app may have been removed or replaced while the request ran.
+          if (this.running.get(k) === cur) cur.app.data[name] = value;
+        } catch { /* a failed refresh keeps the last value and tries again on the next tick */ }
+        finally { busy = false; }
+      }, src.refresh * 1000);
+      h?.unref?.();
+      handles.push(h);
+    }
+    if (handles.length) this.refreshing.set(k, handles);
+  }
+
+  unschedule(k) {
+    for (const h of this.refreshing.get(k) ?? []) this.timers.clearInterval(h);
+    this.refreshing.delete(k);
+  }
 
   /** Starts an app from a spec. Resolves { ok: true } or { ok: false, errors } with a JSON path and a fix for each problem. */
   create(session, id, spec, { style = "android", reduceMotion = false, data, state } = {}) {
     const made = createApp(spec, { style, reduceMotion, ...(data ? { data } : {}), ...(state ? { state } : {}) });
     if (!made.ok) return { ok: false, errors: made.errors };
     this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, version: 1, history: [{ version: 1, at: Date.now() }] });
+    this.schedule(session, id);
     return { ok: true, warnings: made.app.render().warnings ?? [] };
   }
 
@@ -65,6 +108,7 @@ export class SpecHost {
     if (!made.ok) return { ok: false, errors: made.errors };
     const from = cur.version;
     this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now() }] });
+    this.schedule(session, id);
     return { ok: true, version: from + 1, from, warnings: made.app.render().warnings ?? [] };
   }
 
@@ -85,8 +129,8 @@ export class SpecHost {
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
 
   has(session, id) { return this.running.has(key(session, id)); }
-  drop(session, id) { return this.running.delete(key(session, id)); }
-  dropSession(session) { for (const k of [...this.running.keys()]) if (k.startsWith(`${session}/`)) this.running.delete(k); }
+  drop(session, id) { this.unschedule(key(session, id)); return this.running.delete(key(session, id)); }
+  dropSession(session) { for (const k of [...this.running.keys()]) if (k.startsWith(`${session}/`)) { this.unschedule(k); this.running.delete(k); } }
 
   /** The page for an app's current screen. */
   page(session, id) {

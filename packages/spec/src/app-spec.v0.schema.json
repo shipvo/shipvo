@@ -168,6 +168,7 @@
         },
         "select": { "type": "string" },
         "cache": { "type": "string", "pattern": "^[0-9]+(s|m|h|d)$" },
+        "refresh": { "type": "number", "minimum": 30 },
         "paginate": {
           "type": "object",
           "required": ["type"],
