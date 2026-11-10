@@ -103,3 +103,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Real app install from the Store (`install_app`, `find_apps`) | [phone-apps](phone-apps.md) | | | |
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
+| Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
