@@ -134,7 +134,12 @@ export const device: Device = {
   net: { online: () => online, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
 };
 export const setOnline = (o: boolean) => { online = o; netSubs.forEach((f) => f(o)); };
-export { Linking };
+export { Linking, Share };
+export type SharePayload = { message?: string; url?: string; title?: string };
+/** On a phone the system share sheet hands shares to other apps, so there is nothing to subscribe to. Returns a no-op unsubscribe. */
+export const onShare = (_cb: (p: SharePayload) => void) => () => {};
+/** The share this app was opened with. `null` on a phone. */
+export const getInitialShare = (): SharePayload | null => null;
 export const openUrl = (url: string) => Linking.openURL(url);
 /** Call `cb` with each URL opened in the app (deep links). Returns an unsubscribe function. */
 export const onUrl = (cb: (url: string) => void) => { const s = Linking.addEventListener("url", (e) => cb(e.url)); return () => s.remove(); };

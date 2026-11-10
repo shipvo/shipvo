@@ -1,3 +1,5 @@
 - sim + device: `Share.share({ message, url })` opens a share sheet that lists the other installed apps and Copy, in the Android and iPhone skins. It is labelled "Share sheet" in the accessibility tree.
 - mcp: new `share_to { app_id }` tool picks an app on the open sheet. The app comes to the front and gets the message and url through `onShare` (and `getInitialShare`) from `@shipvo/device`. Errors: `no_share_sheet`, `not_share_target`. Device-log entries are marked simulated.
 - device: `device.share.text` now uses the same sheet.
+- device: new exports `Share`, `onShare`, `getInitialShare` and the `SharePayload` type, on Android, iOS and web. Migration: none needed; apps that do not import them are unchanged. On a phone `onShare` returns a no-op unsubscribe and `getInitialShare` returns `null`.
+- device: `device.share.text` on the simulator now lists the installed apps plus Copy, not the fixed WhatsApp and Messages. Migration: tests that tapped "WhatsApp" or "Messages" should pick an installed app with `share_to` or tap "Copy".

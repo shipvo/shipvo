@@ -186,8 +186,8 @@ async function newSession(id, opts = {}) {
     const s = sessions.get(id); if (!s) return false;
     try { assertUnlocked(s.life); assertForeground(s.nav); } catch { return false; }
     if (target === s.apps.current_app || !s.apps.installed_apps.some((a) => a.id === target)) return false;
-    try { await switchToApp(s, s.page, target); } catch { return s.apps.current_app === target; }
-    try { await s.page.evaluate((p) => globalThis.__pnDevice?.deliverShare?.(p), { message: payload?.message, url: payload?.url, title: payload?.title }); } catch {}
+    try { await switchToApp(s, s.page, target); } catch { return false; }
+    try { await s.page.evaluate((p) => globalThis.__pnDevice?.deliverShare?.(p), { message: payload?.message, url: payload?.url, title: payload?.title }); } catch { return false; }
     return true;
   });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${bk}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });

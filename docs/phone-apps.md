@@ -155,3 +155,5 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 ## Open a link in the owning app
 
 `open_url myapp://item/42` finds the installed app that declares the `myapp` scheme. If that app is not the current one, the simulator switches to it. The app's `getInitialURL()` returns the link once, and its `onUrl` listener gets the `url` event. Switching to another app or reloading afterwards does not deliver the link again. Android and iOS skins behave the same. `Linking.openURL` from inside an app does the same for another app's scheme.
+
+`share_to { app_id }` picks an app on the open share sheet (opened by `Share.share` in the app) on Android and iOS. The app comes to the front and receives the message and url through `onShare` or `getInitialShare` from `@shipvo/device`. Errors: `no_share_sheet`, `not_share_target`.

@@ -32,12 +32,13 @@ before(async () => {
   const esbuild = require("esbuild");
   const stub = join(root, "rn.js"); mkdirSync(root, { recursive: true }); writeFileSync(stub, "export const Platform={}, Share={}, Linking={}, Appearance={}, PixelRatio={}, AccessibilityInfo={}, I18nManager={}, Dimensions={};");
   const entry = join(root, "entry.ts");
-  writeFileSync(entry, `import { Share, onShare } from ${JSON.stringify(join(here, "../device/src/index.web.ts"))};
+  writeFileSync(entry, `import { Share, onShare, device } from ${JSON.stringify(join(here, "../device/src/index.web.ts"))};
 onShare((p) => { document.getElementById("got").textContent = "Got " + p.message + " " + p.url; });
-document.getElementById("share").onclick = () => { Share.share({ message: "Look at this", url: "https://example.com/p/1" }); };`);
+document.getElementById("share").onclick = () => { Share.share({ message: "Look at this", url: "https://example.com/p/1" }); };
+document.getElementById("clip").onclick = async () => { document.getElementById("got").textContent = "Clip " + JSON.stringify(await device.clipboard.get()); };`);
   const out = await esbuild.build({ entryPoints: [entry], bundle: true, write: false, format: "iife", platform: "browser", alias: { "react-native": stub }, logLevel: "silent" });
   mkdirSync(dist, { recursive: true });
-  writeFileSync(join(dist, "index.html"), `<!doctype html><html><head><title>fx</title></head><body><h1>Notes</h1><p id="got"></p><button id="share">Share it</button><script>${out.outputFiles[0].text.replace(/<\/script/g, "<\\/script")}</script></body></html>`);
+  writeFileSync(join(dist, "index.html"), `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>fx</title></head><body><h1>Notes</h1><p id="got"></p><button id="share">Share it</button><button id="clip">Read clip</button><script>${out.outputFiles[0].text.replace(/<\/script/g, "<\\/script")}</script></body></html>`);
   proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", dir, "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here });
   let err = ""; proc.stderr.on("data", (d) => { err += d; });
   let up = false;
@@ -85,4 +86,16 @@ test("share_to for an app the sheet does not list returns not_share_target and l
   const r = await act("unk", { action: "share_to", app_id: "nope" });
   assert.equal(r.code, "not_share_target");
   assert.match((await act("unk", { action: "screen" })).screen, /Share sheet/);
+});
+
+test("Copy puts message and url on the clipboard and closes the sheet", async () => {
+  assert.ok((await call("/session", { session: "copy", phone: PHONE, skin: "android" })).ok);
+  const first = await act("copy", { action: "screen" });
+  const r = await act("copy", { action: "tap", ref: ref(first.screen, "Share it") });
+  assert.match(r.screen, /Share sheet/);
+  const c = await act("copy", { action: "tap", ref: ref(r.screen, "Copy") });
+  assert.ok(c.ok, JSON.stringify(c));
+  assert.doesNotMatch((await act("copy", { action: "screen" })).screen, /Share sheet/);
+  const after = await act("copy", { action: "tap", ref: ref((await act("copy", { action: "screen" })).screen, "Read clip") });
+  assert.match(after.screen, /Clip "Look at this\\nhttps:\/\/example\.com\/p\/1"/);
 });

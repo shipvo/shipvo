@@ -396,7 +396,8 @@ async function shareSheet(c: SharePayload): Promise<boolean> {
     if (c.message && c.url) card.append(p(c.url));
     const row = (label: string, d: string, id: string | null, run: () => void) => {
       const b = btn("", run); b.setAttribute("aria-label", label); if (id) b.setAttribute("data-pn-share-app", id);
-      b.innerHTML = `${icon(d)}<span style="margin-left:10px">${label.replace(/^Share to /, "").replace(/[<>&]/g, "")}</span>`;
+      b.innerHTML = `${icon(d)}<span style="margin-left:10px"></span>`;
+      (b.lastElementChild as HTMLElement).textContent = label.replace(/^Share to /, "");
       Object.assign(b.style, { display: "flex", alignItems: "center", justifyContent: "flex-start", width: "100%", textAlign: "left" });
       return b;
     };
