@@ -1,0 +1,3 @@
+- `@shipvo/sim`: new `app_activity` action lists each spec app's versions with what changed, its `http` data sources and its events. `update_app` events in `device_log` now carry the change lines.
+- `@shipvo/mcp`: new tool `app_activity`.
+- Migration: none; new tool.
