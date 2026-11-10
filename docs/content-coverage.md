@@ -127,6 +127,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Show or hide an app on a time window (`schedule_app`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
+| Held release when failures look fake (fresh installs or a burst; owner approves or denies) | [auto-halt](auto-halt.md#when-the-failures-look-like-an-attack) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
 | Export a list as CSV from a spec app (`csv(rows, columns?)`) | [spec-blocks](spec-blocks.md#export-data-as-csv), [phone-apps](phone-apps.md#export-data-as-csv), [app-spec](design/app-spec.md) | | | |
 | Refs after a phone restart (`f1e2`, `p1e5`) work in `tap`, `type`, `scroll`, `wait_for` | [agents](agents.md#troubleshooting) | | | |

@@ -1,6 +1,6 @@
 # Adapters: what a runtime port must do
 
-This page is for a maintainer planning another runtime, such as the Capacitor adapter (epic #297). It lists what the current runtimes do, which release-decision rules exist, and where each one lives. It describes the code as it is. It does not propose moving anything.
+This page is for a maintainer planning another runtime, such as the Capacitor adapter (epic #297). It lists what the current runtimes do, which release-decision rules exist, and where each one lives. It describes the code as it is.
 
 There are two runtimes today: Android (Kotlin) and iOS (Swift). Both sit behind one JS API in TypeScript.
 
@@ -37,7 +37,7 @@ The JS API every adapter must back is the `Native` type in `packages/runtime/src
 | 12 | **Promotion and stability.** `markHealthy` promotes a pending release only if it is the one running. The boot counter is cleared only after the app stays up 30 seconds, or goes to the background cleanly. An uncaught JS error cancels that (`noteCrash`). | Android: `packages/runtime/android/src/main/java/dev/shipvo/runtime/BootRules.kt` (`onHealthy`, `markStableIfHealthy`), `packages/runtime/android/src/main/java/dev/shipvo/runtime/ShipvoRuntimeModule.kt`. iOS: `BundleSelector.promoteIfRunning`, `BundleSelector.markStableIfHealthy`. JS hook: `installCrashHook` in `packages/runtime/src/index.ts`. | Per platform (the crash hook is shared) |
 | 13 | **New shell resets state.** When the installed app version differs from the one the stored bundles were fetched under, all stored bundles and counters are deleted. | Android: `Store.resetForNewShell`. iOS: `Store.resetForNewShell`. | Per platform |
 | 14 | **Rollback.** An app-called `rollback` drops the pending release, blocks the current one, and reverts to the previous one. | Android: `rollback` in `packages/runtime/android/src/main/java/dev/shipvo/runtime/ShipvoRuntimeModule.kt`, `ShipvoHostHandler.revertToPrevious`. iOS: `packages/runtime/ios/ShipvoRuntimeModule.swift`, `BundleSelector.revertToPrevious`. | Per platform |
-| 15 | **Rejection events.** A typed 404 from the control plane (`hermes_bytecode_mismatch`, `native_module_missing`, `native_module_version`) returns `status: "none"` with a `reason`. Android queues `pointer_rejected:<reason>` once, not once per check. | Android: `PointerQuery.rejectionEvent`. iOS returns the reason; I did not find the queued event there. | Per platform |
+| 15 | **Rejection events.** A typed 404 from the control plane (`hermes_bytecode_mismatch`, `native_module_missing`, `native_module_version`) returns `status: "none"` with a `reason`. Android and iOS return the reason to the caller. Android also queues `pointer_rejected:<reason>` once, not once per check. | Android: `PointerQuery.rejectionEvent`. iOS: `Updater.swift`. | Per platform |
 
 Telemetry event names are in `packages/schema/src/index.ts` (`Telemetry.event`).
 
@@ -45,22 +45,25 @@ Telemetry event names are in `packages/schema/src/index.ts` (`Telemetry.event`).
 
 `@shipvo/capacitor` (`packages/capacitor`) is a third implementation, in TypeScript, for a signed web bundle. A web pointer has `kind: "web"`. These rules are now implemented in `packages/capacitor/src/engine.ts` and tested in `packages/capacitor/test/capacitor.test.ts`: 1 (platform and kind), 2, 3 (uses `bandForCohort` from `@shipvo/schema`), 4, 5, 10, 11, 12, 13, 14 and 15 (events are `pointer_rejected:<why>`, queued once per distinct reason). Signature, size and sha-256 checks use WebCrypto. `native.ts` serves the chosen bundle in the web view, and `checkForUpdate({ apply: true })` switches it. A plain web bundle has no bytecode header, so rule 6 has nothing to check. These are one TypeScript copy that Android and iOS Capacitor shells both use, not a fourth copy per OS.
 
-## What a Capacitor port would need to redo
+## Where each rule runs
 
-From the table, these are per platform today, so a Capacitor adapter on each OS would have to write them again or call into the existing Kotlin and Swift:
+For the React Native runtimes:
 
-- Pointer fetch, signature check and hash checks (rules 2, 4, 5, and Verify).
-- Cohort and band choice (rule 3).
-- Bytecode check against the embedded bundle (rule 6). Only needed if the Capacitor bundle is Hermes bytecode. A plain JS bundle has no header, so the check returns "unknown" and allows the release.
-- Patch choice and apply (rule 9).
-- Trial boots, crash-loop window, promotion, stability, new-shell reset and rollback (rules 10 to 14). These depend on how the host picks its bundle at load time. React Native uses `getJSBundleFile` (Android) and a React delegate handler (iOS). Capacitor loads web assets from a server path, so its hook differs.
-- The `Native` JS API (`packages/runtime/src/index.ts`).
+On the control plane, for both platforms:
+- Rule 1: serving and storing the pointer by platform.
+- Rule 6: the server side (`?hbc=`).
+- Rules 7 (capability match) and 8 (halted release).
 
-These need no new work, because the control plane decides them (rules 1, 6 on the server side, 7, 8). The adapter must send `?hbc=` and `?nm=` and handle the typed 404:
+On the device, per platform (Android and iOS each have their own code):
+- Rule 1: the iOS platform check.
+- Rules 2 to 5.
+- Rule 6: the device side (the bytecode header check and sending the versions).
+- Rules 9 to 14.
+- Rule 15: the device reads the typed 404 reason on Android and iOS and returns it with `status: "none"`.
 
-- Platform paths and path/platform match.
-- Native module match.
-- Halted release.
+The device sends `?hbc=` and `?nm=` and reads the typed 404 answer.
+
+A runtime port that loads web assets from a server path (as Capacitor does) picks its bundle through its own host hook, so rules 10 to 14 are written against that hook. `@shipvo/capacitor` does this in `packages/capacitor/src/engine.ts`.
 
 ## Troubleshooting
 
@@ -71,5 +74,7 @@ These need no new work, because the control plane decides them (rules 1, 6 on th
 ## Next steps
 
 - [Capacitor](capacitor.md): signed web-bundle updates for Android and iOS, from one TypeScript engine.
+- [Self-hosting](self-hosting.md): the control plane that decides rules 1, 6, 7 and 8.
 - [Store release](store.md): ship the shell to Google Play and the App Store.
 - [Threat model for signed updates](threat-model.md): why verification is never skipped.
+- [Glossary](glossary.md).
