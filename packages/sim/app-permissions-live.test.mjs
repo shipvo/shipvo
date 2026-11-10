@@ -170,3 +170,28 @@ for (const style of ["android", "ios"]) {
     } finally { await b.close(); }
   });
 }
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: permission_log records install answers, blocks, Settings changes, uses and uninstall`, async () => {
+    const sid = `pl-${style}`;
+    assert.ok((await call("/session", { session: sid })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "remind", spec: REMIND, style, permissions: { notifications: false } })).ok, true);
+    assert.equal((await ping(sid, "remind")).code, "permission_denied");
+    assert.equal((await act(sid, { action: "set_app_permission", id: "remind", permission: "notifications", allowed: true })).ok, true);
+    assert.equal((await act(sid, { action: "app_action", id: "remind", action_name: "ping", input: {}, agent: "claude-ai" })).ok, true);
+    const log = await act(sid, { action: "permission_log", app: "remind" });
+    assert.equal(log.ok, true, JSON.stringify(log).slice(0, 300));
+    assert.deepEqual(log.entries.map((e) => [e.permission, e.event, e.by]), [
+      ["notifications", "denied", "install"], ["camera", "granted", "install"],
+      ["notifications", "blocked", "ping"],
+      ["notifications", "granted", "settings"],
+      ["notifications", "used", "ping"],
+    ]);
+    assert.equal(log.entries.at(-1).caller, "claude");
+    assert.deepEqual((await act(sid, { action: "permission_log", event: "blocked" })).entries.map((e) => e.app), ["remind"]);
+    assert.equal((await act(sid, { action: "permission_log", event: "maybe" })).code, "bad_event");
+    assert.equal((await act(sid, { action: "uninstall_app", id: "remind" })).ok, true);
+    const gone = (await act(sid, { action: "permission_log", app: "remind", event: "removed" })).entries;
+    assert.deepEqual(gone.map((e) => [e.permission, e.by]).sort(), [["camera", "uninstall"], ["notifications", "uninstall"]]);
+  });
+}

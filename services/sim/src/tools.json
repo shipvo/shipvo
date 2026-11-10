@@ -1804,6 +1804,55 @@
     }
   },
   {
+    "name": "permission_log",
+    "description": "Every device permission decision on the phone, oldest first, on Android and iOS: when an app was granted or denied a permission (by install, import, update, the Settings switch or the app's own prompt), when a permission was removed, and each time an app action used a permission or was blocked by a denial, with the assistant that called it. Filter by app, permission or event. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "app": {
+          "type": "string",
+          "description": "Only this app id"
+        },
+        "permission": {
+          "type": "string",
+          "description": "Only this permission, such as camera or notifications"
+        },
+        "event": {
+          "type": "string",
+          "enum": [
+            "granted",
+            "denied",
+            "removed",
+            "used",
+            "blocked"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "description": "Most recent entries to return (default 100)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "pin_app",
     "description": "Pin an installed app to the top of the home screen (Android and iOS style), after any apps pinned before it, or unpin it with pinned: false. Works for Store apps and apps made with create_app, and survives update_app. Fails with not_installed. Logged in device_log.",
     "inputSchema": {
