@@ -1,0 +1,3 @@
+- `@shipvo/schema`: release pointers take an optional `state_version` (positive integer).
+- `@shipvo/cli`: set `stateVersion` in `shipvo.json` and `shipvo publish` signs it into the release. `shipvo rollback` refuses to send phones to a lower `state_version` unless you pass `--allow-state-downgrade`; the control plane records the downgrade in the audit log.
+- Migration: none. Releases without `state_version` behave as before.
