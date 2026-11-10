@@ -1138,6 +1138,103 @@
     }
   },
   {
+    "name": "inbox_clear",
+    "description": "Empty this session's private inbox. Returns how many messages were removed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "inbox_read",
+    "description": "Read this session's private inbox: its address and every message, oldest first, each with from, subject, text, codes (4 to 8 digits) and links. Reading changes nothing: a second call returns the same result.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Only mail whose subject contains this"
+        },
+        "from": {
+          "type": "string",
+          "description": "Only mail whose sender contains this"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "inbox_wait",
+    "description": "Wait for mail in this session's private inbox (its address is in the result; type it into the app's email field). Returns the first message that matches, already there or arriving within timeout_ms: from, subject, text, the 4 to 8 digit codes and the links in it. Use it to finish an emailed code or magic-link sign-in. Fails with inbox_timeout when nothing matches in time. Only this session can read this inbox; mail is kept in memory and removed when the session ends.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Only mail whose subject contains this (not case sensitive)"
+        },
+        "from": {
+          "type": "string",
+          "description": "Only mail whose sender contains this"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 25000,
+          "description": "How long to wait, in ms (default 10000)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "install_app",
     "description": "Install a Store app on the phone, as tapping Install in the Store screen does. The app icon appears on the home screen. Fails with unknown_app (not in the Store) or already_installed. If the marketplace is unreachable the phone's own Store list is used. Logged in device_log as simulated: nothing real is installed.",
     "inputSchema": {
