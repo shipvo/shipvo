@@ -1,0 +1,2 @@
+- docs: new guide "Recover a lost or leaked release key" for Android and iOS apps (`shipvo keys root`, `keys rotate sign`, `keys rotate upload`). `docs/new-machine.md` now leads with the recovery path. `docs/cli.md` and `docs/threat-model.md` describe the rotation path.
+- Migration: none; docs only.
