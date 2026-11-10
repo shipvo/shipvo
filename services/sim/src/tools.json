@@ -1,5 +1,40 @@
 [
   {
+    "name": "app_activity",
+    "description": "What was built and changed on the phone: for each app made with create_app, its versions with a plain line for what changed in each (added, removed or changed screens, actions and data), its http data sources and how often each refreshes, and its events (create, update, action, data refresh). Pass id for one app. Fails with not_installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id; omit for every app"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Most recent events per app (default 50)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "apply_update",
     "description": "Apply the ready release: the app restarts on the new bundle, like restart. After 3 boots that throw, the phone goes back to the old release and the state is reverted with reason crash_loop. Fails with not_ready unless the state is ready. Simulated; logged in device_log.",
     "inputSchema": {
