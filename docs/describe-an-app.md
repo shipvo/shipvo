@@ -84,7 +84,15 @@ Check any spec before you send it:
 
 ```bash
 npm install @shipvo/spec
-node -e 'import("@shipvo/spec").then(({validate}) => console.log(validate(JSON.parse(require("fs").readFileSync("gift-ideas.json","utf8")))))'
+```
+
+Save this as `check.mjs` next to `gift-ideas.json`, then run `node check.mjs`:
+
+```js
+import { readFileSync } from "node:fs";
+import { validate } from "@shipvo/spec";
+
+console.log(validate(JSON.parse(readFileSync("gift-ideas.json", "utf8"))));
 ```
 
 Expected output:
@@ -102,8 +110,8 @@ fix: Add "label": a short name that people and agents see, for example "Add goal
 
 ## Troubleshooting
 
-- **`invalid_spec`.** Read the `path` and `fix` of each problem. Common ones: a button or field without a `label`, an `app.id` that is not a lowercase letter followed by lowercase letters, digits, dashes or underscores (1 to 64 characters in all), a name used in `{{ }}` that is not in `data`, or palette text with too little contrast.
-- **`bad_app_id`.** The id has characters the phone does not accept. The `create_app` id may use lowercase letters, digits and dashes, up to 40 characters. This is a separate rule from the `app.id` in the spec.
+- **`invalid_spec`.** Read the `path` and `fix` of each problem. Common ones: a button or field without a `label`, an `app.id` that is not a lowercase letter followed by lowercase letters, digits or dashes (2 to 63 characters in all), a name used in `{{ }}` that is not in `data`, or palette text with too little contrast.
+- **`bad_app_id`.** The id has a character the phone does not accept, such as a capital letter, a space or an underscore. The `create_app` id may use lowercase letters, digits and dashes, up to 40 characters. A valid id is `gift-ideas`. This is a separate rule from the `app.id` in the spec.
 - **`already_installed`.** An app with that id is on the phone. Use `update_app` to change it, or uninstall it first.
 - **`not_installed` from `update_app` or `app_activity`.** The id is not an app made with `create_app`. Check the id on the home screen or with `list_apps`.
 - **`action_failed`.** The action refused the input. The reason is in the error: for example a required field was empty.
@@ -111,7 +119,7 @@ fix: Add "label": a short name that people and agents see, for example "Add goal
 
 ## Try it without installing anything
 
-The [playground](getting-started.md#try-it-in-your-browser-first) shows phones in your browser. Its agent panel lets you call tools from the page.
+The [playground](getting-started.md#try-it-in-your-browser-first) shows phones in your browser. Type a short description of an app, such as "a gift ideas list", to see it appear.
 
 ## Next steps
 

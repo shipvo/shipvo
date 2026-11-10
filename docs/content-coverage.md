@@ -102,8 +102,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
 | Arrange the home screen (`arrange_apps`, schedules, `set_phone_time`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
 | Describe an app and it appears (`create_app`, `update_app`) | [describe-an-app](describe-an-app.md), [phone-apps](phone-apps.md) | | | |
-| Export and import a phone's apps (`export_phone_apps`, `import_phone_apps`) | [phone-apps](phone-apps.md) | | | |
-| Describe an app and it appears (`create_app`, `update_app`) | [phone-apps](phone-apps.md) | | | |
 | Export and import a phone's apps and home-screen layout (`export_phone_apps`, `import_phone_apps`, layout warnings) | [phone-apps](phone-apps.md) | | | |
 | Real app install from the Store (`install_app`, `find_apps`) | [phone-apps](phone-apps.md) | | | |
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
@@ -118,6 +116,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |
 | Gallery of example specs (`packages/spec/gallery`: habit tracker, workout log, expense splitter, trip checklist, flashcards) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |
+| Signing seed backup and restore on a new machine (`shipvo keys export`, `shipvo keys import`) | [new-machine](new-machine.md) | | | |
 | See what an agent built and changed in a spec app (`app_activity`) | [phone-apps](phone-apps.md#see-what-was-built-and-changed) | | | |
 | Fetch an app's live data now (`refresh_app`) | [phone-apps](phone-apps.md#fetch-live-data-now) | | | |
 | Show or hide an app on a time window (`schedule_app`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |

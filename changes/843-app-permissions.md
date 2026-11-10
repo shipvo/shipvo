@@ -1,0 +1,5 @@
+- `@shipvo/sim`: the install consent card lists each device permission an app declares, with Allow and Deny. Answers are stored per app, shown in `installed_apps`, kept in phone.json, `export_apps` and `import_apps`, and changed later with one Settings toggle per app and permission (`set_app_permission`).
+- `@shipvo/spec`: an action that needs a denied device permission (a `notify` step needs `notifications`) returns `permission_denied` and names the permission. New export `actionDeviceNeeds`; `createApp` takes `devicePermissions`.
+- Migration: none; new options and a new error code.
+- sim: the Settings switch on the `/phone` page now calls `set_app_permission` on the session, so it changes what the app may do (Android and iOS). `set_app_permission` also returns `profile`, the phone as a phone.json object that keeps the answers.
+- sim: `update_app` adds an answer (allowed to start) for each newly declared device permission and drops answers for permissions the new version no longer asks for.
