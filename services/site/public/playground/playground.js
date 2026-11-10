@@ -7,7 +7,12 @@
   if (q.get("platform") === "ios") state.platform = "ios";
   ["dark", "large", "rtl"].forEach(function (k) { if (q.get(k) === "1") state[k] = true; });
 
-  function send() { try { phone.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} replay(); }
+  var manyGrid = null;
+  function sendMany() {
+    if (!manyGrid) return;
+    Array.prototype.forEach.call(manyGrid.querySelectorAll("iframe"), function (fr) { try { fr.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} });
+  }
+  function send() { sendMany(); try { phone.contentWindow.postMessage({ type: "pg:prefs", dark: state.dark, large: state.large, rtl: state.rtl }, "*"); } catch (e) {} replay(); }
   function loadPhone() { phone.title = state.platform === "ios" ? "iOS phone" : "Android phone"; phone.src = phone.getAttribute("data-src-" + state.platform); }
   phone.addEventListener("load", function () { send(); setTimeout(send, 300); });
   window.addEventListener("message", function (e) { if (e.source === phone.contentWindow && e.data && e.data.type === "pg:ready") send(); });
@@ -120,6 +125,8 @@
 
   // Many phones: N frames of the same phone files, Android, iOS or alternating.
   var many = { count: 4, mix: "both" };
+  if (q.has("phones")) { var qn = Math.round(Number(q.get("phones"))); many.count = qn >= 1 ? Math.min(12, qn) : (qn <= 0 ? 1 : 4); }
+  if (q.get("mix") === "android" || q.get("mix") === "ios") many.mix = q.get("mix");
   function manyPanel(panel) {
     var ctl = document.createElement("div"); ctl.className = "pg-many-ctl";
     var l1 = document.createElement("label"); l1.textContent = "Phones";
@@ -128,8 +135,18 @@
     var sel = document.createElement("select"); sel.id = "pg-many-mix";
     [["android", "Android"], ["ios", "iOS"], ["both", "Android and iOS"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
     sel.value = many.mix; l2.appendChild(sel);
-    ctl.appendChild(l1); ctl.appendChild(l2); panel.appendChild(ctl);
-    var grid = document.createElement("div"); grid.className = "pg-many"; grid.id = "pg-many-grid"; panel.appendChild(grid);
+    var copy = document.createElement("button"); copy.type = "button"; copy.id = "pg-many-copy"; copy.textContent = "Copy link";
+    var note = document.createElement("span"); note.id = "pg-many-copied"; note.setAttribute("role", "status"); note.setAttribute("aria-live", "polite");
+    ctl.appendChild(l1); ctl.appendChild(l2); ctl.appendChild(copy); ctl.appendChild(note); panel.appendChild(ctl);
+    var grid = document.createElement("div"); grid.className = "pg-many"; grid.id = "pg-many-grid"; panel.appendChild(grid); manyGrid = grid;
+    copy.addEventListener("click", function () {
+      var u = new URL(location.href), sp = new URLSearchParams();
+      sp.set("phones", String(many.count)); sp.set("mix", many.mix); if (state.dark) sp.set("dark", "1");
+      u.search = "?" + sp.toString(); u.hash = "#many";
+      history.replaceState(null, "", u.toString());
+      note.textContent = "Link copied.";
+      try { navigator.clipboard.writeText(u.toString()).catch(function () { note.textContent = "Link is in the address bar."; }); } catch (e) { note.textContent = "Link is in the address bar."; }
+    });
     function render() {
       var n = Math.round(Number(num.value));
       if (!(n >= 1)) return;
@@ -142,6 +159,7 @@
         fr.setAttribute("data-platform", pl);
         fr.title = (pl === "ios" ? "iOS" : "Android") + " phone " + (i + 1);
         fr.src = phone.getAttribute("data-src-" + pl);
+        fr.addEventListener("load", function () { sendMany(); setTimeout(sendMany, 300); });
         grid.appendChild(fr);
       });
     }
