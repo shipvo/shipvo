@@ -10,6 +10,9 @@ const inputs: Record<string, [string, Record<string, unknown>]> = {
   "expense-splitter": ["add_expense", { who: "Ana", what: "Taxi", amount: 12 }],
   "trip-checklist": ["add_item", { name: "Passport", group: "Documents", qty: 1 }],
   flashcards: ["add_card", { deck: "Spanish", front: "Hello", back: "Hola" }],
+  "reading-board": ["add_book", { title: "Dune", author: "Herbert", pages: 412 }],
+  "meal-planner": ["add_meal", { name: "Paella", day: "2026-11-11", note: "Table for four" }],
+  "favourite-places": ["add_place", { name: "Castle", lat: 38.71, lng: -9.13 }],
 };
 
 const expected: Record<string, { row: Record<string, unknown>; text: string }> = {
@@ -18,6 +21,16 @@ const expected: Record<string, { row: Record<string, unknown>; text: string }> =
   "expense-splitter": { row: { who: "Ana", what: "Taxi", amount: 12 }, text: "Total 12" },
   "trip-checklist": { row: { name: "Passport", group: "Documents", qty: 1 }, text: "Items to pack: 1" },
   flashcards: { row: { deck: "Spanish", front: "Hello", back: "Hola" }, text: "Cards: 1" },
+  "reading-board": { row: { title: "Dune", author: "Herbert", status: "To read", pages: 412 }, text: "Pages on the board: 412" },
+  "meal-planner": { row: { name: "Paella", day: "2026-11-11", note: "Table for four" }, text: "Meals planned: 1" },
+  "favourite-places": { row: { name: "Castle", lat: 38.71, lng: -9.13 }, text: "Places saved: 1" },
+};
+
+// The block that must show the new row, by spec.
+const blocks: Record<string, [string, string]> = {
+  "reading-board": ["listitem", "Dune, Herbert"],
+  "meal-planner": ["event", "Paella"],
+  "favourite-places": ["pin", "Castle"],
 };
 
 function screenText(spec: unknown, data: Record<string, unknown>): string {
@@ -47,7 +60,7 @@ describe("spec gallery", () => {
         expect(Object.keys(spec.data).length).toBeGreaterThan(0);
         expect(Object.keys(spec.actions).length).toBeGreaterThan(0);
         expect(types).toContain('"type":"form"');
-        expect(types).toMatch(/"type":"(list|chart)"/);
+        expect(types).toMatch(/"type":"(list|chart|kanban|calendar|map)"/);
       });
 
       it("renders the same tree on the Android and iOS skins", () => {
@@ -68,6 +81,30 @@ describe("spec gallery", () => {
       });
     });
   }
+
+  for (const id of Object.keys(blocks)) {
+    for (const style of ["android", "ios"] as const) {
+      it(`${id}: the block shows the new row on ${style}`, () => {
+        const spec = JSON.parse(readFileSync(new URL(`${id}.json`, dir), "utf8"));
+        const r = createApp(spec, {});
+        if (!r.ok) throw new Error(JSON.stringify(r.errors));
+        const [action, input] = inputs[id]!;
+        expect(r.app.call(action, input).ok).toBe(true);
+        const t = renderScreen(spec, { style, data: r.app.data });
+        if (!t.ok) throw new Error(JSON.stringify(t));
+        expect(describeTree(t.tree)).toContain(blocks[id]![1]);
+      });
+    }
+  }
+
+  it("reading-board: move_book moves a card to Done", () => {
+    const spec = JSON.parse(readFileSync(new URL("reading-board.json", dir), "utf8"));
+    const r = createApp(spec, {});
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    r.app.call("add_book", { title: "Dune", author: "Herbert", pages: 412 });
+    expect(r.app.move("Dune", "Done").ok).toBe(true);
+    expect((r.app.data.books as any[])[0].status).toBe("Done");
+  });
 
   it("habit-tracker: check_in rejects a missing habit", () => {
     const r = createApp(JSON.parse(readFileSync(new URL("habit-tracker.json", dir), "utf8")), {});
