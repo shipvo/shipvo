@@ -47,8 +47,9 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 2. Tap Settings, then tap **Secrets**.
 3. Each saved key shows its name, the app, the domain it may call, its access, and when it was last used ("never" if it has not been used).
 4. To replace a key, tap **Rotate** next to it. The screen shows a one-time link. Open that link and paste the new value there. The old value keeps working until you do. Only web links (http or https) are shown, and the key value is never displayed.
-5. To remove a key, tap **Revoke** on its row and confirm. The prompt says this cannot be undone. The key is deleted and its row disappears. Tap **Cancel** and nothing is sent. Apps that used the key can no longer call the service until you save a key again.
-6. Tap **Back** to return to Settings.
+5. To see where a key was used, tap **Use log** on its row. It lists each use with the time (UTC), the app, the host and the outcome. Tap **Use log** again to hide it. A key that was never used says "Not used yet." If the list cannot load, the row says "Could not load the use log. Try again."
+6. To remove a key, tap **Revoke** on its row and confirm. The prompt says this cannot be undone. The key is deleted and its row disappears. Tap **Cancel** and nothing is sent. Apps that used the key can no longer call the service until you save a key again.
+7. Tap **Back** to return to Settings.
 
 If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 
