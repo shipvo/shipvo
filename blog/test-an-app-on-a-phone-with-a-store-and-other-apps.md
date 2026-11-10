@@ -12,7 +12,7 @@ kicker: Many apps|one phone
 
 A real phone is never just your app. It has a home screen, a store, a browser, settings and a dozen other apps. Most bugs that users report happen in the gaps between them: the app was opened from a link, a different app was in front, or the home screen did not show what the person expected.
 
-Most test setups cannot reach those gaps, because the emulator holds one app and nothing else. This post shows how to test them on Shipvo Phone, the simulated Android or iOS phone you get in a browser tab. The search phrase we wrote it for is **test a mobile app with other apps installed**. Every call below was run against the simulator in this repo, and the output is what it printed.
+This post shows how to test them on Shipvo Phone, the simulated Android or iOS phone you get in a browser tab. The search phrase we wrote it for is **test a mobile app with other apps installed**. Every call below was run against the simulator in this repo, and the output is what it printed.
 
 ## What is on a Shipvo Phone besides your app
 
@@ -56,7 +56,7 @@ switch_app { session, id: "splitly" }                       -> it is now current
 uninstall_app { session, id: "splitly" }                    -> the phone goes home
 ```
 
-Installing from the marketplace is a real fetch of the published app. `device_log` records the install with `source: "real"` and the `sha256` of the bundle, so a test can check that the bytes it got are the bytes that were published. If the marketplace cannot be reached, you get `store_unreachable` and the tool does not guess. Set `PN_STORE_FIXTURE=1` for a local list of four apps and no network.
+Installing from the marketplace is a real fetch of the published app. `device_log` records the install with `source: "real"` and the `sha256` of the bundle, so a test can check that the bytes it got are the bytes that were published. If the bundle cannot be fetched, the app is not installed and `install_app` returns `store_app_unreachable` (or `too_large`, `host_not_allowed`). `list_store_apps` and `find_apps` return `store_unreachable` when the marketplace cannot be reached, and `install_app` then uses the phone's own Store list. Set `PN_STORE_FIXTURE=1` for a local list of four apps and no network.
 
 ## Pin and hide apps, and see what the home screen shows
 
@@ -120,7 +120,7 @@ Every change is also in `device_log`, with `simulated` set on the ones that only
 
 ## Check that an update keeps what people typed
 
-An app on a phone gets updated. `update_app { session, id, spec }` replaces an app's spec as a new version. Entered data and settings stay, and a bad spec changes nothing. The check that matters is the one users care about: after the update, is their data still there? Write the test with an `export_phone_apps` call before and after. It returns every spec app on the phone as JSON, never including secrets or keys, and `import_phone_apps` recreates them on another phone, so you can copy a whole phone between runs or between Android and iOS styles.
+An app on a phone gets updated. `update_app { session, id, spec }` replaces an app's spec as a new version; entered data and settings stay, and a bad spec changes nothing. To check that data survives, call `export_phone_apps { session }` before and after the update and compare the `data` of each app. `import_phone_apps` recreates the apps on another phone, Android and iOS styles alike.
 
 ## Why this is worth doing
 
