@@ -134,7 +134,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `my_tasks`, `start_task`, `finish_task`; `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
 | Session inbox for emailed codes and magic links (`inbox_wait`, `inbox_read`, `inbox_clear`, `phone.inbox`) | [email-sign-in](email-sign-in.md), [agents](agents.md) | | | |
 | Permissions detected from camera, scanner and file blocks; denied ones give `permission_denied` on a `navigate` screen | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
-| Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
-| Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android), [getting-started](getting-started.md) | | | |
-| Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
 | Key rotations in the audit log (`shipvo audit`, `action: key-rotation`) | [key-rotation](key-rotation.md#see-rotations-in-the-audit-log), [cli](cli.md#shipvo-audit) | | | |
