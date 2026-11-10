@@ -2,7 +2,7 @@
 // Apps see a short stable name as `caller`, so two assistants on one phone are told apart without being asked.
 const KNOWN = [
   [/claude|anthropic/i, "claude"],
-  [/chatgpt|openai|gpt/i, "chatgpt"],
+  [/chatgpt|openai|\bgpt(?:-?\d|\b)/i, "chatgpt"],
   [/cursor/i, "cursor"],
   [/gemini/i, "gemini"],
   [/copilot/i, "copilot"],
