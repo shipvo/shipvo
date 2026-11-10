@@ -238,6 +238,7 @@ When the Assistant Inbox is installed, every phone tool result for a session sta
 | `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
 | `bad_timezone` from `schedule_app` or `arrange_apps` | The `timezone` is not an IANA name | Use a name such as `Europe/Berlin` or `America/New_York`, not `CET` or `Berlin` |
+| `not_supported_attached` | The session is attached to the live `shipvo run` phone, which does not take this tool | Call `open_app` again with `attach: "never"`, or open `<sim>/watch` in a browser |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
 | `updated: false` from `mark_read`, `start_task` or `finish_task` | The id is wrong, the message is for another assistant, or the task is already started or done | Read the `reason`, list yours with `check_inbox` or `my_tasks`, and use an id from there |
