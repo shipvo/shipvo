@@ -16,7 +16,7 @@ export interface ShipvoNativePlugin {
   status(): Promise<{ serving?: string }>;
 }
 
-/** Android only for now (iOS follows): build a stored bundle from another stored bundle and a BSDIFF40 patch. Native checks the patch hash, the rebuilt size and hash, and the memory budget. */
+/** Build a stored bundle from another stored bundle and a BSDIFF40 patch. Native checks the patch hash, the rebuilt size and hash, and the memory budget. */
 export interface ShipvoPatchPlugin {
   filePatch(o: { base: string; name: string; patch: string; patchSha256: string; size: number; sha256: string }): Promise<{ via: "patch" | "full"; patchError?: string }>;
 }
