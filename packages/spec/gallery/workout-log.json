@@ -1,0 +1,130 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "workout-log",
+    "name": "Workout log",
+    "description": "Log sets and see your volume by exercise."
+  },
+  "theme": {
+    "mode": "dark",
+    "palette": {
+      "primary": "#6EA8FF",
+      "text": "#F3F4F6",
+      "background": "#0B1220",
+      "surface": "#1F2937",
+      "muted": "#9CA3AF"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "sets": {
+      "source": "collection",
+      "fields": {
+        "exercise": "text",
+        "reps": "number",
+        "weight": "number"
+      },
+      "seed": []
+    },
+    "volume": {
+      "source": "computed",
+      "value": "{{ sum(sets.map(s, s.reps * s.weight)) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Workouts",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Volume {{ volume }}"
+        },
+        {
+          "type": "chart",
+          "kind": "bar",
+          "from": "sets",
+          "x": "{{ item.exercise }}",
+          "y": "{{ item.reps }}",
+          "aggregate": "sum",
+          "label": "Reps by exercise"
+        },
+        {
+          "type": "form",
+          "label": "Log set form",
+          "submit": {
+            "label": "Log set",
+            "action": "log_set"
+          },
+          "fields": [
+            {
+              "name": "exercise",
+              "type": "text",
+              "label": "Exercise",
+              "required": true,
+              "maxLength": 60
+            },
+            {
+              "name": "reps",
+              "type": "number",
+              "label": "Reps",
+              "required": true,
+              "min": 1,
+              "max": 1000
+            },
+            {
+              "name": "weight",
+              "type": "number",
+              "label": "Weight",
+              "min": 0
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "label": "Sets",
+          "from": "{{ sets }}",
+          "item": {
+            "title": "{{ item.exercise }}",
+            "subtitle": "{{ item.reps }} reps at {{ item.weight }}"
+          },
+          "empty": {
+            "message": "No sets yet"
+          }
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "log_set": {
+      "description": "Log one set of an exercise.",
+      "input": {
+        "exercise": {
+          "type": "text"
+        },
+        "reps": {
+          "type": "number"
+        },
+        "weight": {
+          "type": "number",
+          "default": 0
+        }
+      },
+      "do": [
+        {
+          "insert": "sets",
+          "value": {
+            "exercise": "{{ input.exercise }}",
+            "reps": "{{ input.reps }}",
+            "weight": "{{ input.weight }}"
+          }
+        },
+        {
+          "toast": "Set logged"
+        }
+      ]
+    }
+  }
+}
