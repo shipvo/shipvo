@@ -93,7 +93,7 @@ The pointer files are under `p/<appId>/<shell major>/<band>`. Check one with `sh
 
 ## Step 5. Ship the store build
 
-Build and submit one new binary with the Shipvo plugin and your public key in it. Users on the old CodePush build keep running their last CodePush bundle. They get Shipvo updates only after they install this binary. Ship the Step 5 store build first; every build with the runtime then updates over the air.
+Build and submit one new binary with the Shipvo plugin and your public key in it. Users on the old CodePush build keep running their last CodePush bundle. They get Shipvo updates only after they install this binary. Shipvo updates reach every build that contains the Shipvo runtime.
 
 ## Step 6. Publish
 
