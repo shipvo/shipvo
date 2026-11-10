@@ -57,7 +57,7 @@ The phone below is the finished Tide & Tackle sample shop, not your Sandbar Shop
 
 ![The shop template on a 390 by 844 phone screen. The heading says Sandbar Shop. Below it are five products with prices: Canvas tote $18.00, Enamel mug $12.00, Pocket notebook $6.50, Wool beanie $24.00 and Steel bottle $29.00.](/tutorials/your-own-shop/01-starter-list.png)
 
-Click a product, click **Add to cart**, click **Back**, then click **Cart**. You should see the product and a total. Nothing is charged: this template has no payment step yet.
+Click a product, click **Add to cart**, click **Back**, then click **Cart**. You should see the product and a total. Click **Pay** to pay for the cart. The order confirmation screen then appears with a Back to shop button.
 
 > **If something goes wrong.**
 > - `Port 4545 is in use`: the simulator is already running in another window. Close that window, or press Ctrl + C in it, and try again.
