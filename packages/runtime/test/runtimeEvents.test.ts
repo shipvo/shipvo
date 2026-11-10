@@ -47,3 +47,14 @@ describe("forwardRuntimeEvents", () => {
     expect(run(["pointer_rejected:hermes_bytecode_mismatch", "pointer_rejected:x", "pointer_rejected"])).toEqual([]);
   });
 });
+
+describe("crash_loop_revert state versions", () => {
+  const capture = (events: string[]) => { const out: unknown[] = []; forwardRuntimeEvents(events, (e, r, x) => out.push([e, r, x])); return out; };
+  it("passes state_version_from and state_version_to", () => {
+    expect(capture(["crash_loop_revert:5:3:2"])).toEqual([["crash_loop_revert", undefined, { state_version_from: 3, state_version_to: 2 }]]);
+  });
+  it("leaves them out when absent or 0", () => {
+    expect(capture(["crash_loop_revert:5:3:0"])).toEqual([["crash_loop_revert", undefined, { state_version_from: 3 }]]);
+    expect(capture(["crash_loop_revert"])).toEqual([["crash_loop_revert", undefined, undefined]]);
+  });
+});

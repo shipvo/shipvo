@@ -22,7 +22,7 @@ const NATIVE_MODULE_REASONS: string[] = ["native_module_missing", "native_module
  */
 export function forwardRuntimeEvents(
   events: string[],
-  send: (event: ForwardedEvent, release?: number) => void,
+  send: (event: ForwardedEvent, release?: number, extra?: { state_version_from?: number; state_version_to?: number }) => void,
 ): void {
   for (const e of events) {
     const [name, id] = e.split(":");
@@ -33,6 +33,14 @@ export function forwardRuntimeEvents(
     }
     if (!(FORWARDED_EVENTS as readonly string[]).includes(name)) continue;
     const release = CARRIES_RELEASE.includes(name) && id !== undefined && /^\d+$/.test(id) ? Number(id) : undefined;
+    // "crash_loop_revert:<release>:<state_version_from>:<state_version_to>"; a 0 or missing part means no declaration.
+    if (name === "crash_loop_revert") {
+      const [, , from, to] = e.split(":");
+      const pos = (x?: string) => (x !== undefined && /^\d+$/.test(x) && Number(x) > 0 ? Number(x) : undefined);
+      const extra = { ...(pos(from) ? { state_version_from: pos(from) } : {}), ...(pos(to) ? { state_version_to: pos(to) } : {}) };
+      send(name, undefined, Object.keys(extra).length ? extra : undefined);
+      continue;
+    }
     send(name as ForwardedEvent, release);
   }
 }

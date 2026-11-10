@@ -133,6 +133,8 @@ async function publishRun(argv: string[], json: boolean): Promise<Done> {
   const nativeModules = requiredNativeModules(".", skippedNative);
   if (skippedNative.length) console.error(`native modules not recorded (the range is not a plain numeric semver range, so the control plane cannot check it): ${skippedNative.join(", ")}`);
   if (dry) console.error(`native modules this release requires: ${nativeModules ? Object.entries(nativeModules).map(([n, r]) => `${n}@${r}`).join(", ") : "none found"}`);
+  const stateVersion = cfg.stateVersion;
+  if (stateVersion !== undefined && (!Number.isInteger(stateVersion) || stateVersion < 1)) throw new UsageError(`shipvo.json: "stateVersion" must be a positive whole number (got ${JSON.stringify(stateVersion)})`);
   const bands = (a.bands || "b0,b1,b2").split(",");
   if (dry) {
     const verdict = checkPublishPolicy(cfg.policy, bands);
@@ -198,10 +200,10 @@ async function publishRun(argv: string[], json: boolean): Promise<Done> {
     for (const band of bands) {
       const body = JSON.stringify({ schema_version: "1.0", app_id: APP, shell_major: MAJOR, band, ...(pf === "ios" ? { platform: "ios" } : {}), release, issued_at,
         core: { version: `1.0.${release}`, sha256: newSha, size: bytes.length, url: `b/${APP}/${name}`, patches },
-        addons: [], screens: [], min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(hermesVersion && hermesEngine ? { hermes_engine: hermesEngine } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), ...(web ? { web } : {}) });
+        addons: [], screens: [], min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(hermesVersion && hermesEngine ? { hermes_engine: hermesEngine } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), ...(stateVersion ? { state_version: stateVersion } : {}), ...(web ? { web } : {}) });
       await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
-    await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(hermesVersion && hermesEngine ? { hermes_engine: hermesEngine } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), web }), "application/json");
+    await kv.put(pf === "ios" ? `h/${APP}/ios-r${release}` : `h/${APP}/r${release}`, JSON.stringify({ release, issued_at, sha256: newSha, size: bytes.length, min_shell_version: MIN_SHELL, ...(hermesVersion ? { hermes_bytecode_version: hermesVersion } : {}), ...(hermesVersion && hermesEngine ? { hermes_engine: hermesEngine } : {}), ...(nativeModules ? { required_native_modules: nativeModules } : {}), ...(stateVersion ? { state_version: stateVersion } : {}), web }), "application/json");
     totalBytes += bytes.length;
     summary[pf] = { bytes: bytes.length, patches: patches.map((p) => ({ from: p.from_sha256.slice(0, 12), kb: +(p.size / 1024).toFixed(1) })) };
     if (web) summary.web = web;
@@ -232,6 +234,21 @@ export function publishedSummary(release: number, bands: string[]) {
   const rest = ["b0", "b1", "b2"].filter((b) => !bands.includes(b));
   const next = rest.length ? `Next: shipvo status, then shipvo promote --to ${rest.join(",")}.` : "Next: shipvo status.";
   return `Published release ${release} to ${bands.join(", ")}. ${next}`;
+}
+
+/** The highest `state_version` in the live pointers of these bands, or 0 when none declares one. */
+async function appliedStateVersion(kv: { get(k: string): Promise<string | null> }, app: string, major: number, bands: string[], pf: Platform): Promise<number> {
+  let max = 0;
+  for (const band of bands) {
+    try { const v = JSON.parse(JSON.parse((await kv.get(pointerKey(app, major, band, pf)))!).body).state_version; if (Number.isInteger(v)) max = Math.max(max, v); } catch {}
+  }
+  return max;
+}
+
+/** Why a rollback was refused, and what to do. */
+export function stateDowngradeMessage(to: number, target: number, applied: number) {
+  const has = target > 0 ? `state version ${target}` : "no state version";
+  return `Release ${to} has ${has}, but devices already run code that writes state version ${applied}. Older code may crash or corrupt the stored data it cannot read. Ship a forward fix instead, or pass --allow-state-downgrade to roll back anyway (the choice is recorded in the audit log).`;
 }
 
 /** The rollback result in plain words. */
@@ -308,20 +325,31 @@ export async function rollback(argv: string[]) {
 }
 
 async function rollbackRun(argv: string[], json: boolean): Promise<Done> {
-  checkFlags(argv, ["to", "bands", "platform", "dry-run", "json"]);
+  checkFlags(argv, ["to", "bands", "platform", "dry-run", "json", "allow-state-downgrade"]);
   const a = parse(argv), dry = a["dry-run"] !== undefined, cfg = loadConfig();
   const offline = dry && !hasStore();
   const SEED = dry ? "" : seed(), kv = offline ? offlineKv() : kvFor(cfg);
   if (offline) console.error("Offline rehearsal: reading releases from .shipvo/dry-run (written by shipvo publish --dry-run). No login used, nothing is sent.");
   const APP = cfg.appId, MAJOR = cfg.shellMajor, to = Number(a.to);
   if (!to) {
-    const usage = "Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all] [--dry-run] [--json]";
+    const usage = "Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all] [--allow-state-downgrade] [--dry-run] [--json]";
     if (json) throw new UsageError(usage);
     console.error(usage); process.exit(2);
   }
   const release = (await currentRelease(kv, APP, MAJOR)) + 1, issued_at = new Date().toISOString();
   let minShell = "1.0.0";
   const platforms = platformsOf(a), bands = (a.bands || "b0,b1,b2").split(",");
+  const allowDowngrade = switchFlag(a, "allow-state-downgrade");
+  const stateByPlatform = new Map<Platform, number>();
+  for (const pf of platforms) {
+    let target = 0;
+    try { target = JSON.parse((await kv.get(pf === "ios" ? `h/${APP}/ios-r${to}` : `h/${APP}/r${to}`))!).state_version ?? 0; } catch {}
+    stateByPlatform.set(pf, target);
+    const applied = await appliedStateVersion(kv, APP, MAJOR, bands, pf);
+    if (applied > target && !allowDowngrade) {
+      throw new CliFailure(stateDowngradeMessage(to, target, applied), "state_downgrade", 1, [{ command: `shipvo rollback ${argv.join(" ")} --allow-state-downgrade`, why: "Roll back anyway, knowing the older code may not read the stored data." }]);
+    }
+  }
   for (const pf of platforms) {
     const bytes = await kv.getBytes(`b/${APP}/${bundleName(to, pf)}`);
     if (!bytes) {
@@ -332,7 +360,7 @@ async function rollbackRun(argv: string[], json: boolean): Promise<Done> {
     try { const h = JSON.parse((await kv.get(pf === "ios" ? `h/${APP}/ios-r${to}` : `h/${APP}/r${to}`))!); minShell = h.min_shell_version || minShell; web = h.web ?? undefined; } catch {}
     for (const band of bands) {
       const body = JSON.stringify({ schema_version: "1.0", app_id: APP, shell_major: MAJOR, band, ...(pf === "ios" ? { platform: "ios" } : {}), release, issued_at,
-        core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${APP}/${bundleName(to, pf)}` }, addons: [], screens: [], min_shell_version: minShell, ...(web ? { web } : {}) });
+        core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${APP}/${bundleName(to, pf)}` }, addons: [], screens: [], min_shell_version: minShell, ...(stateByPlatform.get(pf) ? { state_version: stateByPlatform.get(pf) } : {}), ...(web ? { web } : {}) });
       if (!dry) await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
   }

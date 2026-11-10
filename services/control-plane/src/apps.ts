@@ -204,12 +204,16 @@ async function auditPublish(db: any, id: string, key: string, buf: ArrayBuffer, 
     const m = /(?:^|\/)(?:ios-)?r(\d+)\.hbc$/.exec(String(body.core?.url ?? ""));
     const backTo = m && Number(m[1]) !== body.release ? Number(m[1]) : null;
     let before: string | null = null;
-    try { const r = prev ? JSON.parse(JSON.parse(prev).body).release : null; if (Number.isInteger(r)) before = JSON.stringify({ release: r }); } catch { /* no usable previous pointer */ }
+    let prevState = 0;
+    try { const pb = prev ? JSON.parse(JSON.parse(prev).body) : null; if (Number.isInteger(pb?.release)) before = JSON.stringify({ release: pb.release, ...(pb.state_version ? { state_version: pb.state_version } : {}) }); prevState = Number(pb?.state_version) || 0; } catch { /* no usable previous pointer */ }
+    // A rollback to code with a lower state version passed `--allow-state-downgrade` in the CLI; record that it happened.
+    const newState = Number(body.state_version) || 0;
+    const downgrade = backTo !== null && prevState > newState;
     const owner = await db.prepare("SELECT acc.github_login AS login FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ?").bind(id).first();
     await recordAudit(db, {
       app_id: id, actor: String(owner?.login ?? id), actor_kind: "person", action: backTo === null ? "publish" : "rollback",
       release: body.release, release_id: key, before,
-      after: JSON.stringify({ release: body.release, band: body.band, platform: body.platform ?? "android", ...(backTo === null ? {} : { rolled_back_to: backTo }) }),
+      after: JSON.stringify({ release: body.release, band: body.band, platform: body.platform ?? "android", ...(backTo === null ? {} : { rolled_back_to: backTo }), ...(body.state_version ? { state_version: body.state_version } : {}), ...(downgrade ? { state_downgrade_allowed: true, state_version_from: prevState, state_version_to: newState || null } : {}) }),
     });
   } catch { console.warn(`audit write failed: app=${id} action=publish`); }
 }

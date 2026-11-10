@@ -1,0 +1,4 @@
+- `@shipvo/schema`: releases can declare an optional `state_version` (positive whole number). The telemetry event `crash_loop_revert` can carry `state_version_from` and `state_version_to`.
+- `@shipvo/cli`: `shipvo publish` signs `stateVersion` from `shipvo.json` as `state_version`. `shipvo rollback` refuses to go to a release with a lower state version than the live one unless you pass `--allow-state-downgrade`; the audit log records the downgrade.
+- `@shipvo/runtime`: new `getAppliedStateVersion()` and `pickRevertTarget()`. The `crash_loop_revert` report carries both state versions when the shell sends them.
+- Migration: none; all additions are optional.

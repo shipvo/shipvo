@@ -98,6 +98,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Job handles for slow tools (`job_status`, `wait_ms` on `publish_preview` and `upload_build`) | [cli](cli.md), [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
 | Key rotation: `shipvo keys root`, `keys rotate sign` and `upload` | [key-rotation](key-rotation.md) | | | |
+| State version and `shipvo rollback --allow-state-downgrade` | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
 | Per-app device permissions on the install card (`set_app_permission`) | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
 | Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
 | Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |

@@ -11,6 +11,8 @@ export type RuntimeState = {
   cohort: number; band: "b0" | "b1" | "b2";
   runningRelease: number; currentRelease: number; pendingRelease: number; previousRelease: number;
   blockedRelease?: number; shellVersion?: string;
+  /** `state_version` of the release this device runs. Absent or 0 = the release declared none (or the embedded bundle runs). */
+  stateVersion?: number;
   baseUrl: string; appId: string; shellMajor: number;
 };
 export type CheckResult = {
@@ -109,11 +111,11 @@ export function reportRuntimeEvents(): string[] {
     const rn = require("react-native");
     if (rn.Platform?.OS === "android" && typeof rn.Platform.Version === "number") androidApi = rn.Platform.Version;
   } catch {}
-  forwardRuntimeEvents(events, (event, release) => {
+  forwardRuntimeEvents(events, (event, release, extra) => {
     try {
       // Same payload the sample app sent before this moved here: device_class is fixed to "low", android_api is set on Android only.
       const body = { schema_version: "1.0", app_id: appId, release: release ?? state.runningRelease ?? 0, event,
-        device_class: "low", android_api: androidApi };
+        device_class: "low", android_api: androidApi, ...extra };
       const post = (b: string) => Promise.resolve(fetch(`${baseUrl}/t`, { method: "POST", headers: { "content-type": "application/json" },
         body: b })).catch(() => {});
       const id = identity;
@@ -143,3 +145,20 @@ export const Runtime: Native = native
       reload: () => native.reload(),
     }
   : fallback;
+
+/**
+ * The `state_version` the running release declared in its signed manifest (the data-format version it writes), or 0 when
+ * it declared none or the embedded bundle runs. Use it to migrate stored data, or to refuse data a newer release wrote.
+ */
+export function getAppliedStateVersion(): number {
+  try { const v = Runtime.getState()?.stateVersion; return typeof v === "number" && Number.isInteger(v) && v > 0 ? v : 0; } catch { return 0; }
+}
+
+/**
+ * Which earlier release a crash-loop revert goes back to. `candidates` are earlier releases, newest first. Picks the
+ * newest whose `stateVersion` is not lower than the device's own (`from`); a release that declares none counts as 0.
+ * Returns null when none qualifies: the device falls back to the embedded bundle.
+ */
+export function pickRevertTarget<T extends { stateVersion?: number }>(from: number, candidates: T[]): T | null {
+  return candidates.find((c) => (c.stateVersion ?? 0) >= from) ?? null;
+}

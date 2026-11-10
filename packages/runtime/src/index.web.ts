@@ -19,3 +19,5 @@ export const Runtime = {
 export { FORWARDED_EVENTS, forwardRuntimeEvents } from "./runtimeEvents";
 export function reportRuntimeEvents(): string[] { return []; }
 export function onRuntimeEvents(_fn: (events: string[]) => void): () => void { return () => {}; }
+export function getAppliedStateVersion(): number { return 0; }
+export { pickRevertTarget } from "./index";

@@ -88,6 +88,8 @@ export const ReleasePointer = z.object({
   hermes_engine: z.string().min(1).optional(),
   /** Native modules `core` needs: package name to semver range. Absent on older releases = unknown. */
   required_native_modules: z.record(z.string().min(1), z.string().min(1)).optional(),
+  /** Version of the stored-data format (AsyncStorage, SQLite, MMKV) this release writes. Absent = no declaration. */
+  state_version: z.number().int().positive().optional(),
   /** The agent-facing web build of this same release, served by the control plane at `base` (sim.shipvo.dev opens it). */
   web: z.object({ base: z.string().min(1), entry: z.string().min(1), sha256, files: z.number().int().nonnegative() }).optional(),
   new_control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }).optional(),
@@ -164,6 +166,9 @@ export const Telemetry = z.object({
   bytes_downloaded: z.number().int().nonnegative().optional(),
   apply_ms: z.number().nonnegative().optional(),
   device_class: z.enum(["low", "mid", "high"]).optional(),
+  /** On `crash_loop_revert`: the state version of the reverted release and of the release the device went back to (absent = none declared). */
+  state_version_from: z.number().int().positive().optional(),
+  state_version_to: z.number().int().positive().optional(),
 });
 export type Telemetry = z.infer<typeof Telemetry>;
 
