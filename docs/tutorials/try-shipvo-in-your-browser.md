@@ -1,5 +1,9 @@
 # Try Shipvo in your browser: tap a phone, test device features and watch an update roll back
 
+<video controls preload="metadata" playsinline tabindex="0" data-title="Try Shipvo in your browser: a phone, device features and a rollback" data-length="1 min 32 s" poster="/videos/try-in-your-browser.jpg" src="/media/videos/try-in-your-browser-b9bd7bc6.mp4"><track kind="captions" src="/videos/try-in-your-browser.vtt" srclang="en" label="English">Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Revelation" by Giac &amp; Juan (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/2.0/fr/">CC BY-NC-SA 2.0</a>). Source: <a href="https://www.jamendo.com/track/116970">https://www.jamendo.com/track/116970</a></details>
+
 You will open a shop app on an Android phone and an iPhone in your browser, tap through it, switch the phones to dark mode and large text, set a location and a payment result, watch a signed update reach every phone and roll back after a crash, and share a wall of phones with a link. You install nothing, you make no account and you type no commands.
 
 **Level:** beginner. **Time:** about 15 minutes.

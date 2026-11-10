@@ -43,6 +43,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Release.** One numbered version of your app that phones can download.
 
+**Secrets screen.** The screen in the Settings app on Shipvo Phone that lists the keys you saved for an app, such as a payment key. You can rotate or remove a key there. See [Phone apps](phone-apps.md#see-saved-keys-in-settings).
+
+**Use log.** The list under a saved key that shows when the key was used, where, and what happened. Use it to check that only your app used the key. See [Phone apps](phone-apps.md#see-saved-keys-in-settings).
+
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.
 
 **Signing seed.** The secret file (`.shipvo/seed.txt`) that makes the stamp. Back it up once: without it you cannot update phones that already have your app. See [Moving to a new machine](new-machine.md).
@@ -55,7 +59,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Terminal.** A window where you type commands instead of clicking. On a Mac it is called Terminal. On Windows use "Windows Terminal" or "PowerShell". On Linux it is also called Terminal.
 
-**Audit log.** A list of what happened to your app's releases: who published, who rolled back, and when a release was stopped. You can export it with `shipvo audit`.
+**Audit log.** A list of what happened to your app's releases: who published, who rolled back, when a release was stopped, and when you rotated your release key. You can export it with `shipvo audit`.
 
 **Cohort.** A slice of your users that gets an update before everyone else. See also cohort band.
 
@@ -138,6 +142,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Rotation statement.** A note signed by the root key that tells phones to trust a new release key. `shipvo keys rotate sign` makes it.
 
 **App permission.** A device permission (such as notifications or location) an app declares and you allow or deny on its install card or in Settings. See [phone apps](phone-apps.md#device-permissions-per-app).
+
+**Held release.** A release Shipvo did not halt on its own because the failures looked fake (mostly brand-new installs, or a sudden burst). It keeps serving until you approve the halt or deny the hold. See [Auto-halt](auto-halt.md#when-the-failures-look-like-an-attack).
 
 **Session inbox.** A private mailbox every test session has, with its own address, so a test or an agent can read an emailed sign-in code or link. See [Test an email sign-in](email-sign-in.md).
 

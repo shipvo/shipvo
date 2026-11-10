@@ -1,0 +1,121 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:02.584
+This phone runs in your browser.
+
+2
+00:00:02.584 --> 00:00:04.016
+You installed nothing.
+
+3
+00:00:04.016 --> 00:00:11.375
+By the end, you will have tapped a shop on Android and iOS, tested a payment, and watched a bad update roll back.
+
+4
+00:00:12.975 --> 00:00:15.794
+Open shipvo.dev/playground.
+
+5
+00:00:15.794 --> 00:00:18.614
+A shop called Tide and Tackle appears.
+
+6
+00:00:18.614 --> 00:00:20.394
+Tap Add on two products.
+
+7
+00:00:20.394 --> 00:00:22.175
+The cart says two items.
+
+8
+00:00:23.775 --> 00:00:27.200
+Select iOS, and the same app shows on an iPhone.
+
+9
+00:00:27.200 --> 00:00:29.055
+Select Android to go back.
+
+10
+00:00:29.055 --> 00:00:31.409
+Now try dark mode and large text.
+
+11
+00:00:31.409 --> 00:00:33.050
+The app stays readable.
+
+12
+00:00:36.775 --> 00:00:39.711
+Real phones know where they are, and can pay.
+
+13
+00:00:39.711 --> 00:00:41.146
+You choose the answer.
+
+14
+00:00:41.146 --> 00:00:43.038
+Pick Lisbon for the location.
+
+15
+00:00:43.038 --> 00:00:44.343
+Approve the payment.
+
+16
+00:00:44.343 --> 00:00:45.779
+Turn airplane mode on.
+
+17
+00:00:45.779 --> 00:00:47.475
+The app shows each choice.
+
+18
+00:00:49.775 --> 00:00:51.007
+Now the hard part.
+
+19
+00:00:51.007 --> 00:00:52.651
+Publish a signed update.
+
+20
+00:00:52.651 --> 00:00:54.568
+Shipvo checks the signature.
+
+21
+00:00:54.568 --> 00:00:58.060
+It goes to a tenth of cohorts, then to all of them.
+
+22
+00:00:58.060 --> 00:00:58.950
+Now crash it.
+
+23
+00:00:58.950 --> 00:01:00.798
+Three starts in a row fail.
+
+24
+00:01:00.798 --> 00:01:04.975
+On the fourth, the phone goes back to version one, by itself.
+
+25
+00:01:06.775 --> 00:01:08.377
+Last, add more phones.
+
+26
+00:01:08.377 --> 00:01:11.289
+Pick up to twelve, Android, iOS or both.
+
+27
+00:01:11.289 --> 00:01:15.075
+Copy the link, and whoever opens it sees your setup.
+
+28
+00:01:18.775 --> 00:01:22.686
+That is a phone, a payment and a rollback, with no install.
+
+29
+00:01:22.686 --> 00:01:25.536
+Try it at shipvo.dev/playground.
+
+30
+00:01:25.536 --> 00:01:28.850
+Next, see your own app on a phone with shipvo run.
