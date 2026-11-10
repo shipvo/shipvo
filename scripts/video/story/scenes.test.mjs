@@ -79,3 +79,30 @@ test("setDialogue burns the line in, escapes it, and resets cleanly", () => {
   setDialogue({});
   assert.equal(frameAt(5), base); // mouthFn back to null, lines cleared
 });
+
+import { SEGMENTS, filmTime, totalLength, cutTimes, windowAt, WINDOW_W } from "./vertical.mjs";
+import { CUTS, setView } from "./scenes.mjs";
+
+test("vertical cut: segments run forward inside the film and stay between 30 and 45 s", () => {
+  for (const s of SEGMENTS) assert.ok(s.from >= 0 && s.to <= 100 && s.to > s.from);
+  for (let i = 1; i < SEGMENTS.length; i++) assert.ok(SEGMENTS[i].from >= SEGMENTS[i - 1].to);
+  assert.ok(totalLength() >= 30 && totalLength() <= 45);
+  assert.equal(filmTime(0), 0);
+  assert.equal(filmTime(4.5), 8.6);
+  assert.equal(filmTime(totalLength() + 1), null);
+  const cuts = cutTimes(CUTS);
+  assert.equal(cuts[0], 0);
+  assert.ok(cuts.every((c, i) => i === 0 || c > cuts[i - 1]) && cuts.at(-1) < totalLength());
+});
+
+test("vertical cut: the window fits the frame and text stays inside it", () => {
+  for (let u = 0; u < totalLength(); u += 1 / FPS) {
+    const t = filmTime(u), w = windowAt(t);
+    assert.ok(w.x >= 0 && w.x + WINDOW_W <= 1280, `window out of frame at ${t}`);
+  }
+  setDialogue({ lines: [{ start: 9.4, end: 10.37, who: "mara", text: "Nobody comes in." }] });
+  setView(windowAt(9.8));
+  const svg = frameAt(9.8);
+  setView(null); setDialogue({});
+  assert.ok(svg.includes("Nobody comes in.") && svg.includes('font-size="25"'));
+});

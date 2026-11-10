@@ -1,0 +1,119 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "favourite-places",
+    "name": "Favourite places",
+    "description": "Pin the places you love and see how many you have saved."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "places": {
+      "source": "collection",
+      "fields": {
+        "name": "text",
+        "lat": "number",
+        "lng": "number"
+      },
+      "seed": []
+    },
+    "saved": {
+      "source": "computed",
+      "value": "{{ size(places) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Places",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Places saved: {{ saved }}"
+        },
+        {
+          "type": "map",
+          "label": "Favourite places",
+          "from": "places",
+          "lat": "{{ item.lat }}",
+          "lng": "{{ item.lng }}",
+          "title": "{{ item.name }}",
+          "empty": {
+            "message": "No places yet"
+          }
+        },
+        {
+          "type": "form",
+          "label": "Add place form",
+          "submit": {
+            "label": "Add place",
+            "action": "add_place"
+          },
+          "fields": [
+            {
+              "name": "name",
+              "type": "text",
+              "label": "Name",
+              "required": true,
+              "maxLength": 60
+            },
+            {
+              "name": "lat",
+              "type": "number",
+              "label": "Latitude",
+              "min": -90,
+              "max": 90
+            },
+            {
+              "name": "lng",
+              "type": "number",
+              "label": "Longitude",
+              "min": -180,
+              "max": 180
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "add_place": {
+      "description": "Pin one place on the map.",
+      "input": {
+        "name": {
+          "type": "text"
+        },
+        "lat": {
+          "type": "number"
+        },
+        "lng": {
+          "type": "number"
+        }
+      },
+      "do": [
+        {
+          "insert": "places",
+          "value": {
+            "name": "{{ input.name }}",
+            "lat": "{{ input.lat }}",
+            "lng": "{{ input.lng }}"
+          }
+        },
+        {
+          "toast": "Place added"
+        }
+      ]
+    }
+  }
+}
