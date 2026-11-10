@@ -334,7 +334,7 @@ export async function run(argv: string[]): Promise<number> {
   if (o.open) openBrowser(url);
   const stopWatching = watchAndRebuild({
     dir: process.cwd(),
-    build: () => rebuildInto({ root: process.cwd() }),
+    build: () => rebuildInto({ root: process.cwd(), reuseCache: true }),
     onStart: () => s.notify({ type: "building" }),
     onResult: (r) => s.notify(r.ok ? { type: "reload" } : { type: "error", message: r.message }),
   });

@@ -1,0 +1,1 @@
+- run: rebuilds after a save keep the Metro cache, so a small edit rebuilds faster. `shipvo run` and `shipvo sim --watch` use it. The first build still starts clean. `rebuildInto` takes a new optional `reuseCache` flag; no migration needed.
