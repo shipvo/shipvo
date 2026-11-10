@@ -261,10 +261,10 @@ export class SpecHost {
   }
 
   /** Runs an action by name with the given input, as a generated tool does. Resolves { ok, value } or { ok: false, error }. */
-  call(session, id, action, input = {}) {
+  call(session, id, action, input = {}, context = {}) {
     const r = this.running.get(key(session, id));
     if (!r) return { ok: false, error: "That app is not running" };
-    const res = r.app.call(action, input);
+    const res = r.app.call(action, input, context);
     return res.ok === false && "errors" in res ? { ok: false, error: Object.values(res.errors).join(" ") } : res;
   }
 
