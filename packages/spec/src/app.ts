@@ -85,14 +85,33 @@ function coerce(f: FormField, value: unknown): unknown {
   return f.type === "number" ? Number(value) : value;
 }
 
-/** The device permissions an action needs, from its steps: a `notify` step needs notifications. Only `notify` is enforced today; blocks that use other device features follow in #1361. Looks inside `then` and `else`. */
+/** The device permission a block type needs, if any. */
+const BLOCK_DEVICE: Record<string, string> = { camera: "camera", scanner: "camera", file: "files" };
+
+/** Adds the permissions of the blocks in a list, looking inside `children`. */
+function blockNeeds(blocks: unknown, need: Set<string>): void {
+  if (!Array.isArray(blocks)) return;
+  for (const b of blocks) {
+    if (!b || typeof b !== "object") continue;
+    const p = BLOCK_DEVICE[String((b as Obj).type)];
+    if (p) need.add(p);
+    blockNeeds((b as Obj).children, need);
+  }
+}
+
+/** The device permissions an action needs, from its steps: a `notify` step needs notifications, and a `navigate` step to a screen with a camera, scanner or file block needs camera or files. Looks inside `then` and `else`. */
 export function actionDeviceNeeds(spec: unknown, action: string): string[] {
   const need = new Set<string>();
+  const screens: unknown[] = Array.isArray((spec as Obj)?.screens) ? (spec as Obj).screens : [];
   const walk = (steps: unknown) => {
     if (!Array.isArray(steps)) return;
     for (const st of steps) {
       if (!st || typeof st !== "object") continue;
       if ("notify" in st) need.add("notifications");
+      if (typeof (st as Obj).navigate === "string") {
+        const target = screens.find((x) => (x as Obj)?.id === (st as Obj).navigate) as Obj | undefined;
+        blockNeeds(target?.body, need);
+      }
       walk((st as Obj).then);
       walk((st as Obj).else);
     }
