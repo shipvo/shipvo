@@ -26,6 +26,8 @@ shipvo.json: stateVersion must be a positive integer (got 0).
 shipvo rollback --to 5
 ```
 
+`--platform` defaults to `android`. Use `--platform ios` for iOS, or `--platform all` for Android and iOS together.
+
 If phones already run a higher `state_version` than release 5 declares (or release 5 declares none), the command stops with exit code 1 and does not republish the platform that failed the check:
 
 ```
@@ -63,7 +65,7 @@ shipvo audit tide
 
 **I roll back to an old release and nothing stops me.** Releases published before you set `stateVersion` carry no number. A rollback stops only when phones run a higher `state_version` than the target, so you can roll back freely to a release with no number when phones run none either.
 
-**I roll back with `--platform all`.** Each platform is checked and republished in turn, Android first. If iOS fails the check, the command exits 1 after Android is already republished. Run `shipvo rollback --platform ios --to 5 --dry-run` first to check each platform, or roll back one platform at a time.
+**I roll back both platforms.** Roll back Android and iOS with `--platform all`; each platform is checked in turn. Add `--dry-run` first to see the result of every check before anything is republished.
 
 ## Next steps
 
