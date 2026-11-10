@@ -22,7 +22,7 @@ beforeAll(async () => {
     res.writeHead(200, { "content-type": "application/json" });
     const body = raw ? JSON.parse(raw) : {};
     if (req.url !== "/act") return res.end(JSON.stringify({ ok: true }));
-    seen.push(body);
+    if (body.action !== "pending_banner") seen.push(body);
     const fail = (code: string, error: string) => res.end(JSON.stringify({ ok: false, code, error }));
     const ok = () => res.end(JSON.stringify({ ok: true, screen: `Home screen\ninstalled: ${[...installed.keys()].join(",")} current: ${current}` }));
     if (body.action === "find_apps") {
