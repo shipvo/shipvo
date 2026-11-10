@@ -45,7 +45,7 @@ For `phones`, a number above 12 becomes 12, and 0 or a negative number becomes 1
 
 - **A panel stays empty.** Reload the page. The phones load after the page, and each one takes a moment.
 - **The tool console says an element is not found.** Run `screen` again. Refs are per screen, so a ref from before you changed screen may not exist now.
-- **Lumi ran twice and the cart shows six items (three per run).** Reload the page for a fresh cart, then run it again.
+- **Lumi ran twice and the cart has more than you expected.** Each run adds to what is already in the cart. Reload the page for a fresh cart, then run it again.
 - **Your link opens with a different number of phones.** Check that `phones` is between 1 and 12 and that `mix` is `android`, `ios` or `both`.
 
 ## Next steps
