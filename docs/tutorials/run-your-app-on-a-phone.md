@@ -1,6 +1,6 @@
 # See your app on a phone in your browser with one command
 
-You will type one command and get a phone, Android or iPhone style, in a browser tab, running your app. You will tap through your shop, look at the pretend Android system sheet, switch to the iPhone style and stop it again. You need no real phone, no Android Studio and no Xcode.
+You will type one command and get a phone, Android or iPhone style, in a browser tab, running your app. You will tap through your shop, change a product name and watch the phone update, look at the pretend Android system sheet, switch to the iPhone style and stop it again. You need no real phone, no Android Studio and no Xcode.
 
 **Level:** beginner. **Time:** about 25 minutes to read and follow. On our test machine the first start took within a minute (see "What we measured" at the end).
 
@@ -74,7 +74,7 @@ You do not need to stop the phone to change your app. While it runs, Shipvo watc
 
 Leave the terminal running. Open your app's folder in any text editor and open the file `src/data/products.json`. It holds your products. If you started from the shop template, find the line with `"Wool beanie"`, change the words to `Merino beanie` and save the file.
 
-Look at the terminal. You should see `Rebuilding...` and, a moment later, a line such as `rebuilt in 1.2 s` (your number will differ). The phone shows a small "Updating..." hint and then reloads. The list now says **Merino beanie**. You did not touch the browser tab. Live reload works the same way in the iPhone style: switch the frame and save again, and the iPhone updates too.
+Look at the terminal. You should see `Rebuilding...` and, a moment later, a line such as `rebuilt in 1.2 s` (your number will differ). The phone shows a small "Updating..." hint and then reloads. The list now says **Merino beanie**. You did not touch the browser tab. Live reload works the same way in the iPhone style: [switch the frame](#6-try-the-iphone-style-and-dark-frame) and save again, and the iPhone updates too.
 
 ![The Android phone before the edit. The product list shows Canvas tote, Enamel mug, Pocket notebook, Wool beanie at $24.00 and Steel bottle.](/tutorials/run-your-app-on-a-phone/07-before-edit.png)
 
@@ -83,18 +83,16 @@ Look at the terminal. You should see `Rebuilding...` and, a moment later, a line
 Now make a mistake on purpose. In the same file, break one line. Before:
 
 ```json
-"name": "Merino beanie",
+    "name": "Merino beanie",
 ```
 
 After (a stray word `oops` where the colon was):
 
 ```json
-"name" oops "Merino beanie",
+    "name" oops "Merino beanie",
 ```
 
-Save. The phone keeps showing your last good version. A red bar under the phone says what is wrong and where, for example "Your file src/data/products.json has a mistake at line 5, column 11: check for a missing or extra comma." The terminal prints the same message. Put the colon back and save: the bar goes away and the phone reloads.
-
-![The phone still showing the product list, with a red bar under it that says Your file src/data/products.json has a mistake at line 5, column 11: check for a missing or extra comma. The page still shows your last good version.](/tutorials/run-your-app-on-a-phone/09-error-bar.png)
+Save. The phone keeps showing your last good version. A red bar under the phone names the file, `src/data/products.json`, gives a line and column number, and says the page still shows your last good version. The terminal prints the same message. Put the colon back and save: the bar goes away and the phone reloads.
 
 > **If something goes wrong.**
 > - Nothing happens after you save: check that the terminal still shows `Watching for changes: the phone reloads when you save.` and that you saved the file in the app folder that `shipvo run` started in.
