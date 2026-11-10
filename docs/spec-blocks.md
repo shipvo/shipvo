@@ -114,6 +114,8 @@ app.select("Period", "year");          // { ok: false, error: '"year" is not one
 | `segmented` | One choice from a few | `label`, `bind` to an `enum` state value, `options` |
 | `kanban` | Cards in columns | `label`, `from`, `columns`, `column`, `title`, `detail`, `onMove` |
 | `timeline` | Dated entries, newest day first | `label`, `from`, `date`, `title`, `detail` |
+| `calendar` | Events as a month, week or agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect` |
+| `map` | Pins from data on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect` |
 | `vector` | A small drawing that follows your data | `label`, `value`, `width`, `height`, `shapes`, `motion` |
 
 In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a segmented control reads `Period: week`, and a progress block reads `Monthly goal: 40%`. Assistants and `@shipvo/test` find them by those names.
@@ -136,6 +138,27 @@ A `kanban` block shows the rows of a data source as cards in columns. A `timelin
 - `app.move("Buy bait", "done")` moves a card by its title and runs `onMove`. It answers `ok: false` if the card or the column does not exist.
 
 The validator reports a bad column list, a card in a column the board does not have, a missing or invalid date, and an undeclared `onMove` action, each with a path and a fix.
+
+## Calendars and maps
+
+A `calendar` block shows the rows of a data source as events. A `map` block draws them as pins. Both need a `label` and a `from` (the name of a source in `data`); the rest are expressions that run once per row as `item`.
+
+```json
+{ "type": "calendar", "label": "Plans", "view": "week", "at": "2026-11-10", "from": "events",
+  "date": "{{ item.at }}", "title": "{{ item.name }}",
+  "onSelect": { "action": "pick", "input": { "id": "{{ item.id }}" } } }
+{ "type": "map", "label": "Places", "from": "places", "lat": "{{ item.lat }}", "lng": "{{ item.lng }}",
+  "title": "{{ item.name }}", "onSelect": { "action": "pick", "input": { "id": "{{ item.id }}" } } }
+```
+
+- `view` is `month` (the default), `week` (Monday first) or `agenda` (every event day, in order).
+- `at` is a day such as `2026-11-10`, or an expression. The month or week that contains it is shown. Without `at`, the first event's day is used.
+- `date` is `2026-11-10` or `2026-11-10T09:30`. Events are sorted by date. `detail` is optional.
+- The map draws a pin for each row on a canvas that fits all the pins. It makes no tile or network calls. `lat` is -90 to 90 and `lng` is -180 to 180.
+- `onSelect` names an action from `actions`. `app.press("Dinner")` presses the event, or the pin, by its title and runs the action with `item` set to that row.
+- In the screen tree, a calendar has one `day` group per day that has events, and each event reads `Flight to Lisbon` (title, then detail). A map has one labelled pin per row. Both render on the Android and iPhone skins.
+
+The validator reports a view that is not supported, a start day that is not a date, an event date or a coordinate in the seed data that is not valid, a missing `from`, `date`, `lat`, `lng` or `title`, and an `onSelect` action that is not declared. Each error has a JSON path and a fix.
 
 ## Vector drawings
 
@@ -233,6 +256,9 @@ A data source can call a service with a key you saved once in the secret form. T
 - **`Card column "later" is not a board column.`** A row has a column value that is not in `columns`. Use one of the listed names or add the column.
 - **`Entry date "tomorrow" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
+- **`Calendar view "year" is not supported.`** Use `month`, `week` or `agenda`.
+- **`Pin latitude 95 is not valid.`** Latitude is -90 to 90 and longitude is -180 to 180. Check you did not swap them.
+- **A calendar shows no events.** In `week` and `month` view only the days of the month or week that contains `at` are shown. Change `at` or use `agenda`.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 

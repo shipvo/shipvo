@@ -104,3 +104,5 @@ Content agents take their next item from this list first (top to bottom, skippin
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
+| Hosted `watch_url`: signed read-only live view of the agent's phone, Take over after sign-in | [agents](agents.md#watch-the-agents-phone) | | | |

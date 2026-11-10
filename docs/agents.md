@@ -80,6 +80,8 @@ The person can stop the agent at any time. Any touch or key press on the phone p
 
 The simulator serves a `/watch` page. Open it in a browser to see the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and starts view only; the viewer can turn on **Take over** to drive the phone. For a phone you can touch directly, see [Driving the live phone](#driving-the-live-phone). The video stream runs only while someone is watching. `/sessions` reports `skin` and `streaming` for each session. For a phone you can also touch, use [`shipvo run`](run.md).
 
+On the hosted phone, `open_app` also returns `watch_url`, a link to a read-only view of that one session on Android or iOS (pass `platform` to pick the phone). The link is signed and lasts one hour. It carries no API key, shows only that session, and cannot tap, swipe or type. To drive the phone from the page, choose **Take over** and sign in with the GitHub account that owns the key. A link for another session, an expired or changed link, and a revoked key are all refused.
+
 ## What the tree shows (and hides), on purpose
 
 - **Rails show only what is on screen.** A horizontal list exposes its visible items; the agent swipes (`scroll right` with the rail's ref) to see more, as on a phone.
