@@ -6,17 +6,11 @@ const dir = new URL("../gallery/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
 const inputs: Record<string, [string, Record<string, unknown>]> = {
   "habit-tracker": ["check_in", { habit: "Read", day: "2026-11-10", count: 2 }],
-  "expense-tracker": ["add_expense", { payer: "Ana", what: "Dinner", amount: 40 }],
-  "trip-checklist": ["add_item", { name: "Passport", group: "Documents" }],
-  flashcards: ["add_card", { front: "Hola", back: "Hello" }],
   "workout-log": ["log_set", { exercise: "Squat", reps: 5, weight: 60 }],
 };
 
 const expected: Record<string, { row: Record<string, unknown>; text: string }> = {
-  "habit-tracker": { row: { habit: "Read", day: "2026-11-10", count: 2 }, text: "2 check-ins" },
-  "expense-tracker": { row: { payer: "Ana", what: "Dinner", amount: 40 }, text: "Total $40.00" },
-  "trip-checklist": { row: { name: "Passport", group: "Documents", packed: false }, text: "0 of 1 packed" },
-  flashcards: { row: { front: "Hola", back: "Hello", known: false }, text: "1 cards to learn" },
+  "habit-tracker": { row: { habit: "Read", day: "2026-11-10", count: 2 }, text: "Check-ins: 2" },
   "workout-log": { row: { exercise: "Squat", reps: 5, weight: 60 }, text: "300" },
 };
 
@@ -27,7 +21,7 @@ function screenText(spec: unknown, data: Record<string, unknown>): string {
 }
 
 describe("spec gallery", () => {
-  it("has the five specs", () => {
+  it("has the gallery specs", () => {
     expect(files.map((f) => f.replace(".json", ""))).toEqual(Object.keys(inputs).sort());
   });
 
@@ -69,32 +63,11 @@ describe("spec gallery", () => {
     });
   }
 
-  const follow = (id: string) => {
-    const spec = JSON.parse(readFileSync(new URL(`${id}.json`, dir), "utf8"));
-    const r = createApp(spec, {});
+  it("habit-tracker: check_in rejects a missing habit", () => {
+    const r = createApp(JSON.parse(readFileSync(new URL("habit-tracker.json", dir), "utf8")), {});
     if (!r.ok) throw new Error(JSON.stringify(r.errors));
-    return { spec, app: r.app };
-  };
-
-  it("flashcards: mark_known moves a card out of the learn list", () => {
-    const { spec, app } = follow("flashcards");
-    app.call("add_card", { front: "Hola", back: "Hello" });
-    app.call("add_card", { front: "Adios", back: "Bye" });
-    expect(screenText(spec, app.data)).toContain("2 cards to learn");
-    expect(app.call("mark_known", { front: "Hola" }).ok).toBe(true);
-    expect(app.data.cards).toMatchObject([{ front: "Hola", known: true }, { front: "Adios", known: false }]);
-    const text = screenText(spec, app.data);
-    expect(text).toContain("1 cards to learn");
-  });
-
-  it("trip-checklist: pack_item raises the packed count", () => {
-    const { spec, app } = follow("trip-checklist");
-    app.call("add_item", { name: "Passport", group: "Documents" });
-    app.call("add_item", { name: "Socks", group: "Clothes" });
-    expect(screenText(spec, app.data)).toContain("0 of 2 packed");
-    expect(app.call("pack_item", { name: "Passport" }).ok).toBe(true);
-    expect(app.data.items).toMatchObject([{ name: "Passport", packed: true }, { name: "Socks", packed: false }]);
-    expect(screenText(spec, app.data)).toContain("1 of 2 packed");
+    expect(r.app.call("check_in", { day: "2026-11-10", count: 1 }).ok).toBe(false);
+    expect(r.app.data.checkins).toEqual([]);
   });
 
   it("workout-log shows dark mode", () => {

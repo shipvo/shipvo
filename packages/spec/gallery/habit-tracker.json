@@ -40,7 +40,7 @@
         {
           "type": "text",
           "variant": "title",
-          "value": "{{ total }} check-ins"
+          "value": "Check-ins: {{ total }}"
         },
         {
           "type": "chart",
@@ -87,7 +87,7 @@
           "from": "{{ sortBy(checkins, 'day') }}",
           "item": {
             "title": "{{ item.habit }}",
-            "subtitle": "{{ item.day }}, {{ item.count }} times"
+            "subtitle": "{{ item.day }}, times: {{ item.count }}"
           },
           "empty": {
             "message": "No check-ins yet"
