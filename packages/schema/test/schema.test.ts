@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
+import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, Telemetry, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
 
 const sig = "AAAA".repeat(16);
 const manifest = {
@@ -204,5 +204,12 @@ describe("release pointer state_version", () => {
     const v = ReleasePointer.safeParse({ ...base, state_version: 3 });
     expect(v.success && v.data.state_version).toBe(3);
     for (const bad of [0, -1, 1.5, "2"]) expect(ReleasePointer.safeParse({ ...base, state_version: bad }).success).toBe(false);
+  });
+});
+
+describe("telemetry js_crash events", () => {
+  it("accepts the load kind in the event name", () => {
+    for (const event of ["js_crash_cold", "js_crash_reload"])
+      expect(Telemetry.safeParse({ schema_version: "1.0", app_id: "a", release: 1, event }).success).toBe(true);
   });
 });

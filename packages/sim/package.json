@@ -29,6 +29,7 @@
     "app-name.mjs",
     "identity.mjs",
     "banner.mjs",
+    "search.mjs",
     "wakeup.mjs",
     "frame.mjs",
     "lumi.mjs",
