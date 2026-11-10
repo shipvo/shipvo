@@ -124,7 +124,7 @@ The open screen changes at once. Look for two things: an **About** button under 
 ![The Gift ideas app after the change: the idea from Mum is still in the list, and a blue About button is under it.](/tutorials/describe-an-app/04-updated.png)
 
 > **If something goes wrong.**
-> - Your ideas are gone: your ideas stay while the simulator runs. If you restart it, ask the assistant for the app again.
+> - Your ideas are gone: they stay while the simulator runs. If you restart it, ask the assistant for the app again.
 > - The About button is missing: say "The About button is missing, please update the app again".
 
 ## 7. Try the iPhone look
