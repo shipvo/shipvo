@@ -86,7 +86,7 @@ const RELOAD_CLIENT = `(function(){if(!window.EventSource)return;var b=document.
 var es=new EventSource("${RELOAD_PATH}");
 es.onmessage=function(m){var d;try{d=JSON.parse(m.data)}catch(e){return}
 if(d.type==="building"){if(b&&!b.hidden){b.hidden=true;window.fit&&fit()}if(u)u.hidden=false}
-else if(d.type==="error"){if(u)u.hidden=true;if(b){b.textContent=d.message;b.hidden=false;window.fit&&fit()}}
+else if(d.type==="error"){if(u)u.hidden=true;if(b){b.textContent=d.message;b.hidden=false;window.fit&&fit();b.scrollIntoView&&b.scrollIntoView({block:"nearest"})}}
 else if(d.type==="reload"){if(u)u.hidden=true;if(b){b.hidden=true;window.fit&&fit()}try{f.contentWindow.location.reload()}catch(e){f.src=f.src}}}})()`;
 
 /** The page that shows the app in an Android or iOS frame at its real logical size, scaled to fit the window. The phone body comes from @shipvo/sim's renderFrame. */
@@ -109,7 +109,7 @@ ${frame.css}
 .top{position:fixed;left:12px;right:12px;top:10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;z-index:6;pointer-events:none}
 .top>*{pointer-events:auto}
 .sheetbtn{flex:none;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
-.banner{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);max-width:min(90vw,640px);box-sizing:border-box;max-height:30vh;overflow:auto;padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
+.banner{position:fixed;left:50%;top:10px;transform:translateX(-50%);max-width:min(90vw,640px);box-sizing:border-box;max-height:30vh;overflow:auto;padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
 .banner[hidden]{display:none}
 .updating{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);padding:4px 10px;border-radius:999px;background:#1d2530;color:#fff;font-size:12px;z-index:9}
 .updating[hidden]{display:none}
@@ -128,7 +128,7 @@ function sheet(on){sh.classList.toggle("open",on)}
 document.getElementById("sheetbtn").onclick=function(){sheet(!sh.classList.contains("open"))};
 sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet(false)};
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
-function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var t=document.getElementById("top"),b=document.getElementById("banner");var top=t.offsetHeight+20,bot=b.hidden?10:b.offsetHeight+20;var ah=Math.max(100,innerHeight-top-bot);var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},ah/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.top=(top+ah/2)+"px";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
+function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var t=document.getElementById("top"),b=document.getElementById("banner");var top=t.offsetHeight+20,bot=10;if(!b.hidden){b.style.top=top-10+"px";top+=b.offsetHeight+10}var ah=Math.max(100,innerHeight-top-bot);var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},ah/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.top=(top+ah/2)+"px";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
 </script><script>${runPanelScript()}</script><script>${RELOAD_CLIENT}</script>${render.statusScript ? `<script>${render.statusScript("app", platform, { marketplace: (process.env.PN_CONTROL || "https://api.shipvo.dev").replace(/\/$/, "") }).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }

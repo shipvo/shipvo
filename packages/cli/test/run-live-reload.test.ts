@@ -30,7 +30,7 @@ beforeAll(async () => {
 }, 120_000);
 afterAll(async () => { await browser?.close(); });
 
-async function session(platform: Platform) {
+async function session(platform: Platform, viewport = { width: 500, height: 950 }) {
   const root = mkdtempSync(join(tmpdir(), "shipvo-live-"));
   mkdirSync(join(root, "src"));
   writeFileSync(join(root, "src", "title.txt"), "Hello tide");
@@ -47,7 +47,7 @@ async function session(platform: Platform) {
     onResult: (r) => { if (r.ok) reloadAt = Date.now(); server.notify(r.ok ? { type: "reload" } : { type: "error", message: r.message }); },
   });
   await wait(100);
-  const page = await browser.newPage({ viewport: { width: 500, height: 950 } });
+  const page = await browser.newPage({ viewport });
   await page.goto(`http://127.0.0.1:${server.port}/`);
   await page.waitForSelector("#app");
   const app = () => page.frames().find((f: any) => f !== page.mainFrame());
@@ -93,6 +93,22 @@ describe.each(["android", "ios"] as const)("live reload on %s", (platform) => {
       if (SHOTS) await s.page.screenshot({ path: join(SHOTS, `${platform}-fix-building.png`) });
       await s.app().waitForFunction(() => document.querySelector("h1")?.textContent === "Fixed", null, { timeout: 15000 });
       expect(await s.page.isHidden("#banner")).toBe(true);
+    } finally { await s.close(); }
+  }, 60_000);
+
+  it("shows the error inside the window at 1000x600, above the phone", async () => {
+    const s = await session(platform, { width: 1000, height: 600 });
+    try {
+      s.edit("<<syntax error>>");
+      await s.page.waitForSelector("#banner:not([hidden])", { timeout: 15000 });
+      const r = await s.page.evaluate(() => {
+        const b = document.getElementById("banner")!.getBoundingClientRect(), t = document.getElementById("top")!.getBoundingClientRect(), p = document.getElementById("phone")!.getBoundingClientRect();
+        return { bTop: b.top, bBottom: b.bottom, tBottom: t.bottom, pTop: p.top, h: innerHeight };
+      });
+      expect(r.bTop).toBeGreaterThanOrEqual(0);
+      expect(r.bBottom).toBeLessThanOrEqual(r.h);
+      expect(r.bTop).toBeGreaterThanOrEqual(r.tBottom - 1);
+      expect(r.bBottom).toBeLessThanOrEqual(r.pTop + 1);
     } finally { await s.close(); }
   }, 60_000);
 });

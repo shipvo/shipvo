@@ -1,0 +1,1 @@
+- run: the build error bar is pinned to the top of the page, under the title bar, so it is visible in small windows on the Android and iOS frames.
