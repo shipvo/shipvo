@@ -74,13 +74,16 @@ duration=0.733
 
 ## Troubleshooting
 
-- **`recorder_unavailable`**: run `npm i -D playwright && npx playwright install chromium`, then record again.
-- **`encode_failed`**: ffmpeg is missing or failed. Run `ffmpeg -version`; if it prints nothing, install ffmpeg.
-- **`music_unavailable`**: set `SHIPVO_BGMUSIC` to the path of `bgmusic.py`, or leave music out and use narration only.
-- **`frame_unreachable`**: start `shipvo sim` or `shipvo run` first.
-- **`recording_active`**: a recording is already running. Call `record_stop` first.
+| What you see | What it means | What to do |
+| --- | --- | --- |
+| `recorder_unavailable` | The tool that films the phone is not installed | Ask your assistant to run `npm i -D playwright && npx playwright install chromium`, then try again |
+| `frame_unreachable` | The phone is not running | Start it with `shipvo sim` or `shipvo run`, then record again |
+| `encode_failed` | `ffmpeg` is missing | Install ffmpeg, then record again |
+| `narration_unreadable` or `music_failed` | The voice file or music step failed | Your silent video is kept. Fix the file path or install `python3`, then add sound again |
+| `music_unavailable` | The music script was not found | Set `SHIPVO_BGMUSIC` to the path of `bgmusic.py`, or leave music out and use narration only |
+| `recording_active` | A recording is already running | Call `record_stop` first, then record again |
 
-The full list of codes is in [Record a demo video of the phone](record.md#troubleshooting).
+Every error code is explained in [Record a demo video of the phone](record.md#troubleshooting).
 
 ## Next steps
 
