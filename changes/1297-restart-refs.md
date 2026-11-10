@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: tools that take an element `ref` (tap, type, wait_for and the others) now accept refs such as `p1e5`, which the phone uses after a restart. Before, they were refused.
+- Migration: none.

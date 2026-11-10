@@ -273,7 +273,7 @@
           "properties": {
             "ref": {
               "type": "string",
-              "pattern": "^e\\d+$"
+              "pattern": "^(?:p\\d+)?e\\d+$"
             },
             "text": {
               "type": "string"
@@ -2232,7 +2232,7 @@
         },
         "ref": {
           "type": "string",
-          "pattern": "^e\\d+$",
+          "pattern": "^(?:p\\d+)?e\\d+$",
           "description": "Scroll inside this element (a rail or list); omit for the page"
         },
         "compact": {
@@ -2244,7 +2244,7 @@
           "properties": {
             "ref": {
               "type": "string",
-              "pattern": "^e\\d+$"
+              "pattern": "^(?:p\\d+)?e\\d+$"
             },
             "text": {
               "type": "string"
@@ -2769,8 +2769,8 @@
         },
         "ref": {
           "type": "string",
-          "pattern": "^e\\d+$",
-          "description": "Element ref from the screen, e.g. e42"
+          "pattern": "^(?:p\\d+)?e\\d+$",
+          "description": "Element ref from the screen, e.g. e42. After a restart refs look like p1e42; use them as shown."
         },
         "compact": {
           "type": "boolean",
@@ -2781,7 +2781,7 @@
           "properties": {
             "ref": {
               "type": "string",
-              "pattern": "^e\\d+$"
+              "pattern": "^(?:p\\d+)?e\\d+$"
             },
             "text": {
               "type": "string"
@@ -2873,8 +2873,8 @@
         },
         "ref": {
           "type": "string",
-          "pattern": "^e\\d+$",
-          "description": "Element ref from the screen, e.g. e42"
+          "pattern": "^(?:p\\d+)?e\\d+$",
+          "description": "Element ref from the screen, e.g. e42. After a restart refs look like p1e42; use them as shown."
         },
         "text": {
           "type": "string"
@@ -2892,7 +2892,7 @@
           "properties": {
             "ref": {
               "type": "string",
-              "pattern": "^e\\d+$"
+              "pattern": "^(?:p\\d+)?e\\d+$"
             },
             "text": {
               "type": "string"
