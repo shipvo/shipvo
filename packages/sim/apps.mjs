@@ -187,9 +187,9 @@ function placeApp(st, id, patch = {}) {
   if (Object.keys(p).length) a.placement = p; else delete a.placement;
   return a;
 }
-export function arrangeApp(st, id, patch = {}) {
+export function arrangeApp(st, id, patch = {}, name = "arrange_apps") {
   const a = placeApp(st, id, patch);
-  note(st, "arrange_apps", id, { placement: a.placement ?? null });
+  note(st, name, id, { placement: a.placement ?? null });
   return a;
 }
 /** Pin or unpin an app. Pinned apps lead the home screen in the order they were pinned. Throws not_installed. */

@@ -396,9 +396,11 @@ async function act(id, body) {
       return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Home screen layout: pin, hide, reorder and schedule an installed app.
+    case "schedule_app": case "clear_schedule":   // the same schedule as arrange_apps, under the names an assistant looks for
     case "arrange_apps": {
-      const { id: appId, ...patch } = body; delete patch.action; delete patch.session;
-      try { arrangeApp(s.apps, String(appId ?? ""), patch); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      const { id: appId, ...rest } = body; delete rest.action; delete rest.session;
+      const patch = body.action === "clear_schedule" ? { schedule: null } : body.action === "schedule_app" ? { schedule: { days: body.days, from: body.from, to: body.to } } : rest;
+      try { arrangeApp(s.apps, String(appId ?? ""), patch, body.action); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       return { installed_apps: s.apps.installed_apps, home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // The phone's clock, for schedules. at: an ISO time like 2026-11-14T09:00:00, or null for the real time.
@@ -412,7 +414,7 @@ async function act(id, body) {
       const want = Array.isArray(body.ids) ? body.ids.map(String) : null;
       const specs = s.apps.installed_apps.filter((a) => a.kind === "spec");
       if (want) for (const w of want) if (!specs.some((a) => a.id === w)) throw new SimError("not_installed", `'${w}' is not a spec app on this phone`);
-      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id), ...(a.placement ? { placement: structuredClone(a.placement) } : {}) }));
+      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id), ...(a.placement ? { placement: a.placement } : {}) }));
       return { format: "shipvo.phone-apps/v0", apps };
     }
     // Put exported apps on the phone. Every spec is checked first and nothing is installed if any is wrong.
@@ -675,7 +677,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, set_time, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
