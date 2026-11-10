@@ -46,10 +46,11 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 1. Open the phone in your browser with `shipvo run` or `shipvo sim`.
 2. Tap Settings, then tap **Secrets**.
 3. Each saved key shows its name, the app, the domain it may call, its access, and when it was last used ("never" if it has not been used).
-4. To remove a key, tap **Revoke** next to it, then confirm. The key is deleted and its row disappears. Apps that used it can no longer call the service until you save a key again.
-5. Tap **Back** to return to Settings.
+4. To replace a key, tap **Rotate** next to it. The screen shows a one-time link. Open that link and paste the new value there. The old value keeps working until you do. Only web links (http or https) are shown, and the key value is never displayed.
+5. To remove a key, tap **Revoke** next to it, then confirm. The key is deleted and its row disappears. Apps that used it can no longer call the service until you save a key again.
+6. Tap **Back** to return to Settings.
 
-With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate a key or revoke it from a script.
+With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 
 ## Open a web page in the phone's Browser
 
@@ -126,6 +127,12 @@ Installing a marketplace app is real. `install_app` fetches the app's published 
 If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of four apps (`tide`, `notes`, `weather`, `splitly`) with no network.
 
 Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
+
+### Device permissions per app
+
+The Store's install card lists every device permission an app declares (for example `notifications` or `location`), with an Allow or Deny switch for each. Your answers are kept per app in `installed_apps[].permissions`, saved in `phone.json` (`apps[].permissions`) and carried by `export_phone_apps` and `import_phone_apps`. Settings has one switch per app and permission, so you can change an answer later. `install_app` returns `declared` and `permissions`.
+
+An action that needs a denied permission (a `notify` step needs `notifications`) returns `permission_denied` naming the permission, and nothing else in the action runs. The sim action `set_app_permission { id, permission, allowed }` sets an answer; it returns `not_declared` for a permission the app did not declare.
 
 ### Start from a `phone.json`
 

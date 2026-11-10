@@ -1,0 +1,1 @@
+- Docs: setup steps, troubleshooting and next steps for single sign-on and auto-halt.
