@@ -1,5 +1,7 @@
 # Moving to a new machine
 
+For anyone who ships updates with Shipvo and is changing laptops, joining a teammate's repo, or setting up CI. You will get the same signing key on the new machine, so your next release reaches phones that already have your app.
+
 Switching laptops, or joining a teammate's repo, takes two small steps. One of them matters a lot: the **signing seed**.
 
 ## What lives where
@@ -49,3 +51,18 @@ So back it up once, today, even if you are not moving.
 ## Teams
 
 Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`) and let CI publish, or keep it in a shared vault your team already trusts. Each person runs their own `shipvo login` and `shipvo app create`; publish tokens are per machine.
+
+## Troubleshooting
+
+Each message below is printed by the CLI.
+
+- **"That does not look like a Shipvo signing seed (a 32-byte value in base64)."** The text you pasted is cut off or has extra characters. Copy it again from your password manager, or use `keys import --file seed.txt`.
+- **"This seed belongs to a different key … but shipvo.json pins …".** This is the seed of another app or an older key. Nothing was written. Find the backup made for this app, or check that you are in the right folder.
+- **"Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE … or keep it at .shipvo/seed.txt."** The machine has no seed yet. Run `keys import` first, or set `SHIPVO_SIGNING_SEED` in your CI secrets.
+- **"This seed does not match the public key in shipvo.json".** Publishing stopped on purpose, because installed apps would reject the update. Import the matching seed.
+
+## Next steps
+
+- [Getting started](getting-started.md): the full path from a new app to a published update.
+- [CLI guide](cli.md): `keys`, `login`, `app create` and `publish`.
+- [Self-host the control plane](self-hosting.md): run your own server.

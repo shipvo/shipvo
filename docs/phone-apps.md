@@ -82,6 +82,7 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 
 ## Next steps
 
+- [Describe an app and it appears](describe-an-app.md): make an app from a description, step by step.
 - [Agents and Shipvo apps](agents.md): every tool.
 - [Simulated device features](device-api.md): camera, location, payment, notifications.
 - [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
