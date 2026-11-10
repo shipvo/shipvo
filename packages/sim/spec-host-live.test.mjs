@@ -132,6 +132,40 @@ test("update_app is a new version: entered data stays, the screen changes, a bad
   assert.deepEqual(log.map((e) => [e.from, e.version, e.source]), [["1", "2", "real"]]);
 });
 
+for (const style of ["android", "ios"]) {
+  test(`pin_app and hide_app arrange the home screen (${style} style); data and update_app keep it`, async () => {
+    const sid = `sp-pin-${style}`;
+    assert.ok((await call("/session", { session: sid })).ok);
+    const mk = (id) => ({ ...structuredClone(GIFTS), app: { id, name: `App ${id}`, icon: "gift" } });
+    for (const id of ["aa", "bb", "cc"]) { const r = await act(sid, { action: "create_app", id, spec: mk(id), style, open: false }); assert.equal(r.ok, true, JSON.stringify(r)); }
+    await act(sid, { action: "app_action", id: "bb", action_name: "add_gift", input: { name: "Kite" } });
+    const order = (t) => [...t.matchAll(/\((\w+) \d/g)].map((m) => m[1]).join(",");
+    const home = async () => (await act(sid, { action: "press_home" })).screen;
+    assert.equal(order(await home()), "aa,bb,cc");
+    assert.equal((await act(sid, { action: "pin_app", id: "cc", pinned: true })).ok, true);
+    const p = await act(sid, { action: "pin_app", id: "bb", pinned: true });
+    assert.equal(order(p.screen), "cc,bb,aa");   // pinned in the order pinned, then the rest
+    const h = await act(sid, { action: "hide_app", id: "aa", hidden: true });
+    assert.equal(order(h.screen), "cc,bb");
+    assert.equal(h.installed_apps.length, 3);
+    // hidden: still opens and runs actions
+    assert.equal((await act(sid, { action: "app_action", id: "aa", action_name: "add_gift", input: { name: "Drum" } })).ok, true);
+    // update_app keeps placement
+    const v2 = mk("bb"); v2.screens[0].title = "New title";
+    assert.equal((await act(sid, { action: "update_app", id: "bb", spec: v2 })).ok, true);
+    assert.equal(order(await home()), "cc,bb");
+    // unhide restores it unchanged, data included
+    assert.equal(order((await act(sid, { action: "hide_app", id: "aa", hidden: false })).screen), "cc,bb,aa");
+    assert.equal((await act(sid, { action: "switch_app", id: "bb" })).ok, true);
+    assert.match((await act(sid, { action: "screen" })).screen, /Kite/);
+    assert.equal((await act(sid, { action: "pin_app", id: "cc", pinned: false })).ok, true);
+    assert.equal(order(await home()), "bb,aa,cc");
+    for (const a of ["pin_app", "hide_app"]) assert.equal((await act(sid, { action: a, id: "ghost" })).code, "not_installed");
+    const log = (await act(sid, { action: "device_log" })).log.map((e) => e.name);
+    assert.ok(log.includes("pin_app") && log.includes("hide_app"));
+  });
+}
+
 test("uninstall stops the app: actions say not_installed and a new create starts with fresh data", async () => {
   assert.ok((await call("/session", { session: "sp-un" })).ok);
   assert.equal((await act("sp-un", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);

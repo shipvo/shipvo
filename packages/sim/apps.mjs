@@ -98,11 +98,35 @@ export function switchApp(st, id, nav) {
   st.current_app = id; if (nav) nav.where = "app"; note(st, "switch_app", id); return st;
 }
 
+/** Pin or unpin an app. Pinned apps lead the home screen in the order they were pinned. Throws not_installed. */
+export function pinApp(st, id, pinned) {
+  const a = st.installed_apps.find((x) => x.id === id);
+  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
+  if (pinned && a.pinned == null) a.pinned = Math.max(0, ...st.installed_apps.map((x) => x.pinned ?? 0)) + 1;
+  if (!pinned) delete a.pinned;
+  note(st, "pin_app", id, { pinned: !!pinned }); return st;
+}
+
+/** Hide an app from the home screen and the app list, or show it again. Its data stays. Throws not_installed. */
+export function hideApp(st, id, hidden) {
+  const a = st.installed_apps.find((x) => x.id === id);
+  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
+  if (hidden) a.hidden = true; else delete a.hidden;
+  note(st, "hide_app", id, { hidden: !!hidden }); return st;
+}
+
+/** The apps shown on the home screen: pinned first (in pin order), then the rest in install order. Hidden apps are left out. */
+export function homeApps(st) {
+  const shown = st.installed_apps.filter((a) => !a.hidden);
+  return [...shown.filter((a) => a.pinned != null).sort((a, b) => a.pinned - b.pinned), ...shown.filter((a) => a.pinned == null)];
+}
+
 /** Plain text for an agent: the installed apps, then the Store. */
 export function describeApps(st) {
   const l = ["Installed apps"];
-  if (!st.installed_apps.length) l.push("- none");
-  for (const a of st.installed_apps) l.push(`- button "${a.name}" (${a.id} ${a.version}${st.current_app === a.id ? ", open" : ""}: switch_app opens it)`);
+  const shown = homeApps(st);
+  if (!shown.length) l.push("- none");
+  for (const a of shown) l.push(`- button "${a.name}" (${a.id} ${a.version}${a.pinned != null ? ", pinned" : ""}${st.current_app === a.id ? ", open" : ""}: switch_app opens it)`);
   l.push("Store");
   for (const a of st.store) l.push(st.installed_apps.some((i) => i.id === a.id) ? `- "${a.name}" (${a.id}): installed` : `- button "Install ${a.name}" (${a.id}: install_app installs it)`);
   return l.join("\n");
@@ -111,7 +135,7 @@ export function describeApps(st) {
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 /** Home screen icons for installed apps. */
 export function installedIconsHtml(st) {
-  return st.installed_apps.map((a) => `<button type="button" class="sf-icon sf-appicon" data-part="installed-app" data-app="${esc(a.id)}" aria-label="${esc(a.name)}"><b>${esc(a.name.slice(0, 1).toUpperCase())}</b><span>${esc(a.name)}</span></button>`).join("");
+  return homeApps(st).map((a) => `<button type="button" class="sf-icon sf-appicon" data-part="installed-app" data-app="${esc(a.id)}" aria-label="${esc(a.name)}"><b>${esc(a.name.slice(0, 1).toUpperCase())}</b><span>${esc(a.name)}</span></button>`).join("");
 }
 /** Store rows: one button per app that is not installed yet. */
 export function storeRowsHtml(st) {
@@ -142,7 +166,7 @@ export const MAX_BUNDLE_BYTES = 200 * 1024 * 1024;
 export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
 var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=${JSON.stringify(STORE_FIXTURE)};
-var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
+var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},homeApps=${homeApps.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;
