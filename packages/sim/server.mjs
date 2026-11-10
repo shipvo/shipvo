@@ -192,6 +192,8 @@ async function newSession(id, opts = {}) {
     try { await s.page.evaluate((u) => { globalThis.__pnDevice?.setInitialUrl?.(u); return globalThis.__pnDevice?.openUrl(u); }, String(url)); } catch {}
     return true;
   });
+  // Share.share records the share on the session, so it survives the app switch that follows it. Read and clear it with read_share.
+  await ctx.exposeFunction("__pnShareRecorded", (sh) => { const s = sessions.get(id); if (s) s.pendingShare = sh; });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${bk}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   await ctx.addInitScript(installNetGate);
   const page = await ctx.newPage();
@@ -657,6 +659,8 @@ async function act(id, body) {
     case "get_settings": case "set_setting": {
       try { return { ...(await settingsAction(page, body)) }; } catch (e) { if (e instanceof SettingsError) throw new SimError(e.code, e.message); throw e; }
     }
+    case "read_share": { const share = s.pendingShare ?? null; if (body.clear !== false) s.pendingShare = null; return { share }; }
+    case "receive_share": { const handled = await page.evaluate((p) => globalThis.__pnDevice?.receiveShare(p), { message: body.message, url: body.url }); await page.waitForTimeout(400); return { handled: !!handled }; }
     case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
     case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
     case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
@@ -757,7 +761,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, read_share, receive_share, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

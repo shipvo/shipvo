@@ -312,6 +312,10 @@ g.__pnDevice = {
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
+  /** Deliver a share to the foreground app. */
+  receiveShare: (p: SharePayload) => receiveShare(p),
+  /** The share the app last made with `Share.share`, or null. */
+  pendingShare: () => pendingShare,
   /** Set the URL `Linking.getInitialURL()` returns for this load. `null` clears it. */
   setInitialUrl(url: string | null) { initialUrl = url ?? null; },
   capabilities: () => device.capabilities(),
@@ -322,7 +326,7 @@ g.__pnDevice = {
     const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey();
     Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: (profile?.platform ?? state.platform) === "android" && (profile?.api ?? state.api) < 33 ? "granted" : "undetermined" },
       source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
-    recent.length = 0; seq = 0; initialUrl = null;
+    recent.length = 0; seq = 0; initialUrl = null; pendingShare = null;
     announceSystem(sk, false); announceStatus(before, false, bs); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline()));
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },
@@ -369,6 +373,26 @@ function deliverLocal(url: string): boolean {
 }
 export const openUrl = async (url: string) => { deliverUrl(url); };
 let initialUrl: string | null = null;
+export type SharePayload = { message?: string; url?: string };
+export type PendingShare = { message: string | null; url: string | null; sourceApp: string; at: number };
+let pendingShare: PendingShare | null = null;
+/** The `Share` API of a phone. Records one pending share (a second call replaces it); the log entry is marked simulated. */
+export const Share = {
+  sharedAction: "sharedAction" as const,
+  dismissedAction: "dismissedAction" as const,
+  async share(content: SharePayload): Promise<{ action: "sharedAction" }> {
+    pendingShare = { message: content.message ?? null, url: content.url ?? null, sourceApp: state.appName, at: Date.now() };
+    log("share_recorded", { message: pendingShare.message, url: pendingShare.url, sourceApp: pendingShare.sourceApp });
+    (g as { __pnShareRecorded?: (s: PendingShare) => unknown }).__pnShareRecorded?.(pendingShare);
+    return { action: "sharedAction" };
+  },
+};
+/** Hand a share to the app in the foreground: the one-shot `url` path of `openUrl` (listeners and the `pn:url` event), plus a `pn:share` event. True if a listener took the url. */
+export function receiveShare(p: SharePayload): boolean {
+  window.dispatchEvent(new CustomEvent("pn:share", { detail: { message: p.message ?? null, url: p.url ?? null } }));
+  log("share_received", { message: p.message ?? null, url: p.url ?? null });
+  return p.url ? deliverLocal(p.url) : false;
+}
 /** The `Linking` API of a phone, backed by the simulated device. `openURL` goes through `openUrl`; its log entry is marked simulated. */
 export const Linking = {
   async getInitialURL(): Promise<string | null> { return initialUrl; },
