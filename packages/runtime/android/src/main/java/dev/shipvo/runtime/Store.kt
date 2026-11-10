@@ -55,6 +55,10 @@ internal class Store(private val ctx: Context) : TrialCounts, RotationState {
 
   /** The bundle embedded in the APK, used as the first patch baseline. */
   fun embeddedBundle(): ByteArray? = try { ctx.assets.open("index.android.bundle").use { it.readBytes() } } catch (_: Exception) { null }
+  /** Size of the APK's bundle, counted by streaming so nothing large is allocated; null if it cannot be read. */
+  fun embeddedSize(): Long? = try {
+    ctx.assets.open("index.android.bundle").use { ins -> val buf = ByteArray(8192); var n = 0L; while (true) { val r = ins.read(buf); if (r < 0) break; n += r }; n }
+  } catch (_: Exception) { null }
   fun embeddedSha(): String? {
     val key = "embedded_sha:" + installedBinaryVersion
     p.getString(key, null)?.let { return it }
