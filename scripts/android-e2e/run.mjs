@@ -109,7 +109,7 @@ await scenario("first update after install: patch against the APK's own bundle",
     trials.push({ ...(await updateTrial(bundle("v1"), [embedded])), band: BAND });
   }
   const gap = (k) => median(trials.map((t) => t.timeline.gaps[k]));
-  return { pass: trials.every((t) => t.ok && t.via === "patch"), trials, trialCount: FIRST_TRIALS, fullBundleBytes: trials[0].bundleBytes,
+  return { pass: trials.every((t) => t.ok && t.via === "patch" && t.timeline?.gaps?.pointerToPatchMs != null), trials, trialCount: FIRST_TRIALS, fullBundleBytes: trials[0].bundleBytes,
     median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"]),
     phaseMedianMs: { pointerToPatchMs: gap("pointerToPatchMs"), patchToStagedMs: gap("patchToStagedMs"), stagedToHealthyMs: gap("stagedToHealthyMs") } };
 });
