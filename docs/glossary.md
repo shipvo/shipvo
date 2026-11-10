@@ -111,6 +111,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).
 
+**Live reload.** While `shipvo run` is open, Shipvo rebuilds your app each time you save a file and shows the new version in the phone, with no restart. If the save has a mistake, the phone keeps the last good version and a red bar names the file and line. See [Run your app on a phone](run.md#edit-and-save-the-phone-updates).
+
 **Refresh (data source).** A number of seconds on a web data source in an app spec. Shipvo asks the service again on that timer while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
 
 **App activity.** The record of what an agent built on a phone: each version of an app with plain lines for what changed, its web data sources, and its events. You get it with `app_activity`. See [Phone apps](phone-apps.md#see-what-was-built-and-changed).
