@@ -1,0 +1,1 @@
+- Docs: Troubleshooting for network proxy refusal codes and Capacitor builds; ledger rows and roadmap lines for `app_activity`, `refresh_app` and `schedule_app`; glossary entry for app activity.

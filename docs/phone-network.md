@@ -75,3 +75,29 @@ Each change is recorded in `device_log` as simulated.
 ```
 
 The phone starts with that profile. An unknown name fails the session with `bad_profile` and says which names exist.
+
+## Troubleshooting
+
+Every refused call answers with JSON `{ "error": "<code>" }` and the same code in the `x-shipvo-net-error` header. Look the code up in `device_log`.
+
+| Code | Status | What it means and what to do |
+| --- | --- | --- |
+| `unauthorized` | 401 | The session is not signed in. Sign in, then try again. |
+| `host_not_allowed` | 403 | The host is not on the app's allow-list. Ask the owner to add it with `set_network_allow`. `*.example.com` does not match `example.com` itself, so list both. |
+| `blocked_address` | 403 | The host is, or resolves to, a private, loopback, link-local or metadata address. Use a public host. |
+| `port_not_allowed` | 403 | Only ports 80 and 443 are open. Drop the port from the URL. |
+| `credentials_in_url` | 400 | Remove `user:password@` from the URL and send an `authorization` header instead. |
+| `bad_scheme` | 400 | Use an `https:` URL. |
+| `rate_limited` | 429 | Too many requests from this session. Wait the `retry-after` seconds in the reply. |
+| `request_too_large`, `response_too_large` | 413 | The body went over the size limit for a call. Send or fetch less per request. |
+| `too_many_redirects`, `bad_redirect` | 502 | The server redirected too often, or to a URL that is not valid. Call the final URL. |
+| `dns_failed`, `upstream_failed` | 502 | The host did not resolve or did not answer. Check the name, then retry. |
+| `timeout` | 504 | The server took too long. Retry, or check that it answers. |
+
+If an `authorization` header goes missing after a redirect, the redirect left the declared host. Call the final host directly and list it.
+
+## Next steps
+
+- [Device API](device-api.md#network-profiles): the same profiles from the device API.
+- [Phone apps](phone-apps.md): data sources that call a host through this proxy.
+- [Testing](testing.md): write the offline and slow-network checks as typed tests.
