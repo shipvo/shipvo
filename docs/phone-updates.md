@@ -1,5 +1,7 @@
 # OTA updates on the phone
 
+This page is for developers and for assistants testing updates. You get the update states, the three tools, and a runnable test of publish, apply and roll back on the simulated phone.
+
 Publish a release, watch it land on the simulated phone, apply it, and see a bad one roll back. No device needed. Everything here is simulated: nothing real is installed, and `device_log` marks each step `simulated`.
 
 ## What the phone shows
@@ -55,3 +57,20 @@ pnpm --filter @shipvo/sim exec node --test update-live.test.mjs
 Limits: web bundles only (one `index.html`), and no patch (bsdiff) simulation. In `shipvo run`, the frame page draws the banner from a `pn:update` message; the MCP tools do not feed it yet.
 
 The simulator refuses a signed release that is not newer than every release the session knows: the running one (`13` and `r13` both count as 13), the previous one, ones it ran before and blocked ones. This stops an old signed release being replayed. If the app has no release number and the session has seen none, any validly signed release counts as new.
+
+## Troubleshooting
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| `check_for_update` returns `no_update` | No update source is set, or the source holds nothing newer | Start the simulator with `--update-url` and `--update-key`, or set `PN_UPDATE_URL` and `PN_UPDATE_KEY`. |
+| State is `idle` with reason `verify_failed` | The signature or a hash does not match | Sign the pointer with the app's key and check that the bundle sha256 equals `web.sha256`. |
+| `apply_update` returns `not_ready` | Nothing verified is held | Call `check_for_update` first and wait for `ready`. |
+| State is `reverted` with reason `crash_loop` | The new release had a page error on 3 boots in a row | Fix the error and publish a newer release. The blocked one is not offered again. |
+| A release you re-signed is ignored | It is not newer than a release the session already knows | Publish a higher release number. |
+
+## Next steps
+
+- [Getting started](getting-started.md): publish your first signed update.
+- [Test with an assistant](test-with-an-assistant.md): let an assistant run these tools.
+- [Spike results](spike-results.md): the crash-loop rule, measured.
+- [Glossary](glossary.md)

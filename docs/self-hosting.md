@@ -1,6 +1,6 @@
 # Self-hosting the control plane
 
-The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. Free-tier Cloudflare is enough to start.
+The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. This page is for anyone who wants to run their own control plane. You get a working update server on your own Cloudflare account, or on your machine with Docker.
 
 ## Deploy
 
@@ -37,11 +37,11 @@ node ../../scripts/selfhost-smoke.mjs   # in another terminal; prints PASS
 
 On start, the container applies the files in `migrations/` to a local D1 database and adds a local developer key (`SHIPVO_LOCAL_DEV_KEY`, default `sv_test_localdev`). The smoke script uses that key to create an app, publish a signed pointer and read it back. Set the variable to something else if other people can reach your machine, and pass the same value to the script. The value may only contain letters, digits, `_` and `-`. When you change it, the container revokes the earlier local developer key on the next start. The smoke script needs Node 18 or later on the host.
 
-Not covered:
-- No public URL and no TLS. The port is bound to `127.0.0.1` only.
+What the local setup gives you:
+- The port is bound to `127.0.0.1`, so only your machine can reach it.
 - Data lives in the Docker volume `control-plane-data` (`/data` in the container). `docker compose down -v` deletes it.
-- `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login does not work offline, so only the routes the smoke script uses are exercised.
-- This is not a production setup.
+- The routes the smoke script uses: create an app, publish a signed pointer, read it back. `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login needs the network.
+- For a public URL with TLS, use the Cloudflare deploy above.
 
 ## D1 Free plan limits
 
@@ -193,3 +193,21 @@ Limits. The recorded range is the one in `package.json`, not the installed versi
 The full threat table, with the code and test behind each row and a list of gaps, is in [docs/threat-model.md](threat-model.md).
 
 The shell carries the Ed25519 public key and the control plane URL as native manifest meta-data. Pointers are signed with the matching seed, which lives only in your CI secrets; the control plane never has it, so a compromised control plane can serve stale or no releases but cannot forge one. Bundles are verified by SHA-256 and size before staging; patches are verified by the hash of the *result*. A release can never add a permission the shell did not declare, because it is JavaScript running on the shell's native modules.
+
+## Troubleshooting
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| `curl .../health` returns nothing or is refused | The container is not running yet, or you used a different port | `docker compose ps`, then `docker compose logs`. The local server is on `http://localhost:8787`. |
+| The smoke script fails with an auth error | `SHIPVO_LOCAL_DEV_KEY` differs between the container and the script | Set the same value for both. It may only contain letters, digits, `_` and `-`. |
+| `restore` refuses to run | The volume already holds data | Run `docker compose down -v` first, then restore into the empty volume. |
+| `selfhost-upgrade-check.mjs verify` exits 1 | The earlier pointer is no longer served | Read the message it prints, then follow [Roll back](#roll-back). |
+| The pointer answers 404 `release_halted` | [Auto-halt](auto-halt.md) stopped the live release | Publish a fixed release. Publishing a new release clears the halt. |
+| `shipvo doctor` reports `telemetry_dropped_today` above zero | D1 refused telemetry writes for the day | See [D1 Free plan limits](#d1-free-plan-limits). Updates keep flowing. |
+
+## Next steps
+
+- [Auto-halt](auto-halt.md): stop a bad release on its own.
+- [Telemetry export](telemetry-export.md): send events to R2 for SQL tools.
+- [Key rotation](key-rotation.md): change the signing key without a new app build.
+- [CLI guide](cli.md): publish, promote and roll back against your control plane.
