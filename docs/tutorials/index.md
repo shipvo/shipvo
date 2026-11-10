@@ -22,7 +22,7 @@ Taking payments is not a tutorial yet: the shop template has no payment step.
 | Tutorial | You will | Time | Level |
 | --- | --- | --- | --- |
 | [Play chess on two phones](chess-on-two-phones.md) | Start an Android phone and an iPhone-style phone side by side, play a move on one and see it on the other, then watch a full game | about 15 minutes | Beginner |
-| [See your app on a phone in your browser](run-your-app-on-a-phone.md) | Start a simulated Android or iPhone with one command, tap through your app, change a product name and watch the phone update, see the system sheet and stop it | about 25 minutes | Beginner |
+| [See your app on a phone in your browser](run-your-app-on-a-phone.md) | Start a simulated Android or iPhone with one command, tap through your app, change a product name and watch the phone update, see the system sheet and stop it | about 20 minutes | Beginner |
 
 Letting your assistant drive this same phone is not a tutorial yet: attaching is not available yet.
 

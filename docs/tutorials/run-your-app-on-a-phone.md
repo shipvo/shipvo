@@ -2,7 +2,7 @@
 
 You will type one command and get a phone, Android or iPhone style, in a browser tab, running your app. You will tap through your shop, change a product name and watch the phone update, look at the pretend Android system sheet, switch to the iPhone style and stop it again. You need no real phone, no Android Studio and no Xcode.
 
-**Level:** beginner. **Time:** about 25 minutes to read and follow. On our test machine the first start took within a minute (see "What we measured" at the end).
+**Level:** beginner. **Time:** about 20 minutes to read and follow. On our test machine the first start took within a minute (see "What we measured" at the end).
 
 New words are explained once, and collected in the [glossary](../glossary.md).
 
@@ -72,7 +72,13 @@ Below is a live phone with the finished Tide & Tackle sample shop, so you can tr
 
 You do not need to stop the phone to change your app. While it runs, Shipvo watches your files. When you save one, the phone updates by itself. This is called **live reload**.
 
-Leave the terminal running. Open your app's folder in any text editor and open the file `src/data/products.json`. It holds your products. If you started from the shop template, find the line with `"Wool beanie"`, change the words to `Merino beanie` and save the file.
+Leave the terminal running. Open your app's folder in any text editor and open the file `src/data/products.json`. It holds your products. If you started from the shop template, find this line:
+
+```json
+    "name": "Wool beanie",
+```
+
+Change `Wool beanie` to `Merino beanie` and save the file.
 
 Look at the terminal. You should see `Rebuilding...` and, a moment later, a line such as `rebuilt in 1.2 s` (your number will differ). The phone shows a small "Updating..." hint and then reloads. The list now says **Merino beanie**. You did not touch the browser tab. Live reload works the same way in the iPhone style: [switch the frame](#6-try-the-iphone-style-and-dark-frame) and save again, and the iPhone updates too.
 
@@ -143,7 +149,7 @@ Keep the phone open while you work. Each time you save a file, it shows the chan
 
 On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a first start of `shipvo run android` for a new shop app, with an empty cache, bundled 204 modules in 6.0 s and was serving the phone within the 60 seconds we waited. We did not time it more closely than that. A start-to-tappable timing on a clean machine is tracked in issue #676. We took every screenshot in this tutorial from that run.
 
-On 2026-11-10, on a GitHub Actions Linux runner, the test [`packages/cli/test/run-live-reload.test.ts`](https://github.com/shipvo/shipvo/blob/main/packages/cli/test/run-live-reload.test.ts) saved a one-word change in a small app and printed `save-to-visible android: 194 ms` and `save-to-visible ios: 190 ms`: the time from the save to the new text showing in the Android and iPhone frames. A shop app bundles more modules, so its rebuild takes longer. Screenshots 07 to 09 come from a `shipvo run android` session on a shop app.
+On 2026-11-10, on a GitHub Actions Linux runner, the test [`packages/cli/test/run-live-reload.test.ts`](https://github.com/shipvo/shipvo/blob/main/packages/cli/test/run-live-reload.test.ts) saved a one-word change in a small app and printed `save-to-visible android: 194 ms` and `save-to-visible ios: 190 ms`: the time from the save to the new text showing in the Android and iPhone frames. A shop app bundles more modules, so its rebuild takes longer. Screenshots 07 and 08 come from a `shipvo run android` session on a shop app.
 
 ## Next steps
 
