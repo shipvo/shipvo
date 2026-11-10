@@ -23,6 +23,12 @@ beforeAll(async () => {
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "tide", name: "Tide" }] }));
     if (req.url === "/session") { live.set(body.session, { app: "tide", room: body.room ?? null }); return res.end(JSON.stringify({ ok: true, app: "tide", release: "local", screen: '- heading "Shop"' })); }
     if (req.url === "/sessions") return res.end(JSON.stringify({ ok: true, sessions: [...live].map(([session, s]) => ({ session, app: s.app, release: "local", started_at: "2026-11-07T10:00:00.000Z", room: s.room, title: "Shop" })) }));
+    if (req.url === "/room_log" && body.room === "nope") return res.end(JSON.stringify({ ok: false, code: "no_room", error: "no open room" }));
+    if (req.url === "/room_log" && body.room === "team") return res.end(JSON.stringify({ ok: true, cursor: "4", entries: [
+      { n: 1, at: "2026-11-10T10:00:00.000Z", kind: "action", session: "a", agent: "worker-a", tool: "tap", change: "ok" },
+      { n: 2, at: "2026-11-10T10:00:05.000Z", kind: "action", session: "b", agent: "worker-b", tool: "tap", change: "error: not found" },
+      { n: 3, at: "2026-11-10T10:00:09.000Z", kind: "action", session: "a", agent: "worker-a", tool: "type", change: "ok" },
+    ] }));
     if (req.url === "/room_log") return res.end(JSON.stringify({ ok: true, entries: [{ n: 2, at: "t", kind: "note", agent: "x", text: "hi" }], cursor: "2", seen: body }));
     if (req.url === "/room_note") return res.end(JSON.stringify(body.text.length > 500 ? { ok: false, code: "note_too_long", error: "note is too long" } : { ok: true, cursor: "3" }));
     if (req.url === "/end") { ended.push(body.session); live.delete(body.session); return res.end(JSON.stringify({ ok: true, ended: true })); }
@@ -67,6 +73,25 @@ describe("rooms", () => {
     const big: any = await c.callTool({ name: "room_note", arguments: { room: "r1", text: "x".repeat(501) } });
     expect(big.isError).toBe(true);
     expect(big.structuredContent.code).toBe("note_too_long");
+    await c.close();
+  }, 30000);
+
+  it("room_report gives one summary per session in the room; an unknown room gives no_room", async () => {
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1" };
+    delete env.PN_APPS;
+    const c = new Client({ name: "room-test-client", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const r: any = await c.callTool({ name: "room_report", arguments: { room: "team" } });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent.room).toBe("team");
+    expect(r.structuredContent.sessions.map((s: any) => s.session)).toEqual(["a", "b"]);
+    expect(r.structuredContent.sessions[0]).toMatchObject({ agent: "worker-a", steps: 2, seconds: 9, errors: 0 });
+    expect(r.structuredContent.sessions[1]).toMatchObject({ steps: 1, errors: 1 });
+    expect(r.structuredContent.sessions.some((s: any) => s.session === "c")).toBe(false);
+    expect(r.content[0].text.split("\n")).toHaveLength(2);
+    const none: any = await c.callTool({ name: "room_report", arguments: { room: "nope" } });
+    expect(none.isError).toBe(true);
+    expect(none.structuredContent.code).toBe("no_room");
     await c.close();
   }, 30000);
 });
