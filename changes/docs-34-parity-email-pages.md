@@ -1,2 +1,1 @@
 - docs: the email sign-in page now says who it is for and has troubleshooting and next steps.
-- docs: the simulator parity page explains the text numbers, how to reproduce the runs, and has troubleshooting and next steps.

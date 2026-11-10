@@ -73,11 +73,9 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 | `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
 | Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `inbox_read` or `phone.inbox.address()`. |
 | An old code is picked up | The inbox still holds mail from an earlier attempt | Call `inbox_clear` (or `phone.inbox.clear()`) before each attempt. |
-| The address changed | Each session has its own address | Read the address again after every new `open_app`. |
 
 ## Next steps
 
 - [Testing](testing.md) for `mockNetwork` and the rest of the typed test API.
 - [Agents](agents.md) for the other tools an assistant can call on the phone.
 - [Phone apps](phone-apps.md) for the apps on the phone that send and read mail.
-
