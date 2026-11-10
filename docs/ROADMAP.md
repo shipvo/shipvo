@@ -85,6 +85,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: `shipvo keys root` creates the offline root key for key rotation ([Key rotation](key-rotation.md), #1417)
+- 2026-11-10: The Store install card lists each device permission an app declares, with Allow and Deny ([Phone apps](phone-apps.md#device-permissions-per-app), #1356)
 - 2026-11-10: `room_log` and `room_note` let a lead agent see what the other agents in a room did and leave notes for them ([Agents](agents.md#room-log-and-notes), #1419)
 - 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)
 - 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
@@ -94,6 +96,7 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-10: Spec `calendar` and `map` blocks, the Secrets screen in phone Settings, and opening a build from a `build_url` ([App spec](spec-blocks.md#calendars-and-maps), [Phone apps](phone-apps.md#see-saved-keys-in-settings), [Test your build](test-your-build.md#open-a-build-from-a-link), #1353, #1350, #1287)
 - 2026-11-10: Network profile tools for MCP, typed tests and `phone.json` ([Device API](device-api.md#network-profiles), #1338)
 - 2026-11-10: Playground Many phones: 1 to 12 Android and iOS phones with a shareable link ([Getting started](getting-started.md#try-it-in-your-browser-first), #1323, #1335)
+- 2026-11-10: Rotate a saved key from the Secrets screen ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1416)
 - 2026-11-10: Secrets screen in the phone's Settings lists saved keys, metadata only ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1350)
 - 2026-11-10: Pin and hide apps on the home screen, export and import a phone's apps, and search the Store with `find_apps` ([Phone apps](phone-apps.md), #1330, #1329, #1315)
 - 2026-11-10: `shipvo keys root` creates the offline root key for key rotation ([Rotate your update signing key](key-rotation.md), #1417)

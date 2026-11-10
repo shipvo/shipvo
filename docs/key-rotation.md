@@ -9,7 +9,7 @@ Read the design in [Key rotation: model and wire format](design/key-rotation.md)
 ## Before you start
 
 - A Shipvo app with a `shipvo.json` (see [Getting started](getting-started.md)).
-- The root public key built into your app. Android reads it from the manifest meta-data `dev.shipvo.ROOT_KEY`. iOS reads it from the Info.plist key `ShipvoRootKey`. Without it, an app ignores rotations.
+- The root public key built into your app (step 2). Without it, an app ignores rotations.
 - For the upload step: `shipvo login` as the app owner. Tokens cannot upload.
 
 ## 1. Create the root key
@@ -37,9 +37,11 @@ Move the seed into an offline vault, then delete the file. If the root key is lo
 
 For scripts, add `--json`: you get `{ "ok": true, "code": "root_created", "data": { "public_key", "file" }, ... }`.
 
-## 2. Register the root public key
+## 2. Pin and register the root public key
 
-The owner registers the public key with the control plane once (`PUT /rotation/<app>/root`, signed-in owner session). Until then an upload is refused with `no_root_key`.
+Pass the public key to the config plugin as `rootKey` (base64, 32 bytes). `minSequence` is optional and needs `rootKey`. The plugin writes it to the Android manifest meta-data `dev.shipvo.ROOT_KEY` and the iOS Info.plist key `ShipvoRootKey`. Build and submit the app to the stores. Phones from this build onward accept rotations.
+
+Then register the same public key with the control plane once (`PUT /rotation/<app>/root`, signed in as the owner). Until then an upload is refused with `no_root_key`.
 
 ## 3. Sign a rotation (offline)
 
