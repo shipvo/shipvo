@@ -82,6 +82,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Guide for describing an app: a checked example spec, the tools and troubleshooting ([Describe an app and it appears](describe-an-app.md), #1301, #1302, #1396)
 - 2026-11-10: Arrange the home screen with `arrange_apps` (pin, hide, position, schedule) and set the phone's clock with `set_phone_time`, on Android and iOS ([Phone apps](phone-apps.md#arrange-the-home-screen), #1349)
 - 2026-11-10: Watch link on the hosted phone: `open_app` returns a read-only `watch_url` ([Agents](agents.md#watch-link-on-the-hosted-phone), #1277)
 - 2026-11-10: Data sources refresh on an interval (`refresh`), a gallery of example specs, and faster rebuilds in `shipvo run` after a save ([Keep a data source fresh](spec-blocks.md#keep-a-data-source-fresh), [Example specs](spec-blocks.md#example-specs), [shipvo run](run.md), #1351, #1358, #1367)

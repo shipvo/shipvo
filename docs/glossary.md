@@ -110,3 +110,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).
 
 **Refresh (data source).** A number of seconds on a web data source in an app spec. Shipvo asks the service again on that timer while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
+
+**Describe an app.** Ask your assistant for a small app in plain words. It writes a spec, `create_app` puts the app on an Android or iOS phone with an icon, and `update_app` changes it later while keeping what people entered. See [Describe an app and it appears](describe-an-app.md).
+
+**App activity.** The list `app_activity` returns for an app made this way: each version with plain lines for what changed, its data sources and its recent events. See [Describe an app and it appears](describe-an-app.md).

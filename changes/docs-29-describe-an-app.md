@@ -1,0 +1,1 @@
+- Docs: new page "Describe an app and it appears" with a checked example spec, the tools, and troubleshooting for `invalid_spec` and `action_failed`.
