@@ -23,6 +23,7 @@ const MAX_NAME = 64;
 
 const ERRORS = [
   { code: "invalid_input", description: "The input does not match the input schema. The message names the field." },
+  { code: "permission_denied", description: "The action needs a device permission the person denied. The message names it." },
   { code: "action_failed", description: "A step of the action failed. Nothing after the failing step ran." },
 ];
 
