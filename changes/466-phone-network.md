@@ -1,0 +1,4 @@
+- `@shipvo/mcp`: new tools `set_network_profile(session, profile)` and `get_network_profile(session)`. An unknown name fails with `unknown_profile`.
+- `@shipvo/test`: new `phone.setNetwork("slow-4g")` and `phone.getNetwork()`.
+- `phone.json` accepts `"network": "<profile>"`, applied when the phone starts. An unknown name fails the session with `bad_profile`.
+- Migration: none; new tools and a new optional field.
