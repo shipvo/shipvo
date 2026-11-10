@@ -2010,6 +2010,65 @@
     }
   },
   {
+    "name": "room_log",
+    "description": "What the sessions in one room did, oldest first: time, session, agent, tool, target and the change line, plus notes from room_note. Pass since (the cursor from the last call) to get only newer entries. Returns the entries and the next cursor.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "description": "Room name used in open_app"
+        },
+        "since": {
+          "type": "string",
+          "description": "Cursor from an earlier room_log; only newer entries come back"
+        }
+      },
+      "required": [
+        "room"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "room_note",
+    "description": "Post a short plain-text note (up to 500 characters) to a room so the other agents see it in room_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "description": "Room name used in open_app"
+        },
+        "text": {
+          "type": "string",
+          "description": "The note, plain text, up to 500 characters"
+        }
+      },
+      "required": [
+        "room",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "run_app_action",
     "description": "Run one action of an app made with create_app, by name, with its input (for example add_task with { title }). The action changes the app's data the same way tapping its form does, and the open screen shows the result. Fails with not_installed (no such spec app) or action_failed (the action refused the input, with the reason).",
     "inputSchema": {

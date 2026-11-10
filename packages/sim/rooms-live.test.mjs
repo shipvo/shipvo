@@ -75,3 +75,23 @@ test("a failed open leaves no member in the room and no backend file", async () 
   await call("/end", { session: "g" });
   assert.equal((await fetch(`http://localhost:${PORT}/s/~r2/orders`)).status, 404);
 });
+
+test("room log: actions and notes in order, since returns newer, outsiders absent, long note refused", async () => {
+  for (const [session, room] of [["la", "r3"], ["lb", "r3"], ["lc", undefined]]) assert.equal((await call("/session", { session, ...(room ? { room } : {}) })).ok, true);
+  const tap = async (session, agent) => { const r = await call("/act", { session, action: "screen" }); await call("/act", { session, action: "tap", ref: /button "Pay" \[ref=(\w+)\]/.exec(r.screen)[1], agent }); };
+  await tap("la", "lead"); await tap("lc", "outsider");
+  assert.equal((await call("/room_note", { room: "r3", text: "paid in la", agent: "lead" })).ok, true);
+  await tap("lb", "helper");
+  const first = await call("/room_log", { room: "r3" });
+  assert.deepEqual(first.entries.map((e) => [e.kind, e.session, e.agent, e.tool]), [["action", "la", "lead", "tap"], ["note", null, "lead", undefined], ["action", "lb", "helper", "tap"]]);
+  assert.ok(first.entries[0].change);
+  assert.equal(first.entries[1].text, "paid in la");
+  assert.ok(!first.entries.some((e) => e.session === "lc"));
+  const mid = first.entries[1].n;
+  const later = await call("/room_log", { room: "r3", since: String(mid) });
+  assert.deepEqual(later.entries.map((e) => e.session), ["lb"]);
+  assert.deepEqual((await call("/room_log", { room: "r3", since: later.cursor })).entries, []);
+  const long = await call("/room_note", { room: "r3", text: "x".repeat(501) });
+  assert.equal(long.ok, false); assert.equal(long.code, "note_too_long");
+  assert.equal((await call("/room_log", { room: "nope" })).code, "no_room");
+});
