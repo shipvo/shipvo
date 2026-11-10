@@ -1,6 +1,6 @@
 # Describe an app and watch it appear on a phone
 
-You will tell an AI assistant, in plain words, what small app you want. A few seconds later the app is on a simulated Android phone in your browser, with its own icon. You will use it, ask for a change and see the change appear with your entries still in place. You write no code and you need no real phone.
+You will tell an AI assistant, in plain words, what small app you want. A few seconds later the app is on a simulated phone in your browser, with its own icon, on Android and iOS alike. You will use it, ask for a change and see the change appear with your entries still in place. You write no code and you need no real phone.
 
 **Level:** beginner. **Time:** a short first-time setup, then a few minutes of talking to your assistant.
 
@@ -14,7 +14,7 @@ New words are explained once, and collected in the [glossary](../glossary.md).
 
 Here is what you are about to see. The phone below is the Tide & Tackle sample shop. In a moment your assistant will put a different app on a phone just like it.
 
-<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: add two items to the cart, then open the cart. You should see both items and a total." data-fallback="/tutorials/test-with-an-assistant/02-cart.png"></div>
+<div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it (the Tide & Tackle sample, not the app you will build): add two items to the cart, then open the cart. You should see both items and a total." data-fallback="/tutorials/test-with-an-assistant/02-cart.png"></div>
 
 ## 1. Make a starter app and start the simulator
 
@@ -124,7 +124,7 @@ The open screen changes at once. Look for two things: an **About** button under 
 ![The Gift ideas app after the change: the idea from Mum is still in the list, and a blue About button is under it.](/tutorials/describe-an-app/04-updated.png)
 
 > **If something goes wrong.**
-> - Your ideas are gone: an app's data lives for the session. If the simulator was stopped and started, ask the assistant to make the app again.
+> - Your ideas are gone: your ideas stay while the simulator runs. If you restart it, ask the assistant for the app again.
 > - The About button is missing: say "The About button is missing, please update the app again".
 
 ## 7. Try the iPhone look
