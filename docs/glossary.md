@@ -4,8 +4,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Accessibility tree.** The list of buttons, headings and text on a screen that a screen reader reads aloud. An assistant uses the same list to see your app, so a button it cannot find is also hard for a person using a screen reader.
 
-**State version.** A whole number in `shipvo.json` (`stateVersion`) that says which layout your release uses for data saved on the phone. `shipvo rollback` checks it before it sends phones back to older code. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
-
 **Airplane mode (in the simulator).** A switch that turns the phone's network off. The app's calls to the internet then fail, as they do on a real phone, so you can see what your customers see with no signal.
 
 **Deep link.** A web-style address, such as `myapp://item/42`, that opens a particular screen in an app. In Shipvo Phone it opens the app that owns the address and takes you to that screen once.
