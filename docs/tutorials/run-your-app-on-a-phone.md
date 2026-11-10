@@ -49,7 +49,7 @@ You should see a phone in the middle of the page. A small label at the bottom of
 
 ![A browser tab with a phone-shaped frame, Android style, with a camera hole at the top. Inside the phone the app is titled Tidepool Shop and lists five products with prices: Canvas tote $18.00, Enamel mug $12.00, Pocket notebook $6.50, Wool beanie $24.00 and Steel bottle $29.00. The word SIMULATED is under the phone.](/tutorials/run-your-app-on-a-phone/01-android.png)
 
-The page also has a label at the top left that gives the phone size (412 by 915 on Android) and a button at the top right that says **Show Android system sheet**. You will use it in step 4.
+The page also has a label at the top left that gives the phone size (412 by 915 on Android) and a button at the top right that says **Show Android system sheet**. You will use it in step 5.
 
 ## 3. Tap through your shop
 
@@ -68,7 +68,28 @@ Below is a live phone with the finished Tide & Tackle sample shop, so you can tr
 
 > **If something goes wrong.** A click does nothing: wait two seconds and click again. The page is a copy of your app, and the first click can arrive while it is still loading. If the phone stays blank, reload the browser tab.
 
-## 4. See the system sheet
+## 4. Change your app and watch the phone update
+
+You do not need to stop the phone to change your app. While it runs, Shipvo watches your files. When you save one, the phone updates by itself. This is called **live reload**.
+
+Leave the terminal running. Open your app's folder in any text editor and open the file `src/data/products.json`. It holds your products. Find the line with `"Wool beanie"`, change the words to `Merino beanie` and save the file.
+
+Look at the terminal. You should see `Rebuilding...` and, a few seconds later, `rebuilt in 6.1 s` (your number will differ). The phone shows a small "Updating..." hint and then reloads. The list now says **Merino beanie**. You did not touch the browser tab.
+
+![The Android phone before the edit. The product list shows Canvas tote, Enamel mug, Pocket notebook, Wool beanie at $24.00 and Steel bottle.](/tutorials/run-your-app-on-a-phone/07-before-edit.png)
+
+![The same phone after the edit. The fourth product now says Merino beanie, still at $24.00.](/tutorials/run-your-app-on-a-phone/08-after-edit.png)
+
+Now make a mistake on purpose. In the same file, type the word `oops` right after the first `"name"` and save. The phone keeps showing your last good version. A red bar under the phone says what is wrong and where, for example "Your file src/data/products.json has a mistake at line 5, column 11: check for a missing or extra comma." The terminal prints the same message. Take the `oops` out and save: the bar goes away and the phone reloads.
+
+![The phone still showing the product list, with a red bar under it that says Your file src/data/products.json has a mistake at line 5, column 11: check for a missing or extra comma. The page still shows your last good version.](/tutorials/run-your-app-on-a-phone/09-error-bar.png)
+
+> **If something goes wrong.**
+> - Nothing happens after you save: check that the terminal still shows `Watching for changes: the phone reloads when you save.` and that you saved the file in the app folder that `shipvo run` started in.
+> - The red bar stays after you fixed the file: save once more, then wait for `rebuilt in` in the terminal.
+> - You are not sure what to change: ask your assistant to open `src/data/products.json` and change one product name.
+
+## 5. See the system sheet
 
 On a real phone, some questions come from the phone itself, not from your app. An example is "Allow access?" when an app asks for your location. The simulated phone can show this too, so you can see how your app looks while it is covered.
 
@@ -76,7 +97,7 @@ Click **Show Android system sheet** at the top right of the page. You should see
 
 ![The cart screen dimmed behind a white sheet at the bottom of the phone. The sheet asks Allow access? and has two buttons, While using the app and Don't allow.](/tutorials/run-your-app-on-a-phone/04-system-sheet.png)
 
-## 5. Try the iPhone style and dark frame
+## 6. Try the iPhone style and dark frame
 
 Go back to the terminal and press **Ctrl+C** to stop the phone. The terminal gives your prompt back. Now type:
 
@@ -94,7 +115,7 @@ To see the dark frame, add `?dark=1` to the end of the address in your browser, 
 
 Want a different size? The page scales the phone to fit your browser window, so make the window smaller or larger.
 
-## 6. Stop the phone
+## 7. Stop the phone
 
 Go to the terminal and press **Ctrl+C**. The page stops answering. Your files are not changed. Nothing was sent to anyone.
 
@@ -106,11 +127,13 @@ While the phone is on, Shipvo writes a small file called `.shipvo/run.json` in y
 
 You ran your app on a simulated phone in your browser with one command, tapped through the shop, saw the system sheet, switched to the iPhone style and stopped it. You used no real phone and no account.
 
-If you change a screen in your app, stop the phone with Ctrl+C and run `npx shipvo run android` again to see the change.
+Keep the phone open while you work. Each time you save a file, it shows the change.
 
 ## What we measured
 
 On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a first start of `shipvo run android` for a new shop app, with an empty cache, bundled 204 modules in 6.0 s and was serving the phone within the 60 seconds we waited. We did not time it more closely than that. A start-to-tappable timing on a clean machine is tracked in issue #676. We took every screenshot in this tutorial from that run.
+
+On 2026-11-10, on the same kind of runner with this branch's code, saving a one-word change to `src/data/products.json` took 6.1 s to rebuild (the terminal line) and the new name was visible in the phone 6.4 s after the save (measured by a Playwright script polling the page). Screenshots 07 to 09 come from that run.
 
 ## Next steps
 
