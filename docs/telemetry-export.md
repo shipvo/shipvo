@@ -1,5 +1,7 @@
 # Telemetry export: query release data with SQL
 
+This page is for developers who run their own Shipvo control plane. You will get your release telemetry as Parquet files in your own R2 bucket, and SQL queries that answer "did this release help or hurt?".
+
 The control plane can copy release telemetry to your own R2 bucket as [Apache Parquet](https://parquet.apache.org/) files. Any tool that reads Parquet can query them: DuckDB, Spark, pyarrow, or an agent that runs SQL. No Shipvo API is in the way.
 
 ## Turn it on
@@ -42,7 +44,7 @@ telemetry/v1/app=<app_id>/day=<YYYY-MM-DD>/part-<first id>.parquet
 | `android_api` | int64, null | Android API level |
 | `via` | string, null | `patch` or `full` |
 
-**No personal data.** The control plane stores no device id, user id or IP address with telemetry, so the export has none. Cohort bands are not stored with events yet, so `device_class` is the only grouping of devices today.
+**No personal data.** The control plane stores no device id, user id or IP address with telemetry, so the export has none. Use `device_class` to group devices.
 
 ## Query with DuckDB
 
@@ -104,8 +106,17 @@ python3 -c "import pyarrow.parquet as pq; print(pq.read_table('part-000000000001
 
 - **No files appear in the bucket**: the export runs hourly. Check the R2 binding named in [Turn it on](#turn-it-on) and wait for the next hour.
 - **DuckDB cannot read a file**: confirm the file with the pyarrow check above first.
+- **Nothing is written and no error shows**: the export does nothing without the `EXPORT_BUCKET` binding. Run `npx wrangler deploy` again after you uncomment the `[[r2_buckets]]` block.
+- **Errors mention `telemetry_export`**: the migration is missing. Run `npx wrangler d1 migrations apply shipvo --remote`.
+- **A query returns no rows for an app**: the path partition is `app=<app_id>`. Filter on `app`, and read with `hive_partitioning = true`.
+- **Access denied from DuckDB**: the R2 token needs read access to this bucket.
 
 ## Release alerts
 
 To get a call when devices revert a release, set an alert webhook. See [Revert alerts](self-hosting.md#revert-alerts-webhook).
 
+## Next steps
+
+- [Self-hosting](self-hosting.md): deploy the control plane that writes these files.
+- [Revert alerts](self-hosting.md#revert-alerts-webhook): get a call when devices revert a release.
+- [CLI guide](cli.md): `shipvo status` shows release health without SQL.

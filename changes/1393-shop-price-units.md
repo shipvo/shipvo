@@ -1,0 +1,2 @@
+- `@shipvo/cli`: the shop template prints a plain message when a price in `src/data/products.json` looks like it is in the wrong unit (for example `24` or `12.5` instead of `2400` or `1250`). The generated test checks it too.
+- Migration: none; new `priceProblems` export in the generated `src/money.ts`.

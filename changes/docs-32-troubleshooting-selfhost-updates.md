@@ -1,0 +1,2 @@
+- Docs: troubleshooting and next steps for self-hosting and OTA updates on the phone.
+- Migration: none.
