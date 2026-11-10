@@ -39,6 +39,18 @@ Errors: `unknown_setting` (no such key) and `bad_value` (the key does not take t
 
 Each change is recorded in `device_log` as `setting`, with `simulated: true`. Use `set_setting` for all of these keys. `set_device` only takes `darkMode` among them.
 
+### See saved keys in Settings
+
+The Settings app has a **Secrets** row, on the Android and iOS skins alike. Tap it to see one row for each key saved for the apps on that phone:
+
+- the key's name
+- the app that uses it
+- the domain it may be sent to
+- its access level
+- when it was last used, or `never`
+
+With no saved keys, the screen says "No saved keys yet." Tap **Back** to return to Settings. The screen shows only these five facts. The key's value is never shown. To rotate or revoke a key, use the [saved-key routes](self-hosting.md#saved-key-routes-vault).
+
 ## Open a web page in the phone's Browser
 
 Use this when your app links to a web page (a payment page, a privacy policy) and you want to check the page and the way back.
