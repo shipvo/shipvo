@@ -85,7 +85,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
-- 2026-11-10: Revoke a saved key from the Secrets screen, `app_activity` shows what an agent built and changed, and the gallery grows to five example specs ([Phone apps](phone-apps.md#see-saved-keys-in-settings), [Phone apps](phone-apps.md), [Example specs](spec-blocks.md#example-specs), #1388, #1396, #1385)
+- 2026-11-10: Revoke a saved key from the Secrets screen, and the gallery grows to five example specs ([Revoke](phone-apps.md#see-saved-keys-in-settings), [Example specs](spec-blocks.md#example-specs), #1388, #1385)
 - 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
 - 2026-11-10: Arrange the home screen with `arrange_apps` (pin, hide, position, schedule) and set the phone's clock with `set_phone_time`, on Android and iOS ([Phone apps](phone-apps.md#arrange-the-home-screen), #1349)
 - 2026-11-10: Watch link on the hosted phone: `open_app` returns a read-only `watch_url` ([Agents](agents.md#watch-link-on-the-hosted-phone), #1277)

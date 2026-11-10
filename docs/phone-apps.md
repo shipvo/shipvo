@@ -75,7 +75,7 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 | `unknown_setting` / `bad_value` | Wrong key or value | Use the table above |
 | `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
 | `phone_locked` | The phone is locked | Call `unlock` |
-| "Could not revoke this key. Try again." | The simulator could not reach the saved-key route; the key is still saved | Check the simulator is running, then tap **Revoke** again |
+| "Could not revoke this key. Try again." | The simulator did not accept the request or could not be reached; the key is still saved | Check the simulator is running, then tap **Revoke** again |
 | The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
 | `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
