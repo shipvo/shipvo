@@ -299,8 +299,8 @@ What a row looks like when you rotate the release key (see [Key rotation](key-ro
 { "action": "key-rotation", "release": null, "release_id": null, "before": null, "after": "{\"sequence\":2,\"valid_from\":\"2026-11-10T09:00:00.000Z\"}" }
 ```
 
-- `action` is one of `publish`, `rollback`, `halt` or `key-rotation`. A `key-rotation` row has the key sequence number and the time it takes effect in `after`; `release`, `release_id` and `before` are empty.
-- Rotation rows are merged with the other rows by time. They come with the first page only (the page without `before`), so `shipvo audit` always includes them, and a hand-made call to `GET /audit/<app>?before=<id>` does not.
+- `action` is one of `publish`, `rollback`, `halt` or `key-rotation`. A `key-rotation` row has the key sequence number and the time it takes effect in `after`; `release`, `release_id` and `before` are `null`.
+- Rotation rows are merged with the other rows by time. They come with the first page only (the page without `before`), so `shipvo audit` merges them into the newest entries (cut to `--limit`), and a hand-made call to `GET /audit/<app>?before=<id>` does not.
 
 ## shipvo run
 

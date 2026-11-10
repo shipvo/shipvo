@@ -58,14 +58,14 @@ npx -y @shipvo/cli keys rotate upload rotation.json
 
 ### See rotations in the audit log
 
-Rotations also show up in the audit log, next to publishes and rollbacks, as rows with `action` `key-rotation`. The `after` field holds the sequence and the time the new key starts:
+Rotations also show up in the audit log, next to publishes and rollbacks, as rows with `action` `key-rotation`. The `after` field holds the sequence and the time the new key starts, as JSON text:
 
 ```bash
 shipvo audit shop --limit 20
 ```
 
 ```json
-{ "action": "key-rotation", "release": null, "after": { "sequence": 1, "valid_from": "2026-11-06T00:00:00Z" } }
+{ "action": "key-rotation", "release": null, "release_id": null, "before": null, "after": "{\"sequence\":1,\"valid_from\":\"2026-11-06T00:00:00Z\"}" }
 ```
 
 Rotation rows appear in the first page of results only (the one you get without `before`), so `shipvo audit` shows them and a hand-made paged request shows them on its first call. See [`shipvo audit`](cli.md#shipvo-audit).
