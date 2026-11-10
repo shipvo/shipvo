@@ -1,7 +1,8 @@
 // Network mock rules sent by a test (`phone.mockNetwork` in @shipvo/test).
 // The wire format here and the encoder in packages/test/src/phone.ts (encodeMockRules) must stay in sync.
 // Wire rule: { url: string } or { urlRegex: { source, flags } }, optional method,
-// and response: { status, body (string), headers (object of strings), delayMs }.
+// and response: { status, body (string), headers (object of strings), delayMs, mail: { from, subject, text } }.
+// A matched rule with `mail` also delivers that message to the session's own inbox.
 export class MockRuleError extends Error { constructor(message) { super(message); this.code = "mock_invalid"; } }
 
 export function parseMockRules(raw) {
@@ -23,6 +24,12 @@ export function parseMockRules(raw) {
     if (resp.delayMs !== undefined && (typeof resp.delayMs !== "number" || !(resp.delayMs >= 0) || resp.delayMs > 60000)) throw bad("delayMs must be a number from 0 to 60000");
     const headers = resp.headers ?? {};
     if (typeof headers !== "object" || Array.isArray(headers) || Object.values(headers).some((v) => typeof v !== "string")) throw bad("headers must be an object of strings");
-    return { match, method: r.method?.toUpperCase(), status: resp.status, body: resp.body, headers, delayMs: resp.delayMs ?? 0 };
+    let mail;
+    if (resp.mail !== undefined) {
+      const m = resp.mail;
+      if (!m || typeof m !== "object" || typeof m.subject !== "string" || typeof m.text !== "string" || (m.from !== undefined && typeof m.from !== "string")) throw bad("mail must be { subject, text } with an optional from, all strings");
+      mail = { from: m.from, subject: m.subject, text: m.text };
+    }
+    return { match, mail, method: r.method?.toUpperCase(), status: resp.status, body: resp.body, headers, delayMs: resp.delayMs ?? 0 };
   });
 }
