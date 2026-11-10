@@ -23,13 +23,13 @@ CI checks this against the sample app (`packages/cli/test/run-bridge.test.ts`): 
 
 ## Actions
 
-The same channel accepts `tap`, `type`, `scroll` and `back` with the refs from the tree. All four reply with `delivery` (`delivered`) and the new screen. `type` also returns the value now in the field. The frame shows what the agent did, for example "Tapped ..." or "Typing into ...".
+The same channel accepts `tap`, `type`, `scroll` and `back` with the refs from the tree. All four reply with `delivery` (`delivered`) and the new screen. `type` also returns the value now in the field. The frame shows what the agent did, for example "Tapped ..." or "Typed ... into ..." in the event log.
 
 ## Troubleshooting
 
 - **A ref from an earlier read is rejected.** A ref lasts while its element stays in the DOM with the same role and name. If the element leaves the DOM, or its role or name changes, the action fails with `stale_ref` and a message to take a new snapshot. Read the tree again and use the new ref.
-- **An element is missing from the tree.** It has no role, or it is hidden by the screen rules. Give it a `role` or a native element, then read the tree again.
-- **The tree is shallower than the simulator's.** Wrapper elements without a role are left out. Compare by role, name and state, not by nesting.
+- **An element is missing from the tree.** It is hidden (the `hidden` attribute, `aria-hidden="true"`, `display:none` or `visibility:hidden`), or it has no role and its text is shown as a plain line. Show it, or give it a `role` or a native element, then read the tree again.
+- **The tree is shallower than the simulator's.** A wrapper element without a role is not listed; its children and text are. Compare by role, name and state, not by nesting.
 
 ## Next steps
 

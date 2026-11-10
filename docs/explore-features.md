@@ -42,13 +42,15 @@ shipvo explore --seed 1 --max-steps 20 --record-features features.jsonl
 head -n 1 features.jsonl
 ```
 
+The default for `--max-steps` is 100.
+
 The file is created empty at the start and gets one line per action. Each line is one JSON object in the format above.
 
 ## Troubleshooting
 
 - **`--record-features needs a file`.** You gave the flag without a path. Add one, for example `--record-features features.jsonl`.
-- **The file is empty.** The walk took no actions, for example because the start screen has nothing to tap or type into.
-- **Two runs give different lines.** Pass the same `--seed` to repeat a walk.
+- **The file is empty.** The file is created empty when the run starts and gets one line per action. It has no lines until the walk takes its first action.
+- **Two runs give different lines.** A different `--seed`, or a changed app, changes the walk. The same seed on the same app repeats it (default seed 1).
 
 ## Next steps
 
