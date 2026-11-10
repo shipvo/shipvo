@@ -7,6 +7,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
 1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial done 10 Nov; video done 10 Nov; blog done 10 Nov) and the browser playground (launch kit written 10 Nov; tutorial, video and blog needed)
+1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial done 10 Nov; video needed; blog done 10 Nov) and the browser playground (launch kit written 10 Nov; tutorial done 10 Nov; video and blog needed)
 1b. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done (10 Nov), tutorial done; video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial done 10 Nov; video needs the new section)
@@ -24,6 +25,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | [chess-on-two-phones](tutorials/chess-on-two-phones.md) | | [two-ai-agents-play-chess-on-two-phones](../blog/two-ai-agents-play-chess-on-two-phones.md) |
 | Browser playground (sample app on Android and iOS, device API, signed updates, many phones link) | [playground](playground.md) | | | |
 | Describe an app and it appears (`create_app`, `update_app`, `app_activity`) | [describe-an-app](describe-an-app.md) | [describe-an-app](tutorials/describe-an-app.md) | [Describe an app and watch it appear on a phone](videos.md#describe-an-app-and-watch-it-appear-on-a-phone) | |
+| Browser playground (sample app on Android and iOS, device API, signed updates, many phones link) | [playground](playground.md) | [try-shipvo-in-your-browser](tutorials/try-shipvo-in-your-browser.md) | | |
+| Describe an app and it appears (`create_app`, `update_app`, `app_activity`) | [describe-an-app](describe-an-app.md) | [describe-an-app](tutorials/describe-an-app.md) | | |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | Signed over-the-air updates | [getting-started](getting-started.md), [new-machine](new-machine.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
@@ -135,3 +138,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
 | Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android) | | | |
 | Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
+| Key rotations in the audit log (`shipvo audit`, `action: key-rotation`) | [key-rotation](key-rotation.md#see-rotations-in-the-audit-log), [cli](cli.md#shipvo-audit) | | | |
