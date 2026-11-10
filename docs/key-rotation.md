@@ -60,7 +60,7 @@ npx -y @shipvo/cli keys rotate sign --root-seed-file root-seed.txt \
 | `--valid-from` | When it starts, as an ISO time such as `2026-11-12T00:00:00Z`. Default: now (an emergency rotation). At most 90 days ahead. |
 | `--json` | Print the standard result envelope. The statement is in `data.envelope`. |
 
-To override a planned statement, sign a higher sequence.
+To override a planned statement, sign a higher sequence. `keys rotate sign` writes the statement to stdout. Do not combine `> rotation.json` with `--json`: the file would hold the envelope, not the plain statement.
 
 ## 4. Upload it
 
@@ -75,7 +75,7 @@ Expected: `Uploaded. Phones switch when they next fetch it.` Phones check the ro
 
 | You see | Why | Fix |
 | --- | --- | --- |
-| `... already exists. Not overwriting a root key.` | The file name is taken | Pick a new name. Never delete an old root seed you still need |
+| `... already exists. Not overwriting a root key.` | The file name is taken | Pick a new name. Never delete an old root seed you still need. |
 | `the folder does not exist` | `--out` points into a missing folder | Create the folder first |
 | `Cannot read the root seed file` | Wrong path for `--root-seed-file` | Check the path |
 | `--sequence must be a whole number` | Sequence is not an integer of 1 or more | Use `1`, `2`, `3`... |

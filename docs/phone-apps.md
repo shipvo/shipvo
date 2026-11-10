@@ -134,6 +134,15 @@ The Store's install card lists every device permission an app declares (for exam
 
 An action that needs a denied permission (a `notify` step needs `notifications`) returns `permission_denied` naming the permission, and nothing else in the action runs. The sim action `set_app_permission { id, permission, allowed }` sets an answer; it returns `not_declared` for a permission the app did not declare.
 
+Details:
+
+- Answers also show in the home screen text (`permissions: notifications allowed, camera denied`).
+- `set_app_permission { session, id, permission, allowed }` returns the app's `permissions`, `installed_apps` and `profile`, the phone as a phone.json that keeps the answers.
+- `update_app` allows each newly declared permission to start with, and drops answers for permissions the new version no longer asks for.
+- Android and iOS skins behave the same.
+
+Errors from `set_app_permission`: `not_installed`, `unknown_permission` (the message lists the valid names), `bad_value` (`allowed` must be `true` or `false`) and `not_declared` (the app does not ask for that permission).
+
 ### Start from a `phone.json`
 
 A `phone.json` in the folder where the simulator starts (or `--phone <path>`) says what is on the phone at the start. The same file gives the same phone every run.
@@ -178,18 +187,6 @@ device_log { session }                 -> install_app (source "real" for marketp
 | Shop | Lists products, takes orders and shows them in one place; the currency is a setting. | `add_product`, `find_products`, `place_order`, `list_orders`, `set_currency`, `show_matches`, `pick_product` | [`templates/shop/app.json`](../templates/shop/app.json) |
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
-
-## Allow or deny device permissions per app
-
-An app can declare the device features it needs: `notifications`, `camera`, `location`, `contacts`, `calendar`, `photos` and `files`. When you install it, the install card lists each one with **Allow** and **Deny**, the same on Android and iOS skins. Each answer belongs to that app only.
-
-- Answers show in `installed_apps` (for example `permissions: { notifications: true, camera: false }`) and in the home screen text (`permissions: notifications allowed, camera denied`).
-- To change one later, open **Settings** and use the switch under the app's name, or send the simulator action `set_app_permission { session, id, permission, allowed }`. It returns the app's `permissions`, `installed_apps` and `profile`, the phone as a phone.json that keeps the answers.
-- An action that needs a denied permission (a `notify` step needs `notifications`) returns `permission_denied` and names the permission.
-- `export_apps` and `import_apps` carry the answers, and so does a phone.json.
-- `update_app` allows each newly declared permission to start with, and drops answers for permissions the new version no longer asks for.
-
-Errors from `set_app_permission`: `not_installed`, `unknown_permission` (the message lists the valid names), `bad_value` (`allowed` must be `true` or `false`) and `not_declared` (the app does not ask for that permission).
 
 ## Open a link in the owning app
 

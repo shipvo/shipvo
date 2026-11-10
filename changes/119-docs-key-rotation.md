@@ -1,2 +1,2 @@
-- Docs: new page "Rotate your update signing key" (`shipvo keys root`, `keys rotate sign`, `keys rotate upload`, troubleshooting), and a section on per-app device permissions in the phone apps page.
+- Docs: new page "Rotate your update signing key" (`shipvo keys root`, `keys rotate sign`, `keys rotate upload`, troubleshooting), and the `set_app_permission` details in the phone apps permissions section.
 - Migration: none.
