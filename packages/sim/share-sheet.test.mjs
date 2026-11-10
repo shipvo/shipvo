@@ -99,3 +99,15 @@ test("Copy puts message and url on the clipboard and closes the sheet", async ()
   const after = await act("copy", { action: "tap", ref: ref((await act("copy", { action: "screen" })).screen, "Read clip") });
   assert.match(after.screen, /Clip "Look at this\\nhttps:\/\/example\.com\/p\/1"/);
 });
+
+test("Cancel closes the sheet without touching the clipboard", async () => {
+  assert.ok((await call("/session", { session: "cancel", phone: PHONE, skin: "android" })).ok);
+  const first = await act("cancel", { action: "screen" });
+  const r = await act("cancel", { action: "tap", ref: ref(first.screen, "Share it") });
+  assert.match(r.screen, /Share sheet/);
+  await act("cancel", { action: "tap", ref: ref(r.screen, "Cancel") });
+  const s = await act("cancel", { action: "screen" });
+  assert.doesNotMatch(s.screen, /Share sheet/);
+  const after = await act("cancel", { action: "tap", ref: ref(s.screen, "Read clip") });
+  assert.doesNotMatch(after.screen, /example\.com\/p\/1/);
+});

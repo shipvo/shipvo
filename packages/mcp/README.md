@@ -35,6 +35,8 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan and a one-time `challenge`. | Show the plan to the owner and ask them to approve it at `challenge.approval_url` in the admin. Then call again with the same args and `approval: <challenge id>`. `confirm: true` does nothing. |
 | `bad_url` | `open_url` got a URL the app cannot take. | Fix the URL and call again. |
 | `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
+| `no_share_sheet` | `share_to` was called with no share sheet open. | Tap the app's share button first, then call `share_to`. |
+| `not_share_target` | The share sheet does not list that app. | Read the sheet with `screen` and pick an app it lists. |
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
 | `already_locked` | `lock` was called on a locked phone. | Call `unlock` if you want to use the app. |
 | `not_locked` | `unlock` was called on a phone that is not locked. | Carry on; nothing to do. |

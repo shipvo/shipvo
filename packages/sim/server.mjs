@@ -277,7 +277,7 @@ async function switchToApp(s, page, id, fresh = false) {
   await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
-  await page.evaluate(() => globalThis.__pnDevice?.setInitialUrl?.(null));
+  await page.evaluate(() => { globalThis.__pnDevice?.setInitialUrl?.(null); globalThis.__pnDevice?.setInitialShare?.(null); });
 }
 // Fetch layer. Mock rules win; otherwise fetch/XHR run under the session's network profile (default online, untouched).
 async function ensureNetworkRoute(s, page) {

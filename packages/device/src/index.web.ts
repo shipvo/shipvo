@@ -306,6 +306,8 @@ g.__pnDevice = {
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
   /** Set the URL `Linking.getInitialURL()` returns for this load. `null` clears it. */
   setInitialUrl(url: string | null) { initialUrl = url ?? null; },
+  /** Clear (or set) what `getInitialShare()` returns, like `setInitialUrl`. */
+  setInitialShare(p: SharePayload | null) { initialShare = p ?? null; },
   /** Hand the app a share from another app, and set what `getInitialShare()` returns. */
   deliverShare(p: SharePayload) { initialShare = p; return deliverShare(p); },
   /** Pick an app on the open share sheet. "none" when no sheet is open, "unknown" when the sheet does not list that app. */
