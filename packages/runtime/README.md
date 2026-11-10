@@ -71,11 +71,9 @@ An uncaught JS error in a background load counts as one failed boot at once (the
 
 ## Patches and memory (Android)
 
-Before it applies a patch, the Android runtime checks that the base bundle, the patch and the new bundle together fit in 40 % of the app's heap limit. If they do not, it skips the patch and downloads the full bundle instead. If the patch step runs out of memory, it does the same. The update still lands, signed and checked the same way, and the next one tries a patch again.
+Before it applies a patch, the Android runtime checks that the base bundle, the patch and the new bundle together fit in 40 % of the app's heap limit. If they do not, or if the base bundle is missing, `PatchStep.run` returns `over_memory_budget` and the runtime downloads the full bundle instead. If the patch step runs out of memory, it does the same with `out_of_memory`. The update still lands, signed and checked the same way.
 
-`Runtime.checkForUpdate()` tells you what happened in `CheckResult`: `via` is `"full"` and `patchError` is `"over_memory_budget"` or `"out_of_memory"`. `patchError` is `null` when a patch was applied or none was tried.
-
-Troubleshooting: if `via` is often `"full"` on small phones, updates download more bytes but still work. Look at `patchError` in your telemetry to see how many phones skip patches.
+`Runtime.checkForUpdate(apply)` tells you what happened in `CheckResult`: `via` is `"full"` and `patchError` is `"over_memory_budget"` or `"out_of_memory"`. If the patch step fails for another reason, `patchError` holds the error message. `patchError` is `null` when a patch was applied or none was tried. Your app can read `patchError` from the result and log it.
 
 ## Crash after `markHealthy`
 
