@@ -1,0 +1,2 @@
+- `@shipvo/spec`: a gallery of two example specs in `packages/spec/gallery/` (habit tracker, workout log), checked by a test.
+- Migration: none; not part of the published package.
