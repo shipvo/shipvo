@@ -74,7 +74,7 @@ An uncaught JS error in a background load counts as one failed boot at once (the
 
 Before it applies a patch, the Android runtime checks that the base bundle, the patch and the new bundle together fit in 40 % of the app's heap limit. If they do not, or if the base bundle is missing or unreadable, `PatchStep.run` returns `over_memory_budget` and the runtime downloads the full bundle instead. If the patch step runs out of memory, it does the same with `out_of_memory`. The update still lands, signed and checked the same way.
 
-`Runtime.checkForUpdate(apply)` tells you what happened in `CheckResult`: `via` is `"full"` and `patchError` is `"over_memory_budget"` or `"out_of_memory"`. If the patch step fails for another reason, `patchError` holds the error message. `patchError` is `null` when a patch was applied or none was tried. Your app can read `patchError` from the result and log it.
+`Runtime.checkForUpdate(apply)` tells you what happened in `CheckResult`: `via` is `"full"` and `patchError` is `"over_memory_budget"` or `"out_of_memory"`. If the patch step fails for another reason, `patchError` holds the error message. `patchError` is `null` when a patch was applied or none was tried.
 
 ## Crash after `markHealthy`
 
