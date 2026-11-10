@@ -33,7 +33,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Over the air (OTA).** Sending an update to phones through the internet, so people do not have to go to the app store.
 
 
-**Job.** A slow task, such as publishing a preview, that keeps running after the assistant's request has waited long enough. The assistant gets a job name back and asks `job_status` for the result later. See [Agents](agents.md#troubleshooting).
+**Job.** A slow task, such as publishing a preview, that keeps running after the assistant's request has waited long enough. The assistant gets a job name back and asks `job_status` for the result later. See [Agents](agents.md#slow-tools-and-tracing).
 
 **Vault.** A safe place for keys you give an app, such as a payment key. You paste a key once into a private page, it is stored encrypted, and the assistant never sees it. You can replace a key, remove it, and see when it was used. See [Self-hosting](self-hosting.md#saved-key-routes-vault).
 
@@ -104,8 +104,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Right-to-left (RTL).** Languages such as Arabic and Hebrew that read from right to left. A spec with `strings` for that language lays out right to left. See [App spec](spec-blocks.md#translations-and-right-to-left).
 
 **Playground.** The page at shipvo.dev/playground where a sample app runs on an Android phone and an iPhone in your browser, so you can try Shipvo before you install it.
-
-**Job (slow tool).** When `publish_preview` or `upload_build` take longer than `wait_ms`, they return a job id instead of a result. You read it with `job_status`. See [Agents](agents.md#slow-tools-and-tracing).
 
 **Traceparent.** A standard header value that carries a trace id from your assistant's tool call into the logs of every system a request touches. Shipvo records it in the tool-call log. See [Agents](agents.md#slow-tools-and-tracing).
 
