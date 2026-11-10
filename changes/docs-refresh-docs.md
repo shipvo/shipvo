@@ -1,0 +1,1 @@
+- docs: new section "Data that refreshes by itself" on the spec blocks page; `shipvo run` page notes that rebuilds after a save are faster.
