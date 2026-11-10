@@ -206,7 +206,7 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
-| `permission_denied` from an app action | The app needs a device permission you denied | Turn it on in Settings, or call `set_app_permission` with `allowed: true` |
+| `permission_denied` from an app action | You denied the permission the action needs | Allow it in Settings, in the app's permission row, then run the action again |
 | `not_declared` from `set_app_permission` | The app does not ask for that permission | Check `installed_apps` for the permissions it declares |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
