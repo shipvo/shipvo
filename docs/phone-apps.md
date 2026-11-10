@@ -99,6 +99,15 @@ A spec app with an `http` data source can refresh on an interval (`refresh`, in 
 
 Pass `id` for one app and `limit` for the number of recent events. Data and settings a person entered stay across versions, so the history is the record of what the agent changed.
 
+## Check accessibility
+
+`a11y_audit { session }` reads the open screen and lists every control that TalkBack or VoiceOver users cannot use. It is read-only and works the same on the Android and iPhone styles.
+
+- `missing_label`: a button, link, field or other control with no accessible name.
+- `small_target`: a pressable under 48 dp wide or high on the Android style, or under 44 pt on the iPhone style.
+
+Each issue has `ref`, `role`, `code` and `message`. In tests, `await phone.a11yAudit()` returns `{ issues }`.
+
 ## Export data as CSV
 
 Any spec app can turn a collection into CSV with the `csv()` function. Return it from an action and the agent gets the text, on Android and iOS alike:
