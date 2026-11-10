@@ -46,6 +46,7 @@
     "update.mjs",
     "frame.d.mts",
     "mock-rules.mjs",
+    "inbox.mjs",
     "screen-rules.mjs",
     "push-notification.mjs",
     "network-profiles.mjs",
