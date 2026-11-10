@@ -1,0 +1,1 @@
+- docs: new sections for the `calendar` and `map` spec blocks, and opening a hosted build from a link with `build_url`.
