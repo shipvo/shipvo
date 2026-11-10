@@ -135,3 +135,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | `csv()` exports a collection as CSV from an action | [phone-apps](phone-apps.md#export-data-as-csv) | | | |
 | Gallery grows to eight specs (reading board `kanban`, meal planner `calendar`, favourite places `map`) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Denied camera, scanner and file permissions give `permission_denied` for blocks on a `navigate` screen | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
+| Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
+| Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android) | | | |
+| Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
