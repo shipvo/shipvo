@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderScreen, validate } from "../src/index.js";
+import { vectorSvg } from "../src/vector.js";
 import type { ScreenNode } from "../src/index.js";
 
 const gauge = (extra: Record<string, unknown> = {}, theme?: Record<string, unknown>) => ({
@@ -88,5 +89,14 @@ describe("motion", () => {
     const s = gauge();
     (s.screens[0]!.body as any[]).push({ type: "text", value: "hi", motion: { enter: "slide" } });
     expect(render(s).html).toContain("sv-slide 240ms");
+  });
+});
+
+describe("circle dash", () => {
+  it("draws part of the outline from the top", () => {
+    const svg = vectorSvg(10, 10, [{ shape: "circle", cx: 5, cy: 5, r: 4, dash: 25 }], "ring");
+    expect(svg).toContain('stroke-dasharray="25 100"');
+    expect(svg).toContain('pathLength="100"');
+    expect(svg).toContain('transform="rotate(-90 5 5)"');
   });
 });

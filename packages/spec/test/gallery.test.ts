@@ -138,7 +138,28 @@ describe("spec gallery", () => {
     const off = renderScreen(spec, { style: "ios", reduceMotion: true });
     if (!on.ok || !off.ok) throw new Error("render failed");
     expect(JSON.stringify(on.tree)).toContain("pulse");
+    expect(JSON.stringify(on.tree)).toContain("scale");
     expect(JSON.stringify(off.tree)).not.toContain("pulse");
+    expect(JSON.stringify(off.tree)).not.toContain("scale");
+  });
+
+  it("focus-timer: logging 30 minutes fills the ring to 25%", () => {
+    const spec = JSON.parse(readFileSync(new URL("focus-timer.json", dir), "utf8"));
+    expect(screenText(spec, {})).toContain("Daily goal ring: 0%");
+    const r = createApp(spec, {});
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    r.app.call("log_session", { task: "Write spec", minutes: 30 });
+    expect(screenText(spec, r.app.data)).toContain("Daily goal ring: 25%");
+    const t = renderScreen(spec, { style: "ios", data: r.app.data });
+    if (!t.ok) throw new Error("render failed");
+    expect(JSON.stringify(t.tree)).toContain('"dash":25');
+  });
+
+  it("project-timeline: the screen has a control for complete_milestone", () => {
+    const spec = JSON.parse(readFileSync(new URL("project-timeline.json", dir), "utf8"));
+    const forms = spec.screens[0].body.filter((b: any) => b.type === "form");
+    expect(forms.map((f: any) => f.submit.action)).toContain("complete_milestone");
+    expect(screenText(spec, {})).toContain("Complete milestone");
   });
 
   it("habit-tracker: check_in rejects a missing habit", () => {

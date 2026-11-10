@@ -64,16 +64,18 @@
               "shape": "circle",
               "cx": 60,
               "cy": 60,
-              "r": "{{ percent * 0.4 }}",
-              "fill": "#0B5FFF",
-              "opacity": 0.85
+              "r": 50,
+              "fill": "none",
+              "stroke": "#0B5FFF",
+              "strokeWidth": 8,
+              "dash": "{{ percent }}"
             },
             {
               "shape": "text",
               "x": 60,
-              "y": 112,
+              "y": 64,
               "text": "{{ percent }}%",
-              "fontSize": 12,
+              "fontSize": 16,
               "anchor": "middle",
               "fill": "#111827"
             }

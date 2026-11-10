@@ -9,7 +9,7 @@ export type Shape = Record<string, unknown> & { shape: string };
 
 const NUMERIC: Record<string, string[]> = {
   rect: ["x", "y", "width", "height", "rx", "strokeWidth", "opacity"],
-  circle: ["cx", "cy", "r", "strokeWidth", "opacity"],
+  circle: ["cx", "cy", "r", "strokeWidth", "opacity", "dash"],
   path: ["strokeWidth", "opacity"],
   text: ["x", "y", "fontSize", "opacity"],
   linearGradient: ["x1", "y1", "x2", "y2"]
@@ -47,7 +47,11 @@ export function vectorSvg(width: number, height: number, shapes: Shape[], name: 
   const body = shapes.map((s) => {
     switch (s.shape) {
       case "rect": return `<rect${a(s, { x: "x", y: "y", width: "width", height: "height", rx: "rx", fill: "fill", stroke: "stroke", strokeWidth: "stroke-width", opacity: "opacity" })}/>`;
-      case "circle": return `<circle${a(s, { cx: "cx", cy: "cy", r: "r", fill: "fill", stroke: "stroke", strokeWidth: "stroke-width", opacity: "opacity" })}/>`;
+      case "circle": {
+        // `dash` draws that share (0 to 100) of the outline, starting at the top, so a stroked circle can be a progress ring.
+        const dash = s.dash === undefined ? "" : ` pathLength="100" stroke-dasharray="${esc(Math.min(100, Math.max(0, Number(s.dash))))} 100" transform="rotate(-90 ${esc(s.cx ?? 0)} ${esc(s.cy ?? 0)})"`;
+        return `<circle${a(s, { cx: "cx", cy: "cy", r: "r", fill: "fill", stroke: "stroke", strokeWidth: "stroke-width", opacity: "opacity" })}${dash}/>`;
+      }
       case "path": return `<path${a(s, { d: "d", fill: "fill", stroke: "stroke", strokeWidth: "stroke-width", opacity: "opacity" })}/>`;
       case "text": return `<text${a(s, { x: "x", y: "y", fontSize: "font-size", fill: "fill", anchor: "text-anchor", opacity: "opacity" })}>${esc(s.text)}</text>`;
       default: {

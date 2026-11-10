@@ -79,6 +79,23 @@
               "maxLength": 120
             }
           ]
+        },
+        {
+          "type": "form",
+          "label": "Complete milestone form",
+          "submit": {
+            "label": "Complete milestone",
+            "action": "complete_milestone"
+          },
+          "fields": [
+            {
+              "name": "title",
+              "type": "text",
+              "label": "Milestone title",
+              "required": true,
+              "maxLength": 80
+            }
+          ]
         }
       ]
     }

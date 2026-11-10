@@ -1,0 +1,2 @@
+- Spec: a `circle` shape in a `vector` block takes `dash` (0 to 100) to draw part of its outline from the top, for progress rings.
+- Migration: none. Existing specs render the same.
