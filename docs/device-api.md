@@ -183,6 +183,8 @@ await phone.act("set_network_profile", { profile: "2g" });
 
 A name that is not in the table answers `unknown_profile`. Each change is added to `device_log` with `source: "simulated"`.
 
+You can also call `set_network_profile` and `get_network_profile` as MCP tools, use `phone.setNetwork("slow-4g")` in a typed test, or set `"network"` in `phone.json`. See [Network calls on the hosted phone](phone-network.md#over-mcp).
+
 ## The simulated device from the agent's side
 
 | MCP tool | Effect |
