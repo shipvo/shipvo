@@ -1,1 +1,1 @@
-- Docs: the email sign-in page gains a "session cannot see the mail" troubleshooting row and a link to network calls on the hosted phone. The record-a-demo-video example gains a troubleshooting section.
+- Docs: the email sign-in page gains a "session cannot see the mail" troubleshooting row and a link to network calls on the hosted phone. The record-a-demo-video troubleshooting table gains rows for `music_unavailable` and short videos, and two sentences are reworded.
