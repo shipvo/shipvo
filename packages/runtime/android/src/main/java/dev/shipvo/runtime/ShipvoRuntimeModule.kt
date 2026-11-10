@@ -193,7 +193,7 @@ class ShipvoRuntimeModule : Module() {
         for (i in 0 until patches.length()) { val p = patches.getJSONObject(i); if (p.getString("from_sha256") == baseSha) { match = p; break } }
         val chosen = match
         if (chosen != null) {
-          val baseSize = baseFile?.length() ?: wantSize
+          val baseSize = baseFile?.length() ?: s.embeddedSize()
           // Over the memory budget: skip the patch and take the resumable, streamed full download.
           val outcome = PatchStep.run(baseSize, chosen.getLong("size"), wantSize) {
             val patchBytes = http(resolve(s, chosen.getString("url")), null).let { c ->
@@ -204,11 +204,11 @@ class ShipvoRuntimeModule : Module() {
             val base = baseFile?.readBytes() ?: s.embeddedBundle() ?: error("no base bundle")
             val out = Patch.apply(base, patchBytes)
             require(out.size.toLong() == wantSize && Verify.sha256Hex(out) == wantSha) { "patched bundle hash mismatch" }
-            bytesDownloaded = patchBytes.size.toLong()
             out
           }
-          if (outcome.bytes != null) { tmp.writeBytes(outcome.bytes); via = "patch" }
-          else { patchError = outcome.error; bytesDownloaded = 0L; tmp.delete() }
+          val decision = PatchStep.decide(outcome, chosen.getLong("size"))
+          via = decision.via; patchError = decision.patchError; bytesDownloaded = decision.bytesDownloaded
+          if (outcome.bytes != null) tmp.writeBytes(outcome.bytes) else tmp.delete()
         }
       } catch (e: Exception) { patchError = e.message; tmp.delete() }
     }

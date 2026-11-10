@@ -33,4 +33,25 @@ class PatchStepTest {
     assertArrayEquals(byteArrayOf(1, 2), o.bytes); assertNull(o.error)
     assertTrue(PatchStep.fits(1, 1, 1, 100))
   }
+
+  @Test fun unknownBaseSizeIsSkippedAsOverBudget() {
+    var called = false
+    val o = PatchStep.run(null, 1, 1, 512 * mb) { called = true; ByteArray(1) }
+    assertFalse(called); assertEquals("over_memory_budget", o.error)
+  }
+
+  @Test fun outOfMemoryStillShipsTheFullBundleAndRecordsTheError() {
+    val d = PatchStep.decide(PatchStep.run(1 * mb, 1 * mb, 1 * mb, 512 * mb) { throw OutOfMemoryError("heap") }, 1 * mb)
+    assertEquals("full", d.via); assertEquals("out_of_memory", d.patchError); assertEquals(0L, d.bytesDownloaded)
+  }
+
+  @Test fun successfulPatchIsRecordedWithItsSize() {
+    val d = PatchStep.decide(PatchStep.run(1, 1, 1, 512 * mb) { byteArrayOf(1) }, 1234L)
+    assertEquals("patch", d.via); assertNull(d.patchError); assertEquals(1234L, d.bytesDownloaded)
+  }
+
+  @Test fun noMatchingPatchMeansFullWithoutAnError() {
+    val d = PatchStep.decide(null, 0)
+    assertEquals("full", d.via); assertNull(d.patchError)
+  }
 }
