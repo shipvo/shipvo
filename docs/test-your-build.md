@@ -90,6 +90,12 @@ A build is private to your account. A key from another account gets `build_not_f
 
 **`shipvo sim --hosted` says `no_api_key`.** The variable is set in another terminal. Export it in this one, or put it in your agent's MCP server `env`.
 
+**`upload_build` says `stdio_only`.** The hosted server cannot read files on your machine. Add the local server with `npx @shipvo/mcp` (or run `shipvo agents setup`), then ask again.
+
+**`build_not_found` for a build I just uploaded.** The key that opens the phone is not the key that uploaded the build. A build is private to one account, so use the same `SHIPVO_API_KEY` for both.
+
+**`build_expired`.** Builds are deleted after they expire. Upload again and use the new id.
+
 **The phone opens the old version of my app.** `open_app("tide")` opens the published release. Use the full `tide@build:<id>` form with the id from your latest upload.
 
 ## Next steps
