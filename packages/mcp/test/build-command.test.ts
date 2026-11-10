@@ -9,9 +9,10 @@ const flags = (file: string, re: RegExp) => {
   return m[1].replace(/\s+/g, "").split(",").map((a) => a.replace(/"/g, "")).filter((a) => a !== "next" && a !== "sim-dist").join(" ");
 };
 describe("build command", () => {
-  it("is the same in upload_build and shipvo sim", () => {
+  it("is the same in upload_build and shipvo sim", async () => {
     const mcp = flags("../src/build-upload.ts", /run\("npx", \[([^\]]*)\]/);
-    const cli = flags("../../cli/src/sim.ts", /spawnBin\("npx", \[([^\]]*)\]/);
+    const { expoExportArgs } = await import("../../cli/src/sim.ts");
+    const cli = expoExportArgs("sim-dist").slice(0, -1).join(" ");
     expect(mcp).toBe("expo export --platform web --clear --output-dir");
     expect(mcp).toBe(cli);
   });
